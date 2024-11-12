@@ -1,0 +1,13 @@
+{
+    "STUDIO_INSTALL": false,
+    "INSTALL_PATH": "",
+    "USER_FOLDER_PATH": "",
+    "LICENSE_FOLDER": "",
+    "LICENSE_FILE_NAME": "",
+    "UPDATER": false,
+    "BUG_REPORT": true,
+    "CUSTOM_TOOLS_MENU": true,
+    "CUSTOM_SCRIPTS_MENU": true,
+    "CUSTOM_TOOLS_EDITABLE_BY_USER": true,
+    "CUSTOM_SCRIPTS_EDITABLE_BY_USER": true
+}
