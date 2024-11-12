@@ -1,0 +1,31 @@
+
+        TheKeyMachine - Animation toolset for Maya Animators
+        -----------------------------------------------------------------------------------------
+        Beta v. 0.1.30
+        Build: 294 - 12 November 2024
+        Codename: Gort
+        -----------------------------------------------------------------------------------------
+
+         How to install(*):
+
+         - Unzip TheKeyMachine_installer.zip 
+         - Drag & drop TheKeyMachine_drag&drop_installer.py into the Maya viewport.
+         - You don't need to copy any files anywhere; the installer will copy the files for you.
+           Once installation finishes a toolbar should show up in the bottom area of Maya.
+
+
+
+         (*) MacOS users please follow this installation process:
+         https://thekeymachine.gitbook.io/base/getting-started/how-to-install-it/macos-install
+
+
+         For Centralized / Studio install please refer to:
+         https://thekeymachine.gitbook.io/base/getting-started/how-to-install-it/studio-install
+
+         
+
+        -----------------------------------------------------------------------------------------
+        If you need help visit:
+        https://thekeymachine.gitbook.io/base/
+        -----------------------------------------------------------------------------------------
+        
