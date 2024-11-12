@@ -11,13 +11,13 @@ It currently works with Maya versions 2022, 2023, and 2024 on Windows, Linux, an
 
 Some of the available features include:
 
-    Simple and fast installer
-    Advanced tools like Isolate, Snap, Reset, Counter, Temp Pivot, FollowCam, Anim Offset, Copy and Paste Animation, Copy and Paste World Position, advanced curve editor, customizable menus, and more
-    Selection Manager (Selection Sets)
-    Advanced sliders for Tween and Blend
-    And many others
+-Simple and fast installer
+-Advanced tools like Isolate, Snap, Reset, Counter, Temp Pivot, FollowCam, Anim Offset, Copy and Paste Animation, Copy and Paste World Position, advanced curve editor, customizable menus, and more
+-Selection Manager (Selection Sets)
+-Advanced sliders for Tween and Blend
+And many others
 
-TKM is in the beta phase and is being developed by Rodrigo Torres (rodritorres.com).
+TKM is in the beta phase and is being developed by #Rodrigo Torres (rodritorres.com).
 
 
 <img src="./TheKeyMachine/data/img/toolbar_example.png" />
