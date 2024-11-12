@@ -17,7 +17,7 @@ Some of the available features include:
 -Advanced sliders for Tween and Blend
 And many others
 
-TKM is in the beta phase and is being developed by <b>Rodrigo Torres</b> (rodritorres.com).<br><br>
+TKM is in the beta phase and is being developed by <b>Rodrigo Torres</b> (<a href="https://www.rodritorres.com">rodritorres.com</a>).<br><br>
 
 <a href="https://www.thekeymachine.xyz">TheKeyMachine.xyz</a>
 
