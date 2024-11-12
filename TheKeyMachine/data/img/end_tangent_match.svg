@@ -1,0 +1,32 @@
+<svg width="50px" height="50px" version="1.1" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+ <g transform="matrix(-.35885 .99229 -.99229 -.35885 59.02 -12.679)">
+  <g transform="matrix(-.95265 .10478 .11404 -.99815 65.607 39.853)" stroke="#ea6d81" stroke-dashoffset="4.8708" stroke-linecap="round" stroke-linejoin="bevel" stroke-width=".969">
+   <g transform="matrix(-.10679 .96784 -1.0646 -.32426 58.329 15.455)">
+    <g transform="matrix(-.53763 -.84352 .83991 -.53533 -17.527 47.198)">
+     <rect transform="matrix(.99996 .0089785 -.0046886 .99999 0 0)" x="9.6661" y="29.94" width="2.5512" height="21.073" ry=".23948" fill="#f1f1f1" stroke="#2d2d2d" stroke-width="1.4446" style="paint-order:stroke fill markers"/>
+     <rect transform="matrix(.99999 .0053279 -.0072298 .99997 0 0)" x="7.7185" y="26.301" width="6.5764" height="4.7421" ry=".19759" fill="#eaeaea" stroke="#2b2b2b" stroke-width="1.0136" style="paint-order:stroke fill markers"/>
+    </g>
+   </g>
+   <g transform="matrix(.10119 -.96954 1.0652 .31916 21.226 26.492)">
+    <g transform="matrix(-.53763 -.84352 .83991 -.53533 -17.527 47.198)" stroke-width=".9708">
+     <rect transform="matrix(.99998 .0057789 -.0067409 .99998 0 0)" x="7.5545" y="26.296" width="6.5764" height="4.7421" ry=".19759" fill="#eaeaea" stroke="#2b2b2b" stroke-width="1.0136" style="paint-order:stroke fill markers"/>
+    </g>
+   </g>
+  </g>
+ </g>
+ <g transform="matrix(-.35885 .99229 -.99229 -.35885 57.966 19.927)">
+  <g transform="matrix(-.95265 .10478 .11404 -.99815 65.607 39.853)" stroke="#ea6d81" stroke-dashoffset="4.8708" stroke-linecap="round" stroke-linejoin="bevel" stroke-width=".969">
+   <g transform="matrix(-.10679 .96784 -1.0646 -.32426 58.329 15.455)">
+    <g transform="matrix(-.53763 -.84352 .83991 -.53533 -17.527 47.198)">
+     <rect transform="matrix(.99996 .0089785 -.0046886 .99999 0 0)" x="9.6661" y="29.94" width="2.5512" height="21.073" ry=".23948" fill="#f1f1f1" stroke="#2d2d2d" stroke-width="1.4446" style="paint-order:stroke fill markers"/>
+     <rect transform="matrix(.99999 .0053279 -.0072298 .99997 0 0)" x="7.7185" y="26.301" width="6.5764" height="4.7421" ry=".19759" fill="#eaeaea" stroke="#2b2b2b" stroke-width="1.0136" style="paint-order:stroke fill markers"/>
+    </g>
+   </g>
+   <g transform="matrix(.10119 -.96954 1.0652 .31916 21.226 26.492)">
+    <g transform="matrix(-.53763 -.84352 .83991 -.53533 -17.527 47.198)" stroke-width=".9708">
+     <rect transform="matrix(.99998 .0057789 -.0067409 .99998 0 0)" x="7.5545" y="26.296" width="6.5764" height="4.7421" ry=".19759" fill="#eaeaea" stroke="#2b2b2b" stroke-width="1.0136" style="paint-order:stroke fill markers"/>
+    </g>
+   </g>
+  </g>
+ </g>
+</svg>

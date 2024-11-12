@@ -1,0 +1,7 @@
+<svg width="50px" height="50px" version="1.1" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+ <g stroke-linecap="round" stroke-linejoin="round">
+  <path d="m21.505 8.3857h-8.9263v31.496h-10.025" fill="none" stroke="#ea6d81" stroke-dashoffset="4.8708" stroke-width="4.514" style="paint-order:stroke fill markers"/>
+  <path d="m28.54 8.4182h9.1462v31.431h9.9371" fill="none" stroke="#eab56d" stroke-dashoffset=".46515" stroke-width="4.574" style="paint-order:stroke fill markers"/>
+  <rect x="21.195" y="4.5817" width="8.3927" height="7.8892" ry=".14836" fill="#f7f7f7" stroke="#222222" stroke-dashoffset=".46515" stroke-width="1.04" style="paint-order:stroke fill markers"/>
+ </g>
+</svg>
