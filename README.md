@@ -1,5 +1,5 @@
 
-<img width="30px" src="./TheKeyMachine/data/img/TheKeyMachine_logo_500.png" alt="image_name png" />
+<img width="130px" src="./TheKeyMachine/data/img/TheKeyMachine_logo_500.png" alt="image_name png" />
 
 # TheKeyMachine -Animation tool for Maya Animators
 
