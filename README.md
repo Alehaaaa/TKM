@@ -1,5 +1,5 @@
 
-<img width="500px" src="./TheKeyMachine/data/img/TheKeyMachine_logo_500.png" />
+<img width="269px" src="./TheKeyMachine/data/img/tkm_logo_small.png" />
 
 # TheKeyMachine -Animation tool for Maya Animators
 
@@ -10,3 +10,8 @@ TheKeyMachine offers advanced animation tools that significantly speed up daily 
 It currently works with Maya versions 2022, 2023, and 2024 on Windows, Linux, and macOS.
 
 TKM is in the beta phase and is being developed by Rodrigo Torres (rodritorres.com)
+
+
+<img src="./TheKeyMachine/data/img/toolbar_example.png" />
+
+<img src="./TheKeyMachine/data/img/install_example.png" />
