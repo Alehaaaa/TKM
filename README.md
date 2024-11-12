@@ -1,3 +1,6 @@
+
+![plot](./main/TheKeyMachine/data/img/TheKeyMachine_logo_500.png)
+
 # TheKeyMachine -Animation tool for Maya Animators
 
 TheKeyMachine (TKM) is a toolset specially designed for 3D animators working with Autodesk Maya.
