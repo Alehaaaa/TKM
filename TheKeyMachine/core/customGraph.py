@@ -26,11 +26,6 @@ import maya.cmds as cmds
 import maya.mel as mel
 import maya.OpenMayaUI as mui
 
-from PySide2 import QtWidgets, QtCore, QtGui
-from PySide2.QtWidgets import QApplication, QDesktopWidget
-import shiboken2
-from shiboken2 import wrapInstance
-
 import os
 import sys
 import platform
@@ -38,13 +33,25 @@ import subprocess
 import urllib.request
 import importlib
 
+# Try importing PySide2 or PySide6
+try:
+    from PySide2 import QtWidgets, QtCore, QtGui
+    from PySide2.QtWidgets import QApplication, QDesktopWidget
+    import shiboken2
+    from shiboken2 import wrapInstance
+except ImportError:
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtGui import QScreen
+    from PySide6.QtCore import QTimer
+    import shiboken6
+    from shiboken6 import wrapInstance
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
 #                                             Loading necessary modules from TheKeyMachine                                    #
 # -----------------------------------------------------------------------------------------------------------------------------
 
-    
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.keyToolsMod as keyTools
@@ -53,15 +60,15 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
 
 mods = [general,
-    ui,
-    keyTools,
-    selSets,
-    media,
-    style
-]
+        ui,
+        keyTools,
+        selSets,
+        media,
+        style]
 
 for m in mods:
     importlib.reload(m)
+
 
 
 
@@ -88,10 +95,30 @@ original_keyframes = {}
 #                                                       customGraph build                                                     #
 # -----------------------------------------------------------------------------------------------------------------------------
 
+def get_screen_resolution():
+    app = QApplication.instance()
+    if not app:
+        app = QApplication([])
+
+    try:
+        # PySide2
+        from PySide2.QtGui import QDesktopWidget
+        desktop = QDesktopWidget()
+        screen_rect = desktop.screenGeometry()
+    except ImportError:
+        # PySide6
+        screen = app.primaryScreen()
+        screen_rect = screen.geometry()
+
+    screen_width = screen_rect.width()
+    screen_height = screen_rect.height()
+    
+    return screen_width, screen_height
+
+
 def apply_base_stylesheet(button):
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
 
     if screen_width == 3840:
         button.setStyleSheet('''
@@ -144,6 +171,9 @@ def apply_base_stylesheet(button):
 
 
 
+
+
+
 def createCustomGraph():
 
     #from TheKeyMachine.core.toolbar import tkm_lic_status
@@ -161,10 +191,6 @@ def createCustomGraph():
         cmds.columnLayout("customGraph_columnLayout", adj=1, p="graphEditor1")
 
 
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
-
 
     cmds.flowLayout(wr=True, h=25, p="customGraph_columnLayout")
     separator = cmds.separator(style='none', width=5)
@@ -173,9 +199,10 @@ def createCustomGraph():
 
     #________________ Key Tools Buttons  ___________________#
 
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
+
+
 
 
     static_button = cmds.button(l='Static', c=lambda x: keyTools.deleteStaticCurves(), h=20, w=40)
@@ -1241,7 +1268,10 @@ def createCustomGraph():
             cmds.GraphEditor()
         ptr = mui.MQtUtil.findWindow('graphEditor1Window')
         if ptr is not None:
-            return shiboken2.wrapInstance(int(ptr), QtWidgets.QWidget)
+            try:
+                return shiboken2.wrapInstance(int(ptr), QtWidgets.QWidget)
+            except:
+                return shiboken6.wrapInstance(int(ptr), QtWidgets.QWidget)
         else:
             return None
 
