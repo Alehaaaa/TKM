@@ -30,15 +30,49 @@ import maya.mel as mel
 import maya.utils as utils
 import maya.OpenMayaUI as omui
 
-from PySide2 import QtWidgets
-from PySide2.QtWidgets import QApplication, QDesktopWidget
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
-from PySide2.QtCore import QTimer
-from shiboken2 import wrapInstance
+try:
+    from shiboken2 import wrapInstance
+    from PySide2 import QtWidgets
+    from PySide2.QtWidgets import QApplication, QDesktopWidget
+    from PySide2.QtCore import *
+    from PySide2.QtGui import *
+    from PySide2.QtWidgets import *
+    from PySide2.QtCore import QTimer
+except ImportError:
+    from shiboken6 import wrapInstance
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import QTimer
+    from PySide6.QtCore import *
+    from PySide6.QtGui import *
+    from PySide6.QtWidgets import *
 
-TKM_VERSION = "Beta 0.1.30 / Build 294"
+
+
+
+TKM_VERSION = "Beta 0.1.4 / Build 306"
+
+
+def get_screen_resolution():
+    app = QApplication.instance()
+    if not app:
+        app = QApplication([])
+
+    try:
+        # PySide2
+        from PySide2.QtGui import QDesktopWidget
+        desktop = QDesktopWidget()
+        screen_rect = desktop.screenGeometry()
+    except ImportError:
+        # PySide6
+        screen = app.primaryScreen()
+        screen_rect = screen.geometry()
+
+    screen_width = screen_rect.width()
+    screen_height = screen_rect.height()
+    
+    return screen_width, screen_height
+
 
 def update_maya_env():
     version_maya = cmds.about(version=True)
@@ -70,9 +104,8 @@ def onMayaDroppedPythonFile(*args):
     utils.executeDeferred(TheKeyMachine_installer)
 
 def install(button, checkbox, tkm_version, window):
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
 
     if not checkbox.isChecked():
         msg_box = QtWidgets.QMessageBox()
@@ -142,13 +175,13 @@ def maya_main_window():
     return wrapInstance(int(main_window_ptr), QtWidgets.QWidget)
 
 def TheKeyMachine_installer():
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
+
     os_platform = platform.system()
     python_version = f"{sys.version_info.major}{sys.version_info.minor}"
     supported_os = ['Windows', 'Linux', 'Darwin']
-    supported_python_versions = ['37', '39', '310']
+    supported_python_versions = ['37', '39', '310', '311']
 
     if os_platform in supported_os and python_version in supported_python_versions:
 
