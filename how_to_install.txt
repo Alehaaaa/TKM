@@ -1,9 +1,10 @@
 
         TheKeyMachine - Animation toolset for Maya Animators
         -----------------------------------------------------------------------------------------
-        Beta v. 0.1.30
-        Build: 294 - 12 November 2024
-        Codename: Gort
+        Beta v. 0.1.4
+        Build: 306 - 26 March 2025
+        Series: Gort
+	For Maya 2022, 2023, 2024, 2025
         -----------------------------------------------------------------------------------------
 
          How to install(*):
@@ -12,6 +13,7 @@
          - Drag & drop TheKeyMachine_drag&drop_installer.py into the Maya viewport.
          - You don't need to copy any files anywhere; the installer will copy the files for you.
            Once installation finishes a toolbar should show up in the bottom area of Maya.
+         - Click the padlock icon in the left side and register TheKeyMachine
 
 
 
