@@ -23,7 +23,14 @@ import maya.cmds as cmds
 import os
 import sys
 import platform 
-from PySide2.QtWidgets import QApplication, QDesktopWidget
+
+try:
+    from PySide2.QtWidgets import QApplication, QDesktopWidget
+except ImportError:
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6.QtWidgets import *
+    from PySide6.QtGui import *
+    from PySide6.QtCore import *
 
 import TheKeyMachine.mods.mediaMod as media
 
@@ -57,16 +64,44 @@ delete_animation_image = getImage("trash.png")
 
 # style ------------------------------------
 
-desktop = QDesktopWidget()
-screen_resolution = desktop.screenGeometry()
-screen_width = screen_resolution.width()
+def get_screen_resolution():
+    app = QApplication.instance()
+    if not app:
+        app = QApplication([])
 
-if screen_width == 3840:
-    font_size_enun ="25px"
-    font_size ="18px"
-else:
-    font_size_enun ="20px"
-    font_size ="12px"
+    try:
+        # PySide2
+        from PySide2.QtGui import QDesktopWidget
+        desktop = QDesktopWidget()
+        screen_rect = desktop.availableGeometry()
+    except ImportError:
+        # PySide6
+        screen = app.primaryScreen()
+        screen_rect = screen.availableGeometry()
+
+    screen_width = screen_rect.width()
+    screen_height = screen_rect.height()
+    
+    return screen_width, screen_height
+
+
+def get_font_sizes():
+    screen_width, screen_height = get_screen_resolution()
+
+    if screen_width == 3840:
+        font_size_enun = "25px"
+        font_size = "18px"
+    else:
+        font_size_enun = "20px"
+        font_size = "12px"
+
+    return font_size_enun, font_size
+
+
+font_size_enun, font_size = get_font_sizes()
+
+
+
 
 # ----------------------------------------------  TOOLTIPS  --------------------------------------------------------
 

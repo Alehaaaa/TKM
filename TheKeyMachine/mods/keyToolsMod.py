@@ -26,13 +26,25 @@
 import maya.cmds as cmds
 import maya.mel as mel
 import maya.OpenMaya as om
+import maya.OpenMayaUI as mui
 
-from PySide2 import QtWidgets, QtCore
-from PySide2.QtWidgets import QApplication, QDesktopWidget
-from PySide2 import QtWidgets
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
+try:
+    from shiboken2 import wrapInstance
+    from PySide2 import QtWidgets, QtCore
+    from PySide2.QtWidgets import QApplication, QDesktopWidget
+    from PySide2 import QtWidgets
+    from PySide2.QtCore import *
+    from PySide2.QtGui import *
+    from PySide2.QtWidgets import *
+    from PySide2.QtGui import QRegExpValidator
+    from PySide2.QtCore import QRegExp
+except ImportError:
+    from shiboken6 import wrapInstance
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6.QtWidgets import *
+    from PySide6.QtGui import *
+    from PySide6.QtCore import *
+
 
 import json
 import os
@@ -63,6 +75,25 @@ import TheKeyMachine.mods.selSetsMod as selSets
 
 # _____________________________________________________ General _______________________________________________________________#
 
+def get_screen_resolution():
+    app = QApplication.instance()
+    if not app:
+        app = QApplication([])
+
+    try:
+        # PySide2
+        from PySide2.QtGui import QDesktopWidget
+        desktop = QDesktopWidget()
+        screen_rect = desktop.screenGeometry()
+    except ImportError:
+        # PySide6
+        screen = app.primaryScreen()
+        screen_rect = screen.geometry()
+
+    screen_width = screen_rect.width()
+    screen_height = screen_rect.height()
+    
+    return screen_width, screen_height
 
 
 
@@ -643,11 +674,10 @@ def reblock_insert(*args):
 
 
 
-import maya.OpenMayaUI as mui
-from PySide2 import QtWidgets, QtCore
-from shiboken2 import wrapInstance
-from PySide2.QtGui import QRegExpValidator
-from PySide2.QtCore import QRegExp
+#import maya.OpenMayaUI as mui
+#from PySide2 import QtWidgets, QtCore
+#from shiboken2 import wrapInstance
+
 
 def bake_animation(bake_interval=1, window=None):
 
@@ -699,9 +729,8 @@ def bake_animation(bake_interval=1, window=None):
         window.close()
 
 def bake_anim_window(*args):
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
 
     # Variables para implementar el drag
     drag = {"active": False, "position": QtCore.QPoint()}
@@ -787,8 +816,30 @@ def bake_anim_window(*args):
     bake_interval_line_edit.setStyleSheet("background-color: #282828; color: #ccc; border-radius: 5px; padding: 5px; border: none;")
     bake_interval_line_edit.setFixedSize(40, 30)
     # Limitar la entrada a dos dígitos numéricos
-    reg_ex = QRegExp("^[0-9]{1,2}$")
-    input_validator = QRegExpValidator(reg_ex, bake_interval_line_edit)
+
+    try:
+        from PySide6.QtCore import QRegularExpression
+        from PySide6.QtGui import QRegularExpressionValidator
+
+        def create_regex(pattern):
+            return QRegularExpression(pattern)
+
+        def create_validator(pattern, parent=None):
+            return QRegularExpressionValidator(QRegularExpression(pattern), parent)
+    except ImportError:
+        from PySide2.QtCore import QRegExp
+        from PySide2.QtGui import QRegExpValidator
+
+        def create_regex(pattern):
+            return QRegExp(pattern)
+
+        def create_validator(pattern, parent=None):
+            return QRegExpValidator(QRegExp(pattern), parent)
+
+
+
+    reg_ex = create_regex("^[0-9]{1,2}$")
+    input_validator = create_validator("^[0-9]{1,2}$", bake_interval_line_edit)
     bake_interval_line_edit.setValidator(input_validator)
 
 

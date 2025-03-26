@@ -26,14 +26,26 @@ import maya.mel as mel
 import maya.OpenMaya as om
 import maya.OpenMayaUI as mui
 
-from shiboken2 import wrapInstance
-from PySide2 import QtWidgets, QtGui, QtCore
-from PySide2.QtWidgets import QApplication, QDesktopWidget
-from PySide2 import QtWidgets
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
-from PySide2.QtCore import QTimer
+try:
+    from shiboken2 import wrapInstance
+    from PySide2 import QtWidgets, QtGui, QtCore
+    from PySide2.QtWidgets import QApplication, QDesktopWidget
+    from PySide2 import QtWidgets
+    from PySide2.QtCore import *
+    from PySide2.QtGui import *
+    from PySide2.QtWidgets import *
+    from PySide2.QtCore import QTimer
+    from PySide2.QtWidgets import QAction
+except ImportError:
+    from shiboken6 import wrapInstance
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtGui import QScreen, QPixmap
+    from PySide6.QtCore import QTimer
+    from PySide6.QtGui import QAction
+
+
+
 
 import json
 import ssl
@@ -100,7 +112,25 @@ def getUiName():
     print(getUi)
 
 
+def get_screen_resolution():
+    app = QApplication.instance()
+    if not app:
+        app = QApplication([])
 
+    try:
+        # PySide2
+        from PySide2.QtGui import QDesktopWidget
+        desktop = QDesktopWidget()
+        screen_rect = desktop.screenGeometry()
+    except ImportError:
+        # PySide6
+        screen = app.primaryScreen()
+        screen_rect = screen.geometry()
+
+    screen_width = screen_rect.width()
+    screen_height = screen_rect.height()
+    
+    return screen_width, screen_height
 
 
 # ________________________________________________ Sync  ______________________________________________________ #
@@ -338,7 +368,7 @@ def ejecutar_accion(identificador):
     elif identificador == "reset_objects_mods":
         keyTools.reset_objects_mods()
     elif identificador == "deleteAnimation":
-        bar.deleteAnimation()
+        bar.mod_delete_animation()
     elif identificador == "selectOpposite":
         keyTools.selectOpposite()
     elif identificador == "copyOpposite":
@@ -435,9 +465,8 @@ class CustomButton(QtWidgets.QPushButton):
         self.window = window
         self.button_id = button_id
 
-        desktop = QDesktopWidget()
-        screen_resolution = desktop.screenGeometry()
-        screen_width = screen_resolution.width()
+        screen_width, screen_height = get_screen_resolution()
+        screen_width = screen_width
 
         if screen_width == 3840:
             self.setIconSize(QtCore.QSize(45, 45))
@@ -454,25 +483,25 @@ class CustomButton(QtWidgets.QPushButton):
         menu = QtWidgets.QMenu()
 
         # Crear acciones con íconos
-        action1 = QtWidgets.QAction(QtGui.QIcon(media.isolate_image), "Isolate", self)
-        action2 = QtWidgets.QAction(QtGui.QIcon(media.aling_menu_image), "Align", self)
-        action3 = QtWidgets.QAction(QtGui.QIcon(media.tracer_menu_image), "Tracer", self)
-        action4 = QtWidgets.QAction(QtGui.QIcon(media.reset_animation_image), "Reset Values", self)
-        action5 = QtWidgets.QAction(QtGui.QIcon(media.delete_animation_image), "Delete Animation", self)
-        action6 = QtWidgets.QAction(QtGui.QIcon(media.select_opposite_image), "Select Opposite", self)
-        action7 = QtWidgets.QAction(QtGui.QIcon(media.copy_opposite_image), "Copy Opposite", self)
-        action8 = QtWidgets.QAction(QtGui.QIcon(media.mirror_image), "Mirror", self)
-        action9 = QtWidgets.QAction(QtGui.QIcon(media.copy_paste_animation_image), "Copy Animation", self)
-        action10 = QtWidgets.QAction(QtGui.QIcon(media.paste_animation_image), "Paste Animation", self)
-        action11 = QtWidgets.QAction(QtGui.QIcon(media.paste_insert_animation_image), "Paste Insert Animation", self)
-        action12 = QtWidgets.QAction(QtGui.QIcon(media.copy_pose_image), "Copy Pose", self)
-        action13 = QtWidgets.QAction(QtGui.QIcon(media.paste_pose_image), "Paste Pose", self)
-        action14 = QtWidgets.QAction(QtGui.QIcon(media.select_hierarchy_image), "Select Hierarchy", self)
-        action15 = QtWidgets.QAction(QtGui.QIcon(media.link_objects_image), "Copy/Paste Link", self)
-        action16 = QtWidgets.QAction(QtGui.QIcon(media.temp_pivot_image), "Temp Pivot", self)
-        action17 = QtWidgets.QAction(QtGui.QIcon(media.copy_worldspace_frame_animation_image), "Copy Worldspace Current Frame", self)
-        action18 = QtWidgets.QAction(QtGui.QIcon(media.paste_worldspace_frame_animation_image), "Paste Worldspace Current Frame", self)
-        action_opacity = QtWidgets.QAction("Toggle Dynamic Opacity", self)
+        action1 = QAction(QtGui.QIcon(media.isolate_image), "Isolate", self)
+        action2 = QAction(QtGui.QIcon(media.aling_menu_image), "Align", self)
+        action3 = QAction(QtGui.QIcon(media.tracer_menu_image), "Tracer", self)
+        action4 = QAction(QtGui.QIcon(media.reset_animation_image), "Reset Values", self)
+        action5 = QAction(QtGui.QIcon(media.delete_animation_image), "Delete Animation", self)
+        action6 = QAction(QtGui.QIcon(media.select_opposite_image), "Select Opposite", self)
+        action7 = QAction(QtGui.QIcon(media.copy_opposite_image), "Copy Opposite", self)
+        action8 = QAction(QtGui.QIcon(media.mirror_image), "Mirror", self)
+        action9 = QAction(QtGui.QIcon(media.copy_paste_animation_image), "Copy Animation", self)
+        action10 = QAction(QtGui.QIcon(media.paste_animation_image), "Paste Animation", self)
+        action11 = QAction(QtGui.QIcon(media.paste_insert_animation_image), "Paste Insert Animation", self)
+        action12 = QAction(QtGui.QIcon(media.copy_pose_image), "Copy Pose", self)
+        action13 = QAction(QtGui.QIcon(media.paste_pose_image), "Paste Pose", self)
+        action14 = QAction(QtGui.QIcon(media.select_hierarchy_image), "Select Hierarchy", self)
+        action15 = QAction(QtGui.QIcon(media.link_objects_image), "Copy/Paste Link", self)
+        action16 = QAction(QtGui.QIcon(media.temp_pivot_image), "Temp Pivot", self)
+        action17 = QAction(QtGui.QIcon(media.copy_worldspace_frame_animation_image), "Copy Worldspace Current Frame", self)
+        action18 = QAction(QtGui.QIcon(media.paste_worldspace_frame_animation_image), "Paste Worldspace Current Frame", self)
+        action_opacity = QAction("Toggle Dynamic Opacity", self)
         
         menu.addAction(action1)
         menu.addAction(action2)
@@ -566,9 +595,8 @@ class CustomButton(QtWidgets.QPushButton):
 
 def orbit_window(*args, offset_x=0, offset_y=0):
 
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
 
     global dynamic_opacity
     dynamic_opacity = False 
@@ -732,9 +760,8 @@ def orbit_window_close():
 
 def donate_window():
 
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
 
     if cmds.window("tkm_donate_window", exists=True):
         cmds.deleteUI("tkm_donate_window")
@@ -808,9 +835,21 @@ def donate_window():
     image_label = QtWidgets.QLabel()
     image_label.setAlignment(QtCore.Qt.AlignCenter)
     layout.addWidget(image_label, 0, QtCore.Qt.AlignHCenter)
-    about_image = ui.getImage(image="stripe.png")
-    image_label.setPixmap(about_image)
-    image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+
+    #fix pyside6
+    try:
+        about_image = ui.getImage(image="stripe.png")
+        image_label.setPixmap(about_image)
+        image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+    except:
+
+        # Cargar la imagen como QPixmap
+        about_image = ui.getImage(image="stripe.png")
+        set_about_image = QPixmap(about_image)
+        image_label.setPixmap(set_about_image)
+        image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+
+
 
     TheKeyMachine_version = general.get_thekeymachine_version()
     TheKeyMachine_build_version = general.get_thekeymachine_build_version()
@@ -861,9 +900,8 @@ def donate_window():
 
 def about_window():
 
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
 
     if cmds.window("tkm_about_window", exists=True):
         cmds.deleteUI("tkm_about_window")
@@ -933,13 +971,24 @@ def about_window():
     header_layout.addWidget(close_button)
     layout.addLayout(header_layout)
 
+
     # Código para mostrar la imagen
     image_label = QtWidgets.QLabel()
     image_label.setAlignment(QtCore.Qt.AlignCenter)
     layout.addWidget(image_label, 0, QtCore.Qt.AlignHCenter)
-    about_image = ui.getImage(image="TheKeyMachine_logo_250.png")
-    image_label.setPixmap(about_image)
-    image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+    
+    #fix pyside6
+    try:
+        about_image = ui.getImage(image="TheKeyMachine_logo_250.png")
+        image_label.setPixmap(about_image)
+        image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+    except:
+
+        # Cargar la imagen como QPixmap
+        about_image = ui.getImage(image="TheKeyMachine_logo_250.png")
+        set_about_image = QPixmap(about_image)
+        image_label.setPixmap(set_about_image)
+        image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
 
     TheKeyMachine_version = general.get_thekeymachine_version()
     TheKeyMachine_build_version = general.get_thekeymachine_build_version()
@@ -1067,9 +1116,8 @@ def validate_form(name, explanation):
     return True
 
 def bug_report_window(*args):
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
 
     # Variables para implementar el drag
     drag = {"active": False, "position": QtCore.QPoint()}

@@ -26,9 +26,16 @@ import maya.api.OpenMaya as om
 import maya.OpenMayaUI as mui
 import maya.mel as mel
 
-from PySide2 import QtCore, QtWidgets, QtGui
-from PySide2.QtWidgets import QApplication, QDesktopWidget
-from shiboken2 import wrapInstance
+try:
+    from PySide2 import QtCore, QtWidgets, QtGui
+    from PySide2.QtWidgets import QApplication, QDesktopWidget
+    from shiboken2 import wrapInstance
+except ImportError:
+    from shiboken6 import wrapInstance
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6.QtWidgets import *
+    from PySide6.QtGui import *
+    from PySide6.QtCore import *
 
 
 import json
@@ -53,17 +60,6 @@ python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 
 
 
-# OBSOLETED
-
-def checkl(func):
-    def wrapper(*args, **kwargs):
-        print("")
-    return wrapper
-
-
-# ------------------------------------------------------------------------
-
-
 
 global down_one_level
 down_one_level_var = False
@@ -72,6 +68,27 @@ down_one_level_var = False
 original_bg_color = None
 original_fg_color = None
 original_key_color = None
+
+
+def get_screen_resolution():
+    app = QApplication.instance()
+    if not app:
+        app = QApplication([])
+
+    try:
+        # PySide2
+        from PySide2.QtGui import QDesktopWidget
+        desktop = QDesktopWidget()
+        screen_rect = desktop.screenGeometry()
+    except ImportError:
+        # PySide6
+        screen = app.primaryScreen()
+        screen_rect = screen.geometry()
+
+    screen_width = screen_rect.width()
+    screen_height = screen_rect.height()
+    
+    return screen_width, screen_height
 
 
 
@@ -440,25 +457,25 @@ def isolate_master():
 
             # Fix para activar y desactivar el icono de maya del isolate
             if currentPanel == "modelPanel1":
-                if maya_version == "2024":
+                if maya_version == "2024" or maya_version == "2025":
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn", edit=True, value=True)
                 else:
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout25|IsolateSelectedBtn", edit=True, value=True)
 
             elif currentPanel == "modelPanel2":
-                if maya_version == "2024":
+                if maya_version == "2024" or maya_version == "2025":
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn", edit=True, value=True)
                 else:
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout32|IsolateSelectedBtn", edit=True, value=True)
 
             elif currentPanel == "modelPanel3":
-                if maya_version == "2024":
+                if maya_version == "2024" or maya_version == "2025":
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn", edit=True, value=True)
                 else:
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout39|IsolateSelectedBtn", edit=True, value=True)
 
             elif currentPanel == "modelPanel4":
-                if maya_version == "2024":
+                if maya_version == "2024" or maya_version == "2025":
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn", edit=True, value=True)
                 else:
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout46|IsolateSelectedBtn", edit=True, value=True)
@@ -471,25 +488,25 @@ def isolate_master():
 
              # Fix para activar y desactivar el icono de maya del isolate
             if currentPanel == "modelPanel1":
-                if maya_version == "2024":
+                if maya_version == "2024" or maya_version == "2025":
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn", edit=True, value=False)
                 else:
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout25|IsolateSelectedBtn", edit=True, value=False)
 
             elif currentPanel == "modelPanel2":
-                if maya_version == "2024":
+                if maya_version == "2024" or maya_version == "2025":
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn", edit=True, value=False)
                 else:
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout32|IsolateSelectedBtn", edit=True, value=False)
 
             elif currentPanel == "modelPanel3":
-                if maya_version == "2024":
+                if maya_version == "2024" or maya_version == "2025":
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn", edit=True, value=False)
                 else:
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout39|IsolateSelectedBtn", edit=True, value=False)
 
             elif currentPanel == "modelPanel4":
-                if maya_version == "2024":
+                if maya_version == "2024" or maya_version == "2025":
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn", edit=True, value=False)
                 else:
                     cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout46|IsolateSelectedBtn", edit=True, value=False)
@@ -1060,13 +1077,12 @@ def paste_worldspace_single_frame(*args):
 
 
 
+
 def paste_worldspace_animation(*args):
-    
     original_time = cmds.currentTime(query=True)
 
     # Rutas
     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
-    worldspace_anim_data_folder = general.get_copy_worldspace_data_folder()
 
     if not os.path.exists(worldspace_anim_data_file):
         print("No worldspace animation data found.")
@@ -1075,58 +1091,48 @@ def paste_worldspace_animation(*args):
     with open(worldspace_anim_data_file, 'r') as json_file:
         animation_data = json.load(json_file)
 
-    # Seleccionar objetos antes de pegar la animación
-    object_names = list(animation_data.keys())
+    # Filtrar solo objetos existentes en la escena
+    existing_objects = {obj: data for obj, data in animation_data.items() if cmds.objExists(obj)}
 
-    # Eliminar la animación de los canales de translación y rotación de los objetos
-    for obj in object_names:
-        if cmds.objExists(obj):
-            cmds.cutKey(obj, attribute=['tx', 'ty', 'tz', 'rx', 'ry', 'rz'])
+    if not existing_objects:
+        cmds.warning("No valid objects found in the scene. Animation paste aborted.")
+        return
 
-    # Optimizar el proceso de pegado al iterar sobre los frames en los que hay que pegar
-    all_frames = set()
-    for obj_data in animation_data.values():
-        all_frames.update(obj_data.keys())
+    # Eliminar animación previa de los objetos existentes
+    for obj in existing_objects.keys():
+        cmds.cutKey(obj, attribute=['tx', 'ty', 'tz', 'rx', 'ry', 'rz'])
 
-    all_frames = sorted(list(all_frames), key=int)
+    # Obtener todos los frames únicos donde hay animación
+    all_frames = sorted(set(frame for obj_data in existing_objects.values() for frame in obj_data.keys()), key=int)
 
     # Suspender la actualización de la vista
     cmds.refresh(suspend=True)
 
-    # Crear una barra de progreso
+    # Crear barra de progreso
     gMainProgressBar = mel.eval('$tmp = $gMainProgressBar')
-    total_frames = len(all_frames)
-    cmds.progressBar(gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status='Pasting worldspace animation...', maxValue=total_frames)
+    cmds.progressBar(gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status='Pasting worldspace animation...', maxValue=len(all_frames))
 
     try:
         for frame in all_frames:
-            # Actualizar la barra de progreso
             cmds.progressBar(gMainProgressBar, edit=True, step=1)
-
-            # Verificar si el proceso fue interrumpido por el usuario
             if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
                 break
 
             cmds.currentTime(frame)
-            for obj, obj_data in animation_data.items():
+            for obj, obj_data in existing_objects.items():
                 if frame in obj_data:
                     values = obj_data[frame]
-                    if cmds.objExists(obj):
-                        cmds.xform(obj, translation=values[:3], worldSpace=True)
-                        cmds.xform(obj, rotation=values[3:], worldSpace=True)
-                        cmds.setKeyframe(obj)
-                    else:
-                        print(f"Object {obj} not found in the scene.")
+                    cmds.xform(obj, translation=values[:3], worldSpace=True)
+                    cmds.xform(obj, rotation=values[3:], worldSpace=True)
+                    cmds.setKeyframe(obj)
 
     finally:
-        # aplica euler filter
-        cmds.filterCurve(object_names)
-
-        # Restaurar la actualización de la vista y cerrar la barra de progreso
+        cmds.filterCurve(list(existing_objects.keys()))  # Filtrar solo los objetos válidos
         cmds.refresh(suspend=False)
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
         cmds.currentTime(original_time)
-        cmds.warning("Worldspace animation restored")
+        cmds.warning("Worldspace animation restored successfully")
+
 
 
 
@@ -1905,9 +1911,8 @@ def convert_rotation_order(rot_order='zxy'):
 
 def gimbal_fixer_build():
 
-    desktop = QDesktopWidget()
-    screen_resolution = desktop.screenGeometry()
-    screen_width = screen_resolution.width()
+    screen_width, screen_height = get_screen_resolution()
+    screen_width = screen_width
     
     # 4K fix
     if screen_width == 3840:

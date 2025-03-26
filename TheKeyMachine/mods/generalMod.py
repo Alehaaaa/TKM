@@ -26,13 +26,18 @@ from maya import OpenMayaUI as omui
 from maya.api import OpenMaya as om
 
 
-
-from shiboken2 import wrapInstance
-from PySide2.QtGui import QIcon
-from PySide2.QtGui import QPixmap
-from PySide2.QtWidgets import QWidget
-from PySide2.QtWidgets import *
-from PySide2 import QtWidgets
+try:
+    from shiboken2 import wrapInstance
+    from PySide2.QtGui import QIcon
+    from PySide2.QtGui import QPixmap
+    from PySide2.QtWidgets import QWidget
+    from PySide2.QtWidgets import *
+    from PySide2 import QtWidgets
+except ImportError:
+    from shiboken6 import wrapInstance
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import QTimer
 
 import json
 import os
@@ -97,11 +102,11 @@ USER_FOLDER_PATH = config["USER_FOLDER_PATH"]
 # ------------------------------------------------------------------------
 
 def get_thekeymachine_version():
-    thekeymachine_version = "0.1.3"
+    thekeymachine_version = "0.1.4"
     return thekeymachine_version
 
 def get_thekeymachine_build_version():
-    thekeymachine_build_version = "294"
+    thekeymachine_build_version = "306"
     return thekeymachine_build_version
 
 def get_thekeymachine_codename():
