@@ -7,7 +7,7 @@ TheKeyMachine (TKM) is a open source toolset specially designed for 3D animators
 
 TheKeyMachine offers advanced animation tools that significantly speed up daily tasks and workflows for animators.
 
-It currently works with Maya versions 2022, 2023, and 2024 on Windows, Linux, and macOS.
+It currently works with Maya versions 2022, 2023, 2024 and 2025 on Windows, Linux, and macOS.
 
 Some of the available features include:
 
