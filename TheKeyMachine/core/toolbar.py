@@ -1905,52 +1905,105 @@ class toolbar(object):
 
 
 
+
     def adjust_keyframes(self):
+
+        def _as_scalar(value):
+            v = value
+            # Desanidar listas/tuplas de longitud 1: [[x]] -> [x] -> x
+            while isinstance(v, (list, tuple)) and len(v) == 1:
+                v = v[0]
+            # Si sigue siendo lista/tupla (double3, matrices...), no es escalar
+            if isinstance(v, (list, tuple)):
+                return None, False
+            return v, True
+
+
 
         global animation_offset_original_values
 
-        # Obtener el rango de tiempo seleccionado en el Range Slider
+        # Range del Time Slider
         aTimeSlider = mel.eval('$tmpVar=$gPlayBackSlider')
         timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
-
-        # Si no se selecciona un rango, utilizar todo el rango de la línea de tiempo
         if timeRange[1] - timeRange[0] == 1:
-            timeRange = [cmds.playbackOptions(q=True, minTime=True), cmds.playbackOptions(q=True, maxTime=True)]
+            timeRange = [
+                cmds.playbackOptions(q=True, minTime=True),
+                cmds.playbackOptions(q=True, maxTime=True),
+            ]
 
         selected_objects = cmds.ls(selection=True)
 
         for obj in selected_objects:
-            attrs = cmds.listAttr(obj, keyable=True)
-            if attrs:
-                for attr in attrs:
-                    attr_full_name = obj + '.' + attr
-                    if cmds.getAttr(attr_full_name, settable=True):
-                        keyframes = cmds.keyframe(obj, attribute=attr, query=True)
-                        if keyframes:
-                            for frame in keyframes:
-                                if timeRange[0] <= frame <= timeRange[1]:
-                                    current_value = cmds.getAttr(attr_full_name, time=frame)
-                                    original_value = self.animation_offset_original_values[obj][attr].get(frame)
-                                    if original_value is not None:  # Ensure the original value was stored
-                                        diff = current_value - original_value
-                                        if diff != 0:
-                                            for frame_to_update in keyframes:
-                                                if timeRange[0] <= frame_to_update <= timeRange[1]:
-                                                    original_value_to_update = self.animation_offset_original_values[obj][attr].get(frame_to_update)
-                                                    if original_value_to_update is not None:  # Ensure the original value was stored
-                                                        cmds.setKeyframe(obj, attribute=attr, time=frame_to_update, value=original_value_to_update + diff)
+            # SOLO escalares para evitar double3
+            attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
+            for attr in attrs:
+                attr_full_name = obj + '.' + attr
 
+                # salta bloqueados/no seteables y tipos no numéricos
+                if not cmds.getAttr(attr_full_name, settable=True) or cmds.getAttr(attr_full_name, lock=True):
+                    continue
+                a_type = cmds.getAttr(attr_full_name, type=True)
+                if a_type in ('enum', 'string', 'message'):
+                    continue
 
+                keyframes = cmds.keyframe(obj, attribute=attr, query=True)
+                if not keyframes:
+                    continue
 
+                for frame in keyframes:
+                    if not (timeRange[0] <= frame <= timeRange[1]):
+                        continue
 
+                    # valores actual y original
+                    cur_raw = cmds.getAttr(attr_full_name, time=frame)
+                    current_value, ok_cur = _as_scalar(cur_raw)
+
+                    original_value = (
+                        self.animation_offset_original_values
+                        .get(obj, {})
+                        .get(attr, {})
+                        .get(frame)
+                    )
+
+                    if original_value is not None:
+                        original_value, ok_org = _as_scalar(original_value)
+                    else:
+                        ok_org = False
+
+                    if not (ok_cur and ok_org):
+                        # si alguno no es escalar, ignora este par (evita restar listas)
+                        continue
+
+                    diff = current_value - original_value
+                    if diff == 0:
+                        continue
+
+                    # aplica offset a todas las keys del rango
+                    for frame_to_update in keyframes:
+                        if not (timeRange[0] <= frame_to_update <= timeRange[1]):
+                            continue
+
+                        orig_update = (
+                            self.animation_offset_original_values
+                            .get(obj, {})
+                            .get(attr, {})
+                            .get(frame_to_update)
+                        )
+                        if orig_update is None:
+                            continue
+
+                        orig_update, ok_upd = _as_scalar(orig_update)
+                        if not ok_upd:
+                            continue
+
+                        cmds.setKeyframe(obj, attribute=attr, time=frame_to_update,
+                                         value=orig_update + diff)
 
     def offset_animation_deferred(self, interval):
-
         def adjust_offset_animation():
-
             self.adjust_keyframes()
 
-        while self.anim_offset_run_timer: 
+        while self.anim_offset_run_timer:
             time.sleep(interval)
             utils.executeDeferred(adjust_offset_animation)
 
@@ -3660,6 +3713,7 @@ class toolbar(object):
         cmds.menuItem(l="Paste Animation", c=keyTools.paste_animation, image=media.paste_animation_image, p=copy_paste_animation_popup_menu)
         cmds.menuItem(l="Paste Insert", c=keyTools.paste_insert_animation, image=media.paste_insert_animation_image, p=copy_paste_animation_popup_menu)
         cmds.menuItem(l="Paste Opposite", c=keyTools.paste_opposite_animation, image=media.paste_opposite_animation_image, p=copy_paste_animation_popup_menu)
+        cmds.menuItem(l="Paste To", c=lambda *_: keyTools.paste_animation_to(), image=media.paste_animation_image, p=copy_paste_animation_popup_menu)
         cmds.menuItem(divider=True, parent=copy_paste_animation_popup_menu)
         cmds.menuItem(l="Copy Pose", c=keyTools.copy_pose, image=media.copy_pose_image, p=copy_paste_animation_popup_menu)
         cmds.menuItem(l="Paste Pose", c=keyTools.paste_pose, image=media.paste_pose_image, p=copy_paste_animation_popup_menu)
