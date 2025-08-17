@@ -1264,48 +1264,86 @@ def cache_keyframe_data(objs):
 # Esta es la funcion para el modo Blend normal
 
 def blend_to_key(percentage, objs=None, selection=True):
+
     global is_dragging, frame_data_cache, is_cached, last_autokey_time, autokey_interval
 
+    try:
+        if not is_dragging:
+            cmds.undoInfo(openChunk=True)
+            is_dragging = True
 
-    if not is_dragging:
-        cmds.undoInfo(openChunk=True)
-        is_dragging = True
+        if objs is None and selection:
+            objs = cmds.ls(selection=True)
 
-    if objs is None and selection:
-        objs = cmds.ls(selection=True)
+        if not objs:
+            return
 
-    if not objs:
+        if not is_cached:
+
+            frame_data_cache = cache_keyframe_data(objs)
+            is_cached = True
+
+        currentTime = cmds.currentTime(query=True)  
+
+        for obj in objs:
+            # Sólo atributos escalares keyables (evita double3 compuestos como rotate/translate)
+            attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
+
+            for attr in attrs:
+                attrFull = f"{obj}.{attr}"
+
+                # salta si no existe en la caché
+                if attrFull not in frame_data_cache:
+                    continue
+
+                # salta si está bloqueado o no es seteable
+                if cmds.getAttr(attrFull, lock=True) or not cmds.getAttr(attrFull, settable=True):
+                    continue
+
+                # salta tipos no numéricos
+                a_type = cmds.getAttr(attrFull, type=True)
+                if a_type in ("enum", "string", "message"):
+                    continue
+
+                cachedData = frame_data_cache[attrFull]
+
+                # nombres tal cual en tu cache: "original_value", "previousValue", "nextValue"
+                orig = cachedData.get("original_value")
+                nxt  = cachedData.get("nextValue")
+                prev = cachedData.get("previousValue")
+
+                # si por cualquier motivo llega lista/tupla, pasa
+                if any(isinstance(v, (list, tuple)) for v in (orig, nxt, prev) if v is not None):
+                    continue
+
+                # también salta si orig no es número
+                if not isinstance(orig, (int, float)):
+                    continue
+
+                if nxt is not None and isinstance(nxt, (int, float)) and percentage > 0:
+                    difference = nxt - orig
+                elif prev is not None and isinstance(prev, (int, float)):
+                    difference = orig - prev
+                else:
+                    continue
+
+                weightedDifference = (difference * abs(percentage)) / 50.0
+                currentValue = orig + weightedDifference if percentage > 0 else orig - weightedDifference
+
+                try:
+                    cmds.setAttr(attrFull, float(currentValue))
+                except Exception:
+                    # por si un attr acepta sólo enteros o tiene límites
+                    try:
+                        cmds.setAttr(attrFull, int(round(currentValue)))
+                    except Exception:
+                        continue
+
+    finally:
+        # cierra el chunk de undo si se abrió
         if is_dragging:
             cmds.undoInfo(closeChunk=True)
             is_dragging = False
-        return
-
-    if not is_cached:
-        frame_data_cache = cache_keyframe_data(objs)
-        is_cached = True
-
-    currentTime = cmds.currentTime(query=True)
-
-    for obj in objs:
-        attrs = cmds.listAttr(obj, keyable=True) or []
-
-        for attr in attrs:
-            attrFull = f'{obj}.{attr}'
-            if attrFull not in frame_data_cache:
-                continue
-
-            cachedData = frame_data_cache[attrFull]
-            if cachedData["nextValue"] is not None and percentage > 0:
-                difference = cachedData["nextValue"] - cachedData["original_value"]
-            elif cachedData["previousValue"] is not None:
-                difference = cachedData["original_value"] - cachedData["previousValue"]
-            else:
-                continue
-
-            weightedDifference = (difference * abs(percentage)) / 50.0
-            currentValue = cachedData["original_value"] + weightedDifference if percentage > 0 else cachedData["original_value"] - weightedDifference
-
-            cmds.setAttr(attrFull, currentValue)
 
 
 
@@ -1506,7 +1544,7 @@ def tween(percentage, slider_name="bar_tween_slider"):
     if not tween_frame_data_cache:
         tween_frame_data_cache = prepare_tween_data()
 
-    # Puntos de "resistencia" al 100% y 0%
+    # puntos de "resistencia" al 100% y 0%
     resistance_points = [(100.0, 4.5), (0.0, 4.5)]
     for resistance_point, resistance_range in resistance_points:
         if resistance_point - resistance_range <= percentage <= resistance_point + resistance_range:
@@ -1521,13 +1559,36 @@ def tween(percentage, slider_name="bar_tween_slider"):
     currentTime = cmds.currentTime(query=True)
     adjustments = []
 
-    # Lógica de interpolación usando tween_frame_data_cache
     for attrFull, cache in tween_frame_data_cache.items():
         if not cache.get("needsCalculation", False):
             continue
 
-        previousValue = cache["previousValue"]
-        nextValue = cache["nextValue"]
+        # salta attrs inexistentes/bloqueados/no seteables/no numéricos
+        try:
+            if not cmds.objExists(attrFull):
+                continue
+            if cmds.getAttr(attrFull, lock=True) or not cmds.getAttr(attrFull, settable=True):
+                continue
+            a_type = cmds.getAttr(attrFull, type=True)
+            if a_type in ("enum", "string", "message"):
+                continue
+        except Exception:
+            continue
+
+        previousValue = cache.get("previousValue")
+        nextValue = cache.get("nextValue")
+
+        # sin valores válidos, nada que hacer
+        if previousValue is None or nextValue is None:
+            continue
+
+        # evita restar listas/tuplas (double3, matrices, etc.)
+        if isinstance(previousValue, (list, tuple)) or isinstance(nextValue, (list, tuple)):
+            continue
+
+        # exige número escalar
+        if not isinstance(previousValue, (int, float)) or not isinstance(nextValue, (int, float)):
+            continue
 
         difference = nextValue - previousValue
         weightedDifference = (difference * percentage) / 100.0
@@ -1535,8 +1596,9 @@ def tween(percentage, slider_name="bar_tween_slider"):
 
         adjustments.append((attrFull, currentValue))
 
-    # Aplicar ajustes
+    # aplicar ajustes (tu función existente)
     apply_tween_adjustments(adjustments, currentTime, tween_frame_data_cache)
+    
 
 def apply_tween_adjustments(adjustments, currentTime, tween_frame_data_cache):
     for attrFull, currentValue in adjustments:
@@ -3022,7 +3084,146 @@ def paste_opposite_animation(*args):
     cmds.warning("Mirror Animation Restored")
 
 
+def paste_animation_to(source_control_name=None, replace=True, insert_at_current=False, *args, **kwargs):
 
+    # Utilidades locales
+    def _short(name):
+        # quita namespace si lo hay
+        return name.rsplit(":", 1)[-1]
+
+    def _attr_exists_and_settable(node, attr):
+        if not cmds.objExists(node):
+            return False
+        full_attr = f"{node}.{attr}"
+        if not cmds.objExists(full_attr):
+            return False
+        try:
+            # settable=True y no locked
+            return cmds.getAttr(full_attr, se=True) and not cmds.getAttr(full_attr, lock=True)
+        except Exception:
+            return False
+
+    def _load_animation(json_file_path):
+        with open(json_file_path, "r") as f:
+            return json.load(f)
+
+    # Destinos: selección actual
+    targets = cmds.ls(selection=True) or []
+    if not targets:
+        cmds.warning("Please select at least one destination control.")
+        return
+
+    # Cargar JSON
+    json_file_path = general.get_copy_paste_animation_file()
+    if not os.path.exists(json_file_path):
+        cmds.warning("No animation file found. Please copy animation first.")
+        return
+
+    try:
+        animation_data = _load_animation(json_file_path)
+    except Exception as e:
+        cmds.warning("Error reading animation file: {}".format(e))
+        return
+
+    if not isinstance(animation_data, dict) or not animation_data:
+        cmds.warning("Animation file is empty or invalid.")
+        return
+
+    # Determinar ORIGEN
+    available_sources = list(animation_data.keys())
+
+    if source_control_name is None:
+        if len(available_sources) == 1:
+            source_control_name = available_sources[0]
+        else:
+            cmds.warning(
+                "Multiple sources found in animation file. "
+                "Please specify source_control_name. Available: {}".format(", ".join(available_sources))
+            )
+            return
+    else:
+        # Aceptar tanto con como sin namespace; normalizamos a corto
+        source_control_name = _short(source_control_name)
+
+    # Buscar el nombre EXACTO en el JSON por comparación de cortos
+    matched_source = None
+    for k in available_sources:
+        if _short(k) == source_control_name:
+            matched_source = k
+            break
+
+    if matched_source is None:
+        cmds.warning(
+            "Source control '{}' not found in animation file. Available: {}".format(
+                source_control_name, ", ".join(available_sources)
+            )
+        )
+        return
+
+    src_channels = animation_data.get(matched_source, {})
+    if not src_channels:
+        cmds.warning("No channel data found for source '{}'.".format(matched_source))
+        return
+
+    # Calcular desplazamiento temporal si insertamos en el tiempo actual
+    time_shift = 0.0
+    if insert_at_current:
+        # Primer key del primer canal que tenga keys
+        first_key_time = None
+        for ch, data in src_channels.items():
+            kfs = data.get("keyframes") or []
+            if kfs:
+                t0 = kfs[0]
+                if first_key_time is None or (t0 is not None and t0 < first_key_time):
+                    first_key_time = t0
+        if first_key_time is not None:
+            current = cmds.currentTime(query=True)
+            time_shift = current - first_key_time
+
+    # Aplicar a cada destino seleccionado
+    total_keys_set = 0
+    for dst in targets:
+        # Para logs legibles, también mostramos el corto
+        dst_short = _short(dst)
+
+        for channel, anim_data in src_channels.items():
+            keyframes = anim_data.get("keyframes") or []
+            values = anim_data.get("values") or []
+
+            if not keyframes or not values:
+                continue
+
+            if not _attr_exists_and_settable(dst, channel):
+                # Canal no existe en el destino; lo saltamos
+                continue
+
+            if replace:
+                try:
+                    cmds.cutKey(dst, time=(0, 1e6), attribute=channel, option="keys")
+                except Exception:
+                    pass
+
+            # Pegar keys (con posible desplazamiento)
+            for frame, value in zip(keyframes, values):
+                t = frame + time_shift
+                try:
+                    cmds.setKeyframe(dst, time=t, attribute=channel, value=value)
+                    total_keys_set += 1
+                except Exception as e:
+                    # Si un key falla, seguimos con los demás canales
+                    print("Failed to set key on {}.{} at {}: {}".format(dst, channel, t, e))
+
+    if total_keys_set == 0:
+        cmds.warning(
+            "No keys were pasted. Check that destination controls have the needed attributes "
+            "and that the source has keyframes."
+        )
+    else:
+        mode = "inserted at current time" if insert_at_current else "pasted"
+        repl = " (replaced existing keys)" if replace else ""
+        cmds.warning("Animation {} from '{}' to {} target(s){} — {} keys set.".format(
+            mode, _short(matched_source), len(targets), repl, total_keys_set
+        ))
 
 
 
