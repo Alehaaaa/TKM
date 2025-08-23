@@ -1869,15 +1869,11 @@ class toolbar(object):
 
         def _as_scalar(value):
             v = value
-            # Desanidar listas/tuplas de longitud 1: [[x]] -> [x] -> x
             while isinstance(v, (list, tuple)) and len(v) == 1:
                 v = v[0]
-            # Si sigue siendo lista/tupla (double3, matrices...), no es escalar
             if isinstance(v, (list, tuple)):
                 return None, False
             return v, True
-
-
 
         global animation_offset_original_values
 
@@ -1937,7 +1933,7 @@ class toolbar(object):
                     if diff == 0:
                         continue
 
-                    # aplica offset a todas las keys del rango
+                    # aplica offset a todas las keys del rango (UNA sola vez por atributo)
                     for frame_to_update in keyframes:
                         if not (timeRange[0] <= frame_to_update <= timeRange[1]):
                             continue
@@ -1955,8 +1951,17 @@ class toolbar(object):
                         if not ok_upd:
                             continue
 
-                        cmds.setKeyframe(obj, attribute=attr, time=frame_to_update,
-                                         value=orig_update + diff)
+                        new_val = orig_update + diff
+                        cmds.setKeyframe(obj, attribute=attr, time=frame_to_update, value=new_val)
+
+
+                    for fr in keyframes:
+                        if timeRange[0] <= fr <= timeRange[1]:
+                            self.animation_offset_original_values.setdefault(obj, {}).setdefault(attr, {})[fr] = cmds.getAttr(attr_full_name, time=fr)
+
+
+                    break  # salimos del bucle de frames (ya aplicamos el offset para este attr)
+
 
     def offset_animation_deferred(self, interval):
         def adjust_offset_animation():
@@ -1993,6 +1998,10 @@ class toolbar(object):
                 self.anim_offset_run_timer = False
                 pass
 
+
+
+
+#---------------------------------------------------------------
 
     def toggle_micro_move_button(self, *args):
 
