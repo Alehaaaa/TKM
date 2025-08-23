@@ -16,6 +16,7 @@ PySide6 or PySide2 (Maya 2017+). No external COLOR import.
 """
 
 from typing import Optional
+import importlib
 
 # --- Qt compat (PySide6 / PySide2) ---------------------------------------------
 try:  # Maya 2025+
@@ -42,7 +43,11 @@ except ImportError:
     import maya.api.OpenMayaUI as mui
 
 
+
+
 import TheKeyMachine.mods.uiMod as ui
+importlib.reload(ui)
+
 
 
 

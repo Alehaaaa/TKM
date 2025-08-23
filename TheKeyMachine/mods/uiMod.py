@@ -118,7 +118,6 @@ class Color:
         green = "#45C46B"
 
         def __init__(self):
-            # Copy class attributes into instance attributes
             for k, v in self.__class__.__dict__.items():
                 if not k.startswith('_') and not callable(v):
                     setattr(self, k, v)
@@ -129,6 +128,7 @@ class Color:
     @property
     def color(self):
         return self._color
+    
 
 
 # ________________________________________________ General  ______________________________________________________ #
