@@ -74,27 +74,27 @@ def get_screen_resolution():
     return screen_width, screen_height
 
 
-def update_maya_env():
-    version_maya = cmds.about(version=True)
-    user_dir = cmds.internalVar(userAppDir=True)
-    maya_dir = os.path.join(user_dir, version_maya)
+# def update_maya_env():
+#     version_maya = cmds.about(version=True)
+#     user_dir = cmds.internalVar(userAppDir=True)
+#     maya_dir = os.path.join(user_dir, version_maya)
     
-    env_file_path = os.path.join(maya_dir, "Maya.env")
+#     env_file_path = os.path.join(maya_dir, "Maya.env")
     
-    user_app_folder = cmds.internalVar(userAppDir=True)
-    tkm_img_folder = os.path.join(user_app_folder, "scripts/TheKeyMachine/data/img")
+#     user_app_folder = cmds.internalVar(userAppDir=True)
+#     tkm_img_folder = os.path.join(user_app_folder, "scripts/TheKeyMachine/data/img")
     
-    new_line = f"\n# THIS LINE IS HERE FOR UNINSTALLING PURPOSES, PLEASE DO NOT TOUCH. START OF THEKEYMACHINE CODE\nXBMLANGPATH = {tkm_img_folder};%XBMLANGPATH%\n# END OF THEKEYMACHINE CODE\n"
+#     new_line = f"\n# THIS LINE IS HERE FOR UNINSTALLING PURPOSES, PLEASE DO NOT TOUCH. START OF THEKEYMACHINE CODE\nXBMLANGPATH = {tkm_img_folder};%XBMLANGPATH%\n# END OF THEKEYMACHINE CODE\n"
     
-    if platform.system() != 'Windows':
-        new_line = f"\n# THIS LINE IS HERE FOR UNINSTALLING PURPOSES, PLEASE DO NOT TOUCH. START OF THEKEYMACHINE CODE\nXBMLANGPATH = {tkm_img_folder}:$XBMLANGPATH\n# END OF THEKEYMACHINE CODE\n"
+#     if platform.system() != 'Windows':
+#         new_line = f"\n# THIS LINE IS HERE FOR UNINSTALLING PURPOSES, PLEASE DO NOT TOUCH. START OF THEKEYMACHINE CODE\nXBMLANGPATH = {tkm_img_folder}:$XBMLANGPATH\n# END OF THEKEYMACHINE CODE\n"
 
-    if not os.path.exists(env_file_path):
-        with open(env_file_path, 'w') as file:
-            file.write(new_line)
-    else:
-        with open(env_file_path, 'a') as file:
-            file.write(new_line)
+#     if not os.path.exists(env_file_path):
+#         with open(env_file_path, 'w') as file:
+#             file.write(new_line)
+#     else:
+#         with open(env_file_path, 'a') as file:
+#             file.write(new_line)
 
 
 
@@ -150,7 +150,7 @@ def install(button, checkbox, tkm_version, window):
             button, "Installation Error", f"An error occurred while copying files: {str(e)}")
         return
 
-    update_maya_env()
+    # update_maya_env() # No need as images are referenced as filepath
 
     tkm_version.setText("<p style='color: #b9e861;'>Installation completed</p>")
     tkm_version.setGeometry(222, 190, 250, 20) 
