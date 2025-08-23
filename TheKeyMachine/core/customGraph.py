@@ -14,6 +14,7 @@
     thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
                                                                                                                                               
     Developed by: Rodrigo Torres / rodritorres.com                                                                                             
+    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
                                                                                                                                              
 
 
@@ -94,6 +95,8 @@ curveModeSlider = None
 is_dragging = False
 original_keyframes = {}
 
+
+COLOR = ui.Color()
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -220,7 +223,7 @@ def createCustomGraph():
 
     share_button = cmds.button(l='Share', c=lambda x: keyTools.shareKeys(), h=20, w=40)
     share_button_widget = wrapInstance(int(mui.MQtUtil.findControl(share_button)), QtWidgets.QPushButton)
-    share_button_widget.setToolTip("Share keys between curves to ensure both curves have the same keys in the same position.<br><br> The first curve selected is the reference curve, which will share the position of its keys.")
+    share_button_widget.setToolTip("Share keys between curves to ensure both curves have the same keys in the same position.<br><br> The first curve selected is the reference curve, which will share the position of its keys")
     apply_base_stylesheet(share_button_widget)
 
 
@@ -232,7 +235,7 @@ def createCustomGraph():
 
     flip_button = cmds.button(l='Flip', c=lambda x: keyTools.flipCurves(), h=20, w=40)
     flip_button_widget = wrapInstance(int(mui.MQtUtil.findControl(flip_button)), QtWidgets.QPushButton)
-    flip_button_widget.setToolTip("Inverts the selected curve vertically.<br><br> Right-click to see more options.")
+    flip_button_widget.setToolTip("Inverts the selected curve vertically.<br><br> Right-click to see more options")
     apply_base_stylesheet(flip_button_widget)
 
 
@@ -291,7 +294,7 @@ def createCustomGraph():
 
     cmds.separator(style='none', width=2)
     
-    barBlendSlider_widget = sw.SliderWidget("customGraph_tween_slider", min=-100, max=100, value=0, text="TW", color=ui.color_codes["_02"], dragCommand=lambda x: keyTools.tween(x, slider_name="customGraph_tween_slider"), p=flowtoolbar_layout)
+    barBlendSlider_widget = sw.SliderWidget("customGraph_tween_slider", min=-100, max=100, value=0, text="TW", color=COLOR.color.yellow, dragCommand=lambda x: keyTools.tween(x, slider_name="customGraph_tween_slider"), p=flowtoolbar_layout)
     barBlendSlider = barBlendSlider_widget.objectName()
     """
     tweenSliderLabel=cmds.text(label="T")
@@ -464,9 +467,9 @@ def createCustomGraph():
                     cmds.setKeyframe(curve, time=next_position, value=current_value)
                     
                 else:
-                    print("No more available positions to add keyframes.")
+                    print("No more available positions to add keyframes")
         else:
-            print("Please select at least one animation curve in the Graph Editor.")
+            print("Please select at least one animation curve in the Graph Editor")
 
 
 
@@ -506,7 +509,7 @@ def createCustomGraph():
                         new_value = mean_value + (initial_value - mean_value) * factor
                         cmds.keyframe(curve, edit=True, time=(time, time), valueChange=new_value)
         else:
-            print("Please select at least one animation curve in the Graph Editor.")
+            print("Please select at least one animation curve in the Graph Editor")
 
 
 
@@ -535,7 +538,7 @@ def createCustomGraph():
                         cmds.keyframe(curve, edit=True, time=(time, time), valueChange=new_value)
 
         else:
-            print("Please select at least one animation curve in the Graph Editor.")
+            print("Please select at least one animation curve in the Graph Editor")
 
 
 
@@ -560,7 +563,7 @@ def createCustomGraph():
                 
                 curves_smooth(curve, factor)
         else:
-            print("Please select at least one animation curve in the Graph Editor.")
+            print("Please select at least one animation curve in the Graph Editor")
 
 
 
@@ -637,10 +640,8 @@ def createCustomGraph():
                         new_value = initial_value + noise
                         
                         cmds.keyframe(curve, edit=True, time=(time, time), valueChange=new_value)
-                else:
-                    print("")
         else:
-            print("Please select at least one animation curve in the Graph Editor.")
+            print("Please select at least one animation curve in the Graph Editor")
 
 
 
@@ -668,10 +669,8 @@ def createCustomGraph():
                         direction = 1 if (i // 2) % 2 == 0 else -1
                         new_value = initial_value + direction * value
                         cmds.keyframe(curve, edit=True, time=(time, time), valueChange=new_value)
-                else:
-                    print("")
         else:
-            print("Please select at least one animation curve in the Graph Editor.")
+            print("Please select at least one animation curve in the Graph Editor")
 
 
 
@@ -686,7 +685,7 @@ def createCustomGraph():
         keyframes = cmds.keyframe(curve, query=True, selected=True, timeChange=True, valueChange=True)
 
         if not keyframes or len(keyframes) % 2 != 0:
-            print(f"Please select at least one keyframe on curve {curve}.")
+            print(f"Please select at least one keyframe on curve {curve}")
             return
 
         # Store original keyframes for undo
@@ -718,7 +717,7 @@ def createCustomGraph():
             for curve in curves:
                 curves_linear_interpolation(curve, blend_factor)
         else:
-            print("Please select at least one animation curve in the Graph Editor.")
+            print("Please select at least one animation curve in the Graph Editor")
 
 
 
@@ -754,7 +753,7 @@ def createCustomGraph():
                     ease_curves(curve, (factor - 0.5) * 2, ease_out) 
                     
         else:
-            print("Please select at least one animation curve in the Graph Editor.")
+            print("Please select at least one animation curve in the Graph Editor")
 
 
     def ease_curves(curve, factor, ease_func):
@@ -788,7 +787,7 @@ def createCustomGraph():
         keyframes = cmds.keyframe(curve, query=True, selected=True, timeChange=True, valueChange=True)
 
         if not keyframes or len(keyframes) % 2 != 0:
-            print(f"Please select at least one keyframe on curve {curve}.")
+            print(f"Please select at least one keyframe on curve {curve}")
             return
 
         # Store original keyframes for undo
@@ -820,7 +819,7 @@ def createCustomGraph():
             for curve in curves:
                 curves_flat_interpolation(curve, blend_factor)
         else:
-            print("Please select at least one animation curve in the Graph Editor.")
+            print("Please select at least one animation curve in the Graph Editor")
 
 
 
@@ -864,7 +863,7 @@ def createCustomGraph():
 
     
     
-    curveModeSlider_widget = sw.SliderWidget("bar_blend_slider", min=-100, max=100, value=0, text="CV", color=ui.color_codes["_07"], dragCommand=curveModeSlider_change, p=flowtoolbar_layout)
+    curveModeSlider_widget = sw.SliderWidget("bar_blend_slider", min=-100, max=100, value=0, text="CV", color=COLOR.color.orange, dragCommand=curveModeSlider_change, p=flowtoolbar_layout)
     curveModeSlider = barBlendSlider_widget.objectName()
 
     curveModeSlider = cmds.floatSlider(width=140, min=0, max=1, value=0,
@@ -1300,8 +1299,6 @@ def createCustomGraph():
     if cmds.window("graphEditor1Window", exists=True):
         float_slider = cmds.floatSlider(min=0.1, max=1.0, v=1.0, dragCommand=lambda x: set_opacity_from_slider(x), w=40, hr=True)
         separator = cmds.separator(style='none', width=5)
-    else:
-        print("")
 
 
 
@@ -1310,7 +1307,7 @@ def createCustomGraph():
     popup_menu = cmds.popupMenu(parent=about_button, button=1, ctl=False, alt=False)
     
     customGraph_help_submenu = cmds.menuItem(subMenu=True, label="Help", image=media.help_menu_image, parent=popup_menu)
-    cmds.menuItem(l="Discord Community", image=media.help_menu_image, c=lambda x: general.open_url("https://discord.com/channels/1186722267212820610"), p=customGraph_help_submenu)
+    cmds.menuItem(l="Discord Community", image=media.help_menu_image, c=lambda x: general.open_url("https://discord.gg/G2J5yyjz"), p=customGraph_help_submenu)
     cmds.menuItem(label="Knowledge base", image=media.help_menu_image, parent=customGraph_help_submenu, c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base"))
     cmds.menuItem(label="Youtube channel", image=media.help_menu_image, parent=customGraph_help_submenu, c=lambda x: general.open_url("https://www.youtube.com/@TheKeyMachineMayaTools"))
 

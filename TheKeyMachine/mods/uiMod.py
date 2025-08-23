@@ -15,6 +15,7 @@
     thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
                                                                                                                                               
     Developed by: Rodrigo Torres / rodritorres.com                                                                                             
+    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
                                                                                                                                              
 
 
@@ -102,6 +103,34 @@ color_codes_hover = {
 }
 
 
+
+class Color:
+    class ColorPalette:
+        gray = "#444444"
+        darkGray = "#3C3C3C"
+        darkerGray = "#333333"
+        lightGray = "#747474"
+        white = "#e9edf2"
+        darkWhite = "#cfd6df"
+        cyan = "#58e1ff"
+        orange = "#C9844B"
+        yellow = "#E6DC54"
+        green = "#45C46B"
+
+        def __init__(self):
+            # Copy class attributes into instance attributes
+            for k, v in self.__class__.__dict__.items():
+                if not k.startswith('_') and not callable(v):
+                    setattr(self, k, v)
+
+    def __init__(self):
+        self._color = self.ColorPalette()
+
+    @property
+    def color(self):
+        return self._color
+
+
 # ________________________________________________ General  ______________________________________________________ #
 
 def getImage(*args, image):
@@ -130,8 +159,7 @@ def reloadUI():
 
 
 def getUiName():
-    getUi=cmds.getPanel(withFocus=True)
-    print(getUi)
+    print(cmds.playblast(activeEditor = True))
 
 
 def get_screen_resolution():
@@ -258,13 +286,13 @@ def uninstall():
                 if os.path.exists(tkm_folder_path):
                     shutil.rmtree(tkm_folder_path)
                 else:
-                    cmds.warning("TheKeyMachine folder not found.")
+                    cmds.warning("TheKeyMachine folder not found")
             else:
                 # Para Linux y Darwin (macOS), intenta eliminar toda la carpeta "TheKeyMachine"
                 if os.path.exists(tkm_folder_path):
                     shutil.rmtree(tkm_folder_path)
                 else:
-                    cmds.warning("TheKeyMachine folder not found.")
+                    cmds.warning("TheKeyMachine folder not found")
 
             # Elimina customGraph
             if cmds.columnLayout("customGraph_columnLayout", exists=True):
@@ -293,7 +321,7 @@ def uninstall():
         except Exception as e:
             cmds.error(f'An error occurred during uninstallation: {e}')
     else:
-        print("Uninstallation cancelled by user.")
+        print("Uninstallation cancelled by user")
 
 
 
@@ -900,6 +928,11 @@ def about_window():
     screen_width, screen_height = get_screen_resolution()
     screen_width = screen_width
 
+    multiplier = 1.0
+    if screen_width == 3840:
+        multiplier = 1.5
+
+
     if cmds.window("tkm_about_window", exists=True):
         cmds.deleteUI("tkm_about_window")
 
@@ -987,39 +1020,42 @@ def about_window():
         image_label.setPixmap(set_about_image)
         image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
 
+    TheKeyMachine_stage_version = general.get_thekeymachine_stage_version()
     TheKeyMachine_version = general.get_thekeymachine_version()
     TheKeyMachine_build_version = general.get_thekeymachine_build_version()
 
-    if screen_width == 3840:
-        label2 = QtWidgets.QLabel("<span style='font-size: 16px; color:#cccccc'>Animation toolset for Maya Animators<br><br><br></span><br><span style='font-size: 20px; color:#cccccc'><b>Version:&nbsp;&nbsp;</b></span><span style='font-size: 20px; color:#86CDAD'>beta v{}</span><span style='font-size: 20px; color:#cccccc'><b>&nbsp;&nbsp;&nbsp;&nbsp;Build:&nbsp;&nbsp;</b></span><span style='font-size: 20px; color:#86CDAD'>{}</span><br><br><br>".format(TheKeyMachine_version, TheKeyMachine_build_version))
-    else:
-        label2 = QtWidgets.QLabel("<span style='font-size: 12px; color:#cccccc'>Animation toolset for Maya Animators<br><br><br></span><br><span style='font-size: 14px; color:#cccccc'><b>Version:&nbsp;&nbsp;</b></span><span style='font-size: 14px; color:#86CDAD'>beta v{}</span><span style='font-size: 14px; color:#cccccc'><b>&nbsp;&nbsp;&nbsp;&nbsp;Build:&nbsp;&nbsp;</b></span><span style='font-size: 14px; color:#86CDAD'>{}</span><br><br><br>".format(TheKeyMachine_version, TheKeyMachine_build_version))
+    label2 = QtWidgets.QLabel(
+        (
+            "<span style='font-size: {}px; color:#cccccc'>Animation toolset for Maya Animators<br><br><br></span>"
+            "<br><span style='font-size: {}px; color:#cccccc'><b>Version:&nbsp;&nbsp;</b></span>"
+            "<span style='font-size: {}px; color:#86CDAD'>{} v{}</span>"
+            "<span style='font-size: {}px; color:#cccccc'><b>&nbsp;&nbsp;&nbsp;&nbsp;Build:&nbsp;&nbsp;</b></span>"
+            "<span style='font-size: {}px; color:#86CDAD'>{}</span><br><br><br>"
+        ).format(
+            16 * multiplier, 14 * multiplier, 14 * multiplier,
+            TheKeyMachine_stage_version, TheKeyMachine_version,
+            14 * multiplier, 14 * multiplier,
+            TheKeyMachine_build_version
+        )
+    )
 
     label2.setAlignment(QtCore.Qt.AlignCenter)
     layout.addWidget(label2, 0, QtCore.Qt.AlignHCenter)
     label2.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
 
-    if screen_width == 3840:
-                label6 = QtWidgets.QLabel("<br><span style='font-size: 14px; color:#cccccc'>"
-                                  "This tool is licensed under the GNU General Public License v3.0.<br>"
-                                  "For more details, see <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color:#86CDAD;'>GNU GPL 3.0</a>.<br><br>"
-                                  "Developed by: "
-                                  "Rodrigo Torres - <a href='http://rodritorres.com' style='color:#86CDAD;'>rodritorres.com</a></span><br><br>"
-                                  "<span style='font-size: 10px; color:#cccccc'>"
-                                  "http://www.thekeymachine.xyz / "
-                                  "x@thekeymachine.xyz</span>")
-    else:
-        label6 = QtWidgets.QLabel("<br><span style='font-size: 10px; color:#cccccc'>"
-                                  "This tool is licensed under the GNU General Public License v3.0.<br>"
-                                  "For more details, see <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color:#86CDAD;'>GNU GPL 3.0</a>.<br><br>"
-                                  "Developed by: "
-                                  "Rodrigo Torres - <a href='http://rodritorres.com' style='color:#86CDAD;'>rodritorres.com</a></span><br><br>"
-                                  "<span style='font-size: 10px; color:#cccccc'>"
-                                  "http://www.thekeymachine.xyz / "
-                                  "x@thekeymachine.xyz</span>")
+    label6 = QtWidgets.QLabel(f"<br><span style='font-size: {14 if screen_width == 3840 else 10}px; color:#cccccc'>"
+                        "This tool is licensed under the GNU General Public License v3.0.<br>"
+                        "For more details, see <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color:#86CDAD;'>GNU GPL 3.0</a>.<br><br>"
+                        "Developed by: "
+                        "Rodrigo Torres - <a href='http://rodritorres.com' style='color:#86CDAD;'>rodritorres.com</a><br>"
+                        "Modified by: "
+                        "Alehaaaa - <a href='http://alehaaaa.github.io' style='color:#86CDAD;'>alehaaaa.github.io</a></span><br><br>"
+                        "<span style='font-size: 10px; color:#cccccc'>"
+                        "<a href='http://www.thekeymachine.xyz' style='color:#86CDAD;'>www.thekeymachine.xyz</a> / "
+                        "<a href='mailto:x@thekeymachine.xyz' style='color:#86CDAD;'>x@thekeymachine.xyz</a></span>")
 
-        # Habilitar interacciones de enlaces
-        label6.setOpenExternalLinks(True)
+    # Habilitar interacciones de enlaces
+    label6.setOpenExternalLinks(True)
 
           
 
@@ -1253,13 +1289,13 @@ def bug_report_window(*args):
     explanation_label = QtWidgets.QLabel("")
     explanation_textbox = QtWidgets.QTextEdit()
     explanation_textbox.setStyleSheet(textbox_style)
-    explanation_textbox.setPlaceholderText("Please describe the problem or error you're experiencing. To identify and correct the issue, it's essential to reproduce it. Detail step-by-step the actions you've taken and specify which tool is causing the error.")
+    explanation_textbox.setPlaceholderText("Please describe the problem or error you're experiencing. To identify and correct the issue, it's essential to reproduce it. Detail step-by-step the actions you've taken and specify which tool is causing the error")
     explanation_textbox.textChanged.connect(lambda: limit_textbox_characters(explanation_textbox, 1200))
 
     script_error_label = QtWidgets.QLabel("")
     script_error_textbox = QtWidgets.QTextEdit()
     script_error_textbox.setStyleSheet(textbox_style)
-    script_error_textbox.setPlaceholderText("If you see any errors in the Script Editor, please copy and paste the code here. The last 3 or 4 lines should be sufficient.")
+    script_error_textbox.setPlaceholderText("If you see any errors in the Script Editor, please copy and paste the code here. The last 3 or 4 lines should be sufficient")
     script_error_textbox.textChanged.connect(lambda: limit_textbox_characters(script_error_textbox, 1200))
 
     confirmation_label = QtWidgets.QLabel("<br>")

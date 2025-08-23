@@ -13,6 +13,7 @@
                                                                                                                                               
                                                                                                                                               
     Developed by: Rodrigo Torres / rodritorres.com                                                                                             
+    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
                                                                                                                                              
 
 
@@ -61,7 +62,7 @@ def set_button_value(button_name):
     selection = cmds.ls(selection=True)
     button_selections = load_button_selections()
     if button_name in button_selections and button_selections[button_name]["locked"]:
-        cmds.warning("SelectionSet is locked. Unlock before overwriting.")
+        cmds.warning("SelectionSet is locked. Unlock before overwriting")
         return
     button_selections[button_name] = {"selection": selection, "locked": False}
     save_button_selections(button_selections)
@@ -116,7 +117,7 @@ def add_button_selection(button_name):
     # Verificar si el botón ya tiene una selección guardada
     if button_name in button_selections:
         if button_selections[button_name]["locked"]:
-            cmds.warning("SelectionSet is locked. Unlock before modifying.")
+            cmds.warning("SelectionSet is locked. Unlock before modifying")
             return
         # Si la tecla Ctrl está presionada, realizar suma de selecciones
         if cmds.getModifiers() & 4:  # 4 representa la tecla Ctrl
@@ -142,7 +143,7 @@ def remove_button_selection(button_name):
     # Verificar si el botón tiene una selección guardada
     if button_name in button_selections:
         if button_selections[button_name]["locked"]:
-            cmds.warning("SelectionSet is locked. Unlock before modifying.")
+            cmds.warning("SelectionSet is locked. Unlock before modifying")
             return
         # Si la tecla Shift está presionada, realizar resta de selecciones
         if cmds.getModifiers() & 1:  # 1 representa la tecla Shift
@@ -179,4 +180,4 @@ def save_button_selections(button_selections):
     with open(json_file, "w") as f:
         json.dump(button_selections, f)
 
-    cmds.warning("Done")
+    print("Saved button selection")

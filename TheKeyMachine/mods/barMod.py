@@ -14,6 +14,7 @@
     thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
                                                                                                                                               
     Developed by: Rodrigo Torres / rodritorres.com                                                                                             
+    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
                                                                                                                                              
 
 
@@ -171,7 +172,7 @@ def delete_time_slider_animation():
     
     # Verificar si hay algo seleccionado
     if not selection:
-        cmds.warning("Please select at least one object.")
+        print("Select at least one object")
         return
 
     mel.eval('timeSliderClearKey;')
@@ -188,7 +189,7 @@ def delete_animation():
     
     # Verificar si hay algo seleccionado
     if not selection:
-        cmds.warning("Please select at least one object.")
+        print("Select at least one object")
         return
 
     # Si hay canales seleccionados, solo borra esos canales
@@ -234,8 +235,6 @@ def createLocator():
             # Añadir el locator al grupo 'temp_locators'
             cmds.parent(locator, 'temp_locators')
         cmds.select(selection)
-    else:
-        cmds.warning('Please select at least one object.')
 
 
 def selectTempLocators(*args):
@@ -247,8 +246,6 @@ def selectTempLocators(*args):
 
     if locators:
         cmds.select(locators)
-    else:
-        cmds.warning('There are no temp locators in the scene.')
 
 
 def deleteTempLocators(*args):
@@ -258,10 +255,6 @@ def deleteTempLocators(*args):
         locators = [loc for loc in potential_locators if loc.split('_')[-1].isdigit()]
         if locators:
             cmds.delete(locators)
-        else:
-            cmds.warning('There are no temp locators in the scene.')
-    else:
-        cmds.warning('There are no temp locators group')
 
 
 
@@ -323,7 +316,7 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False):
 
     # Asegurarse de que hay al menos dos objetos seleccionados
     if len(sel) < 2:
-        cmds.warning("Please select at least two objects.")
+        print("Select at least two objects")
         return
 
     # Obtener el objeto destino (último objeto en la lista de selección)
@@ -432,7 +425,7 @@ def isolate_master():
     
     # Si no hay objetos seleccionados y el estado de aislamiento es 0, salimos de la función.
     if not selected_objects and currentState == 0:
-        cmds.warning("No objects selected.")
+        print("Select at least one object")
         return
     # Si no hay objetos seleccionados pero el aislamiento está activado, lo desactivamos.
     elif not selected_objects and currentState == 1:
@@ -555,7 +548,7 @@ def selectHierarchy():
         for obj in selection:
             select_curves_with_ctrl(obj)
     else:
-        cmds.warning("Please select at least one object")
+        print("Select at least one object")
 
 
 
@@ -580,12 +573,12 @@ def create_temp_pivot(use_saved_position=False, *args):
     seleccion = cmds.ls(selection=True)
 
     if not seleccion:
-        cmds.warning("Please select at least one object")
+        print("Select at least one object")
         return
 
     if cmds.objExists("tkm_temp_pivot"):
 
-        cmds.warning("Temp pivot already exists. Please unselect the current object to remove it.")
+        cmds.warning("Temp pivot already exists. Please unselect the current object to remove it")
         return
 
     # Variables globales
@@ -600,7 +593,7 @@ def create_temp_pivot(use_saved_position=False, *args):
         seleccion = cmds.ls(selection=True)
         
         if not seleccion:
-            cmds.warning("Please select at least one obj")
+            print("Select at least one obj")
             return
         
         general.create_TheKeyMachine_node()
@@ -702,7 +695,7 @@ def create_temp_pivot(use_saved_position=False, *args):
         
         seleccion = cmds.ls(selection=True)
         if not seleccion:
-            cmds.warning("Please select one obj first")
+            print("Select one obj first")
             return
         
         if temp_pivot_obj in seleccion:
@@ -727,7 +720,7 @@ def create_temp_pivot(use_saved_position=False, *args):
                 cmds.xform(follow_obj, matrix=new_follow_matrix_list, worldSpace=True)
 
             else:
-                cmds.warning(f"There is not temp pivot data for {follow_obj}.")
+                cmds.warning(f"There is not temp pivot data for {follow_obj}")
 
 
     get_temp_pivot_relation()
@@ -860,28 +853,27 @@ def mod_copy_worldspace_animation(*args):
 
 
 def color_copy_worldspace_animation(*args):
-    set_temp_timeslider_colors()
+    # set_temp_timeslider_colors()
     cmds.evalDeferred(copy_worldspace_animation)
-    cmds.evalDeferred(restore_timeslider_colors)
+    # cmds.evalDeferred(restore_timeslider_colors)
 
 
 
 def color_paste_worldspace_animation(*args):
-    set_temp_timeslider_colors()
+    # set_temp_timeslider_colors()
     cmds.evalDeferred(paste_worldspace_animation)
-    cmds.evalDeferred(restore_timeslider_colors)
+    # cmds.evalDeferred(restore_timeslider_colors)
 
 
 def copy_worldspace_animation(*args):
 
     selected_objects = cmds.ls(selection=True)
     if not selected_objects:
-        cmds.warning("No objects selected.")
+        print("Select at least one object")
         return
 
     # Comprobar si los objetos seleccionados tienen claves de animación
     if not cmds.keyframe(selected_objects, query=True):
-        cmds.warning("Selected objects do not have any animation.")
         return
 
     animation_data = {}
@@ -937,7 +929,7 @@ def copy_worldspace_animation(*args):
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
         # Restaurar el tiempo actual a su estado original
         cmds.currentTime(original_time)
-        cmds.warning("Worldspace animation copied")
+        print("Worldspace animation copied")
 
 
 
@@ -948,18 +940,14 @@ def copy_range_worldspace_animation(*args):
 
     selected_objects = cmds.ls(selection=True)
     if not selected_objects:
-        cmds.warning("No objects selected.")
         return
 
     # Comprobar si los objetos seleccionados tienen claves de animación
     if not cmds.keyframe(selected_objects, query=True):
-        cmds.warning("Selected objects do not have any animation.")
         return
 
     time_range = keyTools.get_selected_time_range()
-    print(time_range)
     if time_range is None:
-        cmds.warning("No time range selected on the timeslider.")
         return
 
     animation_data = {}
@@ -1023,7 +1011,6 @@ def copy_range_worldspace_animation(*args):
 def copy_worldspace_single_frame(*args):
     selected_objects = cmds.ls(selection=True)
     if not selected_objects:
-        cmds.warning("No objects selected.")
         return
 
     animation_data = {}
@@ -1056,7 +1043,7 @@ def paste_worldspace_single_frame(*args):
     worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
 
     if not os.path.exists(worldspace_anim_data_file):
-        cmds.warning("No worldspace data found.")
+        cmds.warning("No worldspace data found")
         return
 
     with open(worldspace_anim_data_file, 'r') as json_file:
@@ -1071,7 +1058,7 @@ def paste_worldspace_single_frame(*args):
             cmds.xform(obj, translation=values[:3], worldSpace=True)
             cmds.xform(obj, rotation=values[3:], worldSpace=True)
         else:
-            cmds.warning(f"Object {obj} not found in the scene.")
+            cmds.warning(f"Object {obj} not found in the scene")
 
     cmds.warning("Worldspace values applied")
 
@@ -1085,7 +1072,7 @@ def paste_worldspace_animation(*args):
     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
 
     if not os.path.exists(worldspace_anim_data_file):
-        print("No worldspace animation data found.")
+        print("No worldspace animation data found")
         return
 
     with open(worldspace_anim_data_file, 'r') as json_file:
@@ -1095,7 +1082,7 @@ def paste_worldspace_animation(*args):
     existing_objects = {obj: data for obj, data in animation_data.items() if cmds.objExists(obj)}
 
     if not existing_objects:
-        cmds.warning("No valid objects found in the scene. Animation paste aborted.")
+        cmds.warning("Objects not found in the scene. Animation paste aborted")
         return
 
     # Eliminar animación previa de los objetos existentes
@@ -1167,7 +1154,7 @@ def create_tracer(*args):
     
     # Verificar si hay exactamente un objeto seleccionado.
     if len(selected_objects) != 1:
-        cmds.warning("Please select only one object.")
+        print("Select only one object")
         return
 
     # Verifica o crea el grupo 'TheKeyMachine'
@@ -1191,7 +1178,7 @@ def create_tracer(*args):
     selected_objects = cmds.ls(selection=True)
     
     if not selected_objects:
-        cmds.warning("Please select an object to trace")
+        print("Select an object to trace")
         return
 
     if cmds.objExists("tracerHandle"):
@@ -1215,8 +1202,6 @@ def create_tracer(*args):
 def select_tracer_offset_node(*args):
     if cmds.objExists("tracer_offset"):
         cmds.select("tracer_offset", replace=True)
-    else:
-        cmds.warning("tracer_offset node does not exist.")
 
 
 def remove_tracer_node(*args):
@@ -1229,7 +1214,7 @@ def remove_tracer_node(*args):
 def tracer_connected(connected=False, update_cb=None, *args):
 
     if not cmds.objExists("tracerHandle"):
-        cmds.warning("No tracer node in the scene")
+        print("No tracer node in the scene")
         return
     
     is_connected = cmds.isConnected("tracer.points", "tracerHandleShape.points")
@@ -1257,16 +1242,14 @@ def tracer_update_checkbox(value):
 
 def tracer_refresh(*args):
     if not cmds.objExists("tracerHandle"):
-        cmds.warning("No tracer node in the scene")
+        print("No tracer node in the scene")
     else:
         is_connected = cmds.isConnected("tracer.points", "tracerHandleShape.points")
-        if is_connected:
-            cmds.warning("Tracer is already connected")
-        else:
+        if not is_connected:
             cmds.connectAttr("tracer.points", "tracerHandleShape.points", force=True)
-            cmds.setAttr("tracer.increment", 1);
-            cmds.setAttr("tracer.increment", 2);
-            cmds.setAttr("tracer.increment", 1);
+            cmds.setAttr("tracer.increment", 1)
+            cmds.setAttr("tracer.increment", 2)
+            cmds.setAttr("tracer.increment", 1)
             cmds.disconnectAttr("tracer.points", "tracerHandleShape.points")
 
 
@@ -1276,8 +1259,6 @@ def set_tracer_blue_color(*args):
         cmds.setAttr("tracerHandleShape.extraTrailColor", 0.1615, 0.1766, 0.3581, type="double3")
         cmds.setAttr("tracerHandleShape.trailColor", 0.2879, 0.2932, 0.358, type="double3")
         cmds.setAttr("tracerHandleShape.keyframeColor", 1.0, 1.0, 1.0, type="double3")
-    else:
-        cmds.warning("No tracer node in the scene")
 
 def set_tracer_red_color(*args):
 
@@ -1285,8 +1266,6 @@ def set_tracer_red_color(*args):
         cmds.setAttr("tracerHandleShape.extraTrailColor", 0.8143, 0.5109, 0.5318, type="double3")
         cmds.setAttr("tracerHandleShape.trailColor", 0.4398, 0.1724, 0.1908, type="double3")
         cmds.setAttr("tracerHandleShape.keyframeColor", 1.0, 1.0, 1.0, type="double3")
-    else:
-        cmds.warning("No tracer node in the scene")
 
 def set_tracer_grey_color(*args):
 
@@ -1294,14 +1273,10 @@ def set_tracer_grey_color(*args):
         cmds.setAttr("tracerHandleShape.extraTrailColor", 0.2879, 0.2932, 0.358, type="double3")
         cmds.setAttr("tracerHandleShape.trailColor", 0.122, 0.122, 0.122, type="double3")
         cmds.setAttr("tracerHandleShape.keyframeColor", 1.0, 1.0, 1.0, type="double3")
-    else:
-        cmds.warning("No tracer node in the scene")
 
 def tracer_show_hide(*args):
 
-    if not cmds.objExists("tracerHandle"):
-        pass
-    else:
+    if cmds.objExists("tracerHandle"):
         visibility = cmds.getAttr("tracerHandle.visibility")
         cmds.setAttr("tracerHandle.visibility", not visibility)
 
@@ -1323,18 +1298,13 @@ def create_follow_cam(translation=True, rotation=True, *args):
         general.create_TheKeyMachine_node()
 
     if not selected_objects:
-        cmds.warning('No objects selected.')
+        print('Select at least one object.')
         return
 
     target_object = selected_objects[0]
 
-    mpanel = ["modelPanel1", "modelPanel2", "modelPanel3", "modelPanel4"]
-
     # Obtén el panel con el foco actualmente y encuentra la cámara activa
-    panel = cmds.getPanel(withFocus=True)
-    if panel not in mpanel:
-        cmds.warning("There is no active viewport. Please select one.")
-        return
+    panel = cmds.playblast(activeEditor = True)
     camera = cmds.modelEditor(panel, query=True, camera=True)
     followCam_original_camera = camera
 
@@ -1388,13 +1358,7 @@ def create_follow_cam(translation=True, rotation=True, *args):
 def remove_followCam(*args):
     global followCam_original_camera
     # Obtén el panel con el foco actualmente
-    panel = cmds.getPanel(withFocus=True)
-    
-    # Comprueba si el panel es un visor (modelPanel)
-    if cmds.getPanel(typeOf=panel) != "modelPanel":
-        # Si no es un visor, selecciona el panel 'persp' por defecto
-        panel = "modelPanel4"  # generalmente corresponde al visor perspectiva
-    
+    panel = cmds.playblast(activeEditor = True)
     current_camera = cmds.modelEditor(panel, query=True, camera=True)
 
     if cmds.objExists('tkm_followCam'):
@@ -1464,7 +1428,7 @@ def select_rig_controls(*args):
     selected = cmds.ls(selection=True, long=True)
 
     if not selected:
-        cmds.warning("Please select at least one control.")
+        print("Select at least one control")
         return
 
     # Obtener los namespaces de los objetos seleccionados
@@ -1504,7 +1468,7 @@ def select_rig_controls(*args):
 
         cmds.select(filtered_curves, replace=True)
     else:
-        cmds.warning("There are no curve-type controls to select.")
+        cmds.warning("There are no curve-type controls to select")
 
 
 
@@ -1564,7 +1528,7 @@ def select_animated_rig_controls(*args):
     selected = cmds.ls(selection=True, long=True)
 
     if not selected:
-        cmds.warning("Please select at least one control.")
+        print("Select at least one control")
         return
 
     namespaces = set()
@@ -1597,7 +1561,7 @@ def select_animated_rig_controls(*args):
 
         cmds.select(filtered_controls, replace=True)
     else:
-        cmds.warning("There are no suitable controls to select.")
+        cmds.warning("There are no suitable controls to select")
 
 
 
@@ -1605,14 +1569,9 @@ def select_animated_rig_controls(*args):
 # _______________________________________ DEPTH MOVER
 
 def activeCamera():
-    panel = cmds.getPanel(withFocus=True)
-    if cmds.getPanel(typeOf=panel) != 'modelPanel':
-        for p in cmds.getPanel(visiblePanels=True):
-            if cmds.getPanel(typeOf=p) == 'modelPanel':
-                panel = p
-                break
-    if cmds.getPanel(typeOf=panel) != 'modelPanel':
-        OpenMaya.MGlobal.displayWarning('There is no camera selected.')
+    panel = cmds.playblast(activeEditor = True)
+    
+    if not panel:
         return None
 
     camShape = cmds.modelEditor(panel, query=True, camera=True)
@@ -1751,12 +1710,12 @@ def gimbal_fixer_window(*args):
     if cmds.ls(sl=True):  # Verifica si hay una selección
         update_rotation_order(main_window)  # Ejecuta el botón "Reload"
     else:
-        cmds.warning("Please select a control and reload")
+        print("Select a control and reload")
 
 def update_rotation_order(window):
     sel = cmds.ls(sl=True)
     if not sel:
-        cmds.warning("Please select a control.")
+        print("Select a control")
         return
 
     current_rotate_order = cmds.getAttr(f'{sel[0]}.rotateOrder')
@@ -2310,7 +2269,7 @@ def micro_move_pre_drag(*args):
 
     micro_move_selected_objects = cmds.ls(selection=True)
     if not micro_move_selected_objects:
-        raise Exception("Please select an object.")
+        raise Exception("Please select an object")
 
     transform_attrs = ['translateX', 'translateY', 'translateZ']
 

@@ -12,6 +12,7 @@
     thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
                                                                                                                                               
     Developed by: Rodrigo Torres / rodritorres.com                                                                                             
+    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
                                                                                                                                              
 
 
@@ -19,9 +20,10 @@
 
 
 def reload():
-	import TheKeyMachine.core.toolbar as t
-	t.tb.reload()
+    import TheKeyMachine.core.toolbar as t
+    t.tb.reload()
 
 def toggle():
-	import TheKeyMachine.core.toolbar as t
-	t.tb.toggle()
+    import TheKeyMachine.core.toolbar as t
+    t.tb.toggle()
+

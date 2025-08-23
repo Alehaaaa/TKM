@@ -1,9 +1,9 @@
 from __future__ import annotations
 """
-SliderWidget — CORE-faithful, single-file recreation (no picks)
+SliderWidget — COLOR-faithful, single-file recreation (no picks)
 ===============================================================
 
-Self-contained slider that mimics the original AnimBot/CORE style but
+Self-contained slider that mimics the original AnimBot/COLOR style but
 behaves like a tweenmachine: a centered horizontal scrub from -100..+100.
 No A/B picks. Context menu on right-click (hook point kept).
 
@@ -12,7 +12,7 @@ What's new (same behavior, nicer structure):
 - Centralized wheel logic via apply_wheel_delta().
 - Clearer separation of responsibilities & comments.
 
-PySide6 or PySide2 (Maya 2017+). No external CORE import.
+PySide6 or PySide2 (Maya 2017+). No external COLOR import.
 """
 
 from typing import Optional
@@ -20,7 +20,7 @@ from typing import Optional
 # --- Qt compat (PySide6 / PySide2) ---------------------------------------------
 try:  # Maya 2025+
     # from shiboken6 import wrapInstance  # type: ignore
-    from PySide6.QtCore import Qt, QRect, Signal, QTimer, QSignalBlocker  # type: ignore
+    from PySide6.QtCore import Qt, QRect, Signal, QTimer, QSignalBlocker, QPoint  # type: ignore
     from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen  # type: ignore
     from PySide6.QtWidgets import ( # type: ignore
         QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton
@@ -28,7 +28,7 @@ try:  # Maya 2025+
     PYSIDE = 6
 except ImportError:  # Maya 2017–2024
     # from shiboken2 import wrapInstance
-    from PySide2.QtCore import Qt, QRect, Signal, QTimer, QSignalBlocker
+    from PySide2.QtCore import Qt, QRect, Signal, QTimer, QSignalBlocker, QPoint
     from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen
     from PySide2.QtWidgets import (
         QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton
@@ -42,39 +42,11 @@ except ImportError:
     import maya.api.OpenMayaUI as mui
 
 
-# --- Minimal CORE-like shim -----------------------------------------------------
-class _CorePalette:
-    gray = "#444444"
-    darkGray = "#3C3C3C"
-    darkerGray = "#333333"
-    lightGray = "#747474"
-    white = "#e9edf2"
-    darkWhite = "#cfd6df"
-    cyan = "#58e1ff"
+import TheKeyMachine.mods.uiMod as ui
 
 
-class _CoreShim:
-    class Color:
-        def __init__(self, **kv):
-            for k, v in kv.items():
-                setattr(self, k, v)
 
-    def __init__(self):
-        palette = {k: v for k, v in _CorePalette.__dict__.items() if not k.startswith('_')}
-        self._color = self.Color(**palette)
-        self._flipWheelPref = False
-        self._extraWheelBias = 0
-
-    @property
-    def color(self):
-        return self._color
-
-    def getWheelFactor(self) -> int:
-        # factor can be flipped / biased like CORE prefs
-        return (-1 if self._flipWheelPref else 1) + self._extraWheelBias
-
-
-CORE = _CoreShim()
+COLOR = ui.Color()
 
 
 # --- utility: reset slider value without emitting signals -----------------------
@@ -94,7 +66,7 @@ class _ResetWithoutEmit:
 # --- tiny button with centered square ------------------------------------------
 class _SliderButton(QPushButton):
     """Flat square-indicator button that emits its signed percent on click."""
-    def __init__(self, parent: QWidget, *, percent: int, color: str):
+    def __init__(self, parent: QWidget, *, percent: int, color: str, worldSpace: bool = False):
         super().__init__(parent)
         self._percent = percent
         self._color = color
@@ -108,21 +80,60 @@ class _SliderButton(QPushButton):
             f"QPushButton:pressed {{ background-color: {self._color}; border-radius: 0; }}"
         )
 
+        self._worldSpace = worldSpace if abs(percent) == 100 else False
+
     @property
     def percent(self) -> int:
         return self._percent
+    
+    def setWorldSpace(self, enabled: int):
+        self._worldSpace = enabled
+        self.update()
+
 
     def paintEvent(self, e):
         super().paintEvent(e)
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
+
         w, h, s = self.width(), self.height(), self._box_sz
         x = (w - s) // 2
         y = (h - s) // 2
-        p.setPen(QPen(Qt.black, 0.5))
-        p.setBrush(QColor(self._color))
-        p.drawRect(QRect(x, y, s, s))
+
+        if self._worldSpace:
+            cx, cy = w // 2, h // 2
+            r = int(min(w, h) * 0.275)  # smaller globe
+
+            # Fill the circle with self._color (background)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(self._color))
+            p.drawEllipse(QRect(cx - r, cy - r, 2 * r, 2 * r))
+
+            # Black linework on top
+            pen = QPen(QColor(COLOR.color.darkGray))
+            pen.setWidthF(0.85)
+            p.setPen(pen)
+            p.setBrush(Qt.NoBrush)
+
+            # Outer circle outline
+            p.drawEllipse(QRect(cx - r, cy - r, 2 * r, 2 * r))
+
+            # Equator
+            p.drawLine(cx - r + 1, cy, cx + r - 1, cy)
+
+            # Curved meridians (left/right)
+            mer_w = int(2 * r * 0.45)               # tweak curvature here (0.5–0.65 looks good)
+            mer_rect = QRect(cx - mer_w // 2, cy - r, mer_w, 2 * r)
+            p.drawArc(mer_rect, 90 * 14,  180 * 16)  # left arc
+            p.drawArc(mer_rect, 90 * 14, -180 * 16)  # right arc
+        else:
+            # Default: small filled square
+            p.setPen(QPen(Qt.black, 0.5))
+            p.setBrush(QColor(self._color))
+            p.drawRect(QRect(x, y, s, s))
+
         p.end()
+
 
 
 # --- core slider (custom painting & handle-only interaction) --------------------
@@ -195,8 +206,7 @@ class _HandleOnlySlider(QSlider):
 
     def apply_wheel_delta(self, delta_units: int):
         """Centralized wheel logic used by both this slider and the parent widget."""
-        factor = float(CORE.getWheelFactor())
-        inc = int((delta_units / 5.0) * factor) * 1000  # 120 units ≈ 6% per notch
+        inc = int(delta_units / 5.0) * 1000  # 120 units ≈ 6% per notch
         if not inc:
             return
 
@@ -232,12 +242,12 @@ class _HandleOnlySlider(QSlider):
             handle_bg = self._color
             handle_border = "none"
         else:
-            handle_bg = CORE.color.gray
-            handle_border = f"{self._border_px}px solid {CORE.color.darkerGray}"
+            handle_bg = COLOR.color.gray
+            handle_border = f"{self._border_px}px solid {COLOR.color.darkerGray}"
         self.setStyleSheet(
             f"""
 QSlider::groove:horizontal {{
-    background: {CORE.color.darkGray};
+    background: {COLOR.color.darkGray};
     height: {gh}px;
     border-radius: {self._handle_radius}px;
     margin: 0 {self._padding_lr}px;
@@ -348,7 +358,7 @@ QSlider::handle:horizontal {{
         p.setRenderHint(QPainter.Antialiasing)
 
         # text shadow
-        p.setPen(QColor(QColor(CORE.color.darkGray)))
+        p.setPen(QColor(QColor(COLOR.color.darkGray)))
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             p.drawText(hrect.translated(dx, dy), Qt.AlignCenter, self._text)
 
@@ -375,7 +385,7 @@ QSlider::handle:horizontal {{
                               max(0, cx - hrect.width() // 2 - pad - g.x()), g.height())
             align = Qt.AlignVCenter | Qt.AlignLeft
         p.setFont(self._value_font)
-        p.setPen(QColor(CORE.color.lightGray))
+        p.setPen(QColor(COLOR.color.lightGray))
         p.drawText(text_rect, align, f"{self.value() / 1000.0:.2f}")
         p.end()
 
@@ -388,11 +398,11 @@ class SliderWidget(QWidget):
     Signals:
       - valueChanged(float): slider percent (drag/wheel/keys or side buttons)
       - dragStarted()
-      - dragFinished(float)
+      - dragFinished()
     """
     valueChanged = Signal(float)
     dragStarted = Signal()
-    dragFinished = Signal(float)
+    dragFinished = Signal()
 
     def __init__(
         self,
@@ -403,6 +413,8 @@ class SliderWidget(QWidget):
         text: str = "SL",
         color: str = "#444444",
         dragCommand=None,
+        dropCommand=None,
+        worldSpace=None,
         p=None
     ):
         super().__init__(None)
@@ -411,6 +423,7 @@ class SliderWidget(QWidget):
 
         self._scale = 1000  # internal units per 1%
         self._color = color
+        self._worldSpace = worldSpace
 
         # base layout: only the slider; buttons live in overlay containers
         base = QHBoxLayout(self)
@@ -444,10 +457,11 @@ class SliderWidget(QWidget):
         # left side buttons (near handle => AlignRight)
         self._leftButtons = []
         for v in values:
-            b = _SliderButton(self._leftOverlay, percent=-abs(v), color=color)
+            b = _SliderButton(self._leftOverlay, percent=-abs(v), color=color, worldSpace=self._worldSpace)
             b.clicked.connect(lambda _c=False, btn=b: self._on_button_clicked(btn))
             self._leftLayout.addWidget(b, 1)
             self._leftButtons.append(b)
+
 
         # right side buttons (AlignLeft)
         self._rightButtons = []
@@ -465,6 +479,8 @@ class SliderWidget(QWidget):
 
         if dragCommand:
             self.valueChanged.connect(dragCommand)
+        if dropCommand:
+            self.dragFinished.connect(dropCommand)
 
         # initial geometry sync
         self._update_buttons()
@@ -486,13 +502,33 @@ class SliderWidget(QWidget):
     def setColor(self, color: str):
         self._slider._color = color
         self._slider._apply_stylesheet(thick=False)
+    
+    def setWorldSpace(self, enabled: int):
+        if enabled == self._worldSpace:
+            return
+
+        for b in self._leftButtons:
+            p = int(b.percent)
+            if abs(p) == 100:
+                b.setWorldSpace(enabled)
+
+        for b in self._rightButtons:
+            p = int(b.percent)
+            if abs(p) == 100:
+                b.setWorldSpace(enabled)
+        
+        self._worldSpace = enabled
+
 
     def setDragCommand(self, dragCommand):
-        try:
-            self.valueChanged.disconnect()
-        except Exception:
-            pass
+        try: self.valueChanged.disconnect()
+        except Exception: pass
         self.valueChanged.connect(dragCommand)
+    
+    def setDropCommand(self, dropCommand):
+        try: self.dragFinished.disconnect()
+        except Exception: pass
+        self.dragFinished.connect(dropCommand)
 
     def setRange(self, min_v: int, max_v: int):
         self._slider.setRange(int(min_v * self._scale), int(max_v * self._scale))
@@ -576,7 +612,7 @@ class SliderWidget(QWidget):
         self.valueChanged.emit(self.percent())
 
     def _on_inner_finished(self, pct: float):
-        self.dragFinished.emit(self.percent())
+        self.dragFinished.emit()
         self._leftOverlay.show()
         self._rightOverlay.show()
 

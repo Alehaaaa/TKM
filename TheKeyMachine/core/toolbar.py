@@ -12,6 +12,7 @@
     thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
                                                                                                                                               
     Developed by: Rodrigo Torres / rodritorres.com                                                                                             
+    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
                                                                                                                                              
 
 
@@ -223,6 +224,10 @@ toggleAnimOffsetButtonState = False
 micro_move_button_state = False
 WorkspaceName = 'k'
 selection_sets_workspace = 's'
+
+
+COLOR = ui.Color()
+
 
 class toolbar(object):
     open_new_scene_scriptJob = None
@@ -522,31 +527,35 @@ class toolbar(object):
 
         # Check that the new name is not empty
         if not new_setgroup_name.strip():
-            cmds.warning("Please enter a valid set group name.")
+            cmds.warning("Please enter a valid set group name")
             return
 
-        # Check that the new name does not already exist in the scene
-        if cmds.objExists(new_setgroup_name):
-            cmds.warning(f"A set group named '{new_setgroup_name}' already exists. Please choose a different name.")
-            return
+        # # Check that the new name does not already exist in the scene
+        # if cmds.objExists(new_setgroup_name):
+        #     cmds.warning(f"A set group named '{new_setgroup_name}' already exists. Please choose a different name")
+        #     return
 
-        # Check that the new name does not start with a number
-        if re.match(r"^\d", new_setgroup_name):
-            cmds.warning("Set group name cannot start with a number.")
-            return
+        # # Check that the new name does not start with a number
+        # if re.match(r"^\d", new_setgroup_name):
+        #     cmds.warning("Set group name cannot start with a number")
+        #     return
 
-        # Check that the new name does not contain invalid characters or spaces for Maya
-        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", new_setgroup_name):
-            cmds.warning("Set group name contains invalid characters or spaces. Only letters, numbers, and underscores are allowed.")
-            return
+        # # Check that the new name does not contain invalid characters or spaces for Maya
+        # if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", new_setgroup_name):
+        #     cmds.warning("Set group name contains invalid characters or spaces. Only letters, numbers, and underscores are allowed")
+        #     return
+
+
+        # Let cmds.rename handle the renaming logic/permissions
+
 
         # Check that the name is not "main" or "Main"
         if new_setgroup_name.lower() == "main":
-            cmds.warning("Cannot rename set group 'main'.")
+            cmds.warning("Cannot rename set group 'main'")
             return
 
         # Add the "_setgroup" suffix to the new name
-        new_setgroup_name = f"{new_setgroup_name}_setgroup"
+        new_setgroup_name = f"{new_setgroup_name.strip()}_setgroup"
 
         # Rename the set group in a deferred callback
         def rename_setgroup_deferred():
@@ -681,7 +690,7 @@ class toolbar(object):
     def rename_set(self, old_set_name, new_set_name, set_group=None, *args):
         # Check that the new name is not empty
         if not new_set_name.strip():
-            cmds.warning("Please enter a valid set name.")
+            cmds.warning("Please enter a valid set name")
             return
 
         # Check that the new name does not already exist in the scene
@@ -689,18 +698,23 @@ class toolbar(object):
         new_set_name_with_color = f"{new_set_name}_{set_group}_{current_color_suffix}"
 
         if cmds.objExists(new_set_name_with_color):
-            cmds.warning(f"A set named '{new_set_name_with_color}' already exists. Please choose a different name.")
+            cmds.warning(f"A set named '{new_set_name_with_color}' already exists. Please choose a different name")
             return
 
-        # Check that the new name does not start with a number
-        if re.match(r"^\d", new_set_name):
-            cmds.warning("Set name cannot start with a number.")
-            return
+        # # Check that the new name does not start with a number
+        # if re.match(r"^\d", new_set_name):
+        #     cmds.warning("Set name cannot start with a number")
+        #     return
 
-        # Check that the new name does not contain invalid characters or spaces for Maya
-        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", new_set_name):
-            cmds.warning("Set name contains invalid characters or spaces. Only letters, numbers, and underscores are allowed.")
-            return
+        # # Check that the new name does not contain invalid characters or spaces for Maya
+        # if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", new_set_name):
+        #     cmds.warning("Set name contains invalid characters or spaces. Only letters, numbers, and underscores are allowed")
+        #     return
+
+        
+        # Let cmds.rename handle the renaming logic/permissions
+
+
 
         # Rename the selection group
         def rename_set_deferred():
@@ -833,7 +847,7 @@ class toolbar(object):
 
         # Check that the selection group exists
         if not set_node:
-            cmds.warning(f"Set '{set_name}' does not exist.")
+            cmds.warning(f"Set '{set_name}' does not exist")
             return
 
         # Remove the underscore from the color suffix
@@ -847,7 +861,7 @@ class toolbar(object):
 
         # Check that the new name does not already exist in the scene
         if cmds.objExists(new_set_name):
-            cmds.warning(f"A set named '{new_set_name}' already exists. Please choose a different color.")
+            cmds.warning(f"A set named '{new_set_name}' already exists. Please choose a different color")
             return
 
         # Rename the selection group with the updated color suffix
@@ -912,7 +926,7 @@ class toolbar(object):
 
 
         else:
-            cmds.warning(f"{new_set_group_name} already exists.")
+            cmds.warning(f"{new_set_group_name} already exists")
 
 
 
@@ -1207,7 +1221,7 @@ class toolbar(object):
         selection = cmds.ls(selection=True)
 
         if not selection:
-            cmds.warning("Please select at least on object.")
+            print("Select at least on object")
         else:
 
             new_set_name = set_name_field.text()
@@ -1267,7 +1281,7 @@ class toolbar(object):
                 set_name_field.clear()
 
             else:
-                cmds.warning(f"{new_set_name} already exists.")
+                cmds.warning(f"{new_set_name} already exists")
 
 
 
@@ -1282,7 +1296,7 @@ class toolbar(object):
 
                 # Verificar si el conjunto de selección ya está en el setgroup de destino
                 if current_setgroup == target_setgroup:
-                    cmds.warning(f"The set '{set_name}' is already in the setgroup '{target_setgroup}'.")
+                    cmds.warning(f"The set '{set_name}' is already in the setgroup '{target_setgroup}'")
                 else:
                     # Mover el conjunto de selección al setgroup de destino
                     cmds.sets(set_name, e=True, remove=current_setgroup)
@@ -1290,9 +1304,9 @@ class toolbar(object):
                     cmds.warning("Set moved")
                     cmds.evalDeferred(self.create_buttons_for_sel_sets)
             else:
-                cmds.warning(f"The set is not part of any setgroup.")
+                cmds.warning(f"The set is not part of any setgroup")
         else:
-            cmds.warning("Invalid set or setgroup names.")
+            cmds.warning("Invalid set or setgroup names")
 
 
 
@@ -1321,12 +1335,12 @@ class toolbar(object):
 
         # Asegúrate de que haya algo seleccionado en la escena
         if not cmds.ls(selection=True):
-            cmds.warning("No objects selected.")
+            print("Select at least one object")
             return
 
         # Asegúrate de que el set exista
         if not cmds.objExists(set_name):
-            cmds.warning(f"Set {set_name} does not exist.")
+            cmds.warning(f"Set {set_name} does not exist")
             return
 
         # Añade la selección al conjunto de selección
@@ -1335,12 +1349,12 @@ class toolbar(object):
     def remove_selection_from_set(self, set_name, *args):
 
         if not cmds.ls(selection=True):
-            cmds.warning("No objects selected.")
+            print("Select at least one object")
             return
 
         # Asegúrate de que el set exista
         if not cmds.objExists(set_name):
-            cmds.warning(f"Set {set_name} does not exist.")
+            cmds.warning(f"Set {set_name} does not exist")
             return
 
         # Elimina la selección del conjunto de selección
@@ -1959,7 +1973,7 @@ class toolbar(object):
 
         if not selection:
             # Si no hay objetos seleccionados, muestra un mensaje de error
-            cmds.warning("Please select one object.")
+            print("Select one object")
         else:
 
             # Toggle button state
@@ -1986,7 +2000,7 @@ class toolbar(object):
 
         if self.micro_move_button_state:
             cmds.undoInfo(openChunk=True)
-            cmds.iconTextButton("micro_move_button", e=True, bgc=(0.3, 0.3, 0.3))
+            # cmds.iconTextButton("micro_move_button", e=True, bgc=(0.3, 0.3, 0.3))
             self.micro_move_run_timer = True
             bar.activate_micro_move()
 
@@ -1999,7 +2013,7 @@ class toolbar(object):
             current_context = cmds.currentCtx()
             microMoveContext = "microMoveCtx"
             microRotateContext = "microRotateCtx"
-            cmds.iconTextButton("micro_move_button", e=True, bgc=(0.2, 0.2, 0.2))
+            # cmds.iconTextButton("micro_move_button", e=True, bgc=(0.2, 0.2, 0.2))
 
             # El thread tarda en pararse así que necesitamos crear esto y así salirnos en barMod de la ejecución
             cmds.manipMoveContext('dummyCtx')
@@ -2085,6 +2099,7 @@ class toolbar(object):
 
         os_info = platform.system() + " " + platform.release()
 
+        tkm_stage = general.get_thekeymachine_version()
         tkm_version = general.get_thekeymachine_version()
 
         app = QApplication.instance()
@@ -2105,7 +2120,7 @@ class toolbar(object):
 
         print("_____________________ TKM sys info ______________________")
         print("")
-        print(f"TKM version: {tkm_version}")
+        print(f"TKM version: {tkm_stage} v{tkm_version}")
         print("Operating System: " + os_info)
         print("Install path: " + INSTALL_PATH)
         print("User folder path: " + USER_FOLDER_PATH)
@@ -2218,7 +2233,7 @@ class toolbar(object):
     def create_bookmark(self, list_widget, *args):
         current_selection = cmds.ls(selection=True)
         if not current_selection:
-            cmds.warning("No objects selected.")
+            print("Select at least one object")
             return
 
         text = cmds.promptDialog(
@@ -2233,12 +2248,12 @@ class toolbar(object):
         if text == 'Create':
             bookmark_name = cmds.promptDialog(query=True, text=True)
             if not bookmark_name:  # Validar si el campo de texto está vacío
-                cmds.warning("Bookmark name cannot be empty.")
+                cmds.warning("Bookmark name cannot be empty")
                 return
 
             # Validar el nombre del bookmark usando una expresión regular
             if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", bookmark_name):
-                cmds.warning("Invalid bookmark name. It should start with a letter or underscore and contain only letters, numbers, and underscores.")
+                cmds.warning("Invalid bookmark name. It should start with a letter or underscore and contain only letters, numbers, and underscores")
                 return
 
             self.create_ibookmark_node()
@@ -2329,15 +2344,15 @@ class toolbar(object):
                             cmds.isolateSelect(currentPanel, addSelected=True)
 
                     else:
-                        cmds.warning("Please set the focus on a camera or viewport.")
+                        cmds.warning("Please set the focus on a camera or viewport")
 
 
                 else:
-                    cmds.warning(f"No hay objetos dentro del bookmark '{bookmark_name}'.")
+                    cmds.warning(f"No hay objetos dentro del bookmark '{bookmark_name}'")
             else:
-                cmds.warning(f"Bookmark '{bookmark_name}' no encontrado en la escena.")
+                cmds.warning(f"Bookmark '{bookmark_name}' no encontrado en la escena")
         else:
-            cmds.warning("No bookmark selected.")
+            cmds.warning("No bookmark selected")
 
         # Restaurar la selección original al final de la función
         cmds.select(clear=True)
@@ -2432,8 +2447,6 @@ class toolbar(object):
 
 
     def buildUI(self):
-
-
         # Fix para que no de error, por si no lee el ancho del ViewPanel
 
         if self.bar_center_value == None:
@@ -2581,196 +2594,44 @@ class toolbar(object):
         def update_tooltips():
             # Leer el valor actual de show_tooltips
             show_tooltips = read_show_tooltips()
-            
-
-
-
-            if self.screen_width == 3840:
-                base_style = '''
-                    QPushButton {
-                        color: #bfbfbf;
-                        background-color: #404040;
-                        border-radius: 5px;
-                        font: 22px;
-                    }
-                    QPushButton:hover:!pressed {
-                        color: #bfbfbf;
-                        background-color: #555555;
-                        border-radius: 5px;
-                        font: 22px;
-                    }
-                '''
-
-                base_color_style = '''
-                    QPushButton {
-                        color: #66949d;
-                        background-color: #404040;
-                        border-radius: 5px;
-                        font: 22px;
-                    }
-                    QPushButton:hover:!pressed {
-                        color: #66949d;
-                        background-color: #484848;
-                        border-radius: 5px;
-                        font: 22px;
-                    }
-
-                '''
-                selector_style = f'''
-                    QPushButton {{
-                        color: #666;
-                        background-color: #353535;
-                        border-radius: 8px;
-                        font: 16px;
-
-                        
-                        background-repeat: no-repeat;
-                        background-position: center;
-
-
-                    }}
-                    QPushButton:hover:!pressed {{
-                        color: #ccc;
-                        background-color: #393939;
-                        border-radius: 8px;
-                        font: 16px;
-                    }}
-                '''
-
-                blend_slider_buttons_style = f'''
-                    QPushButton {{
-                        color: #999;
-                        background-color: #404040;
-                        border-radius: 4px;
-                        font: 18px;
-
-                        
-                        background-repeat: no-repeat;
-                        background-position: center;
-
-
-                    }}
-                    QPushButton:hover:!pressed {{
-                        color: #ccc;
-                        background-color: #424242;
-                        border-radius: 4px;
-                        font: 18px;
-                    }}
-                '''
-
-            else:
-                base_style = '''
-                    QPushButton {
-                        color: #bfbfbf;
-                        background-color: #404040;
-                        border-radius: 5px;
-                        font: 14px;
-                    }
-                    QPushButton:hover:!pressed {
-                        color: #bfbfbf;
-                        background-color: #555555;
-                        border-radius: 5px;
-                        font: 14px;
-                    }
-                '''
-
-                base_color_style = '''
-                    QPushButton {
-                        color: #66949d;
-                        background-color: #404040;
-                        border-radius: 5px;
-                        font: 14px;
-                    }
-                    QPushButton:hover:!pressed {
-                        color: #66949d;
-                        background-color: #484848;
-                        border-radius: 5px;
-                        font: 14px;
-                    }
-
-                '''
-                selector_style = f'''
-                    QPushButton {{
-                        color: #666;
-                        background-color: #353535;
-                        border-radius: 8px;
-                        font: 10px;
-
-                        
-                        background-repeat: no-repeat;
-                        background-position: center;
-
-
-                    }}
-                    QPushButton:hover:!pressed {{
-                        color: #ccc;
-                        background-color: #393939;
-                        border-radius: 8px;
-                        font: 10px;
-                    }}
-                '''
-
-                blend_slider_buttons_style = f'''
-                    QPushButton {{
-                        color: #999;
-                        background-color: #404040;
-                        border-radius: 4px;
-                        font: 10px;
-
-                        
-                        background-repeat: no-repeat;
-                        background-position: center;
-
-
-                    }}
-                    QPushButton:hover:!pressed {{
-                        color: #ccc;
-                        background-color: #424242;
-                        border-radius: 4px;
-                        font: 10px;
-                    }}
-                '''
-
-
-
 
             
             # Lista que contiene los widgets y los textos de los tooltips
             buttons_and_tooltips = [
-                (pointer_button_widget, helper.pointer_tooltip_text, None),
-                (isolate_button_widget, helper.isolate_tooltip_text, None),
-                (block_keys_button_widget, helper.block_keys_tooltip_text, None),
-                (createLocator_button_widget, helper.createLocator_tooltip_text, None),
-                (align_button_widget, helper.align_tooltip_text, None),
-                (tracer_button_widget, helper.tracer_tooltip_text, None),
-                (deleteAnim_button_widget, helper.delete_animation_tooltip_text, None),
-                (reset_values_button_widget, helper.reset_values_tooltip_text, None),
-                (select_opposite_button_widget, helper.select_opposite_tooltip_text, None),
-                (copy_opposite_button_widget, helper.copy_opposite_tooltip_text, None),
-                (mirror_button_widget, helper.mirror_tooltip_text, None),
-                (copy_paste_animation_button_widget, helper.copy_paste_animation_tooltip_text, None),
-                (selector_button_widget, helper.selector_tooltip_text, selector_style),
-                (select_hierarchy_button_widget, helper.select_hierarchy_tooltip_text, None),
-                (animation_offset_button_widget, helper.animation_offset_tooltip_text, None),
-                (link_objects_button_widget, helper.link_objects_tooltip_text, None),
-                (create_follow_cam_button_widget, helper.follow_cam_tooltip_text, None),
-                (copy_worldspace_button_widget, helper.copy_worldspace_tooltip_text, None),
-                (temp_pivot_button_widget, helper.temp_pivot_tooltip_text, None),
-                (micro_move_button_widget, helper.micro_move_tooltip_text, None),
-                (selection_sets_button_widget, helper.selection_sets_tooltip_text, None),
-                (open_custom_graph_button_widget, helper.customGraph_tooltip_text, None),
-                # (toolBox_button_widget, helper.custom_tools_tooltip_text, None),
-                # (customScripts_button_widget, helper.custom_scripts_tooltip_text, None),
+                (pointer_button_widget, helper.pointer_tooltip_text),
+                (isolate_button_widget, helper.isolate_tooltip_text),
+                (block_keys_button_widget, helper.block_keys_tooltip_text),
+                (createLocator_button_widget, helper.createLocator_tooltip_text),
+                (align_button_widget, helper.align_tooltip_text),
+                (tracer_button_widget, helper.tracer_tooltip_text),
+                (deleteAnim_button_widget, helper.delete_animation_tooltip_text),
+                (reset_values_button_widget, helper.reset_values_tooltip_text),
+                (select_opposite_button_widget, helper.select_opposite_tooltip_text),
+                (copy_opposite_button_widget, helper.copy_opposite_tooltip_text),
+                (mirror_button_widget, helper.mirror_tooltip_text),
+                (copy_paste_animation_button_widget, helper.copy_paste_animation_tooltip_text),
+                (selector_button_widget, helper.selector_tooltip_text),
+                (select_hierarchy_button_widget, helper.select_hierarchy_tooltip_text),
+                (animation_offset_button_widget, helper.animation_offset_tooltip_text),
+                (link_objects_button_widget, helper.link_objects_tooltip_text),
+                (create_follow_cam_button_widget, helper.follow_cam_tooltip_text),
+                (copy_worldspace_button_widget, helper.copy_worldspace_tooltip_text),
+                (temp_pivot_button_widget, helper.temp_pivot_tooltip_text),
+                (micro_move_button_widget, helper.micro_move_tooltip_text),
+                (selection_sets_button_widget, helper.selection_sets_tooltip_text),
+                (open_custom_graph_button_widget, helper.customGraph_tooltip_text),
+                # (toolBox_button_widget, helper.custom_tools_tooltip_text),
+                # (customScripts_button_widget, helper.custom_scripts_tooltip_text),
 
-                (move_key_left_b_widget, helper.move_key_left_b_widget_tooltip_text, base_style),
-                (remove_inbetween_b_widget, helper.remove_inbetween_b_widget_tooltip_text, base_style),
-                (add_inbetween_b_widget, helper.add_inbetween_b_widget_tooltip_text, base_style),
-                (move_key_right_b_widget, helper.move_key_right_b_widget_tooltip_text, base_style),
-                (clear_selected_keys_widget, helper.clear_selected_keys_widget_tooltip_text, base_color_style),
-                (select_scene_animation_widget, helper.select_scene_animation_widget_tooltip_text, base_color_style),
+                (move_key_left_b_widget, helper.move_key_left_b_widget_tooltip_text),
+                (remove_inbetween_b_widget, helper.remove_inbetween_b_widget_tooltip_text),
+                (add_inbetween_b_widget, helper.add_inbetween_b_widget_tooltip_text),
+                (move_key_right_b_widget, helper.move_key_right_b_widget_tooltip_text),
+                (clear_selected_keys_widget, helper.clear_selected_keys_widget_tooltip_text),
+                (select_scene_animation_widget, helper.select_scene_animation_widget_tooltip_text),
 
-                (barTweenSlider_widget, helper.blend_to_frame_slider_tooltip_text, blend_slider_buttons_style),
-                (barBlendSlider_widget, helper.blend_to_frame_slider_tooltip_text, blend_slider_buttons_style),
+                (barTweenSlider_widget, helper.blend_to_frame_slider_tooltip_text),
+                (barBlendSlider_widget, helper.blend_to_frame_slider_tooltip_text),
 
             ]
 
@@ -2786,17 +2647,11 @@ class toolbar(object):
                 border-radius: 4px;
             }
             """
-            style_disabled = ""
 
             # Iterar sobre cada botón y su tooltip para establecer el tooltip según el valor de show_tooltips
-            for button_widget, tooltip_text, button_base_style in buttons_and_tooltips:
-                combined_style = button_base_style if button_base_style else ""
-                if show_tooltips:
-                    button_widget.setToolTip(tooltip_text)
-                    button_widget.setStyleSheet(combined_style + style_enabled)
-                else:
-                    button_widget.setToolTip("")
-                    button_widget.setStyleSheet(combined_style + style_disabled)
+            for button_widget, tooltip_text in buttons_and_tooltips:
+                button_widget.setToolTip(tooltip_text if show_tooltips else "")
+                button_widget.setStyleSheet(style_enabled)
 
 
 
@@ -3020,7 +2875,7 @@ class toolbar(object):
         blend_to_key_left_button = cmds.button('blend_to_key_left', l="1", vis=False, w=1, h=1, c=lambda x: update_button_with_current_frame('blend_to_key_left'), p="rowtoolbar")
 
         # Slider Widget Blend Slider
-        barBlendSlider_widget = sw.SliderWidget("bar_blend_slider", min=-100, max=100, value=0, text="BN", color=ui.color_codes["_06"], dragCommand=blend_slider_wrapper, p=rowtoolbar_layout)
+        barBlendSlider_widget = sw.SliderWidget("bar_blend_slider", min=-100, max=100, value=0, text="BN", color=COLOR.color.green, dragCommand=blend_slider_wrapper, p=rowtoolbar_layout)
         barBlendSlider = barBlendSlider_widget.objectName()
 
         blend_to_key_right_button = cmds.button('blend_to_key_right', l="1", vis=False, w=1, h=1, c=lambda x: update_button_with_current_frame('blend_to_key_right'), p="rowtoolbar")
@@ -3051,50 +2906,52 @@ class toolbar(object):
         # Al final de customGraph.py hay un if-else para mostrar u ocultar el tween slider dependiendo de 
         # si el graph editor esta en modo dock o no. Con esto se evita duplicar el slider
 
-        def update_label_with_slider_value(value):
-            rounded_value = round(value)
-
-            # Ajusta el valor de la etiqueta basado en el valor del slider
-            if -20 <= rounded_value < 50:
-                # Escala el valor de forma que 50 se convierta en 120 y -20 también en 120
-                set_value = 120 - abs(20 + rounded_value)
-            else:
-                # Para valores de 50 a 120, muestra el valor tal cual
-                set_value = rounded_value
-
-            cmds.text('barTweenSliderLabelText', edit=True, label=str(set_value))
-
-
 
         def tween_wrapper(value):
             keyTools.handle_autokey_start()
             keyTools.tween(value)  # Llama a la función tween original
-            # update_label_with_slider_value(value)
 
-        def reset_label_after_drag(value):
+        def tween_drop_wrapper():
             keyTools.handle_autokey_end()
-            cmds.text('barTweenSliderLabelText', edit=True, label="T")
             keyTools.tweenSliderReset(barTweenSlider)
 
 
 
-        def set_tween_slider_command(mode):
-            cmds.floatSlider("bar_tween_slider", edit=True, value=50)  # Restablecer el slider
-            if mode == 'Tweener World Space':
-                cmds.floatSlider("bar_tween_slider", edit=True, dragCommand=tween_wrapper)  
-                cmds.text('barTweenSliderLabelText', edit=True, label="TW" )
-            elif mode == 'Tweener':
-                cmds.floatSlider("bar_tween_slider", edit=True, dragCommand=tween_wrapper)
-                cmds.text('barTweenSliderLabelText', edit=True, label="TL" )
-                
+        def set_tween_slider_command(mode, *args):
+            match mode:
+                case 'tweener':
+                    # barTweenSlider_widget.setText("TW")
+                    barTweenSlider_widget.setWorldSpace(False)
+                    barTweenSlider_widget.setDragCommand(tween_wrapper)
+                case 'tweener_worldspace':
+                    # barTweenSlider_widget.setText("WL")
+                    barTweenSlider_widget.setWorldSpace(True)
+                    barTweenSlider_widget.setDragCommand(tween_wrapper)
+                    
 
         # Slider Widget Tween Slider
-        barTweenSlider_widget = sw.SliderWidget("bar_tween_slider", min=-120, max=120, value=0, text="TW", color=ui.color_codes["_02"], dragCommand=tween_wrapper, p=rowtoolbar_layout)
+        barTweenSlider_widget = sw.SliderWidget("bar_tween_slider", min=-120, max=120, value=0, text="TW", color=COLOR.color.yellow, dragCommand=tween_wrapper, dropCommand=tween_drop_wrapper, p=rowtoolbar_layout)
         barTweenSlider = barTweenSlider_widget.objectName()
 
         cmds.separator("bar_tween_slider_separator", style='none', width=10, p="rowtoolbar")
 
 
+
+        barTweenSlider_popup_menu = cmds.popupMenu(button=3, ctl=False, alt=False, parent=barTweenSlider)
+
+
+        # Tween slider menu
+        # Crear una colección de radio buttons
+        radio_collection = cmds.radioCollection()
+
+        # Crear los items de menú y agregarlos a la colección
+        cmds.radioMenuItemCollection(radio_collection)
+        
+        # Agrega los items de menú con radio buttons
+        bar_tween_menu = cmds.menuItem(l="Tweener", radioButton=True, p=barTweenSlider_popup_menu, command=lambda x: set_tween_slider_command('tweener'))
+        bar_tween_worldspace_menu = cmds.menuItem(l="Tweener World Space", radioButton=True, p=barTweenSlider_popup_menu, command=lambda x: set_tween_slider_command('tweener_worldspace'))
+
+        cmds.menuItem(bar_tween_menu, edit=True, radioButton=True)
 
 
 
@@ -3703,7 +3560,7 @@ class toolbar(object):
         # === Help submenu ===
         help_menu = toolbar_menu.addMenu(QtGui.QIcon(media.help_menu_image), "Help")
         help_menu.addAction(QtGui.QIcon(media.discord_image), "Discord Community",
-                            lambda: general.open_url("https://discord.com/channels/1186722267212820610"))
+                            lambda: general.open_url("https://discord.gg/G2J5yyjz"))
         help_menu.addAction(QtGui.QIcon(media.help_menu_image), "Knowledge base",
                             lambda: general.open_url("https://thekeymachine.gitbook.io/base"))
         help_menu.addAction(QtGui.QIcon(media.youtube_image), "Youtube channel",

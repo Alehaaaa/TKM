@@ -16,6 +16,7 @@
     thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
                                                                                                                                               
     Developed by: Rodrigo Torres / rodritorres.com                                                                                             
+    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
                                                                                                                                              
 
 
@@ -219,7 +220,7 @@ def set_smart_key():
     selected_objects = cmds.ls(selection=True)
 
     if not selected_objects:
-        cmds.warning("Please select at least one object")
+        print("Select at least one object")
     else:
         # Obtén el tiempo actual
         current_time = cmds.currentTime(query=True)
@@ -279,8 +280,6 @@ def smart_translate_manipulator():
             cmds.manipMoveContext('Move', e=True, mode=2)  # Cambiar a modo "object"
         else:
             cmds.manipMoveContext('Move', e=True, mode=0)  # Cambiar a modo "world"
-    else:
-        print("")
 
 
 

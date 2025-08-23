@@ -13,6 +13,7 @@
     thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
                                                                                                                                               
     Developed by: Rodrigo Torres / rodritorres.com                                                                                             
+    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
                                                                                                                                              
 
 
@@ -99,15 +100,19 @@ USER_FOLDER_PATH = config["USER_FOLDER_PATH"]
 # ------------------------------------------------------------------------
 
 def get_thekeymachine_version():
-    thekeymachine_version = "0.1.41"
+    thekeymachine_version = "0.1.50"
     return thekeymachine_version
 
+def get_thekeymachine_stage_version():
+    thekeymachine_stage_version = "beta"
+    return thekeymachine_stage_version
+
 def get_thekeymachine_build_version():
-    thekeymachine_build_version = "307"
+    thekeymachine_build_version = "308"
     return thekeymachine_build_version
 
 def get_thekeymachine_codename():
-    thekeymachine_codename = "Gort"
+    thekeymachine_codename = "Jell-O"
     return thekeymachine_codename
 
 
@@ -205,7 +210,10 @@ def create_TheKeyMachine_node():
     # Guardar la selección inicial
     initial_selection = cmds.ls(selection=True)
 
+    tkm_stage = get_thekeymachine_version()
     tkm_version = get_thekeymachine_version()
+    tkm_full_version = "{} v{}".format(tkm_stage, tkm_version)
+
     tkm_codename = get_thekeymachine_codename()
 
     if not cmds.objExists("TheKeyMachine"):
@@ -226,7 +234,7 @@ def create_TheKeyMachine_node():
             cmds.setAttr(node + "." + attr, lock=True, keyable=False, channelBox=False)
 
         # Añadir los atributos "codeEnum" y "version"
-        cmds.addAttr(node, longName="version", niceName="version", attributeType="enum", enumName=tkm_version, keyable=True)
+        cmds.addAttr(node, longName="version", niceName="version", attributeType="enum", enumName=tkm_full_version, keyable=True)
         cmds.addAttr(node, longName="series", niceName="series", attributeType="enum", enumName=tkm_codename, keyable=True)
 
         # Restaurar la selección inicial
@@ -319,7 +327,7 @@ def open_file(sub_directory, file_name):
         except subprocess.CalledProcessError as e:
             # Si xdg-open produce un error, intenta cambiar temporalmente LD_LIBRARY_PATH y volver a intentar
             print(f"Error opening the file with xdg-open: {e}")
-            print("Attempting to open the file with modified LD_LIBRARY_PATH...")
+            print("Attempting to open the file with modified LD_LIBRARY_PATH..")
             
             original_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
             os.environ['LD_LIBRARY_PATH'] = '/usr/lib:/lib:/usr/local/lib'
