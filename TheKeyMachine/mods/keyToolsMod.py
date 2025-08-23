@@ -1267,83 +1267,80 @@ def blend_to_key(percentage, objs=None, selection=True):
 
     global is_dragging, frame_data_cache, is_cached, last_autokey_time, autokey_interval
 
-    try:
-        if not is_dragging:
-            cmds.undoInfo(openChunk=True)
-            is_dragging = True
 
-        if objs is None and selection:
-            objs = cmds.ls(selection=True)
+    if not is_dragging:
+        cmds.undoInfo(openChunk=True)
+        is_dragging = True
 
-        if not objs:
-            return
+    if objs is None and selection:
+        objs = cmds.ls(selection=True)
 
-        if not is_cached:
-
-            frame_data_cache = cache_keyframe_data(objs)
-            is_cached = True
-
-        currentTime = cmds.currentTime(query=True)  
-
-        for obj in objs:
-            # Sólo atributos escalares keyables (evita double3 compuestos como rotate/translate)
-            attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
-
-            for attr in attrs:
-                attrFull = f"{obj}.{attr}"
-
-                # salta si no existe en la caché
-                if attrFull not in frame_data_cache:
-                    continue
-
-                # salta si está bloqueado o no es seteable
-                if cmds.getAttr(attrFull, lock=True) or not cmds.getAttr(attrFull, settable=True):
-                    continue
-
-                # salta tipos no numéricos
-                a_type = cmds.getAttr(attrFull, type=True)
-                if a_type in ("enum", "string", "message"):
-                    continue
-
-                cachedData = frame_data_cache[attrFull]
-
-                # nombres tal cual en tu cache: "original_value", "previousValue", "nextValue"
-                orig = cachedData.get("original_value")
-                nxt  = cachedData.get("nextValue")
-                prev = cachedData.get("previousValue")
-
-                # si por cualquier motivo llega lista/tupla, pasa
-                if any(isinstance(v, (list, tuple)) for v in (orig, nxt, prev) if v is not None):
-                    continue
-
-                # también salta si orig no es número
-                if not isinstance(orig, (int, float)):
-                    continue
-
-                if nxt is not None and isinstance(nxt, (int, float)) and percentage > 0:
-                    difference = nxt - orig
-                elif prev is not None and isinstance(prev, (int, float)):
-                    difference = orig - prev
-                else:
-                    continue
-
-                weightedDifference = (difference * abs(percentage)) / 50.0
-                currentValue = orig + weightedDifference if percentage > 0 else orig - weightedDifference
-
-                try:
-                    cmds.setAttr(attrFull, float(currentValue))
-                except Exception:
-                    # por si un attr acepta sólo enteros o tiene límites
-                    try:
-                        cmds.setAttr(attrFull, int(round(currentValue)))
-                    except Exception:
-                        continue
-
-    finally:
-        # cierra el chunk de undo si se abrió
+    if not objs:
         if is_dragging:
             cmds.undoInfo(closeChunk=True)
             is_dragging = False
+        return
+
+    if not is_cached:
+
+        frame_data_cache = cache_keyframe_data(objs)
+        is_cached = True
+
+    currentTime = cmds.currentTime(query=True)  
+
+    for obj in objs:
+        # Sólo atributos escalares keyables (evita double3 compuestos como rotate/translate)
+        attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
+
+        for attr in attrs:
+            attrFull = f"{obj}.{attr}"
+
+            # salta si no existe en la caché
+            if attrFull not in frame_data_cache:
+                continue
+
+            # salta si está bloqueado o no es seteable
+            if cmds.getAttr(attrFull, lock=True) or not cmds.getAttr(attrFull, settable=True):
+                continue
+
+            # salta tipos no numéricos
+            a_type = cmds.getAttr(attrFull, type=True)
+            if a_type in ("enum", "string", "message"):
+                continue
+
+            cachedData = frame_data_cache[attrFull]
+
+            # nombres tal cual en tu cache: "original_value", "previousValue", "nextValue"
+            orig = cachedData.get("original_value")
+            nxt  = cachedData.get("nextValue")
+            prev = cachedData.get("previousValue")
+
+            # si por cualquier motivo llega lista/tupla, pasa
+            if any(isinstance(v, (list, tuple)) for v in (orig, nxt, prev) if v is not None):
+                continue
+
+            # también salta si orig no es número
+            if not isinstance(orig, (int, float)):
+                continue
+
+            if nxt is not None and isinstance(nxt, (int, float)) and percentage > 0:
+                difference = nxt - orig
+            elif prev is not None and isinstance(prev, (int, float)):
+                difference = orig - prev
+            else:
+                continue
+
+            weightedDifference = (difference * abs(percentage)) / 50.0
+            currentValue = orig + weightedDifference if percentage > 0 else orig - weightedDifference
+
+            try:
+                cmds.setAttr(attrFull, float(currentValue))
+            except Exception:
+                # por si un attr acepta sólo enteros o tiene límites
+                try:
+                    cmds.setAttr(attrFull, int(round(currentValue)))
+                except Exception:
+                    continue
 
 
 
@@ -1596,7 +1593,7 @@ def tween(percentage, slider_name="bar_tween_slider"):
 
         adjustments.append((attrFull, currentValue))
 
-    # aplicar ajustes (tu función existente)
+
     apply_tween_adjustments(adjustments, currentTime, tween_frame_data_cache)
     
 
