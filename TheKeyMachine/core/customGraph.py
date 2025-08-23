@@ -59,12 +59,17 @@ import TheKeyMachine.mods.selSetsMod as selSets
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
 
-mods = [general,
-        ui,
-        keyTools,
-        selSets,
-        media,
-        style]
+from TheKeyMachine.widgets import sliderWidget as sw # type: ignore
+
+mods = [
+    general,
+    ui,
+    keyTools,
+    selSets,
+    media,
+    style,
+    sw
+]
 
 for m in mods:
     importlib.reload(m)
@@ -85,7 +90,7 @@ curves_optionMenu = None
 customGraphWin = None
 
 
-curve_mode_slider = None
+curveModeSlider = None
 is_dragging = False
 original_keyframes = {}
 
@@ -176,8 +181,6 @@ def apply_base_stylesheet(button):
 
 def createCustomGraph():
 
-    #from TheKeyMachine.core.toolbar import tkm_lic_status
-
     graph_vis = cmds.getPanel(vis=True)
 
     if "graphEditor1" in graph_vis:
@@ -192,7 +195,11 @@ def createCustomGraph():
 
 
 
-    cmds.flowLayout(wr=True, h=25, p="customGraph_columnLayout")
+    flowtoolbar = cmds.flowLayout(wr=True, h=25, p="customGraph_columnLayout")
+    flow_ptr = mui.MQtUtil.findControl(flowtoolbar)
+    flow_qw = wrapInstance(int(flow_ptr), QtWidgets.QWidget)
+    flowtoolbar_layout = flow_qw.layout()
+
     separator = cmds.separator(style='none', width=5)
 
 
@@ -235,7 +242,7 @@ def createCustomGraph():
         "Performs a cleanup and repositioning of the keys that are in a sub-frame "
         "to the nearest frame.<br><br>This tool doesn't just perform a simple snap, but "
         "it ensures to clean up and prevent multiple keyframes in the same frame.<br><br> "
-        "Ideal for after scaling an animation."
+        "Ideal for after scalign an animation."
     )
     apply_base_stylesheet(clean_button_widget)
 
@@ -284,8 +291,12 @@ def createCustomGraph():
 
     cmds.separator(style='none', width=2)
     
+    barBlendSlider_widget = sw.SliderWidget("customGraph_tween_slider", min=-100, max=100, value=0, text="TW", color=ui.color_codes["_02"], dragCommand=lambda x: keyTools.tween(x, slider_name="customGraph_tween_slider"), p=flowtoolbar_layout)
+    barBlendSlider = barBlendSlider_widget.objectName()
+    """
     tweenSliderLabel=cmds.text(label="T")
     separator = cmds.separator(style='none', width=4)
+    
     tweenSlider = cmds.floatSlider("customGraph_tween_slider", width=140, min=-20, max=120, value=50, step=1, ann="TweenMachine", 
                        dragCommand=lambda x: keyTools.tween(x, slider_name="customGraph_tween_slider"), 
                        changeCommand=lambda x: keyTools.tweenSliderReset(tweenSlider))
@@ -356,7 +367,7 @@ def createCustomGraph():
         }}
     '''.format(bg_color=tweenSlider_bg_color, tick_color=tweenSlider_tick_color)
 
-    tweenSlider_widget.setStyleSheet(styleSheet)
+    tweenSlider_widget.setStyleSheet(styleSheet)"""
 
     separator = cmds.separator(style='none', width=15)
 
@@ -371,26 +382,26 @@ def createCustomGraph():
     def curve_mode_changed(*args):
         mode = cmds.optionMenu(curves_option_menu, query=True, value=True)
         if mode == "Smooth":
-            cmds.floatSlider(curve_mode_slider, edit=True, min=0.0, max=0.5, value=0)
+            cmds.floatSlider(curveModeSlider, edit=True, min=0.0, max=0.5, value=0)
         elif mode == "Wave":
-            cmds.floatSlider(curve_mode_slider, edit=True, min=-1, max=1, value=0)
+            cmds.floatSlider(curveModeSlider, edit=True, min=-1, max=1, value=0)
         elif mode == "Scale":
-            cmds.floatSlider(curve_mode_slider, edit=True, min=0.7, max=1.3, value=1)
+            cmds.floatSlider(curveModeSlider, edit=True, min=0.7, max=1.3, value=1)
         elif mode == "Scale Sel":
-            cmds.floatSlider(curve_mode_slider, edit=True, min=0.7, max=1.3, value=1)
+            cmds.floatSlider(curveModeSlider, edit=True, min=0.7, max=1.3, value=1)
         elif mode == "Lineal":
-            cmds.floatSlider(curve_mode_slider, edit=True, min=0.0, max=1.0, value=0)
+            cmds.floatSlider(curveModeSlider, edit=True, min=0.0, max=1.0, value=0)
         elif mode == "Flat":
-            cmds.floatSlider(curve_mode_slider, edit=True, min=0, max=1.0, value=0)
+            cmds.floatSlider(curveModeSlider, edit=True, min=0, max=1.0, value=0)
         elif mode == "Ease in/out":
-            cmds.floatSlider(curve_mode_slider, edit=True, min=0, max=1, value=0.5)
+            cmds.floatSlider(curveModeSlider, edit=True, min=0, max=1, value=0.5)
         elif mode == "Noise":
-            cmds.floatSlider(curve_mode_slider, edit=True, min=0.0, max=0.5, value=0)
+            cmds.floatSlider(curveModeSlider, edit=True, min=0.0, max=0.5, value=0)
         elif mode == "Add":
-            cmds.floatSlider(curve_mode_slider, edit=True, min=0.0, max=0.5, value=0)
+            cmds.floatSlider(curveModeSlider, edit=True, min=0.0, max=0.5, value=0)
         sliderReset()
 
-    def curve_mode_slider_change(value):
+    def curveModeSlider_change(value):
         mode = cmds.optionMenu(curves_option_menu, query=True, value=True)
         if mode == "Smooth":
             apply_curves_smooth_function(value)
@@ -846,19 +857,24 @@ def createCustomGraph():
         if current_option == "Wave":
             reset_value = 0
 
-        cmds.floatSlider(curve_mode_slider, edit=True, value=reset_value)
+        cmds.floatSlider(curveModeSlider, edit=True, value=reset_value)
 
 
-    #global curve_mode_slider, curves_option_menu
+    #global curveModeSlider, curves_option_menu
 
-    curve_mode_slider = cmds.floatSlider(width=140, min=0, max=1, value=0,
-                               dragCommand=curve_mode_slider_change,
+    
+    
+    curveModeSlider_widget = sw.SliderWidget("bar_blend_slider", min=-100, max=100, value=0, text="CV", color=ui.color_codes["_07"], dragCommand=curveModeSlider_change, p=flowtoolbar_layout)
+    curveModeSlider = barBlendSlider_widget.objectName()
+
+    curveModeSlider = cmds.floatSlider(width=140, min=0, max=1, value=0,
+                               dragCommand=curveModeSlider_change,
                                changeCommand=sliderReset)
 
-    curve_mode_slider_widget = wrapInstance(int(mui.MQtUtil.findControl(curve_mode_slider)), QtWidgets.QSlider)
+    curveModeSlider_widget = wrapInstance(int(mui.MQtUtil.findControl(curveModeSlider)), QtWidgets.QSlider)
     
-    curve_mode_slider_bg_color= "#323232"
-    curve_mode_slider_tick_color = "#90d074"
+    curveModeSlider_bg_color= "#323232"
+    curveModeSlider_tick_color = "#90d074"
 
     styleSheet = '''
         QSlider {{
@@ -895,9 +911,9 @@ def createCustomGraph():
             margin: -5px 0;
             border-radius: 2px;
         }}
-    '''.format(bg_color=curve_mode_slider_bg_color, tick_color=curve_mode_slider_tick_color)
+    '''.format(bg_color=curveModeSlider_bg_color, tick_color=curveModeSlider_tick_color)
 
-    curve_mode_slider_widget.setStyleSheet(styleSheet)
+    curveModeSlider_widget.setStyleSheet(styleSheet)
 
     separator = cmds.separator(style='none', width=5)
     curves_option_menu = cmds.optionMenu(label='', width=90, changeCommand=curve_mode_changed)

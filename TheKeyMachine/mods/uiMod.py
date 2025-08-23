@@ -75,9 +75,31 @@ from TheKeyMachine.mods.generalMod import config
 
 INSTALL_PATH                    = config["INSTALL_PATH"]
 USER_FOLDER_PATH                = config["USER_FOLDER_PATH"]
-LICENSE_FOLDER                  = config["LICENSE_FOLDER"]
 
 
+
+
+color_codes = {
+    "_01": "#878A90",   #gris
+    "_02": "#E6DC54",   #amarillo
+    "_03": "#96BEC7",   #azul claro
+    "_04": "#598693",   # azul oscuro
+    "_05": "#8190B8",  # purple
+    "_06": "#45C46B",  # verde
+    "_07": "#C9844B",   # naranja
+    "_08": "#AD4D4E"    # rojo oscuro
+}
+
+color_codes_hover = {
+    "_01": "#A0A5AF",   #gris
+    "_02": "#EEE3C2",   #amarillo
+    "_03": "#ABD9E3",   #azul claro
+    "_04": "#77ABBA",   # azul oscuro
+    "_05": "#A1AFD9",  # purple
+    "_06": "#83C4B3",  # verde
+    "_07": "#D99993",   # rojo claro
+    "_08": "#D46668"    # rojo oscuro
+}
 
 
 # ________________________________________________ General  ______________________________________________________ #
@@ -223,7 +245,6 @@ def uninstall():
             
             version_maya = cmds.about(version=True)
             maya_dir = os.path.join(user_app_dir, version_maya)
-            env_file_path = os.path.join(maya_dir, "Maya.env")
             
             # Crear una carpeta llamada "uninstalled" dentro de TheKeyMachine si no existe
             uninstalled_folder_path = os.path.join(tkm_folder_path, "uninstalled")
@@ -244,30 +265,6 @@ def uninstall():
                     shutil.rmtree(tkm_folder_path)
                 else:
                     cmds.warning("TheKeyMachine folder not found.")
-
-            # Borra la carpeta de la licencia del usuario
-            if os.path.exists(LICENSE_FOLDER):
-                shutil.rmtree(LICENSE_FOLDER)
-            else:
-                print("")
-
-            # Borra las líneas de código en Maya.env
-            if os.path.exists(env_file_path):
-                with open(env_file_path, 'r') as f:
-                    lines = f.readlines()
-
-                with open(env_file_path, 'w') as f:
-                    in_tkm_code_block = False
-                    for line in lines:
-                        if line.strip() == "# THIS LINE IS HERE FOR UNINSTALLING PURPOSES, PLEASE DO NOT TOUCH. START OF THEKEYMACHINE CODE":
-                            in_tkm_code_block = True
-                        elif line.strip() == "# END OF THEKEYMACHINE CODE":
-                            in_tkm_code_block = False
-                        elif not in_tkm_code_block:
-                            f.write(line)
-            else:
-                cmds.warning('Maya.env file does not exist.')
-
 
             # Elimina customGraph
             if cmds.columnLayout("customGraph_columnLayout", exists=True):
@@ -338,7 +335,7 @@ acciones = {
 
 iconos_acciones = {
     "bar.isolate_master": media.isolate_image,
-    "bar.align_selected_objects": media.aling_menu_image,
+    "bar.align_selected_objects": media.align_menu_image,
     "bar.mod_tracer": media.tracer_menu_image,
     "keyTools.reset_objects_mods": media.reset_animation_image,
     "bar.deleteAnimation": media.delete_animation_image,
@@ -484,7 +481,7 @@ class CustomButton(QtWidgets.QPushButton):
 
         # Crear acciones con íconos
         action1 = QAction(QtGui.QIcon(media.isolate_image), "Isolate", self)
-        action2 = QAction(QtGui.QIcon(media.aling_menu_image), "Align", self)
+        action2 = QAction(QtGui.QIcon(media.align_menu_image), "Align", self)
         action3 = QAction(QtGui.QIcon(media.tracer_menu_image), "Tracer", self)
         action4 = QAction(QtGui.QIcon(media.reset_animation_image), "Reset Values", self)
         action5 = QAction(QtGui.QIcon(media.delete_animation_image), "Delete Animation", self)
@@ -529,7 +526,7 @@ class CustomButton(QtWidgets.QPushButton):
         if action == action1:
             self.updateButton(media.isolate_image, "isolate_master")
         elif action == action2:
-            self.updateButton(media.aling_menu_image, "align_selected_objects")
+            self.updateButton(media.align_menu_image, "align_selected_objects")
         elif action == action3:
             self.updateButton(media.tracer_menu_image, "mod_tracer")
         elif action == action4:

@@ -68,11 +68,8 @@ def load_config():
     USERNAME = os.environ.get('USERNAME') or os.environ.get('USER')
 
     default_config = {
-        "STUDIO_INSTALL": False,
         "INSTALL_PATH": os.path.join(USER_MAYA_DIR, "scripts"),
         "USER_FOLDER_PATH": os.path.join(USER_MAYA_DIR, "scripts"),
-        "LICENSE_FOLDER": os.path.join(USER_MAYA_DIR, "scripts/TheKeyMachine_user_data/license"), # obsoleto
-        "LICENSE_FILE_NAME": "user",
         "UPDATER": False,
         "BUG_REPORT": True,
         "CUSTOM_TOOLS_MENU": True,
@@ -85,7 +82,7 @@ def load_config():
         if key not in config or config[key] == "":
             config[key] = default_value
 
-    for key in ["INSTALL_PATH", "USER_FOLDER_PATH", "LICENSE_FOLDER"]:
+    for key in ["INSTALL_PATH", "USER_FOLDER_PATH"]:
         if "{USERNAME}" in config[key]:
             config[key] = config[key].replace("{USERNAME}", USERNAME)
 
@@ -102,11 +99,11 @@ USER_FOLDER_PATH = config["USER_FOLDER_PATH"]
 # ------------------------------------------------------------------------
 
 def get_thekeymachine_version():
-    thekeymachine_version = "0.1.4"
+    thekeymachine_version = "0.1.41"
     return thekeymachine_version
 
 def get_thekeymachine_build_version():
-    thekeymachine_build_version = "306"
+    thekeymachine_build_version = "307"
     return thekeymachine_build_version
 
 def get_thekeymachine_codename():

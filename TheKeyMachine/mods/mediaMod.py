@@ -53,16 +53,13 @@ tkm_node_image = getImage("tkm_node.png")
 
 if platform.system() == 'Darwin':
 
-    license_image = getImage("100/unlock_license_105.svg")
-
-    
     pointer_image = getImage("100/pointer_105.svg")
     depth_mover_image = getImage("100/depth_mover_105.svg")
     select_rig_controls_image = getImage("100/select_rig_controls_105.svg")
     select_animated_rig_controls_image = getImage("100/select_animated_rig_controls_105.svg")
     isolate_image = getImage("100/isolate_105.svg")
     create_locator_image = getImage("100/cube_105.svg")
-    aling_menu_image = getImage("100/magnet_105.svg")
+    align_menu_image = getImage("100/magnet_105.svg")
     tracer_menu_image = getImage("100/tracer_105.svg")
     reset_animation_image = getImage("100/eraser_105.svg")
     delete_animation_image = getImage("100/trash_105.svg")
@@ -118,8 +115,6 @@ if platform.system() == 'Darwin':
 
 else:
 
-    license_image = getImage("unlock_license.svg")
-
     pointer_image = getImage("pointer.svg")
     depth_mover_image = getImage("depth_mover.svg")
     select_rig_controls_image = getImage("select_rig_controls.svg")
@@ -127,7 +122,7 @@ else:
 
     isolate_image = getImage("isolate.svg")
     create_locator_image = getImage("cube.svg")
-    aling_menu_image = getImage("magnet.svg")
+    align_menu_image = getImage("magnet.svg")
     tracer_menu_image = getImage("tracer.svg")
     reset_animation_image = getImage("eraser.svg")
     delete_animation_image = getImage("trash.svg")

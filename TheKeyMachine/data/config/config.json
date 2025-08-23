@@ -1,9 +1,6 @@
 {
-    "STUDIO_INSTALL": false,
     "INSTALL_PATH": "",
     "USER_FOLDER_PATH": "",
-    "LICENSE_FOLDER": "",
-    "LICENSE_FILE_NAME": "",
     "UPDATER": false,
     "BUG_REPORT": true,
     "CUSTOM_TOOLS_MENU": true,

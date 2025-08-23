@@ -251,9 +251,7 @@ def smart_rotation_manipulator():
         if current_rotate_mode == 1: # si esta en modo world
             cmds.manipRotateContext('Rotate', e=True, mode=2)  # Cambiar a modo "gimbal"
         if current_rotate_mode == 2: # si esta en modo gimbal
-        	cmds.manipRotateContext('Rotate', e=True, mode=0)  # Cambiar a modo "object"
-    else:
-        print("")
+            cmds.manipRotateContext('Rotate', e=True, mode=0)  # Cambiar a modo "object"
 
 # -------------- smart rotation release
 
@@ -324,5 +322,3 @@ def move_keyframes_right():
 
     desplazamiento = cmds.intField("move_keyframes_int", q=True, value=True)
     keyTools.move_keyframes_in_range(desplazamiento)
-
-

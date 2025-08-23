@@ -1987,7 +1987,6 @@ def gimbal_fixer_build():
     central_widget = QtWidgets.QWidget(window)
     central_widget.setStyleSheet(f"""
     QWidget {{
-        background-color: #454545; 
         border-radius: 10px;
         border: 1px solid #393939;
         font-size: {font_size}px;

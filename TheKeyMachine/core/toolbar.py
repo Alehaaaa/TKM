@@ -24,18 +24,20 @@ import maya.mel as mel
 import maya.utils as utils
 import maya.OpenMaya as om
 import maya.OpenMayaUI as mui
-
 try:
-    from shiboken6 import wrapInstance
-    from PySide6 import QtWidgets, QtCore, QtGui
-    from PySide6.QtWidgets import QApplication
-    from PySide6.QtCore import QTimer
+    from shiboken6 import wrapInstance, getCppPointer # type: ignore 
+    from PySide6 import QtWidgets, QtCore, QtGui # type: ignore
+    from PySide6.QtGui import QActionGroup # type: ignore
+    from PySide6.QtWidgets import QApplication, QDialog # type: ignore
+    from PySide6.QtCore import QTimer # type: ignore # , Signal
 except ImportError:
     # Qt related imports
-    from shiboken2 import wrapInstance
+    from shiboken2 import wrapInstance, getCppPointer
     from PySide2 import QtWidgets, QtCore, QtGui
-    from PySide2.QtWidgets import QApplication, QDesktopWidget
-    from PySide2.QtCore import QTimer
+    from PySide2.QtWidgets import QApplication, QDesktopWidget, QDialog, QActionGroup
+    from PySide2.QtCore import QTimer # , Signal
+
+    
 
 # Standard library imports
 import os
@@ -61,16 +63,19 @@ import base64
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.uiMod as ui
-import TheKeyMachine.mods.keyToolsMod as keyTools
-import TheKeyMachine.mods.selSetsMod as selSets
-import TheKeyMachine.mods.helperMod as helper
-import TheKeyMachine.mods.mediaMod as media
-import TheKeyMachine.mods.styleMod as style
-import TheKeyMachine.mods.barMod as bar
-import TheKeyMachine.mods.hotkeysMod as hotkeys
-import TheKeyMachine.core.customGraph as cg
+import TheKeyMachine.mods.generalMod as general # type: ignore
+import TheKeyMachine.mods.uiMod as ui # type: ignore
+import TheKeyMachine.mods.keyToolsMod as keyTools # type: ignore
+import TheKeyMachine.mods.selSetsMod as selSets # type: ignore
+import TheKeyMachine.mods.helperMod as helper # type: ignore
+import TheKeyMachine.mods.mediaMod as media # type: ignore
+import TheKeyMachine.mods.styleMod as style # type: ignore
+import TheKeyMachine.mods.barMod as bar # type: ignore
+import TheKeyMachine.mods.hotkeysMod as hotkeys # type: ignore
+import TheKeyMachine.core.customGraph as cg # type: ignore
+
+from TheKeyMachine.widgets import sliderWidget as sw # type: ignore
+from TheKeyMachine.widgets import menuWidget as mw # type: ignore
 
 
 
@@ -79,13 +84,10 @@ import TheKeyMachine.core.customGraph as cg
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-from TheKeyMachine.mods.generalMod import config
+from TheKeyMachine.mods.generalMod import config # type: ignore
 
-STUDIO_INSTALL                  = config["STUDIO_INSTALL"]
 INSTALL_PATH                    = config["INSTALL_PATH"]
 USER_FOLDER_PATH                = config["USER_FOLDER_PATH"]
-LICENSE_FOLDER                  = config["LICENSE_FOLDER"]
-LICENSE_FILE_NAME               = config["LICENSE_FILE_NAME"]
 UPDATER                         = config["UPDATER"]
 BUG_REPORT                      = config["BUG_REPORT"]
 CUSTOM_TOOLS_MENU               = config["CUSTOM_TOOLS_MENU"]
@@ -118,7 +120,7 @@ if not os.path.exists(USER_PREFERENCE_FILE):
 
 # Attempt to import the user preferences module
 try:
-    import TheKeyMachine_user_data.preferences.user_preferences as user_preferences
+    import TheKeyMachine_user_data.preferences.user_preferences as user_preferences # type: ignore
 except ImportError as e:
     print(f"Error al importar: {e}")
 
@@ -172,12 +174,12 @@ if not scripts_exists:
 
 # Intentar importar los módulos
 try:
-    import TheKeyMachine_user_data
-    importlib.reload(TheKeyMachine_user_data)
-    import TheKeyMachine_user_data.connect
+    import TheKeyMachine_user_data # type: ignore
+    importlib.reload(TheKeyMachine_user_data) # type: ignore
+    import TheKeyMachine_user_data.connect # type: ignore
 
-    import TheKeyMachine_user_data.connect.tools.tools as connectToolBox
-    import TheKeyMachine_user_data.connect.scripts.scripts as cbScripts
+    import TheKeyMachine_user_data.connect.tools.tools as connectToolBox # type: ignore
+    import TheKeyMachine_user_data.connect.scripts.scripts as cbScripts # type: ignore
 except ImportError as e:
     importlib.reload(TheKeyMachine_user_data)
     print(f"Error al importar: {e}")
@@ -202,7 +204,9 @@ modules_to_reload = [
     hotkeys,
     user_preferences,
     connectToolBox,
-    cbScripts
+    cbScripts,
+    sw,
+    mw,
 ]
 
 for module in modules_to_reload:
@@ -237,11 +241,6 @@ class toolbar(object):
         self.run_centerToolbar = True
         self.tc.start()
 
-
-
-        # OBSOLETED - to be removed
-        global tkm_lic_status
-        tkm_lic_status = True
 
 
         # When loading a new scene, the on_scene_opened() function is executed, which includes, among other things, the function to update the selectionSets.
@@ -312,9 +311,9 @@ class toolbar(object):
     def toggle(self, *args):
         if cmds.workspaceControl(WorkspaceName, query=True, exists=True):
             if cmds.workspaceControl(WorkspaceName, query=True, visible=True):
-                cmds.workspaceControl(WorkspaceName, edit=True, visible=False)
+                cmds.workspaceControl(WorkspaceName, edit=True, visible=False, actLikeMayaUIElement=True)
             else:
-                cmds.workspaceControl(WorkspaceName, edit=True, restore=True)
+                cmds.workspaceControl(WorkspaceName, edit=True, restore=True, actLikeMayaUIElement=True)
         else:
             self.reload()
 
@@ -337,13 +336,6 @@ class toolbar(object):
         return False
 
 
-    # OBSOLETED - to be removed
-    def checkl(func):
-        def wrapper(*args, **kwargs):
-            print("obsoleted")
-        return wrapper
-
-
     # Update the iBookmarks menu when scene changes
     def update_popup_menu(self):
 
@@ -353,7 +345,7 @@ class toolbar(object):
             cmds.popupMenu('isolate_button_popupMenu', e=True, deleteAllItems=True)
 
             # Agrega un ítem para abrir la ventana de bookmarks
-            cmds.menuItem(l="Bookmarks", c=lambda x: create_ibookmarks_window(), annotation="Open isolate bookmarks window", image=media.ibookmarks_menu_image, parent='isolate_button_popupMenu')
+            cmds.menuItem(l="Bookmarks", c=lambda x: create_ibookmarks_window(), annotation="Open isolate bookmarks window", image=media.ibookmarks_menu_image, parent='isolate_button_popupMenu') # type: ignore
             cmds.menuItem(divider=True, parent='isolate_button_popupMenu')
             cmds.menuItem('down_level_checkbox', l="Down one level", annotation="", checkBox=False, c=lambda x: bar.toggle_down_one_level(x), parent='isolate_button_popupMenu')
 
@@ -372,12 +364,12 @@ class toolbar(object):
                     l=text, 
                     parent='isolate_button_popupMenu',
                     image=media.grey_menu_image,
-                    c=lambda x, text=text: isolate_bookmark(bookmark_name=text))
+                    c=lambda x, text=text: isolate_bookmark(bookmark_name=text)) # type: ignore
 
             cmds.menuItem(divider=True, parent='isolate_button_popupMenu')
 
             # Agrega un ítem para abrir la ventana de bookmarks
-            cmds.menuItem(l="Bookmarks", c=lambda x: create_ibookmarks_window(), annotation="Open isolate bookmarks window", image=media.ibookmarks_menu_image, parent='isolate_button_popupMenu')
+            cmds.menuItem(l="Bookmarks", c=lambda x: create_ibookmarks_window(), annotation="Open isolate bookmarks window", image=media.ibookmarks_menu_image, parent='isolate_button_popupMenu') # type: ignore
             cmds.menuItem(divider=True, parent='isolate_button_popupMenu')
             cmds.menuItem('down_level_checkbox', l="Down one level", annotation="", checkBox=False, c=lambda x: bar.toggle_down_one_level(x), parent='isolate_button_popupMenu')
 
@@ -428,29 +420,6 @@ class toolbar(object):
 
 
     # _______________________________________________________ SELECTION SET ________________________________________________________
-
-
-    color_codes = {
-        "_01": "#878A90",   #gris
-        "_02": "#D7CDAF",   #amarillo
-        "_03": "#96BEC7",   #azul claro
-        "_04": "#598693",   # azul oscuro
-        "_05": "#8190B8",  # purple
-        "_06": "#619C8D",  # verde
-        "_07": "#C2827C",   # rojo claro
-        "_08": "#AD4D4E"    # rojo oscuro
-    }
-
-    color_codes_hover = {
-        "_01": "#A0A5AF",   #gris
-        "_02": "#EEE3C2",   #amarillo
-        "_03": "#ABD9E3",   #azul claro
-        "_04": "#77ABBA",   # azul oscuro
-        "_05": "#A1AFD9",  # purple
-        "_06": "#83C4B3",  # verde
-        "_07": "#D99993",   # rojo claro
-        "_08": "#D46668"    # rojo oscuro
-    }
 
 
 
@@ -624,7 +593,7 @@ class toolbar(object):
                 self.rename_setgroup(original_setgroup_name, new_setgroup_name)  # Asumiendo que tienes una función llamada rename_setgroup
                 window.close()
 
-        parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
+        parent = self.maya_main_window()
 
         window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
         window.resize(200, 80)
@@ -638,7 +607,7 @@ class toolbar(object):
         window.mouseReleaseEvent = mouseReleaseEvent
 
         central_widget = QtWidgets.QWidget(window)
-        central_widget.setStyleSheet("background-color: #444; border-radius: 10px;")
+        # central_widget.setStyleSheet("background-color: #444; border-radius: 10px;")
         layout = QtWidgets.QVBoxLayout(central_widget)
         layout.setContentsMargins(10, 10, 10, 10)
 
@@ -776,7 +745,7 @@ class toolbar(object):
                 self.rename_set(set_name, new_set_name)
                 window.close()
 
-        parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
+        parent = self.maya_main_window()
         window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
         window.resize(200, 80)
         window.setObjectName('SetNameWindow')
@@ -789,7 +758,7 @@ class toolbar(object):
         window.mouseReleaseEvent = mouseReleaseEvent
 
         central_widget = QtWidgets.QWidget(window)
-        central_widget.setStyleSheet("background-color: #444; border-radius: 10px;")  # Color de fondo y borde redondeado
+        # central_widget.setStyleSheet("background-color: #444; border-radius: 10px;")  # Color de fondo y borde redondeado
         layout = QtWidgets.QVBoxLayout(central_widget)
         layout.setContentsMargins(10, 10, 10, 10)
 
@@ -986,7 +955,7 @@ class toolbar(object):
             drag["active"] = False
 
 
-        parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
+        parent = self.maya_main_window()
 
         window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
         window.resize(200, 120)
@@ -1000,7 +969,7 @@ class toolbar(object):
         window.mouseReleaseEvent = mouseReleaseEvent
 
         central_widget = QtWidgets.QWidget(window)
-        central_widget.setStyleSheet("background-color: #444; border-radius: 10px;")
+        # central_widget.setStyleSheet("background-color: #444; border-radius: 10px;")
         layout = QtWidgets.QVBoxLayout(central_widget)
         layout.setContentsMargins(10, 10, 10, 10)
 
@@ -1112,24 +1081,13 @@ class toolbar(object):
 
         color_button_layout = QtWidgets.QHBoxLayout()
 
-
-        color_codes_hover = {
-            "_01": "#A0A5AF",
-            "_02": "#EEE3C2",
-            "_03": "#ABD9E3",
-            "_04": "#77ABBA",
-            "_05": "#A1AFD9",
-            "_06": "#83C4B3",
-            "_07": "#D99993",
-            "_08": "#D46668"
-        }
-        for color_suffix, hex_code in self.color_codes.items():
+        for color_suffix, hex_code in ui.color_codes.items():
             button = QtWidgets.QPushButton("")
             if self.screen_width == 3840:
                 button.setFixedSize(50, 50)
             else:
                 button.setFixedSize(34, 34)
-            hover_color = color_codes_hover.get(color_suffix, hex_code)  # Asegura un valor por defecto
+            hover_color = ui.color_codes_hover.get(color_suffix, hex_code)  # Asegura un valor por defecto
             button.setStyleSheet(
                 "QPushButton {"
                 f"    background-color: {hex_code};"
@@ -1604,8 +1562,8 @@ class toolbar(object):
 
 
                     # Obtiene el valor del color del código de color
-                    button_color_hex = self.color_codes.get(f"_{color_suffix}", "#333333")  # Default to white (#FFFFFF) if color_suffix not found
-                    button_color_hex_hover = self.color_codes_hover.get(f"_{color_suffix}", "#333333")  # Default to white (#FFFFFF) if color_suffix not found
+                    button_color_hex = ui.color_codes.get(f"_{color_suffix}", "#333333")  # Default to white (#FFFFFF) if color_suffix not found
+                    button_color_hex_hover = ui.color_codes_hover.get(f"_{color_suffix}", "#333333")  # Default to white (#FFFFFF) if color_suffix not found
 
                     # Calcula el ancho del botón en función del número de caracteres en la etiqueta
                     button_width = max(60, len(set_name) * 8)
@@ -1672,19 +1630,6 @@ class toolbar(object):
 
                     # Crea un menú emergente con una opción de "Delete set"
                     selset_button = cmds.popupMenu(parent=button)
-
-                    # Estilo config menu
-                    selset_button_style_widget = wrapInstance(int(mui.MQtUtil.findControl(selset_button)), QtWidgets.QWidget)
-                    selset_button_style_widget.setStyleSheet(f'''
-                        QMenu {{
-                            background-color: {style.QMenu_bg_color};
-                            padding: {style.QMenu_padding_size};
-                            margin: 0px;
-                        }}
-                        QMenu::item {{
-                            padding: 5 10;
-                        }}
-                    ''')
 
 
 
@@ -1850,7 +1795,7 @@ class toolbar(object):
 
     def centerBar(*args):
 
-        import TheKeyMachine.core.toolbar
+        import TheKeyMachine.core.toolbar # type: ignore
         TheKeyMachine.core.toolbar.tb.centrar()
 
 
@@ -2162,7 +2107,6 @@ class toolbar(object):
         print("")
         print(f"TKM version: {tkm_version}")
         print("Operating System: " + os_info)
-        print(f"Studio install: {STUDIO_INSTALL}")
         print("Install path: " + INSTALL_PATH)
         print("User folder path: " + USER_FOLDER_PATH)
         print("User preference file: " + USER_PREFERENCE_FILE)
@@ -2194,26 +2138,26 @@ class toolbar(object):
 
 
         if cmds.workspaceControl(WorkspaceName, query=True, exists=True) is False:
-            cmds.workspaceControl(WorkspaceName, dtm=["bottom", False],  ih=30, li=True, hp="fixed", tp=["east", True], floating=False, uiScript='from TheKeyMachine.core.toolbar import tb\ntb.buildUI()')
+            cmds.workspaceControl(WorkspaceName, dtm=["bottom", False],  ih=30, li=True, hp="fixed", tp=["west", True], floating=False, uiScript='from TheKeyMachine.core.toolbar import tb\ntb.buildUI()', actLikeMayaUIElement=True)
 
             cmds.workspaceControl(WorkspaceName, edit=True, dtc=( TIME_SLIDER ,"top"))
         else:
-            cmds.workspaceControl(WorkspaceName, edit=True, restore=True)
+            cmds.workspaceControl(WorkspaceName, edit=True, restore=True, actLikeMayaUIElement=True)
 
 
         # Fix para dejar la tab en el lado izquierdo, debería arreglar el error al reinstalar
         if cmds.workspaceControl(WorkspaceName, query=True, exists=True):
-            cmds.workspaceControl(WorkspaceName, edit=True, tabPosition=["east", True])
+            cmds.workspaceControl(WorkspaceName, edit=True, tabPosition=["west", True])
         else:
             pass
 
 
         # Crea el selection sets workspace
         if cmds.workspaceControl(selection_sets_workspace, query=True, exists=True) is False:
-            cmds.workspaceControl(selection_sets_workspace,  ih=35, li=True, tp=["east", True], floating=False, dtc=["k","bottom"], retain=True, vis=False, uiScript='from TheKeyMachine.core.toolbar import tb\ntb.create_selection_sets_workspace()')
-            cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["east", True])
+            cmds.workspaceControl(selection_sets_workspace,  ih=35, li=True, tp=["west", True], floating=False, dtc=["k","bottom"], retain=True, vis=False, uiScript='from TheKeyMachine.core.toolbar import tb\ntb.create_selection_sets_workspace()', actLikeMayaUIElement=True)
+            cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
         else:
-            cmds.workspaceControl(selection_sets_workspace, edit=True, restore=False)
+            cmds.workspaceControl(selection_sets_workspace, edit=True, restore=False, actLikeMayaUIElement=True)
             self.update_selectionSets_on_new_scene()
 
 
@@ -2221,7 +2165,7 @@ class toolbar(object):
     # Crea el selection sets workspace ----------------------------------------------------------------------------
 
     def create_selection_sets_workspace(self):
-        cmds.flowLayout('selection_sets_flow_layout', columnSpacing=1, wr=True, bgc=[0.2,0.2,0.2], w=150)
+        cmds.flowLayout('selection_sets_flow_layout', columnSpacing=1, wr=True, w=150)
         self.selection_sets_empty_setup()
 
 
@@ -2233,11 +2177,11 @@ class toolbar(object):
             if vis_state:
                 cmds.workspaceControl(selection_sets_workspace, edit=True, visible=False)
             else:
-                cmds.workspaceControl(selection_sets_workspace, edit=True, restore=True)
+                cmds.workspaceControl(selection_sets_workspace, edit=True, restore=True, actLikeMayaUIElement=True)
                 self.create_buttons_for_sel_sets()
         else:
-            cmds.workspaceControl(selection_sets_workspace,  ih=35, li=True, tp=["east", True], floating=False, dtc=["k","bottom"], retain=True, vis=True, uiScript='from TheKeyMachine.core.toolbar import tb\ntb.create_selection_sets_workspace()')
-            cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["east", True])
+            cmds.workspaceControl(selection_sets_workspace, ih=35, li=True, tp=["west", True], floating=False, dtc=["k","bottom"], retain=True, vis=True, uiScript='from TheKeyMachine.core.toolbar import tb\ntb.create_selection_sets_workspace()', actLikeMayaUIElement=True)
+            cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
             self.update_selectionSets_on_new_scene()
 
 
@@ -2245,7 +2189,7 @@ class toolbar(object):
 
     def set_reload(self):
 
-        import TheKeyMachine.core.toolbar as t
+        import TheKeyMachine.core.toolbar as t # type: ignore
         importlib.reload(t)
 
 
@@ -2797,7 +2741,7 @@ class toolbar(object):
                 (isolate_button_widget, helper.isolate_tooltip_text, None),
                 (block_keys_button_widget, helper.block_keys_tooltip_text, None),
                 (createLocator_button_widget, helper.createLocator_tooltip_text, None),
-                (aling_button_widget, helper.align_tooltip_text, None),
+                (align_button_widget, helper.align_tooltip_text, None),
                 (tracer_button_widget, helper.tracer_tooltip_text, None),
                 (deleteAnim_button_widget, helper.delete_animation_tooltip_text, None),
                 (reset_values_button_widget, helper.reset_values_tooltip_text, None),
@@ -2815,8 +2759,8 @@ class toolbar(object):
                 (micro_move_button_widget, helper.micro_move_tooltip_text, None),
                 (selection_sets_button_widget, helper.selection_sets_tooltip_text, None),
                 (open_custom_graph_button_widget, helper.customGraph_tooltip_text, None),
-                (toolBox_button_widget, helper.custom_tools_tooltip_text, None),
-                (customScripts_button_widget, helper.custom_scripts_tooltip_text, None),
+                # (toolBox_button_widget, helper.custom_tools_tooltip_text, None),
+                # (customScripts_button_widget, helper.custom_scripts_tooltip_text, None),
 
                 (move_key_left_b_widget, helper.move_key_left_b_widget_tooltip_text, base_style),
                 (remove_inbetween_b_widget, helper.remove_inbetween_b_widget_tooltip_text, base_style),
@@ -2825,8 +2769,8 @@ class toolbar(object):
                 (clear_selected_keys_widget, helper.clear_selected_keys_widget_tooltip_text, base_color_style),
                 (select_scene_animation_widget, helper.select_scene_animation_widget_tooltip_text, base_color_style),
 
-                (blend_to_key_left_button_widget, helper.blend_to_frame_slider_tooltip_text, blend_slider_buttons_style),
-                (blend_to_key_right_button_widget, helper.blend_to_frame_slider_tooltip_text, blend_slider_buttons_style),
+                (barTweenSlider_widget, helper.blend_to_frame_slider_tooltip_text, blend_slider_buttons_style),
+                (barBlendSlider_widget, helper.blend_to_frame_slider_tooltip_text, blend_slider_buttons_style),
 
             ]
 
@@ -2862,12 +2806,14 @@ class toolbar(object):
 
         row_center_value = 10
 
-        cmds.columnLayout("columntoolbar", columnAttach=('both', 1), h=38, cal="center", adj=True, bgc=[0.2,0.2,0.2], columnWidth=900)
+        cmds.columnLayout("columntoolbar", columnAttach=('both', 1), h=38, cal="center", adj=True, columnWidth=900)
         
-        cmds.rowLayout("rowtoolbar", h=38, nc=60, bgc=[0.2,0.2,0.2], vis=tkm_lic_status, p="columntoolbar")
+        cmds.rowLayout("rowtoolbar", h=38, nc=60, p="columntoolbar")
         cmds.separator("centerRow", style='none', width=row_center_value, p="rowtoolbar") 
 
-        
+        row_ptr = mui.MQtUtil.findControl("rowtoolbar")
+        row_qw = wrapInstance(int(row_ptr), QtWidgets.QWidget)
+        rowtoolbar_layout = row_qw.layout()
 
 
         # _____________________ keyBox__________________________________________________ #
@@ -2918,18 +2864,18 @@ class toolbar(object):
 
 
 
-        def update_blend_label_with_slider_value(value):
-            rounded_value = abs(round(value * 2))
-            cmds.text('barBlendSliderLabelText', edit=True, label=str(rounded_value))
+        # def update_blend_label_with_slider_value(value):
+        #     rounded_value = abs(round(value * 2))
+        #     cmds.text('barBlendSliderLabelText', edit=True, label=str(rounded_value))
 
         # Wrapper para el modo Pull/Push
         def pull_push_wrapper(value):
             keyTools.blend_pull_and_push(value / 10.0)  # Ajusta el valor antes de pasarlo
-            update_blend_label_with_slider_value(value)
+            # update_blend_label_with_slider_value(value)
 
         def blend_to_frame_wrapper(value):
             blend_to_frame_with_button_values(value)
-            update_blend_label_with_slider_value(value)
+            # update_blend_label_with_slider_value(value)
 
 
 
@@ -2980,7 +2926,7 @@ class toolbar(object):
                     except Exception as e:
                         print(f"Error blending {attr} on {obj}: {str(e)}")
 
-            update_blend_label_with_slider_value(value)
+            # update_blend_label_with_slider_value(value)
 
 
 
@@ -2989,22 +2935,22 @@ class toolbar(object):
         def blend_slider_wrapper(value):
             keyTools.handle_autokey_start()
             keyTools.blend_to_key(value)  # Llama a la función tween original
-            update_blend_label_with_slider_value(value) 
+            # update_blend_label_with_slider_value(value) 
 
-        def reset_blend_slider_label_after_drag(value):
-            global current_blend_slider_mode
-            # Restablece la etiqueta a "0"
-            label = "BL"
-            if current_blend_slider_mode == 'pull_push':
-                label = "PP"
-            if current_blend_slider_mode == 'blend_to_frame':
-                label = "BK"
-            if current_blend_slider_mode == 'blend_to_default':
-                label = "BD"
-            cmds.text('barBlendSliderLabelText', edit=True, label=label)
-            # Llama a la función tweenSliderReset
-            keyTools.handle_autokey_end()
-            keyTools.blendSliderReset(barBlendSlider)
+        # def reset_blend_slider_label_after_drag(value):
+        #     global current_blend_slider_mode
+        #     # Restablece la etiqueta a "0"
+        #     label = "BL"
+        #     if current_blend_slider_mode == 'pull_push':
+        #         label = "PP"
+        #     if current_blend_slider_mode == 'blend_to_frame':
+        #         label = "BK"
+        #     if current_blend_slider_mode == 'blend_to_default':
+        #         label = "BD"
+        #     cmds.text('barBlendSliderLabelText', edit=True, label=label)
+        #     # Llama a la función tweenSliderReset
+        #     keyTools.handle_autokey_end()
+        #     keyTools.blendSliderReset(barBlendSlider)
 
 
 
@@ -3018,42 +2964,35 @@ class toolbar(object):
         def set_blend_slider_command(mode):
             global current_blend_slider_mode
             current_blend_slider_mode = mode
-            cmds.floatSlider("bar_blend_slider", edit=True, value=0)  # Restablecer el slider
-            if mode == 'pull_push':
-                cmds.floatSlider("bar_blend_slider", edit=True, min=-50, max=50, value=0, dragCommand=pull_push_wrapper)  # Divide el valor por 10 antes de pasarlo
-                cmds.text('barBlendSliderLabelText', edit=True, label="PP" )
+
+            match mode:
+                case 'pull_push':
+                    barBlendSlider_widget.setText("PP")
+                    barBlendSlider_widget.setDragCommand(pull_push_wrapper)
                 
-                cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
-                cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
-                cmds.separator('blend_to_key_right_button_separator', edit=True, w=1)
-                cmds.separator('blend_to_key_left_button_separator', edit=True, w=1)
-            
-            elif mode == 'blend':
-                cmds.floatSlider("bar_blend_slider", edit=True, min=-50, max=50, value=0, dragCommand=blend_slider_wrapper)
-                cmds.text('barBlendSliderLabelText', edit=True, label="BL" )
+                    cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
+                    cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
+
+                case 'blend':
+                    barBlendSlider_widget.setText("BL")
+                    barBlendSlider_widget.setDragCommand(blend_slider_wrapper)
                 
-                cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
-                cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
-                cmds.separator('blend_to_key_right_button_separator', edit=True, w=1)
-                cmds.separator('blend_to_key_left_button_separator', edit=True, w=1)
-            
-            elif mode == 'blend_to_default':
-                cmds.floatSlider("bar_blend_slider", edit=True, min=0, max=1, value=0, dragCommand=blend_to_default_wrapper)
-                cmds.text('barBlendSliderLabelText', edit=True, label="BD" )
+                    cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
+                    cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
+                    
+                case 'blend_to_default':
+                    barBlendSlider_widget.setText("BD")
+                    barBlendSlider_widget.setDragCommand(blend_to_default_wrapper)
                 
-                cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
-                cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
-                cmds.separator('blend_to_key_right_button_separator', edit=True, w=1)
-                cmds.separator('blend_to_key_left_button_separator', edit=True, w=1)
-            
-            elif mode == 'blend_to_frame':
-                cmds.floatSlider("bar_blend_slider", edit=True, min=-50, max=50, value=0, dragCommand=blend_to_frame_wrapper)
-                cmds.text('barBlendSliderLabelText', edit=True, label="BK" )
+                    cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
+                    cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
+
+                case 'blend_to_frame':
+                    barBlendSlider_widget.setText("BK")
+                    barBlendSlider_widget.setDragCommand(blend_to_frame_wrapper)
                 
-                cmds.button('blend_to_key_left', edit=True, vis=True, w=25, h=16)
-                cmds.button('blend_to_key_right', edit=True, vis=True, w=25, h=16)
-                cmds.separator('blend_to_key_right_button_separator', edit=True, w=5)
-                cmds.separator('blend_to_key_left_button_separator', edit=True, w=5)
+                    cmds.button('blend_to_key_left', edit=True, vis=True, w=25, h=16)
+                    cmds.button('blend_to_key_right', edit=True, vis=True, w=25, h=16)
 
 
         def blend_to_frame_with_button_values(percentage):
@@ -3076,56 +3015,19 @@ class toolbar(object):
 
 
         cmds.separator(style='none', width=15, p="rowtoolbar")
-        barBlendSliderLabel = cmds.text('barBlendSliderLabelText', label="BL", p="rowtoolbar")
-        barBlendSliderLabel_widget = wrapInstance(int(mui.MQtUtil.findControl(barBlendSliderLabel)), QtWidgets.QLabel)
 
-        if self.screen_width == 3840:
-            barBlendSliderLabel_widget.setStyleSheet('''
-                QLabel {
-                    color: #777;
-                    font: 15px;
-                    min-width: 24px;
-                }
-
-                ''')
-        else:
-            barBlendSliderLabel_widget.setStyleSheet('''
-                QLabel {
-                    color: #777;
-                    font: 10px;
-                    min-width: 15px;
-                }
-
-                ''')
-            
-
-        cmds.separator(style='none', width=1, p="rowtoolbar")
-        blend_to_key_left_button = cmds.button('blend_to_key_left', l="1", vis=False, w=1, h=1, c=lambda x: update_button_with_current_frame('blend_to_key_left'), p="rowtoolbar")
-        blend_to_key_left_button_widget = wrapInstance(int(mui.MQtUtil.findControl(blend_to_key_left_button)), QtWidgets.QPushButton)
-        cmds.separator('blend_to_key_left_button_separator', style='none', width=5, p="rowtoolbar")
-
-        barBlendSlider = cmds.floatSlider("bar_blend_slider", width=160, min=-50, max=50, value=0, dragCommand=blend_slider_wrapper, changeCommand=lambda x: reset_blend_slider_label_after_drag(x), p="rowtoolbar")
         
-        cmds.separator('blend_to_key_right_button_separator', style='none', width=5, p="rowtoolbar")
+        blend_to_key_left_button = cmds.button('blend_to_key_left', l="1", vis=False, w=1, h=1, c=lambda x: update_button_with_current_frame('blend_to_key_left'), p="rowtoolbar")
+
+        # Slider Widget Blend Slider
+        barBlendSlider_widget = sw.SliderWidget("bar_blend_slider", min=-100, max=100, value=0, text="BN", color=ui.color_codes["_06"], dragCommand=blend_slider_wrapper, p=rowtoolbar_layout)
+        barBlendSlider = barBlendSlider_widget.objectName()
+
         blend_to_key_right_button = cmds.button('blend_to_key_right', l="1", vis=False, w=1, h=1, c=lambda x: update_button_with_current_frame('blend_to_key_right'), p="rowtoolbar")
-        blend_to_key_right_button_widget = wrapInstance(int(mui.MQtUtil.findControl(blend_to_key_right_button)), QtWidgets.QPushButton)
 
 
         barBlendSlider_popup_menu = cmds.popupMenu(button=3, ctl=False, alt=False, parent=barBlendSlider)
 
-
-        # Estilo config menu
-        barBlendSlider_popup_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(barBlendSlider_popup_menu)), QtWidgets.QWidget)
-        barBlendSlider_popup_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                padding: {style.QMenu_padding_size};
-                margin: 0px;
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
 
         # Blend slider menu
         # Crear una colección de radio buttons
@@ -3142,97 +3044,6 @@ class toolbar(object):
 
         cmds.menuItem(bar_blend_blend_menu, edit=True, radioButton=True)
         
-        barBlendSlider_widget = wrapInstance(int(mui.MQtUtil.findControl(barBlendSlider)), QtWidgets.QSlider)
-        
-        barBlendSlider_bg_color= "#282828"
-        barBlendSlider_tick_color = "#6a99b6"
-
-
-        if self.screen_width == 3840:
-            styleSheet = '''
-                QSlider {{
-                    color: #909090;
-                    font: 15x;
-                }}
-
-                QSlider::groove:horizontal {{
-                    height: 5px;
-                    border: 2px solid {bg_color};
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                                    stop:0    {tick_color},
-                                    stop:0.02 {tick_color},
-                                    stop:0.03 {bg_color},
-                                    stop:0.24 {bg_color},
-                                    stop:0.25 {tick_color},
-                                    stop:0.26 {bg_color},
-                                    stop:0.49 {bg_color},
-                                    stop:0.5  {tick_color},
-                                    stop:0.51 {bg_color},
-                                    stop:0.74 {bg_color},
-                                    stop:0.75 {tick_color},
-                                    stop:0.76 {bg_color},
-                                    stop:0.97 {bg_color},
-                                    stop:0.98 {tick_color},
-                                    stop:1    {tick_color});
-                    border-radius: 2.5px; /* Mitad de la altura para un rastro totalmente redondeado */
-                }}
-
-                QSlider::handle:horizontal {{
-                    background-color: #afafaf;
-                    height: 15px;
-                    width: 8px;
-                    margin: -5px 0;
-                    border-radius: 2px;
-                }}
-            '''.format(bg_color=barBlendSlider_bg_color, tick_color=barBlendSlider_tick_color)
-
-        else:
-            styleSheet = '''
-                QSlider {{
-                    color: #909090;
-                    font: 10px;
-                }}
-
-                QSlider::groove:horizontal {{
-                    height: 2px;
-                    border: 2px solid {bg_color};
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                                    stop:0    {tick_color},
-                                    stop:0.02 {tick_color},
-                                    stop:0.03 {bg_color},
-                                    stop:0.24 {bg_color},
-                                    stop:0.25 {tick_color},
-                                    stop:0.26 {bg_color},
-                                    stop:0.49 {bg_color},
-                                    stop:0.5  {tick_color},
-                                    stop:0.51 {bg_color},
-                                    stop:0.74 {bg_color},
-                                    stop:0.75 {tick_color},
-                                    stop:0.76 {bg_color},
-                                    stop:0.97 {bg_color},
-                                    stop:0.98 {tick_color},
-                                    stop:1    {tick_color});
-                    border-radius: 2.5px; /* Mitad de la altura para un rastro totalmente redondeado */
-                }}
-
-                QSlider::handle:horizontal {{
-                    background-color: #afafaf;
-                    height: 10px;
-                    width: 8px;
-                    margin: -5px 0;
-                    border-radius: 2px;
-                }}
-            '''.format(bg_color=barBlendSlider_bg_color, tick_color=barBlendSlider_tick_color)
-
-
-
-
-        barBlendSlider_widget.setStyleSheet(styleSheet)
-        cmds.separator("bar_blend_slider_separator", style='none', width=15, p="rowtoolbar")
-
-
-
-
 
 
         # _____________________ TweenSlider ____________________________ #
@@ -3258,7 +3069,7 @@ class toolbar(object):
         def tween_wrapper(value):
             keyTools.handle_autokey_start()
             keyTools.tween(value)  # Llama a la función tween original
-            update_label_with_slider_value(value)
+            # update_label_with_slider_value(value)
 
         def reset_label_after_drag(value):
             keyTools.handle_autokey_end()
@@ -3275,166 +3086,11 @@ class toolbar(object):
             elif mode == 'Tweener':
                 cmds.floatSlider("bar_tween_slider", edit=True, dragCommand=tween_wrapper)
                 cmds.text('barTweenSliderLabelText', edit=True, label="TL" )
+                
 
-
-        barTweenSliderLabel=cmds.text('barTweenSliderLabelText', label="T", p="rowtoolbar")
-        barTweenSliderLabel_widget = wrapInstance(int(mui.MQtUtil.findControl(barTweenSliderLabel)), QtWidgets.QLabel)
-
-        if self.screen_width == 3840:
-            barTweenSliderLabel_widget.setStyleSheet('''
-                QLabel {
-                    color: #777;
-                    font: 15px;
-                    min-width: 24px;
-                }
-
-                ''')
-        else:
-            barTweenSliderLabel_widget.setStyleSheet('''
-                QLabel {
-                    color: #777;
-                    font: 10px;
-                    min-width: 15px;
-                }
-
-                ''')
-
-            
-        cmds.separator("bar_tween_slider_t_separator", style='none', width=5, p="rowtoolbar")
-
-        barTweenSlider = cmds.floatSlider("bar_tween_slider", width=160, h=17, min=-20, max=120, value=50, dragCommand=tween_wrapper, changeCommand=lambda x: reset_label_after_drag(x), p="rowtoolbar")
-        
-        barTweenSlider_widget = wrapInstance(int(mui.MQtUtil.findControl(barTweenSlider)), QtWidgets.QSlider)
-
-        barTweenSlider_bg_color= "#282828"
-        barTweenSlider_tick_color = "#adb66a"
-
-        if self.screen_width == 3840:
-            styleSheet = '''
-                QSlider {{
-                    color: #909090;
-                    font: 10px;
-                }}
-
-                QSlider::groove:horizontal {{
-                    height: 5px;
-                    border: 2px solid {bg_color};
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                                    stop:0    {tick_color},
-                                    stop:0.02 {tick_color},
-                                    stop:0.03 {bg_color},
-
-                                    stop:0.15  {bg_color},
-                                    stop:0.155 {tick_color},
-                                    stop:0.165 {tick_color},  
-                                    stop:0.17 {bg_color},
-
-
-                                    stop:0.32 {bg_color},                   
-                                    stop:0.325 {tick_color},
-                                    stop:0.335 {tick_color},
-                                    stop:0.336 {bg_color},
-
-
-                                    stop:0.5 {bg_color},
-                                    stop:0.505  {tick_color},
-                                    stop:0.51  {tick_color},
-                                    stop:0.515 {bg_color},
-
-
-                                    stop:0.67 {bg_color},
-                                    stop:0.675 {tick_color},
-                                    stop:0.685 {tick_color},
-                                    stop:0.688 {bg_color},
-
-
-
-                                    stop:0.835 {bg_color},
-                                    stop:0.84 {tick_color},
-                                    stop:0.85  {tick_color},
-                                    stop:0.854 {bg_color},
-
-
-                                    stop:0.92 {bg_color},
-                                    stop:0.97 {bg_color},
-                                    stop:0.98 {tick_color},
-                                    stop:1    {tick_color});
-                    border-radius: 2.5px; /* Mitad de la altura para un rastro totalmente redondeado */
-                }}
-
-                QSlider::handle:horizontal {{
-                    background-color: #afafaf;
-                    height: 10px;
-                    width: 8px;
-                    margin: -5px 0;
-                    border-radius: 2px;
-                }}
-            '''.format(bg_color=barTweenSlider_bg_color, tick_color=barTweenSlider_tick_color)
-
-        else:
-            styleSheet = '''
-                QSlider {{
-                    color: #909090;
-                    font: 10px;
-                }}
-
-                QSlider::groove:horizontal {{
-                    height: 2px;
-                    border: 2px solid {bg_color};
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                                    stop:0    {tick_color},
-                                    stop:0.02 {tick_color},
-                                    stop:0.03 {bg_color},
-
-                                    stop:0.15  {bg_color},
-                                    stop:0.155 {tick_color},
-                                    stop:0.165 {tick_color},  
-                                    stop:0.17 {bg_color},
-
-
-                                    stop:0.32 {bg_color},                   
-                                    stop:0.325 {tick_color},
-                                    stop:0.335 {tick_color},
-                                    stop:0.336 {bg_color},
-
-
-                                    stop:0.5 {bg_color},
-                                    stop:0.505  {tick_color},
-                                    stop:0.51  {tick_color},
-                                    stop:0.515 {bg_color},
-
-
-                                    stop:0.67 {bg_color},
-                                    stop:0.675 {tick_color},
-                                    stop:0.685 {tick_color},
-                                    stop:0.688 {bg_color},
-
-
-
-                                    stop:0.835 {bg_color},
-                                    stop:0.84 {tick_color},
-                                    stop:0.85  {tick_color},
-                                    stop:0.854 {bg_color},
-
-
-                                    stop:0.92 {bg_color},
-                                    stop:0.97 {bg_color},
-                                    stop:0.98 {tick_color},
-                                    stop:1    {tick_color});
-                    border-radius: 2.5px; /* Mitad de la altura para un rastro totalmente redondeado */
-                }}
-
-                QSlider::handle:horizontal {{
-                    background-color: #afafaf;
-                    height: 10px;
-                    width: 8px;
-                    margin: -5px 0;
-                    border-radius: 2px;
-                }}
-            '''.format(bg_color=barTweenSlider_bg_color, tick_color=barTweenSlider_tick_color)
-
-
-        barTweenSlider_widget.setStyleSheet(styleSheet)
+        # Slider Widget Tween Slider
+        barTweenSlider_widget = sw.SliderWidget("bar_tween_slider", min=-120, max=120, value=0, text="TW", color=ui.color_codes["_02"], dragCommand=tween_wrapper, p=rowtoolbar_layout)
+        barTweenSlider = barTweenSlider_widget.objectName()
 
         cmds.separator("bar_tween_slider_separator", style='none', width=10, p="rowtoolbar")
 
@@ -3464,18 +3120,6 @@ class toolbar(object):
         #cmds.menuItem(l="Help",  c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/isolate"), image=media.help_menu_image, parent=pointer_button_popupMenu)
 
 
-        pointer_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(pointer_button_popupMenu)), QtWidgets.QWidget)
-        pointer_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
-
 
 
 
@@ -3492,18 +3136,6 @@ class toolbar(object):
         cmds.menuItem(divider=True, parent=self.isolate_button_popupMenu)
         cmds.menuItem(l="Help",  c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/isolate"), image=media.help_menu_image, parent=self.isolate_button_popupMenu)
 
-
-        isolate_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(self.isolate_button_popupMenu)), QtWidgets.QWidget)
-        isolate_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
 
 
 
@@ -3522,45 +3154,21 @@ class toolbar(object):
         cmds.menuItem(l="Remove temp locators", c=bar.deleteTempLocators, image=media.create_locator_image, p=createLocator_popup_menu)
         createLocator_button_widget = wrapInstance(int(mui.MQtUtil.findControl(createLocator_button)), QtWidgets.QWidget)
 
-        # Estilo menu
-        createLocators_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(createLocator_popup_menu)), QtWidgets.QWidget)
-        createLocators_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
 
 
 
 
-        # Aling / match transforms ----------------------------------------------------------
+        # align / match transforms ----------------------------------------------------------
 
-        aling_button = cmds.iconTextButton(l="", w=user_preferences.toolbar_icon_w, h=user_preferences.toolbar_icon_h, image=media.aling_menu_image, c=bar.align_selected_objects, p="rowtoolbar")
-        aling_popup_menu = cmds.popupMenu(parent=aling_button)
-        cmds.menuItem(l="Translation", c=partial(bar.align_selected_objects, pos=True, rot=False, scl=False), image=media.aling_menu_image, p=aling_popup_menu)
-        cmds.menuItem(l="Rotation", c=partial(bar.align_selected_objects, pos=False, rot=True, scl=False), image=media.aling_menu_image, p=aling_popup_menu)
-        cmds.menuItem(l="Scale", c=partial(bar.align_selected_objects, pos=False, rot=False, scl=True), image=media.aling_menu_image, p=aling_popup_menu)
+        align_button = cmds.iconTextButton(l="", w=user_preferences.toolbar_icon_w, h=user_preferences.toolbar_icon_h, image=media.align_menu_image, c=bar.align_selected_objects, p="rowtoolbar")
+        align_popup_menu = cmds.popupMenu(parent=align_button)
+        cmds.menuItem(l="Translation", c=partial(bar.align_selected_objects, pos=True, rot=False, scl=False), image=media.align_menu_image, p=align_popup_menu)
+        cmds.menuItem(l="Rotation", c=partial(bar.align_selected_objects, pos=False, rot=True, scl=False), image=media.align_menu_image, p=align_popup_menu)
+        cmds.menuItem(l="Scale", c=partial(bar.align_selected_objects, pos=False, rot=False, scl=True), image=media.align_menu_image, p=align_popup_menu)
 
-        aling_button_widget = wrapInstance(int(mui.MQtUtil.findControl(aling_button)), QtWidgets.QWidget)
-        aling_button_widget.setToolTip("")
+        align_button_widget = wrapInstance(int(mui.MQtUtil.findControl(align_button)), QtWidgets.QWidget)
+        align_button_widget.setToolTip("")
 
-        # Estilo align submenu
-        aling_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(aling_popup_menu)), QtWidgets.QWidget)
-        aling_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
 
 
 
@@ -3587,19 +3195,6 @@ class toolbar(object):
 
 
 
-        # Estilo tracer submenu
-        tracer_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(tracer_popup_menu)), QtWidgets.QWidget)
-        tracer_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
-
 
 
 
@@ -3615,21 +3210,6 @@ class toolbar(object):
         cmds.menuItem(l="Clear All Saved Data", c=keyTools.restore_default_data, image=media.reset_animation_image, p=reset_values_popup_menu)
         cmds.menuItem(divider=True, parent=reset_values_popup_menu)
         cmds.menuItem(l="Help", image=media.help_menu_image, c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/reset-to-default"), p=reset_values_popup_menu)
-
-
-
-        # Estilo Copy Paste Animation menu
-        reset_values_popup_menu_widget = wrapInstance(int(mui.MQtUtil.findControl(reset_values_popup_menu)), QtWidgets.QWidget)
-        reset_values_popup_menu_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
 
 
 
@@ -3688,18 +3268,6 @@ class toolbar(object):
         cmds.menuItem(divider=True, parent=mirror_popup_menu)
         cmds.menuItem(l="Help", image=media.help_menu_image, c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/mirror"), p=mirror_popup_menu)
 
-        mirror_popup_menu_widget = wrapInstance(int(mui.MQtUtil.findControl(mirror_popup_menu)), QtWidgets.QWidget)
-        mirror_popup_menu_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
-
 
 
 
@@ -3720,20 +3288,6 @@ class toolbar(object):
         cmds.menuItem(divider=True, parent=copy_paste_animation_popup_menu)
 
         cmds.menuItem(l="Help", image=media.help_menu_image, c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-paste-animation"), p=copy_paste_animation_popup_menu)
-
-
-        # Estilo Copy Paste Animation menu
-        copy_paste_animation_popup_menu_widget = wrapInstance(int(mui.MQtUtil.findControl(copy_paste_animation_popup_menu)), QtWidgets.QWidget)
-        copy_paste_animation_popup_menu_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
 
 
 
@@ -3762,19 +3316,6 @@ class toolbar(object):
         cmds.menuItem(l="Follow only Rotation", c= lambda *args: bar.create_follow_cam(translation=False, rotation=True), image=media.follow_cam_image, p=create_follow_cam_popup_menu)
         cmds.menuItem(divider=True, parent=create_follow_cam_popup_menu)
         cmds.menuItem(l="Remove followCam", image=media.remove_followCam, c=bar.remove_followCam, p=create_follow_cam_popup_menu)
-
-        # Estilo followCam menu
-        followCam_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(create_follow_cam_popup_menu)), QtWidgets.QWidget)
-        followCam_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
 
 
 
@@ -3859,20 +3400,6 @@ class toolbar(object):
 
 
 
-        # Style Link obj menu
-        link_objects_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(link_objects_popup_menu)), QtWidgets.QWidget)
-        link_objects_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
-
-
 
 
         # Copy WorldSpace ----------------------------------------------------------------------------
@@ -3890,18 +3417,6 @@ class toolbar(object):
         cmds.menuItem(divider=True, parent=copy_worldspace_button_popup_menu)
         cmds.menuItem(l="Help",  c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-worldspace"), image=media.help_menu_image, parent=copy_worldspace_button_popup_menu)
 
-        copy_worldspace_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(copy_worldspace_button_popup_menu )), QtWidgets.QWidget)
-        copy_worldspace_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
-
 
 
         # Temp Pivot ----------------------------------------------------------------------------
@@ -3915,36 +3430,11 @@ class toolbar(object):
         cmds.menuItem(l="Help",  c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/temp-pivots"), image=media.help_menu_image, parent=temp_pivot_button_popup_menu)
 
 
-        temp_pivot_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(temp_pivot_button_popup_menu )), QtWidgets.QWidget)
-        temp_pivot_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
-
-
 
         # Micro Move ----------------------------------------------------------------------------
         micro_move_button = cmds.iconTextButton('micro_move_button', l="", h=user_preferences.toolbar_icon_h, w=user_preferences.toolbar_icon_w, image=media.ruler_image, c=self.toggle_micro_move_button, parent="rowtoolbar")
         micro_move_button_widget = wrapInstance(int(mui.MQtUtil.findControl(micro_move_button)), QtWidgets.QWidget)
         micro_move_button_widget.setToolTip("")
-
-        temp_pivot_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(temp_pivot_button_popup_menu )), QtWidgets.QWidget)
-        temp_pivot_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
 
 
         # Key Menu -------------------------------------------------------------------------------
@@ -3970,20 +3460,6 @@ class toolbar(object):
         cmds.setParent('..', menu=True)
 
 
-        # Estilo block submenu
-        block_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(block_keys_popup_menu)), QtWidgets.QWidget)
-        block_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
-
-
 
         # Anim tangents ----------------------------------------------------------------------------
 
@@ -4006,7 +3482,7 @@ class toolbar(object):
   
         def open_customGraph():
 
-            import TheKeyMachine.core.customGraph as cg
+            import TheKeyMachine.core.customGraph as cg # type: ignore
             cg.createCustomGraph()
 
 
@@ -4015,6 +3491,7 @@ class toolbar(object):
         open_custom_graph_button_widget.setToolTip("")
 
 
+        """
         # custom tools ----------------------------------------------------------------------------
         if CUSTOM_TOOLS_MENU:
             cmds.separator(style='none', width=18, p="rowtoolbar")
@@ -4029,7 +3506,6 @@ class toolbar(object):
         toolBox_popup_menu = cmds.popupMenu(button=1, ctl=False, alt=False, parent=toolBox_button)
 
 
-        
         def initialize_tool_menu(*args):
             importlib.reload(connectToolBox)
             # Eliminar los elementos existentes del menú
@@ -4105,23 +3581,10 @@ class toolbar(object):
 
         # Llama a la función para inicializar el menú
         initialize_tool_menu()
+        """
 
 
-        # Estilo custom tools menu
-        custom_tools_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(toolBox_popup_menu)), QtWidgets.QWidget)
-        custom_tools_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
-
-
-
+        """
         # custom scripts ----------------------------------------------------------------------------
 
         if CUSTOM_SCRIPTS_MENU:
@@ -4212,97 +3675,95 @@ class toolbar(object):
 
         # Llama a la función para inicializar el menú
         initialize_scripts_menu()
-
-        # Estilo custom scripts menu
-        custom_scripts_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(customScripts_popup_menu)), QtWidgets.QWidget)
-        custom_scripts_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                border: 0px solid {style.QMenu_border_color};
-                padding: {style.QMenu_padding_size};
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
-
+        """
 
 
 
 
         #_____________________ configAbout Menu _____________________________#
 
+        overshootSliders = False
+        
+        def _setOvershoot(state):
+            for slider in {barBlendSlider_widget, barTweenSlider_widget}:
+                slider.setOvershoot(state)
+        _setOvershoot(overshootSliders)
+
 
         toolbar_config_button = cmds.iconTextButton("settings_toolbar_button", l="", w=user_preferences.toolbar_icon_w, h=user_preferences.toolbar_icon_h, image=media.settings_image, p="rowtoolbar")
-        
+        # Wrap the Maya control into a Qt widget
+        toolbar_config_button_widget = wrapInstance(
+            int(mui.MQtUtil.findControl(toolbar_config_button)),
+            QtWidgets.QPushButton
+        )
 
-        toolbar_config_popup_menu = cmds.popupMenu(button=1, ctl=False, alt=False, parent=toolbar_config_button)
+        # Build your menu with your mw.MenuWidget; make sure the button is the PARENT
+        toolbar_menu = mw.MenuWidget(parent=toolbar_config_button_widget)
 
-        # Estilo config menu
-        toolbar_config_menu_style_widget = wrapInstance(int(mui.MQtUtil.findControl(toolbar_config_popup_menu)), QtWidgets.QWidget)
-        toolbar_config_menu_style_widget.setStyleSheet(f'''
-            QMenu {{
-                background-color: {style.QMenu_bg_color};
-                padding: {style.QMenu_padding_size};
-                margin: 0px;
-            }}
-            QMenu::item {{
-                padding: {style.QMenu_item_padding_v_size} {style.QMenu_item_padding_h_size};
-            }}
-        ''')
+        # === Help submenu ===
+        help_menu = toolbar_menu.addMenu(QtGui.QIcon(media.help_menu_image), "Help")
+        help_menu.addAction(QtGui.QIcon(media.discord_image), "Discord Community",
+                            lambda: general.open_url("https://discord.com/channels/1186722267212820610"))
+        help_menu.addAction(QtGui.QIcon(media.help_menu_image), "Knowledge base",
+                            lambda: general.open_url("https://thekeymachine.gitbook.io/base"))
+        help_menu.addAction(QtGui.QIcon(media.youtube_image), "Youtube channel",
+                            lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"))
 
+        # === Config submenu ===
+        config_menu = toolbar_menu.addMenu(QtGui.QIcon(media.settings_image), "Config")
 
+        config_menu.addSection("Shelf icon")
+        config_menu.addAction("Add Toggle Button To Shelf", self.create_shelf_icon)
 
-        radio_collection = cmds.radioMenuItemCollection()
+        config_menu.addSection("Tools settings")
+        show_tooltips_action = config_menu.addAction("Show tooltips")
+        show_tooltips_action.setCheckable(True)
+        show_tooltips_action.setChecked(show_tooltips)
+        show_tooltips_action.toggled.connect(toggle_tooltips)
 
+        overshoot_action = config_menu.addAction("Overshoot Sliders")
+        overshoot_action.setCheckable(True)
+        overshoot_action.setChecked(overshootSliders)
+        overshoot_action.toggled.connect(_setOvershoot)
 
-        # Donate
-        cmds.menuItem(l="Donate", c=lambda x: ui.donate_window(), image=media.donate_menu_image, p=toolbar_config_popup_menu)
-        cmds.menuItem(divider=True, parent=toolbar_config_popup_menu)
+        config_menu.addSection("Toolbar's icons size")
+        size_group = QActionGroup(config_menu)
+        small_action = config_menu.addAction("Small")
+        medium_action = config_menu.addAction("Medium")
+        big_action = config_menu.addAction("Big")
+        for act in (small_action, medium_action, big_action):
+            act.setCheckable(True)
+            size_group.addAction(act)
 
-        # Help Menu
-        help_toolbar_sub_menu = cmds.menuItem(l="Help", subMenu=True, image=media.help_menu_image, p=toolbar_config_popup_menu)
-        cmds.menuItem(l="Discord Community", image=media.discord_image, c=lambda x: general.open_url("https://discord.com/channels/1186722267212820610"), p=help_toolbar_sub_menu)
-        cmds.menuItem(l="Knowledge base", image=media.help_menu_image, c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base"), p=help_toolbar_sub_menu)
-        cmds.menuItem(l="Youtube channel", image=media.youtube_image, c=lambda x: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"), p=help_toolbar_sub_menu)
-        
-
-        # Config Menu
-        config_sub_menu = cmds.menuItem(l="Config", subMenu=True, image=media.settings_image, p=toolbar_config_popup_menu)
-
-        cmds.menuItem(divider=True, l="Shelf icon", parent=config_sub_menu)
-        cmds.menuItem(l="Add Toggle Button To Shelf", c=self.create_shelf_icon, p=config_sub_menu)
-
-        cmds.menuItem(divider=True, l="Help tooltips", parent=config_sub_menu)
-        cmds.menuItem(l="Show tooltips", c=lambda x: toggle_tooltips(x), checkBox=show_tooltips, p=config_sub_menu)
-
-        cmds.menuItem(divider=True, l="Toolbars's icons size", parent=config_sub_menu)
-        small_rb = cmds.menuItem(label="Small", c=set_icon_size_small, radioButton=True, p=config_sub_menu)
-        medium_rb = cmds.menuItem(label="Medium", c=set_icon_size_medium, radioButton=True, p=config_sub_menu)
-        big_rb = cmds.menuItem(label="Big", c=set_icon_size_big, radioButton=True, p=config_sub_menu)
-
-        cmds.menuItem(divider=True, l="Hotkeys", parent=config_sub_menu)
-        cmds.menuItem(l="Add TheKeyMachine Hotkeys", c=hotkeys.create_TheKeyMachine_hotkeys, p=config_sub_menu)
-
-        cmds.menuItem(divider=True, l="General", parent=config_sub_menu)
-        cmds.menuItem(l="Reload", c=self.reload, image=media.reload_image, p=config_sub_menu)
-
-        cmds.setParent('..', menu=True)
+        small_action.triggered.connect(lambda: set_icon_size_small())
+        medium_action.triggered.connect(lambda: set_icon_size_medium())
+        big_action.triggered.connect(lambda: set_icon_size_big())
 
         current_size = get_current_icon_size()
+        {"Small": small_action, "Medium": medium_action, "Big": big_action}.get(current_size, medium_action).setChecked(True)
 
-        if current_size == "Small":
-            cmds.menuItem(small_rb, edit=True, radioButton=True)
-        elif current_size == "Medium":
-            cmds.menuItem(medium_rb, edit=True, radioButton=True)
-        elif current_size == "Big":
-            cmds.menuItem(big_rb, edit=True, radioButton=True)
+        config_menu.addSection("Hotkeys")
+        config_menu.addAction("Add TheKeyMachine Hotkeys", hotkeys.create_TheKeyMachine_hotkeys)
 
-        cmds.menuItem(divider=True, parent=toolbar_config_popup_menu)
-        cmds.menuItem(l="Uninstall", image=media.uninstall_image, vis=True, c=lambda x: ui.uninstall(), p=toolbar_config_popup_menu)
-        cmds.menuItem(divider=True, parent=toolbar_config_popup_menu)
-        cmds.menuItem(l="About", c=lambda x: ui.about_window(), image=media.about_image, p=toolbar_config_popup_menu)
+        config_menu.addSection("General")
+        config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload)
 
+        # Separators and others
+        toolbar_menu.addSeparator()
+        toolbar_menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall)
+        toolbar_menu.addSeparator()
+        toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window)
+
+        # --- OPEN AT CURSOR POSITION (left & right click) ---
+        # IMPORTANT: don't call setMenu(); we handle showing explicitly at the cursor
+        def _open_menu_at_cursor():
+            toolbar_menu.popup(QtGui.QCursor.pos())
+
+        toolbar_config_button_widget.clicked.connect(_open_menu_at_cursor)
+        toolbar_config_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        toolbar_config_button_widget.customContextMenuRequested.connect(lambda _pos: _open_menu_at_cursor())
+
+        
 
         # crea los tooltips
         update_tooltips()
