@@ -18,11 +18,11 @@ PySide6 or PySide2 (Maya 2017+). No external CORE import.
 # --- Qt compat (PySide6 / PySide2) ---------------------------------------------
 try:  # Maya 2025+
     from PySide6 import QtWidgets
-    from PySide6 import QtGui
+    from PySide6 import QtCore
     PYSIDE = 6
 except ImportError:  # Maya 2017–2024
     from PySide2 import QtWidgets
-    from PySide2 import QtGui
+    from PySide2 import QtCore
     PYSIDE = 2
 
 
@@ -58,3 +58,21 @@ class MenuWidget(QtWidgets.QMenu):
             pass
 
         return super(MenuWidget, self).mouseReleaseEvent(e)
+
+
+
+class SpinBox(QtWidgets.QSpinBox):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Al inicio, sin botones
+        self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+
+    def enterEvent(self, event: QtCore.QEvent):
+        """Cuando el ratón entra en el widget → mostrar flechas"""
+        self.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event: QtCore.QEvent):
+        """Cuando el ratón sale del widget → ocultar flechas"""
+        self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        super().leaveEvent(event)

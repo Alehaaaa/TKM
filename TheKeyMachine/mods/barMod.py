@@ -1375,10 +1375,14 @@ def remove_followCam(*args):
 # ________________________SELECTOR______________
 
 
-def selektor_window(*args):
+def selector_window(*args):
     window_name = "selectedObjectsWindow"
     if cmds.window(window_name, exists=True):
         cmds.deleteUI(window_name)
+
+    if cmds.button('selector_button', q=True, label=True) == "0":
+        return
+
 
     window = cmds.window(window_name, title="Selector", widthHeight=(230, 365), sizeable=False)
     cmds.columnLayout(adjustableColumn=True)

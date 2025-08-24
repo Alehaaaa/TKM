@@ -76,7 +76,7 @@ import TheKeyMachine.mods.hotkeysMod as hotkeys # type: ignore
 import TheKeyMachine.core.customGraph as cg # type: ignore
 
 from TheKeyMachine.widgets import sliderWidget as sw # type: ignore
-from TheKeyMachine.widgets import menuWidget as mw # type: ignore
+from TheKeyMachine.widgets import customWidgets as cw # type: ignore
 
 
 
@@ -207,7 +207,7 @@ modules_to_reload = [
     connectToolBox,
     cbScripts,
     sw,
-    mw,
+    cw,
 ]
 
 for module in modules_to_reload:
@@ -239,7 +239,6 @@ class toolbar(object):
         self.micro_move_button_state = False
         self.micro_move_run_timer = True
         self.animation_offset_original_values = {}
-        self.move_keyframes_intField = None
         self.setgroup_states = {}
         self.setgroup_buttons = {}
         self.tc = threading.Thread(target=self.toolbar_center_time, args=(1,))      # Create a thread to center the toolbar
@@ -2639,8 +2638,8 @@ class toolbar(object):
                 (clear_selected_keys_widget, helper.clear_selected_keys_widget_tooltip_text),
                 (select_scene_animation_widget, helper.select_scene_animation_widget_tooltip_text),
 
-                (barTweenSlider_widget, helper.blend_to_frame_slider_tooltip_text),
-                (barBlendSlider_widget, helper.blend_to_frame_slider_tooltip_text),
+                (barBlendSlider_widget, helper.blend_slider_tooltip_text),
+                (barTweenSlider_widget, helper.tween_slider_tooltip_text),
 
             ]
 
@@ -2694,8 +2693,18 @@ class toolbar(object):
         remove_inbetween_b_widget.setToolTip("")
 
     
-        self.move_keyframes_intField = cmds.intField("move_keyframes_int", width=38, h=22, minValue=1, value=1, bgc=[0.14,0.14,0.14], p="rowtoolbar")
-        desplazamiento = cmds.intField("move_keyframes_int", q=True, value=True)
+        move_keyframes_intField = cw.SpinBox()
+        move_keyframes_intField.setFixedSize(50, 24)
+        move_keyframes_intField.setMinimum(1)
+        move_keyframes_intField.setValue(1)
+        move_keyframes_intField.setStyleSheet(
+            "border: 0px;"
+            "border-radius: 5px;"
+            )
+
+        rowtoolbar_layout.addWidget(move_keyframes_intField)
+
+        desplazamiento = move_keyframes_intField.value()
 
         add_inbetween_b = cmds.button(l=" + ", h=22, w=26, bgc=[0.23,0.23,0.23], p="rowtoolbar", c=keyTools.add_inbetween)
         add_inbetween_b_widget = wrapInstance(int(mui.MQtUtil.findControl(add_inbetween_b)), QtWidgets.QPushButton)
@@ -2857,6 +2866,8 @@ class toolbar(object):
                 
                     cmds.button('blend_to_key_left', edit=True, vis=True, w=25, h=16)
                     cmds.button('blend_to_key_right', edit=True, vis=True, w=25, h=16)
+            
+            barBlendSlider_widget.startFlash()
 
 
         def blend_to_frame_with_button_values(percentage):
@@ -2936,6 +2947,8 @@ class toolbar(object):
                     # barTweenSlider_widget.setText("WL")
                     barTweenSlider_widget.setWorldSpace(True)
                     barTweenSlider_widget.setDragCommand(tween_wrapper)
+            
+            barTweenSlider_widget.startFlash()
                     
 
         # Slider Widget Tween Slider
@@ -3101,8 +3114,9 @@ class toolbar(object):
 
 
 
-        selector_button = cmds.button('selector_button', l="0", h=user_preferences.toolbar_icon_h, w=user_preferences.toolbar_icon_w, c=bar.selektor_window, p="rowtoolbar")
+        selector_button = cmds.button('selector_button', l="0", h=user_preferences.toolbar_icon_h, w=user_preferences.toolbar_icon_w, c=bar.selector_window, p="rowtoolbar")
         selector_button_widget = wrapInstance(int(mui.MQtUtil.findControl(selector_button)), QtWidgets.QWidget)
+
         selector_button_widget.setToolTip("")
 
         cmds.separator(w=20, vis=False, p="rowtoolbar")
@@ -3563,8 +3577,8 @@ class toolbar(object):
             QtWidgets.QPushButton
         )
 
-        # Build your menu with your mw.MenuWidget; make sure the button is the PARENT
-        toolbar_menu = mw.MenuWidget(parent=toolbar_config_button_widget)
+        # Build your menu with your cw.MenuWidget; make sure the button is the PARENT
+        toolbar_menu = cw.MenuWidget(parent=toolbar_config_button_widget)
 
         # === Help submenu ===
         help_menu = toolbar_menu.addMenu(QtGui.QIcon(media.help_menu_image), "Help")

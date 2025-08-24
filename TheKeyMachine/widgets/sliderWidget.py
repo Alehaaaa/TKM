@@ -78,8 +78,10 @@ class _SliderButton(QPushButton):
         self._box_sz = 6 if abs(percent) == 100 else 3
         self.setFixedHeight(parent.height())
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setToolTip(f"{percent:+d}%")
-        self.setStatusTip(f"{percent:+d}%")
+
+        # self.setToolTip(f"{percent:+d}%")
+        # self.setStatusTip(f"{percent:+d}%")
+
         self.setStyleSheet(
             "QPushButton { background: none; border-radius: 0; }"
             f"QPushButton:pressed {{ background-color: {self._color}; border-radius: 0; }}"
@@ -185,8 +187,8 @@ class _HandleOnlySlider(QSlider):
         self.setFixedWidth(200)
         self.setFixedHeight(24)
 
-        self.setToolTip(f"Slider for {text}")
-        self.setStatusTip(f"Slider for {text}")
+        # self.setToolTip(f"Slider for {text}")
+        # self.setStatusTip(f"Slider for {text}")
 
         self._apply_stylesheet(thick=False)
 
@@ -492,8 +494,7 @@ class SliderWidget(QWidget):
 
         # add to provided layout, if any
         if p is not None:
-            try:
-                p.addWidget(self)
+            try: p.addWidget(self)
             except Exception as e:
                 print("SliderWidget: could not add to provided layout:", e)
 
@@ -606,6 +607,37 @@ class SliderWidget(QWidget):
 
         self._leftOverlay.raise_()
         self._rightOverlay.raise_()
+
+
+    def startFlash(self, flashes: int = 3, interval: int = 40):
+        """
+        Overlay the widget in white a given number of flashes, then remove it.
+
+        Args:
+            flashes (int): Number of flashes (default: 2).
+            interval (int): Duration in ms for each on/off toggle (default: 120).
+        """
+        # Crear overlay blanco sobre toda la superficie del widget
+        overlay = QWidget(self)
+        overlay.setStyleSheet("background-color: white;")
+        overlay.setGeometry(self.rect())
+        overlay.raise_()
+
+        # Estado interno de flashes
+        state = {"count": 0}
+
+        def toggle():
+            if state["count"] >= flashes * 2:
+                overlay.deleteLater()
+                return
+            overlay.setVisible(state["count"] % 2 == 0)
+            state["count"] += 1
+            QTimer.singleShot(interval, toggle)
+
+        # Inicia primer toggle
+        toggle()
+
+
 
     # --- signal plumbing --------------------------------------------------------
     def _on_drag_started(self):
