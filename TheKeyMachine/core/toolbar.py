@@ -78,6 +78,8 @@ import TheKeyMachine.core.customGraph as cg # type: ignore
 from TheKeyMachine.widgets import sliderWidget as sw # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw # type: ignore
 
+from TheKeyMachine.mods import tweenMod as tween # type: ignore
+
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -208,6 +210,7 @@ modules_to_reload = [
     cbScripts,
     sw,
     cw,
+    tween,
 ]
 
 for module in modules_to_reload:
@@ -219,7 +222,6 @@ for module in modules_to_reload:
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-current_blend_slider_mode = "BL"
 toggleAnimOffsetButtonState = False
 micro_move_button_state = False
 WorkspaceName = 'k'
@@ -2807,23 +2809,7 @@ class toolbar(object):
 
         def blend_slider_wrapper(value):
             keyTools.handle_autokey_start()
-            keyTools.blend_to_key(value)  # Llama a la función tween original
-            # update_blend_label_with_slider_value(value) 
-
-        # def reset_blend_slider_label_after_drag(value):
-        #     global current_blend_slider_mode
-        #     # Restablece la etiqueta a "0"
-        #     label = "BL"
-        #     if current_blend_slider_mode == 'pull_push':
-        #         label = "PP"
-        #     if current_blend_slider_mode == 'blend_to_frame':
-        #         label = "BK"
-        #     if current_blend_slider_mode == 'blend_to_default':
-        #         label = "BD"
-        #     cmds.text('barBlendSliderLabelText', edit=True, label=label)
-        #     # Llama a la función tweenSliderReset
-        #     keyTools.handle_autokey_end()
-        #     keyTools.blendSliderReset(barBlendSlider)
+            keyTools.blend_to_key(value)
 
 
 
@@ -2835,27 +2821,40 @@ class toolbar(object):
 
 
         def set_blend_slider_command(mode):
-            global current_blend_slider_mode
-            current_blend_slider_mode = mode
+            barBlendSlider_widget.setMode(mode)
 
             match mode:
                 case 'pull_push':
                     barBlendSlider_widget.setText("PP")
-                    barBlendSlider_widget.setDragCommand(pull_push_wrapper)
+                    barBlendSlider_widget.setDragCommand(tween.interpolate)
                 
                     cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
                     cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
 
                 case 'blend':
                     barBlendSlider_widget.setText("BL")
-                    barBlendSlider_widget.setDragCommand(blend_slider_wrapper)
+                    barBlendSlider_widget.setDragCommand(tween.interpolate) # blend_slider_wrapper
+                
+                    cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
+                    cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
+
+                case 'blend_to_average':
+                    barBlendSlider_widget.setText("BA")
+                    barBlendSlider_widget.setDragCommand(tween.interpolate)
+                
+                    cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
+                    cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
+
+                case 'blend_to_curve':
+                    barBlendSlider_widget.setText("BC")
+                    barBlendSlider_widget.setDragCommand(tween.interpolate) # blend_to_curve_wrapper
                 
                     cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
                     cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)
                     
                 case 'blend_to_default':
                     barBlendSlider_widget.setText("BD")
-                    barBlendSlider_widget.setDragCommand(blend_to_default_wrapper)
+                    barBlendSlider_widget.setDragCommand(tween.interpolate) # blend_to_default_wrapper
                 
                     cmds.button('blend_to_key_left', edit=True, vis=False, w=1, h=1)
                     cmds.button('blend_to_key_right', edit=True, vis=False, w=1, h=1)

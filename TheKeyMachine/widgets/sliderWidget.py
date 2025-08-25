@@ -203,7 +203,7 @@ class _HandleOnlySlider(QSlider):
         # internal units = thousandths of a percent
         return round(self.value() / 1000.0, 3)
 
-    def set_percent(self, pct: float):
+    def setPercent(self, pct: float):
         self.setValue(int(round(pct * 1000)))
         self.moved.emit(self.percent())
         self.finished.emit(self.percent())
@@ -407,7 +407,7 @@ class SliderWidget(QWidget):
       - dragStarted()
       - dragFinished()
     """
-    valueChanged = Signal(float)
+    valueChanged = Signal(float, str)
     dragStarted = Signal()
     dragFinished = Signal()
 
@@ -422,6 +422,7 @@ class SliderWidget(QWidget):
         dragCommand=None,
         dropCommand=None,
         worldSpace=None,
+        mode='blend',
         p=None
     ):
         super().__init__(None)
@@ -431,6 +432,8 @@ class SliderWidget(QWidget):
         self._scale = 1000  # internal units per 1%
         self._color = color
         self._worldSpace = worldSpace
+
+        self._mode = mode
 
         # base layout: only the slider; buttons live in overlay containers
         base = QHBoxLayout(self)
@@ -482,7 +485,7 @@ class SliderWidget(QWidget):
         self._slider.started.connect(self._on_drag_started)
         self._slider.moved.connect(self._on_inner_moved)
         self._slider.finished.connect(self._on_inner_finished)
-        self._slider.valueChanged.connect(lambda _v: self.valueChanged.emit(self.percent()))
+        self._slider.valueChanged.connect(lambda _v: self.valueChanged.emit(self.percent(), self._mode))
 
         if dragCommand:
             self.valueChanged.connect(dragCommand)
@@ -501,7 +504,9 @@ class SliderWidget(QWidget):
         # Nice-to-have: accept wheel focus from anywhere in the widget
         self.setFocusPolicy(Qt.StrongFocus)
 
-    # --- public API -------------------------------------------------------------
+# --- PUBLIC API -------------------------------------------------------------
+
+    # --- setters --------------------------------------------------------------
     def setText(self, text: str):
         self._slider._text = text
 
@@ -525,7 +530,6 @@ class SliderWidget(QWidget):
         
         self._worldSpace = enabled
 
-
     def setDragCommand(self, dragCommand):
         try: self.valueChanged.disconnect()
         except Exception: pass
@@ -541,55 +545,67 @@ class SliderWidget(QWidget):
         self._update_buttons()
 
     def setValue(self, v: int):
-        """NOTE: retains original behavior (expects raw internal units)."""
         self._slider.setValue(int(v))
 
-    def value(self) -> int:
-        """Raw internal value (thousandths of percent)."""
-        return int(self._slider.value())
+    def setMode(self, mode: str):
+        self._mode = mode
 
-    def percent(self) -> float:
-        return round(self._slider.value() / float(self._scale), 3)
-
-    def set_percent(self, pct: float):
-        self._slider.setValue(int(round(pct * self._scale)))
-
-    def setOvershoot(self, visible: bool):
-        # Toggle only overshoot buttons (> |100|) and set range to the largest
-        # overshoot found on each side (fallback to ±100).
-        left_max = 100
-        right_max = 100
-
+    def setOvershoot(self, visible: bool, maximum: int = 100):
+        left_max = right_max = maximum
         for b in self._leftButtons:
             p = int(b.percent)
-            if abs(p) > 100:
+            if abs(p) > maximum:
                 b.setVisible(visible)
-                left_max = max(left_max, abs(p))
+                left_max = max(right_max, abs(p))
 
         for b in self._rightButtons:
             p = int(b.percent)
-            if abs(p) > 100:
+            if abs(p) > maximum:
                 b.setVisible(visible)
                 right_max = max(right_max, abs(p))
 
         if visible:
             self._slider.set_range(-left_max, right_max)
         else:
-            self._slider.set_range(-100, 100)
-
+            self._slider.set_range(-maximum, maximum)
         self._update_buttons()
 
-    # --- parent-wide wheel handling --------------------------------------------
+    def setPercent(self, pct: float):
+        self._slider.setValue(int(round(pct * self._scale)))
+
+    # --- getters --------------------------------------------------------------
+    def mode(self) -> str:
+        return self._mode
+
+    def value(self) -> int:
+        return int(self._slider.value())
+
+    def percent(self) -> float:
+        return round(self._slider.value() / float(self._scale), 3)
+    
+    def worldSpace(self) -> bool:
+        return self._worldSpace
+
+    def color(self) -> str:
+        return self._slider._color
+    
+    def text(self) -> str:
+        return self._slider._text
+
+
+# --- PRIVATE API ------------------------------------------------------------
+    # --- event handlers -------------------------------------------------------
     def wheelEvent(self, e: QWheelEvent):
         """Make the wheel change the slider even if the cursor is over overlays/buttons."""
         delta = e.angleDelta().x() + e.angleDelta().y()
         self._slider.apply_wheel_delta(delta)
         e.accept()
 
-    # --- geometry mgmt for overlays --------------------------------------------
     def resizeEvent(self, e):
         super().resizeEvent(e)
         self._update_buttons()
+
+
 
     def _update_buttons(self):
         s = self._slider
@@ -617,13 +633,11 @@ class SliderWidget(QWidget):
             flashes (int): Number of flashes (default: 2).
             interval (int): Duration in ms for each on/off toggle (default: 120).
         """
-        # Crear overlay blanco sobre toda la superficie del widget
         overlay = QWidget(self)
         overlay.setStyleSheet("background-color: white;")
         overlay.setGeometry(self.rect())
         overlay.raise_()
 
-        # Estado interno de flashes
         state = {"count": 0}
 
         def toggle():
@@ -634,7 +648,6 @@ class SliderWidget(QWidget):
             state["count"] += 1
             QTimer.singleShot(interval, toggle)
 
-        # Inicia primer toggle
         toggle()
 
 
@@ -646,7 +659,7 @@ class SliderWidget(QWidget):
         self._rightOverlay.hide()
 
     def _on_inner_moved(self, pct: float):
-        self.valueChanged.emit(self.percent())
+        self.valueChanged.emit(self.percent(), self._mode)
 
     def _on_inner_finished(self, pct: float):
         self.dragFinished.emit()
@@ -654,5 +667,4 @@ class SliderWidget(QWidget):
         self._rightOverlay.show()
 
     def _on_button_clicked(self, btn: _SliderButton):
-        # keep existing behavior: emit valueChanged with the button's percent
-        self.valueChanged.emit(float(btn.percent))
+        self.valueChanged.emit(float(btn.percent), self._mode)
