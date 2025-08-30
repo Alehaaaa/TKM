@@ -85,6 +85,8 @@ def create_TheKeyMachine_hotkeys(*args):
 
     selectOpposite = 'import TheKeyMachine.mods.keyToolsMod as key; key.selectOpposite()'
 
+    addSelectOpposite = 'import TheKeyMachine.mods.keyToolsMod as key; key.addSelectOpposite()'
+
     copyOpposite = 'import TheKeyMachine.mods.keyToolsMod as key; key.copyOpposite()'
 
     mirror = 'import TheKeyMachine.mods.keyToolsMod as key; key.mirror()'
@@ -164,6 +166,7 @@ def create_TheKeyMachine_hotkeys(*args):
         ('delete_animation', 'Delete Objects Animation', delete_animation),
         ('delete_time_slider_animation', 'Delete Selected Time Slider Animation', delete_animation),
         ('selectOpposite', 'Select Opposite', selectOpposite),
+        ('addSelectOpposite', 'Add Select Opposite', addSelectOpposite),
         ('copyOpposite', 'Copy Opposite', copyOpposite),
         ('mirror', 'Mirror', mirror),
         ('copy_animation', 'Copy Animation', copy_animation),

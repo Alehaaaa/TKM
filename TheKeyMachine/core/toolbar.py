@@ -3123,7 +3123,7 @@ class toolbar(object):
 
 
         # Select opposite ---------------------------------------------------------------------
-        select_opposite_button = cmds.iconTextButton(l="", h=user_preferences.toolbar_icon_h, w=user_preferences.toolbar_icon_w, image=media.select_opposite_image, c=keyTools.selectOpposite, p="rowtoolbar")
+        select_opposite_button = cmds.iconTextButton(l="", h=user_preferences.toolbar_icon_h, w=user_preferences.toolbar_icon_w, image=media.select_opposite_image, c=keyTools.selectOppositeHandler, p="rowtoolbar")
         select_opposite_button_widget = wrapInstance(int(mui.MQtUtil.findControl(select_opposite_button)), QtWidgets.QWidget)
         select_opposite_button_widget.setToolTip("")
 

@@ -2277,7 +2277,7 @@ def select_objects_from_selected_curves(*args):
 # _____________________________ Patrones Mirror ______________________________________
 
 
-PATRONES_MIRROR = [
+MIRROR_PATTERNS = [
     ('R_', 'L_'),
     ('L_', 'R_'),
 
@@ -2320,11 +2320,11 @@ PATRONES_MIRROR = [
 # __________ Funcion para buscar control opuesto ___________________________________
 
 def find_opposite_name(name):
-    global PATRONES_MIRROR
+    global MIRROR_PATTERNS
     # Divide el nombre en partes (namespace y nombre del control)
     namespace, _, control_name = name.rpartition(':')
 
-    for pattern, opposite_pattern in PATRONES_MIRROR:
+    for pattern, opposite_pattern in MIRROR_PATTERNS:
         if pattern in control_name:
             new_control_name = control_name.replace(pattern, opposite_pattern, 1)
             possible_opposite_name = f'{namespace}:{new_control_name}' if namespace else new_control_name
@@ -2338,31 +2338,46 @@ def find_opposite_name(name):
 
 
 
-def selectOpposite(*args):
-    global PATRONES_MIRROR
-
-    # Verifica si la tecla Shift está presionada
+def selectOppositeHandler(*args):
     mods = mel.eval('getModifiers')
     shift_pressed = bool(mods % 2)  # Shift
-    
-    # Obtén la selección actual
-    selected_objects = cmds.ls(selection=True)
 
-    # Lista para almacenar los nombres de los controles opuestos
+    if shift_pressed:
+        addSelectOpposite(args)
+    else:
+        selectOpposite(args)
+
+
+def selectOpposite(*args):
+    global MIRROR_PATTERNS
+    
+    selected_objects = cmds.ls(selection=True)
     opposite_controls = []
 
-    # Reutilizar la lógica de 'find_opposite_name' de la función 'mirror'
     for obj in selected_objects:
         opposite_obj = find_opposite_name(obj)
         if opposite_obj and cmds.objExists(opposite_obj):
             opposite_controls.append(opposite_obj)
 
-    # Finalmente, selecciona todos los controles opuestos
     if opposite_controls:
-        if shift_pressed:
-            cmds.select(opposite_controls, add=True)
-        else:
-            cmds.select(opposite_controls)
+        cmds.select(opposite_controls)
+
+
+def addSelectOpposite(*args):
+    global MIRROR_PATTERNS
+    
+    selected_objects = cmds.ls(selection=True)
+    opposite_controls = []
+
+    for obj in selected_objects:
+        opposite_obj = find_opposite_name(obj)
+        if opposite_obj and cmds.objExists(opposite_obj):
+            opposite_controls.append(opposite_obj)
+
+    if opposite_controls:
+        cmds.select(opposite_controls, add=True)
+
+
 
 
 
@@ -2395,7 +2410,7 @@ def copyOpposite(*args):
             return value
 
         def replace_pattern_in_attribute(attr):
-            for from_pattern, to_pattern in PATRONES_MIRROR:
+            for from_pattern, to_pattern in MIRROR_PATTERNS:
                 if from_pattern in attr:
                     return attr.replace(from_pattern, to_pattern)
             return attr
@@ -2449,7 +2464,7 @@ def mirror(*args):
     cmds.undoInfo(openChunk=True)
 
     try:
-        global PATRONES_MIRROR
+        global MIRROR_PATTERNS
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
 
         ATTRIBUTES_TO_IGNORE = {"tag"}
@@ -2478,7 +2493,7 @@ def mirror(*args):
             # Divide el nombre en partes (namespace y nombre del control)
             namespace, _, control_name = name.rpartition(':')
 
-            for pattern, opposite_pattern in PATRONES_MIRROR:
+            for pattern, opposite_pattern in MIRROR_PATTERNS:
                 # Revisa si el patrón está en el nombre del control
                 if pattern in control_name:
                     # Realiza el reemplazo solo para la primera aparición del patrón
@@ -2586,7 +2601,7 @@ def mirror(*args):
 
 
 def mirror_to_opposite(*args):
-    global PATRONES_MIRROR
+    global MIRROR_PATTERNS
     mirror_exceptions_file_path = general.get_mirror_exceptions_file()
 
     ATTRIBUTES_TO_IGNORE = {"tag"}
@@ -2615,7 +2630,7 @@ def mirror_to_opposite(*args):
         # Divide el nombre en partes (namespace y nombre del control)
         namespace, _, control_name = name.rpartition(':')
 
-        for pattern, opposite_pattern in PATRONES_MIRROR:
+        for pattern, opposite_pattern in MIRROR_PATTERNS:
             # Revisa si el patrón está en el nombre del control
             if pattern in control_name:
                 # Realiza el reemplazo solo para la primera aparición del patrón
@@ -3018,7 +3033,7 @@ def paste_opposite_animation(*args):
 
 
     def find_mirror_control(control_name):
-        for pattern, opposite_pattern in PATRONES_MIRROR:
+        for pattern, opposite_pattern in MIRROR_PATTERNS:
             if pattern in control_name:
                 return control_name.replace(pattern, opposite_pattern, 1)
         return None
