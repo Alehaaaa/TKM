@@ -860,14 +860,14 @@ def mod_copy_worldspace_animation(*args):
 
 
 def color_copy_worldspace_animation(*args):
-    set_temp_timeslider_colors()
+    #set_temp_timeslider_colors()
     cmds.evalDeferred(copy_worldspace_animation)
     cmds.evalDeferred(restore_timeslider_colors)
 
 
 
 def color_paste_worldspace_animation(*args):
-    set_temp_timeslider_colors()
+    #set_temp_timeslider_colors()
     cmds.evalDeferred(paste_worldspace_animation)
     cmds.evalDeferred(restore_timeslider_colors)
 
