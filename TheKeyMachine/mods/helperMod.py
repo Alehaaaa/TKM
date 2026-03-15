@@ -1,43 +1,33 @@
+"""
+
+TheKeyMachine - Animation Toolset for Maya Animators
 
 
-'''
+This file is part of TheKeyMachine, an open source software for Autodesk Maya licensed under the GNU General Public License v3.0 (GPL-3.0).
+You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.
+By using this code, you agree to keep it open source and share any modifications.
+This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
 
-    TheKeyMachine - Animation Toolset for Maya Animators                                           
-                                                                                                                                              
-                                                                                                                                              
-    This file is part of TheKeyMachine, an open source software for Autodesk Maya licensed under the GNU General Public License v3.0 (GPL-3.0).                                           
-    You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.                                              
-    By using this code, you agree to keep it open source and share any modifications.                                                          
-    This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
+thekeymachine.xyz / x@thekeymachine.xyz
 
-    thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
-                                                                                                                                              
-    Developed by: Rodrigo Torres / rodritorres.com                                                                                             
-    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
-                                                                                                                                             
+Developed by: Rodrigo Torres / rodritorres.com
+Modified by: Alehaaaa / alehaaaa.github.io
 
 
-'''
 
+"""
 
-import maya.cmds as cmds
 import os
-import sys
-import platform 
 
 try:
-    from PySide2.QtWidgets import QApplication, QDesktopWidget
+    from PySide6.QtWidgets import QApplication
 except ImportError:
-    from PySide6 import QtWidgets, QtCore, QtGui
-    from PySide6.QtWidgets import *
-    from PySide6.QtGui import *
-    from PySide6.QtCore import *
+    from PySide2.QtWidgets import QApplication, QDesktopWidget
 
 import TheKeyMachine.mods.mediaMod as media
-
 from TheKeyMachine.mods.generalMod import config
 
-INSTALL_PATH                    = config["INSTALL_PATH"]
+INSTALL_PATH = config["INSTALL_PATH"]
 
 
 # ---------------------------------------------
@@ -60,10 +50,8 @@ reset_animation_image = getImage("eraser.png")
 delete_animation_image = getImage("trash.png")
 
 
-
-
-
 # style ------------------------------------
+
 
 def get_screen_resolution():
     app = QApplication.instance()
@@ -71,25 +59,24 @@ def get_screen_resolution():
         app = QApplication([])
 
     try:
-        # PySide2
-        from PySide2.QtGui import QDesktopWidget
-        desktop = QDesktopWidget()
-        screen_rect = desktop.availableGeometry()
-    except ImportError:
         # PySide6
         screen = app.primaryScreen()
-        screen_rect = screen.availableGeometry()
+        screen_rect = screen.geometry()
+    except Exception:
+        # PySide2
+        desktop = QDesktopWidget()
+        screen_rect = desktop.screenGeometry()
 
     screen_width = screen_rect.width()
     screen_height = screen_rect.height()
-    
+
     return screen_width, screen_height
 
 
 def get_font_sizes():
     screen_width, screen_height = get_screen_resolution()
 
-    if screen_width == 3840:
+    if screen_width >= 4000:
         font_size_enun = "25px"
         font_size = "18px"
     else:
@@ -102,12 +89,10 @@ def get_font_sizes():
 font_size_enun, font_size = get_font_sizes()
 
 
-
-
 # ----------------------------------------------  TOOLTIPS  --------------------------------------------------------
 
 
-#-------- KeyBox
+# -------- KeyBox
 
 
 move_key_left_b_widget_tooltip_text = (
@@ -118,9 +103,7 @@ move_key_left_b_widget_tooltip_text = (
 
 
 remove_inbetween_b_widget_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Remove Inbetween </b></font><br><br>"
-    "Remove one inbetween.<br><br>"
-    ""
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Remove Inbetween </b></font><br><br>Remove one inbetween.<br><br>"
 )
 
 
@@ -131,9 +114,7 @@ move_keyframes_intField_widget_tooltip_text = (
 )
 
 add_inbetween_b_widget_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Add Inbetween </b></font><br><br>"
-    "Add one inbetween<br><br>"
-    ""
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Add Inbetween </b></font><br><br>Add one inbetween<br><br>"
 )
 
 
@@ -167,25 +148,60 @@ select_scene_animation_widget_tooltip_text = (
 # ------ Sliders
 
 
-blend_slider_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:20px;'><b>Blend Slider </b></font><br><br>"
+blend_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Blend </b></font><br><br>"
     "Blend between previous and next keyframe value.<br><br>"
     "Select channels in the Channel Box to adjust only those channels.<br><br>"
-    ""
 )
 
-blend_to_frame_slider_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:20px;'><b>Blend to Frame </b></font><br><br>"
+blend_to_default_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Blend to Default </b></font><br><br>"
+    "Blend current value towards its default value.<br><br>"
+)
+
+blend_to_frame_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Blend to Frame </b></font><br><br>"
     "Upon pressing each button, the current frame is assigned to the button.<br>"
     "The blend slider will perform the blending function between the assigned frames.<br><br>"
-    ""
 )
 
-tween_slider_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:20px;'><b>Tween Slider </b></font><br><br>"
+pull_push_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Pull / Push </b></font><br><br>Pull or Push the keyframes.<br><br>"
+)
+
+tweener_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tweener </b></font><br><br>"
     "Tween between previous and next keyframe.<br><br>"
     "Select channels in the Channel Box to adjust only those channels.<br><br>"
-    ""
+)
+
+tweener_world_space_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tweener World Space </b></font><br><br>"
+    "Tween between previous and next keyframe in world space.<br><br>"
+)
+
+
+# ----- Tangents
+
+
+auto_tangent_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Auto Tangent</b></font><img src='{media.auto_tangent_image}' width='30'><br><br>"
+    "Set the tangents of the selected keyframes to Auto.<br><br>"
+)
+
+spline_tangent_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Spline Tangent</b></font><img src='{media.spline_tangent_image}' width='30'><br><br>"
+    "Set the tangents of the selected keyframes to Spline.<br><br>"
+)
+
+linear_tangent_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Linear Tangent</b></font><img src='{media.linear_tangent_image}' width='30'><br><br>"
+    "Set the tangents of the selected keyframes to Linear.<br><br>"
+)
+
+step_tangent_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Step Tangent</b></font><img src='{media.step_tangent_image}' width='30'><br><br>"
+    "Set the tangents of the selected keyframes to Stepped.<br><br>"
 )
 
 
@@ -198,8 +214,7 @@ block_keys_tooltip_text = (
     "Use: Simply select the objects and run the tool.<br>"
     "</font>"
     "<br><br>"
-
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Share Keys </b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Share Keys </b></font><img src='{media.share_keys_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool allows you to share keys position between one object and another so that both objects have the same keyframes position.<br><br>"
     "You can share keys to more than one object at the same time.<br><br>"
@@ -207,15 +222,13 @@ block_keys_tooltip_text = (
     "Use: First select the object that has the keyframes, followed by the objects you want to share the keyframes with.<br>"
     "</font>"
     "<br><br>"
-
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake Anim </b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake Anim </b></font><img src='{media.bake_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "A simple way of baking all your animation. By default this tool switch your curves to step mode.<br><br>"
     "Select the objects you want to bake and run the tool.<br><br>"
     "Use: Add '2' in interval to bake you animation every 2 frames.<br><br>"
     "</font>"
     ""
-
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Gimbal Fixer </b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Gimbal Fixer allows you to change the rotation order of a control or object without altering the existing animation.<br>"
@@ -223,7 +236,6 @@ block_keys_tooltip_text = (
     "The tool displays a list of options where the lowest percentage is the best choice.<br><br>"
     "</font>"
     ""
-
 )
 
 
@@ -233,24 +245,20 @@ block_keys_tooltip_text = (
 pointer_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Rig Controls </b></font><img src='{media.select_rig_controls_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "This tool selects all rig controls. Selected controls will be only nurbs curves.."
+    "This tool selects all rig controls. Selected controls will be only nurbs curves."
     "</font>"
     "<br><br>"
-
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Animated Rig Controls </b></font><img src='{media.select_animated_rig_controls_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool selects all animated rig controls. Selected controls will be only nurbs curves."
     "</font>"
     "<br><br>"
-
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Depth Mover </b></font><img src='{media.depth_mover_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Adjust object depth without altering its camera-relative position or angle.<br><br>"
     "</font>"
     ""
-
 )
-
 
 
 # ----- Isolate
@@ -269,9 +277,7 @@ isolate_tooltip_text = (
     "For additional assistance, please refer to the knowledge site.<br><br>"
     "Right-click for options.<br>"
     "</font>"
-
 )
-
 
 
 createLocator_tooltip_text = (
@@ -301,8 +307,8 @@ tracer_tooltip_text = (
     "Use 'refresh' to refresh the trail without activating it.<br><br>"
     f"<font style='color: #869fac; font-size:{font_size};'><b>Keys Shortcuts:</b></font><br>"
     f"<font style='color: #869fac; font-size:{font_size};'>Shift &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Refresh</font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Ctrol &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Show/Hide</font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Ctrol + Alt &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Remove</font><br>"
+    f"<font style='color: #869fac; font-size:{font_size};'>Ctrl &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Show/Hide</font><br>"
+    f"<font style='color: #869fac; font-size:{font_size};'>Ctrl + Alt &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Remove</font><br>"
     "</font>"
 )
 
@@ -314,7 +320,7 @@ reset_values_tooltip_text = (
     "</font>"
     f"<font style='color: #869fac; font-size:{font_size};'><b>Shortcuts:</b></font><br>"
     f"<font style='color: #869fac; font-size:{font_size};'>Shift &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Reset Translations</font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Ctrol &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Reset Rotations</font><br>"
+    f"<font style='color: #869fac; font-size:{font_size};'>Ctrl &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Reset Rotations</font><br>"
     "</font>"
 )
 
@@ -330,7 +336,6 @@ delete_animation_tooltip_text = (
     "</font>"
     ""
     "</font>"
-
 )
 
 
@@ -368,7 +373,8 @@ mirror_tooltip_text = (
 copy_paste_animation_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Animation </b></font><img src='{media.copy_paste_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Copy and paste animations of objects or controls. The animation is saved in a file, so it can be pasted in another Maya session.<br><br>"
+    "Copy and paste animations of objects or controls.<br>"
+    "The animation is saved in a file, so it can be pasted in another Maya session.<br><br>"
     "If you have copied only one side of the controls, you can paste them on the opposite side.<br><br>"
     "</font>"
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Pose </b></font><img src='{media.copy_pose_image}' width='30'><br><br>"
@@ -379,8 +385,6 @@ copy_paste_animation_tooltip_text = (
 )
 
 
-
-
 selector_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Selector </b></font><img src='{media.selector_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
@@ -388,7 +392,6 @@ selector_tooltip_text = (
     "The list is sorted in alphabetical or numerical order. Use the 'Reload' option to refresh the items you see in the window.<br><br>"
     ""
     "</font>"
-
 )
 
 select_hierarchy_tooltip_text = (
@@ -413,7 +416,8 @@ animation_offset_tooltip_text = (
 link_objects_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Link objects </b></font><img src='{media.link_objects_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Link objects is like using parent constraints without constraints. The tool allows you to save the relationship between several objects and apply that relationship back when needed.<br><br>"
+    "Link objects is like using parent constraints without constraints.<br>"
+    "The tool allows you to save the relationship between several objects and apply that relationship back when needed.<br><br>"
     "The usage is straightforward: first, select the objects that will follow then the main or target object. Run 'Copy Link Position'<br><br>"
     ""
     "To retrieve the object relationship, execute 'Paste Link Position'. At least one object must be selected.<br><br>"
@@ -441,17 +445,14 @@ copy_worldspace_tooltip_text = (
     "Copy and paste world space positions. Useful for reseting, for example, the master control in a walking cycle.<br><br>"
     "To 'Copy' select a group of controls and click 'Copy worldspace'.<br><br>"
     "To 'Paste' just click 'Paste worldspace' there is not need of selecting any control.<br><br>"
-
     f"<font style='color: #869fac; font-size:{font_size};'><b>Shortcuts:</b></font><br>"
     f"<font style='color: #869fac; font-size:{font_size};'>Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Copy worldspace</font><br>"
     f"<font style='color: #869fac; font-size:{font_size};'>Shift + Click &nbsp;&nbsp;&nbsp; Paste worldspace</font>"
     "</font><br><br>"
-
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace Current Frame </b></font><img src='{media.copy_worldspace_frame_animation_image}' width='28'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy and paste world space values for the current frame.<br><br>"
     "</font>"
-
 )
 
 temp_pivot_tooltip_text = (
@@ -463,7 +464,6 @@ temp_pivot_tooltip_text = (
     "<br><br>"
     "Right-click for options.<br>"
     "</font>"
-
 )
 
 
@@ -475,7 +475,6 @@ micro_move_tooltip_text = (
     "It works only with rotations in Gimbal mode and translations in Local or World mode."
     "<br><br>"
     "</font>"
-
 )
 
 
@@ -489,7 +488,6 @@ selection_sets_tooltip_text = (
     "Import and export sets and groups between scenes."
     "<br>"
     "</font>"
-
 )
 
 customGraph_tooltip_text = (
@@ -498,7 +496,6 @@ customGraph_tooltip_text = (
     "Open GraphEditor with the customGraph add-on.<br><br>"
     "customGraph is a specific set of tools for the GraphEditor. Manipulate animation curves, lock or mute channels, or create specific selection sets.<br><br>"
     "</font>"
-
 )
 
 custom_tools_tooltip_text = (
@@ -509,7 +506,6 @@ custom_tools_tooltip_text = (
     f"<font style='color: #e67373; font-size:{font_size};'>Please refer to the help page to understand how this tool works and to avoid errors in TheKeyMachine."
     "</font>"
     "<br>"
-
 )
 
 custom_scripts_tooltip_text = (

@@ -1,107 +1,93 @@
+"""
+
+TheKeyMachine - Animation Toolset for Maya Animators
+
+
+This file is part of TheKeyMachine, an open source software for Autodesk Maya licensed under the GNU General Public License v3.0 (GPL-3.0).
+You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.
+By using this code, you agree to keep it open source and share any modifications.
+This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
+
+thekeymachine.xyz / x@thekeymachine.xyz
+
+Developed by: Rodrigo Torres / rodritorres.com
+Modified by: Alehaaaa / alehaaaa.github.io
 
 
 
-
-'''
-
-    TheKeyMachine - Animation Toolset for Maya Animators                                           
-                                                                                                                                              
-                                                                                                                                              
-    This file is part of TheKeyMachine, an open source software for Autodesk Maya licensed under the GNU General Public License v3.0 (GPL-3.0).                                           
-    You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.                                              
-    By using this code, you agree to keep it open source and share any modifications.                                                          
-    This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
-
-    thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
-                                                                                                                                              
-    Developed by: Rodrigo Torres / rodritorres.com                                                                                             
-    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
-                                                                                                                                             
-
-
-'''
-
+"""
 
 import maya.cmds as cmds
 import maya.mel as mel
-import maya.OpenMaya as om
 import maya.OpenMayaUI as mui
 
 try:
     from shiboken2 import wrapInstance
-    from PySide2 import QtWidgets, QtGui, QtCore
     from PySide2.QtWidgets import QApplication, QDesktopWidget
-    from PySide2 import QtWidgets
     from PySide2.QtCore import *
     from PySide2.QtGui import *
     from PySide2.QtWidgets import *
     from PySide2.QtCore import QTimer
     from PySide2.QtWidgets import QAction
+
+    from PySide2 import QtCore, QtGui, QtWidgets
 except ImportError:
     from shiboken6 import wrapInstance
-    from PySide6 import QtWidgets, QtCore, QtGui
     from PySide6.QtWidgets import QApplication
-    from PySide6.QtGui import QScreen, QPixmap
+    from PySide6.QtGui import QPixmap
     from PySide6.QtCore import QTimer
     from PySide6.QtGui import QAction
 
+    from PySide6 import QtCore, QtGui, QtWidgets
 
 
-
-import json
 import ssl
 import os
 import platform
 import sys
 import urllib.request
 import urllib.parse
-import re
 import shutil
-import base64
-import importlib
-import zipfile
 from functools import partial
 
 
-import TheKeyMachine.core.customGraph as cg
-import TheKeyMachine.core.toolbar as tb
+# import TheKeyMachine.core.customGraph as cg
+# import TheKeyMachine.core.toolbar as tb
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.keyToolsMod as keyTools
-import TheKeyMachine.mods.selSetsMod as selSets
+
+# import TheKeyMachine.mods.selSetsMod as selSets
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.barMod as bar
 
 from TheKeyMachine.mods.generalMod import config
 
-INSTALL_PATH                    = config["INSTALL_PATH"]
-USER_FOLDER_PATH                = config["USER_FOLDER_PATH"]
-
-
+INSTALL_PATH = config["INSTALL_PATH"]
+USER_FOLDER_PATH = config["USER_FOLDER_PATH"]
 
 
 color_codes = {
-    "_01": "#878A90",   #gris
-    "_02": "#E6DC54",   #amarillo
-    "_03": "#96BEC7",   #azul claro
-    "_04": "#598693",   # azul oscuro
+    "_01": "#878A90",  # gris
+    "_02": "#E6DC54",  # amarillo
+    "_03": "#96BEC7",  # azul claro
+    "_04": "#598693",  # azul oscuro
     "_05": "#8190B8",  # purple
     "_06": "#45C46B",  # verde
-    "_07": "#C9844B",   # naranja
-    "_08": "#AD4D4E"    # rojo oscuro
+    "_07": "#C9844B",  # naranja
+    "_08": "#AD4D4E",  # rojo oscuro
 }
 
 color_codes_hover = {
-    "_01": "#A0A5AF",   #gris
-    "_02": "#EEE3C2",   #amarillo
-    "_03": "#ABD9E3",   #azul claro
-    "_04": "#77ABBA",   # azul oscuro
+    "_01": "#A0A5AF",  # gris
+    "_02": "#EEE3C2",  # amarillo
+    "_03": "#ABD9E3",  # azul claro
+    "_04": "#77ABBA",  # azul oscuro
     "_05": "#A1AFD9",  # purple
     "_06": "#83C4B3",  # verde
-    "_07": "#D99993",   # rojo claro
-    "_08": "#D46668"    # rojo oscuro
+    "_07": "#D99993",  # rojo claro
+    "_08": "#D46668",  # rojo oscuro
 }
-
 
 
 class Color:
@@ -119,7 +105,7 @@ class Color:
 
         def __init__(self):
             for k, v in self.__class__.__dict__.items():
-                if not k.startswith('_') and not callable(v):
+                if not k.startswith("_") and not callable(v):
                     setattr(self, k, v)
 
     def __init__(self):
@@ -128,10 +114,10 @@ class Color:
     @property
     def color(self):
         return self._color
-    
 
 
 # ________________________________________________ General  ______________________________________________________ #
+
 
 def getImage(*args, image):
     img_dir = os.path.join(INSTALL_PATH, "TheKeyMachine/data/img/")
@@ -143,7 +129,7 @@ def getImage(*args, image):
 
 
 def toggle_shelf(*args):
-    mel.eval('ToggleShelf')
+    mel.eval("ToggleShelf")
 
 
 def ref(value, widget):
@@ -159,7 +145,7 @@ def reloadUI():
 
 
 def getUiName():
-    print(cmds.playblast(activeEditor = True))
+    print(cmds.playblast(activeEditor=True))
 
 
 def get_screen_resolution():
@@ -168,18 +154,17 @@ def get_screen_resolution():
         app = QApplication([])
 
     try:
-        # PySide2
-        from PySide2.QtGui import QDesktopWidget
-        desktop = QDesktopWidget()
-        screen_rect = desktop.screenGeometry()
-    except ImportError:
         # PySide6
         screen = app.primaryScreen()
         screen_rect = screen.geometry()
+    except Exception:
+        # PySide2
+        desktop = QDesktopWidget()
+        screen_rect = desktop.screenGeometry()
 
     screen_width = screen_rect.width()
     screen_height = screen_rect.height()
-    
+
     return screen_width, screen_height
 
 
@@ -188,7 +173,7 @@ def get_screen_resolution():
 
 # Se usa en customGraph para la funcion de filtro
 
-filterMode_sync_on_code = '''
+filterMode_sync_on_code = """
 
 global proc syncChannelBoxFcurveEd()
 {
@@ -212,9 +197,9 @@ global proc syncChannelBoxFcurveEd()
     }
 }
 syncChannelBoxFcurveEd();
-'''
+"""
 
-filterMode_sync_off_code = '''
+filterMode_sync_off_code = """
 
 global proc syncChannelBoxFcurveEd()
 {
@@ -224,10 +209,12 @@ syncChannelBoxFcurveEd();
 
 filterUIClearFilter graphEditor1OutlineEd;
 
-'''
+"""
+
 
 def filterMode_sync_on():
     mel.eval(filterMode_sync_on_code)
+
 
 def filterMode_sync_off():
     mel.eval(filterMode_sync_off_code)
@@ -235,7 +222,7 @@ def filterMode_sync_off():
 
 def customGraph_filter_mods(*args):
     # Get the current state of the modifiers
-    mods = mel.eval('getModifiers')
+    mods = mel.eval("getModifiers")
     shift_pressed = bool(mods % 2)  # Check if Shift is pressed
 
     if shift_pressed:
@@ -244,36 +231,33 @@ def customGraph_filter_mods(*args):
         filterMode_sync_on()
 
 
-
-
 # ---------------------------------------------------- UNINSTALL ---------------------------------------------------------------------------------
-
 
 
 def uninstall():
     # Muestra un cuadro de diálogo para confirmar la desinstalación
     result = cmds.confirmDialog(
-        title='Uninstall TheKeyMachine',
-        message='Do you want to uninstall TheKeyMachine?',
-        button=['Uninstall', 'Cancel'],
-        defaultButton='Uninstall',
-        cancelButton='Cancel',
-        dismissString='Cancel'
+        title="Uninstall TheKeyMachine",
+        message="Do you want to uninstall TheKeyMachine?",
+        button=["Uninstall", "Cancel"],
+        defaultButton="Uninstall",
+        cancelButton="Cancel",
+        dismissString="Cancel",
     )
 
-    if result == 'Uninstall':
+    if result == "Uninstall":
         try:
-            # Desactiva el thread para centrar la toolbar 
+            # Desactiva el thread para centrar la toolbar
             run_centerToolbar = False
 
             # Definiendo las rutas
             user_app_dir = cmds.internalVar(userAppDir=True)
             user_dir = cmds.internalVar(userScriptDir=True)
             tkm_folder_path = os.path.join(INSTALL_PATH, "TheKeyMachine")
-            
+
             version_maya = cmds.about(version=True)
             maya_dir = os.path.join(user_app_dir, version_maya)
-            
+
             # Crear una carpeta llamada "uninstalled" dentro de TheKeyMachine si no existe
             uninstalled_folder_path = os.path.join(tkm_folder_path, "uninstalled")
             if not os.path.exists(uninstalled_folder_path):
@@ -282,7 +266,7 @@ def uninstall():
                 cmds.warning('"uninstalled" folder already exists inside "TheKeyMachine".')
 
             # obsolete - Lista de carpetas a eliminar dentro de TheKeyMachine. En Win hay problemas al descargar el modulo de pyarmor, por eso no se intenta borra ya que daría error
-            if platform.system() == 'Windows':
+            if platform.system() == "Windows":
                 if os.path.exists(tkm_folder_path):
                     shutil.rmtree(tkm_folder_path)
                 else:
@@ -301,31 +285,27 @@ def uninstall():
             # Necesitamos retrasar la eliminacion del workspace para dar tiempo a parar el callback 'centrar toolbar'
             def remove_tkm_workspace():
                 # Elimina el workspaceControl llamado "k" y "s""
-                if cmds.workspaceControl('k', exists=True):
-                    cmds.workspaceControl('k', e=True, fl=True) # La hacemos flotante
-                    cmds.workspaceLayoutManager( s=True ) # Salvar workspace 
-                    cmds.workspaceControl('k', e=True, close=True) # Cerrar
-                    cmds.deleteUI('k', control=True)
+                if cmds.workspaceControl("k", exists=True):
+                    cmds.workspaceControl("k", e=True, fl=True)  # La hacemos flotante
+                    cmds.workspaceLayoutManager(s=True)  # Salvar workspace
+                    cmds.workspaceControl("k", e=True, close=True)  # Cerrar
+                    cmds.deleteUI("k", control=True)
                 else:
                     cmds.warning('The workspaceControl "k" does not exist.')
 
-                if cmds.workspaceControl('s', exists=True):
-                    cmds.deleteUI('s', control=True)
+                if cmds.workspaceControl("s", exists=True):
+                    cmds.deleteUI("s", control=True)
                 else:
                     cmds.warning('The workspaceControl "s" does not exist.')
-                    
-                cmds.warning('TheKeyMachine has been uninstalled')
+
+                cmds.warning("TheKeyMachine has been uninstalled")
 
             QTimer.singleShot(700, remove_tkm_workspace)
-            
+
         except Exception as e:
-            cmds.error(f'An error occurred during uninstallation: {e}')
+            cmds.error(f"An error occurred during uninstallation: {e}")
     else:
         print("Uninstallation cancelled by user")
-
-
-
-
 
 
 # ___________________________________________________________ ORBIT _____________________________________________________________
@@ -333,7 +313,6 @@ def uninstall():
 
 def accion_temp_pivot():
     bar.create_temp_pivot(False)
-
 
 
 acciones = {
@@ -354,10 +333,7 @@ acciones = {
     "copy_pose": "keyTools.copy_pose",
     "paste_pose": "keyTools.paste_pose",
     "copy_worldspace_single_frame": "bar.copy_worldspace_single_frame",
-    "paste_worldspace_single_frame": "bar.paste_worldspace_single_frame"
-
-
-
+    "paste_worldspace_single_frame": "bar.paste_worldspace_single_frame",
 }
 
 
@@ -379,7 +355,7 @@ iconos_acciones = {
     "keyTools.copy_pose": media.copy_pose_image,
     "keyTools.paste_pose": media.paste_pose_image,
     "bar.copy_worldspace_single_frame": media.copy_worldspace_frame_animation_image,
-    "bar.paste_worldspace_single_frame": media.paste_worldspace_frame_animation_image
+    "bar.paste_worldspace_single_frame": media.paste_worldspace_frame_animation_image,
 }
 
 
@@ -426,7 +402,7 @@ def ejecutar_accion(identificador):
 
 def guardar_configuracion_botones():
     config_path = USER_FOLDER_PATH + "/TheKeyMachine_user_data/tools/orbit/orbit.py"
-    
+
     with open(config_path, "r") as file:
         lineas = file.readlines()
 
@@ -434,7 +410,7 @@ def guardar_configuracion_botones():
     for button_id, action_name in configuracion_orbit.items():
         linea_a_actualizar = f"{button_id} = "
         indice_linea = next((i for i, linea in enumerate(lineas) if linea.startswith(linea_a_actualizar)), None)
-        
+
         if indice_linea is not None:
             lineas[indice_linea] = f"{button_id} = '{action_name}'\n"
         else:
@@ -444,7 +420,6 @@ def guardar_configuracion_botones():
     # Reescribir el archivo con las líneas actualizadas
     with open(config_path, "w") as file:
         file.writelines(lineas)
-
 
 
 def leer_configuracion_orbit():
@@ -457,7 +432,7 @@ def leer_configuracion_orbit():
         "button4": "copyOpposite",
         "button5": "mirror",
         "button6": "selectHierarchy",
-        "button7": "isolate_master"
+        "button7": "isolate_master",
     }
 
     # Crear el directorio si no existe
@@ -469,7 +444,7 @@ def leer_configuracion_orbit():
             lines = file.readlines()
         for line in lines:
             if line.startswith("button"):
-                key, value = line.split('=')
+                key, value = line.split("=")
                 key = key.strip()
                 value = value.strip().strip("'")
                 configuracion_orbit[key] = value
@@ -481,7 +456,9 @@ def leer_configuracion_orbit():
 
     return configuracion_orbit
 
+
 configuracion_orbit = leer_configuracion_orbit()
+
 
 class CustomButton(QtWidgets.QPushButton):
     def __init__(self, icon_path, button_id, parent=None, window=None):
@@ -527,7 +504,7 @@ class CustomButton(QtWidgets.QPushButton):
         action17 = QAction(QtGui.QIcon(media.copy_worldspace_frame_animation_image), "Copy Worldspace Current Frame", self)
         action18 = QAction(QtGui.QIcon(media.paste_worldspace_frame_animation_image), "Paste Worldspace Current Frame", self)
         action_opacity = QAction("Toggle Dynamic Opacity", self)
-        
+
         menu.addAction(action1)
         menu.addAction(action2)
         menu.addAction(action3)
@@ -590,7 +567,6 @@ class CustomButton(QtWidgets.QPushButton):
         elif action == action_opacity:
             self.toggleDynamicOpacity()
 
-
     def updateButton(self, icon_path, action_identifier):
         self.setIcon(QtGui.QIcon(icon_path))
 
@@ -617,15 +593,13 @@ class CustomButton(QtWidgets.QPushButton):
             self.window.setWindowOpacity(0.60)
 
 
-
 def orbit_window(*args, offset_x=0, offset_y=0):
 
     screen_width, screen_height = get_screen_resolution()
     screen_width = screen_width
 
     global dynamic_opacity
-    dynamic_opacity = False 
-
+    dynamic_opacity = False
 
     if cmds.window("orbit_window", exists=True):
         cmds.deleteUI("orbit_window")
@@ -666,7 +640,7 @@ def orbit_window(*args, offset_x=0, offset_y=0):
         global dynamic_opacity
         if dynamic_opacity:
             timer.stop()  # Detener el timer si el mouse sale antes del retardo
-            window.setWindowOpacity(0.60) 
+            window.setWindowOpacity(0.60)
 
     parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
     window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
@@ -676,9 +650,9 @@ def orbit_window(*args, offset_x=0, offset_y=0):
     else:
         window.resize(360, 15)
 
-    window.setObjectName('orbit_window')
-    window.setWindowTitle('Orbit')
-    window.setWindowOpacity(1.0) 
+    window.setObjectName("orbit_window")
+    window.setWindowTitle("Orbit")
+    window.setWindowOpacity(1.0)
     window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
     window.mousePressEvent = mousePressEvent
     window.mouseMoveEvent = mouseMoveEvent
@@ -704,7 +678,6 @@ def orbit_window(*args, offset_x=0, offset_y=0):
     main_layout = QtWidgets.QHBoxLayout()
     central_widget.setLayout(main_layout)
 
-
     botones = []  # Lista para almacenar los botones
 
     for button_id in ["button1", "button2", "button3", "button4", "button5", "button6", "button7"]:
@@ -712,7 +685,7 @@ def orbit_window(*args, offset_x=0, offset_y=0):
         icon_path = iconos_acciones.get(acciones.get(action_name, ""), media.isolate_image)  # Obtener la ruta del icono
 
         boton = CustomButton(icon_path, button_id, window=window)
-        
+
         # Conectar el botón a la acción correspondiente
         boton.clicked.connect(partial(ejecutar_accion, action_name))
 
@@ -738,9 +711,8 @@ def orbit_window(*args, offset_x=0, offset_y=0):
         """
         boton.setStyleSheet(button_style)
 
-
     # Botón de cierre
-    close_button = QtWidgets.QPushButton('X')
+    close_button = QtWidgets.QPushButton("X")
     if screen_width == 3840:
         close_button.setFixedSize(30, 30)
     else:
@@ -776,11 +748,7 @@ def orbit_window_close():
         cmds.deleteUI("orbit_window")
 
 
-
-
 # ________________________________________________ Donate window  ______________________________________________________ #
-
-
 
 
 def donate_window():
@@ -812,8 +780,8 @@ def donate_window():
     window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
     window.resize(350, 330)
     window.setWindowOpacity(1.0)
-    window.setObjectName('tkm_donate_window')
-    window.setWindowTitle('Donate')
+    window.setObjectName("tkm_donate_window")
+    window.setWindowTitle("Donate")
     window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
     window.mousePressEvent = mousePressEvent
@@ -838,7 +806,7 @@ def donate_window():
     header_layout = QtWidgets.QHBoxLayout()
     header_layout.addStretch()
 
-    close_button = QtWidgets.QPushButton('X')
+    close_button = QtWidgets.QPushButton("X")
     close_button.setFixedSize(22, 22)
     close_button.setStyleSheet(
         "QPushButton {"
@@ -861,43 +829,40 @@ def donate_window():
     image_label.setAlignment(QtCore.Qt.AlignCenter)
     layout.addWidget(image_label, 0, QtCore.Qt.AlignHCenter)
 
-    #fix pyside6
+    # fix pyside6
     try:
         about_image = ui.getImage(image="stripe.png")
         image_label.setPixmap(about_image)
         image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
     except:
-
         # Cargar la imagen como QPixmap
         about_image = ui.getImage(image="stripe.png")
         set_about_image = QPixmap(about_image)
         image_label.setPixmap(set_about_image)
         image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
 
-
-
     TheKeyMachine_version = general.get_thekeymachine_version()
     TheKeyMachine_build_version = general.get_thekeymachine_build_version()
 
-
     if screen_width == 3840:
-        label6 = QtWidgets.QLabel("<br><span style='font-size: 14px; color:#cccccc'>"
-                          "The development of TheKeyMachine is a big effort in terms of energy and time.<br><br>If you use this tool professionally or regularly, please try to make a donation.<br> This will greatly help the project grow and have continuity. Every small amount counts.<br>"
-                          "Thank you!<br><br><br>"
-                          "Support TheKeyMachine <a href='http://thekeymachine.xyz/donate.php' style='color:#86CDAD;'><br>http://thekeymachine.xyz/donate</a></span><br><br>")
+        label6 = QtWidgets.QLabel(
+            "<br><span style='font-size: 14px; color:#cccccc'>"
+            "The development of TheKeyMachine is a big effort in terms of energy and time.<br><br>If you use this tool professionally or regularly, please try to make a donation.<br> This will greatly help the project grow and have continuity. Every small amount counts.<br>"
+            "Thank you!<br><br><br>"
+            "Support TheKeyMachine <a href='http://thekeymachine.xyz/donate.php' style='color:#86CDAD;'><br>http://thekeymachine.xyz/donate</a></span><br><br>"
+        )
 
     else:
-        label6 = QtWidgets.QLabel("<br><span style='font-size: 12px; color:#cccccc'>"
-                          "The development of TheKeyMachine is a big effort<br>in terms of time and energy.<br><br>If you use this tool professionally or regularly,<br>please try to make a donation.<br><br> This will greatly help the project grow<br> and have continuity. Every small amount counts.<br>"
-                          "Thank you!<br><br><br>"
-                          "Support TheKeyMachine<a href='http://thekeymachine.xyz/donate.php' style='color:#86CDAD;'><br>http://thekeymachine.xyz/donate</a></span><br><br>")
-
-
+        label6 = QtWidgets.QLabel(
+            "<br><span style='font-size: 12px; color:#cccccc'>"
+            "The development of TheKeyMachine is a big effort<br>in terms of time and energy.<br><br>If you use this tool professionally or regularly,<br>please try to make a donation.<br><br> This will greatly help the project grow<br> and have continuity. Every small amount counts.<br>"
+            "Thank you!<br><br><br>"
+            "Support TheKeyMachine<a href='http://thekeymachine.xyz/donate.php' style='color:#86CDAD;'><br>http://thekeymachine.xyz/donate</a></span><br><br>"
+        )
 
         # Habilitar interacciones de enlaces
         label6.setOpenExternalLinks(True)
 
-          
     label6.setAlignment(QtCore.Qt.AlignCenter)
     layout.addWidget(label6)
 
@@ -921,8 +886,6 @@ def donate_window():
 # ________________________________________________ About window  ______________________________________________________ #
 
 
-
-
 def about_window():
 
     screen_width, screen_height = get_screen_resolution()
@@ -931,7 +894,6 @@ def about_window():
     multiplier = 1.0
     if screen_width == 3840:
         multiplier = 1.5
-
 
     if cmds.window("tkm_about_window", exists=True):
         cmds.deleteUI("tkm_about_window")
@@ -957,8 +919,8 @@ def about_window():
     window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
     window.resize(350, 330)
     window.setWindowOpacity(1.0)
-    window.setObjectName('tkm_about_window')
-    window.setWindowTitle('About')
+    window.setObjectName("tkm_about_window")
+    window.setWindowTitle("About")
     window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
     window.mousePressEvent = mousePressEvent
@@ -983,7 +945,7 @@ def about_window():
     header_layout = QtWidgets.QHBoxLayout()
     header_layout.addStretch()
 
-    close_button = QtWidgets.QPushButton('X')
+    close_button = QtWidgets.QPushButton("X")
     close_button.setFixedSize(22, 22)
     close_button.setStyleSheet(
         "QPushButton {"
@@ -1001,19 +963,17 @@ def about_window():
     header_layout.addWidget(close_button)
     layout.addLayout(header_layout)
 
-
     # Código para mostrar la imagen
     image_label = QtWidgets.QLabel()
     image_label.setAlignment(QtCore.Qt.AlignCenter)
     layout.addWidget(image_label, 0, QtCore.Qt.AlignHCenter)
-    
-    #fix pyside6
+
+    # fix pyside6
     try:
         about_image = ui.getImage(image="TheKeyMachine_logo_250.png")
         image_label.setPixmap(about_image)
         image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
     except:
-
         # Cargar la imagen como QPixmap
         about_image = ui.getImage(image="TheKeyMachine_logo_250.png")
         set_about_image = QPixmap(about_image)
@@ -1032,10 +992,14 @@ def about_window():
             "<span style='font-size: {}px; color:#cccccc'><b>&nbsp;&nbsp;&nbsp;&nbsp;Build:&nbsp;&nbsp;</b></span>"
             "<span style='font-size: {}px; color:#86CDAD'>{}</span><br><br><br>"
         ).format(
-            16 * multiplier, 14 * multiplier, 14 * multiplier,
-            TheKeyMachine_stage_version, TheKeyMachine_version,
-            14 * multiplier, 14 * multiplier,
-            TheKeyMachine_build_version
+            16 * multiplier,
+            14 * multiplier,
+            14 * multiplier,
+            TheKeyMachine_stage_version,
+            TheKeyMachine_version,
+            14 * multiplier,
+            14 * multiplier,
+            TheKeyMachine_build_version,
         )
     )
 
@@ -1043,22 +1007,21 @@ def about_window():
     layout.addWidget(label2, 0, QtCore.Qt.AlignHCenter)
     label2.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
 
-    label6 = QtWidgets.QLabel(f"<br><span style='font-size: {14 if screen_width == 3840 else 10}px; color:#cccccc'>"
-                        "This tool is licensed under the GNU General Public License v3.0.<br>"
-                        "For more details, see <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color:#86CDAD;'>GNU GPL 3.0</a>.<br><br>"
-                        "Developed by: "
-                        "Rodrigo Torres - <a href='http://rodritorres.com' style='color:#86CDAD;'>rodritorres.com</a><br>"
-                        "Modified by: "
-                        "Alehaaaa - <a href='http://alehaaaa.github.io' style='color:#86CDAD;'>alehaaaa.github.io</a></span><br><br>"
-                        "<span style='font-size: 10px; color:#cccccc'>"
-                        "<a href='http://www.thekeymachine.xyz' style='color:#86CDAD;'>www.thekeymachine.xyz</a> / "
-                        "<a href='mailto:x@thekeymachine.xyz' style='color:#86CDAD;'>x@thekeymachine.xyz</a></span>")
+    label6 = QtWidgets.QLabel(
+        f"<br><span style='font-size: {14 if screen_width == 3840 else 10}px; color:#cccccc'>"
+        "This tool is licensed under the GNU General Public License v3.0.<br>"
+        "For more details, see <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color:#86CDAD;'>GNU GPL 3.0</a>.<br><br>"
+        "Developed by: "
+        "Rodrigo Torres - <a href='http://rodritorres.com' style='color:#86CDAD;'>rodritorres.com</a><br>"
+        "Modified by: "
+        "Alehaaaa - <a href='http://alehaaaa.github.io' style='color:#86CDAD;'>alehaaaa.github.io</a></span><br><br>"
+        "<span style='font-size: 10px; color:#cccccc'>"
+        "<a href='http://www.thekeymachine.xyz' style='color:#86CDAD;'>www.thekeymachine.xyz</a> / "
+        "<a href='mailto:x@thekeymachine.xyz' style='color:#86CDAD;'>x@thekeymachine.xyz</a></span>"
+    )
 
     # Habilitar interacciones de enlaces
     label6.setOpenExternalLinks(True)
-
-          
-
 
     label6.setAlignment(QtCore.Qt.AlignCenter)
     layout.addWidget(label6)
@@ -1080,12 +1043,7 @@ def about_window():
     window.show()
 
 
-
-
-
-
 # ___________________________________________________ BUG Report ___________________________________________________________ #
-
 
 
 def on_send_click(name_input, email_input, explanation_textbox, script_error_textbox, confirmation_label, window, send_button):
@@ -1118,16 +1076,16 @@ def send_bug_report(name, email, explanation, script_error):
     tkm_version = general.get_thekeymachine_version()
 
     data = {
-        'name': name,
-        'email': email,
-        'explanation': explanation,
-        'script_error': script_error,
-        'python_version': python_version,
-        'os_version': os_version,
-        'maya_version': maya_version,
-        'tkm_version': tkm_version
+        "name": name,
+        "email": email,
+        "explanation": explanation,
+        "script_error": script_error,
+        "python_version": python_version,
+        "os_version": os_version,
+        "maya_version": maya_version,
+        "tkm_version": tkm_version,
     }
-    data = urllib.parse.urlencode(data).encode('utf-8')
+    data = urllib.parse.urlencode(data).encode("utf-8")
 
     # Ruta al archivo .pem y creación del contexto SSL
 
@@ -1136,7 +1094,7 @@ def send_bug_report(name, email, explanation, script_error):
     context = ssl.create_default_context(cafile=cert_file_path)
 
     with urllib.request.urlopen(url, data, context=context) as response:
-        response_data = response.read().decode('utf-8')
+        response_data = response.read().decode("utf-8")
         if "success" in response_data:
             return True
         else:
@@ -1147,6 +1105,7 @@ def validate_form(name, explanation):
     if not name.strip() or not explanation.strip():
         return False
     return True
+
 
 def bug_report_window(*args):
     screen_width, screen_height = get_screen_resolution()
@@ -1179,8 +1138,8 @@ def bug_report_window(*args):
 
     window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
     window.resize(600, 700)
-    window.setObjectName('BugReportWindow')
-    window.setWindowTitle('Report a Bug')
+    window.setObjectName("BugReportWindow")
+    window.setWindowTitle("Report a Bug")
     window.setWindowOpacity(1.0)
     window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
@@ -1208,7 +1167,6 @@ def bug_report_window(*args):
     window_layout.addWidget(central_widget)
     window.setLayout(window_layout)
 
-
     # Styles
     apology_label_style = "color: #d37457; font-size: 20px;"
     apology_text_style = "color: #ccc; font-size: 14px;"
@@ -1232,7 +1190,7 @@ def bug_report_window(*args):
         confirmation_label_style = "color: #9bbbca; font-size: 18px;"
         input_style = "background-color:  #2d2d2d ; font-size: 20px; border: none; border-radius: 5px; color: #bbb;"
         textbox_style = "background-color: #2d2d2d; font-size: 20px; border: none; border-radius: 5px; color: #bbb;"
-    
+
     button_style = (
         "QPushButton {"
         "    background-color: #525252;"
@@ -1247,7 +1205,7 @@ def bug_report_window(*args):
         "}"
     )
 
-    close_button = QtWidgets.QPushButton('X')
+    close_button = QtWidgets.QPushButton("X")
     close_button.setFixedSize(25, 25)
     close_button.setStyleSheet(
         "QPushButton {"
@@ -1266,7 +1224,7 @@ def bug_report_window(*args):
     apology_label = QtWidgets.QLabel("<b>Report a Bug</b>")
     apology_label2 = QtWidgets.QLabel("Have you found a bug? Please fill the report and I will do")
     apology_label3 = QtWidgets.QLabel("my best to fix it in the next update.<br>")
-    
+
     apology_label.setStyleSheet(apology_label_style)
     apology_label2.setStyleSheet(apology_text_style)
     apology_label3.setStyleSheet(apology_text_style)
@@ -1289,37 +1247,43 @@ def bug_report_window(*args):
     explanation_label = QtWidgets.QLabel("")
     explanation_textbox = QtWidgets.QTextEdit()
     explanation_textbox.setStyleSheet(textbox_style)
-    explanation_textbox.setPlaceholderText("Please describe the problem or error you're experiencing. To identify and correct the issue, it's essential to reproduce it. Detail step-by-step the actions you've taken and specify which tool is causing the error")
+    explanation_textbox.setPlaceholderText(
+        "Please describe the problem or error you're experiencing. To identify and correct the issue, it's essential to reproduce it. Detail step-by-step the actions you've taken and specify which tool is causing the error"
+    )
     explanation_textbox.textChanged.connect(lambda: limit_textbox_characters(explanation_textbox, 1200))
 
     script_error_label = QtWidgets.QLabel("")
     script_error_textbox = QtWidgets.QTextEdit()
     script_error_textbox.setStyleSheet(textbox_style)
-    script_error_textbox.setPlaceholderText("If you see any errors in the Script Editor, please copy and paste the code here. The last 3 or 4 lines should be sufficient")
+    script_error_textbox.setPlaceholderText(
+        "If you see any errors in the Script Editor, please copy and paste the code here. The last 3 or 4 lines should be sufficient"
+    )
     script_error_textbox.textChanged.connect(lambda: limit_textbox_characters(script_error_textbox, 1200))
 
     confirmation_label = QtWidgets.QLabel("<br>")
     confirmation_label.setStyleSheet(confirmation_label_style)
-    
+
     send_button = QtWidgets.QPushButton("Send bug")
     send_button.setFixedSize(550, 40)
     send_button.setStyleSheet(button_style)
-    send_button.clicked.connect(lambda: on_send_click(name_input, email_input, explanation_textbox, script_error_textbox, confirmation_label, window, send_button))
+    send_button.clicked.connect(
+        lambda: on_send_click(name_input, email_input, explanation_textbox, script_error_textbox, confirmation_label, window, send_button)
+    )
 
     layout.addWidget(close_button, alignment=QtCore.Qt.AlignRight)
     layout.addWidget(apology_label, alignment=QtCore.Qt.AlignCenter)
     layout.addWidget(apology_label2, alignment=QtCore.Qt.AlignCenter)
     layout.addWidget(apology_label3, alignment=QtCore.Qt.AlignCenter)
     layout.addWidget(confirmation_label, alignment=QtCore.Qt.AlignCenter)
-    #layout.addWidget(name_label)
+    # layout.addWidget(name_label)
     layout.addWidget(name_input)
-    #layout.addWidget(email_label)
+    # layout.addWidget(email_label)
     layout.addWidget(email_input)
     layout.addWidget(explanation_label)
     layout.addWidget(explanation_textbox)
     layout.addWidget(script_error_label)
     layout.addWidget(script_error_textbox)
-    
+
     layout.addWidget(send_button, alignment=QtCore.Qt.AlignCenter)
 
     if screen_width == 3840:
@@ -1329,8 +1293,6 @@ def bug_report_window(*args):
         name_input.setFixedSize(400, 40)
         email_input.setFixedSize(400, 40)
         send_button.setFixedSize(750, 50)
-
-
 
     window.show()
 

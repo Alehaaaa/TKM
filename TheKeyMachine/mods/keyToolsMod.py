@@ -1,80 +1,65 @@
+"""
+
+TheKeyMachine - Animation Toolset for Maya Animators
+
+
+This file is part of TheKeyMachine, an open source software for Autodesk Maya licensed under the GNU General Public License v3.0 (GPL-3.0).
+You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.
+By using this code, you agree to keep it open source and share any modifications.
+This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
+
+thekeymachine.xyz / x@thekeymachine.xyz
+
+Developed by: Rodrigo Torres / rodritorres.com
+Modified by: Alehaaaa / alehaaaa.github.io
 
 
 
-'''
-
-    TheKeyMachine - Animation Toolset for Maya Animators                                           
-                                                                                                                                              
-                                                                                                                                              
-    This file is part of TheKeyMachine, an open source software for Autodesk Maya licensed under the GNU General Public License v3.0 (GPL-3.0).                                           
-    You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.                                              
-    By using this code, you agree to keep it open source and share any modifications.                                                          
-    This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
-
-    thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
-                                                                                                                                              
-    Developed by: Rodrigo Torres / rodritorres.com                                                                                             
-    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
-                                                                                                                                             
-
-
-'''
-
-
-
-
+"""
 
 import maya.cmds as cmds
 import maya.mel as mel
-import maya.OpenMaya as om
-import maya.OpenMayaUI as mui
 
 try:
-    from shiboken2 import wrapInstance
-    from PySide2 import QtWidgets, QtCore
-    from PySide2.QtWidgets import QApplication, QDesktopWidget
-    from PySide2 import QtWidgets
-    from PySide2.QtCore import *
-    from PySide2.QtGui import *
-    from PySide2.QtWidgets import *
-    from PySide2.QtGui import QRegExpValidator
-    from PySide2.QtCore import QRegExp
+    import maya.OpenMaya as om
+    import maya.OpenMayaUI as mui
 except ImportError:
+    import maya.api.OpenMaya as om
+    import maya.api.OpenMayaUI as mui
+
+try:
     from shiboken6 import wrapInstance
-    from PySide6 import QtWidgets, QtCore, QtGui
-    from PySide6.QtWidgets import *
-    from PySide6.QtGui import *
-    from PySide6.QtCore import *
+    from PySide6.QtWidgets import QApplication, QWidget, QLineEdit, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+    from PySide6.QtGui import QRegularExpressionValidator
+    from PySide6.QtCore import QRegularExpression, Qt, QPoint
+except ImportError:
+    from shiboken2 import wrapInstance
+    from PySide2.QtWidgets import QApplication, QWidget, QLineEdit, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+    from PySide2.QtWidgets import QDesktopWidget
+
+    from PySide2.QtGui import QRegExpValidator
+    from PySide2.QtCore import QRegExp, Qt, QPoint
+
+    QRegularExpression = QRegExp
+    QRegularExpressionValidator = QRegExpValidator
 
 
 import json
 import os
 import sys
 import math
-import platform
-import urllib.request
 import re
-import shutil
-import base64
-from functools import partial
 from collections import Counter
 
-import TheKeyMachine
+
+import TheKeyMachine.mods.generalMod as general
 
 
 python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 
 
-import TheKeyMachine.core.customGraph as cg
-import TheKeyMachine.core.toolbar as tb
-import TheKeyMachine.mods.mediaMod as media
-import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.uiMod as ui
-import TheKeyMachine.mods.keyToolsMod as keyTools
-import TheKeyMachine.mods.selSetsMod as selSets
-
-
 # _____________________________________________________ General _______________________________________________________________#
+
 
 def get_screen_resolution():
     app = QApplication.instance()
@@ -82,20 +67,18 @@ def get_screen_resolution():
         app = QApplication([])
 
     try:
-        # PySide2
-        from PySide2.QtGui import QDesktopWidget
-        desktop = QDesktopWidget()
-        screen_rect = desktop.screenGeometry()
-    except ImportError:
         # PySide6
         screen = app.primaryScreen()
         screen_rect = screen.geometry()
+    except Exception:
+        # PySide2
+        desktop = QDesktopWidget()
+        screen_rect = desktop.screenGeometry()
 
     screen_width = screen_rect.width()
     screen_height = screen_rect.height()
-    
-    return screen_width, screen_height
 
+    return screen_width, screen_height
 
 
 def clear_timeslider_selection():
@@ -104,7 +87,7 @@ def clear_timeslider_selection():
     selection = cmds.ls(selection=True)
 
     # Crear y eliminar un nodo temporal
-    empty_node = cmds.createNode('transform', name='tempNode')
+    empty_node = cmds.createNode("transform", name="tempNode")
     cmds.delete(empty_node)
 
     # Restaurar la selección original, si había algo seleccionado
@@ -112,12 +95,10 @@ def clear_timeslider_selection():
         cmds.select(selection)
 
 
-
-
 def get_time_range_selected():
-    aTimeSlider = mel.eval('$tmpVar=$gPlayBackSlider')
+    aTimeSlider = mel.eval("$tmpVar=$gPlayBackSlider")
     timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
-    
+
     # Verificar que el rango de tiempo seleccionado no esta vacío
     if timeRange[0] == timeRange[1]:
         return None
@@ -125,10 +106,9 @@ def get_time_range_selected():
     return timeRange
 
 
-
 # Esta es una version nueva que evalua correctamente si es un rango o no. Dejo la otra porque se usa en algunos sitios. Hay que limpiar.
 def get_selected_time_range():
-    aTimeSlider = mel.eval('$tmpVar=$gPlayBackSlider')
+    aTimeSlider = mel.eval("$tmpVar=$gPlayBackSlider")
     timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
     current_time = cmds.currentTime(query=True)
 
@@ -159,7 +139,7 @@ def getSelectedCurves():
     om.MGlobal.getActiveSelectionList(selectionList)
 
     # filter through the anim curves
-    listIter = om.MItSelectionList(selectionList,  om.MFn.kAnimCurve)
+    listIter = om.MItSelectionList(selectionList, om.MFn.kAnimCurve)
     while not listIter.isDone():
         # Retrieve current item's MObject
         mobj = om.MObject()
@@ -177,7 +157,7 @@ def getSelectedCurves():
 
 def get_selected_channels():
     # Obtén el nombre del Channel Box principal
-    main_channel_box = mel.eval('global string $gChannelBoxName; $temp=$gChannelBoxName;')
+    main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
 
     # Obtén los canales seleccionados
     selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
@@ -185,10 +165,8 @@ def get_selected_channels():
     return selected_channels
 
 
-
-
-
 # Estas dos funciones la idea era usarlas para hacer overlap
+
 
 def find_root_in_selection(objects):
     """
@@ -197,20 +175,19 @@ def find_root_in_selection(objects):
     """
     # Ordenamos los objetos por nombre para garantizar que procesamos primero el nodo padre si está presente.
     objects_sorted = sorted(objects)
-    
+
     for obj in objects_sorted:
         # Obtiene la lista de descendientes
         descendants = cmds.listRelatives(obj, allDescendents=True) or []
-        
+
         # Verifica si algún descendiente coincide con nuestra lista de objetos
         matching_descendants = [desc for desc in descendants if desc in objects]
-        
+
         # Si hay coincidencias, significa que el objeto actual es un nodo raíz para los objetos seleccionados.
         if matching_descendants:
             return obj
 
     return None
-
 
 
 def find_all_roots_in_selection():
@@ -219,25 +196,23 @@ def find_all_roots_in_selection():
     """
     selection = cmds.ls(selection=True)
     root_nodes = []
-    
+
     while selection:
         root_node = find_root_in_selection(selection)
         if root_node:
             root_nodes.append(root_node)
-            
+
             # Obtiene la lista de descendientes del nodo raíz
             descendants = cmds.listRelatives(root_node, allDescendents=True) or []
-            
+
             # Elimina el nodo raíz y todos sus descendientes de la lista de selección
             for obj in [root_node] + descendants:
                 if obj in selection:
                     selection.remove(obj)
         else:
             break
-    
+
     return root_nodes
-
-
 
 
 # --------------------------------------------------- LINK OBJECTS -----------------------------------------------------
@@ -245,14 +220,13 @@ def find_all_roots_in_selection():
 
 def mod_link_objects(*args):
     # Get the current state of the modifiers
-    mods = mel.eval('getModifiers')
+    mods = mel.eval("getModifiers")
     shift_pressed = bool(mods % 2)  # Check if Shift is pressed
 
     if shift_pressed:
         paste_link()
     else:
         copy_link()
-
 
 
 # Variables globales
@@ -263,92 +237,78 @@ def load_relative_data():
     global relative_data
 
     matrix_file_path = general.get_copy_link_data_file()
-    
+
     # Verificar si el archivo existe
     if not os.path.exists(matrix_file_path):
         cmds.warning("No saved relative matrix data found")
         return
-    
-    # Leer el diccionario del archivo JSON
-    with open(matrix_file_path, 'r') as f:
-        relative_data = json.load(f)
 
+    # Leer el diccionario del archivo JSON
+    with open(matrix_file_path, "r") as f:
+        relative_data = json.load(f)
 
 
 def copy_link(*args):
 
-    import json
-    import os
-    import maya.cmds as cmds
-    import maya.api.OpenMaya as om
-
-
     matrix_file_path = general.get_copy_link_data_file()
-    
+
     seleccion = cmds.ls(selection=True)
     if len(seleccion) < 2:
         print("Select at least 2 objects")
         return
-    
+
     main_obj = seleccion[-1]
     follow_objs = seleccion[:-1]
-    
+
     save_dict = {"main_obj": main_obj, "relative_matrices": {}}
-    
+
     for follow_obj in follow_objs:
         main_matrix = cmds.xform(main_obj, query=True, matrix=True, worldSpace=True)
         follow_matrix = cmds.xform(follow_obj, query=True, matrix=True, worldSpace=True)
-        
+
         main_mmatrix = om.MMatrix(main_matrix)
         follow_mmatrix = om.MMatrix(follow_matrix)
-        
+
         relative_matrix = follow_mmatrix * main_mmatrix.inverse()
-        
+
         # Guardar la matriz relativa en el diccionario
         save_dict["relative_matrices"][follow_obj] = [relative_matrix.getElement(i, j) for i in range(4) for j in range(4)]
-    
+
     # Guardar el diccionario en un archivo JSON
 
     matrix_file_folder = general.get_copy_link_data_folder()
     os.makedirs(matrix_file_folder, exist_ok=True)
-    with open(matrix_file_path, 'w') as f:
+    with open(matrix_file_path, "w") as f:
         json.dump(save_dict, f)
 
     print("Copied link data")
 
-
-
     load_relative_data()
 
 
-
 def paste_link(*args):
-    import json
-    import os
-    import maya.cmds as cmds
-    import maya.api.OpenMaya as om
 
     global relative_data
 
     main_obj = relative_data.get("main_obj")
     relative_matrices = relative_data.get("relative_matrices", {})
-    
+
     # No necesitamos verificar la selección. Usamos directamente los objetos de relative_data.
     follow_objs = list(relative_matrices.keys())
-    
+
     # Verificar si existe un rango seleccionado en el timeline
     playback_range = cmds.playbackOptions(query=True, minTime=True), cmds.playbackOptions(query=True, maxTime=True)
-    range_start, range_end = cmds.timeControl('timeControl1', q=True, rangeArray=True)
-    
+    range_start, range_end = cmds.timeControl("timeControl1", q=True, rangeArray=True)
+
     if range_start != playback_range[0] or range_end != playback_range[1]:
         frames = list(range(int(range_start), int(range_end)))
     else:
         # Si no hay un rango seleccionado, aplicar solo al frame actual
         frames = [cmds.currentTime(query=True)]
-    
+
     for frame in frames:
         cmds.currentTime(frame)
-        
+
         for follow_obj in follow_objs:
             if follow_obj in relative_matrices:
                 relative_matrix_list = relative_matrices[follow_obj]
@@ -356,21 +316,19 @@ def paste_link(*args):
                 for i in range(4):
                     for j in range(4):
                         relative_matrix.setElement(i, j, relative_matrix_list[i * 4 + j])
-                
+
                 main_matrix = cmds.xform(main_obj, query=True, matrix=True, worldSpace=True)
                 main_mmatrix = om.MMatrix(main_matrix)
-                
+
                 new_follow_matrix = relative_matrix * main_mmatrix
                 new_follow_matrix_list = [new_follow_matrix.getElement(i, j) for i in range(4) for j in range(4)]
-                
+
                 cmds.xform(follow_obj, matrix=new_follow_matrix_list, worldSpace=True)
-                cmds.setKeyframe(follow_obj, attribute='translate', t=frame)
-                cmds.setKeyframe(follow_obj, attribute='rotate', t=frame)
-                cmds.setKeyframe(follow_obj, attribute='scale', t=frame)
+                cmds.setKeyframe(follow_obj, attribute="translate", t=frame)
+                cmds.setKeyframe(follow_obj, attribute="rotate", t=frame)
+                cmds.setKeyframe(follow_obj, attribute="scale", t=frame)
             else:
                 cmds.warning(f"Could not save relative matrix for {follow_obj}")
-
-
 
 
 # Esta version esta simplificada y no mira si hay un rango seleccionado, de esta forma el callback
@@ -378,13 +336,12 @@ def paste_link(*args):
 
 
 def paste_link_callback():
-    import maya.api.OpenMaya as om
 
     global relative_data
 
     main_obj = relative_data.get("main_obj")
     relative_matrices = relative_data.get("relative_matrices", {})
-    
+
     # No necesitamos verificar la selección. Usamos directamente los objetos de relative_data.
     follow_objs = list(relative_matrices.keys())
 
@@ -395,22 +352,17 @@ def paste_link_callback():
             for i in range(4):
                 for j in range(4):
                     relative_matrix.setElement(i, j, relative_matrix_list[i * 4 + j])
-            
+
             main_matrix = cmds.xform(main_obj, query=True, matrix=True, worldSpace=True)
             main_mmatrix = om.MMatrix(main_matrix)
-            
+
             new_follow_matrix = relative_matrix * main_mmatrix
             new_follow_matrix_list = [new_follow_matrix.getElement(i, j) for i in range(4) for j in range(4)]
-            
+
             cmds.xform(follow_obj, matrix=new_follow_matrix_list, worldSpace=True)
 
         else:
             cmds.warning(f"Could not save relative matrix for {follow_obj}")
-
-
-
-
-
 
 
 attribute_callback_id = None
@@ -419,48 +371,44 @@ process_callback = False
 
 
 def add_link_obj_callbacks(*args):
-    import maya.api.OpenMaya as om
 
     global relative_data, attribute_callback_id, time_callback_id, eval_callback_id, process_callback
 
     process_callback = True
-    
+
     # Obtén el nombre del objeto principal desde relative_data
     main_obj_name = relative_data.get("main_obj")
     if not main_obj_name:
         cmds.warning("Relative data object not found")
         return
-    
+
     # Obtén el MObject del objeto principal
     selection_list = om.MSelectionList()
     selection_list.add(main_obj_name)
     main_obj_mobject = selection_list.getDependNode(0)
-    
+
     # Registra el callback de atributo
     attribute_callback_id = om.MNodeMessage.addAttributeChangedCallback(main_obj_mobject, attribute_callback_function)
-    
+
     # Registra el callback de cambio de tiempo
-    time_callback_id = om.MEventMessage.addEventCallback('timeChanged', time_callback_function)
-
-
-
-
+    time_callback_id = om.MEventMessage.addEventCallback("timeChanged", time_callback_function)
 
 
 def attribute_callback_function(msg, plug, otherPlug, clientData):
-    import maya.api.OpenMaya as om
+
     global process_callback
-    
+
     if not process_callback:
         return
-    
+
     if msg & om.MNodeMessage.kAttributeSet:
         process_callback = False
         paste_link_callback()
         process_callback = True
 
+
 def time_callback_function(clientData):
-    import maya.api.OpenMaya as om
+
     global process_callback
     if not process_callback:
         return
@@ -469,9 +417,8 @@ def time_callback_function(clientData):
     process_callback = True
 
 
-
 def remove_link_obj_callbacks(*args):
-    import maya.api.OpenMaya as om
+
     global attribute_callback_id, time_callback_id
 
     try:
@@ -487,17 +434,16 @@ def remove_link_obj_callbacks(*args):
         print(f"Error removing callback: {e}")
 
 
-
 # ---------------------------------------------------------- SHARE KEYS ---------------------------------------------------------
 
 
 def share_keys(*args):
     objetos = cmds.ls(selection=True)
-    
+
     if len(objetos) < 2:
         print("Select at least 2 objects")
         return
-    
+
     objeto_principal = objetos[0]
     objetos_secundarios = objetos[1:]
 
@@ -528,19 +474,14 @@ def share_keys(*args):
         for frame in frames_claves:
             if frame not in frames_secundario:
                 cmds.setKeyframe(objeto_secundario, time=frame, insert=True)
-        
+
         for frame in frames_secundario:
             if frame not in frames_claves:
                 cmds.cutKey(objeto_secundario, time=(frame, frame))
 
 
-
-
 # ______________________________________ ReBlock Move
 
-
-import maya.cmds as cmds
-from collections import Counter
 
 def reblock_move(*args):
     # Obtener la lista de objetos seleccionados
@@ -632,9 +573,6 @@ def reblock_move(*args):
                     cmds.keyframe(curva, edit=True, time=(frame,), timeChange=frame_objetivo)
 
 
-
-
-
 def reblock_insert(*args):
     # Obtener la lista de objetos actualmente seleccionados en la escena
     objetos = cmds.ls(selection=True)
@@ -658,7 +596,7 @@ def reblock_insert(*args):
     for objeto in objetos:
         # Obtener los fotogramas clave específicos del objeto actual
         frames_objeto = set(cmds.keyframe(objeto, query=True, timeChange=True) or [])
-        
+
         for frame in frames_objeto:
             # Si el fotograma no es mayoritario, encontrar el fotograma mayoritario más cercano y insertar una nueva clave allí
             if frame not in frames_mayoritarios:
@@ -669,15 +607,7 @@ def reblock_insert(*args):
                     cmds.cutKey(objeto, time=(frame, frame))
 
 
-
-
-#___________________________ BAKE ANIM  _____________________________________
-
-
-
-#import maya.OpenMayaUI as mui
-#from PySide2 import QtWidgets, QtCore
-#from shiboken2 import wrapInstance
+# ___________________________ BAKE ANIM  _____________________________________
 
 
 def bake_animation(bake_interval=1, window=None):
@@ -707,21 +637,20 @@ def bake_animation(bake_interval=1, window=None):
             removeBakedAttributeFromLayer=False,
             bakeOnOverrideLayer=False,
             controlPoints=False,
-            shape=True
+            shape=True,
         )
 
         # Cambiar las tangentes de las claves a stepped.
         for obj in selected_objects:
-            anim_curves = cmds.listConnections(obj, type='animCurve')
+            anim_curves = cmds.listConnections(obj, type="animCurve")
             if anim_curves:
                 for curve in anim_curves:
                     cmds.selectKey(curve, add=True, keyframe=True)
-                    cmds.keyTangent(inTangentType='stepnext', outTangentType='step')
+                    cmds.keyTangent(inTangentType="stepnext", outTangentType="step")
 
-    
     except Exception as e:
         cmds.warning("An error occurred: {}".format(e))
-    
+
     finally:
         # Cerrar el chunk de undo
         cmds.undoInfo(closeChunk=True)
@@ -729,21 +658,22 @@ def bake_animation(bake_interval=1, window=None):
     if window:
         window.close()
 
+
 def bake_anim_window(*args):
     screen_width, screen_height = get_screen_resolution()
     screen_width = screen_width
 
     # Variables para implementar el drag
-    drag = {"active": False, "position": QtCore.QPoint()}
+    drag = {"active": False, "position": QPoint()}
 
     def mousePressEvent(event):
-        if event.button() == QtCore.Qt.LeftButton:
+        if event.button() == Qt.LeftButton:
             drag["active"] = True
             drag["position"] = event.globalPos() - window.frameGeometry().topLeft()
             event.accept()
 
     def mouseMoveEvent(event):
-        if event.buttons() == QtCore.Qt.LeftButton and drag["active"]:
+        if event.buttons() == Qt.LeftButton and drag["active"]:
             window.move(event.globalPos() - drag["position"])
             event.accept()
 
@@ -757,24 +687,24 @@ def bake_anim_window(*args):
             try:
                 bake_interval = float(interval)
                 bake_animation(bake_interval=bake_interval, window=window)
-                
+
             except ValueError:
                 cmds.warning("Please enter a valid number for bake interval")
 
-    parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
+    parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QWidget)
 
-    window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
+    window = QWidget(parent, Qt.Window | Qt.FramelessWindowHint)
     window.resize(200, 100)
-    window.setObjectName('BakeAnimWindow')
-    window.setWindowTitle('Bake Anim')
-    window.setWindowOpacity(1.0) 
-    window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+    window.setObjectName("BakeAnimWindow")
+    window.setWindowTitle("Bake Anim")
+    window.setWindowOpacity(1.0)
+    window.setAttribute(Qt.WA_TranslucentBackground)
 
     window.mousePressEvent = mousePressEvent
     window.mouseMoveEvent = mouseMoveEvent
     window.mouseReleaseEvent = mouseReleaseEvent
 
-    central_widget = QtWidgets.QWidget(window)
+    central_widget = QWidget(window)
     central_widget.setStyleSheet("""
         QWidget {
             background-color: #454545; 
@@ -785,14 +715,14 @@ def bake_anim_window(*args):
             border: none;
         }
         """)
-    layout = QtWidgets.QVBoxLayout(central_widget)
+    layout = QVBoxLayout(central_widget)
     layout.setContentsMargins(10, 10, 10, 10)
 
-    window_layout = QtWidgets.QVBoxLayout(window)
+    window_layout = QVBoxLayout(window)
     window_layout.addWidget(central_widget)
     window.setLayout(window_layout)
 
-    close_button = QtWidgets.QPushButton('X')
+    close_button = QPushButton("X")
     close_button.setFixedSize(20, 20)
     close_button.setStyleSheet(
         "QPushButton {"
@@ -809,42 +739,26 @@ def bake_anim_window(*args):
     )
     close_button.clicked.connect(window.close)
 
-    # Definición de los widgets 
-    bake_label = QtWidgets.QLabel("Add interval to bake:")
+    # Definición de los widgets
+    bake_label = QLabel("Add interval to bake:")
     bake_label.setStyleSheet("color: #ccc;")
 
-    bake_interval_line_edit = QtWidgets.QLineEdit()
+    bake_interval_line_edit = QLineEdit()
     bake_interval_line_edit.setStyleSheet("background-color: #282828; color: #ccc; border-radius: 5px; padding: 5px; border: none;")
     bake_interval_line_edit.setFixedSize(40, 30)
     # Limitar la entrada a dos dígitos numéricos
 
-    try:
-        from PySide6.QtCore import QRegularExpression
-        from PySide6.QtGui import QRegularExpressionValidator
+    def create_regex(pattern):
+        return QRegularExpression(pattern)
 
-        def create_regex(pattern):
-            return QRegularExpression(pattern)
+    def create_validator(pattern, parent=None):
+        return QRegularExpressionValidator(QRegularExpression(pattern), parent)
 
-        def create_validator(pattern, parent=None):
-            return QRegularExpressionValidator(QRegularExpression(pattern), parent)
-    except ImportError:
-        from PySide2.QtCore import QRegExp
-        from PySide2.QtGui import QRegExpValidator
-
-        def create_regex(pattern):
-            return QRegExp(pattern)
-
-        def create_validator(pattern, parent=None):
-            return QRegExpValidator(QRegExp(pattern), parent)
-
-
-
-    reg_ex = create_regex("^[0-9]{1,2}$")
+    # reg_ex = create_regex("^[0-9]{1,2}$")
     input_validator = create_validator("^[0-9]{1,2}$", bake_interval_line_edit)
     bake_interval_line_edit.setValidator(input_validator)
 
-
-    bake_button = QtWidgets.QPushButton('Bake')
+    bake_button = QPushButton("Bake")
     bake_button.setFixedSize(80, 30)
     bake_button.setStyleSheet(
         "QPushButton {"
@@ -861,7 +775,6 @@ def bake_anim_window(*args):
         "}"
     )
 
-
     if screen_width == 3840:
         window.resize(350, 100)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -871,17 +784,15 @@ def bake_anim_window(*args):
         bake_interval_line_edit.setFixedSize(100, 50)
         bake_button.setFixedSize(150, 50)
 
-
-
     bake_button.clicked.connect(bake_button_clicked)
 
     # Crear un QHBoxLayout para el QLineEdit y el QPushButton
-    bake_layout = QtWidgets.QHBoxLayout()
+    bake_layout = QHBoxLayout()
     bake_layout.addWidget(bake_interval_line_edit)
     bake_layout.addWidget(bake_button)
 
-    layout.addWidget(close_button, alignment=QtCore.Qt.AlignRight)
-    layout.addWidget(bake_label, alignment=QtCore.Qt.AlignLeft)
+    layout.addWidget(close_button, alignment=Qt.AlignRight)
+    layout.addWidget(bake_label, alignment=Qt.AlignLeft)
     layout.addLayout(bake_layout)
     window.show()
     # Adjust the window position
@@ -889,7 +800,6 @@ def bake_anim_window(*args):
     x = parent_geometry.x() + parent_geometry.width() / 2 - window.width() + 15
     y = parent_geometry.y() + parent_geometry.height() / 2 - window.height() / 2 + 250
     window.move(x, y)
-
 
 
 # ____________________________________________________ ShiftKeys Box _____________________________________________________________#
@@ -900,7 +810,7 @@ def delete_keyframes_before_current_time():
     selected = cmds.ls(selection=True)
 
     if not selected:
-        print('No hay objetos seleccionados')
+        print("No hay objetos seleccionados")
         return
 
     # Obtiene el tiempo actual
@@ -911,7 +821,7 @@ def delete_keyframes_before_current_time():
         keyframes = cmds.keyframe(obj, query=True)
 
         if not keyframes:
-           # print(f'No hay keyframes en el objeto: {obj}')
+            # print(f'No hay keyframes en el objeto: {obj}')
             continue
 
         # Elimina los keyframes que están antes de la currentTime
@@ -925,7 +835,7 @@ def delete_keyframes_after_current_time():
     selected = cmds.ls(selection=True)
 
     if not selected:
-        print('No hay objetos seleccionados')
+        print("No hay objetos seleccionados")
         return
 
     # Obtiene el tiempo actual
@@ -936,7 +846,7 @@ def delete_keyframes_after_current_time():
         keyframes = cmds.keyframe(obj, query=True)
 
         if not keyframes:
-          #  print(f'No hay keyframes en el objeto: {obj}')
+            #  print(f'No hay keyframes en el objeto: {obj}')
             continue
 
         # Elimina los keyframes que están después de la currentTime
@@ -964,54 +874,68 @@ def select_all_animation_curves(*args):
         cmds.selectKey(add=True)
     else:
         print("No anim curves found")
-        
+
 
 def clear_selected_keys(*args):
     cmds.selectKey(clear=True)
 
 
-
 # For Hotkeys
 
+
+def __get_move_keyframes_offset():
+    try:
+        from TheKeyMachine.core.toolbar import tb
+
+        if hasattr(tb, "move_keyframes_intField"):
+            return int(tb.move_keyframes_intField.value())
+    except Exception:
+        pass
+    return 1
+
+
 def hotkey_move_keyframes_left():
-    desplazamiento = cmds.intField("move_keyframes_int", q=True, value=True)
-    desplazamiento = desplazamiento *-1
-    keyTools.move_keyframes_in_range(-1)
+    offset = __get_move_keyframes_offset()
+    move_keyframes_in_range(-offset)
 
 
 def hotkey_move_keyframes_right():
-    desplazamiento = cmds.intField("move_keyframes_int", q=True, value=True)
-    keyTools.move_keyframes_in_range(desplazamiento)
+    offset = __get_move_keyframes_offset()
+    move_keyframes_in_range(offset)
+
 
 # _____
 
 
 def add_inbetween(*args):
-    mel.eval('timeSliderEditKeys addInbetween')
+    mel.eval("timeSliderEditKeys addInbetween")
     currentT = cmds.currentTime(q=True)
-    moveLeft = currentT +1
+    moveLeft = currentT + 1
     cmds.currentTime(moveLeft)
 
 
 def remove_inbetween(*args):
-    mel.eval('timeSliderEditKeys removeInbetween')
+    mel.eval("timeSliderEditKeys removeInbetween")
     currentT = cmds.currentTime(q=True)
-    moveLeft = currentT -1
+    moveLeft = currentT - 1
     cmds.currentTime(moveLeft)
 
 
 def move_keyframes_in_range(*args):
 
-    desplazamiento = cmds.intField("move_keyframes_int", q=True, value=True)
-
-    if args[0] == -1:
-        desplazamiento = -int(desplazamiento)
-
+    # Use explicitly passed offset, or fetch from the toolbar spinbox
+    if args and isinstance(args[0], (int, float)):
+        desplazamiento = int(args[0])
+    else:
+        desplazamiento = __get_move_keyframes_offset()
+        # Fallback for old behaviour where -1 was passed as a direction flag
+        if args and args[0] == -1:
+            desplazamiento = -desplazamiento
 
     currentT = cmds.currentTime(q=True)
 
     # Obtén el control deslizante de tiempo actual
-    aTimeSlider = mel.eval('$tmpVar=$gPlayBackSlider')
+    aTimeSlider = mel.eval("$tmpVar=$gPlayBackSlider")
 
     # Obtén el rango seleccionado en el rangeSlider
     timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
@@ -1024,7 +948,7 @@ def move_keyframes_in_range(*args):
         cmds.undoInfo(openChunk=True)
 
         # Obtén todas las curvas de animación en la escena
-        animation_curves = cmds.ls(type='animCurve')
+        animation_curves = cmds.ls(type="animCurve")
         cmds.selectKey(clear=True)
 
         for curve in animation_curves:
@@ -1034,29 +958,25 @@ def move_keyframes_in_range(*args):
 
             # Selecciona todos los keyframes de la curva dentro del rango seleccionado
             cmds.selectKey(curve, time=(start_frame, end_frame), add=True)
-        
+
         # Mueve los keyframes seleccionados
         # Inicia un nuevo bloque de deshacer
-        cmds.keyframe(edit=True, includeUpperBound=True, animation='keys', relative=True, option='over', timeChange=desplazamiento)
+        cmds.keyframe(edit=True, includeUpperBound=True, animation="keys", relative=True, option="over", timeChange=desplazamiento)
 
         # Mover el tiempo un frame a la izquierda
         moveLeft = currentT + desplazamiento
         cmds.currentTime(moveLeft)
         cmds.undoInfo(closeChunk=True)
 
-
     else:
         selection = cmds.ls(selection=True)
 
-        if not selection:
-            print("No object selected")
-        else:
-
+        if selection:
             # Comprobar si hay keyframes seleccionados
-            selected_keys = mel.eval('keyframe -query -selected')
+            selected_keys = mel.eval("keyframe -query -selected")
             if selected_keys:
                 # Si hay keyframes seleccionados, moverlos
-                mel.eval('keyframe -e -iub true -animation keys -r -o over -tc {}'.format(desplazamiento))
+                mel.eval("keyframe -e -iub true -animation keys -r -o over -tc {}".format(desplazamiento))
             else:
                 for obj in selection:
                     # Verificar si el objeto seleccionado tiene un keyframe en el tiempo actual
@@ -1077,21 +997,20 @@ def move_keyframes_in_range(*args):
                 cmds.currentTime(moveLeft)
 
 
-
-
 # _____________________________________________________________________________________________________________________
 
 is_dragging = False
 original_keyframes = {}
 original_values = {}  # Vamos a guardar el valor original de cada atributo
 frame_data_cache = {}  # New dictionary to cache frame data for performance
-original_keyframe_values = {} 
+original_keyframe_values = {}
 
 global tween_frame_data_cache
 tween_frame_data_cache = {}
 
 global original_auto_key_state
 original_auto_key_state = None
+
 
 def handle_autokey_start():
     global original_auto_key_state
@@ -1109,14 +1028,11 @@ def handle_autokey_end():
         original_auto_key_state = None  # Restablecer para la próxima operación
 
 
-
-
-
 def blend_pull_and_push(value, objs=None, selection=True):
     global original_values, original_keyframe_values, is_dragging
 
     selected_channels = get_selected_channels()
-    
+
     if not objs and not selection:
         raise ValueError("No objects given to blend_pull_and_push")
 
@@ -1147,7 +1063,7 @@ def blend_pull_and_push(value, objs=None, selection=True):
             if not cmds.attributeQuery(attr, node=obj, exists=True):
                 continue
 
-            attrFull = f'{obj}.{attr}'
+            attrFull = f"{obj}.{attr}"
 
             if cmds.getAttr(attrFull, lock=True) or not cmds.getAttr(attrFull, keyable=True):
                 # Si el atributo está bloqueado o no es keyable, continuar con el siguiente
@@ -1172,10 +1088,10 @@ def blend_pull_and_push(value, objs=None, selection=True):
 
                         original_value = original_keyframe_values[key_identifier]
 
-                        if attr in ['rx', 'ry', 'rz']:
+                        if attr in ["rx", "ry", "rz"]:
                             # Aplicar un factor de cambio para los atributos de rotación
                             newValue = original_value + value * rotation_factor
-                        elif attr in ['tx', 'ty', 'tz']:
+                        elif attr in ["tx", "ty", "tz"]:
                             # Aplicar un factor de cambio para los atributos de translación
                             newValue = original_value + value * translation_factor
                         else:
@@ -1186,10 +1102,10 @@ def blend_pull_and_push(value, objs=None, selection=True):
             else:
                 currentValue = original_values.get(attrFull)
                 if currentValue is not None:
-                    if attr in ['rx', 'ry', 'rz']:
+                    if attr in ["rx", "ry", "rz"]:
                         # Aplicar un factor de cambio para los atributos de rotación
                         newValue = currentValue + value * rotation_factor
-                    elif attr in ['tx', 'ty', 'tz']:
+                    elif attr in ["tx", "ty", "tz"]:
                         # Aplicar un factor de cambio para los atributos de translación
                         newValue = currentValue + value * translation_factor
                     else:
@@ -1212,19 +1128,19 @@ def blend_pull_and_push(value, objs=None, selection=True):
                     cmds.setAttr(attrFull, newValue)
 
 
-
-
 # Blend normal .................................................................................
 
 is_cached = False
 frame_data_cache = {}
+
+
 def cache_keyframe_data(objs):
     keyframe_data = {}
     currentTime = cmds.currentTime(query=True)
     for obj in objs:
         attrs = cmds.listAttr(obj, keyable=True) or []
         for attr in attrs:
-            attrFull = f'{obj}.{attr}'
+            attrFull = f"{obj}.{attr}"
             if cmds.objExists(attrFull):
                 keyframes = cmds.keyframe(attrFull, query=True) or []
                 original_value = cmds.getAttr(attrFull)
@@ -1253,21 +1169,17 @@ def cache_keyframe_data(objs):
                     "nextValue": nextValue,
                     "minValue": minValue,
                     "maxValue": maxValue,
-                    "prevTanType": prevTanType  # Añadir tipo de tangente
+                    "prevTanType": prevTanType,  # Añadir tipo de tangente
                 }
     return keyframe_data
 
 
-
-
-
-
 # Esta es la funcion para el modo Blend normal
+
 
 def blend_to_key(percentage, objs=None, selection=True):
 
     global is_dragging, frame_data_cache, is_cached, last_autokey_time, autokey_interval
-
 
     if not is_dragging:
         cmds.undoInfo(openChunk=True)
@@ -1283,11 +1195,10 @@ def blend_to_key(percentage, objs=None, selection=True):
         return
 
     if not is_cached:
-
         frame_data_cache = cache_keyframe_data(objs)
         is_cached = True
 
-    currentTime = cmds.currentTime(query=True)  
+    # currentTime = cmds.currentTime(query=True)
 
     for obj in objs:
         # Sólo atributos escalares keyables (evita double3 compuestos como rotate/translate)
@@ -1313,7 +1224,7 @@ def blend_to_key(percentage, objs=None, selection=True):
 
             # nombres tal cual en tu cache: "original_value", "previousValue", "nextValue"
             orig = cachedData.get("original_value")
-            nxt  = cachedData.get("nextValue")
+            nxt = cachedData.get("nextValue")
             prev = cachedData.get("previousValue")
 
             # si por cualquier motivo llega lista/tupla, pasa
@@ -1344,9 +1255,6 @@ def blend_to_key(percentage, objs=None, selection=True):
                     continue
 
 
-
-
-
 # blend to frame ......................................................................................
 
 
@@ -1356,7 +1264,7 @@ def cache_blend_frame_data(objs, left_frame, right_frame):
     for obj in objs:
         attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []  # Solo atributos escalares (numéricos)
         for attr in attrs:
-            attrFull = f'{obj}.{attr}'
+            attrFull = f"{obj}.{attr}"
             if cmds.objExists(attrFull):
                 leftValue = cmds.getAttr(attrFull, time=left_frame) if left_frame is not None else None
                 rightValue = cmds.getAttr(attrFull, time=right_frame) if right_frame is not None else None
@@ -1374,18 +1282,13 @@ def cache_blend_frame_data(objs, left_frame, right_frame):
                     "rightValue": rightValue,
                     "original_value": cmds.getAttr(attrFull),
                     "needsCalculation": True,
-                    "prevTanType": prevTanType  # Añadir tipo de tangente
+                    "prevTanType": prevTanType,  # Añadir tipo de tangente
                 }
     return frame_data_cache
 
 
-
-
-
-
-
-
 # Esta es la funcion para el modo Blend to Frame
+
 
 def blend_to_frame(percentage, left_frame=None, right_frame=None, objs=None, selection=True):
     global is_dragging, frame_data_cache, is_cached
@@ -1408,7 +1311,7 @@ def blend_to_frame(percentage, left_frame=None, right_frame=None, objs=None, sel
         attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
 
         for attr in attrs:
-            attrFull = f'{obj}.{attr}'
+            attrFull = f"{obj}.{attr}"
             if attrFull not in frame_data_cache:
                 continue
 
@@ -1419,8 +1322,6 @@ def blend_to_frame(percentage, left_frame=None, right_frame=None, objs=None, sel
             original_value = cachedData["original_value"]
             previousValue = cachedData["leftValue"]
             nextValue = cachedData["rightValue"]
-
-
 
             if nextValue is not None and percentage > 0:
                 difference = nextValue - original_value
@@ -1436,12 +1337,6 @@ def blend_to_frame(percentage, left_frame=None, right_frame=None, objs=None, sel
             cmds.setAttr(attrFull, currentValue)
 
 
-
-
-
-
-
-
 def blendSliderReset(slider):
     global original_keyframes, original_values, is_dragging, frame_data_cache, original_keyframe_values, is_cached
 
@@ -1449,11 +1344,11 @@ def blendSliderReset(slider):
     if frame_data_cache:
         currentTime = cmds.currentTime(query=True)
         for attrFull, cacheData in frame_data_cache.items():
-            if 'prevTanType' in cacheData:
-                prevTanType = cacheData['prevTanType']
+            if "prevTanType" in cacheData:
+                prevTanType = cacheData["prevTanType"]
                 # Ajustar 'step' a 'stepnext'
-                if prevTanType == 'step':
-                    prevTanType = 'stepnext'
+                if prevTanType == "step":
+                    prevTanType = "stepnext"
                 # Crear un nuevo keyframe
                 cmds.setKeyframe(attrFull, time=currentTime)
                 # Aplicar la tangente al keyframe
@@ -1474,21 +1369,13 @@ def blendSliderReset(slider):
     cmds.floatSlider(slider, edit=True, value=0)
 
 
-
-
 # _____________________________________________________ Tween Machine _______________________________________________________________#
-
-
-
-
-
 
 
 def prepare_tween_data(objs=None, attrs=None):
     global tween_frame_data_cache
     tween_frame_data_cache = {}
     currentTime = cmds.currentTime(query=True)
-
 
     for obj in objs or cmds.ls(selection=True):
         if not cmds.objExists(obj):
@@ -1499,15 +1386,15 @@ def prepare_tween_data(objs=None, attrs=None):
             continue
 
         for attr in current_attrs:
-            attrFull = '%s.%s' % (obj, attr)
+            attrFull = "%s.%s" % (obj, attr)
             keyframes = cmds.keyframe(attrFull, query=True) or []
-            
+
             if not keyframes:
                 continue
 
             previousKeyframes = [frame for frame in keyframes if frame < currentTime]
             laterKeyframes = [frame for frame in keyframes if frame > currentTime]
-            
+
             if not previousKeyframes or not laterKeyframes:
                 tween_frame_data_cache[attrFull] = {"needsCalculation": False}
                 continue
@@ -1517,11 +1404,11 @@ def prepare_tween_data(objs=None, attrs=None):
 
             previousValue = cmds.getAttr(attrFull, time=previousFrame)
             nextValue = cmds.getAttr(attrFull, time=nextFrame)
-            
+
             tween_frame_data_cache[attrFull] = {
                 "previousValue": previousValue,
                 "nextValue": nextValue,
-                "needsCalculation": previousValue != nextValue
+                "needsCalculation": previousValue != nextValue,
             }
 
             previousKeyframes = [frame for frame in keyframes if frame < currentTime]
@@ -1532,8 +1419,6 @@ def prepare_tween_data(objs=None, attrs=None):
                 tween_frame_data_cache[attrFull]["prevTanType"] = prevTanType
 
     return tween_frame_data_cache
-
-
 
 
 def tween(percentage):
@@ -1586,14 +1471,13 @@ def tween(percentage):
 
         adjustments.append((attrFull, currentValue))
 
-
     apply_tween_adjustments(adjustments, currentTime, tween_frame_data_cache)
-    
+
 
 def apply_tween_adjustments(adjustments, currentTime, tween_frame_data_cache):
     for attrFull, currentValue in adjustments:
-        obj, attr = attrFull.split('.')
-        
+        obj, attr = attrFull.split(".")
+
         if cmds.attributeQuery(attr, node=obj, minExists=True):
             minLimit = cmds.attributeQuery(attr, node=obj, minimum=True)[0]
             currentValue = max(currentValue, minLimit)
@@ -1601,9 +1485,8 @@ def apply_tween_adjustments(adjustments, currentTime, tween_frame_data_cache):
         if cmds.attributeQuery(attr, node=obj, maxExists=True):
             maxLimit = cmds.attributeQuery(attr, node=obj, maximum=True)[0]
             currentValue = min(currentValue, maxLimit)
-                
-        cmds.setAttr(attrFull, currentValue)
 
+        cmds.setAttr(attrFull, currentValue)
 
 
 def tweenSliderReset(slider):
@@ -1617,20 +1500,17 @@ def tweenSliderReset(slider):
             # Crear un nuevo keyframe
             cmds.setKeyframe(attrFull, time=currentTime)
 
-            if 'prevTanType' in cacheData:
-                prevTanType = cacheData['prevTanType']
+            if "prevTanType" in cacheData:
+                prevTanType = cacheData["prevTanType"]
                 # Ajustar 'step' a 'stepnext'
-                if prevTanType == 'step':
-                    prevTanType = 'step'
+                if prevTanType == "step":
+                    prevTanType = "step"
                 # Aplicar la tangente al keyframe
                 cmds.keyTangent(attrFull, edit=True, time=(currentTime,), inTangentType=prevTanType, outTangentType=prevTanType)
 
-            if 'currentValue' in cacheData:
-                currentValue = cacheData['currentValue']
+            if "currentValue" in cacheData:
+                currentValue = cacheData["currentValue"]
                 cmds.setAttr(attrFull, currentValue)
-
-
-
 
     # Resetear las variables globales
     original_keyframes = {}
@@ -1640,9 +1520,6 @@ def tweenSliderReset(slider):
     if is_dragging:
         cmds.undoInfo(closeChunk=True)
         is_dragging = False
-
-
-
 
 
 # _____________________________________________________ Key Tools  Customgraph _______________________________________________________________#
@@ -1658,7 +1535,7 @@ def deleteStaticCurves():
         shapes = cmds.listRelatives(obj, shapes=True, fullPath=True)
         if shapes:
             selected_shapes.extend(shapes)
-    
+
     # Fusionar las listas de objetos y formas
     all_selected = list(set(selected_objects + selected_shapes))
 
@@ -1667,7 +1544,7 @@ def deleteStaticCurves():
     for obj in all_selected:
         anim_curves = cmds.listConnections(obj, type="animCurve", connections=False, plugs=False) or []
         for curve in anim_curves:
-            keyframes = cmds.keyframe(curve, query=True, timeChange=True) or []
+            # keyframes = cmds.keyframe(curve, query=True, timeChange=True) or []
             values = cmds.keyframe(curve, query=True, valueChange=True) or []
             if len(set(values)) == 1:  # Usar un conjunto para buscar valores únicos
                 curves_to_delete.append(curve)
@@ -1677,14 +1554,12 @@ def deleteStaticCurves():
         cmds.delete(curves_to_delete)
 
 
-
 def snapKeyframes():
-# Obtén la selección actual
+    # Obtén la selección actual
     selected_objects = cmds.ls(sl=True)
 
     for obj in selected_objects:
-
-        if not cmds.attributeQuery('translateX', node=obj, exists=True):
+        if not cmds.attributeQuery("translateX", node=obj, exists=True):
             print(f"Objet {obj} is not animatable")
             continue
 
@@ -1727,7 +1602,6 @@ def snapKeyframes():
                     cmds.keyTangent(curve, time=(rounded_key,), edit=True, outTangentType=out_tangent[0])
 
 
-
 def shareKeys():
     # Obtener los keyframes de todas las curvas
     all_times = cmds.keyframe(query=True, timeChange=True)
@@ -1764,7 +1638,6 @@ def shareKeys():
                         cmds.setKeyframe(curve, time=time, value=frame_value)
 
 
-
 def match_keys():
     # Obtener las curvas seleccionadas
     selected_curves = cmds.keyframe(selected=True, query=True, name=True)
@@ -1774,7 +1647,6 @@ def match_keys():
         print("Select at least two animation curves")
 
     else:
-
         # Obtener los keyframes de la primera curva seleccionada
         first_curve_times = cmds.keyframe(selected_curves[-1], query=True, timeChange=True)
         first_curve_values = cmds.keyframe(selected_curves[-1], query=True, valueChange=True)
@@ -1783,7 +1655,7 @@ def match_keys():
         for curve in selected_curves[:-1]:
             # Obtener los keyframes actuales de la curva
             curve_times = cmds.keyframe(curve, query=True, timeChange=True)
-            
+
             # Borrar keyframes que no están en la primera curva
             extra_frames = set(curve_times) - set(first_curve_times)
             for frame in extra_frames:
@@ -1796,7 +1668,7 @@ def match_keys():
 
 def flipCurves():
     selectedCurves = cmds.keyframe(n=1, sl=1, q=1)
-    
+
     if selectedCurves is not None:
         for curve in selectedCurves:
             # Obtener todos los valores de keyframes para la curva
@@ -1809,17 +1681,16 @@ def flipCurves():
             cmds.scaleKey(curve, valueScale=-1, valuePivot=pivot)
 
 
-
 def flipKeyGroup():
 
     # Obtener las curvas con keyframes seleccionados
     selectedCurves = cmds.keyframe(q=True, name=True, sl=True)
-    
+
     if selectedCurves is not None:
         for curve in selectedCurves:
             # Obtener los tiempos de los keyframes seleccionados para la curva
             selected_times = cmds.keyframe(curve, query=True, timeChange=True, sl=True)
-            
+
             # Obtener los valores de los keyframes seleccionados en base a los tiempos
             selected_values = [cmds.keyframe(curve, query=True, time=(t, t), valueChange=True)[0] for t in selected_times]
 
@@ -1835,23 +1706,17 @@ def flipKeyGroup():
         print("Select at least one keyframe in Graph Editor")
 
 
-
-
 def flipFromKeyframe():
-    selectedCurves=cmds.keyframe(n=1, sl=1, q=1)
+    selectedCurves = cmds.keyframe(n=1, sl=1, q=1)
 
     if selectedCurves is not None:
         for piv in selectedCurves:
             pivot = cmds.keyframe(query=True, valueChange=True)[0]
-        
+
         for s in selectedCurves:
             cmds.scaleKey(s, valueScale=-1, valuePivot=pivot, scaleSpecifiedKeys=1)
     else:
         cmds.warning("No keys selected")
-
-
-
-
 
 
 # ------------------------------ OVERLAP
@@ -1859,15 +1724,13 @@ def flipFromKeyframe():
 
 def mod_overlap_animation(*args):
     # Get the current state of the modifiers
-    mods = mel.eval('getModifiers')
+    mods = mel.eval("getModifiers")
     shift_pressed = bool(mods % 2)  # Check if Shift is pressed
 
     if shift_pressed:
         overlap_backward()
     else:
         overlap_forward()
-
-
 
 
 def get_selected_objects():
@@ -1888,13 +1751,18 @@ def overlap_forward(*args):
     # Si no hay curvas seleccionadas en el Graph Editor, obtén las curvas de los canales seleccionados
     if not selected_anim_curves:
         selected_channels = get_selected_channels()
-        
+
         # Si no hay canales seleccionados, muestra un mensaje al usuario y termina la ejecución
         if not selected_channels:
             print("Select animation curves or channels in the Channel Box")
             return
-        
-        selected_anim_curves = [cmds.listConnections(f'{obj}.{channel}', type='animCurve')[0] for obj in selected_objects_order for channel in selected_channels if cmds.listConnections(f'{obj}.{channel}', type='animCurve')]
+
+        selected_anim_curves = [
+            cmds.listConnections(f"{obj}.{channel}", type="animCurve")[0]
+            for obj in selected_objects_order
+            for channel in selected_channels
+            if cmds.listConnections(f"{obj}.{channel}", type="animCurve")
+        ]
 
     # Elimina los duplicados de la lista manteniendo el orden original
     seen = set()
@@ -1903,7 +1771,7 @@ def overlap_forward(*args):
     # Si hay curvas seleccionadas...
     if selected_anim_curves:
         for i, curve in enumerate(selected_anim_curves):
-            cmds.keyframe(curve, edit=True, includeUpperBound=True, relative=True, option="over", timeChange=i*frames_to_move)
+            cmds.keyframe(curve, edit=True, includeUpperBound=True, relative=True, option="over", timeChange=i * frames_to_move)
 
 
 def overlap_backward(*args):
@@ -1918,13 +1786,18 @@ def overlap_backward(*args):
     # Si no hay curvas seleccionadas en el Graph Editor, obtén las curvas de los canales seleccionados
     if not selected_anim_curves:
         selected_channels = get_selected_channels()
-        
+
         # Si no hay canales seleccionados, muestra un mensaje al usuario y termina la ejecución
         if not selected_channels:
             print("Select animation curves or channels in the Channel Box")
             return
-        
-        selected_anim_curves = [cmds.listConnections(f'{obj}.{channel}', type='animCurve')[0] for obj in selected_objects_order for channel in selected_channels if cmds.listConnections(f'{obj}.{channel}', type='animCurve')]
+
+        selected_anim_curves = [
+            cmds.listConnections(f"{obj}.{channel}", type="animCurve")[0]
+            for obj in selected_objects_order
+            for channel in selected_channels
+            if cmds.listConnections(f"{obj}.{channel}", type="animCurve")
+        ]
 
     # Elimina los duplicados de la lista manteniendo el orden original
     seen = set()
@@ -1933,8 +1806,7 @@ def overlap_backward(*args):
     # Si hay curvas seleccionadas...
     if selected_anim_curves:
         for i, curve in enumerate(selected_anim_curves):
-            cmds.keyframe(curve, edit=True, includeUpperBound=True, relative=True, option="over", timeChange=i*frames_to_move)
-
+            cmds.keyframe(curve, edit=True, includeUpperBound=True, relative=True, option="over", timeChange=i * frames_to_move)
 
 
 # __________________________________________________ Iso / Mute / Lock ____________________________________________________________#
@@ -1942,7 +1814,7 @@ def overlap_backward(*args):
 
 def isolateCurve():
     # Obtén las curvas seleccionadas en el Graph Editor
-    selected_objects = cmds.selectionConnection('graphEditor1FromOutliner', q=1, object=1)
+    selected_objects = cmds.selectionConnection("graphEditor1FromOutliner", q=1, object=1)
 
     if not selected_objects:
         cmds.warning("There are not selected curves in Graph Editor")
@@ -1953,16 +1825,16 @@ def isolateCurve():
 
 def toggleMute():
     # Obtener las curvas seleccionadas en el Graph Editor
-    selected_curves = cmds.selectionConnection('graphEditor1FromOutliner', q=1, object=1)
-    
+    selected_curves = cmds.selectionConnection("graphEditor1FromOutliner", q=1, object=1)
+
     if selected_curves:
         for curve in selected_curves:
             # Reemplazar guiones bajos por puntos en el nombre del canal
-            #curve = curve.replace("_", "")
-            
+            # curve = curve.replace("_", "")
+
             # Consultar si el canal está en mute
             is_muted = cmds.mute(curve, q=True)
-            
+
             if is_muted:
                 # Desactivar el mute del canal
                 cmds.mute(curve, disable=True)
@@ -1971,10 +1843,9 @@ def toggleMute():
                 cmds.mute(curve)
 
 
-
 def toggleLock():
     # Obtén las curvas seleccionadas en el Graph Editor
-    selected_objects = cmds.selectionConnection('graphEditor1FromOutliner', q=1, object=1)
+    selected_objects = cmds.selectionConnection("graphEditor1FromOutliner", q=1, object=1)
 
     # Si no hay objetos seleccionados, lanza un error
     if not selected_objects:
@@ -1984,7 +1855,7 @@ def toggleLock():
     # Por cada objeto seleccionado
     for obj in selected_objects:
         # Obtén las curvas de animación de este objeto
-        anim_curves = cmds.listConnections(obj, type='animCurve')
+        anim_curves = cmds.listConnections(obj, type="animCurve")
 
         # Si no hay curvas de animación, lanza un error y continua con el siguiente objeto
         if not anim_curves:
@@ -1994,13 +1865,11 @@ def toggleLock():
         # Por cada curva de animación
         for curve in anim_curves:
             # Obtén el estado actual de bloqueo (lock) de la curva
-            is_locked = cmds.getAttr(curve + '.ktv', lock=True)
+            is_locked = cmds.getAttr(curve + ".ktv", lock=True)
 
             # Si la curva está bloqueada (locked), desbloquéala (unlock).
             # Si no está bloqueada (unlocked), blóquela (lock).
-            cmds.setAttr(curve + '.ktv', lock= not is_locked)
-
-
+            cmds.setAttr(curve + ".ktv", lock=not is_locked)
 
 
 # _____________________________________________________ Resets _______________________________________________________________#
@@ -2008,7 +1877,7 @@ def toggleLock():
 
 def reset_objects_mods(*args):
     # Get the current state of the modifiers
-    mods = mel.eval('getModifiers')
+    mods = mel.eval("getModifiers")
     shift_pressed = bool(mods % 2)  # Check if Shift is pressed
     ctrl_pressed = bool(mods & 4)  # Check if Ctrl is pressed
 
@@ -2031,15 +1900,15 @@ def save_default_values(*args):
 
     # Leer datos existentes del archivo JSON, si existe
     if os.path.exists(json_file_path):
-        with open(json_file_path, 'r') as file:
+        with open(json_file_path, "r") as file:
             data = json.load(file)
     else:
         data = {}
 
     for obj in objetos_seleccionados:
         # Extraer el namespace y el nombre corto del objeto
-        partes = obj.split(':')
-        namespace = partes[0] if len(partes) > 1 else 'default'
+        partes = obj.split(":")
+        namespace = partes[0] if len(partes) > 1 else "default"
         nombre_corto = partes[-1]
 
         # Agregar namespace al diccionario si no existe
@@ -2053,16 +1922,15 @@ def save_default_values(*args):
         for attr in atributos:
             if attr == "tag":
                 continue  # Ignorar el atributo "tag"
-            atributo_completo = f'{nombre_corto}.{attr}'
-            valor = cmds.getAttr(f'{obj}.{attr}')
+            atributo_completo = f"{nombre_corto}.{attr}"
+            valor = cmds.getAttr(f"{obj}.{attr}")
             data[namespace][atributo_completo] = valor
 
     # Guardar los datos actualizados en un archivo JSON
-    with open(json_file_path, 'w') as file:
+    with open(json_file_path, "w") as file:
         json.dump(data, file, indent=4)
 
-    cmds.warning(f'Data saved')
-
+    cmds.warning("Data saved")
 
 
 def restore_default_data(*args):
@@ -2071,14 +1939,12 @@ def restore_default_data(*args):
 
     # Verificar si el archivo existe y vaciar su contenido
     if os.path.exists(json_file_path):
-        with open(json_file_path, 'w') as file:
+        with open(json_file_path, "w") as file:
             json.dump({}, file)  # Escribe un diccionario vacío en el archivo
 
-        cmds.warning(f"All default values restored")
+        cmds.warning("All default values restored")
     else:
         print("There is not a JSON file to restore")
-
-
 
 
 def remove_default_values_for_selected_object(*args):
@@ -2087,7 +1953,7 @@ def remove_default_values_for_selected_object(*args):
 
     # Leer datos existentes del archivo JSON, si existe
     if os.path.exists(json_file_path):
-        with open(json_file_path, 'r') as file:
+        with open(json_file_path, "r") as file:
             data = json.load(file)
     else:
         print("There is not a JSON file")
@@ -2098,8 +1964,8 @@ def remove_default_values_for_selected_object(*args):
 
     for obj in objetos_seleccionados:
         # Extraer el namespace y el nombre corto del objeto
-        partes = obj.split(':')
-        namespace = partes[0] if len(partes) > 1 else 'default'
+        partes = obj.split(":")
+        namespace = partes[0] if len(partes) > 1 else "default"
         nombre_corto = partes[-1]
 
         # Eliminar la información del objeto del JSON
@@ -2115,13 +1981,10 @@ def remove_default_values_for_selected_object(*args):
                 del data[namespace]
 
     # Guardar los datos actualizados en un archivo JSON
-    with open(json_file_path, 'w') as file:
+    with open(json_file_path, "w") as file:
         json.dump(data, file, indent=4)
 
     print(f"Data removed from JSON {json_file_path}")
-
-
-
 
 
 def reset_object_values(reset_translations=False, reset_rotations=False):
@@ -2133,7 +1996,7 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
 
         # Leer datos del archivo JSON si existe
         if os.path.exists(json_file_path):
-            with open(json_file_path, 'r') as file:
+            with open(json_file_path, "r") as file:
                 data = json.load(file)
         else:
             data = {}
@@ -2143,8 +2006,8 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
 
         for obj in selected_objects:
             # Extraer el namespace y el nombre corto del objeto
-            partes = obj.split(':')
-            namespace = partes[0] if len(partes) > 1 else 'default'
+            partes = obj.split(":")
+            namespace = partes[0] if len(partes) > 1 else "default"
             nombre_corto = partes[-1]
 
             attrs = selected_channels if selected_channels else cmds.listAttr(obj, keyable=True)
@@ -2153,7 +2016,7 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
                 continue
 
             for attr in attrs:
-                attr_full = f'{nombre_corto}.{attr}'
+                attr_full = f"{nombre_corto}.{attr}"
 
                 # Comprobar si hay datos guardados para el atributo
                 if namespace in data and attr_full in data[namespace]:
@@ -2164,11 +2027,11 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
                         print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
                 else:
                     # Restablecer a los valores por defecto
-                    if reset_translations and not attr.startswith('translate'):
+                    if reset_translations and not attr.startswith("translate"):
                         continue
-                    if reset_rotations and not attr.startswith('rotate'):
+                    if reset_rotations and not attr.startswith("rotate"):
                         continue
-                    
+
                     try:
                         is_locked = cmds.getAttr(obj + "." + attr, lock=True)
                         if is_locked:
@@ -2176,7 +2039,7 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
 
                         connections = cmds.listConnections(obj + "." + attr, source=True, destination=False, plugs=True)
                         if connections:
-                            node_type = cmds.nodeType(connections[0].split('.')[0])
+                            node_type = cmds.nodeType(connections[0].split(".")[0])
                             if node_type not in ["animCurveTL", "animCurveTA", "animCurveTT", "animCurveTU"]:
                                 cmds.disconnectAttr(connections[0], obj + "." + attr)
 
@@ -2193,11 +2056,10 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
         cmds.undoInfo(closeChunk=True)
 
 
-
 def get_default_value(node):
     type = cmds.nodeType(node)
-    
-    if "animCurve" in type: 
+
+    if "animCurve" in type:
         target = cmds.listConnections(node + ".output", plugs=True, destination=False, source=True)
         if target:
             object, attr = target[0].split("")
@@ -2205,19 +2067,19 @@ def get_default_value(node):
             object, attr = None, None
     else:
         object, attr = node.split("")
-    
+
     if not object or not attr:
         return None
-    
+
     if cmds.attributeQuery(attr, node=object, exists=True):
         default_value = cmds.attributeQuery(attr, node=object, listDefault=True)[0]
         return default_value
-    
+
     return None
 
 
 def get_default_value_main():
-    selected_curves = cmds.selectionConnection('graphEditor1FromOutliner', query=True, object=True)
+    selected_curves = cmds.selectionConnection("graphEditor1FromOutliner", query=True, object=True)
 
     if selected_curves:
         for curve in selected_curves:
@@ -2229,7 +2091,6 @@ def get_default_value_main():
                         cmds.keyframe(curve, edit=True, valueChange=default_value, time=(keyframe, keyframe))
 
 
-
 # _____________________________________________________ select object from selected curve _______________________________________________________________#
 
 
@@ -2238,8 +2099,8 @@ def get_namespace_from_selection(*args):
     selected_objects = cmds.ls(selection=True)
     if selected_objects:
         object_name = selected_objects[0]
-        if ':' in object_name:
-            return object_name.split(':')[0]
+        if ":" in object_name:
+            return object_name.split(":")[0]
     return None
 
 
@@ -2255,91 +2116,77 @@ def select_objects_from_selected_curves(*args):
     # Obtener y seleccionar los objetos asociados a las curvas seleccionadas
     selected_objects = set()
     for curve_name in selected_curves:
-        object_name = '_'.join(curve_name.split('_')[:-1])  # Eliminar el sufijo "_rotateY"
-        
+        object_name = "_".join(curve_name.split("_")[:-1])  # Eliminar el sufijo "_rotateY"
+
         # Agregar el namespace al nombre del objeto si existe
         if namespace:
             object_name_with_namespace = f"{namespace}:{object_name}"
             if cmds.objExists(object_name_with_namespace):
                 object_name = object_name_with_namespace
-        
+
         if cmds.objExists(object_name):
             selected_objects.add(object_name)
-    
+
     if selected_objects:
         cmds.selectKey(selected_curves, add=True)  # Seleccionar las claves en el Graph Editor
-        mel.eval('isolateAnimCurve true graphEditor1FromOutliner graphEditor1GraphEd;')
+        mel.eval("isolateAnimCurve true graphEditor1FromOutliner graphEditor1GraphEd;")
         cmds.select(list(selected_objects), replace=True)  # Seleccionar los objetos en la vista 3D
-
-
 
 
 # _____________________________ Patrones Mirror ______________________________________
 
 
 MIRROR_PATTERNS = [
-    ('R_', 'L_'),
-    ('L_', 'R_'),
-
-    ('_R', '_L'),
-    ('_L', '_R'),
-
-    ('_R_', '_L_'),
-    ('_L_', '_R_'),
-
-    ('r_', 'l_'),
-    ('l_', 'r_'),
-
-    ('_r_', '_l_'),
-    ('_l_', '_r_'),
-
-    ('_rt_', '_lf_'),
-    ('_lf_', '_rt_'),
-
-    ('_rg_', '_lf_'),
-    ('_lf_', '_rg_'),
-
-    ('_lf', '_rg'),
-    ('_rg', '_lf'),
-
-    ('RF_', 'LF_'),
-    ('LF_', 'RF_'),
-
-    ('left_', 'right_'),
-    ('right_', 'left_'),
-
-    ('_left', '_right_'),
-    ('_right', '_left'),
-
-    ('_left_', '_right_'),
-    ('_right_', '_left_')
+    ("R_", "L_"),
+    ("L_", "R_"),
+    ("_R", "_L"),
+    ("_L", "_R"),
+    ("_R_", "_L_"),
+    ("_L_", "_R_"),
+    ("r_", "l_"),
+    ("l_", "r_"),
+    ("_r_", "_l_"),
+    ("_l_", "_r_"),
+    ("_rt_", "_lf_"),
+    ("_lf_", "_rt_"),
+    ("_rg_", "_lf_"),
+    ("_lf_", "_rg_"),
+    ("_lf", "_rg"),
+    ("_rg", "_lf"),
+    ("RF_", "LF_"),
+    ("LF_", "RF_"),
+    ("left_", "right_"),
+    ("right_", "left_"),
+    ("_left", "_right_"),
+    ("_right", "_left"),
+    ("_left_", "_right_"),
+    ("_right_", "_left_"),
 ]
-
 
 
 # __________ Funcion para buscar control opuesto ___________________________________
 
+
 def find_opposite_name(name):
     global MIRROR_PATTERNS
     # Divide el nombre en partes (namespace y nombre del control)
-    namespace, _, control_name = name.rpartition(':')
+    namespace, _, control_name = name.rpartition(":")
 
     for pattern, opposite_pattern in MIRROR_PATTERNS:
         if pattern in control_name:
             new_control_name = control_name.replace(pattern, opposite_pattern, 1)
-            possible_opposite_name = f'{namespace}:{new_control_name}' if namespace else new_control_name
+            possible_opposite_name = f"{namespace}:{new_control_name}" if namespace else new_control_name
             if cmds.objExists(possible_opposite_name):
                 return possible_opposite_name
 
     return None
 
 
-#___________________________ SELECT OPPOSITE _____________________________________
-
+# ___________________________ SELECT OPPOSITE _____________________________________
 
 
 def selectOppositeHandler(*args):
-    mods = mel.eval('getModifiers')
+    mods = mel.eval("getModifiers")
     shift_pressed = bool(mods % 2)  # Shift
 
     if shift_pressed:
@@ -2350,7 +2197,7 @@ def selectOppositeHandler(*args):
 
 def selectOpposite(*args):
     global MIRROR_PATTERNS
-    
+
     selected_objects = cmds.ls(selection=True)
     opposite_controls = []
 
@@ -2365,7 +2212,7 @@ def selectOpposite(*args):
 
 def addSelectOpposite(*args):
     global MIRROR_PATTERNS
-    
+
     selected_objects = cmds.ls(selection=True)
     opposite_controls = []
 
@@ -2378,11 +2225,7 @@ def addSelectOpposite(*args):
         cmds.select(opposite_controls, add=True)
 
 
-
-
-
-
-#___________________________ Copy Opposite _____________________________________
+# ___________________________ Copy Opposite _____________________________________
 
 
 def copyOpposite(*args):
@@ -2394,7 +2237,7 @@ def copyOpposite(*args):
 
         def load_exceptions(file_path):
             if os.path.exists(file_path):
-                with open(file_path, 'r') as file:
+                with open(file_path, "r") as file:
                     return json.load(file)
             else:
                 return {}
@@ -2430,11 +2273,11 @@ def copyOpposite(*args):
 
                     opposite_attr = replace_pattern_in_attribute(attr)
 
-                    if not cmds.getAttr(f'{opposite_obj}.{opposite_attr}', lock=True):
+                    if not cmds.getAttr(f"{opposite_obj}.{opposite_attr}", lock=True):
                         try:
-                            current_value = cmds.getAttr(f'{obj}.{attr}')
+                            current_value = cmds.getAttr(f"{obj}.{attr}")
                             current_value = apply_exception(obj, attr, current_value)
-                            cmds.setAttr(f'{opposite_obj}.{opposite_attr}', current_value)
+                            cmds.setAttr(f"{opposite_obj}.{opposite_attr}", current_value)
                         except Exception as e:
                             print("Error compiling attribute:, {}".format(str(e)))
 
@@ -2444,19 +2287,16 @@ def copyOpposite(*args):
         cmds.undoInfo(closeChunk=True)
 
 
-
-
-
 # ________________________________________________________________ MIRROR _______________________________________________________________________ #
+
 
 def load_exceptions():
     mirror_exceptions_file_path = general.get_mirror_exceptions_file()
     if os.path.exists(mirror_exceptions_file_path):
-        with open(mirror_exceptions_file_path, 'r') as file:
+        with open(mirror_exceptions_file_path, "r") as file:
             return json.load(file)
     else:
         return {}
-
 
 
 def mirror(*args):
@@ -2472,7 +2312,7 @@ def mirror(*args):
         # Cargar excepciones
         def load_exceptions(file_path):
             if os.path.exists(file_path):
-                with open(file_path, 'r') as file:
+                with open(file_path, "r") as file:
                     return json.load(file)
             else:
                 return {}
@@ -2488,24 +2328,21 @@ def mirror(*args):
         def is_attribute_modifiable(control, attr):
             return cmds.getAttr(f"{control}.{attr}", settable=True)
 
-
         def find_opposite_name(name):
             # Divide el nombre en partes (namespace y nombre del control)
-            namespace, _, control_name = name.rpartition(':')
+            namespace, _, control_name = name.rpartition(":")
 
             for pattern, opposite_pattern in MIRROR_PATTERNS:
                 # Revisa si el patrón está en el nombre del control
                 if pattern in control_name:
                     # Realiza el reemplazo solo para la primera aparición del patrón
                     new_control_name = control_name.replace(pattern, opposite_pattern, 1)
-                    possible_opposite_name = f'{namespace}:{new_control_name}' if namespace else new_control_name
-                    #print(f"Intentando reemplazar {pattern} por {opposite_pattern} en {control_name}, resultado: {possible_opposite_name}")  # Impresión de depuración
+                    possible_opposite_name = f"{namespace}:{new_control_name}" if namespace else new_control_name
+                    # print(f"Intentando reemplazar {pattern} por {opposite_pattern} en {control_name}, resultado: {possible_opposite_name}")  # Impresión de depuración
                     if cmds.objExists(possible_opposite_name):
                         return possible_opposite_name
 
             return None
-
-
 
         def apply_exception(control, attr, value):
             # Obtén el nombre del control sin el namespace
@@ -2518,7 +2355,6 @@ def mirror(*args):
                 elif exception_type == "keep":
                     return value  # Mantener el mismo valor
             return value
-
 
         def swap_control_values(control1, control2):
             if not cmds.objExists(control1):
@@ -2550,7 +2386,6 @@ def mirror(*args):
                         if control_name in exceptions and attr in exceptions[control_name]:
                             exception_type = exceptions[control_name][attr]
                             if exception_type == "invert":
-
                                 cmds.setAttr(f"{control1}.{attr}", value1 * 1)
 
                         else:
@@ -2558,15 +2393,12 @@ def mirror(*args):
                             if attr in ["translateX", "rotateZ", "rotateY"]:
                                 cmds.setAttr(f"{control1}.{attr}", value1 * -1)
 
-
                 except Exception as e:
                     cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
 
-
-
         def mirror_controls():
             selected_controls = cmds.ls(selection=True)
-            
+
             if not selected_controls:
                 print("Select a control")
                 return
@@ -2596,8 +2428,7 @@ def mirror(*args):
         cmds.undoInfo(closeChunk=True)
 
 
-
-#------------------------------- mirror to opposite
+# ------------------------------- mirror to opposite
 
 
 def mirror_to_opposite(*args):
@@ -2609,7 +2440,7 @@ def mirror_to_opposite(*args):
     # Cargar excepciones
     def load_exceptions(file_path):
         if os.path.exists(file_path):
-            with open(file_path, 'r') as file:
+            with open(file_path, "r") as file:
                 return json.load(file)
         else:
             return {}
@@ -2625,23 +2456,21 @@ def mirror_to_opposite(*args):
     def is_attribute_modifiable(control, attr):
         return cmds.getAttr(f"{control}.{attr}", settable=True)
 
-
     def find_opposite_name(name):
         # Divide el nombre en partes (namespace y nombre del control)
-        namespace, _, control_name = name.rpartition(':')
+        namespace, _, control_name = name.rpartition(":")
 
         for pattern, opposite_pattern in MIRROR_PATTERNS:
             # Revisa si el patrón está en el nombre del control
             if pattern in control_name:
                 # Realiza el reemplazo solo para la primera aparición del patrón
                 new_control_name = control_name.replace(pattern, opposite_pattern, 1)
-                possible_opposite_name = f'{namespace}:{new_control_name}' if namespace else new_control_name
-                #print(f"Intentando reemplazar {pattern} por {opposite_pattern} en {control_name}, resultado: {possible_opposite_name}")  # Impresión de depuración
+                possible_opposite_name = f"{namespace}:{new_control_name}" if namespace else new_control_name
+                # print(f"Intentando reemplazar {pattern} por {opposite_pattern} en {control_name}, resultado: {possible_opposite_name}")  # Impresión de depuración
                 if cmds.objExists(possible_opposite_name):
                     return possible_opposite_name
 
         return None
-
 
     def apply_exception(control, attr, value):
         # Obtén el nombre del control sin el namespace
@@ -2689,11 +2518,9 @@ def mirror_to_opposite(*args):
             except Exception as e:
                 cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
 
-
-
     def mirror_controls():
         selected_controls = cmds.ls(selection=True)
-        
+
         if not selected_controls:
             print("Select a control")
             return
@@ -2719,19 +2546,17 @@ def mirror_to_opposite(*args):
     mirror_controls()
 
 
-
-
-
 # _____________________________________ add exception
+
 
 def add_mirror_invert_exception(*args):
     def get_selected_channels():
-        main_channel_box = mel.eval('global string $gChannelBoxName; $temp=$gChannelBoxName;')
+        main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
         selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
         return selected_channels
 
     def get_long_name(obj, short_name):
-        """ Obtiene el nombre largo del atributo a partir de su nombre corto. """
+        """Obtiene el nombre largo del atributo a partir de su nombre corto."""
         return cmds.attributeQuery(short_name, node=obj, longName=True)
 
     def add_exceptions_to_json(selected_controls, selected_channels, json_path):
@@ -2740,7 +2565,7 @@ def add_mirror_invert_exception(*args):
 
         # Leer datos existentes del archivo JSON, si existe
         if os.path.exists(json_path):
-            with open(json_path, 'r') as file:
+            with open(json_path, "r") as file:
                 exceptions = json.load(file)
         else:
             exceptions = {}
@@ -2755,7 +2580,7 @@ def add_mirror_invert_exception(*args):
                 exceptions[control_name][long_name] = "invert"
 
         # Guarda las excepciones actualizadas en el archivo JSON
-        with open(json_path, 'w') as file:
+        with open(json_path, "w") as file:
             json.dump(exceptions, file, indent=4)
 
     def create_mirror_exception():
@@ -2772,16 +2597,14 @@ def add_mirror_invert_exception(*args):
     create_mirror_exception()
 
 
-
-
 def add_mirror_keep_exception(*args):
     def get_selected_channels():
-        main_channel_box = mel.eval('global string $gChannelBoxName; $temp=$gChannelBoxName;')
+        main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
         selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
         return selected_channels
 
     def get_long_name(obj, short_name):
-        """ Obtiene el nombre largo del atributo a partir de su nombre corto. """
+        """Obtiene el nombre largo del atributo a partir de su nombre corto."""
         return cmds.attributeQuery(short_name, node=obj, longName=True)
 
     def add_exceptions_to_json(selected_controls, selected_channels, json_path):
@@ -2790,7 +2613,7 @@ def add_mirror_keep_exception(*args):
 
         # Leer datos existentes del archivo JSON, si existe
         if os.path.exists(json_path):
-            with open(json_path, 'r') as file:
+            with open(json_path, "r") as file:
                 exceptions = json.load(file)
         else:
             exceptions = {}
@@ -2805,7 +2628,7 @@ def add_mirror_keep_exception(*args):
                 exceptions[control_name][long_name] = "keep"
 
         # Guarda las excepciones actualizadas en el archivo JSON
-        with open(json_path, 'w') as file:
+        with open(json_path, "w") as file:
             json.dump(exceptions, file, indent=4)
 
     def create_mirror_exception():
@@ -2822,23 +2645,22 @@ def add_mirror_keep_exception(*args):
     create_mirror_exception()
 
 
-
 # _____________________________________ remove exception
 
 
 def remove_mirror_invert_exception(*args):
     def get_selected_channels():
-        main_channel_box = mel.eval('global string $gChannelBoxName; $temp=$gChannelBoxName;')
+        main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
         selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
         return selected_channels
 
     def get_long_name(obj, short_name):
-        """ Obtiene el nombre largo del atributo a partir de su nombre corto. """
+        """Obtiene el nombre largo del atributo a partir de su nombre corto."""
         return cmds.attributeQuery(short_name, node=obj, longName=True)
 
     def remove_exceptions_from_json(selected_controls, selected_channels, json_path):
         if os.path.exists(json_path):
-            with open(json_path, 'r') as file:
+            with open(json_path, "r") as file:
                 exceptions = json.load(file)
         else:
             exceptions = {}
@@ -2855,7 +2677,7 @@ def remove_mirror_invert_exception(*args):
                         del exceptions[control_name][long_name]
 
         # Guarda las excepciones actualizadas en el archivo JSON
-        with open(json_path, 'w') as file:
+        with open(json_path, "w") as file:
             json.dump(exceptions, file, indent=4)
 
     def remove_mirror_exceptions():
@@ -2870,7 +2692,6 @@ def remove_mirror_invert_exception(*args):
             print("Select controls and channels to remove exceptions")
 
     remove_mirror_exceptions()
-
 
 
 # ______________________________________________________COPY PASTE ANIMATION ______________________________________________________________________________#
@@ -2891,7 +2712,7 @@ def copy_animation(*args):
     def save_animation_to_json(json_file_path, animation_data):
         # Asegurar que la carpeta donde se guardará el archivo exista
         os.makedirs(os.path.dirname(json_file_path), exist_ok=True)
-        
+
         with open(json_file_path, "w") as json_file:
             json.dump(animation_data, json_file, indent=4)
 
@@ -2933,8 +2754,8 @@ def copy_animation(*args):
         cmds.warning(f"Error saving animation: {e}")
 
 
-
 # PASTE ANIMATION ___________________________________________________________________________
+
 
 def paste_animation(*args):
     def apply_animation_from_json(json_file_path, selected_objects):
@@ -2952,7 +2773,7 @@ def paste_animation(*args):
                     cmds.cutKey(control, time=(0, 10000), attribute=channel, option="keys")
 
                     # Aplicar nueva animación
-                    for frame, value in zip(anim_data['keyframes'], anim_data['values']):
+                    for frame, value in zip(anim_data["keyframes"], anim_data["values"]):
                         cmds.setKeyframe(control, time=frame, attribute=channel, value=value)
 
     # Obtener los objetos seleccionados
@@ -2961,7 +2782,6 @@ def paste_animation(*args):
     if not selected_objects:
         print("Select at least one control")
         return
-
 
     json_file_path = general.get_copy_paste_animation_file()
 
@@ -2986,12 +2806,12 @@ def paste_insert_animation(*args):
 
             if control_name in animation_data:
                 for channel, anim_data in animation_data[control_name].items():
-                    if anim_data['keyframes']:
+                    if anim_data["keyframes"]:
                         # Calcular la diferencia de tiempo
-                        time_diff = insert_time - anim_data['keyframes'][0]
+                        time_diff = insert_time - anim_data["keyframes"][0]
 
                         # Insertar animación ajustada
-                        for frame, value in zip(anim_data['keyframes'], anim_data['values']):
+                        for frame, value in zip(anim_data["keyframes"], anim_data["values"]):
                             adjusted_frame = frame + time_diff
                             cmds.setKeyframe(control, time=adjusted_frame, attribute=channel, value=value)
 
@@ -3011,33 +2831,30 @@ def paste_insert_animation(*args):
     print("Animation inserted")
 
 
-
-
 # PASTE OPPOSITE ________________________________________________________________________
+
 
 def paste_opposite_animation(*args):
 
     mirror_exceptions_file_path = general.get_mirror_exceptions_file()
 
-    ATTRIBUTES_TO_IGNORE = {"tag"}
+    # ATTRIBUTES_TO_IGNORE = {"tag"}
 
     # Cargar excepciones
     def load_exceptions(file_path):
         if os.path.exists(file_path):
-            with open(file_path, 'r') as file:
+            with open(file_path, "r") as file:
                 return json.load(file)
         else:
             return {}
 
     exceptions = load_exceptions(mirror_exceptions_file_path)
 
-
     def find_mirror_control(control_name):
         for pattern, opposite_pattern in MIRROR_PATTERNS:
             if pattern in control_name:
                 return control_name.replace(pattern, opposite_pattern, 1)
         return None
-
 
     def mirror_value(attr, value):
         if attr in exceptions.get(control_name, {}):
@@ -3047,7 +2864,6 @@ def paste_opposite_animation(*args):
         if attr in [""]:
             return -value
         return value
-
 
     json_file_path = general.get_copy_paste_animation_file()
 
@@ -3063,11 +2879,11 @@ def paste_opposite_animation(*args):
                 continue
 
             for channel, channel_data in anim_data.items():
-                mirrored_values = [mirror_value(channel, v) for v in channel_data['values']]
+                mirrored_values = [mirror_value(channel, v) for v in channel_data["values"]]
                 cmds.cutKey(full_mirror_control_name, time=(0, 10000), attribute=channel, option="keys")
-                for frame, value in zip(channel_data['keyframes'], mirrored_values):
+                for frame, value in zip(channel_data["keyframes"], mirrored_values):
                     cmds.setKeyframe(full_mirror_control_name, time=frame, attribute=channel, value=value)
-    
+
     print("Mirror Animation Restored")
 
 
@@ -3124,8 +2940,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             source_control_name = available_sources[0]
         else:
             cmds.warning(
-                "Multiple sources found in animation file. "
-                "Please specify source_control_name. Available: {}".format(", ".join(available_sources))
+                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(", ".join(available_sources))
             )
             return
     else:
@@ -3140,11 +2955,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             break
 
     if matched_source is None:
-        cmds.warning(
-            "Source control '{}' not found in animation file. Available: {}".format(
-                source_control_name, ", ".join(available_sources)
-            )
-        )
+        cmds.warning("Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources)))
         return
 
     src_channels = animation_data.get(matched_source, {})
@@ -3171,7 +2982,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
     total_keys_set = 0
     for dst in targets:
         # Para logs legibles, también mostramos el corto
-        dst_short = _short(dst)
+        # dst_short = _short(dst)
 
         for channel, anim_data in src_channels.items():
             keyframes = anim_data.get("keyframes") or []
@@ -3201,18 +3012,13 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
                     print("Failed to set key on {}.{} at {}: {}".format(dst, channel, t, e))
 
     if total_keys_set == 0:
-        cmds.warning(
-            "No keys were pasted. Check that destination controls have the needed attributes "
-            "and that the source has keyframes."
-        )
+        cmds.warning("No keys were pasted. Check that destination controls have the needed attributes and that the source has keyframes.")
     else:
         mode = "inserted at current time" if insert_at_current else "pasted"
         repl = " (replaced existing keys)" if replace else ""
-        cmds.warning("Animation {} from '{}' to {} target(s){} — {} keys set.".format(
-            mode, _short(matched_source), len(targets), repl, total_keys_set
-        ))
-
-
+        cmds.warning(
+            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(mode, _short(matched_source), len(targets), repl, total_keys_set)
+        )
 
 
 # COPY POSE ________________________________________________________________________
@@ -3242,12 +3048,12 @@ def copy_pose(*args):
 
         pose_data[control_name] = {}
         for attr in attributes:
-            if not cmds.getAttr(f"{control}.{attr}", lock=True) and \
-               cmds.getAttr(f"{control}.{attr}", keyable=True):
+            if not cmds.getAttr(f"{control}.{attr}", lock=True) and cmds.getAttr(f"{control}.{attr}", keyable=True):
                 try:
                     values = cmds.getAttr(f"{control}.{attr}")
                     pose_data[control_name][attr] = values
-                except:
+                except Exception as e:
+                    print(f"Error getting attribute {attr} from {control}: {e}")
                     pass  # Ignorar atributos que no pueden ser leídos
 
     json_file_path = general.get_copy_paste_pose_file()
@@ -3257,11 +3063,7 @@ def copy_pose(*args):
     cmds.warning("Pose saved")
 
 
-
-
-
 # PASTE POSE _____________________________________________________________
-
 
 
 def paste_pose(*args):
@@ -3274,7 +3076,7 @@ def paste_pose(*args):
             return True
         if isinstance(value, list) and all(isinstance(v, (float, int)) for v in value):
             return True
-        if isinstance(value, str) and not re.search(r'[# ]', value):
+        if isinstance(value, str) and not re.search(r"[# ]", value):
             return True
         return False
 
@@ -3318,36 +3120,10 @@ def paste_pose(*args):
     cmds.warning("Pose restored")
 
 
-
-
-
 # ______________________________________________ TANGENTS
 
 
 # MATCH CYCLE
-
-def getSelectedCurves():
-    curveNames = []
-
-    # get the current selection list
-    selectionList = om.MSelectionList()
-    om.MGlobal.getActiveSelectionList(selectionList)
-
-    # filter through the anim curves
-    listIter = om.MItSelectionList(selectionList,  om.MFn.kAnimCurve)
-    while not listIter.isDone():
-        # Retrieve current item's MObject
-        mobj = om.MObject()
-        listIter.getDependNode(mobj)
-
-        # Convert MObject to MFnDependencyNode
-        depNodeFn = om.MFnDependencyNode(mobj)
-        curveName = depNodeFn.name()
-
-        curveNames.append(curveName)
-        listIter.next()
-
-    return curveNames
 
 
 def match_curve_cycle(*args):
@@ -3355,7 +3131,7 @@ def match_curve_cycle(*args):
 
     for curve in curveNames:
         # Obtén el tiempo y valor del primer keyframe
-        firstKeyTime = cmds.findKeyframe(curve, which='first')
+        firstKeyTime = cmds.findKeyframe(curve, which="first")
         firstKeyValue = cmds.keyframe(curve, time=(firstKeyTime, firstKeyTime), query=True, valueChange=True)[0]
 
         # Obtén las propiedades de las tangentes del primer keyframe
@@ -3365,7 +3141,7 @@ def match_curve_cycle(*args):
         firstInAngle = cmds.keyTangent(curve, time=(firstKeyTime,), query=True, inAngle=True)[0]
 
         # Obtén el tiempo del último keyframe
-        lastKeyTime = cmds.findKeyframe(curve, which='last')
+        lastKeyTime = cmds.findKeyframe(curve, which="last")
 
         # Establece el valor del último keyframe igual al primer keyframe
         cmds.keyframe(curve, time=(lastKeyTime, lastKeyTime), valueChange=firstKeyValue)
@@ -3377,19 +3153,8 @@ def match_curve_cycle(*args):
         cmds.keyTangent(curve, time=(lastKeyTime,), edit=True, inAngle=firstInAngle, outAngle=firstOutAngle)
 
 
-
 # Bouncy tangets
 
-def get_graph_editor_selected_keyframes():
-    anim_curves = cmds.keyframe(q=True, selected=True, name=True)
-    if not anim_curves:
-        return []
-
-    keyframes = []
-    for curve in anim_curves:
-        keyframes += [(curve, frame) for frame in cmds.keyframe(curve, q=True, selected=True)]
-
-    return keyframes
 
 def calculateTangentAngle(curve, time1, value1, time2, value2):
     # Calcula el ángulo de la tangente entre dos keyframes
@@ -3398,6 +3163,7 @@ def calculateTangentAngle(curve, time1, value1, time2, value2):
     angle_radians = math.atan2(value2 - value1, time2 - time1)
     angle_degrees = math.degrees(angle_radians)
     return angle_degrees
+
 
 def bouncy_tangets(*args, angle_adjustment_factor=1.3):  # Ajuste de ángulo
     selectedKeyframes = get_graph_editor_selected_keyframes()
@@ -3429,8 +3195,5 @@ def bouncy_tangets(*args, angle_adjustment_factor=1.3):  # Ajuste de ángulo
         adjusted_in_angle = max(-85, min(85, inAngle * angle_adjustment_factor))
         adjusted_out_angle = max(-85, min(85, outAngle * angle_adjustment_factor))
 
-
         # Ajustar las tangentes con el factor de ajuste de ángulo
-        cmds.keyTangent(curve, time=(time,), edit=True, lock=False, absolute=True, 
-                        inAngle=adjusted_in_angle, 
-                        outAngle=adjusted_out_angle)
+        cmds.keyTangent(curve, time=(time,), edit=True, lock=False, absolute=True, inAngle=adjusted_in_angle, outAngle=adjusted_out_angle)

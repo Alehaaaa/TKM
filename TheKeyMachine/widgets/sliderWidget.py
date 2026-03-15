@@ -14,12 +14,14 @@ except ImportError:
 
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.widgets.util as util
+import TheKeyMachine.widgets.customWidgets as cw
 
 importlib.reload(ui)
 importlib.reload(util)
+importlib.reload(cw)
 
 """
-SliderWidget — COLOR-faithful, single-file recreation (no picks)
+QFlatSliderWidget — COLOR-faithful, single-file recreation (no picks)
 ===============================================================
 
 Self-contained slider that mimics the original AnimBot/COLOR style but
@@ -27,7 +29,7 @@ behaves like a tweenmachine: a centered horizontal scrub from -100..+100.
 No A/B picks. Context menu on right-click (hook point kept).
 
 What's new (same behavior, nicer structure):
-- Wheel works from anywhere inside SliderWidget (buttons/overlays/empty).
+- Wheel works from anywhere inside QFlatSliderWidget (buttons/overlays/empty).
 - Centralized wheel logic via apply_wheel_delta().
 - Clearer separation of responsibilities & comments.
 
@@ -39,11 +41,11 @@ COLOR = ui.Color()
 
 
 # --- tiny button with centered square ------------------------------------------
-class SliderButton(QPushButton):
+class SliderButton(cw.TooltipMixin, QPushButton):
     """Flat square-indicator button that emits its signed percent on click."""
 
     def __init__(self, parent: QWidget, *, percent: int, color: str, worldSpace: bool = False):
-        super().__init__(parent)
+        super(SliderButton, self).__init__(parent)
         self._percent = percent
         self._color = color
         self._box_sz = util.DPI(6) if abs(percent) == 100 else util.DPI(3)
@@ -51,11 +53,25 @@ class SliderButton(QPushButton):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         self.setStyleSheet(
-            "QPushButton { background: none; border-radius: 0; }"
-            f"QPushButton:pressed {{ background-color: {self._color}; border-radius: 0; }}"
+            f"QPushButton {{ background: none; border-radius: 0; }}QPushButton:pressed {{ background-color: {self._color}; border-radius: 0; }}"
         )
 
         self._worldSpace = worldSpace if abs(percent) == 100 else False
+        self._hover = False
+
+        self._tooltip_title = ""
+        self._tooltip_description = ""
+        # Initial tooltip
+        self._update_tooltip()
+
+    def _update_tooltip(self):
+        title = self._tooltip_title or "Value"
+        self.set_tooltip_data(text=f"{title}: {self._percent}%", description=self._tooltip_description)
+
+    def set_tooltip_info(self, title: str, description: str = ""):
+        self._tooltip_title = title
+        self._tooltip_description = description
+        self._update_tooltip()
 
     @property
     def percent(self) -> int:
@@ -64,6 +80,16 @@ class SliderButton(QPushButton):
     def setWorldSpace(self, enabled: int):
         self._worldSpace = enabled
         self.update()
+
+    def enterEvent(self, e):
+        self._hover = True
+        self.update()
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hover = False
+        self.update()
+        super().leaveEvent(e)
 
     def paintEvent(self, e):
         super().paintEvent(e)
@@ -74,43 +100,68 @@ class SliderButton(QPushButton):
         x = (w - s) // 2
         y = (h - s) // 2
 
-        if self._worldSpace:
-            cx, cy = w // 2, h // 2
-            r = int(min(w, h) * 0.275)  # smaller globe
-
-            # Fill the circle with self._color (background)
-            p.setPen(Qt.NoPen)
-            p.setBrush(QColor(self._color))
-            p.drawEllipse(QRect(cx - r, cy - r, 2 * r, 2 * r))
-
-            # Black linework on top
-            pen = QPen(QColor(COLOR.color.darkGray))
-            pen.setWidthF(0.85)
-            p.setPen(pen)
-            p.setBrush(Qt.NoBrush)
-
-            # Outer circle outline
-            p.drawEllipse(QRect(cx - r, cy - r, 2 * r, 2 * r))
-
-            # Equator
-            p.drawLine(cx - r + 1, cy, cx + r - 1, cy)
-
-            # Curved meridians (left/right)
-            mer_w = int(2 * r * 0.45)  # tweak curvature here (0.5–0.65 looks good)
-            mer_rect = QRect(cx - mer_w // 2, cy - r, mer_w, 2 * r)
-            p.drawArc(mer_rect, 90 * 14, 180 * 16)  # left arc
-            p.drawArc(mer_rect, 90 * 14, -180 * 16)  # right arc
+        base_color = QColor(self._color)
+        if getattr(self, "_hover", False):
+            main_color = QColor(
+                min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
+            )
+            glow_color = QColor(255, 255, 255, 40)
+            # Create a list of 8 offsets for silhouette glow + (0, 0) for main draw
+            offsets = [(-1, -1), (1, 1), (-1, 1), (1, -1), (0, -1), (0, 1), (-1, 0), (1, 0), (0, 0)]
         else:
-            # Default: small filled square
-            p.setPen(QPen(Qt.black, 0.5))
-            p.setBrush(QColor(self._color))
-            p.drawRect(QRect(x, y, s, s))
+            main_color = base_color
+            glow_color = Qt.transparent
+            offsets = [(0, 0)]
+
+        for dx, dy in offsets:
+            is_glow = dx != 0 or dy != 0
+
+            p.save()
+            p.translate(dx, dy)
+
+            if self._worldSpace:
+                cx, cy = w // 2, h // 2
+                r = int(min(w, h) * 0.275)  # smaller globe
+
+                p.setPen(Qt.NoPen)
+                p.setBrush(glow_color if is_glow else main_color)
+                p.drawEllipse(QRect(cx - r, cy - r, 2 * r, 2 * r))
+
+                if not is_glow:
+                    # Black linework on top
+                    pen = QPen(QColor(COLOR.color.darkGray))
+                    pen.setWidthF(0.85)
+                    p.setPen(pen)
+                    p.setBrush(Qt.NoBrush)
+
+                    # Outer circle outline
+                    p.drawEllipse(QRect(cx - r, cy - r, 2 * r, 2 * r))
+
+                    # Equator
+                    p.drawLine(cx - r + 1, cy, cx + r - 1, cy)
+
+                    # Curved meridians (left/right)
+                    mer_w = int(2 * r * 0.45)  # tweak curvature here (0.5–0.65 looks good)
+                    mer_rect = QRect(cx - mer_w // 2, cy - r, mer_w, 2 * r)
+                    p.drawArc(mer_rect, 90 * 14, 180 * 16)  # left arc
+                    p.drawArc(mer_rect, 90 * 14, -180 * 16)  # right arc
+            else:
+                # Default: small filled square
+                if is_glow:
+                    p.setPen(Qt.NoPen)
+                else:
+                    p.setPen(QPen(Qt.black, 0.5))
+
+                p.setBrush(glow_color if is_glow else main_color)
+                p.drawRect(QRect(x, y, s, s))
+
+            p.restore()
 
         p.end()
 
 
 # --- core slider (custom painting & handle-only interaction) --------------------
-class HandleOnlySlider(QSlider):
+class SliderHandle(cw.TooltipMixin, QSlider):
     """Horizontal slider that only drags when grabbing the handle."""
 
     started = Signal()
@@ -137,6 +188,9 @@ class HandleOnlySlider(QSlider):
         self._padding_lr = util.DPI(8)
         self._pressOffset: Optional[int | bool] = None  # bool True = "wheel active"
         self._hover = False
+        self._handle_hover = False
+        self._tooltip_title = ""
+        self._tooltip_description = ""
 
         # wheel-reset timer (end interaction after a pause)
         self._wheel_reset_timer = QTimer(self)
@@ -148,19 +202,39 @@ class HandleOnlySlider(QSlider):
         self._value_font = QFont()
         self._value_font.setPointSize(util.DPI(14))
         self._text_font = QFont()
-        self._text_font.setPointSize(util.DPI(9))
+        self._text_font.setPointSize(util.DPI(8.5))
 
         # size
         self.setFixedWidth(util.DPI(200))
         self.setFixedHeight(util.DPI(24))
 
-        # self.setToolTip(f"Slider for {text}")
-        # self.setStatusTip(f"Slider for {text}")
-
         self._apply_stylesheet(thick=False)
 
-        # sync moved on any value change
-        self.valueChanged.connect(lambda _v: self.moved.emit(self.percent()))
+        self.valueChanged.connect(self._update_self_tooltip)
+        # self._update_self_tooltip() # will be called by QFlatSliderWidget initial sync
+
+    def set_tooltip_info(self, title: str, description: str = ""):
+        self._tooltip_title = title
+        self._tooltip_description = description
+        self._update_self_tooltip()
+
+    def enterEvent(self, e):
+        self._hover = True
+        self.update()
+        # super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hover = False
+        self._handle_hover = False
+        from TheKeyMachine.tooltips import QFlatTooltipManager
+
+        QFlatTooltipManager.hide()
+        self.update()
+        super().leaveEvent(e)
+
+    def _update_self_tooltip(self, _v=None):
+        title = self._tooltip_title or self._text
+        self.set_tooltip_data(text=title, description=self._tooltip_description)
 
     # --- public helpers ---------------------------------------------------------
     def handle_size(self) -> int:
@@ -281,6 +355,24 @@ QSlider::handle:horizontal {{
         super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e: QMouseEvent):
+        # Update handle hover state
+        pos = e.pos()
+        hrect = self._handle_hit_rect()
+        is_handle_hover = hrect.contains(pos)
+
+        was_handle_hover = getattr(self, "_handle_hover", False)
+        self._handle_hover = is_handle_hover
+
+        if is_handle_hover != was_handle_hover and not self._is_active():
+            self.update()
+            from TheKeyMachine.tooltips import QFlatTooltipManager
+
+            if is_handle_hover:
+                if hasattr(self, "_tooltip_data") and (self._tooltip_data.get("text") or self._tooltip_data.get("description")):
+                    QFlatTooltipManager.delayed_show(anchor_widget=self, **self._tooltip_data)
+            else:
+                QFlatTooltipManager.hide()
+
         if self.isSliderDown() and self._pressOffset is not None and self._pressOffset is not True:
             track_left = self._padding_lr
             track_w = self.width() - 2 * self._padding_lr - self._handle
@@ -346,9 +438,24 @@ QSlider::handle:horizontal {{
         p.setBrush(Qt.NoBrush)
         p.drawPath(path)
 
+        base_color = QColor(self._color)
+        if getattr(self, "_handle_hover", False):
+            main_color = QColor(
+                min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
+            )
+            glow_color = QColor(255, 255, 255, 40)
+            # draw silhouette glow by shifting path
+            p.setBrush(glow_color)
+            p.setPen(Qt.NoPen)
+            for dx, dy in [(-1, -1), (1, 1), (-1, 1), (1, -1), (0, -1), (0, 1), (-1, 0), (1, 0)]:
+                glow_path = path.translated(dx, dy)
+                p.drawPath(glow_path)
+        else:
+            main_color = base_color
+
         # 2. Draw fill (drawn ON TOP of the outline, covering the inner half of the stroke)
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(self._color))
+        p.setBrush(main_color)
         p.drawPath(path)
 
         if not self._pressOffset:
@@ -373,7 +480,7 @@ QSlider::handle:horizontal {{
 
 
 # --- public composite widget ----------------------------------------------------
-class SliderWidget(QWidget):
+class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     """
     Public composite widget.
 
@@ -399,6 +506,8 @@ class SliderWidget(QWidget):
         dropCommand=None,
         worldSpace=None,
         p=None,
+        tooltipTitle: str = "",
+        tooltipDescription: str = "",
     ):
         super().__init__(None)
         if name:
@@ -407,13 +516,15 @@ class SliderWidget(QWidget):
         self._scale = 1000  # internal units per 1%
         self._color = color
         self._worldSpace = worldSpace
+        self._tooltipTitle = tooltipTitle
+        self._tooltipDescription = tooltipDescription
 
         # base layout: only the slider; buttons live in overlay containers
         base = QHBoxLayout(self)
         base.setContentsMargins(0, 0, 0, 0)
         base.setSpacing(0)
 
-        self._slider = HandleOnlySlider(self, value=int(value * self._scale), text=text, color=color)
+        self._slider = SliderHandle(self, value=int(value * self._scale), text=text, color=color)
         self._slider.setRange(int(min * self._scale), int(max * self._scale))
         self._slider.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         base.addWidget(self._slider, 0, Qt.AlignCenter)
@@ -463,7 +574,12 @@ class SliderWidget(QWidget):
         if dropCommand:
             self.dragFinished.connect(dropCommand)
 
-        # initial geometry sync
+        # initial geometry & tooltip sync
+        if tooltipTitle:
+            self.setTooltipInfo(tooltipTitle, tooltipDescription)
+        else:
+            self._slider._update_self_tooltip()
+
         self._update_buttons()
 
         # add to provided layout, if any
@@ -471,9 +587,9 @@ class SliderWidget(QWidget):
             try:
                 p.addWidget(self)
             except Exception as e:
-                print("SliderWidget: could not add to provided layout:", e)
+                print("QFlatSliderWidget: could not add to provided layout:", e)
 
-        # Nice-to-have: accept wheel focus from anywhere in the widget
+        # Accept wheel focus from anywhere in the widget
         self.setFocusPolicy(Qt.StrongFocus)
 
     # --- public API -------------------------------------------------------------
@@ -483,6 +599,15 @@ class SliderWidget(QWidget):
     def setColor(self, color: str):
         self._slider._color = color
         self._slider._apply_stylesheet(thick=False)
+
+    def setTooltipInfo(self, title: str, description: str = ""):
+        self._tooltipTitle = title
+        self._tooltipDescription = description
+        self._slider.set_tooltip_info(title, description)
+        for b in self._leftButtons:
+            b.set_tooltip_info(title, description)
+        for b in self._rightButtons:
+            b.set_tooltip_info(title, description)
 
     def setWorldSpace(self, enabled: int):
         if enabled == self._worldSpace:
@@ -557,9 +682,8 @@ class SliderWidget(QWidget):
 
         self._update_buttons()
 
-    # --- parent-wide wheel handling --------------------------------------------
     def wheelEvent(self, e: QWheelEvent):
-        """Make the wheel change the slider even if the cursor is over overlays/buttons."""
+        """Make the wheel change the slider"""
         delta = e.angleDelta().x() + e.angleDelta().y()
         self._slider.apply_wheel_delta(delta)
         e.accept()
@@ -594,28 +718,31 @@ class SliderWidget(QWidget):
             flashes (int): Number of flashes (default: 2).
             interval (int): Duration in ms for each on/off toggle (default: 120).
         """
-        # Crear overlay blanco sobre toda la superficie del widget
         overlay = QWidget(self)
         overlay.setStyleSheet("background-color: white;")
         overlay.setGeometry(self.rect())
         overlay.raise_()
 
-        # Estado interno de flashes
-        state = {"count": 0}
+        count = 0
 
         def toggle():
-            if state["count"] >= flashes * 2:
+            nonlocal count
+            if count >= flashes * 2:
                 overlay.deleteLater()
                 return
-            overlay.setVisible(state["count"] % 2 == 0)
-            state["count"] += 1
+            overlay.setVisible(count % 2 == 0)
+            count += 1
             QTimer.singleShot(interval, toggle)
 
-        # Inicia primer toggle
+        # Start first toggle
         toggle()
 
     # --- signal plumbing --------------------------------------------------------
     def _on_drag_started(self):
+        from TheKeyMachine.tooltips import QFlatTooltipManager
+
+        QFlatTooltipManager.hide()
+
         self.dragStarted.emit()
         self._leftOverlay.hide()
         self._rightOverlay.hide()
@@ -629,5 +756,4 @@ class SliderWidget(QWidget):
         self._rightOverlay.show()
 
     def _on_button_clicked(self, btn: SliderButton):
-        # keep existing behavior: emit valueChanged with the button's percent
         self.valueChanged.emit(float(btn.percent))

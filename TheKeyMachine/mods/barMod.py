@@ -1,39 +1,34 @@
+"""
+
+TheKeyMachine - Animation Toolset for Maya Animators
+
+
+This file is part of TheKeyMachine, an open source software for Autodesk Maya licensed under the GNU General Public License v3.0 (GPL-3.0).
+You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.
+By using this code, you agree to keep it open source and share any modifications.
+This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
+
+thekeymachine.xyz / x@thekeymachine.xyz
+
+Developed by: Rodrigo Torres / rodritorres.com
+Modified by: Alehaaaa / alehaaaa.github.io
 
 
 
-'''
-
-    TheKeyMachine - Animation Toolset for Maya Animators                                           
-                                                                                                                                              
-                                                                                                                                              
-    This file is part of TheKeyMachine, an open source software for Autodesk Maya licensed under the GNU General Public License v3.0 (GPL-3.0).                                           
-    You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.                                              
-    By using this code, you agree to keep it open source and share any modifications.                                                          
-    This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
-
-    thekeymachine.xyz / x@thekeymachine.xyz                                                                                                                                        
-                                                                                                                                              
-    Developed by: Rodrigo Torres / rodritorres.com                                                                                             
-    Modified by: Alehaaaa / alehaaaa.github.io                                                                                                 
-                                                                                                                                             
-
-
-'''
-
+"""
 
 import maya.cmds as cmds
 from maya import OpenMaya as om
-import maya.api.OpenMaya as om
 import maya.OpenMayaUI as mui
 import maya.mel as mel
 
 try:
-    from PySide2 import QtCore, QtWidgets, QtGui
+    from PySide2 import QtCore, QtWidgets
     from PySide2.QtWidgets import QApplication, QDesktopWidget
     from shiboken2 import wrapInstance
 except ImportError:
     from shiboken6 import wrapInstance
-    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6 import QtWidgets, QtCore
     from PySide6.QtWidgets import *
     from PySide6.QtGui import *
     from PySide6.QtCore import *
@@ -43,7 +38,6 @@ import json
 import os
 import sys
 import math
-import platform
 import importlib
 import functools
 
@@ -58,8 +52,6 @@ import TheKeyMachine.mods.generalMod as general
 python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 
 # -------------------------------------------------------------------------
-
-
 
 
 global down_one_level
@@ -77,85 +69,75 @@ def get_screen_resolution():
         app = QApplication([])
 
     try:
-        # PySide2
-        from PySide2.QtGui import QDesktopWidget
-        desktop = QDesktopWidget()
-        screen_rect = desktop.screenGeometry()
-    except ImportError:
         # PySide6
         screen = app.primaryScreen()
         screen_rect = screen.geometry()
+    except Exception:
+        # PySide2
+        desktop = QDesktopWidget()
+        screen_rect = desktop.screenGeometry()
 
     screen_width = screen_rect.width()
     screen_height = screen_rect.height()
-    
-    return screen_width, screen_height
 
+    return screen_width, screen_height
 
 
 def set_temp_timeslider_colors():
     global python_version, original_bg_color, original_fg_color, original_key_color
 
     # fix para maya 2024
-    if python_version == '310':
-    
+    if python_version == "310":
         # Store the original colors
-        original_bg_color = cmds.displayRGBColor('timeControlBackground', query=True)
-        original_key_color = cmds.displayRGBColor('timeControlKey', query=True)
+        original_bg_color = cmds.displayRGBColor("timeControlBackground", query=True)
+        original_key_color = cmds.displayRGBColor("timeControlKey", query=True)
 
         # Set temporary colors
-        cmds.displayRGBColor('timeControlBackground', 0.20530900359153748, 0.2126081883907318, 0.22100000083446503)
-        cmds.displayRGBColor('timeControlKey', 0.31883829832077026, 0.3369826376438141, 0.3578431308269501)
+        cmds.displayRGBColor("timeControlBackground", 0.20530900359153748, 0.2126081883907318, 0.22100000083446503)
+        cmds.displayRGBColor("timeControlKey", 0.31883829832077026, 0.3369826376438141, 0.3578431308269501)
         cmds.refresh(f=True)
     else:
-        
         # Store the original colors
-        original_bg_color = cmds.displayRGBColor('timeSliderBackground', query=True)
-        original_fg_color = cmds.displayRGBColor('timeSliderForeground', query=True)
-        original_key_color = cmds.displayRGBColor('timeSliderKey', query=True)
+        original_bg_color = cmds.displayRGBColor("timeSliderBackground", query=True)
+        original_fg_color = cmds.displayRGBColor("timeSliderForeground", query=True)
+        original_key_color = cmds.displayRGBColor("timeSliderKey", query=True)
 
         # Set temporary colors
-        cmds.displayRGBColor('timeSliderBackground', 0.20530900359153748, 0.2126081883907318, 0.22100000083446503)
-        cmds.displayRGBColor('timeSliderForeground', 0.13725490868091583, 0.13725490868091583, 0.13725490868091583)
-        cmds.displayRGBColor('timeSliderKey', 0.31883829832077026, 0.3369826376438141, 0.3578431308269501)
+        cmds.displayRGBColor("timeSliderBackground", 0.20530900359153748, 0.2126081883907318, 0.22100000083446503)
+        cmds.displayRGBColor("timeSliderForeground", 0.13725490868091583, 0.13725490868091583, 0.13725490868091583)
+        cmds.displayRGBColor("timeSliderKey", 0.31883829832077026, 0.3369826376438141, 0.3578431308269501)
         cmds.refresh(f=True)
 
 
 def restore_timeslider_colors():
     global python_version, original_bg_color, original_fg_color, original_key_color
 
-    #fix para maya 2024
-    if python_version == '310':
-        
+    # fix para maya 2024
+    if python_version == "310":
         if original_bg_color:
             # Restore original colors
-            cmds.displayRGBColor('timeControlBackground', original_bg_color[0], original_bg_color[1], original_bg_color[2])
-            cmds.displayRGBColor('timeControlKey', original_key_color[0], original_key_color[1], original_key_color[2])
+            cmds.displayRGBColor("timeControlBackground", original_bg_color[0], original_bg_color[1], original_bg_color[2])
+            cmds.displayRGBColor("timeControlKey", original_key_color[0], original_key_color[1], original_key_color[2])
 
     else:
-        
         if original_bg_color and original_fg_color:
             # Restore original colors
-            cmds.displayRGBColor('timeSliderBackground', original_bg_color[0], original_bg_color[1], original_bg_color[2])
-            cmds.displayRGBColor('timeSliderForeground', original_fg_color[0], original_fg_color[1], original_fg_color[2])
-            cmds.displayRGBColor('timeSliderKey', original_key_color[0], original_key_color[1], original_key_color[2])
-
-
+            cmds.displayRGBColor("timeSliderBackground", original_bg_color[0], original_bg_color[1], original_bg_color[2])
+            cmds.displayRGBColor("timeSliderForeground", original_fg_color[0], original_fg_color[1], original_fg_color[2])
+            cmds.displayRGBColor("timeSliderKey", original_key_color[0], original_key_color[1], original_key_color[2])
 
 
 def openCustomGraph():
 
     import TheKeyMachine.core.customGraph
+
     importlib.reload(TheKeyMachine.core.customGraph)
     TheKeyMachine.core.customGraph.openCustomGraph()
 
 
-
-
-
 def mod_delete_animation(*args):
     # Get the current state of the modifiers
-    mods = mel.eval('getModifiers')
+    mods = mel.eval("getModifiers")
     shift_pressed = bool(mods % 2)  # Check if Shift is pressed
 
     if shift_pressed:
@@ -164,29 +146,27 @@ def mod_delete_animation(*args):
         delete_animation()
 
 
-
 def delete_time_slider_animation():
-    
+
     # Obtener selección actual
     selection = cmds.ls(selection=True)
-    
+
     # Verificar si hay algo seleccionado
     if not selection:
         print("Select at least one object")
         return
 
-    mel.eval('timeSliderClearKey;')
-
+    mel.eval("timeSliderClearKey;")
 
 
 def delete_animation():
 
     # Obtener canales seleccionados
     selected_channels = keyTools.get_selected_channels()
-    
+
     # Obtener selección actual
     selection = cmds.ls(selection=True)
-    
+
     # Verificar si hay algo seleccionado
     if not selection:
         print("Select at least one object")
@@ -203,22 +183,19 @@ def delete_animation():
             cmds.cutKey(obj, clear=True)
 
 
-
-
 def createLocator():
     selection = cmds.ls(selection=True)
     if selection:
-        
         # Verificar si el grupo 'TheKeyMachine' existe, si no, crearlo
-        if not cmds.objExists('TheKeyMachine'):
+        if not cmds.objExists("TheKeyMachine"):
             general.create_TheKeyMachine_node()
-        
+
         # Verificar si el grupo 'temp_locators' existe, si no, crearlo
-        if not cmds.objExists('temp_locators'):
-            cmds.group(em=True, name='temp_locators')
+        if not cmds.objExists("temp_locators"):
+            cmds.group(em=True, name="temp_locators")
             # Hacer 'temp_locators' hijo de 'TheKeyMachine'
-            cmds.parent('temp_locators', 'TheKeyMachine')
-        
+            cmds.parent("temp_locators", "TheKeyMachine")
+
         for i, obj in enumerate(selection):
             locator = cmds.spaceLocator()[0]
             cmds.matchTransform(locator, obj)
@@ -230,35 +207,35 @@ def createLocator():
             cmds.setAttr(locator + ".localScaleX", 5)
             cmds.setAttr(locator + ".localScaleY", 5)
 
-            locator = cmds.rename(locator, f'tkm_temp_locator_{i}')  # Renombrar el locator con un índice único y almacenar el nuevo nombre
-            
+            locator = cmds.rename(locator, f"tkm_temp_locator_{i}")  # Renombrar el locator con un índice único y almacenar el nuevo nombre
+
             # Añadir el locator al grupo 'temp_locators'
-            cmds.parent(locator, 'temp_locators')
+            cmds.parent(locator, "temp_locators")
         cmds.select(selection)
 
 
 def selectTempLocators(*args):
     # Buscar en la escena los objetos con el patrón 'tkm_temp_locator_*'
-    potential_locators = cmds.ls('tkm_temp_locator_*')
-    
+    potential_locators = cmds.ls("tkm_temp_locator_*")
+
     # Filtrar la lista para solo obtener objetos que terminen con un número
-    locators = [loc for loc in potential_locators if loc.split('_')[-1].isdigit()]
+    locators = [loc for loc in potential_locators if loc.split("_")[-1].isdigit()]
 
     if locators:
         cmds.select(locators)
 
 
 def deleteTempLocators(*args):
-    if cmds.objExists('temp_locators'):
+    if cmds.objExists("temp_locators"):
         # Lista todos los hijos del grupo 'temp_locators' y los borra
-        potential_locators = cmds.ls('tkm_temp_locator_*')
-        locators = [loc for loc in potential_locators if loc.split('_')[-1].isdigit()]
+        potential_locators = cmds.ls("tkm_temp_locator_*")
+        locators = [loc for loc in potential_locators if loc.split("_")[-1].isdigit()]
         if locators:
             cmds.delete(locators)
 
 
+# ___________________________ Set Tangets _______________________________________
 
-#___________________________ Set Tangets _______________________________________
 
 def getSelectedCurves():
     curveNames = []
@@ -268,7 +245,7 @@ def getSelectedCurves():
     om.MGlobal.getActiveSelectionList(selectionList)
 
     # filter through the anim curves
-    listIter = om.MItSelectionList(selectionList,  om.MFn.kAnimCurve)
+    listIter = om.MItSelectionList(selectionList, om.MFn.kAnimCurve)
     while not listIter.isDone():
         # Retrieve current item's MObject
         mobj = om.MObject()
@@ -283,6 +260,7 @@ def getSelectedCurves():
 
     return curveNames
 
+
 def get_graph_editor_selected_keyframes():
     anim_curves = cmds.keyframe(q=True, selected=True, name=True)
     if not anim_curves:
@@ -295,9 +273,8 @@ def get_graph_editor_selected_keyframes():
     return keyframes
 
 
-
 def setTangent(tangent_type):
-    
+
     selectedKeyframes = get_graph_editor_selected_keyframes()
 
     if selectedKeyframes:
@@ -305,9 +282,8 @@ def setTangent(tangent_type):
             cmds.keyTangent(curve, time=(frame,), itt=tangent_type, ott=tangent_type)
     else:
         # Si no hay curvas seleccionadas, ejecutar el comando MEL
-        mel_command = 'timeSliderSetTangent {}'.format(tangent_type)
+        mel_command = "timeSliderSetTangent {}".format(tangent_type)
         mel.eval(mel_command)
-
 
 
 def align_selected_objects(*args, pos=True, rot=True, scl=False):
@@ -334,8 +310,8 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False):
         time_range = keyTools.get_time_range_selected()
 
         # Crear una barra de progreso
-        gMainProgressBar = mel.eval('$tmp = $gMainProgressBar')
-        cmds.progressBar(gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status='Alineando objetos...', maxValue=100)
+        gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
+        cmds.progressBar(gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status="Alineando objetos...", maxValue=100)
 
         try:
             # Si hay un rango de tiempo seleccionado y no es igual al tiempo actual
@@ -372,57 +348,54 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False):
         cmds.refresh(suspend=False)
 
 
+def align_range(*args):
+    align_selected_objects(*args)
 
 
-            
+# ___________________________ iso Rig _____________________________________
 
-#___________________________ iso Rig _____________________________________
 
 def toggle_down_one_level(value):
     global down_one_level_var
     down_one_level_var = value
 
 
-
-
 def get_root_node(node, down_one_level=False):
     previous_node = None
 
     # Obtén el nombre completo del nodo para evitar conflictos de nombres duplicados
-    node = cmds.ls(node, long=True)[0]  
-    
+    node = cmds.ls(node, long=True)[0]
+
     while True:
         parents = cmds.listRelatives(node, parent=True, fullPath=True)
-        
+
         if not parents:
             # Si down_one_level está activado, queremos el nodo anterior al nodo raíz
             # Si estamos en el nodo raíz y down_one_level está activado, devolveremos el previous_node
             # Si down_one_level no está activado, simplemente devolveremos el nodo actual
-            return previous_node if down_one_level else node  
-        
+            return previous_node if down_one_level else node
+
         # Guardar el nodo actual antes de movernos al siguiente nodo padre
         previous_node = node
-        
+
         # Actualizar el nodo actual al nodo padre para la próxima iteración
         node = parents[0]
-
-
 
 
 def isolate_master():
     global down_one_level_var
     down_one_level = down_one_level_var
 
-    down_one_level = cmds.menuItem('down_level_checkbox', query=True, checkBox=True)
-    
+    down_one_level = cmds.menuItem("down_level_checkbox", query=True, checkBox=True)
+
     # Guardar la selección actual
     current_selection = cmds.ls(selection=True)
-    
+
     # Obtener los objetos actualmente seleccionados
     selected_objects = cmds.ls(selection=True)
     currentPanel = cmds.getPanel(wf=True)
     currentState = cmds.isolateSelect(currentPanel, query=True, state=True)
-    
+
     # Si no hay objetos seleccionados y el estado de aislamiento es 0, salimos de la función.
     if not selected_objects and currentState == 0:
         print("Select at least one object")
@@ -436,75 +409,133 @@ def isolate_master():
         for selected_object in selected_objects:
             root_object = get_root_node(selected_object, down_one_level=down_one_level)
             cmds.select(root_object, add=True)  # Añadir el objeto raíz a la selección
-        
 
         # Fix para activar/desactivar el icono isolate que en maya 2024 esta en otro layout
 
         maya_version = cmds.about(version=True)
 
-
         if currentState == 0:
             cmds.isolateSelect(currentPanel, state=1)
             cmds.isolateSelect(currentPanel, addSelected=True)
 
-
             # Fix para activar y desactivar el icono de maya del isolate
             if currentPanel == "modelPanel1":
                 if maya_version == "2024" or maya_version == "2025":
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn", edit=True, value=True)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn",
+                        edit=True,
+                        value=True,
+                    )
                 else:
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout25|IsolateSelectedBtn", edit=True, value=True)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout25|IsolateSelectedBtn",
+                        edit=True,
+                        value=True,
+                    )
 
             elif currentPanel == "modelPanel2":
                 if maya_version == "2024" or maya_version == "2025":
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn", edit=True, value=True)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn",
+                        edit=True,
+                        value=True,
+                    )
                 else:
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout32|IsolateSelectedBtn", edit=True, value=True)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout32|IsolateSelectedBtn",
+                        edit=True,
+                        value=True,
+                    )
 
             elif currentPanel == "modelPanel3":
                 if maya_version == "2024" or maya_version == "2025":
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn", edit=True, value=True)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn",
+                        edit=True,
+                        value=True,
+                    )
                 else:
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout39|IsolateSelectedBtn", edit=True, value=True)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout39|IsolateSelectedBtn",
+                        edit=True,
+                        value=True,
+                    )
 
             elif currentPanel == "modelPanel4":
                 if maya_version == "2024" or maya_version == "2025":
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn", edit=True, value=True)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn",
+                        edit=True,
+                        value=True,
+                    )
                 else:
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout46|IsolateSelectedBtn", edit=True, value=True)
-
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout46|IsolateSelectedBtn",
+                        edit=True,
+                        value=True,
+                    )
 
         else:
             cmds.isolateSelect(currentPanel, state=0)
             cmds.isolateSelect(currentPanel, removeSelected=True)
 
-
-             # Fix para activar y desactivar el icono de maya del isolate
+            # Fix para activar y desactivar el icono de maya del isolate
             if currentPanel == "modelPanel1":
                 if maya_version == "2024" or maya_version == "2025":
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn", edit=True, value=False)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn",
+                        edit=True,
+                        value=False,
+                    )
                 else:
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout25|IsolateSelectedBtn", edit=True, value=False)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout25|IsolateSelectedBtn",
+                        edit=True,
+                        value=False,
+                    )
 
             elif currentPanel == "modelPanel2":
                 if maya_version == "2024" or maya_version == "2025":
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn", edit=True, value=False)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn",
+                        edit=True,
+                        value=False,
+                    )
                 else:
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout32|IsolateSelectedBtn", edit=True, value=False)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout32|IsolateSelectedBtn",
+                        edit=True,
+                        value=False,
+                    )
 
             elif currentPanel == "modelPanel3":
                 if maya_version == "2024" or maya_version == "2025":
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn", edit=True, value=False)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn",
+                        edit=True,
+                        value=False,
+                    )
                 else:
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout39|IsolateSelectedBtn", edit=True, value=False)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout39|IsolateSelectedBtn",
+                        edit=True,
+                        value=False,
+                    )
 
             elif currentPanel == "modelPanel4":
                 if maya_version == "2024" or maya_version == "2025":
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn", edit=True, value=False)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn",
+                        edit=True,
+                        value=False,
+                    )
                 else:
-                    cmds.iconTextCheckBox("MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout46|IsolateSelectedBtn", edit=True, value=False)
+                    cmds.iconTextCheckBox(
+                        "MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout46|IsolateSelectedBtn",
+                        edit=True,
+                        value=False,
+                    )
 
-                
     # Restaurar la selección previa
     if current_selection:
         cmds.select(current_selection)
@@ -512,14 +543,8 @@ def isolate_master():
         cmds.select(clear=True)  # Borra la selección si no había nada seleccionado previamente
 
 
+# ____________________________ selector jerarquia
 
-
-
-
-
-
-
-#____________________________ selector jerarquia
 
 def select_curves_with_ctrl(obj):
     # Obtén los descendientes del objeto
@@ -540,6 +565,7 @@ def select_curves_with_ctrl(obj):
                 print(f"Error selecting: {e}")
                 continue
 
+
 def selectHierarchy():
     # Obtener la selección actual
     selection = cmds.ls(selection=True)
@@ -551,20 +577,10 @@ def selectHierarchy():
         print("Select at least one object")
 
 
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------  TEMP PIVOT ------------------------------------------------------#
 
 
 def create_temp_pivot(use_saved_position=False, *args):
-
 
     attribute_callback_id = None
     time_callback_id = None
@@ -577,35 +593,33 @@ def create_temp_pivot(use_saved_position=False, *args):
         return
 
     if cmds.objExists("tkm_temp_pivot"):
-
         cmds.warning("Temp pivot already exists. Please unselect the current object to remove it")
         return
 
     # Variables globales
     temp_pivot_relative_data = {}
 
-
     def get_temp_pivot_relation():
         cmds.undoInfo(openChunk=True)
 
         matrix_file_path = general.get_temp_pivot_data_file()
-        
+
         seleccion = cmds.ls(selection=True)
-        
+
         if not seleccion:
             print("Select at least one obj")
             return
-        
+
         general.create_TheKeyMachine_node()
 
         # 1. Crear el nodo transform
         cmds.undoInfo(openChunk=True)
-        temp_pivot_obj = cmds.createNode('transform', name="tkm_temp_pivot")
+        temp_pivot_obj = cmds.createNode("transform", name="tkm_temp_pivot")
         cmds.parent("tkm_temp_pivot", "TheKeyMachine")
-        
+
         if use_saved_position:
             if os.path.exists(matrix_file_path):
-                with open(matrix_file_path, 'r') as f:
+                with open(matrix_file_path, "r") as f:
                     data = json.load(f)
                 saved_position = data.get("tkm_temp_pivot_position", [0, 0, 0])
                 saved_rotation = data.get("tkm_temp_pivot_rotation", [0, 0, 0])
@@ -613,7 +627,7 @@ def create_temp_pivot(use_saved_position=False, *args):
                 cmds.setAttr(f"{temp_pivot_obj}.translateX", saved_position[0])
                 cmds.setAttr(f"{temp_pivot_obj}.translateY", saved_position[1])
                 cmds.setAttr(f"{temp_pivot_obj}.translateZ", saved_position[2])
-                
+
                 cmds.setAttr(f"{temp_pivot_obj}.rotateX", saved_rotation[0])
                 cmds.setAttr(f"{temp_pivot_obj}.rotateY", saved_rotation[1])
                 cmds.setAttr(f"{temp_pivot_obj}.rotateZ", saved_rotation[2])
@@ -627,48 +641,45 @@ def create_temp_pivot(use_saved_position=False, *args):
                 total_x += pos[0]
                 total_y += pos[1]
                 total_z += pos[2]
-            
+
             num_objs = len(seleccion)
             mid_x = total_x / num_objs
             mid_y = total_y / num_objs
             mid_z = total_z / num_objs
-            
+
             # Establecer la posición de tkm_temp_pivot en el punto medio
             cmds.setAttr(f"{temp_pivot_obj}.translateX", mid_x)
             cmds.setAttr(f"{temp_pivot_obj}.translateY", mid_y)
             cmds.setAttr(f"{temp_pivot_obj}.translateZ", mid_z)
-        
+
         follow_objs = seleccion  # Todos los objetos seleccionados serán follow_objs
         save_dict = {"temp_pivot_obj": temp_pivot_obj, "follow_temp_pivot_objs": {}}
-        
+
         for follow_obj in follow_objs:
             main_matrix = cmds.xform(temp_pivot_obj, query=True, matrix=True, worldSpace=True)
             follow_matrix = cmds.xform(follow_obj, query=True, matrix=True, worldSpace=True)
-            
+
             main_mmatrix = om.MMatrix(main_matrix)
             follow_mmatrix = om.MMatrix(follow_matrix)
-            
+
             relative_matrix = follow_mmatrix * main_mmatrix.inverse()
-            
+
             # Guardar la matriz relativa en el diccionario
             save_dict["follow_temp_pivot_objs"][follow_obj] = [relative_matrix.getElement(i, j) for i in range(4) for j in range(4)]
-        
+
         # Guardar el diccionario en un archivo JSON
         matrix_file_folder = general.get_temp_pivot_data_folder()
         os.makedirs(matrix_file_folder, exist_ok=True)
-        with open(matrix_file_path, 'w') as f:
+        with open(matrix_file_path, "w") as f:
             json.dump(save_dict, f)
 
         cmds.select(temp_pivot_obj)
         get_c_Ctx = cmds.currentCtx()
 
         if get_c_Ctx == "selectSuperContext":
-            cmds.setToolTo('moveSuperContext')
+            cmds.setToolTo("moveSuperContext")
         cmds.select(temp_pivot_obj)
         cmds.ctxEditMode()
-
-
-
 
     def load_temp_pivot_data():
         global temp_pivot_relative_data
@@ -676,28 +687,27 @@ def create_temp_pivot(use_saved_position=False, *args):
         # Rutas
 
         matrix_file_path = general.get_temp_pivot_data_file()
-        
+
         # Verificar si el archivo existe
         if not os.path.exists(matrix_file_path):
             cmds.warning("Error, need temp pivot data first")
             return
-        
-        # Leer el diccionario del archivo JSON
-        with open(matrix_file_path, 'r') as f:
-            temp_pivot_relative_data = json.load(f)
 
+        # Leer el diccionario del archivo JSON
+        with open(matrix_file_path, "r") as f:
+            temp_pivot_relative_data = json.load(f)
 
     def set_temp_pivot_relation():
         global temp_pivot_relative_data
 
         temp_pivot_obj = temp_pivot_relative_data.get("temp_pivot_obj")
         follow_temp_pivot_objs = temp_pivot_relative_data.get("follow_temp_pivot_objs", {})
-        
+
         seleccion = cmds.ls(selection=True)
         if not seleccion:
             print("Select one obj first")
             return
-        
+
         if temp_pivot_obj in seleccion:
             follow_objs = list(follow_temp_pivot_objs.keys())
         else:
@@ -710,41 +720,37 @@ def create_temp_pivot(use_saved_position=False, *args):
                 for i in range(4):
                     for j in range(4):
                         relative_matrix.setElement(i, j, relative_matrix_list[i * 4 + j])
-                
+
                 main_matrix = cmds.xform(temp_pivot_obj, query=True, matrix=True, worldSpace=True)
                 main_mmatrix = om.MMatrix(main_matrix)
-                
+
                 new_follow_matrix = relative_matrix * main_mmatrix
                 new_follow_matrix_list = [new_follow_matrix.getElement(i, j) for i in range(4) for j in range(4)]
-                
+
                 cmds.xform(follow_obj, matrix=new_follow_matrix_list, worldSpace=True)
 
             else:
                 cmds.warning(f"There is not temp pivot data for {follow_obj}")
 
-
     get_temp_pivot_relation()
-
 
     def add_callbacks_link():
         global attribute_callback_id, time_callback_id, process_callback
-        
+
         process_callback = True
-        
+
         temp_pivot_obj_name = "tkm_temp_pivot"
-        
+
         # Obtén el MObject del objeto principal
         selection_list = om.MSelectionList()
         selection_list.add(temp_pivot_obj_name)
         temp_pivot_obj_mobject = selection_list.getDependNode(0)
-        
+
         # Registra el callback de atributo
         attribute_callback_id = om.MNodeMessage.addAttributeChangedCallback(temp_pivot_obj_mobject, attribute_callback_function)
-        
+
         # Registra el callback de cambio de tiempo
-        time_callback_id = om.MEventMessage.addEventCallback('timeChanged', time_callback_function)
-
-
+        time_callback_id = om.MEventMessage.addEventCallback("timeChanged", time_callback_function)
 
     def remove_callbacks_link():
         global attribute_callback_id, time_callback_id
@@ -758,18 +764,16 @@ def create_temp_pivot(use_saved_position=False, *args):
         except Exception as e:
             print(f"Error removing callback: {e}")
 
-
     def attribute_callback_function(msg, plug, otherPlug, clientData):
         global process_callback
-        
+
         if not process_callback:
             return
-        
+
         if msg & om.MNodeMessage.kAttributeSet:
             process_callback = False
             set_temp_pivot_relation()
             process_callback = True
-
 
     def time_callback_function(clientData):
         global process_callback
@@ -779,36 +783,30 @@ def create_temp_pivot(use_saved_position=False, *args):
         set_temp_pivot_relation()  # Llamada a tu función set_matrix
         process_callback = True
 
-
-
     load_temp_pivot_data()
     add_callbacks_link()
-
-
 
     def update_temp_pivot_transform_in_file(position, rotation):
 
         matrix_file_path = general.get_temp_pivot_data_file()
-        
+
         # Cargar datos actuales
-        with open(matrix_file_path, 'r') as f:
+        with open(matrix_file_path, "r") as f:
             data = json.load(f)
-        
+
         # Actualizar la posición de "tkm_temp_pivot"
         data["tkm_temp_pivot_position"] = position
         data["tkm_temp_pivot_rotation"] = rotation
-        
-        # Guardar datos actualizados
-        with open(matrix_file_path, 'w') as f:
-            json.dump(data, f)
 
+        # Guardar datos actualizados
+        with open(matrix_file_path, "w") as f:
+            json.dump(data, f)
 
     def temp_pivot_scriptJob_SelectionChanged():
 
         if not cmds.objExists("tkm_temp_pivot"):
             return
         else:
-
             # Crear un locator y hacer matchTransform a tkm_temp_pivot
             locator = cmds.spaceLocator()[0]
             cmds.matchTransform(locator, "tkm_temp_pivot")
@@ -828,21 +826,15 @@ def create_temp_pivot(use_saved_position=False, *args):
             cmds.undoInfo(closeChunk=True)
             cmds.undoInfo(closeChunk=True)
 
-
-        
-    cmds.scriptJob(runOnce = True, killWithScene = True,  event =('SelectionChanged',  temp_pivot_scriptJob_SelectionChanged))
-
-
-
+    cmds.scriptJob(runOnce=True, killWithScene=True, event=("SelectionChanged", temp_pivot_scriptJob_SelectionChanged))
 
 
 # ---------------------------------------------------  COPY/PASTE WORLDSPACE ANIMATION  ------------------------------------------------------#
 
 
-
 def mod_copy_worldspace_animation(*args):
     # Get the current state of the modifiers
-    mods = mel.eval('getModifiers')
+    mods = mel.eval("getModifiers")
     shift_pressed = bool(mods % 2)  # Check if Shift is pressed
 
     if shift_pressed:
@@ -851,12 +843,10 @@ def mod_copy_worldspace_animation(*args):
         color_copy_worldspace_animation()
 
 
-
 def color_copy_worldspace_animation(*args):
     # set_temp_timeslider_colors()
     cmds.evalDeferred(copy_worldspace_animation)
     # cmds.evalDeferred(restore_timeslider_colors)
-
 
 
 def color_paste_worldspace_animation(*args):
@@ -885,9 +875,11 @@ def copy_worldspace_animation(*args):
     cmds.refresh(suspend=True)
 
     # Crear una barra de progreso
-    gMainProgressBar = mel.eval('$tmp = $gMainProgressBar')
+    gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
     total_frames = len(set(cmds.keyframe(selected_objects, query=True)))
-    cmds.progressBar(gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status='Copying worldspace animation...', maxValue=total_frames)
+    cmds.progressBar(
+        gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status="Copying worldspace animation...", maxValue=total_frames
+    )
 
     try:
         all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, query=True))))
@@ -901,8 +893,9 @@ def copy_worldspace_animation(*args):
             for source_obj in selected_objects:
                 # Asegurarse de que el objeto tiene claves en este frame
                 if cmds.keyframe(source_obj, query=True, time=(frame, frame)):
-                    worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + \
-                                        cmds.xform(source_obj, query=True, rotation=True, worldSpace=True)
+                    worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
+                        source_obj, query=True, rotation=True, worldSpace=True
+                    )
                     if source_obj not in animation_data:
                         animation_data[source_obj] = {}
 
@@ -913,14 +906,13 @@ def copy_worldspace_animation(*args):
 
         # Save to JSON
 
-
         worldspace_anim_data_file = general.get_copy_worldspace_data_file()
         worldspace_anim_data_folder = general.get_copy_worldspace_data_folder()
 
         if not os.path.exists(worldspace_anim_data_folder):
             os.makedirs(worldspace_anim_data_folder)
 
-        with open(worldspace_anim_data_file, 'w') as json_file:
+        with open(worldspace_anim_data_file, "w") as json_file:
             json.dump(animation_data, json_file)
 
     finally:
@@ -932,9 +924,8 @@ def copy_worldspace_animation(*args):
         print("Worldspace animation copied")
 
 
-
-
 # -------------------- Copy range worldspace
+
 
 def copy_range_worldspace_animation(*args):
 
@@ -959,10 +950,12 @@ def copy_range_worldspace_animation(*args):
     cmds.refresh(suspend=True)
 
     # Crear una barra de progreso
-    gMainProgressBar = mel.eval('$tmp = $gMainProgressBar')
+    gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
     all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, query=True, time=(time_range[0], time_range[1])))))
     total_frames = len(all_keyframes)
-    cmds.progressBar(gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status='Copying worldspace animation...', maxValue=total_frames)
+    cmds.progressBar(
+        gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status="Copying worldspace animation...", maxValue=total_frames
+    )
 
     try:
         for frame in all_keyframes:
@@ -975,8 +968,9 @@ def copy_range_worldspace_animation(*args):
             for source_obj in selected_objects:
                 # Asegurarse de que el objeto tiene claves en este frame
                 if cmds.keyframe(source_obj, query=True, time=(frame, frame)):
-                    worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + \
-                                        cmds.xform(source_obj, query=True, rotation=True, worldSpace=True)
+                    worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
+                        source_obj, query=True, rotation=True, worldSpace=True
+                    )
                     if source_obj not in animation_data:
                         animation_data[source_obj] = {}
 
@@ -992,7 +986,7 @@ def copy_range_worldspace_animation(*args):
         if not os.path.exists(worldspace_anim_data_folder):
             os.makedirs(worldspace_anim_data_folder)
 
-        with open(worldspace_anim_data_file, 'w') as json_file:
+        with open(worldspace_anim_data_file, "w") as json_file:
             json.dump(animation_data, json_file)
 
     finally:
@@ -1005,8 +999,8 @@ def copy_range_worldspace_animation(*args):
         cmds.warning("Worldspace animation copied")
 
 
-
 # ............. copy single frame worldspace
+
 
 def copy_worldspace_single_frame(*args):
     selected_objects = cmds.ls(selection=True)
@@ -1019,8 +1013,9 @@ def copy_worldspace_single_frame(*args):
     current_time = cmds.currentTime(query=True)
 
     for source_obj in selected_objects:
-        worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + \
-                            cmds.xform(source_obj, query=True, rotation=True, worldSpace=True)
+        worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
+            source_obj, query=True, rotation=True, worldSpace=True
+        )
         animation_data[source_obj] = {int(current_time): worldspace_values}
 
     # Save to JSON
@@ -1030,15 +1025,14 @@ def copy_worldspace_single_frame(*args):
     if not os.path.exists(worldspace_anim_data_folder):
         os.makedirs(worldspace_anim_data_folder)
 
-    with open(worldspace_anim_data_file, 'w') as json_file:
+    with open(worldspace_anim_data_file, "w") as json_file:
         json.dump(animation_data, json_file)
 
     cmds.warning("Worldspace values for current frame copied")
 
 
-
 def paste_worldspace_single_frame(*args):
-    
+
     # Rutas
     worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
 
@@ -1046,7 +1040,7 @@ def paste_worldspace_single_frame(*args):
         cmds.warning("No worldspace data found")
         return
 
-    with open(worldspace_anim_data_file, 'r') as json_file:
+    with open(worldspace_anim_data_file, "r") as json_file:
         animation_data = json.load(json_file)
 
     # Aplicar valores de worldspace guardados del primer frame disponible
@@ -1063,8 +1057,6 @@ def paste_worldspace_single_frame(*args):
     cmds.warning("Worldspace values applied")
 
 
-
-
 def paste_worldspace_animation(*args):
     original_time = cmds.currentTime(query=True)
 
@@ -1075,7 +1067,7 @@ def paste_worldspace_animation(*args):
         print("No worldspace animation data found")
         return
 
-    with open(worldspace_anim_data_file, 'r') as json_file:
+    with open(worldspace_anim_data_file, "r") as json_file:
         animation_data = json.load(json_file)
 
     # Filtrar solo objetos existentes en la escena
@@ -1087,7 +1079,7 @@ def paste_worldspace_animation(*args):
 
     # Eliminar animación previa de los objetos existentes
     for obj in existing_objects.keys():
-        cmds.cutKey(obj, attribute=['tx', 'ty', 'tz', 'rx', 'ry', 'rz'])
+        cmds.cutKey(obj, attribute=["tx", "ty", "tz", "rx", "ry", "rz"])
 
     # Obtener todos los frames únicos donde hay animación
     all_frames = sorted(set(frame for obj_data in existing_objects.values() for frame in obj_data.keys()), key=int)
@@ -1096,8 +1088,10 @@ def paste_worldspace_animation(*args):
     cmds.refresh(suspend=True)
 
     # Crear barra de progreso
-    gMainProgressBar = mel.eval('$tmp = $gMainProgressBar')
-    cmds.progressBar(gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status='Pasting worldspace animation...', maxValue=len(all_frames))
+    gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
+    cmds.progressBar(
+        gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status="Pasting worldspace animation...", maxValue=len(all_frames)
+    )
 
     try:
         for frame in all_frames:
@@ -1121,15 +1115,12 @@ def paste_worldspace_animation(*args):
         cmds.warning("Worldspace animation restored successfully")
 
 
-
-
-
-
 # ____________________________________ Tracer _______________________________________________
+
 
 def mod_tracer(*args):
     # Get the current state of the modifiers
-    mods = mel.eval('getModifiers')
+    mods = mel.eval("getModifiers")
 
     shift_pressed = bool(mods & 1)  # Check if Shift is pressed
     ctrl_pressed = bool(mods & 4)  # Check if Ctrl is pressed
@@ -1138,10 +1129,8 @@ def mod_tracer(*args):
     if shift_pressed:
         tracer_refresh()
     elif ctrl_pressed and not alt_pressed:
-
         tracer_show_hide()
     elif ctrl_pressed and alt_pressed:
-
         remove_tracer_node()
     else:
         create_tracer()
@@ -1149,9 +1138,8 @@ def mod_tracer(*args):
 
 def create_tracer(*args):
 
-
     selected_objects = cmds.ls(selection=True)
-    
+
     # Verificar si hay exactamente un objeto seleccionado.
     if len(selected_objects) != 1:
         print("Select only one object")
@@ -1159,24 +1147,24 @@ def create_tracer(*args):
 
     # Verifica o crea el grupo 'TheKeyMachine'
     if not cmds.objExists("TheKeyMachine"):
-        general.create_TheKeyMachine_node() 
-    
+        general.create_TheKeyMachine_node()
+
     # Verifica si 'CTracer' existe y si no, lo crea o lo reinicia
     if cmds.objExists("TKM_Tracer"):
         cmds.delete("TKM_Tracer")
-    
+
     selected_objects_start = cmds.ls(selection=True)
     cmds.createNode("transform", name="TKM_Tracer")
     cmds.parent("TKM_Tracer", "TheKeyMachine")
-    
+
     # Crea un nuevo nodo para 'tracer_offset' dentro de 'TKM_Tracer'
     cmds.createNode("transform", name="tracer_offset")
     cmds.parent("tracer_offset", "TKM_Tracer")
-    
+
     cmds.select(selected_objects_start)
-    
+
     selected_objects = cmds.ls(selection=True)
-    
+
     if not selected_objects:
         print("Select an object to trace")
         return
@@ -1197,8 +1185,6 @@ def create_tracer(*args):
     cmds.select(selected_objects)
 
 
-
-
 def select_tracer_offset_node(*args):
     if cmds.objExists("tracer_offset"):
         cmds.select("tracer_offset", replace=True)
@@ -1209,14 +1195,12 @@ def remove_tracer_node(*args):
         cmds.delete("TKM_Tracer")
 
 
-
-
 def tracer_connected(connected=False, update_cb=None, *args):
 
     if not cmds.objExists("tracerHandle"):
         print("No tracer node in the scene")
         return
-    
+
     is_connected = cmds.isConnected("tracer.points", "tracerHandleShape.points")
 
     # Si queremos conectar pero ya está conectado, o si queremos desconectar pero ya está desconectado, regresamos.
@@ -1234,10 +1218,8 @@ def tracer_connected(connected=False, update_cb=None, *args):
         update_cb(connected)
 
 
-
 def tracer_update_checkbox(value):
-    cmds.menuItem('tracer_checkbox_menuItem', e=True, checkBox=value)
-
+    cmds.menuItem("tracer_checkbox_menuItem", e=True, checkBox=value)
 
 
 def tracer_refresh(*args):
@@ -1260,12 +1242,14 @@ def set_tracer_blue_color(*args):
         cmds.setAttr("tracerHandleShape.trailColor", 0.2879, 0.2932, 0.358, type="double3")
         cmds.setAttr("tracerHandleShape.keyframeColor", 1.0, 1.0, 1.0, type="double3")
 
+
 def set_tracer_red_color(*args):
 
     if cmds.objExists("tracerHandle"):
         cmds.setAttr("tracerHandleShape.extraTrailColor", 0.8143, 0.5109, 0.5318, type="double3")
         cmds.setAttr("tracerHandleShape.trailColor", 0.4398, 0.1724, 0.1908, type="double3")
         cmds.setAttr("tracerHandleShape.keyframeColor", 1.0, 1.0, 1.0, type="double3")
+
 
 def set_tracer_grey_color(*args):
 
@@ -1274,6 +1258,7 @@ def set_tracer_grey_color(*args):
         cmds.setAttr("tracerHandleShape.trailColor", 0.122, 0.122, 0.122, type="double3")
         cmds.setAttr("tracerHandleShape.keyframeColor", 1.0, 1.0, 1.0, type="double3")
 
+
 def tracer_show_hide(*args):
 
     if cmds.objExists("tracerHandle"):
@@ -1281,11 +1266,10 @@ def tracer_show_hide(*args):
         cmds.setAttr("tracerHandle.visibility", not visibility)
 
 
-
-
 # FollowCam _________________________________________________________________
 
 followCam_original_camera = None
+
 
 def create_follow_cam(translation=True, rotation=True, *args):
     global followCam_original_camera
@@ -1294,32 +1278,31 @@ def create_follow_cam(translation=True, rotation=True, *args):
     selected_objects = cmds.ls(selection=True)
 
     # Verifica si existe el grupo "TheKeyMachine"
-    if not cmds.objExists('TheKeyMachine'):
+    if not cmds.objExists("TheKeyMachine"):
         general.create_TheKeyMachine_node()
 
     if not selected_objects:
-        print('Select at least one object.')
+        print("Select at least one object.")
         return
 
     target_object = selected_objects[0]
 
     # Obtén el panel con el foco actualmente y encuentra la cámara activa
-    panel = cmds.playblast(activeEditor = True)
+    panel = cmds.playblast(activeEditor=True)
     camera = cmds.modelEditor(panel, query=True, camera=True)
     followCam_original_camera = camera
 
-
     # Si ya existe el nodo "tkm_followCam", crea una cámara y grupo temporales
-    if cmds.objExists('tkm_followCam'):
-        follow_cam = cmds.duplicate(camera, name='followCam_tmp')[0]
-        follow_cam_group = cmds.group(follow_cam, name='tkm_followCam_tmp')
+    if cmds.objExists("tkm_followCam"):
+        follow_cam = cmds.duplicate(camera, name="followCam_tmp")[0]
+        follow_cam_group = cmds.group(follow_cam, name="tkm_followCam_tmp")
     else:
         # Duplica la cámara activa y renómbrala
-        follow_cam = cmds.duplicate(camera, name='followCam')[0]
-        follow_cam_group = cmds.group(follow_cam, name='tkm_followCam')
+        follow_cam = cmds.duplicate(camera, name="followCam")[0]
+        follow_cam_group = cmds.group(follow_cam, name="tkm_followCam")
 
     # Mueve el grupo "tkm_followCam" dentro del grupo "TheKeyMachine"
-    cmds.parent(follow_cam_group, 'TheKeyMachine')
+    cmds.parent(follow_cam_group, "TheKeyMachine")
 
     # Desparenta temporalmente el nodo del dagContainer
     cmds.parent(follow_cam_group, world=True)
@@ -1332,44 +1315,43 @@ def create_follow_cam(translation=True, rotation=True, *args):
         skip_rot = []
 
         if not translation:
-            skip_trans = ['x', 'y', 'z']
+            skip_trans = ["x", "y", "z"]
         if not rotation:
-            skip_rot = ['x', 'y', 'z']
+            skip_rot = ["x", "y", "z"]
 
         cmds.parentConstraint(target_object, follow_cam_group, maintainOffset=True, skipTranslate=skip_trans, skipRotate=skip_rot)
 
     # Regresa el nodo al dagContainer
-    cmds.parent(follow_cam_group, 'TheKeyMachine')
-    
+    cmds.parent(follow_cam_group, "TheKeyMachine")
+
     # Si se creó un grupo y una cámara temporal, renombra estos para reemplazar los existentes
-    if cmds.objExists('tkm_followCam_tmp'):
-        cmds.delete('tkm_followCam')
-        cmds.rename('tkm_followCam_tmp', 'tkm_followCam')
-        cmds.rename('followCam_tmp', 'followCam')
-        follow_cam = 'followCam'  # Asegura que follow_cam contenga el nombre correcto de la cámara
+    if cmds.objExists("tkm_followCam_tmp"):
+        cmds.delete("tkm_followCam")
+        cmds.rename("tkm_followCam_tmp", "tkm_followCam")
+        cmds.rename("followCam_tmp", "followCam")
+        follow_cam = "followCam"  # Asegura que follow_cam contenga el nombre correcto de la cámara
 
     # Si la cámara activa en el panel no es 'followCam', cambia la vista a 'followCam'
-    if camera != 'followCam':
+    if camera != "followCam":
         cmds.lookThru(panel, follow_cam)
-    
+
     cmds.select(selected_objects)
 
 
 def remove_followCam(*args):
     global followCam_original_camera
     # Obtén el panel con el foco actualmente
-    panel = cmds.playblast(activeEditor = True)
+    panel = cmds.playblast(activeEditor=True)
     current_camera = cmds.modelEditor(panel, query=True, camera=True)
 
-    if cmds.objExists('tkm_followCam'):
-        cmds.delete('tkm_followCam')
+    if cmds.objExists("tkm_followCam"):
+        cmds.delete("tkm_followCam")
 
         # Si el nombre de la cámara actual no es "persp", cambia la vista a "persp"
         print(followCam_original_camera)
         cmds.lookThru(panel, followCam_original_camera)
     else:
         print("No followCam in the scene")
-
 
 
 # ________________________SELECTOR______________
@@ -1380,9 +1362,8 @@ def selector_window(*args):
     if cmds.window(window_name, exists=True):
         cmds.deleteUI(window_name)
 
-    if cmds.button('selector_button', q=True, label=True) == "0":
+    if cmds.button("selector_button", q=True, label=True) == "0":
         return
-
 
     window = cmds.window(window_name, title="Selector", widthHeight=(230, 365), sizeable=False)
     cmds.columnLayout(adjustableColumn=True)
@@ -1393,12 +1374,14 @@ def selector_window(*args):
     reload_selected_objects(object_list)
     cmds.showWindow(window)
 
+
 def select_objects_from_list(list_name, *args):
     # Obtener los elementos seleccionados en la lista
     selected_objects = cmds.textScrollList(list_name, query=True, selectItem=True)
 
     # Seleccionar los objetos en la escena
     cmds.select(selected_objects, replace=True)
+
 
 def reload_selected_objects(list_name, *args):
     selected_objects = cmds.ls(selection=True)
@@ -1411,9 +1394,8 @@ def reload_selected_objects(list_name, *args):
     cmds.textScrollList(list_name, edit=True, append=sorted_objects)
 
 
-
-
 # _____________________ SELECT RIG CHARACTER CONTROLS
+
 
 def select_rig_controls(*args):
     def find_curves(node):
@@ -1421,7 +1403,7 @@ def select_rig_controls(*args):
         shapes = cmds.listRelatives(node, shapes=True, fullPath=True)
         if shapes:
             for shape in shapes:
-                if cmds.nodeType(shape) == 'nurbsCurve':
+                if cmds.nodeType(shape) == "nurbsCurve":
                     curves.append(node)
         children = cmds.listRelatives(node, children=True, fullPath=True)
         if children:
@@ -1439,7 +1421,7 @@ def select_rig_controls(*args):
     namespaces = set()
     no_namespace = False
     for obj in selected:
-        namespace_parts = obj.split(':')
+        namespace_parts = obj.split(":")
         if len(namespace_parts) > 1:
             namespace = namespace_parts[0]
             namespaces.add(namespace)
@@ -1463,20 +1445,20 @@ def select_rig_controls(*args):
 
     if all_curves:
         if namespaces:  # Si hay namespaces, filtra las curvas que comiencen con algún namespace
-            filtered_curves = [curve for curve in all_curves if any(curve.startswith(ns + ':') for ns in namespaces)]
+            filtered_curves = [curve for curve in all_curves if any(curve.startswith(ns + ":") for ns in namespaces)]
         else:
             filtered_curves = all_curves
 
         if no_namespace:  # Si hay objetos sin namespace, incluye curvas sin namespace
-            filtered_curves += [curve for curve in all_curves if ':' not in curve]
+            filtered_curves += [curve for curve in all_curves if ":" not in curve]
 
         cmds.select(filtered_curves, replace=True)
     else:
         cmds.warning("There are no curve-type controls to select")
 
 
+# ______________ SELECT ANIMATED RIG CONTROLS
 
-# ______________ SELECT ANIMATED RIG CONTROLS 
 
 def select_animated_rig_controls(*args):
     cache = {}
@@ -1489,14 +1471,14 @@ def select_animated_rig_controls(*args):
         transforms = cmds.listRelatives(node, parent=True, fullPath=True) or [node]
         for transform in transforms:
             # Comprobar si el transform es un joint
-            if cmds.nodeType(transform) == 'joint':
+            if cmds.nodeType(transform) == "joint":
                 if is_animated_and_keyable(transform):
                     controls.append(transform)
-            elif cmds.nodeType(transform) == 'transform':
+            elif cmds.nodeType(transform) == "transform":
                 shapes = cmds.listRelatives(transform, shapes=True, fullPath=True)
                 if shapes:
                     for shape in shapes:
-                        if cmds.nodeType(shape) == 'nurbsCurve':
+                        if cmds.nodeType(shape) == "nurbsCurve":
                             if is_animated_and_keyable(transform):
                                 controls.append(transform)
 
@@ -1518,11 +1500,11 @@ def select_animated_rig_controls(*args):
             return False
 
         for attr in attrs:
-            if not cmds.getAttr(node + '.' + attr, lock=True):
-                connections = cmds.listConnections(node + '.' + attr, type='animCurve')
+            if not cmds.getAttr(node + "." + attr, lock=True):
+                connections = cmds.listConnections(node + "." + attr, type="animCurve")
                 if connections:
                     for conn in connections:
-                        if cmds.nodeType(conn) in ['animCurveTA', 'animCurveTL', 'animCurveTU']:
+                        if cmds.nodeType(conn) in ["animCurveTA", "animCurveTL", "animCurveTU"]:
                             cache[node] = True
                             return True
 
@@ -1537,7 +1519,7 @@ def select_animated_rig_controls(*args):
 
     namespaces = set()
     for obj in selected:
-        namespace_parts = obj.split(':')
+        namespace_parts = obj.split(":")
         if len(namespace_parts) > 1:
             namespace = namespace_parts[0]
             namespaces.add(namespace)
@@ -1559,7 +1541,7 @@ def select_animated_rig_controls(*args):
 
     if all_controls:
         if namespaces:  # Si hay namespaces, filtra los controles que comienzan con alguno de los namespaces
-            filtered_controls = [control for control in all_controls if any(control.startswith(ns + ':') for ns in namespaces)]
+            filtered_controls = [control for control in all_controls if any(control.startswith(ns + ":") for ns in namespaces)]
         else:  # Si no hay namespaces, selecciona todos los controles tal como están
             filtered_controls = all_controls
 
@@ -1568,13 +1550,12 @@ def select_animated_rig_controls(*args):
         cmds.warning("There are no suitable controls to select")
 
 
-
-
 # _______________________________________ DEPTH MOVER
 
+
 def activeCamera():
-    panel = cmds.playblast(activeEditor = True)
-    
+    panel = cmds.playblast(activeEditor=True)
+
     if not panel:
         return None
 
@@ -1582,11 +1563,12 @@ def activeCamera():
     if not camShape:
         return None
 
-    if cmds.nodeType(camShape) == 'transform':
+    if cmds.nodeType(camShape) == "transform":
         return camShape
-    elif cmds.nodeType(camShape) in ['camera', 'stereoRigCamera']:
+    elif cmds.nodeType(camShape) in ["camera", "stereoRigCamera"]:
         return cmds.listRelatives(camShape, parent=True, path=True)[0]
     return None
+
 
 class Coord3D:
     def __init__(self, x=0, y=0, z=0):
@@ -1615,14 +1597,24 @@ class Coord3D:
         mag = self.magnitude()
         return Coord3D(self.x / mag, self.y / mag, self.z / mag) if mag else self
 
+
 class MouseDragger(object):
-    def __init__(self, name='mlMouseDraggerContext', title='MouseDragger', multiplier=0.1, cursor='hand'):
+    def __init__(self, name="mlMouseDraggerContext", title="MouseDragger", multiplier=0.1, cursor="hand"):
         self.multiplier = multiplier
         self.draggerContext = name
         if not cmds.draggerContext(self.draggerContext, exists=True):
             self.draggerContext = cmds.draggerContext(self.draggerContext)
 
-        cmds.draggerContext(self.draggerContext, edit=True, pressCommand=self.onPress, dragCommand=self.onDrag, releaseCommand=self.onRelease, cursor=cursor, drawString=title, undoMode='all')
+        cmds.draggerContext(
+            self.draggerContext,
+            edit=True,
+            pressCommand=self.onPress,
+            dragCommand=self.onDrag,
+            releaseCommand=self.onRelease,
+            cursor=cursor,
+            drawString=title,
+            undoMode="all",
+        )
 
     def onPress(self):
         self.anchorPoint = cmds.draggerContext(self.draggerContext, query=True, anchorPoint=True)
@@ -1633,11 +1625,11 @@ class MouseDragger(object):
         self.x = (dragPoint[0] - self.anchorPoint[0]) * self.multiplier
         self.y = (dragPoint[1] - self.anchorPoint[1]) * self.multiplier
         self.performDrag()
-        cmds.refresh() 
+        cmds.refresh()
 
     def onRelease(self):
         cmds.undoInfo(closeChunk=True)
-        cmds.setToolTo('selectSuperContext')
+        cmds.setToolTo("selectSuperContext")
 
     def performDrag(self):
         pass
@@ -1648,23 +1640,27 @@ class MouseDragger(object):
 
 class DepthControlDragger(MouseDragger):
     def __init__(self):
-        super(DepthControlDragger, self).__init__(name='mlDepthControlDraggerContext', title='DepthControl', multiplier=0.1)
+        super(DepthControlDragger, self).__init__(name="mlDepthControlDraggerContext", title="DepthControl", multiplier=0.1)
 
         cam = activeCamera()
         if not cam:
-            om.MGlobal.displayWarning('No camera found.')
+            om.MGlobal.displayWarning("No camera found.")
             return
 
         sel = cmds.ls(sl=True)
         if not sel:
-            om.MGlobal.displayWarning('Please select an object.')
+            om.MGlobal.displayWarning("Please select an object.")
             return
 
         self.cameraCoord = Coord3D(*cmds.xform(cam, query=True, worldSpace=True, rotatePivot=True))
-        self.objs = [(obj, Coord3D(*cmds.xform(obj, query=True, worldSpace=True, rotatePivot=True)) - self.cameraCoord) for obj in sel if cmds.getAttr(obj+'.translate', settable=True)]
+        self.objs = [
+            (obj, Coord3D(*cmds.xform(obj, query=True, worldSpace=True, rotatePivot=True)) - self.cameraCoord)
+            for obj in sel
+            if cmds.getAttr(obj + ".translate", settable=True)
+        ]
 
         if not self.objs:
-            om.MGlobal.displayWarning('Selected objects do not have translate attributes to apply this tool.')
+            om.MGlobal.displayWarning("Selected objects do not have translate attributes to apply this tool.")
             return
 
         self.activateTool()
@@ -1674,28 +1670,26 @@ class DepthControlDragger(MouseDragger):
             newPos = (coord.normalize() * self.x) + coord + self.cameraCoord
             cmds.move(newPos.x, newPos.y, newPos.z, obj, absolute=True, worldSpace=True)
 
+
 def depth_mover(*args):
     DepthControlDragger()
-
-
-
-
 
 
 # ___________________________________________  GIMBAL FIXER  _______________________________________
 
 
+ROTATE_ORDERS = ["xyz", "yzx", "zxy", "xzy", "yxz", "zyx"]
 
-ROTATE_ORDERS = ['xyz', 'yzx', 'zxy', 'xzy', 'yxz', 'zyx']
 
-class UndoSetup():
+class UndoSetup:
     def __enter__(self):
         cmds.undoInfo(openChunk=True)
 
     def __exit__(self, *args):
         cmds.undoInfo(closeChunk=True)
 
-class StopRefresh():
+
+class StopRefresh:
     def __enter__(self):
         self.resetAutoKey = cmds.autoKeyframe(query=True, state=True)
         cmds.autoKeyframe(state=False)
@@ -1704,6 +1698,7 @@ class StopRefresh():
     def __exit__(self, *args):
         cmds.autoKeyframe(state=self.resetAutoKey)
         cmds.refresh(suspend=False)
+
 
 def gimbal_fixer_window(*args):
     if cmds.window("gimbal_fixer", exists=True):
@@ -1716,22 +1711,23 @@ def gimbal_fixer_window(*args):
     else:
         print("Select a control and reload")
 
+
 def update_rotation_order(window):
     sel = cmds.ls(sl=True)
     if not sel:
         print("Select a control")
         return
 
-    current_rotate_order = cmds.getAttr(f'{sel[0]}.rotateOrder')
+    current_rotate_order = cmds.getAttr(f"{sel[0]}.rotateOrder")
     current_rotate_order_text = ROTATE_ORDERS[current_rotate_order]
 
     tolerances = rotate_gimbal_state(sel[0])
-    rotate_orders = ['xyz', 'yzx', 'zxy', 'xzy', 'yxz', 'zyx']
+    rotate_orders = ["xyz", "yzx", "zxy", "xzy", "yxz", "zyx"]
     tolerances_with_orders = list(zip(tolerances, rotate_orders))
     sorted_tolerances = sorted(tolerances_with_orders)
 
     button_names = ["Best", "Good", "Moderate", "Average", "Poor", "Inadequate"]
-    
+
     for button_name, (_, order) in zip(button_names, sorted_tolerances):
         button = window.findChild(QtWidgets.QPushButton, f"{button_name.lower()}_button")
         if button:
@@ -1752,12 +1748,12 @@ def update_rotation_order(window):
 
     control_name_edit = window.findChild(QtWidgets.QLineEdit, "control_name_edit")
     if control_name_edit:
-        object_name = sel[0].split(':')[-1]
+        object_name = sel[0].split(":")[-1]
         control_name_edit.setText(object_name)
 
     rotation_order_edit = window.findChild(QtWidgets.QLineEdit, "rotation_order_edit")
     if rotation_order_edit:
-        rotate_order = cmds.getAttr(f'{sel[0]}.rotateOrder')
+        rotate_order = cmds.getAttr(f"{sel[0]}.rotateOrder")
         rotation_order_edit.setText(ROTATE_ORDERS[rotate_order])
 
     tolerances = rotate_gimbal_state(sel[0])
@@ -1768,8 +1764,9 @@ def update_rotation_order(window):
 
     cmds.select(sel)
 
+
 def rotate_gimbal_state(obj):
-    rot_data = cmds.duplicate(obj, name='temp#', parentOnly=True)[0]
+    rot_data = cmds.duplicate(obj, name="temp#", parentOnly=True)[0]
 
     tolerences = list()
     for rot_order in ROTATE_ORDERS:
@@ -1779,47 +1776,57 @@ def rotate_gimbal_state(obj):
     cmds.delete(rot_data)
     return tolerences
 
+
 def get_gimbal_quality(tolerances):
     index = tolerances.index(min(tolerances))
     quality_names = ["Best", "Good", "Moderate", "Average", "Poor", "Inadequate"]
     return quality_names[index]
 
+
 def gimbal_tolerence(obj):
-    rotateOrder = ROTATE_ORDERS[cmds.getAttr(obj+'.rotateOrder')]
-    midValue = cmds.getAttr(obj+'.r'+rotateOrder[1])
-    gimbalTest = abs(((midValue+90) % 180) - 90) / 90
+    rotateOrder = ROTATE_ORDERS[cmds.getAttr(obj + ".rotateOrder")]
+    midValue = cmds.getAttr(obj + ".r" + rotateOrder[1])
+    gimbalTest = abs(((midValue + 90) % 180) - 90) / 90
     return gimbalTest
+
 
 def get_order_from_button(button):
     return button.text()
 
+
 def xyz(*args):
-    convert_rotation_order(rot_order='xyz')
+    convert_rotation_order(rot_order="xyz")
+
 
 def yzx(*args):
-    convert_rotation_order(rot_order='yzx')
+    convert_rotation_order(rot_order="yzx")
+
 
 def zxy(*args):
-    convert_rotation_order(rot_order='zxy')
+    convert_rotation_order(rot_order="zxy")
+
 
 def xzy(*args):
-    convert_rotation_order(rot_order='xzy')
+    convert_rotation_order(rot_order="xzy")
+
 
 def yxz(*args):
-    convert_rotation_order(rot_order='yxz')
+    convert_rotation_order(rot_order="yxz")
+
 
 def zyx(*args):
-    convert_rotation_order(rot_order='zyx')
+    convert_rotation_order(rot_order="zyx")
 
-def convert_rotation_order(rot_order='zxy'):
-    if not rot_order in ROTATE_ORDERS:
-        om.MGlobal.displayWarning('Wrong rotation order '+str(rot_order))
+
+def convert_rotation_order(rot_order="zxy"):
+    if rot_order not in ROTATE_ORDERS:
+        om.MGlobal.displayWarning("Wrong rotation order " + str(rot_order))
         return
 
     sel = cmds.ls(sl=True)
 
     if not sel:
-        om.MGlobal.displayWarning('Please select a control.')
+        om.MGlobal.displayWarning("Please select a control.")
         return
 
     time = cmds.currentTime(query=True)
@@ -1831,10 +1838,10 @@ def convert_rotation_order(rot_order='zxy'):
     unkeyed_data_objs = list()
 
     for obj in sel:
-        rotKeys = cmds.keyframe(obj, attribute='rotate', query=True, timeChange=True)
+        rotKeys = cmds.keyframe(obj, attribute="rotate", query=True, timeChange=True)
         if rotKeys:
             key_times[obj] = list(set(rotKeys))
-            prevrot_order[obj] = ROTATE_ORDERS[cmds.getAttr(obj+'.rotateOrder')]
+            prevrot_order[obj] = ROTATE_ORDERS[cmds.getAttr(obj + ".rotateOrder")]
             key_data.extend(rotKeys)
             keyed_data_objs.append(obj)
         else:
@@ -1842,7 +1849,6 @@ def convert_rotation_order(rot_order='zxy'):
 
     with UndoSetup():
         if keyed_data_objs:
-
             key_data = list(set(key_data))
             key_data.sort()
 
@@ -1851,15 +1857,14 @@ def convert_rotation_order(rot_order='zxy'):
                     cmds.currentTime(frame, edit=True)
                     for obj in keyed_data_objs:
                         if frame in key_times[obj]:
-                            cmds.setKeyframe(obj, attribute='rotate')
+                            cmds.setKeyframe(obj, attribute="rotate")
 
                 for frame in key_data:
                     cmds.currentTime(frame, edit=True)
                     for obj in keyed_data_objs:
                         if frame in key_times[obj]:
-
                             cmds.xform(obj, preserve=True, rotateOrder=rot_order)
-                            cmds.setKeyframe(obj, attribute='rotate')
+                            cmds.setKeyframe(obj, attribute="rotate")
                             cmds.xform(obj, preserve=False, rotateOrder=prevrot_order[obj])
 
                 cmds.currentTime(time, edit=True)
@@ -1872,11 +1877,12 @@ def convert_rotation_order(rot_order='zxy'):
             for obj in unkeyed_data_objs:
                 cmds.xform(obj, preserve=True, rotateOrder=rot_order)
 
+
 def gimbal_fixer_build():
 
     screen_width, screen_height = get_screen_resolution()
     screen_width = screen_width
-    
+
     # 4K fix
     if screen_width == 3840:
         win_w = 495
@@ -1913,10 +1919,6 @@ def gimbal_fixer_build():
         layout_margin = 10
         font_size = 11
 
-
-
-
-
     drag = {"active": False, "position": QtCore.QPoint()}
 
     def mousePressEvent(event):
@@ -1939,8 +1941,8 @@ def gimbal_fixer_build():
     window.resize(win_h, win_w)
 
     window.setWindowOpacity(1.0)
-    window.setObjectName('gimbal_fixer')
-    window.setWindowTitle('Gimbal Fixer')
+    window.setObjectName("gimbal_fixer")
+    window.setWindowTitle("Gimbal Fixer")
     window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
     window.mousePressEvent = mousePressEvent
@@ -1977,7 +1979,7 @@ def gimbal_fixer_build():
 
     header_layout = QtWidgets.QHBoxLayout()
     header_layout.addStretch()
-    close_button = QtWidgets.QPushButton('X')
+    close_button = QtWidgets.QPushButton("X")
     close_button.setFixedSize(close_button_size, close_button_size)
     close_button.clicked.connect(window.close)
     close_button.setStyleSheet(
@@ -1997,7 +1999,7 @@ def gimbal_fixer_build():
     layout.addLayout(header_layout)
 
     control_name_layout = QtWidgets.QHBoxLayout()
-    control_name_label = QtWidgets.QLabel('Control name:')
+    control_name_label = QtWidgets.QLabel("Control name:")
     control_name_edit = QtWidgets.QLineEdit()
     control_name_edit.setObjectName("control_name_edit")
     control_name_edit.setStyleSheet("QLineEdit { color: #a5a5a5; }")
@@ -2008,7 +2010,7 @@ def gimbal_fixer_build():
     layout.addLayout(control_name_layout)
 
     rotation_order_layout = QtWidgets.QHBoxLayout()
-    rotation_order_label = QtWidgets.QLabel('Rotation order:')
+    rotation_order_label = QtWidgets.QLabel("Rotation order:")
     rotation_order_edit = QtWidgets.QLineEdit()
     rotation_order_edit.setObjectName("rotation_order_edit")
     rotation_order_edit.setStyleSheet("QLineEdit { color: #d9d9d9; }")
@@ -2021,7 +2023,7 @@ def gimbal_fixer_build():
     layout.addSpacing(layout_spacing)
 
     best_layout = QtWidgets.QHBoxLayout()
-    best_button = QtWidgets.QPushButton('')
+    best_button = QtWidgets.QPushButton("")
     best_button.setObjectName("best_button")
     best_edit = QtWidgets.QLineEdit()
     best_edit.setObjectName("best_edit")
@@ -2047,7 +2049,7 @@ def gimbal_fixer_build():
     )
 
     good_layout = QtWidgets.QHBoxLayout()
-    good_button = QtWidgets.QPushButton('')
+    good_button = QtWidgets.QPushButton("")
     good_button.setObjectName("good_button")
     good_edit = QtWidgets.QLineEdit()
     good_edit.setObjectName("good_edit")
@@ -2073,7 +2075,7 @@ def gimbal_fixer_build():
     )
 
     average_layout = QtWidgets.QHBoxLayout()
-    average_button = QtWidgets.QPushButton('')
+    average_button = QtWidgets.QPushButton("")
     average_button.setObjectName("moderate_button")
     average_edit = QtWidgets.QLineEdit()
     average_edit.setObjectName("moderate_edit")
@@ -2099,7 +2101,7 @@ def gimbal_fixer_build():
     )
 
     average2_layout = QtWidgets.QHBoxLayout()
-    average2_button = QtWidgets.QPushButton('')
+    average2_button = QtWidgets.QPushButton("")
     average2_button.setObjectName("average_button")
     average2_edit = QtWidgets.QLineEdit()
     average2_edit.setObjectName("average_edit")
@@ -2125,7 +2127,7 @@ def gimbal_fixer_build():
     )
 
     bad_layout = QtWidgets.QHBoxLayout()
-    bad_button = QtWidgets.QPushButton('')
+    bad_button = QtWidgets.QPushButton("")
     bad_button.setObjectName("poor_button")
     bad_edit = QtWidgets.QLineEdit()
     bad_edit.setObjectName("poor_edit")
@@ -2151,7 +2153,7 @@ def gimbal_fixer_build():
     )
 
     worst_layout = QtWidgets.QHBoxLayout()
-    worst_button = QtWidgets.QPushButton('')
+    worst_button = QtWidgets.QPushButton("")
     worst_button.setObjectName("inadequate_button")
     worst_edit = QtWidgets.QLineEdit()
     worst_edit.setObjectName("inadequate_edit")
@@ -2178,7 +2180,7 @@ def gimbal_fixer_build():
 
     layout.addSpacing(layout_spacing)
 
-    reload_button = QtWidgets.QPushButton('RELOAD')
+    reload_button = QtWidgets.QPushButton("RELOAD")
     reload_button.clicked.connect(lambda: update_rotation_order(window))
     layout.addWidget(reload_button)
     reload_button.setFixedSize(reload_button_w, reload_button_h)
@@ -2203,10 +2205,7 @@ def gimbal_fixer_build():
     return window
 
 
-
-
 # _________________________________ MICRO MOVE ________________________________________________________
-
 
 
 micro_move_selected_objects = []
@@ -2214,12 +2213,13 @@ micro_move_callback_ids = []
 micro_move_drivers = []
 micro_move_animation_data = {}
 
+
 def micro_move_copy_animation(object_name, attributes):
     global micro_move_animation_data
-    
+
     if object_name not in micro_move_animation_data:
         micro_move_animation_data[object_name] = {}  # Inicializar un diccionario vacío para el objeto
-    
+
     for attribute in attributes:
         keyframes = cmds.keyframe(object_name, attribute=attribute, query=True, timeChange=True)
         if keyframes:
@@ -2253,15 +2253,16 @@ def micro_move_attribute_callback_function(msg, plug, other_plug, client_data):
 
         if isinstance(driver_value, list) or isinstance(driver_value, tuple):
             modified_values = [value / 6 for value in driver_value[0]]
-            cmds.setAttr(duplicated_name, *modified_values, type='double3')
+            cmds.setAttr(duplicated_name, *modified_values, type="double3")
         else:
             cmds.setAttr(duplicated_name, driver_value / 6)
+
 
 def add_micro_move_callback(object_name):
     selection_list = om.MSelectionList()
     selection_list.add(object_name)
     mobject = selection_list.getDependNode(0)
-    
+
     callback_id = om.MNodeMessage.addAttributeChangedCallback(mobject, micro_move_attribute_callback_function, object_name)
     micro_move_callback_ids.append(callback_id)
 
@@ -2275,7 +2276,7 @@ def micro_move_pre_drag(*args):
     if not micro_move_selected_objects:
         raise Exception("Please select an object")
 
-    transform_attrs = ['translateX', 'translateY', 'translateZ']
+    transform_attrs = ["translateX", "translateY", "translateZ"]
 
     for selected in micro_move_selected_objects:
         for attr in transform_attrs:
@@ -2316,13 +2317,13 @@ def micro_move_post_drag():
         duplicate_name = f"{selected}_connect"
         if cmds.objExists(duplicate_name):
             translate_values = {}
-            for attr in ['translateX', 'translateY', 'translateZ']:
+            for attr in ["translateX", "translateY", "translateZ"]:
                 # Verificar si el atributo es settable antes de intentar leerlo
                 if cmds.getAttr(f"{duplicate_name}.{attr}", se=True):
                     translate_values[attr] = cmds.getAttr(f"{duplicate_name}.{attr}")
             cmds.delete(duplicate_name)
         else:
-            translate_values = {'translateX': 0, 'translateY': 0, 'translateZ': 0}
+            translate_values = {"translateX": 0, "translateY": 0, "translateZ": 0}
             cmds.delete(duplicate_name)
 
         driver_name = f"{selected}_driver"
@@ -2350,12 +2351,9 @@ def remove_micro_move_callbacks():
         om.MMessage.removeCallback(id)
     micro_move_callback_ids = []
 
+
 def micro_move_post_drag_deferred(*args):
     cmds.evalDeferred(micro_move_post_drag)
-
-
-
-
 
 
 # _________________________________ MICRO ROTATE ________________________________________________________
@@ -2367,12 +2365,13 @@ micro_rotate_drivers = []
 micro_rotate_connects = []
 micro_rotate_animation_data = {}
 
+
 def micro_rotate_copy_animation(object_name, attributes):
     global micro_rotate_animation_data
-    
+
     if object_name not in micro_rotate_animation_data:
         micro_rotate_animation_data[object_name] = {}  # Inicializar un diccionario vacío para el objeto
-    
+
     for attribute in attributes:
         keyframes = cmds.keyframe(object_name, attribute=attribute, query=True, timeChange=True)
         if keyframes:
@@ -2404,9 +2403,9 @@ def micro_rotate_pack_funtion():
         selection_list = om.MSelectionList()
         selection_list.add(source_object)
         mobject = selection_list.getDependNode(0)
-        
+
         def add_micro_rotate_dirty_callback(mobject, plug, client_data):
-            if plug.partialName() in ('r', 'rx', 'ry', 'rz'):
+            if plug.partialName() in ("r", "rx", "ry", "rz"):
                 rotation = cmds.getAttr(f"{source_object}.rotate")[0]  # Devuelve una tupla
                 half_rotation = [value / 6 for value in rotation]
                 cmds.rotate(half_rotation[0], half_rotation[1], half_rotation[2], target_object, absolute=True)
@@ -2422,7 +2421,7 @@ def micro_rotate_pack_funtion():
 
     micro_rotate_selected_objects = cmds.ls(selection=True)
 
-    transform_attrs = ['rotateX', 'rotateY', 'rotateZ']
+    transform_attrs = ["rotateX", "rotateY", "rotateZ"]
     for selected in micro_rotate_selected_objects:
         for attr in transform_attrs:
             micro_rotate_copy_animation(selected, transform_attrs)
@@ -2438,32 +2437,32 @@ def micro_rotate_pack_funtion():
             cmds.transformLimits(driver, e=True, ry=(0, 0), ery=(False, False))
             cmds.transformLimits(driver, e=True, rz=(0, 0), erz=(False, False))
 
-        transform_attrs = ['rotateX', 'rotateY', 'rotateZ']
+        transform_attrs = ["rotateX", "rotateY", "rotateZ"]
         for attr in transform_attrs:
             if not cmds.getAttr(f"{selected}.{attr}", lock=True):
                 original_value = cmds.getAttr(f"{selected}.{attr}")
                 new_value = original_value * 6
                 cmds.setAttr(f"{driver}.{attr}", new_value)
-        
+
         # Conectar los canales visibles y keyables
         for attr in transform_attrs:
             if cmds.getAttr(f"{selected}.{attr}", se=True):  # se = settable
                 try:
                     cmds.connectAttr(f"{connect}.{attr}", f"{selected}.{attr}", force=True)
                 except RuntimeError as e:
-                    print(f"Unable to connect {attr} from {duplicated} to {selected}: {e}")
+                    print(f"Unable to connect {attr} from {connect} to {selected}: {e}")
 
         add_micro_rotate_callback(driver, connect)
-        
+
     if micro_rotate_drivers:
         cmds.select(micro_rotate_drivers)
     micro_rotate_drivers.clear()
 
 
-
 def micro_rotate_pre_drag(*args):
     cmds.undoInfo(openChunk=True)
     micro_rotate_pack_funtion()
+
 
 def micro_rotate_post_deferred():
     global micro_rotate_selected_objects, micro_rotate_animation_data
@@ -2474,13 +2473,13 @@ def micro_rotate_post_deferred():
 
         if cmds.objExists(duplicate_name):
             rotate_values = {}
-            for attr in ['rotateX', 'rotateY', 'rotateZ']:
+            for attr in ["rotateX", "rotateY", "rotateZ"]:
                 # Verificar si el atributo es settable antes de intentar leerlo
                 if cmds.getAttr(f"{duplicate_name}.{attr}", se=True):
                     rotate_values[attr] = cmds.getAttr(f"{duplicate_name}.{attr}")
             cmds.delete(duplicate_name)
         else:
-            rotate_values = {'rotateX': 0, 'rotateY': 0, 'rotateZ': 0}
+            rotate_values = {"rotateX": 0, "rotateY": 0, "rotateZ": 0}
             cmds.delete(duplicate_name)
 
         if cmds.objExists(duplicate_name):
@@ -2508,20 +2507,19 @@ def remove_micro_rotate_callbacks():
         om.MMessage.removeCallback(id)
     micro_rotate_callback_ids = []
 
+
 def micro_rotate_post_drag(*args):
     cmds.evalDeferred(micro_rotate_post_deferred)
 
 
-
-
 # _______________________________________________ MICRO MOVE CALL __________________________________________________
+
 
 def activate_micro_move(*args):
 
     current_context = cmds.currentCtx()
     microMoveContext = "microMoveCtx"
     microRotateContext = "microRotateCtx"
-
 
     if cmds.contextInfo("dummyCtx", exists=True):
         if cmds.contextInfo(microRotateContext, exists=True):
@@ -2530,20 +2528,25 @@ def activate_micro_move(*args):
         if cmds.contextInfo(microMoveContext, exists=True):
             cmds.deleteUI(microMoveContext, toolContext=True)
 
-        if cmds.contextInfo('dummyCtx', exists=True):
-            cmds.deleteUI('dummyCtx', toolContext=True)
+        if cmds.contextInfo("dummyCtx", exists=True):
+            cmds.deleteUI("dummyCtx", toolContext=True)
 
-        cmds.setToolTo('moveSuperContext')
+        cmds.setToolTo("moveSuperContext")
 
     else:
-
         if current_context == "RotateSuperContext":
             if cmds.contextInfo(microRotateContext, exists=True):
                 cmds.setToolTo(microRotateContext)
             else:
                 cmds.manipRotateContext(microRotateContext)
                 # 0 object, 1 world, 2 gimbal
-                cmds.manipRotateContext(microRotateContext, e=True, preDragCommand=(micro_rotate_pre_drag, 'transform'), postDragCommand=(micro_rotate_post_drag, 'transform'), mode=2)
+                cmds.manipRotateContext(
+                    microRotateContext,
+                    e=True,
+                    preDragCommand=(micro_rotate_pre_drag, "transform"),
+                    postDragCommand=(micro_rotate_post_drag, "transform"),
+                    mode=2,
+                )
                 cmds.setToolTo(microRotateContext)
 
         elif current_context == "moveSuperContext":
@@ -2551,8 +2554,11 @@ def activate_micro_move(*args):
                 cmds.setToolTo(microMoveContext)
             else:
                 cmds.manipMoveContext(microMoveContext)
-                cmds.manipMoveContext(microMoveContext, e=True, preDragCommand=(micro_move_pre_drag, 'transform'), postDragCommand=(micro_move_post_drag_deferred, 'transform'), mode=0)
+                cmds.manipMoveContext(
+                    microMoveContext,
+                    e=True,
+                    preDragCommand=(micro_move_pre_drag, "transform"),
+                    postDragCommand=(micro_move_post_drag_deferred, "transform"),
+                    mode=0,
+                )
                 cmds.setToolTo(microMoveContext)
-
-
-
