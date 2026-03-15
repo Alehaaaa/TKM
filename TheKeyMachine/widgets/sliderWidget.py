@@ -1,4 +1,23 @@
 from __future__ import annotations
+
+from typing import Optional
+import importlib
+
+try:
+    from PySide6.QtCore import Qt, QRect, Signal, QTimer
+    from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath
+    from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton
+except ImportError:
+    from PySide2.QtCore import Qt, QRect, Signal, QTimer
+    from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath
+    from PySide2.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton
+
+import TheKeyMachine.mods.uiMod as ui
+import TheKeyMachine.widgets.util as util
+
+importlib.reload(ui)
+importlib.reload(util)
+
 """
 SliderWidget — COLOR-faithful, single-file recreation (no picks)
 ===============================================================
@@ -15,72 +34,21 @@ What's new (same behavior, nicer structure):
 PySide6 or PySide2 (Maya 2017+). No external COLOR import.
 """
 
-from typing import Optional
-import importlib
-
-# --- Qt compat (PySide6 / PySide2) ---------------------------------------------
-try:  # Maya 2025+
-    # from shiboken6 import wrapInstance  # type: ignore
-    from PySide6.QtCore import Qt, QRect, Signal, QTimer, QSignalBlocker, QPoint  # type: ignore
-    from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen  # type: ignore
-    from PySide6.QtWidgets import ( # type: ignore
-        QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton
-    )  # type: ignore
-    PYSIDE = 6
-except ImportError:  # Maya 2017–2024
-    # from shiboken2 import wrapInstance
-    from PySide2.QtCore import Qt, QRect, Signal, QTimer, QSignalBlocker, QPoint
-    from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen
-    from PySide2.QtWidgets import (
-        QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton
-    )
-    PYSIDE = 2
-
-# Optional in Maya contexts; harmless if unused
-try:
-    import maya.OpenMayaUI as mui
-except ImportError:
-    import maya.api.OpenMayaUI as mui
-
-
-
-
-import TheKeyMachine.mods.uiMod as ui
-importlib.reload(ui)
-
-
-
 
 COLOR = ui.Color()
 
 
-# --- utility: reset slider value without emitting signals -----------------------
-class _ResetWithoutEmit:
-    def __init__(self, slider: QSlider):
-        self._slider = slider
-
-    def __call__(self):
-        blocker = QSignalBlocker(self._slider)
-        self._slider.setValue(getattr(self._slider, "defaultValue", 0))
-        if hasattr(self._slider, "_apply_stylesheet"):
-            self._slider._apply_stylesheet(thick=False)  # type: ignore[attr-defined]
-        if hasattr(self._slider, "_pressOffset"):
-            self._slider._pressOffset = None  # type: ignore[attr-defined]
-
-
 # --- tiny button with centered square ------------------------------------------
-class _SliderButton(QPushButton):
+class SliderButton(QPushButton):
     """Flat square-indicator button that emits its signed percent on click."""
+
     def __init__(self, parent: QWidget, *, percent: int, color: str, worldSpace: bool = False):
         super().__init__(parent)
         self._percent = percent
         self._color = color
-        self._box_sz = 6 if abs(percent) == 100 else 3
+        self._box_sz = util.DPI(6) if abs(percent) == 100 else util.DPI(3)
         self.setFixedHeight(parent.height())
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        # self.setToolTip(f"{percent:+d}%")
-        # self.setStatusTip(f"{percent:+d}%")
 
         self.setStyleSheet(
             "QPushButton { background: none; border-radius: 0; }"
@@ -92,11 +60,10 @@ class _SliderButton(QPushButton):
     @property
     def percent(self) -> int:
         return self._percent
-    
+
     def setWorldSpace(self, enabled: int):
         self._worldSpace = enabled
         self.update()
-
 
     def paintEvent(self, e):
         super().paintEvent(e)
@@ -129,9 +96,9 @@ class _SliderButton(QPushButton):
             p.drawLine(cx - r + 1, cy, cx + r - 1, cy)
 
             # Curved meridians (left/right)
-            mer_w = int(2 * r * 0.45)               # tweak curvature here (0.5–0.65 looks good)
+            mer_w = int(2 * r * 0.45)  # tweak curvature here (0.5–0.65 looks good)
             mer_rect = QRect(cx - mer_w // 2, cy - r, mer_w, 2 * r)
-            p.drawArc(mer_rect, 90 * 14,  180 * 16)  # left arc
+            p.drawArc(mer_rect, 90 * 14, 180 * 16)  # left arc
             p.drawArc(mer_rect, 90 * 14, -180 * 16)  # right arc
         else:
             # Default: small filled square
@@ -142,10 +109,10 @@ class _SliderButton(QPushButton):
         p.end()
 
 
-
 # --- core slider (custom painting & handle-only interaction) --------------------
-class _HandleOnlySlider(QSlider):
+class HandleOnlySlider(QSlider):
     """Horizontal slider that only drags when grabbing the handle."""
+
     started = Signal()
     moved = Signal(float)
     finished = Signal(float)
@@ -163,11 +130,11 @@ class _HandleOnlySlider(QSlider):
         self.defaultValue = value
         self._color = color
         self._text = text
-        self._thin_h = 10
-        self._handle = 24
-        self._handle_radius = 5
-        self._border_px = 1
-        self._padding_lr = 8
+        self._thin_h = util.DPI(10)
+        self._handle = util.DPI(24)
+        self._handle_radius = util.DPI(5)
+        self._border_px = util.DPI(1)
+        self._padding_lr = util.DPI(8)
         self._pressOffset: Optional[int | bool] = None  # bool True = "wheel active"
         self._hover = False
 
@@ -179,13 +146,13 @@ class _HandleOnlySlider(QSlider):
 
         # fonts
         self._value_font = QFont()
-        self._value_font.setPointSize(14)
+        self._value_font.setPointSize(util.DPI(14))
         self._text_font = QFont()
-        self._text_font.setPointSize(8)
+        self._text_font.setPointSize(util.DPI(9))
 
         # size
-        self.setFixedWidth(200)
-        self.setFixedHeight(24)
+        self.setFixedWidth(util.DPI(200))
+        self.setFixedHeight(util.DPI(24))
 
         # self.setToolTip(f"Slider for {text}")
         # self.setStatusTip(f"Slider for {text}")
@@ -235,7 +202,7 @@ class _HandleOnlySlider(QSlider):
 
     # --- internals --------------------------------------------------------------
     def _reset_without_emit(self):
-        reset = _ResetWithoutEmit(self)
+        reset = util.ResetWithoutEmit(self)
         reset()
         self.finished.emit(self.percent())
 
@@ -260,7 +227,7 @@ QSlider::groove:horizontal {{
     margin: 0 {self._padding_lr}px;
 }}
 QSlider::handle:horizontal {{
-    width: {int(h*1.05)}px;
+    width: {int(h * 1.05)}px;
     height: {h}px;
     margin-top: {mt}px;
     margin-bottom: {mb}px;
@@ -278,11 +245,10 @@ QSlider::handle:horizontal {{
     # geometry helpers
     def _groove_rect(self) -> QRect:
         gh = self._handle if self._is_active() else self._thin_h
-        return QRect(self._padding_lr, (self.height() - gh)//2,
-                    self.width()-2*self._padding_lr, gh)
+        return QRect(self._padding_lr, (self.height() - gh) // 2, self.width() - 2 * self._padding_lr, gh)
 
     def _handle_rect(self) -> QRect:
-        track_w = self.width() - 2*self._padding_lr - self._handle
+        track_w = self.width() - 2 * self._padding_lr - self._handle
         if track_w <= 0:
             x = self._padding_lr
         else:
@@ -290,7 +256,7 @@ QSlider::handle:horizontal {{
             ratio = (self.sliderPosition() - self.minimum()) / (rng or 1.0)
             x = int(self._padding_lr + ratio * track_w)
         gh = self._handle if self._is_active() else self._thin_h
-        y  = (self.height() - gh) // 2
+        y = (self.height() - gh) // 2
         return QRect(x, y, self._handle, gh)
 
     def _handle_hit_rect(self) -> QRect:
@@ -364,15 +330,26 @@ QSlider::handle:horizontal {{
         hrect = self._handle_rect()
         p.setRenderHint(QPainter.Antialiasing)
 
-        # text shadow
-        p.setPen(QColor(QColor(COLOR.color.darkGray)))
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            p.drawText(hrect.translated(dx, dy), Qt.AlignCenter, self._text)
-
-        # label text
+        # label text with thin outline
         p.setFont(self._text_font)
-        p.setPen(QColor(self._color))
-        p.drawText(hrect, Qt.AlignCenter, self._text)
+        fm = p.fontMetrics()
+        tw = fm.horizontalAdvance(self._text)
+        # Calculate baseline position to center text in hrect
+        tx = hrect.x() + (hrect.width() - tw) / 2.0
+        ty = hrect.y() + (hrect.height() + fm.capHeight()) / 2.0
+
+        path = QPainterPath()
+        path.addText(tx, ty, self._text_font, self._text)
+
+        # 1. Draw thin outline (drawn first so it sits BEHIND the fill, growing only outwards)
+        p.setPen(QPen(QColor(COLOR.color.darkGray), util.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        p.setBrush(Qt.NoBrush)
+        p.drawPath(path)
+
+        # 2. Draw fill (drawn ON TOP of the outline, covering the inner half of the stroke)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(self._color))
+        p.drawPath(path)
 
         if not self._pressOffset:
             p.end()
@@ -382,14 +359,12 @@ QSlider::handle:horizontal {{
         g = self._groove_rect()
         cx = hrect.center().x()
         mid = self.width() // 2
-        pad = 6
+        pad = util.DPI(6)
         if cx < mid:
-            text_rect = QRect(cx + hrect.width() // 2 + pad, g.y(),
-                              g.right() - (cx + hrect.width() // 2) - pad + 1, g.height())
+            text_rect = QRect(cx + hrect.width() // 2 + pad, g.y(), g.right() - (cx + hrect.width() // 2) - pad + 1, g.height())
             align = Qt.AlignVCenter | Qt.AlignRight
         else:
-            text_rect = QRect(g.x(), g.y(),
-                              max(0, cx - hrect.width() // 2 - pad - g.x()), g.height())
+            text_rect = QRect(g.x(), g.y(), max(0, cx - hrect.width() // 2 - pad - g.x()), g.height())
             align = Qt.AlignVCenter | Qt.AlignLeft
         p.setFont(self._value_font)
         p.setPen(QColor(COLOR.color.lightGray))
@@ -407,6 +382,7 @@ class SliderWidget(QWidget):
       - dragStarted()
       - dragFinished()
     """
+
     valueChanged = Signal(float)
     dragStarted = Signal()
     dragFinished = Signal()
@@ -422,7 +398,7 @@ class SliderWidget(QWidget):
         dragCommand=None,
         dropCommand=None,
         worldSpace=None,
-        p=None
+        p=None,
     ):
         super().__init__(None)
         if name:
@@ -437,7 +413,7 @@ class SliderWidget(QWidget):
         base.setContentsMargins(0, 0, 0, 0)
         base.setSpacing(0)
 
-        self._slider = _HandleOnlySlider(self, value=int(value * self._scale), text=text, color=color)
+        self._slider = HandleOnlySlider(self, value=int(value * self._scale), text=text, color=color)
         self._slider.setRange(int(min * self._scale), int(max * self._scale))
         self._slider.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         base.addWidget(self._slider, 0, Qt.AlignCenter)
@@ -458,22 +434,20 @@ class SliderWidget(QWidget):
             lay.setContentsMargins(0, 0, 0, 0)
             lay.setSpacing(0)
 
-
         values = [150, 125, 105, 100, 50, 15, 5]
 
         # left side buttons (near handle => AlignRight)
         self._leftButtons = []
         for v in values:
-            b = _SliderButton(self._leftOverlay, percent=-abs(v), color=color, worldSpace=self._worldSpace)
+            b = SliderButton(self._leftOverlay, percent=-abs(v), color=color, worldSpace=self._worldSpace)
             b.clicked.connect(lambda _c=False, btn=b: self._on_button_clicked(btn))
             self._leftLayout.addWidget(b, 1)
             self._leftButtons.append(b)
 
-
         # right side buttons (AlignLeft)
         self._rightButtons = []
         for v in reversed(values):
-            b = _SliderButton(self._rightOverlay, percent=v, color=color)
+            b = SliderButton(self._rightOverlay, percent=v, color=color)
             b.clicked.connect(lambda _c=False, btn=b: self._on_button_clicked(btn))
             self._rightLayout.addWidget(b, 1)
             self._rightButtons.append(b)
@@ -494,7 +468,8 @@ class SliderWidget(QWidget):
 
         # add to provided layout, if any
         if p is not None:
-            try: p.addWidget(self)
+            try:
+                p.addWidget(self)
             except Exception as e:
                 print("SliderWidget: could not add to provided layout:", e)
 
@@ -508,7 +483,7 @@ class SliderWidget(QWidget):
     def setColor(self, color: str):
         self._slider._color = color
         self._slider._apply_stylesheet(thick=False)
-    
+
     def setWorldSpace(self, enabled: int):
         if enabled == self._worldSpace:
             return
@@ -522,18 +497,21 @@ class SliderWidget(QWidget):
             p = int(b.percent)
             if abs(p) == 100:
                 b.setWorldSpace(enabled)
-        
+
         self._worldSpace = enabled
 
-
     def setDragCommand(self, dragCommand):
-        try: self.valueChanged.disconnect()
-        except Exception: pass
+        try:
+            self.valueChanged.disconnect()
+        except Exception:
+            pass
         self.valueChanged.connect(dragCommand)
-    
+
     def setDropCommand(self, dropCommand):
-        try: self.dragFinished.disconnect()
-        except Exception: pass
+        try:
+            self.dragFinished.disconnect()
+        except Exception:
+            pass
         self.dragFinished.connect(dropCommand)
 
     def setRange(self, min_v: int, max_v: int):
@@ -608,7 +586,6 @@ class SliderWidget(QWidget):
         self._leftOverlay.raise_()
         self._rightOverlay.raise_()
 
-
     def startFlash(self, flashes: int = 3, interval: int = 40):
         """
         Overlay the widget in white a given number of flashes, then remove it.
@@ -637,8 +614,6 @@ class SliderWidget(QWidget):
         # Inicia primer toggle
         toggle()
 
-
-
     # --- signal plumbing --------------------------------------------------------
     def _on_drag_started(self):
         self.dragStarted.emit()
@@ -653,6 +628,6 @@ class SliderWidget(QWidget):
         self._leftOverlay.show()
         self._rightOverlay.show()
 
-    def _on_button_clicked(self, btn: _SliderButton):
+    def _on_button_clicked(self, btn: SliderButton):
         # keep existing behavior: emit valueChanged with the button's percent
         self.valueChanged.emit(float(btn.percent))
