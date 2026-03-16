@@ -103,7 +103,7 @@ move_key_left_b_widget_tooltip_text = (
 
 
 remove_inbetween_b_widget_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Remove Inbetween </b></font><br><br>Remove one inbetween.<br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Remove Inbetween</b></font><br><br>Remove one inbetween.<br><br>"
 )
 
 
@@ -114,12 +114,12 @@ move_keyframes_intField_widget_tooltip_text = (
 )
 
 add_inbetween_b_widget_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Add Inbetween </b></font><br><br>Add one inbetween<br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Add Inbetween</b></font><br><br>Add one inbetween<br><br>"
 )
 
 
 move_key_right_b_widget_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Nudge Keys Right </b></font><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Nudge Keys Right</b></font><br><br>"
     "Move the selected keyframes by the number of frames specified in the central box.<br><br>"
     ""
 )
@@ -149,34 +149,34 @@ select_scene_animation_widget_tooltip_text = (
 
 
 blend_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Blend </b></font><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Blend to Neighbor</b></font><br><br>"
     "Blend between previous and next keyframe value.<br><br>"
     "Select channels in the Channel Box to adjust only those channels.<br><br>"
 )
 
 blend_to_default_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Blend to Default </b></font><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Blend to Default</b></font><br><br>"
     "Blend current value towards its default value.<br><br>"
 )
 
 blend_to_frame_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Blend to Frame </b></font><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Blend to Frame</b></font><br><br>"
     "Upon pressing each button, the current frame is assigned to the button.<br>"
     "The blend slider will perform the blending function between the assigned frames.<br><br>"
 )
 
 pull_push_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Pull / Push </b></font><br><br>Pull or Push the keyframes.<br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Pull / Push</b></font><br><br>Soften or intessify the animation.<br><br>"
 )
 
 tweener_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tweener </b></font><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tweener</b></font><br><br>"
     "Tween between previous and next keyframe.<br><br>"
     "Select channels in the Channel Box to adjust only those channels.<br><br>"
 )
 
 tweener_world_space_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tweener World Space </b></font><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tweener World Space</b></font><br><br>"
     "Tween between previous and next keyframe in world space.<br><br>"
 )
 
@@ -208,13 +208,13 @@ step_tangent_tooltip_text = (
 # ----- ReBlock, ShareKeys, BakeKeys
 
 block_keys_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>reBlock </b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>reBlock</b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "reBlock helps you place all animation keys where your main poses are. Especially useful when some keyframes have moved out of place.<br><br>"
     "Use: Simply select the objects and run the tool.<br>"
     "</font>"
     "<br><br>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Share Keys </b></font><img src='{media.share_keys_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Share Keys</b></font><img src='{media.share_keys_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool allows you to share keys position between one object and another so that both objects have the same keyframes position.<br><br>"
     "You can share keys to more than one object at the same time.<br><br>"
@@ -222,14 +222,14 @@ block_keys_tooltip_text = (
     "Use: First select the object that has the keyframes, followed by the objects you want to share the keyframes with.<br>"
     "</font>"
     "<br><br>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake Anim </b></font><img src='{media.bake_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake Anim</b></font><img src='{media.bake_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "A simple way of baking all your animation. By default this tool switch your curves to step mode.<br><br>"
     "Select the objects you want to bake and run the tool.<br><br>"
     "Use: Add '2' in interval to bake you animation every 2 frames.<br><br>"
     "</font>"
     ""
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Gimbal Fixer </b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Gimbal Fixer</b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Gimbal Fixer allows you to change the rotation order of a control or object without altering the existing animation.<br>"
     "It is ideal for changing the rotation order when we have a control with gimbal lock.<br><br>"
@@ -243,17 +243,17 @@ block_keys_tooltip_text = (
 
 
 pointer_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Rig Controls </b></font><img src='{media.select_rig_controls_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Rig Controls</b></font><img src='{media.select_rig_controls_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool selects all rig controls. Selected controls will be only nurbs curves."
     "</font>"
     "<br><br>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Animated Rig Controls </b></font><img src='{media.select_animated_rig_controls_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Animated Rig Controls</b></font><img src='{media.select_animated_rig_controls_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool selects all animated rig controls. Selected controls will be only nurbs curves."
     "</font>"
     "<br><br>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Depth Mover </b></font><img src='{media.depth_mover_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Depth Mover</b></font><img src='{media.depth_mover_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Adjust object depth without altering its camera-relative position or angle.<br><br>"
     "</font>"
@@ -265,7 +265,7 @@ pointer_tooltip_text = (
 
 
 isolate_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Isolate  </b></font><img src='{isolate_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Isolate </b></font><img src='{isolate_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool allows you to isolate the entire rig by selecting just a single control.<br><br>"
     "You can utilize this tool to isolate multiple rigs simultaneously or select both<br>"
@@ -281,7 +281,7 @@ isolate_tooltip_text = (
 
 
 createLocator_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Temp locator   </b></font><img src='{create_locator_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Temp locator  </b></font><img src='{create_locator_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Create temp locators on the spot in the selected object or objects.<br><br><br>"
     "Right-click for options.<br>"
@@ -289,7 +289,7 @@ createLocator_tooltip_text = (
 )
 
 align_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Match / Align  </b></font><img src='{match_image}' width='30'><br><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Match / Align </b></font><img src='{match_image}' width='30'><br><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Aling one object to another.<br><br>"
     "First select the child object, then the parent object.<br><br>"
@@ -300,7 +300,7 @@ align_tooltip_text = (
 )
 
 tracer_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tracer  </b></font><img src='{tracer_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tracer </b></font><img src='{tracer_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Create a motion trail on the selected object<br><br>"
     "This is a modified Maya's motion trail. You can activate or desactivate it so that it will not refresh eveytime you move the tracked object<br><br>"
@@ -313,7 +313,7 @@ tracer_tooltip_text = (
 )
 
 reset_values_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Reset to default  </b></font><img src='{reset_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Reset to default </b></font><img src='{reset_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Reset objects to their default values. Handy to reset a pose, or attributes in an object.<br><br>"
     "Select channels in the ChannelBox to reset only the selected channels.<br><br>"
@@ -325,7 +325,7 @@ reset_values_tooltip_text = (
 )
 
 delete_animation_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Delete Animation </b></font><img src='{delete_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Delete Animation</b></font><img src='{delete_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Delete animation in all animation channels.<br><br>"
     "Select channels in the ChannelBox to remove animation only in the selected channels.<br><br>"
@@ -340,7 +340,7 @@ delete_animation_tooltip_text = (
 
 
 select_opposite_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select opposite </b></font><img src='{media.select_opposite_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select opposite</b></font><img src='{media.select_opposite_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Select the opposite control of a rig. You can select more than one object at a time.<br><br>"
     ""
@@ -351,7 +351,7 @@ select_opposite_tooltip_text = (
 )
 
 copy_opposite_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy opposite </b></font><img src='{media.copy_opposite_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy opposite</b></font><img src='{media.copy_opposite_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy the current values from the selected objects to their opposite.<br><br>"
     "Keep in mind that this tool works in conjunction with the Mirror tool. Any exception added in Mirror will affect this tool.<br><br>"
@@ -360,7 +360,7 @@ copy_opposite_tooltip_text = (
 )
 
 mirror_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Mirror </b></font><img src='{media.mirror_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Mirror</b></font><img src='{media.mirror_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool creates mirror positions for the selected objects.<br><br>"
     "Given the large number of existing rigs, it may sometimes be necessary to configure the tool. This is done by adding exceptions so that the mirror functions correctly.<br>"
@@ -371,13 +371,13 @@ mirror_tooltip_text = (
 )
 
 copy_paste_animation_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Animation </b></font><img src='{media.copy_paste_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Animation</b></font><img src='{media.copy_paste_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy and paste animations of objects or controls.<br>"
     "The animation is saved in a file, so it can be pasted in another Maya session.<br><br>"
     "If you have copied only one side of the controls, you can paste them on the opposite side.<br><br>"
     "</font>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Pose </b></font><img src='{media.copy_pose_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Pose</b></font><img src='{media.copy_pose_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy and paste poses between the same or different character. The pose is saved in a file, so it can be pasted in another Maya session.<br><br>"
     "To paste poses between characters, they must have the same control name.<br><br>"
@@ -386,7 +386,7 @@ copy_paste_animation_tooltip_text = (
 
 
 selector_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Selector </b></font><img src='{media.selector_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Selector</b></font><img src='{media.selector_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Display all selected items in a window where you can make individual or group selections.<br><br>"
     "The list is sorted in alphabetical or numerical order. Use the 'Reload' option to refresh the items you see in the window.<br><br>"
@@ -395,7 +395,7 @@ selector_tooltip_text = (
 )
 
 select_hierarchy_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select hierarchy </b></font><img src='{media.select_hierarchy_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select hierarchy</b></font><img src='{media.select_hierarchy_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Select the descending hierarchy from the currently selected objects.<br><br>"
     "Select the shoulder control of an FK arm to select shoulder-forearm-wrist. It's also useful for selecting all the finger controls of a hand by only selecting the top controls.<br><br>"
@@ -404,7 +404,7 @@ select_hierarchy_tooltip_text = (
 )
 
 animation_offset_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Animation offset </b></font><img src='{media.animation_offset_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Animation offset</b></font><img src='{media.animation_offset_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Animation offset allows you to move the position of an animated object without affecting the existing animation.<br>"
     "The position change made propagates throughout the entire existing animation.<br><br>"
@@ -414,7 +414,7 @@ animation_offset_tooltip_text = (
 )
 
 link_objects_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Link objects </b></font><img src='{media.link_objects_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Link objects</b></font><img src='{media.link_objects_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Link objects is like using parent constraints without constraints.<br>"
     "The tool allows you to save the relationship between several objects and apply that relationship back when needed.<br><br>"
@@ -431,7 +431,7 @@ link_objects_tooltip_text = (
 )
 
 follow_cam_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>FollowCam </b></font><img src='{media.follow_cam_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>FollowCam</b></font><img src='{media.follow_cam_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "FollowCam creates a camera that will follow the selected object.<br><br>"
     "It's useful when you need to make animation changes to an object that is moving, in this way the object will remain static in the camera's view.<br><br>"
@@ -440,7 +440,7 @@ follow_cam_tooltip_text = (
 )
 
 copy_worldspace_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace </b></font><img src='{media.copy_worldspace_animation_image}' width='28'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace</b></font><img src='{media.copy_worldspace_animation_image}' width='28'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy and paste world space positions. Useful for reseting, for example, the master control in a walking cycle.<br><br>"
     "To 'Copy' select a group of controls and click 'Copy worldspace'.<br><br>"
@@ -449,14 +449,14 @@ copy_worldspace_tooltip_text = (
     f"<font style='color: #869fac; font-size:{font_size};'>Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Copy worldspace</font><br>"
     f"<font style='color: #869fac; font-size:{font_size};'>Shift + Click &nbsp;&nbsp;&nbsp; Paste worldspace</font>"
     "</font><br><br>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace Current Frame </b></font><img src='{media.copy_worldspace_frame_animation_image}' width='28'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace Current Frame</b></font><img src='{media.copy_worldspace_frame_animation_image}' width='28'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy and paste world space values for the current frame.<br><br>"
     "</font>"
 )
 
 temp_pivot_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Temp pivot </b></font><img src='{media.temp_pivot_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Temp pivot</b></font><img src='{media.temp_pivot_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Temp pivot allows you to create temporary pivots.<br><br>"
     "These pivots are created without affecting object's animation or pivot and without using any kind of constraint.<br><br>"
@@ -468,7 +468,7 @@ temp_pivot_tooltip_text = (
 
 
 micro_move_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Micro Move </b></font><img src='{media.ruler_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Micro Move</b></font><img src='{media.ruler_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "The tool allows you to move and rotate controls at a much slower speed than usual.<br><br>"
     "It is especially useful for adjusting facial controls. The tool has some limitations:<br><br>"
@@ -479,7 +479,7 @@ micro_move_tooltip_text = (
 
 
 selection_sets_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Selection Sets </b></font><img src='{media.selection_sets_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Selection Sets</b></font><img src='{media.selection_sets_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Create sets of selections.<br><br>"
     "Use the 'main' group to add selection sets that are not related to each other, or create 'Groups' to group all sets under the same category.<br><br>"
@@ -491,7 +491,7 @@ selection_sets_tooltip_text = (
 )
 
 customGraph_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>customGraph </b></font><img src='{media.customGraph_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>customGraph</b></font><img src='{media.customGraph_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Open GraphEditor with the customGraph add-on.<br><br>"
     "customGraph is a specific set of tools for the GraphEditor. Manipulate animation curves, lock or mute channels, or create specific selection sets.<br><br>"
@@ -499,7 +499,7 @@ customGraph_tooltip_text = (
 )
 
 custom_tools_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Custom Tools </b></font><img src='{media.custom_tools_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Custom Tools</b></font><img src='{media.custom_tools_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool it's designed to add shortcuts to the pipeline tools you use in your day-to-day.<br><br>"
     "</font>"
@@ -509,7 +509,7 @@ custom_tools_tooltip_text = (
 )
 
 custom_scripts_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Custom Scripts </b></font><img src='{media.custom_scripts_image}' width='30', height='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Custom Scripts</b></font><img src='{media.custom_scripts_image}' width='30', height='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool it's designed to add shortcuts to your personal scripts and third-party tools.<br><br>"
     "If you don't like using Maya's shelf, this is the perfect place to centralize your scripts. "

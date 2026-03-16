@@ -18,35 +18,20 @@ Modified by: Alehaaaa / alehaaaa.github.io
 """
 
 import maya.cmds as cmds
-import maya.mel as mel
-from maya import OpenMaya as om
 from maya import OpenMayaUI as omui
-from maya.api import OpenMaya as om
 
 
 try:
     from shiboken2 import wrapInstance
-    from PySide2.QtGui import QIcon
-    from PySide2.QtGui import QPixmap
-    from PySide2.QtWidgets import QWidget
-    from PySide2.QtWidgets import *
     from PySide2 import QtWidgets
 except ImportError:
     from shiboken6 import wrapInstance
-    from PySide6 import QtWidgets, QtCore, QtGui
-    from PySide6.QtWidgets import QApplication
-    from PySide6.QtCore import QTimer
+    from PySide6 import QtWidgets
 
 import json
-import os
-import urllib.request
-import ssl
-import re
-import shutil
-import base64
 import subprocess
+import os
 import sys
-import platform
 
 
 def load_config():
@@ -97,23 +82,27 @@ USER_FOLDER_PATH = config["USER_FOLDER_PATH"]
 
 
 def get_thekeymachine_version():
-    thekeymachine_version = "0.1.51"
-    return thekeymachine_version
+    import TheKeyMachine
+
+    return getattr(TheKeyMachine, "__version__", "unknown")
 
 
 def get_thekeymachine_stage_version():
-    thekeymachine_stage_version = "beta"
-    return thekeymachine_stage_version
+    import TheKeyMachine
+
+    return getattr(TheKeyMachine, "__stage__", "unknown")
 
 
 def get_thekeymachine_build_version():
-    thekeymachine_build_version = "308"
-    return thekeymachine_build_version
+    import TheKeyMachine
+
+    return getattr(TheKeyMachine, "__build__", "unknown")
 
 
 def get_thekeymachine_codename():
-    thekeymachine_codename = "Jell-O"
-    return thekeymachine_codename
+    import TheKeyMachine
+
+    return getattr(TheKeyMachine, "__codename__", "unknown")
 
 
 # ----- RUTAS ----------------------------------------------------------------------
@@ -301,7 +290,7 @@ def open_url(url):
 
 
 def open_file(sub_directory, file_name):
-    scripts_dirm = cmds.internalVar(userAppDir=True)
+    # scripts_dirm = cmds.internalVar(userAppDir=True)
     directory = os.path.join(USER_FOLDER_PATH, sub_directory)
 
     # Combinar el directorio y el nombre del archivo para obtener la ruta completa del archivo

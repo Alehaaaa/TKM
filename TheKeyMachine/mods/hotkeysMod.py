@@ -105,7 +105,7 @@ def create_TheKeyMachine_hotkeys(*args):
 
     selectHierarchy = 'import TheKeyMachine.mods.barMod as bar; bar.selectHierarchy()'
 
-    toggleAnimOffsetButton = 'import TheKeyMachine.core.toolbar as toolbar; toolbar.tb.toggleAnimOffsetButton()'
+    toggleAnimOffsetButton = 'from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggleAnimOffsetButton() if tb else None'
 
     create_follow_cam = 'import TheKeyMachine.mods.barMod as bar; bar.create_follow_cam(translation=True, rotation=True)'
 
@@ -135,7 +135,7 @@ def create_TheKeyMachine_hotkeys(*args):
 
     set_step_tangent = 'import TheKeyMachine.mods.barMod as bar; bar.setTangent("step")'
 
-    SelectionSetsToggle = 'import TheKeyMachine.core.toolbar as toolbar; toolbar.tb.toggle_selection_sets_workspace()'
+    SelectionSetsToggle = 'from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggle_selection_sets_workspace() if tb else None'
 
 
 

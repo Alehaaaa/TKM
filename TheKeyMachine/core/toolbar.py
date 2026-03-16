@@ -18,37 +18,35 @@ Modified by: Alehaaaa / alehaaaa.github.io
 """
 
 # Maya related imports
-import maya.cmds as cmds
-import maya.mel as mel
-import maya.utils as utils
-import maya.OpenMayaUI as mui
+from maya import cmds, mel, utils, OpenMayaUI as mui
+from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 
 try:
-    from shiboken6 import wrapInstance  # type: ignore
-    from PySide6 import QtWidgets, QtCore, QtGui  # type: ignore
-    from PySide6.QtCore import QTimer  # type: ignore # , Signal
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6.QtCore import QTimer
+    from shiboken6 import wrapInstance, isValid
 
     QActionGroup = QtGui.QActionGroup
+
 except ImportError:
-    # Qt related imports
-    from shiboken2 import wrapInstance
     from PySide2 import QtWidgets, QtCore, QtGui
-    from PySide2.QtCore import QTimer  # , Signal
+    from PySide2.QtCore import QTimer
+    from shiboken2 import wrapInstance, isValid
 
     QActionGroup = QtWidgets.QActionGroup
 
 
 # Standard library imports
 import os
-import shutil
-import platform
 import re
 import time
 import json
-import functools
-from functools import partial
+import shutil
+import platform
 import threading
 import importlib
+
+from functools import partial
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -59,12 +57,14 @@ import importlib
 import TheKeyMachine.mods.generalMod as general  # type: ignore
 import TheKeyMachine.mods.uiMod as ui  # type: ignore
 import TheKeyMachine.mods.keyToolsMod as keyTools  # type: ignore
-import TheKeyMachine.mods.selSetsMod as selSets  # type: ignore
+
+# import TheKeyMachine.mods.selSetsMod as selSets  # type: ignore
 import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
 import TheKeyMachine.mods.styleMod as style  # type: ignore
 import TheKeyMachine.mods.barMod as bar  # type: ignore
 import TheKeyMachine.mods.hotkeysMod as hotkeys  # type: ignore
+import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.core.customGraph as cg  # type: ignore
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
@@ -72,27 +72,20 @@ from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 import TheKeyMachine.tooltips as tooltips  # type: ignore
 import TheKeyMachine.tooltips.tooltip as tt  # type: ignore
 
-import ssl
-
-
-ssl._create_default_https_context = ssl._create_unverified_context
-
 
 # -----------------------------------------------------------------------------------------------------------------------------
 #              TheKeyMachine configuration is loaded from the JSON, or the default installation paths are used.               #
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-from TheKeyMachine.mods.generalMod import config  # type: ignore
-
-INSTALL_PATH = config["INSTALL_PATH"]
-USER_FOLDER_PATH = config["USER_FOLDER_PATH"]
-UPDATER = config["UPDATER"]
-BUG_REPORT = config["BUG_REPORT"]
-CUSTOM_TOOLS_MENU = config["CUSTOM_TOOLS_MENU"]
-CUSTOM_TOOLS_EDITABLE_BY_USER = config["CUSTOM_TOOLS_EDITABLE_BY_USER"]
-CUSTOM_SCRIPTS_MENU = config["CUSTOM_SCRIPTS_MENU"]
-CUSTOM_SCRIPTS_EDITABLE_BY_USER = config["CUSTOM_SCRIPTS_EDITABLE_BY_USER"]
+INSTALL_PATH = general.config["INSTALL_PATH"]
+USER_FOLDER_PATH = general.config["USER_FOLDER_PATH"]
+UPDATER = general.config["UPDATER"]
+BUG_REPORT = general.config["BUG_REPORT"]
+CUSTOM_TOOLS_MENU = general.config["CUSTOM_TOOLS_MENU"]
+CUSTOM_TOOLS_EDITABLE_BY_USER = general.config["CUSTOM_TOOLS_EDITABLE_BY_USER"]
+CUSTOM_SCRIPTS_MENU = general.config["CUSTOM_SCRIPTS_MENU"]
+CUSTOM_SCRIPTS_EDITABLE_BY_USER = general.config["CUSTOM_SCRIPTS_EDITABLE_BY_USER"]
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -100,7 +93,7 @@ CUSTOM_SCRIPTS_EDITABLE_BY_USER = config["CUSTOM_SCRIPTS_EDITABLE_BY_USER"]
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-USER_PREFERENCE_FILE = os.path.normpath(os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/preferences/user_preferences.py"))
+USER_PREFERENCE_FILE = os.path.normpath(os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data", "preferences", "user_preferences.py"))
 USER_PREFERENCE_FILE_CODE = """
 #____________________ TheKeyMachine User Preferences  ________________________ #
 
@@ -118,7 +111,7 @@ if not os.path.exists(USER_PREFERENCE_FILE):
 
 # Attempt to import the user preferences module
 try:
-    import TheKeyMachine_user_data.preferences.user_preferences as user_preferences  # type: ignore
+    from TheKeyMachine_user_data.preferences import user_preferences  # type: ignore
 except ImportError as e:
     print(f"Error al importar: {e}")
 
@@ -220,10 +213,20 @@ selection_sets_workspace = "s"
 COLOR = ui.Color()
 
 
-class toolbar(object):
+class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     open_new_scene_scriptJob = None
+    selection_script_job = None
 
-    def __init__(self):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setWindowTitle("TheKeyMachine")
+        self.setObjectName(WorkspaceName)
+        self.setContextMenuPolicy(QtCore.Qt.PreventContextMenu)
+
+        self.shelf_painter = None
+        self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
+
+        # Initial state variables
         self.bar_center_value = 10
         self.anim_offset_run_timer = True
         self.toggleAnimOffsetButtonState = False
@@ -251,7 +254,8 @@ class toolbar(object):
         # Utility for determining screen resolution
         screen_width, screen_height = self.get_screen_resolution()
         self.screen_width = screen_width
-        # print(f"Screen width: {self.screen_width}")
+
+        self.buildUI()
 
         # Attempt to load customGraph
         QTimer.singleShot(6000, self.load_customGraph_try_01)
@@ -275,6 +279,207 @@ class toolbar(object):
 
         return screen_width, screen_height
 
+    def showWindow(self):
+        # Build up kwargs for the visibleChangeCommand
+        visible_change_kwargs = {
+            "visibleChangeCommand": self.visible_change_command,
+        }
+
+        # Show the window first to ensure parenting is established
+        self.show(dockable=True, retain=False, **visible_change_kwargs)
+
+        # Now we can safely check for workspace names
+        try:
+            parent = self.parent()
+            workspace_control = parent.objectName() if parent and isValid(parent) else self.objectName() + "WorkspaceControl"
+        except (RuntimeError, AttributeError):
+            workspace_control = self.objectName() + "WorkspaceControl"
+
+        # Build up kwargs for the workspaceControl command
+        kwargs = {
+            "e": True,
+            "visibleChangeCommand": self.visible_change_command,
+        }
+
+        if self.isFloating():
+            kwargs["tp"] = ["west", 0]
+            kwargs["rsw"] = 900
+            kwargs["rsh"] = 40
+
+        # Check if it was just created
+        if cmds.workspaceControl(workspace_control, q=True, exists=True):
+            try:
+                # Apply initial docking if it's new (or just ensure it's correct)
+                # We can't easily know if it's 'new' after self.show() since self.show() creates it
+                # but we can try to apply it anyway if it's not already docked where we want.
+                # Cams.py uses evalDeferred for some things.
+                TIME_SLIDER = mel.eval('getUIComponentToolBar("Time Slider", false)')
+                cmds.workspaceControl(workspace_control, edit=True, dtc=(TIME_SLIDER, "top"))
+                cmds.workspaceControl(workspace_control, edit=True, tabPosition=["west", 0])
+            except Exception:
+                pass
+
+            # Update the workspace control with our kwargs (like visibleChangeCommand)
+            cmds.workspaceControl(workspace_control, **kwargs)
+
+        # Force initial resize
+        QTimer.singleShot(100, self.update_height)
+
+    def visible_change_command(self, *args):
+        if not self.isDockable():
+            return
+        if self.current_layout != cmds.workspaceLayoutManager(q=1, current=True):
+            self.current_layout = cmds.workspaceLayoutManager(q=1, current=True)
+            if not self.isVisible():
+                cmds.evalDeferred(show, lowestPriority=True)
+
+                if self.shelf_painter:
+                    self.shelf_painter.show()
+                else:
+                    cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
+                return
+
+        if not self.isFloating():
+            workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
+            if cmds.workspaceControl(workspace_control, q=True, collapse=True):
+                timer = QTimer(self)
+                timer.setSingleShot(True)
+
+                timer.timeout.connect(
+                    partial(
+                        cmds.workspaceControl,
+                        workspace_control,
+                        e=True,
+                        collapse=False,
+                        tp=["west", 0],
+                    )
+                )
+                timer.start(100)
+            if self.shelf_painter:
+                self.shelf_painter.show()
+            else:
+                cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
+        else:
+            if self.shelf_painter:
+                self.shelf_painter.hide()
+
+        self.update_height()
+
+    def shelf_tabbar(self):
+        if self.shelf_painter:
+            QtGui.QPainter(self.shelf_painter).end()
+            self.shelf_painter.setParent(None)
+            self.shelf_painter.deleteLater()
+
+            self.shelf_painter = None
+
+        def get_maya_qt(ptr=None, qt=QtWidgets.QMainWindow):
+            if ptr is None:
+                ptr = mui.MQtUtil.mainWindow()
+            return wrapInstance(int(ptr), qt)
+
+        workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
+        qctrl = mui.MQtUtil.findControl(workspace_control)
+        control = get_maya_qt(qctrl)
+        tab_handle = control.parent().parent()
+
+        if self.isFloating():
+            tab_handle.tabBar().setVisible(False)
+            return
+
+        self.shelf_painter = cw.QFlatShelfPainter(tab_handle)
+        self.shelf_painter.setGeometry(tab_handle.geometry())
+        self.shelf_painter.updateDrawingParameters(tabbar_width=tab_handle.tabBar().geometry())
+        self.shelf_painter.move(tab_handle.tabBar().pos())
+
+        self.shelf_painter.show()
+        tab_handle.tabBar().setVisible(True)
+
+    def update_height(self):
+        if not isValid(self):
+            return
+
+        if not hasattr(self, "main_toolbar_widget") or not self.main_toolbar_widget or not isValid(self.main_toolbar_widget):
+            return
+
+        # Calculate height based on flow layout
+        layout = self.main_toolbar_widget.layout()
+        if not layout or not hasattr(layout, "heightForWidth"):
+            return
+
+        w = self.width()
+        if w <= 0:
+            w = 900
+
+        needed_h = layout.heightForWidth(w)
+        needed_h += 4
+
+        def get_qt():
+            workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
+            ptr = mui.MQtUtil.findControl(workspace_control)
+            if not ptr:
+                return None
+            return wrapInstance(int(ptr), QtWidgets.QWidget)
+
+        if self.isFloating():
+            # For floating, we need to find the top-most parent (the window frame)
+            tkm_ui = get_qt()
+            if not tkm_ui or not isValid(tkm_ui):
+                return
+
+            parents = []
+            curr = tkm_ui
+            try:
+                while True:
+                    p = curr.parent()
+                    if p and isValid(p):
+                        parents.append(p)
+                        if isinstance(p, QtWidgets.QMainWindow) or p.objectName() == "MayaWindow":
+                            break
+                        curr = p
+                    else:
+                        break
+
+                target = None
+                if parents:
+                    if isinstance(parents[-1], QtWidgets.QMainWindow) or parents[-1].objectName() == "MayaWindow":
+                        if len(parents) >= 2:
+                            target = parents[-2]
+                    else:
+                        target = parents[-1]
+
+                if target and isValid(target):
+                    if target.objectName() == "MayaWindow" or isinstance(target, QtWidgets.QMainWindow):
+                        return
+                    target.setMaximumHeight(needed_h + 30)
+                    target.setMinimumHeight(needed_h + 30)
+            except (RuntimeError, AttributeError):
+                pass
+        else:
+            tkm_ui = get_qt()
+            if not tkm_ui or not isValid(tkm_ui):
+                return
+
+            try:
+                # The workspaceControl container is parent of parent in Maya
+                # based on cams.py line 1168
+                container = tkm_ui.parent()
+                if container and isValid(container):
+                    target = container.parent() if container.parent() and isValid(container.parent()) else container
+
+                    if target and isValid(target):
+                        if target.objectName() == "MayaWindow" or isinstance(target, QtWidgets.QMainWindow):
+                            return
+                        target.setMaximumHeight(needed_h)
+                        target.setMinimumHeight(needed_h)
+            except (RuntimeError, AttributeError):
+                pass
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Trigger height update when internal width changes (wrapping happens)
+        self.update_height()
+
     # These two functions attempt to check if the Graph Editor is open and load customGraph in that case; they are made with two attempts
     def load_customGraph_try_01(self):
         graph_vis = cmds.getPanel(vis=True)
@@ -292,13 +497,7 @@ class toolbar(object):
 
     # For use with toggle functionality on Shelf or Launcher
     def toggle(self, *args):
-        if cmds.workspaceControl(WorkspaceName, query=True, exists=True):
-            if cmds.workspaceControl(WorkspaceName, query=True, visible=True):
-                cmds.workspaceControl(WorkspaceName, edit=True, visible=False, actLikeMayaUIElement=True)
-            else:
-                cmds.workspaceControl(WorkspaceName, edit=True, restore=True, actLikeMayaUIElement=True)
-        else:
-            self.reload()
+        self.showWindow()
 
     def create_shelf_icon(self, *args):
         button_name = "TheKeyMachine"
@@ -433,7 +632,7 @@ class toolbar(object):
 
             # The selection set workspace is hidden; nothing needs to be done
 
-    def reload(*args):
+    def reload(self, *args):
         toolbar_module_name = "TheKeyMachine.core.toolbar"
         customGraph_module_name = "TheKeyMachine.core.customGraph"
 
@@ -441,19 +640,36 @@ class toolbar(object):
         toolbar_module = importlib.import_module(toolbar_module_name)
         customGraph_module = importlib.import_module(customGraph_module_name)
 
-        # If the scriptJob already exists and is active, terminate it
-        if hasattr(toolbar_module.toolbar, "open_new_scene_scriptJob") and toolbar_module.toolbar().isScriptJobActive(
-            toolbar_module.toolbar.open_new_scene_scriptJob
-        ):
-            cmds.scriptJob(kill=toolbar_module.toolbar.open_new_scene_scriptJob, force=True)
+        # Force kill scriptjobs like cams.py
+        for j in cmds.scriptJob(listJobs=True):
+            if "TheKeyMachine" in j or "TheKeyMachine.core.toolbar" in j:
+                if ":" in j:
+                    try:
+                        _id = int(j.split(":")[0])
+                        cmds.scriptJob(kill=_id, force=True)
+                    except Exception:
+                        pass
 
-        if cmds.workspaceControl(WorkspaceName, q=True, exists=True):
-            # Borrar el workspaceControl
-            cmds.deleteUI(WorkspaceName, control=True)
+        # Close and delete the UI
+        try:
+            workspace_control = WorkspaceName + "WorkspaceControl"
+            if cmds.workspaceControl(workspace_control, q=True, exists=True):
+                cmds.deleteUI(workspace_control, control=True)
+        except Exception:
+            pass
+
+        if isValid(self):
+            try:
+                self.blockSignals(True)
+                self.close()
+            except Exception:
+                pass
 
         importlib.reload(toolbar_module)
         importlib.reload(customGraph_module)
-        toolbar_module.tb.startUI()
+
+        # Use the global show() instead of module-level 'tb'
+        toolbar_module.show()
 
     # _______________________________________________________ SELECTION SET ________________________________________________________
 
@@ -1283,7 +1499,7 @@ class toolbar(object):
                     cmds.warning("Set moved")
                     cmds.evalDeferred(self.create_buttons_for_sel_sets)
             else:
-                cmds.warning(f"The set is not part of any setgroup")
+                cmds.warning("The set is not part of any setgroup")
         else:
             cmds.warning("Invalid set or setgroup names")
 
@@ -1362,7 +1578,7 @@ class toolbar(object):
                 label=color_name,
                 image=image_path,  # Agregando la imagen al menuItem
                 parent=parent_menu,
-                command=functools.partial(self.set_set_color, set_name, color_suffix),
+                command=partial(self.set_set_color, set_name, color_suffix),
             )
 
     def clear_selection_sets(self, *args):
@@ -1568,11 +1784,11 @@ class toolbar(object):
                     if is_hidden:
                         continue
 
-                    # Obtiene los miembros del conjunto de selección
-                    members = cmds.sets(sub_sel_set, q=True)
+                    # # Obtiene los miembros del conjunto de selección
+                    # members = cmds.sets(sub_sel_set, q=True)
 
-                    # Crea una cadena con los nombres de los miembros separados por comas
-                    members_string = ", ".join(m for m in (members or []) if cmds.objExists(m))
+                    # # Crea una cadena con los nombres de los miembros separados por comas
+                    # members_string = ", ".join(m for m in (members or []) if cmds.objExists(m))
 
                     # El botón selecciona los miembros del conjunto de selección al hacer clic en él
                     button = cmds.button(
@@ -1646,7 +1862,7 @@ class toolbar(object):
                     cmds.menuItem(
                         label="Rename Set",
                         image=media.rename_selection_set_image,
-                        c=functools.partial(self.change_set_name_window, sub_sel_set, set_group),
+                        c=partial(self.change_set_name_window, sub_sel_set, set_group),
                         p=selset_button,
                     )
                     cmds.menuItem(divider=True, p=selset_button)
@@ -1705,7 +1921,7 @@ class toolbar(object):
         cmds.textScrollList(member_list, edit=True, append=members)
 
         # Agregar una función para el evento changeCommand
-        cmds.textScrollList(member_list, edit=True, sc=functools.partial(self.select_items_from_list, member_list))
+        cmds.textScrollList(member_list, edit=True, sc=partial(self.select_items_from_list, member_list))
 
         cmds.showWindow(window)
 
@@ -1788,12 +2004,6 @@ class toolbar(object):
     def deleteBar(*args):
         cmds.deleteUI(WorkspaceName, control=True)
 
-    def centerBar(*args):
-
-        import TheKeyMachine.core.toolbar  # type: ignore
-
-        TheKeyMachine.core.toolbar.tb.centrar()
-
     def getImage(self, image):
         img_dir = os.path.join(INSTALL_PATH, "TheKeyMachine/data/img/")
 
@@ -1834,7 +2044,7 @@ class toolbar(object):
                             }
 
         # borra selected range slider
-        user_selected_objs = cmds.ls(selection=True)
+        cmds.ls(selection=True)
         cmds.select(clear=True)
         cmds.select(obj)
 
@@ -1974,9 +2184,9 @@ class toolbar(object):
         else:
             self.micro_move_run_timer = False
             cmds.undoInfo(closeChunk=True)
-            current_context = cmds.currentCtx()
-            microMoveContext = "microMoveCtx"
-            microRotateContext = "microRotateCtx"
+            # current_context = cmds.currentCtx()
+            # microMoveContext = "microMoveCtx"
+            # microRotateContext = "microRotateCtx"
             # cmds.iconTextButton("micro_move_button", e=True, bgc=(0.2, 0.2, 0.2))
 
             # El thread tarda en pararse así que necesitamos crear esto y así salirnos en barMod de la ejecución
@@ -2040,42 +2250,10 @@ class toolbar(object):
     # _______________________________________  end center toolbar _____________________________________
 
     def startUI(self):
-
-        MAIN_WORKAREA = mel.eval("$gWorkAreaForm=$gWorkAreaForm")
-        MAIN_PANE = mel.eval("$gViewportWorkspaceControl=$gViewportWorkspaceControl")
-        CHAN_LAYER_EDITOR = mel.eval('getUIComponentDockControl("Channel Box / Layer Editor", false)')
-        OUTLINER = mel.eval('getUIComponentDockControl("Outliner", false)')
-        SHELF = mel.eval('getUIComponentToolBar("Shelf", false)')
-        TIME_SLIDER = mel.eval('getUIComponentToolBar("Time Slider", false)')
-        RANGE_SLIDER = mel.eval('getUIComponentToolBar("Range Slider", false)')
-        COMMAND_LINE = mel.eval('getUIComponentToolBar("Command Line", false)')
-        HELP_LINE = mel.eval('getUIComponentToolBar("Help Line", false)')
-        TOOL_BOX = mel.eval('getUIComponentToolBar("Tool Box", false)')
-
-        if cmds.workspaceControl(WorkspaceName, query=True, exists=True) is False:
-            cmds.workspaceControl(
-                WorkspaceName,
-                dtm=["bottom", False],
-                ih=30,
-                li=True,
-                hp="fixed",
-                tp=["west", True],
-                floating=False,
-                uiScript="from TheKeyMachine.core.toolbar import tb\ntb.buildUI()",
-                actLikeMayaUIElement=True,
-            )
-
-            cmds.workspaceControl(WorkspaceName, edit=True, dtc=(TIME_SLIDER, "top"))
-        else:
-            cmds.workspaceControl(WorkspaceName, edit=True, restore=True, actLikeMayaUIElement=True)
-
-        # Fix para dejar la tab en el lado izquierdo, debería arreglar el error al reinstalar
-        if cmds.workspaceControl(WorkspaceName, query=True, exists=True):
-            cmds.workspaceControl(WorkspaceName, edit=True, tabPosition=["west", True])
-        else:
-            pass
+        self.showWindow()
 
         # Crea el selection sets workspace
+        target_dock = WorkspaceName + "WorkspaceControl"
         if cmds.workspaceControl(selection_sets_workspace, query=True, exists=True) is False:
             cmds.workspaceControl(
                 selection_sets_workspace,
@@ -2083,10 +2261,10 @@ class toolbar(object):
                 li=True,
                 tp=["west", True],
                 floating=False,
-                dtc=["k", "bottom"],
+                dtc=[target_dock, "bottom"],
                 retain=True,
                 vis=False,
-                uiScript="from TheKeyMachine.core.toolbar import tb\ntb.create_selection_sets_workspace()",
+                uiScript="from TheKeyMachine.core.toolbar import get_toolbar\ntb = get_toolbar()\nif tb: tb.create_selection_sets_workspace()",
                 actLikeMayaUIElement=True,
             )
             cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
@@ -2119,7 +2297,7 @@ class toolbar(object):
                 dtc=["k", "bottom"],
                 retain=True,
                 vis=True,
-                uiScript="from TheKeyMachine.core.toolbar import tb\ntb.create_selection_sets_workspace()",
+                uiScript="from TheKeyMachine.core.toolbar import get_toolbar\ntb = get_toolbar()\nif tb: tb.create_selection_sets_workspace()",
                 actLikeMayaUIElement=True,
             )
             cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
@@ -2293,9 +2471,9 @@ class toolbar(object):
 
         # Columna de la derecha con los botones
         button_layout = cmds.columnLayout(adjustableColumn=True, columnAlign="center")
-        create_button = cmds.button(label="Create", command=lambda x: self.create_bookmark(list_widget), width=90)  # Ajustar el ancho del botón
-        remove_button = cmds.button(label="Remove", command=lambda x: self.remove_bookmark(list_widget), width=90)  # Ajustar el ancho del botón
-        isolate_button = cmds.button(label="Isolate", command=lambda x: self.isolate_bookmark(list_widget), width=90)  # Ajustar el ancho del botón
+        cmds.button(label="Create", command=lambda x: self.create_bookmark(list_widget), width=90)  # Ajustar el ancho del botón
+        cmds.button(label="Remove", command=lambda x: self.remove_bookmark(list_widget), width=90)  # Ajustar el ancho del botón
+        cmds.button(label="Isolate", command=lambda x: self.isolate_bookmark(list_widget), width=90)  # Ajustar el ancho del botón
 
         # Establecer las restricciones de disposición en el formLayout
         cmds.formLayout(
@@ -2319,7 +2497,7 @@ class toolbar(object):
     def buildUI(self):
         # Fix para que no de error, por si no lee el ancho del ViewPanel
 
-        if self.bar_center_value == None:
+        if self.bar_center_value is None:
             self.bar_center_value = 1
 
         def parse_tt(html):
@@ -2333,9 +2511,6 @@ class toolbar(object):
             return header, description
 
         # Reconstruir column y row layouts
-        if cmds.columnLayout("columntoolbar", exists=True):
-            cmds.deleteUI("columntoolbar")
-
         if cmds.rowLayout("rowtoolbar", exists=True):
             cmds.deleteUI("rowtoolbar")
 
@@ -2353,55 +2528,15 @@ class toolbar(object):
                 return None  # Esta línea es en caso de que las dimensiones no coincidan con ninguno de los tamaños esperados
 
         def read_toolbar_icon_size():
-
-            scripts_dir = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/preferences")
-            config_file = os.path.join(scripts_dir, "user_preferences.py")
-
-            if os.path.isfile(config_file):
-                config = {}
-                exec(compile(open(config_file).read(), config_file, "exec"), config)
-                toolbar_icon_w = config.get("toolbar_icon_w", 28)
-                toolbar_icon_h = config.get("toolbar_icon_h", 28)
-                toolbar_size = config.get("toolbar_size", 1550)
-                return toolbar_icon_w, toolbar_icon_h, toolbar_size
-            else:
-                # Valores por defecto si no se encuentra el archivo de configuración
-                return 28, 28, 1550
+            w = settings.get_setting("toolbar_icon_w", 28)
+            h = settings.get_setting("toolbar_icon_h", 28)
+            size = settings.get_setting("toolbar_size", 1550)
+            return w, h, size
 
         def update_toolbar_icon_size(w, h, size):
-            scripts_dir = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/preferences")
-            config_file = os.path.join(scripts_dir, "user_preferences.py")
-
-            with open(config_file, "r") as f:
-                config_data = f.read()
-
-            new_data = ""
-            size_set = False
-            w_set = h_set = False
-
-            for line in config_data.split("\n"):
-                if line.strip().startswith("toolbar_icon_w"):
-                    new_data += f"toolbar_icon_w = {w}\n"
-                    w_set = True
-                elif line.strip().startswith("toolbar_icon_h"):
-                    new_data += f"toolbar_icon_h = {h}\n"
-                    h_set = True
-                elif line.strip().startswith("toolbar_size"):
-                    new_data += f"toolbar_size = {size}\n"
-                    size_set = True
-                else:
-                    new_data += line + "\n"
-
-            # En caso de que las variables no existieran previamente, las agregamos al final del archivo
-            if not w_set:
-                new_data += f"toolbar_icon_w = {w}\n"
-            if not h_set:
-                new_data += f"toolbar_icon_h = {h}\n"
-            if not size_set:
-                new_data += f"toolbar_size = {size}\n"
-
-            with open(config_file, "w") as f:
-                f.write(new_data)
+            settings.set_setting("toolbar_icon_w", w)
+            settings.set_setting("toolbar_icon_h", h)
+            settings.set_setting("toolbar_size", size)
 
         def set_icon_size_small(value):
             if value:
@@ -2418,39 +2553,37 @@ class toolbar(object):
                 update_toolbar_icon_size(31, 31, 1650)
                 self.reload()
 
+        def get_current_icon_alignment():
+            return read_toolbar_icon_alignment()
+
+        def read_toolbar_icon_alignment():
+            return settings.get_setting("toolbar_icon_alignment", "Center")
+
+        def update_toolbar_icon_alignment(alignment):
+            settings.set_setting("toolbar_icon_alignment", alignment)
+
+        def set_icon_alignment_left(value):
+            if value:
+                update_toolbar_icon_alignment("Left")
+                self.reload()
+
+        def set_icon_alignment_center(value):
+            if value:
+                update_toolbar_icon_alignment("Center")
+                self.reload()
+
+        def set_icon_alignment_right(value):
+            if value:
+                update_toolbar_icon_alignment("Right")
+                self.reload()
+
         ### ______________________________________________________ TOOLTIPS ___________________________________________________
 
         def read_show_tooltips():
-            scripts_dir = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/preferences")
-            config_file = os.path.join(scripts_dir, "user_preferences.py")
-
-            if os.path.isfile(config_file):
-                config = {}
-                exec(compile(open(config_file).read(), config_file, "exec"), config)
-                show_tooltips = config.get("show_tooltips", True)
-                return show_tooltips
-            else:
-                # Valor por defecto si no se encuentra el archivo de configuración
-                return True
+            return settings.get_setting("show_tooltips", True)
 
         def update_show_tooltips(value):
-            scripts_dir = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/preferences")
-            config_file = os.path.join(scripts_dir, "user_preferences.py")
-
-            with open(config_file, "r") as f:
-                config_data = f.read()
-
-            # Reemplazar la línea que contiene 'show_tooltips' con el nuevo valor
-            new_data = ""
-            for line in config_data.split("\n"):
-                if line.strip().startswith("show_tooltips"):
-                    new_data += f"show_tooltips = {value}\n"
-                else:
-                    new_data += line + "\n"
-
-            # Escribir los nuevos datos en el archivo de configuración
-            with open(config_file, "w") as f:
-                f.write(new_data)
+            settings.set_setting("show_tooltips", value)
 
         def toggle_tooltips(value):
             # Actualizar el valor de `show_tooltips` en el archivo de configuración
@@ -2510,8 +2643,9 @@ class toolbar(object):
                 (move_key_right_b_widget, get_safe_helper("move_key_right_b_widget_tooltip_text")),
                 (clear_selected_keys_widget, get_safe_helper("clear_selected_keys_widget_tooltip_text")),
                 (select_scene_animation_widget, get_safe_helper("select_scene_animation_widget_tooltip_text")),
-                (barBlendSlider_widget, get_safe_helper("blend_slider_tooltip_text")),
-                (barTweenSlider_widget, get_safe_helper("tween_slider_tooltip_text")),
+                (barBlendSlider_widget, get_safe_helper("blend_tooltip_text")),
+                (barTweenSlider_widget, get_safe_helper("tweener_tooltip_text")),
+                (toolbar_config_button_widget, "<b>Config</b><br><br>Open TheKeyMachine configuration and help menu."),
             ]
 
             # Iterar sobre cada botón y su tooltip para establecer el tooltip según el valor de show_tooltips
@@ -2535,16 +2669,35 @@ class toolbar(object):
 
         ### ______________________________________________________ TOOLBAR LAYOUT _____________________________________________________________________###
 
-        cmds.columnLayout("columntoolbar", columnAttach=("both", 1), h=38, cal="center", adj=True, columnWidth=900)
-        col_ptr = mui.MQtUtil.findControl("columntoolbar")
-        col_qw = wrapInstance(int(col_ptr), QtWidgets.QWidget)
-        col_layout = col_qw.layout()
+        if self.layout():
+            QtWidgets.QWidget().setLayout(self.layout())
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
+        col_layout = self.main_layout
 
         self.main_toolbar_widget = QtWidgets.QWidget()
-        rowtoolbar_layout = QtWidgets.QHBoxLayout(self.main_toolbar_widget)
-        rowtoolbar_layout.setContentsMargins(5, 5, 5, 5)
-        rowtoolbar_layout.setSpacing(2)
-        rowtoolbar_layout.setAlignment(QtCore.Qt.AlignCenter)
+        # Use QFlowLayout to allow wrapping
+        toolbar_alignment_str = get_current_icon_alignment()
+        qt_alignment = QtCore.Qt.AlignLeft
+        if toolbar_alignment_str == "Right":
+            qt_alignment = QtCore.Qt.AlignRight
+        elif toolbar_alignment_str == "Center":
+            qt_alignment = QtCore.Qt.AlignHCenter
+
+        rowtoolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=18, Hspacing=6, alignment=qt_alignment)
+
+        def new_section():
+            sec = QtWidgets.QWidget()
+            sec_layout = QtWidgets.QHBoxLayout(sec)
+            sec_layout.setContentsMargins(0, 0, 0, 0)
+            sec_layout.setSpacing(2)
+            rowtoolbar_layout.addWidget(sec)
+            return sec_layout
+
+        sec_layout = new_section()
+
         col_layout.addWidget(self.main_toolbar_widget)
 
         # _____________________ keyBox__________________________________________________ #
@@ -2552,12 +2705,12 @@ class toolbar(object):
         move_key_left_b_widget = cw.QFlatToolButton(tooltip=helper.move_key_left_b_widget_tooltip_text)
         move_key_left_b_widget.setText(" < ")
         move_key_left_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(-self.move_keyframes_intField.value()))
-        rowtoolbar_layout.addWidget(move_key_left_b_widget)
+        sec_layout.addWidget(move_key_left_b_widget)
 
         remove_inbetween_b_widget = cw.QFlatToolButton()
         remove_inbetween_b_widget.setText(" - ")
         remove_inbetween_b_widget.clicked.connect(keyTools.remove_inbetween)
-        rowtoolbar_layout.addWidget(remove_inbetween_b_widget)
+        sec_layout.addWidget(remove_inbetween_b_widget)
 
         self.move_keyframes_intField = cw.QFlatSpinBox()
         self.move_keyframes_intField.setFixedSize(50, 24)
@@ -2565,29 +2718,29 @@ class toolbar(object):
         self.move_keyframes_intField.setValue(1)
         self.move_keyframes_intField.setStyleSheet("border: 0px;border-radius: 5px;")
 
-        rowtoolbar_layout.addWidget(self.move_keyframes_intField)
+        sec_layout.addWidget(self.move_keyframes_intField)
 
         add_inbetween_b_widget = cw.QFlatToolButton()
         add_inbetween_b_widget.setText(" + ")
         add_inbetween_b_widget.clicked.connect(keyTools.add_inbetween)
-        rowtoolbar_layout.addWidget(add_inbetween_b_widget)
+        sec_layout.addWidget(add_inbetween_b_widget)
 
         move_key_right_b_widget = cw.QFlatToolButton()
         move_key_right_b_widget.setText(" > ")
         move_key_right_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(self.move_keyframes_intField.value()))
-        rowtoolbar_layout.addWidget(move_key_right_b_widget)
+        sec_layout.addWidget(move_key_right_b_widget)
 
-        rowtoolbar_layout.addSpacing(8)
+        sec_layout.addSpacing(8)
 
         clear_selected_keys_widget = cw.QFlatToolButton(tooltip=helper.clear_selected_keys_widget_tooltip_text)
         clear_selected_keys_widget.setText(" x ")
         clear_selected_keys_widget.clicked.connect(keyTools.clear_selected_keys)
-        rowtoolbar_layout.addWidget(clear_selected_keys_widget)
+        sec_layout.addWidget(clear_selected_keys_widget)
 
         select_scene_animation_widget = cw.QFlatToolButton(tooltip=helper.select_scene_animation_widget_tooltip_text)
         select_scene_animation_widget.setText(" s ")
         select_scene_animation_widget.clicked.connect(keyTools.select_all_animation_curves)
-        rowtoolbar_layout.addWidget(select_scene_animation_widget)
+        sec_layout.addWidget(select_scene_animation_widget)
 
         # _____________________ BlendSlider ____________________________ #
 
@@ -2692,8 +2845,8 @@ class toolbar(object):
                     blend_to_key_left_b_qt.hide()
                     blend_to_key_right_b_qt.hide()
 
-                case "blend":
-                    barBlendSlider_widget.setText("BL")
+                case "blend_to_neighbor":
+                    barBlendSlider_widget.setText("BN")
                     barBlendSlider_widget.setTooltipInfo(*parse_tt(helper.blend_tooltip_text))
                     barBlendSlider_widget.setDragCommand(blend_slider_wrapper)
 
@@ -2736,14 +2889,14 @@ class toolbar(object):
             # Llama a blend_to_frame con los valores de los botones
             keyTools.blend_to_frame(percentage, left_frame, right_frame)
 
-        rowtoolbar_layout.addSpacing(15)
+        sec_layout = new_section()
 
         blend_to_key_left_b_qt = cw.QFlatToolButton()
         blend_to_key_left_b_qt.setText("1")
         blend_to_key_left_b_qt.setFixedSize(25, 16)
         blend_to_key_left_b_qt.hide()
         blend_to_key_left_b_qt.clicked.connect(lambda: blend_to_key_left_b_qt.setText(str(int(cmds.currentTime(q=True)))))
-        rowtoolbar_layout.addWidget(blend_to_key_left_b_qt)
+        sec_layout.addWidget(blend_to_key_left_b_qt)
 
         title, desc = parse_tt(helper.blend_tooltip_text)
         barBlendSlider_widget = sw.QFlatSliderWidget(
@@ -2754,7 +2907,7 @@ class toolbar(object):
             text="BN",
             color=COLOR.color.green,
             dragCommand=blend_slider_wrapper,
-            p=rowtoolbar_layout,
+            p=sec_layout,
             tooltipTitle=title,
             tooltipDescription=desc,
         )
@@ -2764,17 +2917,17 @@ class toolbar(object):
         blend_to_key_right_b_qt.setFixedSize(25, 16)
         blend_to_key_right_b_qt.hide()
         blend_to_key_right_b_qt.clicked.connect(lambda: blend_to_key_right_b_qt.setText(str(int(cmds.currentTime(q=True)))))
-        rowtoolbar_layout.addWidget(blend_to_key_right_b_qt)
+        sec_layout.addWidget(blend_to_key_right_b_qt)
 
         # Blend slider menu (Qt version)
         barBlendSlider_menu = QtWidgets.QMenu(barBlendSlider_widget)
         blend_action_group = QActionGroup(barBlendSlider_menu)
 
-        bl_action = barBlendSlider_menu.addAction("Blend")
-        bl_action.setCheckable(True)
-        bl_action.setChecked(True)
-        bl_action.setActionGroup(blend_action_group)
-        bl_action.triggered.connect(lambda: set_blend_slider_command("blend"))
+        bn_action = barBlendSlider_menu.addAction("Blend to Neighbor")
+        bn_action.setCheckable(True)
+        bn_action.setChecked(True)
+        bn_action.setActionGroup(blend_action_group)
+        bn_action.triggered.connect(lambda: set_blend_slider_command("blend_to_neighbor"))
 
         bd_action = barBlendSlider_menu.addAction("Blend to Default")
         bd_action.setCheckable(True)
@@ -2822,6 +2975,7 @@ class toolbar(object):
 
             barTweenSlider_widget.startFlash()
 
+        sec_layout = new_section()
         title, desc = parse_tt(helper.tweener_tooltip_text)
         barTweenSlider_widget = sw.QFlatSliderWidget(
             "bar_tween_slider",
@@ -2832,12 +2986,10 @@ class toolbar(object):
             color=COLOR.color.yellow,
             dragCommand=tween_wrapper,
             dropCommand=tween_drop_wrapper,
-            p=rowtoolbar_layout,
+            p=sec_layout,
             tooltipTitle=title,
             tooltipDescription=desc,
         )
-
-        rowtoolbar_layout.addSpacing(10)
 
         # Tween slider menu (Qt version)
         barTweenSlider_menu = QtWidgets.QMenu(barTweenSlider_widget)
@@ -2862,9 +3014,11 @@ class toolbar(object):
 
         # Pointer  -------------------------------------------------------------------------
 
+        sec_layout = new_section()
+
         pointer_button_widget = cw.QFlatToolButton(icon=media.pointer_image, tooltip=helper.pointer_tooltip_text)
         pointer_button_widget.clicked.connect(bar.isolate_master)
-        rowtoolbar_layout.addWidget(pointer_button_widget)
+        sec_layout.addWidget(pointer_button_widget)
 
         pointer_menu = QtWidgets.QMenu(pointer_button_widget)
         pointer_menu.addAction(QtGui.QIcon(media.select_rig_controls_image), "Select Rig Controls", bar.select_rig_controls)
@@ -2881,7 +3035,7 @@ class toolbar(object):
 
         isolate_button_widget = cw.QFlatToolButton(icon=media.isolate_image, tooltip=helper.isolate_tooltip_text)
         isolate_button_widget.clicked.connect(bar.isolate_master)
-        rowtoolbar_layout.addWidget(isolate_button_widget)
+        sec_layout.addWidget(isolate_button_widget)
 
         isolate_menu = QtWidgets.QMenu(isolate_button_widget)
         isolate_menu.addAction(QtGui.QIcon(media.ibookmarks_menu_image), "Bookmarks", self.create_ibookmarks_window)
@@ -2904,7 +3058,7 @@ class toolbar(object):
         # Create Locators  ----------------------------------------------------------------
         createLocator_button_widget = cw.QFlatToolButton(icon=media.create_locator_image, tooltip=helper.createLocator_tooltip_text)
         createLocator_button_widget.clicked.connect(bar.createLocator)
-        rowtoolbar_layout.addWidget(createLocator_button_widget)
+        sec_layout.addWidget(createLocator_button_widget)
 
         createLocator_menu = QtWidgets.QMenu(createLocator_button_widget)
         createLocator_menu.addAction(QtGui.QIcon(media.create_locator_image), "Select temp locators", bar.selectTempLocators)
@@ -2919,7 +3073,7 @@ class toolbar(object):
 
         align_button_widget = cw.QFlatToolButton(icon=media.match_image, tooltip=helper.align_tooltip_text)
         align_button_widget.clicked.connect(bar.align_selected_objects)
-        rowtoolbar_layout.addWidget(align_button_widget)
+        sec_layout.addWidget(align_button_widget)
         align_menu = QtWidgets.QMenu(align_button_widget)
         align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Translation", partial(bar.align_selected_objects, pos=True, rot=False, scl=False))
         align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Rotation", partial(bar.align_selected_objects, pos=False, rot=True, scl=False))
@@ -2939,7 +3093,7 @@ class toolbar(object):
         # Tracer -----------------------------------------------------------------------------
         tracer_button_widget = cw.QFlatToolButton(icon=media.tracer_menu_image, tooltip=helper.tracer_tooltip_text)
         tracer_button_widget.clicked.connect(bar.mod_tracer)
-        rowtoolbar_layout.addWidget(tracer_button_widget)
+        sec_layout.addWidget(tracer_button_widget)
 
         tracer_menu = QtWidgets.QMenu(tracer_button_widget)
         action_tracer_connected = tracer_menu.addAction("Connected")
@@ -2966,7 +3120,7 @@ class toolbar(object):
         # Reset anim  -------------------------------------------------------------------------
         reset_values_button_widget = cw.QFlatToolButton(icon=media.reset_animation_image, tooltip=helper.reset_values_tooltip_text)
         reset_values_button_widget.clicked.connect(keyTools.reset_objects_mods)
-        rowtoolbar_layout.addWidget(reset_values_button_widget)
+        sec_layout.addWidget(reset_values_button_widget)
 
         reset_values_menu = QtWidgets.QMenu(reset_values_button_widget)
         reset_values_menu.addAction(QtGui.QIcon(media.reset_animation_image), "Set Default Values For Selected", keyTools.save_default_values)
@@ -2990,12 +3144,12 @@ class toolbar(object):
         # Delete anim -------------------------------------------------------------------------
         deleteAnim_button_widget = cw.QFlatToolButton(icon=media.delete_animation_image, tooltip=helper.delete_animation_tooltip_text)
         deleteAnim_button_widget.clicked.connect(bar.mod_delete_animation)
-        rowtoolbar_layout.addWidget(deleteAnim_button_widget)
+        sec_layout.addWidget(deleteAnim_button_widget)
 
         selector_button_widget = cw.QFlatToolButton(tooltip=helper.selector_tooltip_text)
         selector_button_widget.setText("0")
         selector_button_widget.clicked.connect(bar.selector_window)
-        rowtoolbar_layout.addWidget(selector_button_widget)
+        sec_layout.addWidget(selector_button_widget)
 
         def update_selector_button_text():
             if not tt.is_valid_widget(selector_button_widget):
@@ -3004,25 +3158,27 @@ class toolbar(object):
             num_selected = len(selected_objects)
             selector_button_widget.setText(str(num_selected))
 
-        cmds.scriptJob(event=["SelectionChanged", update_selector_button_text], parent="columntoolbar")
+        if toolbar.selection_script_job is not None and self.isScriptJobActive(toolbar.selection_script_job):
+            cmds.scriptJob(kill=toolbar.selection_script_job, force=True)
+        toolbar.selection_script_job = cmds.scriptJob(event=["SelectionChanged", update_selector_button_text])
         update_selector_button_text()
 
-        rowtoolbar_layout.addSpacing(20)
+        sec_layout = new_section()
 
         # Select opposite ---------------------------------------------------------------------
         select_opposite_button_widget = cw.QFlatToolButton(icon=media.select_opposite_image, tooltip=helper.select_opposite_tooltip_text)
         select_opposite_button_widget.clicked.connect(keyTools.selectOppositeHandler)
-        rowtoolbar_layout.addWidget(select_opposite_button_widget)
+        sec_layout.addWidget(select_opposite_button_widget)
 
         # Copy opposite -----------------------------------------------------------------------
         copy_opposite_button_widget = cw.QFlatToolButton(icon=media.copy_opposite_image, tooltip=helper.copy_opposite_tooltip_text)
         copy_opposite_button_widget.clicked.connect(keyTools.copyOpposite)
-        rowtoolbar_layout.addWidget(copy_opposite_button_widget)
+        sec_layout.addWidget(copy_opposite_button_widget)
 
         # Mirror -----------------------------------------------------------------------
         mirror_button_widget = cw.QFlatToolButton(icon=media.mirror_image, tooltip=helper.mirror_tooltip_text)
         mirror_button_widget.clicked.connect(keyTools.mirror)
-        rowtoolbar_layout.addWidget(mirror_button_widget)
+        sec_layout.addWidget(mirror_button_widget)
 
         mirror_menu = QtWidgets.QMenu(mirror_button_widget)
         mirror_menu.addAction(QtGui.QIcon(media.mirror_image), "Add Excepction Invert", keyTools.add_mirror_invert_exception)
@@ -3043,7 +3199,7 @@ class toolbar(object):
             icon=media.copy_paste_animation_image, tooltip=helper.copy_paste_animation_tooltip_text
         )
         copy_paste_animation_button_widget.clicked.connect(keyTools.copy_animation)
-        rowtoolbar_layout.addWidget(copy_paste_animation_button_widget)
+        sec_layout.addWidget(copy_paste_animation_button_widget)
 
         cp_menu = QtWidgets.QMenu(copy_paste_animation_button_widget)
         cp_menu.addAction(QtGui.QIcon(media.copy_paste_animation_image), "Copy Animation", keyTools.copy_animation)
@@ -3069,18 +3225,18 @@ class toolbar(object):
         # Select hierarchy -----------------------------------------------------------------------
         select_hierarchy_button_widget = cw.QFlatToolButton(icon=media.select_hierarchy_image, tooltip=helper.select_hierarchy_tooltip_text)
         select_hierarchy_button_widget.clicked.connect(bar.selectHierarchy)
-        rowtoolbar_layout.addWidget(select_hierarchy_button_widget)
+        sec_layout.addWidget(select_hierarchy_button_widget)
 
         # Animation offset -----------------------------------------------------------------------
         animation_offset_button_widget = cw.QFlatToolButton(icon=media.animation_offset_image, tooltip=helper.animation_offset_tooltip_text)
         animation_offset_button_widget.setObjectName("anim_offset_button")
         animation_offset_button_widget.clicked.connect(self.toggleAnimOffsetButton)
-        rowtoolbar_layout.addWidget(animation_offset_button_widget)
+        sec_layout.addWidget(animation_offset_button_widget)
 
         # FollowCam------------------------------------------------------------------------------
         create_follow_cam_button_widget = cw.QFlatToolButton(icon=media.follow_cam_image, tooltip=helper.follow_cam_tooltip_text)
         create_follow_cam_button_widget.clicked.connect(lambda *args: bar.create_follow_cam(translation=True, rotation=True))
-        rowtoolbar_layout.addWidget(create_follow_cam_button_widget)
+        sec_layout.addWidget(create_follow_cam_button_widget)
 
         follow_cam_menu = QtWidgets.QMenu(create_follow_cam_button_widget)
         follow_cam_menu.addAction(
@@ -3104,7 +3260,7 @@ class toolbar(object):
 
         link_objects_button_widget = cw.QFlatToolButton(icon=media.link_objects_image, tooltip=helper.link_objects_tooltip_text)
         link_objects_button_widget.clicked.connect(keyTools.mod_link_objects)
-        rowtoolbar_layout.addWidget(link_objects_button_widget)
+        sec_layout.addWidget(link_objects_button_widget)
 
         # ------funciones para crear el flashing icon al crear el auto-link callback
         global link_obj_image_timer
@@ -3183,7 +3339,7 @@ class toolbar(object):
         # Copy WorldSpace ----------------------------------------------------------------------------
         copy_worldspace_button_widget = cw.QFlatToolButton(icon=media.copy_worldspace_animation_image, tooltip=helper.copy_worldspace_tooltip_text)
         copy_worldspace_button_widget.clicked.connect(bar.mod_copy_worldspace_animation)
-        rowtoolbar_layout.addWidget(copy_worldspace_button_widget)
+        sec_layout.addWidget(copy_worldspace_button_widget)
 
         ws_menu = QtWidgets.QMenu(copy_worldspace_button_widget)
         ws_menu.addAction(QtGui.QIcon(media.copy_worldspace_animation_image), "Copy Worldspace - All Animation", bar.color_copy_worldspace_animation)
@@ -3207,7 +3363,7 @@ class toolbar(object):
         # Temp Pivot ----------------------------------------------------------------------------
         temp_pivot_button_widget = cw.QFlatToolButton(icon=media.temp_pivot_image, tooltip=helper.temp_pivot_tooltip_text)
         temp_pivot_button_widget.clicked.connect(lambda *args: bar.create_temp_pivot(False))
-        rowtoolbar_layout.addWidget(temp_pivot_button_widget)
+        sec_layout.addWidget(temp_pivot_button_widget)
 
         tp_menu = QtWidgets.QMenu(temp_pivot_button_widget)
         tp_menu.addAction(QtGui.QIcon(media.temp_pivot_image), "Last pivot used", lambda *args: bar.create_temp_pivot(True))
@@ -3225,12 +3381,12 @@ class toolbar(object):
         micro_move_button_widget = cw.QFlatToolButton(icon=media.ruler_image, tooltip=helper.micro_move_tooltip_text)
         micro_move_button_widget.setObjectName("micro_move_button")
         micro_move_button_widget.clicked.connect(self.toggle_micro_move_button)
-        rowtoolbar_layout.addWidget(micro_move_button_widget)
+        sec_layout.addWidget(micro_move_button_widget)
 
         # Key Menu -------------------------------------------------------------------------------
         block_keys_button_widget = cw.QFlatToolButton(icon=media.reblock_keys_image, tooltip=helper.block_keys_tooltip_text)
         block_keys_button_widget.clicked.connect(keyTools.share_keys)
-        rowtoolbar_layout.addWidget(block_keys_button_widget)
+        sec_layout.addWidget(block_keys_button_widget)
 
         block_keys_menu = QtWidgets.QMenu(block_keys_button_widget)
         block_keys_menu.addAction(QtGui.QIcon(media.reblock_keys_image), "reBlock", keyTools.reblock_move)
@@ -3243,31 +3399,31 @@ class toolbar(object):
         block_keys_button_widget.customContextMenuRequested.connect(lambda pos: block_keys_menu.exec_(block_keys_button_widget.mapToGlobal(pos)))
 
         # Anim tangents ----------------------------------------------------------------------------
-        rowtoolbar_layout.addSpacing(22)
+        sec_layout = new_section()
 
         auto_tangent_b = cw.QFlatToolButton(icon=media.auto_tangent_image, tooltip="Auto Tangent")
         auto_tangent_b.clicked.connect(lambda: bar.setTangent("auto"))
-        rowtoolbar_layout.addWidget(auto_tangent_b)
+        sec_layout.addWidget(auto_tangent_b)
 
         spline_tangent_b = cw.QFlatToolButton(icon=media.spline_tangent_image, tooltip="Spline Tangent")
         spline_tangent_b.clicked.connect(lambda: bar.setTangent("spline"))
-        rowtoolbar_layout.addWidget(spline_tangent_b)
+        sec_layout.addWidget(spline_tangent_b)
 
         linear_tangent_b = cw.QFlatToolButton(icon=media.linear_tangent_image, tooltip="Linear Tangent")
         linear_tangent_b.clicked.connect(lambda: bar.setTangent("linear"))
-        rowtoolbar_layout.addWidget(linear_tangent_b)
+        sec_layout.addWidget(linear_tangent_b)
 
         step_tangent_b = cw.QFlatToolButton(icon=media.step_tangent_image, tooltip="Step Tangent")
         step_tangent_b.clicked.connect(lambda: bar.setTangent("step"))
-        rowtoolbar_layout.addWidget(step_tangent_b)
+        sec_layout.addWidget(step_tangent_b)
 
-        rowtoolbar_layout.addSpacing(18)
+        sec_layout = new_section()
 
         # Selection Sets  ----------------------------------------------------------------------------
         selection_sets_button_widget = cw.QFlatToolButton(icon=media.selection_sets_image, tooltip=helper.selection_sets_tooltip_text)
         selection_sets_button_widget.setObjectName("toggle_selection_sets_workspace_b")
         selection_sets_button_widget.clicked.connect(self.toggle_selection_sets_workspace)
-        rowtoolbar_layout.addWidget(selection_sets_button_widget)
+        sec_layout.addWidget(selection_sets_button_widget)
 
         # customGraph ----------------------------------------------------------------------------
         def open_customGraph():
@@ -3277,7 +3433,7 @@ class toolbar(object):
 
         open_custom_graph_button_widget = cw.QFlatToolButton(icon=media.customGraph_image, tooltip=helper.customGraph_tooltip_text)
         open_custom_graph_button_widget.clicked.connect(open_customGraph)
-        rowtoolbar_layout.addWidget(open_custom_graph_button_widget)
+        sec_layout.addWidget(open_custom_graph_button_widget)
 
         # custom tools ----------------------------------------------------------------------------
         importlib.invalidate_caches()
@@ -3346,7 +3502,7 @@ class toolbar(object):
 
         toolBox_button_widget = cw.QFlatToolButton(icon=media.custom_tools_image, tooltip=helper.custom_tools_tooltip_text)
         toolBox_button_widget.setVisible(bool(CUSTOM_TOOLS_MENU))
-        rowtoolbar_layout.addWidget(toolBox_button_widget)
+        sec_layout.addWidget(toolBox_button_widget)
 
         toolBox_menu = QtWidgets.QMenu(toolBox_button_widget)
         toolBox_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -3421,7 +3577,7 @@ class toolbar(object):
 
         customScripts_button_widget = cw.QFlatToolButton(icon=media.custom_scripts_image, tooltip=helper.custom_scripts_tooltip_text)
         customScripts_button_widget.setVisible(bool(CUSTOM_SCRIPTS_MENU))
-        rowtoolbar_layout.addWidget(customScripts_button_widget)
+        sec_layout.addWidget(customScripts_button_widget)
 
         customScripts_menu = QtWidgets.QMenu(customScripts_button_widget)
         customScripts_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -3444,41 +3600,55 @@ class toolbar(object):
 
         toolbar_config_button_widget = cw.QFlatToolButton(icon=media.settings_image)
         toolbar_config_button_widget.setObjectName("settings_toolbar_button")
-        rowtoolbar_layout.addWidget(toolbar_config_button_widget)
+        sec_layout.addWidget(toolbar_config_button_widget)
 
         # Build your menu with your cw.MenuWidget; make sure the button is the PARENT
         toolbar_menu = cw.MenuWidget(parent=toolbar_config_button_widget)
 
         # === Help submenu ===
-        help_menu = toolbar_menu.addMenu(QtGui.QIcon(media.help_menu_image), "Help")
-        help_menu.addAction(QtGui.QIcon(media.discord_image), "Discord Community", lambda: general.open_url("https://discord.gg/G2J5yyjz"))
-        help_menu.addAction(QtGui.QIcon(media.help_menu_image), "Knowledge base", lambda: general.open_url("https://thekeymachine.gitbook.io/base"))
+        help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help", description="Resources for help and learning.")
+        toolbar_menu.addMenu(help_menu)
         help_menu.addAction(
-            QtGui.QIcon(media.youtube_image), "Youtube channel", lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools")
+            QtGui.QIcon(media.discord_image),
+            "Discord Community",
+            lambda: general.open_url("https://discord.gg/G2J5yyjz"),
+            description="Join the community for questions and support.",
+        )
+        help_menu.addAction(
+            QtGui.QIcon(media.help_menu_image),
+            "Knowledge base",
+            lambda: general.open_url("https://thekeymachine.gitbook.io/base"),
+            description="Read the official documentation.",
+        )
+        help_menu.addAction(
+            QtGui.QIcon(media.youtube_image),
+            "Youtube channel",
+            lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"),
+            description="Watch tutorials and features demos.",
         )
 
         # === Config submenu ===
-        config_menu = toolbar_menu.addMenu(QtGui.QIcon(media.settings_image), "Config")
-
+        config_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Config", description="Tool configuration and preferences.")
+        toolbar_menu.addMenu(config_menu)
         config_menu.addSection("Shelf icon")
-        config_menu.addAction("Add Toggle Button To Shelf", self.create_shelf_icon)
+        config_menu.addAction("Add Toggle Button To Shelf", self.create_shelf_icon, description="Creates a shelf button to show/hide this toolbar.")
 
         config_menu.addSection("Tools settings")
-        show_tooltips_action = config_menu.addAction("Show tooltips")
+        show_tooltips_action = config_menu.addAction("Show tooltips", description="Show or hide floating tooltips.")
         show_tooltips_action.setCheckable(True)
         show_tooltips_action.setChecked(show_tooltips)
         show_tooltips_action.toggled.connect(toggle_tooltips)
 
-        overshoot_action = config_menu.addAction("Overshoot Sliders")
+        overshoot_action = config_menu.addAction("Overshoot Sliders", description="Allow sliders to reach values beyond -100 to 100.")
         overshoot_action.setCheckable(True)
         overshoot_action.setChecked(overshootSliders)
         overshoot_action.toggled.connect(_setOvershoot)
 
         config_menu.addSection("Toolbar's icons size")
         size_group = QActionGroup(config_menu)
-        small_action = config_menu.addAction("Small")
-        medium_action = config_menu.addAction("Medium")
-        big_action = config_menu.addAction("Big")
+        small_action = config_menu.addAction("Small", description="Set icon size to Small.")
+        medium_action = config_menu.addAction("Medium", description="Set icon size to Medium.")
+        big_action = config_menu.addAction("Big", description="Set icon size to Big.")
         for act in (small_action, medium_action, big_action):
             act.setCheckable(True)
             size_group.addAction(act)
@@ -3490,29 +3660,93 @@ class toolbar(object):
         current_size = get_current_icon_size()
         {"Small": small_action, "Medium": medium_action, "Big": big_action}.get(current_size, medium_action).setChecked(True)
 
+        config_menu.addSection("Toolbar's icons alignment")
+        align_group = QActionGroup(config_menu)
+        left_align_action = config_menu.addAction("Left", description="Align icons to the left.")
+        center_align_action = config_menu.addAction("Center", description="Align icons to the center.")
+        right_align_action = config_menu.addAction("Right", description="Align icons to the right.")
+        for act in (left_align_action, center_align_action, right_align_action):
+            act.setCheckable(True)
+            align_group.addAction(act)
+
+        left_align_action.triggered.connect(set_icon_alignment_left)
+        center_align_action.triggered.connect(set_icon_alignment_center)
+        right_align_action.triggered.connect(set_icon_alignment_right)
+
+        current_align = get_current_icon_alignment()
+        {"Left": left_align_action, "Center": center_align_action, "Right": right_align_action}.get(current_align, center_align_action).setChecked(
+            True
+        )
+
         config_menu.addSection("Hotkeys")
-        config_menu.addAction("Add TheKeyMachine Hotkeys", hotkeys.create_TheKeyMachine_hotkeys)
+        config_menu.addAction("Add TheKeyMachine Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys for TKM tools.")
 
         config_menu.addSection("General")
-        config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload)
+        config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")
 
         # Separators and others
         toolbar_menu.addSeparator()
-        toolbar_menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall)
+        toolbar_menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
         toolbar_menu.addSeparator()
-        toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window)
+        toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
 
         # --- OPEN AT CURSOR POSITION (left & right click) ---
         # IMPORTANT: don't call setMenu(); we handle showing explicitly at the cursor
         def _open_menu_at_cursor():
             toolbar_menu.popup(QtGui.QCursor.pos())
 
+        def _on_toolbar_context_menu(pos):
+            # Only show the main config menu if we are clicking on the background empty space.
+            # If there's a child widget (button, slider, etc.) at this position, we abort
+            # and let that widget handle its own right-click.
+            if self.main_toolbar_widget.childAt(pos):
+                return
+            _open_menu_at_cursor()
+
         toolbar_config_button_widget.clicked.connect(_open_menu_at_cursor)
         toolbar_config_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         toolbar_config_button_widget.customContextMenuRequested.connect(lambda _pos: _open_menu_at_cursor())
+
+        self.main_toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.main_toolbar_widget.customContextMenuRequested.connect(_on_toolbar_context_menu)
 
         # crea los tooltips
         update_tooltips()
 
 
-tb = toolbar()
+_toolbar_instance = None
+
+
+def get_toolbar():
+    global _toolbar_instance
+    return _toolbar_instance
+
+
+def show():
+    global _toolbar_instance
+
+    # Close existing UI robustly
+    try:
+        workspace_control = WorkspaceName + "WorkspaceControl"
+        if cmds.workspaceControl(workspace_control, q=True, exists=True):
+            cmds.deleteUI(workspace_control, control=True)
+    except Exception:
+        pass
+
+    if _toolbar_instance and isValid(_toolbar_instance):
+        try:
+            _toolbar_instance.close()
+            _toolbar_instance.deleteLater()
+        except Exception:
+            pass
+
+    _toolbar_instance = toolbar()
+    _toolbar_instance.startUI()
+
+
+def toggle():
+    global _toolbar_instance
+    if _toolbar_instance and isValid(_toolbar_instance) and _toolbar_instance.isVisible():
+        _toolbar_instance.close()
+    else:
+        show()

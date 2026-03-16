@@ -885,9 +885,10 @@ def clear_selected_keys(*args):
 
 def __get_move_keyframes_offset():
     try:
-        from TheKeyMachine.core.toolbar import tb
+        from TheKeyMachine.core.toolbar import get_toolbar
+        tb = get_toolbar()
 
-        if hasattr(tb, "move_keyframes_intField"):
+        if tb and hasattr(tb, "move_keyframes_intField"):
             return int(tb.move_keyframes_intField.value())
     except Exception:
         pass

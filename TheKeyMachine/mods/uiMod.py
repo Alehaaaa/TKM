@@ -24,9 +24,7 @@ import maya.OpenMayaUI as mui
 try:
     from shiboken2 import wrapInstance
     from PySide2.QtWidgets import QApplication, QDesktopWidget
-    from PySide2.QtCore import *
-    from PySide2.QtGui import *
-    from PySide2.QtWidgets import *
+    from PySide6.QtGui import QPixmap
     from PySide2.QtCore import QTimer
     from PySide2.QtWidgets import QAction
 
@@ -248,15 +246,15 @@ def uninstall():
     if result == "Uninstall":
         try:
             # Desactiva el thread para centrar la toolbar
-            run_centerToolbar = False
+            # run_centerToolbar = False
 
-            # Definiendo las rutas
-            user_app_dir = cmds.internalVar(userAppDir=True)
-            user_dir = cmds.internalVar(userScriptDir=True)
+            # # Definiendo las rutas
+            # user_app_dir = cmds.internalVar(userAppDir=True)
+            # user_dir = cmds.internalVar(userScriptDir=True)
             tkm_folder_path = os.path.join(INSTALL_PATH, "TheKeyMachine")
 
-            version_maya = cmds.about(version=True)
-            maya_dir = os.path.join(user_app_dir, version_maya)
+            # version_maya = cmds.about(version=True)
+            # maya_dir = os.path.join(user_app_dir, version_maya)
 
             # Crear una carpeta llamada "uninstalled" dentro de TheKeyMachine si no existe
             uninstalled_folder_path = os.path.join(tkm_folder_path, "uninstalled")
@@ -834,15 +832,15 @@ def donate_window():
         about_image = ui.getImage(image="stripe.png")
         image_label.setPixmap(about_image)
         image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-    except:
+    except Exception:
         # Cargar la imagen como QPixmap
         about_image = ui.getImage(image="stripe.png")
         set_about_image = QPixmap(about_image)
         image_label.setPixmap(set_about_image)
         image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
 
-    TheKeyMachine_version = general.get_thekeymachine_version()
-    TheKeyMachine_build_version = general.get_thekeymachine_build_version()
+    # TheKeyMachine_version = general.get_thekeymachine_version()
+    # TheKeyMachine_build_version = general.get_thekeymachine_build_version()
 
     if screen_width == 3840:
         label6 = QtWidgets.QLabel(
@@ -973,7 +971,7 @@ def about_window():
         about_image = ui.getImage(image="TheKeyMachine_logo_250.png")
         image_label.setPixmap(about_image)
         image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-    except:
+    except Exception:
         # Cargar la imagen como QPixmap
         about_image = ui.getImage(image="TheKeyMachine_logo_250.png")
         set_about_image = QPixmap(about_image)
@@ -1171,9 +1169,9 @@ def bug_report_window(*args):
     apology_label_style = "color: #d37457; font-size: 20px;"
     apology_text_style = "color: #ccc; font-size: 14px;"
     name_label_style = "color: #bbb; font-size: 12px;"
-    email_label_style = "color: #bbb; font-size: 12px;"
-    error_label_style = "color: #bbb; font-size: 12px;"
-    script_editor_label_style = "color: #bbb; font-size: 12px;"
+    # email_label_style = "color: #bbb; font-size: 12px;"
+    # error_label_style = "color: #bbb; font-size: 12px;"
+    # script_editor_label_style = "color: #bbb; font-size: 12px;"
     confirmation_label_style = "color: #9bbbca;"
 
     input_style = "background-color:  #2d2d2d ; font-size: 12px; border: none; border-radius: 5px; color: #bbb;"
@@ -1184,9 +1182,9 @@ def bug_report_window(*args):
         apology_label_style = "color: #d37457; font-size: 30px;"
         apology_text_style = "color: #ccc; font-size: 18px;"
         name_label_style = "color: #bbb; font-size: 20px;"
-        email_label_style = "color: #bbb; font-size: 20px;"
-        error_label_style = "color: #bbb; font-size: 20px;"
-        script_editor_label_style = "color: #bbb; font-size: 20px;"
+        # email_label_style = "color: #bbb; font-size: 20px;"
+        # error_label_style = "color: #bbb; font-size: 20px;"
+        # script_editor_label_style = "color: #bbb; font-size: 20px;"
         confirmation_label_style = "color: #9bbbca; font-size: 18px;"
         input_style = "background-color:  #2d2d2d ; font-size: 20px; border: none; border-radius: 5px; color: #bbb;"
         textbox_style = "background-color: #2d2d2d; font-size: 20px; border: none; border-radius: 5px; color: #bbb;"
@@ -1237,7 +1235,7 @@ def bug_report_window(*args):
     name_input.setPlaceholderText("Your name")
     name_input.setMaxLength(50)
 
-    email_label = QtWidgets.QLabel("")
+    # email_label = QtWidgets.QLabel("")
     email_input = QtWidgets.QLineEdit()
     email_input.setStyleSheet(input_style)
     email_input.setFixedSize(300, 25)

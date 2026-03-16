@@ -45,7 +45,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
     """Flat square-indicator button that emits its signed percent on click."""
 
     def __init__(self, parent: QWidget, *, percent: int, color: str, worldSpace: bool = False):
-        super(SliderButton, self).__init__(parent)
+        super().__init__(parent)
         self._percent = percent
         self._color = color
         self._box_sz = util.DPI(6) if abs(percent) == 100 else util.DPI(3)
@@ -298,7 +298,7 @@ QSlider::groove:horizontal {{
     background: {COLOR.color.darkGray};
     height: {gh}px;
     border-radius: {self._handle_radius}px;
-    margin: 0 {self._padding_lr}px;
+    margin: 0;
 }}
 QSlider::handle:horizontal {{
     width: {int(h * 1.05)}px;
@@ -371,7 +371,7 @@ QSlider::handle:horizontal {{
                 if hasattr(self, "_tooltip_data") and (self._tooltip_data.get("text") or self._tooltip_data.get("description")):
                     QFlatTooltipManager.delayed_show(anchor_widget=self, **self._tooltip_data)
             else:
-                QFlatTooltipManager.hide()
+                QFlatTooltipManager.cancel_timer()
 
         if self.isSliderDown() and self._pressOffset is not None and self._pressOffset is not True:
             track_left = self._padding_lr

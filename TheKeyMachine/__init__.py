@@ -17,14 +17,33 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
+__version__ = "0.1.51"
+__stage__ = "beta"
+__build__ = "308"
+__codename__ = "Jell-O"
+
 
 def reload():
+    import sys
+    import importlib
+
+    modules_to_delete = [m for m in list(sys.modules.keys()) if m.startswith("TheKeyMachine")]
+
+    for mod_name in modules_to_delete:
+        del sys.modules[mod_name]
+
     import TheKeyMachine.core.toolbar as t
 
-    t.tb.reload()
+    importlib.reload(t)
+
+    tb = t.get_toolbar()
+    if tb:
+        tb.reload()
+    else:
+        t.show()
 
 
 def toggle():
     import TheKeyMachine.core.toolbar as t
 
-    t.tb.toggle()
+    t.show()
