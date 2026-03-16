@@ -17,7 +17,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.51"
+__version__ = "0.1.52"
 __stage__ = "beta"
 __build__ = "308"
 __codename__ = "Jell-O"
