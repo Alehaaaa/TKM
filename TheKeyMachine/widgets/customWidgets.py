@@ -346,11 +346,13 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
 
 
 class QFlowLayout(QtWidgets.QLayout):
-    def __init__(self, parent=None, margin=0, Hspacing=-1, Vspacing=-1, alignment=None):
+    def __init__(self, parent=None, margin=0, Hspacing=-1, Vspacing=-1, alignment=None, **kwargs):
         super().__init__(parent)
         self._item_list = []
-        self._Hspacing = Hspacing
-        self._Vspacing = Vspacing
+        
+        # Handle 'Wspacing' alias from toolbar.py
+        self._Hspacing = kwargs.get('Wspacing', Hspacing) 
+        self._Vspacing = kwargs.get('Hspacing', Vspacing) if 'Wspacing' in kwargs else Vspacing
         
         # PySide/PyQt cross-compatibility
         self.setContentsMargins(margin, margin, margin, margin)
@@ -417,12 +419,8 @@ class QFlowLayout(QtWidgets.QLayout):
         current_line = []
         current_line_width = 0
 
-        space_x = self.spacing()
-        space_y = self.spacing()
-        if space_x == -1:
-            space_x = 5
-        if space_y == -1:
-            space_y = 5
+        space_x = self._Hspacing if self._Hspacing != -1 else 5
+        space_y = self._Vspacing if self._Vspacing != -1 else 5
 
         for item in self._item_list:
             wid = item.widget()

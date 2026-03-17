@@ -412,17 +412,26 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             w = 900
 
         needed_h = layout.heightForWidth(w)
+        # Add some padding for safety
         needed_h += 4
 
         def get_qt():
-            workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
+            try:
+                parent = self.parent()
+                workspace_control = parent.objectName() if parent and isValid(parent) else self.objectName() + "WorkspaceControl"
+            except (AttributeError, RuntimeError):
+                workspace_control = self.objectName() + "WorkspaceControl"
+                
             ptr = mui.MQtUtil.findControl(workspace_control)
             if not ptr:
                 return None
             return wrapInstance(int(ptr), QtWidgets.QWidget)
 
+        # Get the real Maya Main Window handle to avoid accidental re-sizing of it
+        m_win_ptr = mui.MQtUtil.mainWindow()
+        maya_win = wrapInstance(int(m_win_ptr), QtWidgets.QWidget) if m_win_ptr else None
+
         if self.isFloating():
-            # For floating, we need to find the top-most parent (the window frame)
             tkm_ui = get_qt()
             if not tkm_ui or not isValid(tkm_ui):
                 return
@@ -449,10 +458,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                         target = parents[-1]
 
                 if target and isValid(target):
-                    if target.objectName() == "MayaWindow" or isinstance(target, QtWidgets.QMainWindow):
+                    # SAFETY: Never resize the main window or its direct children if they are the top window
+                    if target == maya_win or target.objectName() == "MayaWindow" or isinstance(target, QtWidgets.QMainWindow):
                         return
-                    target.setMaximumHeight(needed_h + 30)
-                    target.setMinimumHeight(needed_h + 30)
+                    # Use setFixedHeight to lock it to necessary space
+                    target.setFixedHeight(needed_h + 30)
             except (RuntimeError, AttributeError):
                 pass
         else:
@@ -461,17 +471,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 return
 
             try:
-                # The workspaceControl container is parent of parent in Maya
-                # based on cams.py line 1168
-                container = tkm_ui.parent()
-                if container and isValid(container):
-                    target = container.parent() if container.parent() and isValid(container.parent()) else container
-
-                    if target and isValid(target):
-                        if target.objectName() == "MayaWindow" or isinstance(target, QtWidgets.QMainWindow):
-                            return
-                        target.setMaximumHeight(needed_h)
-                        target.setMinimumHeight(needed_h)
+                # Match cams.py hierarchy: root of the workspaceControl is often parent of parent
+                target = tkm_ui.parent().parent() if tkm_ui.parent() and tkm_ui.parent().parent() else tkm_ui
+                
+                if target and isValid(target):
+                    # SAFETY: Never resize the main window!
+                    if target == maya_win or target.objectName() == "MayaWindow" or isinstance(target, QtWidgets.QMainWindow):
+                        return
+                    # Use setFixedHeight as in cams.py for proper docking behavior
+                    target.setFixedHeight(needed_h)
             except (RuntimeError, AttributeError):
                 pass
 
