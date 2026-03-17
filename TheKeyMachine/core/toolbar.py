@@ -203,9 +203,6 @@ for module in modules_to_reload:
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-current_blend_slider_mode = "BL"
-toggleAnimOffsetButtonState = False
-micro_move_button_state = False
 WorkspaceName = "k"
 selection_sets_workspace = "s"
 
@@ -226,18 +223,24 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.shelf_painter = None
         self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
 
-        # Initial state variables
+        # Initial state variables from settingsMod
+        self.current_blend_slider_mode = settings.get_setting("current_blend_slider_mode", "BN")
+        self.toggleAnimOffsetButtonState = settings.get_setting("toggleAnimOffsetButtonState", False)
+        self.micro_move_button_state = settings.get_setting("micro_move_button_state", False)
+        self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
+
         self.bar_center_value = 10
         self.anim_offset_run_timer = True
-        self.toggleAnimOffsetButtonState = False
-        self.micro_move_button_state = False
         self.micro_move_run_timer = True
         self.animation_offset_original_values = {}
         self.setgroup_states = {}
         self.setgroup_buttons = {}
-        # self.tc = threading.Thread(target=self.toolbar_center_time, args=(1,))  # Create a thread to center the toolbar
         self.run_centerToolbar = False
-        # self.tc.start()
+
+        # Link object runtime states
+        self.link_obj_image_timer = False
+        self.link_obj_toggle_state = False
+        self.link_obj_thread = None
 
         # When loading a new scene, the on_scene_opened() function is executed, which includes, among other things, the function to update the selectionSets.
         # This first if statement checks whether the scriptJob exists; if not, it either creates or deletes it.
@@ -246,6 +249,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Function that runs when new scenes are opened
         def on_scene_opened():
+            if not isValid(self):
+                return
             self.update_selectionSets_on_new_scene()
             self.update_popup_menu()
 
@@ -259,6 +264,38 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Attempt to load customGraph
         QTimer.singleShot(6000, self.load_customGraph_try_01)
+
+    def closeEvent(self, event):
+        """
+        Handles the close event for the toolbar window.
+        Stops all background threads and performs necessary cleanup.
+        """
+        # Stop animation offset thread
+        self.anim_offset_run_timer = False
+        if hasattr(self, 'anim_offset_thread') and self.anim_offset_thread and self.anim_offset_thread.is_alive():
+            self.anim_offset_thread.join(timeout=0.5)
+
+        # Stop micro move thread
+        self.micro_move_run_timer = False
+        if hasattr(self, 'micro_move_thread') and self.micro_move_thread and self.micro_move_thread.is_alive():
+            self.micro_move_thread.join(timeout=0.5)
+
+        # Stop link objects image toggle thread
+        self.link_obj_image_timer = False
+        if hasattr(self, 'link_obj_thread') and self.link_obj_thread and self.link_obj_thread.is_alive():
+            self.link_obj_thread.join(timeout=0.5)
+
+        # Cleanup painter
+        if self.shelf_painter:
+            try:
+                QtGui.QPainter(self.shelf_painter).end()
+                self.shelf_painter.setParent(None)
+                self.shelf_painter.deleteLater()
+            except Exception:
+                pass
+            self.shelf_painter = None
+
+        super().closeEvent(event)
 
     def get_screen_resolution(self):
         app = QtWidgets.QApplication.instance()
@@ -326,12 +363,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         QTimer.singleShot(100, self.update_height)
 
     def visible_change_command(self, *args):
+        if not isValid(self):
+            return
+
         if not self.isDockable():
             return
         if self.current_layout != cmds.workspaceLayoutManager(q=1, current=True):
             self.current_layout = cmds.workspaceLayoutManager(q=1, current=True)
             if not self.isVisible():
-                cmds.evalDeferred(show, lowestPriority=True)
+                if isValid(self):
+                    cmds.evalDeferred(show, lowestPriority=True)
 
                 if self.shelf_painter:
                     self.shelf_painter.show()
@@ -366,6 +407,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.update_height()
 
     def shelf_tabbar(self):
+        if not isValid(self):
+            return
+
         if self.shelf_painter:
             QtGui.QPainter(self.shelf_painter).end()
             self.shelf_painter.setParent(None)
@@ -421,7 +465,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 workspace_control = parent.objectName() if parent and isValid(parent) else self.objectName() + "WorkspaceControl"
             except (AttributeError, RuntimeError):
                 workspace_control = self.objectName() + "WorkspaceControl"
-                
+
             ptr = mui.MQtUtil.findControl(workspace_control)
             if not ptr:
                 return None
@@ -473,7 +517,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             try:
                 # Match cams.py hierarchy: root of the workspaceControl is often parent of parent
                 target = tkm_ui.parent().parent() if tkm_ui.parent() and tkm_ui.parent().parent() else tkm_ui
-                
+
                 if target and isValid(target):
                     # SAFETY: Never resize the main window!
                     if target == maya_win or target.objectName() == "MayaWindow" or isinstance(target, QtWidgets.QMainWindow):
@@ -490,6 +534,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     # These two functions attempt to check if the Graph Editor is open and load customGraph in that case; they are made with two attempts
     def load_customGraph_try_01(self):
+        if not isValid(self):
+            return
         graph_vis = cmds.getPanel(vis=True)
         if graph_vis and "graphEditor1" in graph_vis:
             cg.createCustomGraph()
@@ -497,6 +543,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             QTimer.singleShot(8000, self.load_customGraph_try_02)
 
     def load_customGraph_try_02(self):
+        if not isValid(self):
+            return
         graph_vis = cmds.getPanel(vis=True)
         if graph_vis and "graphEditor1" in graph_vis:
             cg.createCustomGraph()
@@ -525,6 +573,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     # Update the iBookmarks menu when scene changes
     def update_popup_menu(self, *args):
+        if not isValid(self):
+            return
 
         if not cmds.objExists("iBookmarks"):
             if cmds.popupMenu("isolate_button_popupMenu", exists=True):
@@ -625,6 +675,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             )
 
     def update_selectionSets_on_new_scene(self):
+        if not isValid(self):
+            return
         if cmds.window("SetCreationWindow", exists=True):
             cmds.deleteUI("SetCreationWindow")
 
@@ -2143,9 +2195,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     def offset_animation_deferred(self, interval):
         def adjust_offset_animation():
+            if not isValid(self):
+                return
             self.adjust_keyframes()
 
-        while self.anim_offset_run_timer:
+        while self.anim_offset_run_timer and isValid(self):
             time.sleep(interval)
             utils.executeDeferred(adjust_offset_animation)
 
@@ -2159,19 +2213,24 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         else:
             # Toggle button state
             self.toggleAnimOffsetButtonState = not self.toggleAnimOffsetButtonState
+            settings.set_setting("toggleAnimOffsetButtonState", self.toggleAnimOffsetButtonState)
 
             if self.toggleAnimOffsetButtonState:
                 cmds.undoInfo(openChunk=True)
                 cmds.iconTextButton("anim_offset_button", e=True, bgc=(0.3, 0.3, 0.3))
                 self.anim_offset_run_timer = True
+
+                # Initialize thread variable if not already
+                self.anim_offset_thread = threading.Thread(target=self.offset_animation_deferred, args=(0.3,))
+                self.anim_offset_thread.start()
                 self.store_keyframes()
 
-                t = threading.Thread(target=self.offset_animation_deferred, args=(0.3,))
-                t.start()
             else:
                 cmds.undoInfo(closeChunk=True)
                 cmds.iconTextButton("anim_offset_button", e=True, bgc=(0.2, 0.2, 0.2))
                 self.anim_offset_run_timer = False
+                if self.anim_offset_thread and self.anim_offset_thread.is_alive():
+                    self.anim_offset_thread.join() # Wait for the thread to finish
                 pass
 
     # ---------------------------------------------------------------
@@ -2179,6 +2238,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def toggle_micro_move_button(self, *args):
 
         self.micro_move_button_state = not self.micro_move_button_state
+        settings.set_setting("micro_move_button_state", self.micro_move_button_state)
 
         if self.micro_move_button_state:
             cmds.undoInfo(openChunk=True)
@@ -2186,8 +2246,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             self.micro_move_run_timer = True
             bar.activate_micro_move()
 
-            t = threading.Thread(target=self.micro_move_thread, args=(0.5,))
-            t.start()
+            # Initialize thread variable if not already
+            self.micro_move_thread = threading.Thread(target=self.micro_move_thread, args=(0.5,))
+            self.micro_move_thread.start()
 
         else:
             self.micro_move_run_timer = False
@@ -2200,12 +2261,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             # El thread tarda en pararse así que necesitamos crear esto y así salirnos en barMod de la ejecución
             cmds.manipMoveContext("dummyCtx")
             cmds.setToolTo("dummyCtx")
+            if self.micro_move_thread and self.micro_move_thread.is_alive():
+                self.micro_move_thread.join() # Wait for the thread to finish
 
     def micro_move_thread(self, interval):
         def micro_move_run():
+            if not isValid(self):
+                return
             bar.activate_micro_move()
 
-        while self.micro_move_run_timer:
+        while self.micro_move_run_timer and isValid(self):
             time.sleep(interval)
             utils.executeDeferred(micro_move_run)
 
@@ -2233,8 +2298,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         width, height = screen_rect.width(), screen_rect.height()
 
         tkm_toolbar_width = cmds.workspaceControl(WorkspaceName, query=True, width=True)
-        sobrante = tkm_toolbar_width - user_preferences.toolbar_size
-        toolbar_s = user_preferences.toolbar_size
+        toolbar_s = settings.get_setting("toolbar_size", 1580)
+        sobrante = tkm_toolbar_width - toolbar_s
 
         # El margen que necesitamos meter en el separador de la izq es la mitad de lo que sobra
         margen = sobrante / 2
@@ -2450,7 +2515,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Restaurar la selección original al final de la función
         cmds.select(clear=True)
         if current_selection:
-            cmds.select(current_selection)
+            cmds.select(current_selection, replace=True)
 
     def update_bookmark_list(self, list_widget, *args):
         bookmarks = cmds.listRelatives("iBookmarks", children=True) or []
@@ -2501,6 +2566,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.select(original_selection, replace=True)
         else:
             cmds.select(clear=True)
+
+
+
 
     def buildUI(self):
         # Fix para que no de error, por si no lee el ancho del ViewPanel
@@ -2841,8 +2909,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.button(button_name, edit=True, label=str(int(current_frame)))
 
         def set_blend_slider_command(mode):
-            global current_blend_slider_mode
-            current_blend_slider_mode = mode
+            self.current_blend_slider_mode = mode
+            settings.set_setting("current_blend_slider_mode", mode)
 
             match mode:
                 case "pull_push":
@@ -3263,39 +3331,38 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Copy Link -----------------------------------------------------------------------
 
-        global link_checkbox_state
-        link_checkbox_state = False
+        self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
+        self.link_obj_image_timer = False
+        self.link_obj_thread = None
+        self.link_obj_toggle_state = False
 
         link_objects_button_widget = cw.QFlatToolButton(icon=media.link_objects_image, tooltip=helper.link_objects_tooltip_text)
         link_objects_button_widget.clicked.connect(keyTools.mod_link_objects)
         sec_layout.addWidget(link_objects_button_widget)
 
         # ------funciones para crear el flashing icon al crear el auto-link callback
-        global link_obj_image_timer
-        link_obj_image_timer = True
 
         def toggle_link_obj_button_image():
+            if not isValid(self):
+                return
             # For simplicity, we can use a custom property or just toggle based on a global state
-            global link_obj_toggle_state
-            link_obj_toggle_state = not globals().get("link_obj_toggle_state", False)
+            self.link_obj_toggle_state = not self.link_obj_toggle_state
 
-            new_image = media.link_objects_on_image if link_obj_toggle_state else media.link_objects_image
+            new_image = media.link_objects_on_image if self.link_obj_toggle_state else media.link_objects_image
             link_objects_button_widget.setIcon(QtGui.QIcon(new_image))
 
         def change_link_obj_image(interval):
-            while link_obj_image_timer:
+            while self.link_obj_image_timer and isValid(self):
                 time.sleep(interval)
                 utils.executeDeferred(toggle_link_obj_button_image)
 
         def start_link_obj_toggle_image_thread():
-            global link_obj_image_timer, link_obj_thread
-            link_obj_image_timer = True
-            link_obj_thread = threading.Thread(target=change_link_obj_image, args=(0.3,))
-            link_obj_thread.start()
+            self.link_obj_image_timer = True
+            self.link_obj_thread = threading.Thread(target=change_link_obj_image, args=(0.3,))
+            self.link_obj_thread.start()
 
         def stop_link_obj_toggle_image_thread():
-            global link_obj_image_timer
-            link_obj_image_timer = False
+            self.link_obj_image_timer = False
 
         # Añade el auto-link callback
         def add_link_objects_callback(*args):
@@ -3312,16 +3379,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             link_objects_button_widget.setIcon(QtGui.QIcon(media.link_objects_image))
 
         def toggle_auto_link_callback(*args):
-            global link_checkbox_state
+            self.link_checkbox_state = not self.link_checkbox_state
+            settings.set_setting("link_checkbox_state", self.link_checkbox_state)
 
-            link_checkbox_state = not link_checkbox_state
-
-            if link_checkbox_state:
+            if self.link_checkbox_state:
                 add_link_objects_callback()
             else:
                 remove_link_objects_callback()
 
-            action_auto_link.setChecked(link_checkbox_state)
+            action_auto_link.setChecked(self.link_checkbox_state)
 
         link_objects_menu = QtWidgets.QMenu(link_objects_button_widget)
         link_objects_menu.addAction(QtGui.QIcon(media.link_objects_image), "Copy Link Position", keyTools.copy_link)
@@ -3329,7 +3395,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         link_objects_menu.addSeparator()
         action_auto_link = link_objects_menu.addAction("Auto-link")
         action_auto_link.setCheckable(True)
-        action_auto_link.setChecked(link_checkbox_state)
+        action_auto_link.setChecked(self.link_checkbox_state)
         action_auto_link.triggered.connect(toggle_auto_link_callback)
 
         link_objects_menu.addSeparator()

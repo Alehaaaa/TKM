@@ -118,6 +118,9 @@ class QFlatTooltip(QWidget):
         self.anchor_widget = anchor_widget
         self.shortcuts = shortcuts or []
         self.icon_obj = icon_obj
+        self.text = text
+        self.description = description
+        self.icon_path = icon # Store for reference
 
         # 1. Build the base template
         if template is None:
@@ -238,18 +241,18 @@ class QFlatTooltip(QWidget):
         parts = re.split(r"<br\s*/?>", self.template, maxsplit=1, flags=re.IGNORECASE)
         header_candidate = parts[0] if parts else self.template
 
-        # Look for <b>Title</b> in the header line
-        title_match = re.search(r"<b>(.*?)</b>", header_candidate, re.IGNORECASE)
+        # Look for <b>Title</b> or <title>Title</title> in the header line
+        title_match = re.search(r"<(b|title)>(.*?)</\1>", header_candidate, re.IGNORECASE)
         if title_match:
-            extracted_title = title_match.group(1).strip()
+            extracted_title = title_match.group(2).strip()
 
         # Look for <img src='...'> in the header line
         img_match = re.search(r"<img[^>]*src=['\"](.*?)['\"]", header_candidate, re.IGNORECASE)
         if img_match:
             extracted_icon_path = img_match.group(1)
 
-        # 2. Determine Header Content
-        header_title = extracted_title
+        # 2. Determine Header Content - Fallback to self.text if extraction failed
+        header_title = extracted_title or self.text
         header_pixmap = self.icon_obj if self.icon_obj and not self.icon_obj.isNull() else None
 
         if not header_pixmap and extracted_icon_path:
@@ -450,18 +453,23 @@ class QFlatTooltip(QWidget):
         ah = DPI(self.ARROW_H)
 
         if target_rect:
-            target_x = target_rect.center().x()
             self._global_anc = target_rect
         elif action_rect:
-            global_anc = QRect(widget.mapToGlobal(action_rect.topLeft()), action_rect.size())
-            target_x = global_anc.center().x()
-            self._global_anc = global_anc
-            self.target_rect = global_anc
+            self._global_anc = QRect(widget.mapToGlobal(action_rect.topLeft()), action_rect.size())
+            self.target_rect = self._global_anc
         else:
             target_global = widget.mapToGlobal(QPoint(0, 0))
-            target_x = target_global.x() + widget.width() // 2
             self._global_anc = QRect(target_global, widget.size())
             self.target_rect = self._global_anc
+
+        # Calculate target_x based on cursor position, clamped to the anchor's horizontal bounds.
+        # This makes the tooltip (and arrow) "grow" from exactly where the user is hovering.
+        tx = cursor_pos.x()
+        if tx < self._global_anc.left():
+            tx = self._global_anc.left()
+        elif tx > self._global_anc.right():
+            tx = self._global_anc.right()
+        target_x = tx
 
         # Default to placing tooltip ON TOP (above) the widget (arrow on bottom)
         self.side = "bottom"

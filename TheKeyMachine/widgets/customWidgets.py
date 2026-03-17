@@ -177,7 +177,7 @@ class MenuWidget(QtWidgets.QMenu):
         desc = action.property("description")
         if desc:
             title = action.text().replace("&", "").strip()
-            template = "<title>{}</title><text>{}</text>".format(title, desc)
+            template = "<b>{}</b><br><br>{}".format(title, desc)
 
             geometry = self.actionGeometry(action)
             target_rect = QtCore.QRect(self.mapToGlobal(geometry.topLeft()), geometry.size())
