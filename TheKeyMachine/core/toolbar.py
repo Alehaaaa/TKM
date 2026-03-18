@@ -272,17 +272,17 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         """
         # Stop animation offset thread
         self.anim_offset_run_timer = False
-        if hasattr(self, 'anim_offset_thread') and self.anim_offset_thread and self.anim_offset_thread.is_alive():
+        if hasattr(self, "anim_offset_thread") and self.anim_offset_thread and self.anim_offset_thread.is_alive():
             self.anim_offset_thread.join(timeout=0.5)
 
         # Stop micro move thread
         self.micro_move_run_timer = False
-        if hasattr(self, 'micro_move_thread') and self.micro_move_thread and self.micro_move_thread.is_alive():
+        if hasattr(self, "micro_move_thread") and self.micro_move_thread and self.micro_move_thread.is_alive():
             self.micro_move_thread.join(timeout=0.5)
 
         # Stop link objects image toggle thread
         self.link_obj_image_timer = False
-        if hasattr(self, 'link_obj_thread') and self.link_obj_thread and self.link_obj_thread.is_alive():
+        if hasattr(self, "link_obj_thread") and self.link_obj_thread and self.link_obj_thread.is_alive():
             self.link_obj_thread.join(timeout=0.5)
 
         # Cleanup painter
@@ -361,6 +361,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Force initial resize
         QTimer.singleShot(100, self.update_height)
+        QTimer.singleShot(200, self.shelf_tabbar)
 
     def visible_change_command(self, *args):
         if not isValid(self):
@@ -428,8 +429,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         tab_handle = control.parent().parent()
 
         if self.isFloating():
-            tab_handle.tabBar().setVisible(False)
-            return
+            return tab_handle.tabBar().setVisible(False)
 
         self.shelf_painter = cw.QFlatShelfPainter(tab_handle)
         self.shelf_painter.setGeometry(tab_handle.geometry())
@@ -2230,7 +2230,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 cmds.iconTextButton("anim_offset_button", e=True, bgc=(0.2, 0.2, 0.2))
                 self.anim_offset_run_timer = False
                 if self.anim_offset_thread and self.anim_offset_thread.is_alive():
-                    self.anim_offset_thread.join() # Wait for the thread to finish
+                    self.anim_offset_thread.join()  # Wait for the thread to finish
                 pass
 
     # ---------------------------------------------------------------
@@ -2262,7 +2262,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.manipMoveContext("dummyCtx")
             cmds.setToolTo("dummyCtx")
             if self.micro_move_thread and self.micro_move_thread.is_alive():
-                self.micro_move_thread.join() # Wait for the thread to finish
+                self.micro_move_thread.join()  # Wait for the thread to finish
 
     def micro_move_thread(self, interval):
         def micro_move_run():
@@ -2338,11 +2338,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 retain=True,
                 vis=False,
                 uiScript="from TheKeyMachine.core.toolbar import get_toolbar\ntb = get_toolbar()\nif tb: tb.create_selection_sets_workspace()",
-                actLikeMayaUIElement=True,
             )
             cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
         else:
-            cmds.workspaceControl(selection_sets_workspace, edit=True, restore=False, actLikeMayaUIElement=True)
+            cmds.workspaceControl(selection_sets_workspace, edit=True, restore=False)
             self.update_selectionSets_on_new_scene()
 
     # Crea el selection sets workspace ----------------------------------------------------------------------------
@@ -2358,7 +2357,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             if vis_state:
                 cmds.workspaceControl(selection_sets_workspace, edit=True, visible=False)
             else:
-                cmds.workspaceControl(selection_sets_workspace, edit=True, restore=True, actLikeMayaUIElement=True)
+                cmds.workspaceControl(selection_sets_workspace, edit=True, restore=True)
                 self.create_buttons_for_sel_sets()
         else:
             cmds.workspaceControl(
@@ -2371,7 +2370,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 retain=True,
                 vis=True,
                 uiScript="from TheKeyMachine.core.toolbar import get_toolbar\ntb = get_toolbar()\nif tb: tb.create_selection_sets_workspace()",
-                actLikeMayaUIElement=True,
             )
             cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
             self.update_selectionSets_on_new_scene()
@@ -2566,9 +2564,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.select(original_selection, replace=True)
         else:
             cmds.select(clear=True)
-
-
-
 
     def buildUI(self):
         # Fix para que no de error, por si no lee el ancho del ViewPanel

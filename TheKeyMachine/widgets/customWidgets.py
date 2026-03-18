@@ -1,5 +1,6 @@
 from __future__ import annotations
 from TheKeyMachine.tooltips import QFlatTooltipManager
+from .util import DPI
 import re
 
 """
@@ -118,7 +119,7 @@ class QFlatHoverableIcon:
 class MenuWidget(QtWidgets.QMenu):
     def __init__(self, *args, **kwargs):
         description = kwargs.pop("description", None)
-        
+
         icon = None
         new_args = []
         for arg in args:
@@ -126,15 +127,15 @@ class MenuWidget(QtWidgets.QMenu):
                 icon = arg
             else:
                 new_args.append(arg)
-                
+
         QtWidgets.QMenu.__init__(self, *new_args, **kwargs)
 
         if self.parent() and hasattr(self.parent(), "destroyed"):
             self.parent().destroyed.connect(self.close)
-            
+
         if icon:
             self.setIcon(icon)
-        
+
         if description:
             self.setProperty("description", description)
             title = self.title().replace("&", "").strip()
@@ -349,18 +350,18 @@ class QFlowLayout(QtWidgets.QLayout):
     def __init__(self, parent=None, margin=0, Hspacing=-1, Vspacing=-1, alignment=None, **kwargs):
         super().__init__(parent)
         self._item_list = []
-        
+
         # Handle 'Wspacing' alias from toolbar.py
-        self._Hspacing = kwargs.get('Wspacing', Hspacing) 
-        self._Vspacing = kwargs.get('Hspacing', Vspacing) if 'Wspacing' in kwargs else Vspacing
-        
+        self._Hspacing = kwargs.get("Wspacing", Hspacing)
+        self._Vspacing = kwargs.get("Hspacing", Vspacing) if "Wspacing" in kwargs else Vspacing
+
         # PySide/PyQt cross-compatibility
         self.setContentsMargins(margin, margin, margin, margin)
-        
+
         self.setSpacing(self._Hspacing)
-            
+
         if alignment is not None:
-             self.setAlignment(alignment)
+            self.setAlignment(alignment)
 
     def __del__(self):
         item = self.takeAt(0)
@@ -461,7 +462,7 @@ class QFlowLayout(QtWidgets.QLayout):
                     current_x = effective_rect.right() - line_width + 1
                 elif alignment & int(QtCore.Qt.AlignHCenter):
                     current_x = effective_rect.x() + (effective_rect.width() - line_width) / 2
-                else: # Default is AlignLeft
+                else:  # Default is AlignLeft
                     current_x = effective_rect.x()
 
                 for item in line_items:
@@ -471,6 +472,70 @@ class QFlowLayout(QtWidgets.QLayout):
                     current_x += item_size.width() + space_x
 
                 current_y += lh + space_y
-                
+
         # Total layout height required
         return y + line_height - rect.y() + margins.bottom()
+
+
+# QPainter for the shelf tabBar
+
+
+class QFlatShelfPainter(QtWidgets.QWidget):
+    def __init__(self, parent=None):
+        QtWidgets.QWidget.__init__(self, parent)
+        self.tabbar_width = DPI(16)
+        self.line_thickness = DPI(1)
+        self.line_color = QtGui.QColor(130, 130, 130)
+        self.margin = DPI(4)
+        self.center = DPI(5)
+        self.offset = DPI(1.5)
+
+    def paintEvent(self, event):
+        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+
+        color = self.palette().color(self.backgroundRole())
+        painter = QtGui.QPainter(self)
+        painter.setPen(QtGui.QPen(color, self.tabbar_width))
+        painter.drawLine(self.tabbar_width // 2, 0, self.tabbar_width // 2, self.height())
+
+        pen = QtGui.QPen(self.line_color)
+        pen.setWidth(1)  # Line width of 1 pixel
+        pen.setStyle(QtCore.Qt.CustomDashLine)  # Enable custom dash pattern
+        pen.setDashPattern([0.01, DPI(3)])  # 1 pixel dot, 1 pixel space
+        painter.setPen(pen)
+
+        painter.drawLine(
+            QtCore.QPointF(self.center - self.offset, self.margin / 3),
+            QtCore.QPointF(self.center - self.offset, self.height() - self.margin),
+        )
+        painter.drawLine(
+            QtCore.QPointF(self.center + self.offset, self.margin / 3),
+            QtCore.QPointF(self.center + self.offset, self.height() - self.margin),
+        )
+
+    def resizeEvent(self, event):
+        self.update()
+
+    def updateDrawingParameters(
+        self,
+        tabbar_width=None,
+        line_thickness=None,
+        line_color=None,
+        margin=None,
+        center=None,
+        offset=None,
+    ):
+        """Update drawing parameters and refresh the widget."""
+        if tabbar_width is not None:
+            self.tabbar_width = tabbar_width.width()
+        if line_thickness is not None:
+            self.line_thickness = line_thickness
+        if line_color is not None:
+            self.line_color = line_color
+        if margin is not None:
+            self.margin = margin
+        if center is not None:
+            self.center = center
+        if offset is not None:
+            self.offset = offset
+        self.update()
