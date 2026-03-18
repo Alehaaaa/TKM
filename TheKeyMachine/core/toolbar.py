@@ -69,6 +69,7 @@ import TheKeyMachine.core.customGraph as cg  # type: ignore
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
+from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.tooltips as tooltips  # type: ignore
 import TheKeyMachine.tooltips.tooltip as tt  # type: ignore
 
@@ -229,6 +230,21 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.micro_move_button_state = settings.get_setting("micro_move_button_state", False)
         self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
 
+        self.docking_position = settings.get_setting("docking_position", ["TimeSlider", "top"])
+        self.docking_orients = {
+            "top": "To Top",
+            "bottom": "To Bottom",
+        }
+        self.docking_layouts = {
+            "AttributeEditor": "Attribute Editor",
+            "ChannelBoxLayerEditor": "Channel Box",
+            "Outliner": "Outliner",
+            "MainPane": "Main Viewport",
+            "TimeSlider": "Time Slider",
+            "RangeSlider": "Range Slider",
+            "Shelf": "Shelf",
+        }
+
         self.bar_center_value = 10
         self.anim_offset_run_timer = True
         self.micro_move_run_timer = True
@@ -257,7 +273,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         toolbar.open_new_scene_scriptJob = cmds.scriptJob(event=("SceneOpened", on_scene_opened))
 
         # Utility for determining screen resolution
-        screen_width, screen_height = self.get_screen_resolution()
+        screen_width, screen_height = wutil.get_screen_resolution()
         self.screen_width = screen_width
 
         self.buildUI()
@@ -286,9 +302,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             self.link_obj_thread.join(timeout=0.5)
 
         # Cleanup painter
-        if self.shelf_painter:
+        if self.shelf_painter and isValid(self.shelf_painter):
             try:
-                QtGui.QPainter(self.shelf_painter).end()
                 self.shelf_painter.setParent(None)
                 self.shelf_painter.deleteLater()
             except Exception:
@@ -296,25 +311,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             self.shelf_painter = None
 
         super().closeEvent(event)
-
-    def get_screen_resolution(self):
-        app = QtWidgets.QApplication.instance()
-        if not app:
-            app = QtWidgets.QApplication([])
-
-        try:
-            # PySide6
-            screen = app.primaryScreen()
-            screen_rect = screen.geometry()
-        except Exception:
-            # PySide2
-            desktop = QtWidgets.QDesktopWidget()
-            screen_rect = desktop.screenGeometry()
-
-        screen_width = screen_rect.width()
-        screen_height = screen_rect.height()
-
-        return screen_width, screen_height
 
     def showWindow(self):
         # Build up kwargs for the visibleChangeCommand
@@ -350,8 +346,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 # We can't easily know if it's 'new' after self.show() since self.show() creates it
                 # but we can try to apply it anyway if it's not already docked where we want.
                 # Cams.py uses evalDeferred for some things.
-                TIME_SLIDER = mel.eval('getUIComponentToolBar("Time Slider", false)')
-                cmds.workspaceControl(workspace_control, edit=True, dtc=(TIME_SLIDER, "top"))
+                layout, orient = self.docking_position
+                if wutil.check_visible_layout(layout):
+                    dock_to = self.get_dock_to_control_name(layout)
+                    cmds.workspaceControl(workspace_control, edit=True, dtc=(dock_to, orient))
+
                 cmds.workspaceControl(workspace_control, edit=True, tabPosition=["west", 0])
             except Exception:
                 pass
@@ -375,7 +374,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 if isValid(self):
                     cmds.evalDeferred(show, lowestPriority=True)
 
-                if self.shelf_painter:
+                if self.shelf_painter and isValid(self.shelf_painter):
                     self.shelf_painter.show()
                 else:
                     cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
@@ -397,12 +396,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     )
                 )
                 timer.start(100)
-            if self.shelf_painter:
+            if self.shelf_painter and isValid(self.shelf_painter):
                 self.shelf_painter.show()
             else:
                 cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
         else:
-            if self.shelf_painter:
+            if self.shelf_painter and isValid(self.shelf_painter):
                 self.shelf_painter.hide()
 
         self.update_height()
@@ -411,21 +410,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if not isValid(self):
             return
 
-        if self.shelf_painter:
-            QtGui.QPainter(self.shelf_painter).end()
-            self.shelf_painter.setParent(None)
-            self.shelf_painter.deleteLater()
+        if self.shelf_painter and isValid(self.shelf_painter):
+            try:
+                self.shelf_painter.setParent(None)
+                self.shelf_painter.deleteLater()
+            except Exception:
+                pass
 
             self.shelf_painter = None
 
-        def get_maya_qt(ptr=None, qt=QtWidgets.QMainWindow):
-            if ptr is None:
-                ptr = mui.MQtUtil.mainWindow()
-            return wrapInstance(int(ptr), qt)
-
         workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
         qctrl = mui.MQtUtil.findControl(workspace_control)
-        control = get_maya_qt(qctrl)
+        control = wutil.get_maya_qt(qctrl)
         tab_handle = control.parent().parent()
 
         if self.isFloating():
@@ -466,10 +462,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             except (AttributeError, RuntimeError):
                 workspace_control = self.objectName() + "WorkspaceControl"
 
-            ptr = mui.MQtUtil.findControl(workspace_control)
-            if not ptr:
-                return None
-            return wrapInstance(int(ptr), QtWidgets.QWidget)
+            return wutil.get_control_widget(workspace_control)
 
         # Get the real Maya Main Window handle to avoid accidental re-sizing of it
         m_win_ptr = mui.MQtUtil.mainWindow()
@@ -531,6 +524,99 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         super().resizeEvent(event)
         # Trigger height update when internal width changes (wrapping happens)
         self.update_height()
+
+    def get_dock_to_control_name(self, layout):
+        if layout == "TimeSlider":
+            return mel.eval('getUIComponentToolBar("Time Slider", false)')
+        elif layout == "RangeSlider":
+            return mel.eval('getUIComponentToolBar("Range Slider", false)')
+        elif layout == "Shelf":
+            return mel.eval('getUIComponentToolBar("Shelf", false)')
+        return layout
+
+    def dock_to_ui(self, layout=None, orient=None):
+        if not layout:
+            layout_name = self.dock_ac_group.checkedAction().text()
+            index = list(self.docking_layouts.values()).index(layout_name)
+            layout = list(self.docking_layouts.keys())[index]
+        if not orient:
+            orient_name = self.pos_ac_group.checkedAction().text()
+            index = list(self.docking_orients.values()).index(orient_name)
+            orient = list(self.docking_orients.keys())[index]
+
+        # Enable / Disable actions
+        self.pos_ac_group.checkedAction().setEnabled(False)
+        self.dock_ac_group.checkedAction().setEnabled(False)
+
+        for group in [self.pos_ac_group, self.dock_ac_group]:
+            for action in group.actions():
+                if action and isValid(action):
+                    action.setEnabled(not action.isChecked())
+
+        # Build up kwargs for the workspaceControl command
+        kwargs = {
+            "e": True,
+            "visibleChangeCommand": self.visible_change_command,
+            "tp": ["west", 0],
+            "rsw": 900,
+            "rsh": 40,
+        }
+
+        if wutil.check_visible_layout(layout):
+            dock_to = self.get_dock_to_control_name(layout)
+            kwargs["dockToControl"] = [dock_to, orient]
+            self.docking_position = [layout, orient]
+            settings.set_setting("docking_position", self.docking_position)
+
+        # Make the workspaceControl call just once
+        workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
+        cmds.workspaceControl(workspace_control, **kwargs)
+
+    def update_dock_menu(self):
+        """Update the enabled state of dock buttons before the menu is shown"""
+        if not isValid(self.dock_menu):
+            return
+
+        for action in self.dock_menu.actions():
+            layout = next(
+                (key for key, name in self.docking_layouts.items() if name == action.text()),
+                None,
+            )
+            if layout:
+                if layout == self.docking_position[0]:
+                    action.setEnabled(False)
+                    continue
+                action.setEnabled(wutil.check_visible_layout(layout))
+
+    def _create_dock_menu(self):
+        self.dock_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Dock Window")
+
+        self.pos_ac_group = QActionGroup(self)
+        for orient, name in self.docking_orients.items():
+            ori_btn = self.dock_menu.addAction(name, description="Dock TKM {} of the widget.".format(name))
+            ori_btn.setCheckable(True)
+            self.pos_ac_group.addAction(ori_btn)
+            ori_btn.triggered.connect(partial(self.dock_to_ui, orient=orient))
+            if orient == self.docking_position[1]:
+                ori_btn.setChecked(True)
+                ori_btn.setEnabled(False)
+
+        self.dock_menu.addSeparator()
+
+        self.dock_ac_group = QActionGroup(self)
+        for layout, name in self.docking_layouts.items():
+            dock_btn = self.dock_menu.addAction(name, description="Dock TKM to the {} widget.".format(name))
+            dock_btn.setCheckable(True)
+            self.dock_ac_group.addAction(dock_btn)
+
+            dock_btn.triggered.connect(partial(self.dock_to_ui, layout=layout))
+            if layout == self.docking_position[0]:
+                dock_btn.setChecked(True)
+                dock_btn.setEnabled(False)
+
+        self.dock_menu.aboutToShow.connect(self.update_dock_menu)
+
+        return self.dock_menu
 
     # These two functions attempt to check if the Graph Editor is open and load customGraph in that case; they are made with two attempts
     def load_customGraph_try_01(self):
@@ -3223,7 +3309,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec_layout.addWidget(selector_button_widget)
 
         def update_selector_button_text():
-            if not tt.is_valid_widget(selector_button_widget):
+            if not wutil.is_valid_widget(selector_button_widget):
                 return
             selected_objects = cmds.ls(selection=True)
             num_selected = len(selected_objects)
@@ -3753,6 +3839,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         config_menu.addSection("General")
         config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")
 
+        toolbar_menu.addMenu(self._create_dock_menu())
+
         # Separators and others
         toolbar_menu.addSeparator()
         toolbar_menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
@@ -3815,7 +3903,20 @@ def show():
 
 def toggle():
     global _toolbar_instance
-    if _toolbar_instance and isValid(_toolbar_instance) and _toolbar_instance.isVisible():
-        _toolbar_instance.close()
-    else:
-        show()
+    try:
+        workspace_control = WorkspaceName + "WorkspaceControl"
+        if cmds.workspaceControl(workspace_control, q=True, exists=True):
+            cmds.deleteUI(workspace_control, control=True)
+    except Exception:
+        pass
+
+    # 2. Try to re-show the existing instance if it's alive.
+    try:
+        if _toolbar_instance and isValid(_toolbar_instance):
+            _toolbar_instance.startUI()
+            return
+    except (RuntimeError, AttributeError):
+        pass
+
+    # 3. Fallback: recreate the tool
+    show()

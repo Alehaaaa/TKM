@@ -2,10 +2,8 @@ from __future__ import annotations
 import sys
 import re
 
-import maya.OpenMayaUI as omui
 
 try:
-    from shiboken6 import wrapInstance, isValid  # type: ignore
     from PySide6.QtWidgets import (  # type: ignore
         QWidget,
         QHBoxLayout,
@@ -34,7 +32,6 @@ try:
         QRect,
     )
 except ImportError:
-    from shiboken2 import wrapInstance, isValid
     from PySide2.QtWidgets import (
         QWidget,
         QHBoxLayout,
@@ -63,27 +60,7 @@ except ImportError:
         QRect,
     )
 
-
-def DPI(val):
-    return omui.MQtUtil.dpiScale(val)
-
-
-def get_maya_qt():
-    ptr = omui.MQtUtil.mainWindow()
-    return wrapInstance(int(ptr), QWidget)
-
-
-def is_valid_widget(widget, expected_type=None):
-    if widget is None:
-        return False
-    if expected_type is not None and not isinstance(widget, expected_type):
-        return False
-    try:
-        if isValid(widget):
-            return True
-    except Exception:
-        pass
-    return False
+from TheKeyMachine.widgets import util as wutil
 
 
 class QFlatTooltip(QWidget):
@@ -110,7 +87,7 @@ class QFlatTooltip(QWidget):
     KEY_ORDER = [Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift]
 
     def __init__(self, text="", anchor_widget=None, icon=None, shortcuts=None, description=None, template=None, icon_obj=None):
-        QWidget.__init__(self, get_maya_qt())
+        QWidget.__init__(self, wutil.get_maya_qt())
         self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
@@ -120,7 +97,7 @@ class QFlatTooltip(QWidget):
         self.icon_obj = icon_obj
         self.text = text
         self.description = description
-        self.icon_path = icon # Store for reference
+        self.icon_path = icon  # Store for reference
 
         # 1. Build the base template
         if template is None:
@@ -157,7 +134,7 @@ class QFlatTooltip(QWidget):
         tt_geo = self.frameGeometry()
         side = getattr(self, "side", "bottom")
 
-        buffer = DPI(30)
+        buffer = wutil.DPI(30)
         if side == "top":
             tt_safety = tt_geo.adjusted(-buffer, 0, buffer, buffer)
         else:
@@ -168,7 +145,7 @@ class QFlatTooltip(QWidget):
 
         if getattr(self, "target_rect", None):
             anc_geo = self.target_rect
-        elif self.anchor_widget and is_valid_widget(self.anchor_widget) and self.anchor_widget.isVisible():
+        elif self.anchor_widget and wutil.is_valid_widget(self.anchor_widget) and self.anchor_widget.isVisible():
             anc_geo = self.anchor_widget.rect()
             anc_geo.moveTo(self.anchor_widget.mapToGlobal(QPoint(0, 0)))
         else:
@@ -215,13 +192,13 @@ class QFlatTooltip(QWidget):
 
         self.main_layout.setSizeConstraint(QVBoxLayout.SetMinAndMaxSize)
         self.setStyleSheet(
-            "QFlatTooltip > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(self.BG_COLOR, DPI(self.BORDER_RADIUS))
+            "QFlatTooltip > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(self.BG_COLOR, wutil.DPI(self.BORDER_RADIUS))
         )
 
         self.bg_frame = QFrame()
         self.bg_frame.setObjectName("BgFrame")
-        self.bg_frame.setMinimumWidth(DPI(self.MIN_WIDTH))
-        self.bg_frame.setMaximumWidth(DPI(self.MAX_WIDTH))
+        self.bg_frame.setMinimumWidth(wutil.DPI(self.MIN_WIDTH))
+        self.bg_frame.setMaximumWidth(wutil.DPI(self.MAX_WIDTH))
         self.bg_layout = QVBoxLayout(self.bg_frame)
         self.bg_layout.setContentsMargins(0, 0, 0, 0)
         self.bg_layout.setSpacing(0)
@@ -305,20 +282,20 @@ class QFlatTooltip(QWidget):
                 body_html = ""
 
         content_layout = QVBoxLayout()
-        top_margin = DPI(0) if self.has_header else DPI(12)
-        content_layout.setContentsMargins(DPI(12), top_margin, DPI(12), DPI(8))
+        top_margin = wutil.DPI(0) if self.has_header else wutil.DPI(12)
+        content_layout.setContentsMargins(wutil.DPI(12), top_margin, wutil.DPI(12), wutil.DPI(8))
 
         if body_html.strip():
             raw_lbl = QLabel(body_html)
             raw_lbl.setWordWrap(True)
             raw_lbl.setOpenExternalLinks(True)
             raw_lbl.setTextFormat(Qt.RichText)
-            raw_lbl.setMaximumWidth(DPI(self.MAX_WIDTH))
+            raw_lbl.setMaximumWidth(wutil.DPI(self.MAX_WIDTH))
             raw_lbl.setStyleSheet("color: {}; background: transparent;".format(self.TEXT_COLOR))
             content_layout.addWidget(raw_lbl)
             self.bg_layout.addLayout(content_layout)
-            self.bg_layout.addSpacing(DPI(4))
-        self.bg_layout.addSpacing(DPI(4))
+            self.bg_layout.addSpacing(wutil.DPI(4))
+        self.bg_layout.addSpacing(wutil.DPI(4))
 
         # 5. Shortcuts detection
         # Logic: If the word "Shortcuts" (or similar consistent pattern) is in the HTML,
@@ -331,33 +308,33 @@ class QFlatTooltip(QWidget):
         frame = QFrame()
         frame.setStyleSheet("background-color: {};".format(color))
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(DPI(12), DPI(12), DPI(12), DPI(12))
-        layout.setSpacing(DPI(8))
+        layout.setContentsMargins(wutil.DPI(12), wutil.DPI(12), wutil.DPI(12), wutil.DPI(12))
+        layout.setSpacing(wutil.DPI(8))
         return frame, layout
 
     def _build_shortcuts_section(self):
         frame, layout = self._create_section_frame(self.HEADER_COLOR)
-        layout.setContentsMargins(0, DPI(4), 0, DPI(4))
+        layout.setContentsMargins(0, wutil.DPI(4), 0, wutil.DPI(4))
 
         title_lbl = self._create_text_label("Shortcuts", size=16, bold=True, elide=True, align=Qt.AlignCenter)
-        title_lbl.setMinimumHeight(DPI(20))
+        title_lbl.setMinimumHeight(wutil.DPI(20))
         layout.addWidget(title_lbl)
 
-        self.bg_layout.addSpacing(DPI(10))
+        self.bg_layout.addSpacing(wutil.DPI(10))
         self.bg_layout.addWidget(frame)
-        self.bg_layout.addSpacing(DPI(12))
+        self.bg_layout.addSpacing(wutil.DPI(12))
 
         for sh in self.shortcuts:
             row = QHBoxLayout()
-            row.setContentsMargins(DPI(12), 0, DPI(12), 0)
-            row.setSpacing(DPI(20))
+            row.setContentsMargins(wutil.DPI(12), 0, wutil.DPI(12), 0)
+            row.setSpacing(wutil.DPI(20))
 
             icon_path = sh.get("icon", "default")
             pix = QPixmap(icon_path)
             row.addWidget(self._create_icon_label(pix, dim=17))
 
             name = QLabel(sh.get("label", ""))
-            name.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, DPI(10.5)))
+            name.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5)))
             row.addWidget(name)
             row.addStretch()
 
@@ -365,16 +342,16 @@ class QFlatTooltip(QWidget):
             if isinstance(command, list):
                 command = self._format_keys(command)
             keys = QLabel(command)
-            keys.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, DPI(10.5)))
+            keys.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5)))
             row.addWidget(keys)
             self.bg_layout.addLayout(row)
-            self.bg_layout.addSpacing(DPI(4))
+            self.bg_layout.addSpacing(wutil.DPI(4))
 
-        self.bg_layout.addSpacing(DPI(16))
+        self.bg_layout.addSpacing(wutil.DPI(16))
 
     def _create_icon_label(self, source, dim=16):
         lbl = QLabel()
-        px_dim = DPI(dim)
+        px_dim = wutil.DPI(dim)
         if hasattr(source, "pixmap"):
             pix = source.pixmap(px_dim, px_dim)
         elif isinstance(source, QPixmap):
@@ -392,17 +369,17 @@ class QFlatTooltip(QWidget):
         lbl.setToolTip(text)
         lbl.setWordWrap(True)
 
-        style = "#text_label {{ color: {0}; font-size: {1}px; {2}}}".format(self.TEXT_COLOR, DPI(size), "font-weight: bold;" if bold else "")
+        style = "#text_label {{ color: {0}; font-size: {1}px; {2}}}".format(self.TEXT_COLOR, wutil.DPI(size), "font-weight: bold;" if bold else "")
         lbl.setStyleSheet(style)
         if align:
             lbl.setAlignment(align)
 
         if elide and " " not in text:
             f = lbl.font()
-            f.setPixelSize(DPI(size))
+            f.setPixelSize(wutil.DPI(size))
             f.setBold(bold)
             fm = QFontMetrics(f)
-            limit = DPI(self.MAX_WIDTH - 80)
+            limit = wutil.DPI(self.MAX_WIDTH - 80)
             if fm.horizontalAdvance(text) > limit:
                 lbl.setText(fm.elidedText(text, Qt.ElideLeft, limit))
                 lbl.setWordWrap(False)
@@ -411,17 +388,17 @@ class QFlatTooltip(QWidget):
     def _create_media_label(self, path, is_gif=False):
         lbl = QLabel()
         lbl.setAlignment(Qt.AlignCenter)
-        lbl.setContentsMargins(DPI(12), DPI(4), DPI(12), DPI(4))
+        lbl.setContentsMargins(wutil.DPI(12), wutil.DPI(4), wutil.DPI(12), wutil.DPI(4))
         if is_gif or path.endswith(".gif"):
             movie = QMovie(path)
-            movie.setScaledSize(QSize(DPI(300), DPI(150)))
+            movie.setScaledSize(QSize(wutil.DPI(300), wutil.DPI(150)))
             movie.start()
             lbl.setMovie(movie)
         else:
             pix = QPixmap(path)
             if not pix.isNull():
-                if pix.width() > DPI(300):
-                    pix = pix.scaledToWidth(DPI(300), Qt.SmoothTransformation)
+                if pix.width() > wutil.DPI(300):
+                    pix = pix.scaledToWidth(wutil.DPI(300), Qt.SmoothTransformation)
                 lbl.setPixmap(pix)
         return lbl
 
@@ -433,8 +410,8 @@ class QFlatTooltip(QWidget):
         side = getattr(self, "side", "bottom")
         painter.setBrush(QColor(self.BG_COLOR))
 
-        aw = DPI(self.ARROW_W)
-        ah = DPI(self.ARROW_H)
+        aw = wutil.DPI(self.ARROW_W)
+        ah = wutil.DPI(self.ARROW_H)
         ax = getattr(self, "arrow_x", self.width() / 2)
 
         if side == "top":
@@ -450,15 +427,21 @@ class QFlatTooltip(QWidget):
         self.anchor_widget = widget
 
         cursor_pos = QCursor.pos()
-        ah = DPI(self.ARROW_H)
+        ah = wutil.DPI(self.ARROW_H)
 
         if target_rect:
             self._global_anc = target_rect
         elif action_rect:
-            self._global_anc = QRect(widget.mapToGlobal(action_rect.topLeft()), action_rect.size())
+            try:
+                self._global_anc = QRect(widget.mapToGlobal(action_rect.topLeft()), action_rect.size())
+            except RuntimeError:
+                return
             self.target_rect = self._global_anc
         else:
-            target_global = widget.mapToGlobal(QPoint(0, 0))
+            try:
+                target_global = widget.mapToGlobal(QPoint(0, 0))
+            except RuntimeError:
+                return
             self._global_anc = QRect(target_global, widget.size())
             self.target_rect = self._global_anc
 
@@ -478,27 +461,27 @@ class QFlatTooltip(QWidget):
         self.adjustSize()
         w, h = self.width(), self.height()
 
-        pos = QPoint(target_x - w // 2, self._global_anc.top() - h - DPI(2))
+        pos = QPoint(target_x - w // 2, self._global_anc.top() - h - wutil.DPI(2))
 
         screen = QGuiApplication.screenAt(cursor_pos) or QGuiApplication.primaryScreen()
         geo = screen.availableGeometry()
 
-        if pos.y() < geo.top() + DPI(5):
+        if pos.y() < geo.top() + wutil.DPI(5):
             # Not enough room above, flip to BELOW the widget (arrow on top)
             self.side = "top"
             self.main_layout.setContentsMargins(0, ah, 0, 0)
             self.main_layout.activate()
             self.adjustSize()
             w, h = self.width(), self.height()
-            pos.setY(self._global_anc.bottom() + 1 + DPI(2))
+            pos.setY(self._global_anc.bottom() + 1 + wutil.DPI(2))
 
-        final_x = max(geo.left() + DPI(5), min(pos.x(), geo.right() - w - DPI(5)))
+        final_x = max(geo.left() + wutil.DPI(5), min(pos.x(), geo.right() - w - wutil.DPI(5)))
         pos.setX(final_x)
         self.move(pos)
 
         arrow_x = target_x - final_x
-        aw = DPI(self.ARROW_W)
-        self.arrow_x = max(DPI(6) + aw / 2, min(arrow_x, w - DPI(6) - aw / 2))
+        aw = wutil.DPI(self.ARROW_W)
+        self.arrow_x = max(wutil.DPI(6) + aw / 2, min(arrow_x, w - wutil.DPI(6) - aw / 2))
         self.update()
 
         self._auto_close_timer.start()
@@ -545,6 +528,9 @@ class QFlatTooltipManager(object):
     ):
         if cls._timer:
             cls._timer.stop()
+        # Guard: if anchor_widget has been deleted by the time we show, bail out
+        if anchor_widget is not None and not wutil.is_valid_widget(anchor_widget):
+            return
         cls.hide()
         cls._current_tooltip = QFlatTooltip(
             text=text,
@@ -571,6 +557,11 @@ class QFlatTooltipManager(object):
         except Exception:
             pass
 
-        cls._timer.timeout.connect(lambda: cls.show(**kwargs))
+        anchor = kwargs.get("anchor_widget")
+        def _safe_show():
+            if anchor is not None and not wutil.is_valid_widget(anchor):
+                return
+            cls.show(**kwargs)
+        cls._timer.timeout.connect(_safe_show)
         cls._timer.setInterval(delay)
         cls._timer.start()

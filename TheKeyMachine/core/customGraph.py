@@ -21,15 +21,15 @@ import maya.cmds as cmds
 import maya.OpenMayaUI as mui
 
 import importlib
+import random
+from functools import partial
 
-# Try importing PySide2 or PySide6
 try:
-    from PySide2 import QtWidgets
-    from shiboken2 import wrapInstance
-    from PySide2.QtWidgets import QDesktopWidget
+    from PySide2 import QtCore, QtGui, QtWidgets
+    from PySide2.QtWidgets import QActionGroup
 except ImportError:
-    from PySide6 import QtWidgets
-    from shiboken6 import wrapInstance
+    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6.QtGui import QActionGroup
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -44,8 +44,11 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
+from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
+from TheKeyMachine.widgets import util as wutil  # type: ignore
+import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 
-mods = [general, ui, keyTools, selSets, media, style, sw]
+mods = [general, ui, keyTools, selSets, media, style, sw, cw]
 
 for m in mods:
     importlib.reload(m)
@@ -67,9 +70,10 @@ customGraphWin = None
 curveModeSlider = None
 is_dragging = False
 original_keyframes = {}
-
-
+generated_keyframe_positions = {}
 COLOR = ui.Color()
+current_tangent_mode = settings.get_setting("current_tangent_mode", "Smooth")
+current_modifier_mode = settings.get_setting("current_modifier_mode", "Wave")
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -77,81 +81,108 @@ COLOR = ui.Color()
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-def get_screen_resolution():
-    app = QtWidgets.QApplication.instance()
-    if not app:
-        app = QtWidgets.QApplication([])
-
-    try:
-        # PySide6
-        screen = app.primaryScreen()
-        screen_rect = screen.geometry()
-    except Exception:
-        # PySide2
-        desktop = QDesktopWidget()
-        screen_rect = desktop.screenGeometry()
-
-    screen_width = screen_rect.width()
-    screen_height = screen_rect.height()
-
-    return screen_width, screen_height
-
-
 def apply_base_stylesheet(button):
-    screen_width, screen_height = get_screen_resolution()
-    screen_width = screen_width
+    """Fallback stylesheet for standard buttons if needed"""
+    pass
 
-    if screen_width == 3840:
-        button.setStyleSheet("""
-            QPushButton {
-                color: #bfbfbf;
-                background-color: #555;
-                border-radius: 3px;
-                font: 16px;
-            }
-            QPushButton:hover:!pressed {
-                color: #ffffff;
-                background-color: #646464;
-                border-radius: 3px;
-                font: 16px;
-            }
-            QToolTip {
-                color: #ccc;
-                font-size: 20px;
-                border: 2px solid #333;
-                background-color:  #4a4a4a;
-                padding: 4px;
-                border-radius: 4px;
-            }
 
-            """)
-    else:
-        button.setStyleSheet("""
-            QPushButton {
-                color: #bfbfbf;
-                background-color: #555;
-                border-radius: 3px;
-                font: 11px;
-            }
-            QPushButton:hover:!pressed {
-                color: #ffffff;
-                background-color: #646464;
-                border-radius: 3px;
-                font: 11px;
-            }
-            QToolTip {
-                color: #ccc;
-                font-size: 12px;
-                border: 2px solid #333;
-                background-color:  #4a4a4a;
-                padding: 4px;
-                border-radius: 4px;
-            }
+def create_config_menu(parent_button):
+    """Creates a config menu consistent with the main toolbar"""
+    from TheKeyMachine.tooltips import QFlatTooltipManager
+    import TheKeyMachine.mods.hotkeysMod as hotkeys
 
-            """)
+    menu = cw.MenuWidget(parent=parent_button)
+
+    # Help submenu
+    help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help", description="Resources for help and learning.")
+    menu.addMenu(help_menu)
+    help_menu.addAction(
+        QtGui.QIcon(media.discord_image),
+        "Discord Community",
+        lambda: general.open_url("https://discord.gg/G2J5yyjz"),
+        description="Join the community for support.",
+    )
+    help_menu.addAction(
+        QtGui.QIcon(media.help_menu_image),
+        "Knowledge base",
+        lambda: general.open_url("https://thekeymachine.gitbook.io/base"),
+        description="Read the official documentation.",
+    )
+    help_menu.addAction(
+        QtGui.QIcon(media.youtube_image),
+        "Youtube channel",
+        lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"),
+        description="Watch tutorials.",
+    )
+
+    # Config submenu
+    config_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Config", description="Tool configuration and preferences.")
+    menu.addMenu(config_menu)
+
+    config_menu.addSection("Tools settings")
+    show_tt = settings.get_setting("show_tooltips", True)
+    tt_action = config_menu.addAction("Show tooltips", description="Show or hide floating tooltips.")
+    tt_action.setCheckable(True)
+    tt_action.setChecked(show_tt)
+
+    def toggle_tt(state):
+        settings.set_setting("show_tooltips", state)
+        QFlatTooltipManager.hide()
+
+    tt_action.toggled.connect(toggle_tt)
+
+    config_menu.addSection("Toolbar's icons alignment")
+    align_group = QActionGroup(config_menu)
+    left_align = config_menu.addAction("Left", description="Align icons to the left.")
+    center_align = config_menu.addAction("Center", description="Align icons to the center.")
+    right_align = config_menu.addAction("Right", description="Align icons to the right.")
+
+    current_align = settings.get_setting("graph_toolbar_alignment", "Center")
+    align_map = {"Left": left_align, "Center": center_align, "Right": right_align}
+
+    for label, act in align_map.items():
+        act.setCheckable(True)
+        align_group.addAction(act)
+        if label == current_align:
+            act.setChecked(True)
+
+        def set_align(state, alignment_label=label):
+            if state:
+                settings.set_setting("graph_toolbar_alignment", alignment_label)
+                createCustomGraph()
+
+        act.toggled.connect(set_align)
+
+    config_menu.addSection("Hotkeys")
+    config_menu.addAction("Add TKM Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys.")
+
+    config_menu.addSection("General")
+    config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", createCustomGraph, description="Refresh the TKM interface.")
+
+    menu.addSeparator()
+    menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall, description="Remove TKM from Maya.")
+    menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
+
+    return menu
+
+
+def create_tkm_button(icon=None, text="", tooltip="", description="", command=None, p=None):
+    """Helper to create a QFlatToolButton with our tooltip system"""
+    btn = cw.QFlatToolButton(icon=icon, text=text)
+    if tooltip:
+        btn.set_tooltip_data(text=tooltip, description=description)
+    if command:
+        btn.clicked.connect(command)
+    if p:
+        p.addWidget(btn)
+    return btn
 
 
 def createCustomGraph():
+    def add_to_flow(widget):
+        if widget and wutil.is_valid_widget(widget):
+            flowtoolbar_layout.addWidget(widget)
+        return widget
 
     graph_vis = cmds.getPanel(vis=True)
 
@@ -165,98 +196,104 @@ def createCustomGraph():
         cmds.GraphEditor()
         cmds.columnLayout("customGraph_columnLayout", adj=1, p="graphEditor1")
 
-    flowtoolbar = cmds.flowLayout(wr=True, h=25, p="customGraph_columnLayout")
-    flow_ptr = mui.MQtUtil.findControl(flowtoolbar)
-    flow_qw = wrapInstance(int(flow_ptr), QtWidgets.QWidget)
-    flowtoolbar_layout = flow_qw.layout()
+    flow_qw = cw.QFlowContainer()
+    flow_qw.setObjectName("tkm_customGraph_flowToolbar")
 
-    separator = cmds.separator(style="none", width=5)
+    align_str = settings.get_setting("graph_toolbar_alignment", "Center")
+    align_val = QtCore.Qt.AlignLeft
+    if align_str == "Center":
+        align_val = QtCore.Qt.AlignHCenter
+    elif align_str == "Right":
+        align_val = QtCore.Qt.AlignRight
+
+    flowtoolbar_layout = cw.QFlowLayout(flow_qw, margin=2, Wspacing=5, Hspacing=2, alignment=align_val)
+
+    parent_ptr = mui.MQtUtil.findControl("customGraph_columnLayout")
+    parent_qw = wutil.get_maya_qt(parent_ptr, QtWidgets.QWidget)
+    if parent_qw and parent_qw.layout():
+        parent_qw.layout().addWidget(flow_qw)
+
+    # ________________ Config Button ___________________#
+    config_btn = create_tkm_button(
+        icon=media.settings_image, tooltip="Config", description="Tool configuration and preferences.", p=flowtoolbar_layout
+    )
+    config_menu = create_config_menu(config_btn)
+    config_btn.clicked.connect(lambda: config_menu.exec_(QtGui.QCursor.pos()))
 
     # ________________ Key Tools Buttons  ___________________#
 
-    screen_width, screen_height = get_screen_resolution()
-    screen_width = screen_width
-
-    static_button = cmds.button(l="Static", c=lambda x: keyTools.deleteStaticCurves(), h=20, w=40)
-    static_button_widget = wrapInstance(int(mui.MQtUtil.findControl(static_button)), QtWidgets.QPushButton)
-    static_button_widget.setToolTip("Remove all statics curves")
-    apply_base_stylesheet(static_button_widget)
-
-    share_button = cmds.button(l="Share", c=lambda x: keyTools.shareKeys(), h=20, w=40)
-    share_button_widget = wrapInstance(int(mui.MQtUtil.findControl(share_button)), QtWidgets.QPushButton)
-    share_button_widget.setToolTip(
-        "Share keys between curves to ensure both curves have the same keys in the same position.<br><br> The first curve selected is the reference curve, which will share the position of its keys"
+    create_tkm_button(
+        icon=media.delete_animation_image,
+        text="S",
+        tooltip="Static",
+        description="Remove all statics curves",
+        command=lambda: keyTools.deleteStaticCurves(),
+        p=flowtoolbar_layout,
     )
-    apply_base_stylesheet(share_button_widget)
 
-    match_button = cmds.button(
-        l="Match",
-        c=lambda x: keyTools.match_keys(),
-        h=20,
-        w=45,
-        annotation="First selected curve is the reference curve.\nAll other curves will be matched to the reference curve\n At least one keyframe need on the second curve",
+    create_tkm_button(
+        icon=media.share_keys_image,
+        text="H",
+        tooltip="Share",
+        description="Share keys between curves to ensure both curves have the same keys in the same position.",
+        command=lambda: keyTools.shareKeys(),
+        p=flowtoolbar_layout,
     )
-    match_button_widget = wrapInstance(int(mui.MQtUtil.findControl(match_button)), QtWidgets.QPushButton)
-    match_button_widget.setToolTip(
-        "Makes a match of one curve with another, in this way both curves will be the same.<br><br> The last curve in the selection will be the reference curve"
+
+    create_tkm_button(
+        icon=media.match_image,
+        text="M",
+        tooltip="Match",
+        description="Makes a match of one curve with another, in this way both curves will be the same.",
+        command=lambda: keyTools.match_keys(),
+        p=flowtoolbar_layout,
     )
-    apply_base_stylesheet(match_button_widget)
 
-    flip_button = cmds.button(l="Flip", c=lambda x: keyTools.flipCurves(), h=20, w=40)
-    flip_button_widget = wrapInstance(int(mui.MQtUtil.findControl(flip_button)), QtWidgets.QPushButton)
-    flip_button_widget.setToolTip("Inverts the selected curve vertically.<br><br> Right-click to see more options")
-    apply_base_stylesheet(flip_button_widget)
-
-    clean_button = cmds.button(l="Snap", c=lambda x: keyTools.snapKeyframes(), h=20, w=42)
-    clean_button_widget = wrapInstance(int(mui.MQtUtil.findControl(clean_button)), QtWidgets.QPushButton)
-    clean_button_widget.setToolTip(
-        "Performs a cleanup and repositioning of the keys that are in a sub-frame "
-        "to the nearest frame.<br><br>This tool doesn't just perform a simple snap, but "
-        "it ensures to clean up and prevent multiple keyframes in the same frame.<br><br> "
-        "Ideal for after scalign an animation."
+    create_tkm_button(
+        text="F", tooltip="Flip", description="Inverts the selected curve vertically.", command=lambda: keyTools.flipCurves(), p=flowtoolbar_layout
     )
-    apply_base_stylesheet(clean_button_widget)
 
-    overlap_button = cmds.button(l="Overlap", c=keyTools.mod_overlap_animation, h=20, w=50)
-    overlap_button_widget = wrapInstance(int(mui.MQtUtil.findControl(overlap_button)), QtWidgets.QPushButton)
-    overlap_button_widget.setToolTip(
-        "Applies an overlap frame to the selected curves or selected channels in the ChannelBox.<br><br>"
-        "The application order is based on the selection order of the objects in the 3D view.<br><br>"
-        "Use the <b>'Shift'</b> key to apply the overlap in the opposite direction."
+    create_tkm_button(
+        text="Sn",
+        tooltip="Snap",
+        description="Performs a cleanup and repositioning of the keys that are in a sub-frame to the nearest frame.",
+        command=lambda: keyTools.snapKeyframes(),
+        p=flowtoolbar_layout,
     )
-    apply_base_stylesheet(overlap_button_widget)
 
-    reblock_button = cmds.button(l="reBlock", c=keyTools.reblock_move, h=20, w=50)
-    reblock_button_widget = wrapInstance(int(mui.MQtUtil.findControl(reblock_button)), QtWidgets.QPushButton)
-    reblock_button_widget.setToolTip(
-        "reBlock allows you to realign all the curves so that all their keyframes match up with "
-        "each other.<br><br> This tool is specially designed for the blocking process, where all the curves "
-        "have keyframes in the same positions.<br> If for some reason this relationship is lost, this "
-        "tool lets you recover that relationship.<br>"
+    create_tkm_button(
+        text="O",
+        tooltip="Overlap",
+        description="Applies an overlap frame to the selected curves.",
+        command=keyTools.mod_overlap_animation,
+        p=flowtoolbar_layout,
     )
-    apply_base_stylesheet(reblock_button_widget)
 
-    flip_popup_menu = cmds.popupMenu(parent=flip_button)
-    cmds.menuItem(label="Flip Curves", command=lambda x: keyTools.flipCurves(), parent=flip_popup_menu)
-    cmds.menuItem(label="Flip from Selected Keyframe", command=lambda x: keyTools.flipFromKeyframe(), parent=flip_popup_menu)
-    cmds.menuItem(label="Flip Selected Group", command=lambda x: keyTools.flipKeyGroup(), parent=flip_popup_menu)
+    create_tkm_button(
+        icon=media.reblock_keys_image,
+        text="rB",
+        tooltip="reBlock",
+        description="reBlock allows you to realign all the curves so that all their keyframes match up.",
+        command=keyTools.reblock_move,
+        p=flowtoolbar_layout,
+    )
 
-    separator = cmds.separator(style="none", width=7)
+    extra_btn = create_tkm_button(
+        text="E", tooltip="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes(), p=flowtoolbar_layout
+    )
+    extra_menu = cw.MenuWidget(parent=extra_btn)
+    extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
+    extra_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+    extra_btn.customContextMenuRequested.connect(lambda pos: extra_menu.exec_(extra_btn.mapToGlobal(pos)))
+    extra_btn.clicked.connect(lambda: extra_menu.exec_(QtGui.QCursor.pos()))
 
-    extra_button = cmds.button(l="Extra", c=lambda x: keyTools.snapKeyframes(), h=20, w=40)
-    extra_button_widget = wrapInstance(int(mui.MQtUtil.findControl(extra_button)), QtWidgets.QPushButton)
-    apply_base_stylesheet(extra_button_widget)
-
-    extra_popup_menu = cmds.popupMenu(parent=extra_button, button=1, ctl=False, alt=False)
-    cmds.menuItem(label="Select object from selected curve", parent=extra_popup_menu, c=lambda x: keyTools.select_objects_from_selected_curves())
-
-    separator = cmds.separator(style="none", width=10)
+    flowtoolbar_layout.addSpacing(10)
 
     # ___________________ Tween Machine  ____________________#
 
     cmds.separator(style="none", width=2)
 
-    barBlendSlider_widget = sw.QFlatSliderWidget(
+    _ = sw.QFlatSliderWidget(
         "customGraph_tween_slider",
         min=-100,
         max=100,
@@ -266,7 +303,6 @@ def createCustomGraph():
         dragCommand=lambda x: keyTools.tween(x, slider_name="customGraph_tween_slider"),
         p=flowtoolbar_layout,
     )
-    barBlendSlider = barBlendSlider_widget.objectName()
     """
     tweenSliderLabel=cmds.text(label="T")
     separator = cmds.separator(style='none', width=4)
@@ -275,7 +311,7 @@ def createCustomGraph():
                        dragCommand=lambda x: keyTools.tween(x, slider_name="customGraph_tween_slider"), 
                        changeCommand=lambda x: keyTools.tweenSliderReset(tweenSlider))
 
-    tweenSlider_widget = wrapInstance(int(mui.MQtUtil.findControl(tweenSlider)), QtWidgets.QSlider)
+    tweenSlider_widget = wutil.get_control_widget(tweenSlider, QtWidgets.QSlider)
     
     tweenSlider_bg_color= "#323232"
     tweenSlider_tick_color = "#adb66a"
@@ -343,57 +379,36 @@ def createCustomGraph():
 
     tweenSlider_widget.setStyleSheet(styleSheet)"""
 
-    separator = cmds.separator(style="none", width=15)
+    flowtoolbar_layout.addSpacing(10)
 
-    # ____________________ Curve Tools  _____________________#
+    # ____________________ Curve Modifiers (Green) _____________________#
 
-    def curve_mode_changed(*args):
-        mode = cmds.optionMenu(curves_option_menu, query=True, value=True)
-        if mode == "Smooth":
-            cmds.floatSlider(curveModeSlider, edit=True, min=0.0, max=0.5, value=0)
-        elif mode == "Wave":
-            cmds.floatSlider(curveModeSlider, edit=True, min=-1, max=1, value=0)
-        elif mode == "Scale":
-            cmds.floatSlider(curveModeSlider, edit=True, min=0.7, max=1.3, value=1)
-        elif mode == "Scale Sel":
-            cmds.floatSlider(curveModeSlider, edit=True, min=0.7, max=1.3, value=1)
-        elif mode == "Lineal":
-            cmds.floatSlider(curveModeSlider, edit=True, min=0.0, max=1.0, value=0)
-        elif mode == "Flat":
-            cmds.floatSlider(curveModeSlider, edit=True, min=0, max=1.0, value=0)
-        elif mode == "Ease in/out":
-            cmds.floatSlider(curveModeSlider, edit=True, min=0, max=1, value=0.5)
-        elif mode == "Noise":
-            cmds.floatSlider(curveModeSlider, edit=True, min=0.0, max=0.5, value=0)
-        elif mode == "Add":
-            cmds.floatSlider(curveModeSlider, edit=True, min=0.0, max=0.5, value=0)
-        sliderReset()
+    global current_modifier_mode
+    current_modifier_mode = settings.get_setting("current_modifier_mode", "Wave")
 
-    def curveModeSlider_change(value):
-        mode = cmds.optionMenu(curves_option_menu, query=True, value=True)
-        if mode == "Smooth":
-            apply_curves_smooth_function(value)
-        elif mode == "Wave":
-            apply_curves_wave_function(value)
-        elif mode == "Scale":
-            apply_curves_scale_function(value)
-        elif mode == "Scale Sel":
-            scale_curves_from_point(value)
-        elif mode == "Lineal":
-            apply_curves_linear_function(value)
-        elif mode == "Flat":
-            apply_curves_flat_function(value)
-        elif mode == "Ease in/out":
-            apply_curves_ease_function(value)
-        elif mode == "Noise":
-            apply_curves_noise_function(value)
-        elif mode == "Add":
-            add_random_keyframes_to_curve(value)
+    modifier_modes = {
+        "Add": "AD",
+        "Noise": "NS",
+        "Scale": "SC",
+        "Scale Sel": "SS",
+        "Wave": "WV",
+    }
+
+    # ____________________ Tangent Operations (Orange) _____________________#
+
+    global current_tangent_mode
+    current_tangent_mode = settings.get_setting("current_tangent_mode", "Smooth")
+
+    tangent_modes = {
+        "Ease in/out": "ES",
+        "Flat": "FT",
+        "Lineal": "LN",
+        "Smooth": "SM",
+    }
+
+    flowtoolbar_layout.addSpacing(10)
 
     # _____________ Add keyframes to curve
-    import random
-
-    generated_keyframe_positions = {}
 
     def reset_generated_positions(curve):
         keyframes = cmds.keyframe(curve, query=True, selected=True, timeChange=True)
@@ -558,8 +573,6 @@ def createCustomGraph():
                 cmds.keyframe(selection, edit=True, time=(time[0], time[0]), valueChange=smoothed_value)
 
     # ______________NOISE
-
-    import random
 
     # Diccionario para almacenar el ruido inicial de cada clave
     initial_noise_values = {}
@@ -755,529 +768,225 @@ def createCustomGraph():
         else:
             print("Please select at least one animation curve in the Graph Editor")
 
+    # Now that all helper functions are defined, wire up the modifier and tangent sliders
+
+    def modifier_mode_changed(mode, refresh_slider=True):
+        global current_modifier_mode
+        current_modifier_mode = mode
+        settings.set_setting("current_modifier_mode", mode)
+        modifier_slider.setText(modifier_modes.get(mode, "CM"))
+        if refresh_slider:
+            sliderReset()
+
+    def modifier_slider_change(value):
+        mode = current_modifier_mode
+        if mode == "Wave":
+            v = (value - 50) / 40.0
+            apply_curves_wave_function(v)
+        elif mode in ["Scale", "Scale Sel"]:
+            v = 0.7 + (value / 100.0 * 0.6)
+            if mode == "Scale":
+                apply_curves_scale_function(v)
+            else:
+                scale_curves_from_point(v)
+        elif mode in ["Noise", "Add"]:
+            v = value / 200.0
+            if mode == "Noise":
+                apply_curves_noise_function(v)
+            else:
+                add_random_keyframes_to_curve(v)
+
+    modifier_slider = sw.QFlatSliderWidget(
+        "modifierSlider",
+        min=0,
+        max=100,
+        value=50,
+        text=modifier_modes.get(current_modifier_mode, "CM"),
+        color=COLOR.color.green,
+        dragCommand=modifier_slider_change,
+        p=flowtoolbar_layout,
+        tooltipTitle="Curve Modifiers",
+        tooltipDescription="Modifier modes (Wave, Scale, Noise, etc.)",
+    )
+
+    mod_menu = cw.MenuWidget(parent=modifier_slider)
+    mod_group = QActionGroup(mod_menu)
+    for mode in sorted(modifier_modes.keys()):
+        act = mod_menu.addAction(mode)
+        act.setCheckable(True)
+        mod_group.addAction(act)
+        if mode == current_modifier_mode:
+            act.setChecked(True)
+        act.triggered.connect(partial(modifier_mode_changed, mode))
+    modifier_slider.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+    modifier_slider.customContextMenuRequested.connect(lambda pos: mod_menu.exec_(modifier_slider.mapToGlobal(pos)))
+
+    def tangent_mode_changed(mode, refresh_slider=True):
+        global current_tangent_mode
+        current_tangent_mode = mode
+        settings.set_setting("current_tangent_mode", mode)
+        tangent_slider.setText(tangent_modes.get(mode, "TG"))
+        if refresh_slider:
+            sliderReset()
+
+    def tangent_slider_change(value):
+        mode = current_tangent_mode
+        v = value / 100.0
+        if mode == "Smooth":
+            v = value / 200.0
+            apply_curves_smooth_function(v)
+        elif mode == "Lineal":
+            apply_curves_linear_function(v)
+        elif mode == "Flat":
+            apply_curves_flat_function(v)
+        elif mode == "Ease in/out":
+            apply_curves_ease_function(v)
+
+    tangent_slider = sw.QFlatSliderWidget(
+        "tangentSlider",
+        min=0,
+        max=100,
+        value=50,
+        text=tangent_modes.get(current_tangent_mode, "TG"),
+        color=COLOR.color.orange,
+        dragCommand=tangent_slider_change,
+        p=flowtoolbar_layout,
+        tooltipTitle="Tangent Operations",
+        tooltipDescription="Tangent blending and smoothing.",
+    )
+
+    tg_menu = cw.MenuWidget(parent=tangent_slider)
+    tg_group = QActionGroup(tg_menu)
+    for mode in sorted(tangent_modes.keys()):
+        act = tg_menu.addAction(mode)
+        act.setCheckable(True)
+        tg_group.addAction(act)
+        if mode == current_tangent_mode:
+            act.setChecked(True)
+        act.triggered.connect(partial(tangent_mode_changed, mode))
+    tangent_slider.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+    tangent_slider.customContextMenuRequested.connect(lambda pos: tg_menu.exec_(tangent_slider.mapToGlobal(pos)))
+
     def sliderReset(*args):
         global is_dragging, original_keyframes
         original_keyframes = {}
         generated_keyframe_positions.clear()
-
         if is_dragging:
             cmds.undoInfo(closeChunk=True)
             is_dragging = False
 
-        current_option = cmds.optionMenu(curves_option_menu, query=True, value=True)
+        # Reset both sliders
+        modifier_slider.set_percent(50 if current_modifier_mode in ["Scale", "Scale Sel", "Wave"] else 0)
+        tangent_slider.set_percent(50 if current_tangent_mode == "Ease in/out" else 0)
 
-        reset_value = 0  # Por defecto es 0
-        if current_option == "Add":
-            reset_value = 0
-        if current_option == "Ease in/out":
-            reset_value = 0.5
-        if current_option == "Flat":
-            reset_value = 0
-        if current_option == "Lineal":
-            reset_value = 0
-        if current_option == "Noise":
-            reset_value = 0
-        if current_option == "Scale":
-            reset_value = 1
-        if current_option == "Scale Sel":
-            reset_value = 1
-        if current_option == "Smooth":
-            reset_value = 0
-        if current_option == "Wave":
-            reset_value = 0
+    # Initialize slider states
+    modifier_mode_changed(current_modifier_mode, refresh_slider=False)
+    tangent_mode_changed(current_tangent_mode, refresh_slider=False)
+    sliderReset()
 
-        cmds.floatSlider(curveModeSlider, edit=True, value=reset_value)
-
-    # global curveModeSlider, curves_option_menu
-
-    curveModeSlider_widget = sw.QFlatSliderWidget(
-        "bar_blend_slider", min=-100, max=100, value=0, text="CV", color=COLOR.color.orange, dragCommand=curveModeSlider_change, p=flowtoolbar_layout
-    )
-    curveModeSlider = barBlendSlider_widget.objectName()
-
-    curveModeSlider = cmds.floatSlider(width=140, min=0, max=1, value=0, dragCommand=curveModeSlider_change, changeCommand=sliderReset)
-
-    curveModeSlider_widget = wrapInstance(int(mui.MQtUtil.findControl(curveModeSlider)), QtWidgets.QSlider)
-
-    curveModeSlider_bg_color = "#323232"
-    curveModeSlider_tick_color = "#90d074"
-
-    styleSheet = """
-        QSlider {{
-            color: #909090;
-            font: 10px;
-        }}
-
-        QSlider::groove:horizontal {{
-            height: 2px;
-            border: 2px solid {bg_color};
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                            stop:0    {tick_color},
-                            stop:0.02 {tick_color},
-                            stop:0.03 {bg_color},
-                            stop:0.24 {bg_color},
-                            stop:0.25 {tick_color},
-                            stop:0.26 {bg_color},
-                            stop:0.49 {bg_color},
-                            stop:0.5  {tick_color},
-                            stop:0.51 {bg_color},
-                            stop:0.74 {bg_color},
-                            stop:0.75 {tick_color},
-                            stop:0.76 {bg_color},
-                            stop:0.97 {bg_color},
-                            stop:0.98 {tick_color},
-                            stop:1    {tick_color});
-            border-radius: 2.5px; /* Mitad de la altura para un rastro totalmente redondeado */
-        }}
-
-        QSlider::handle:horizontal {{
-            background-color: #afafaf;
-            height: 10px;
-            width: 8px;
-            margin: -5px 0;
-            border-radius: 2px;
-        }}
-    """.format(bg_color=curveModeSlider_bg_color, tick_color=curveModeSlider_tick_color)
-
-    curveModeSlider_widget.setStyleSheet(styleSheet)
-
-    separator = cmds.separator(style="none", width=5)
-    curves_option_menu = cmds.optionMenu(label="", width=90, changeCommand=curve_mode_changed)
-    cmds.menuItem(label="Add")
-    cmds.menuItem(label="Ease in/out")
-    cmds.menuItem(label="Flat")
-    cmds.menuItem(label="Lineal")
-    cmds.menuItem(label="Noise")
-    cmds.menuItem(label="Scale")
-    cmds.menuItem(label="Scale Sel")
-    cmds.menuItem(label="Smooth")
-    cmds.menuItem(label="Wave")
+    flowtoolbar_layout.addSpacing(10)
 
     # _________________  Iso / Mute / Lock  _________________#
-    separator = cmds.separator(style="none", width=12)
-    iso_button = cmds.button(l="Iso", c=lambda x: keyTools.isolateCurve(), h=20, w=40)
-    iso_button_widget = wrapInstance(int(mui.MQtUtil.findControl(iso_button)), QtWidgets.QPushButton)
-    apply_base_stylesheet(iso_button_widget)
-
-    mute_button = cmds.button(l="Mute", c=lambda x: keyTools.toggleMute(), h=20, w=40)
-    mute_button_widget = wrapInstance(int(mui.MQtUtil.findControl(mute_button)), QtWidgets.QPushButton)
-    apply_base_stylesheet(mute_button_widget)
-
-    lock_button = cmds.button(l="Lock", c=lambda x: keyTools.toggleLock(), h=20, w=40)
-    lock_button_widget = wrapInstance(int(mui.MQtUtil.findControl(lock_button)), QtWidgets.QPushButton)
-    apply_base_stylesheet(lock_button_widget)
-
-    separator = cmds.separator(style="none", width=5)
-    filter_button = cmds.button(l="Filter", h=20, w=40, c=lambda x: ui.customGraph_filter_mods())
-    filter_button_widget = wrapInstance(int(mui.MQtUtil.findControl(filter_button)), QtWidgets.QPushButton)
-    filter_button_widget.setToolTip(
-        "The filter mode is used to filter the selection in the GraphEditor.<br> In this way, only certain animation channels are displayed<br><br>"
-        "To use this tool:<br><br> "
-        "- Select the channel or channels you want to filter in the ChannelBox (for example, RotateX)<br>"
-        "- Press the 'Filter' button.<br>"
-        "- All the controls that you select from now on will only show the RotateX channel."
-        "<br><br>"
-        "To break the filter, click on the filter menu icon located in the GraphEditor at the top left.<br><br>"
-        "<font style='color: #869fac; font-size:11px;'><b>Shortcuts:</b></font><br>"
-        "<font style='color: #869fac; font-size:11px;'>Shift + Click&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Desactive filter</font><br>"
+    create_tkm_button(
+        icon=media.isolate_image,
+        text="I",
+        tooltip="Iso",
+        description="Isolate selected curves.",
+        command=lambda: keyTools.isolateCurve(),
+        p=flowtoolbar_layout,
+    )
+    create_tkm_button(
+        text="Mt", tooltip="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute(), p=flowtoolbar_layout
+    )
+    create_tkm_button(
+        text="Lk", tooltip="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock(), p=flowtoolbar_layout
     )
 
-    apply_base_stylesheet(filter_button_widget)
+    create_tkm_button(
+        text="Fi",
+        tooltip="Filter",
+        p=flowtoolbar_layout,
+        command=lambda: ui.customGraph_filter_mods(),
+        description="Filter selection in the GraphEditor. Shift+Click to deactivate.",
+    )
 
     # ____________________  Resets  _________________________#
-    separator = cmds.separator(style="none", width=5)
-    resetCurves_button = cmds.button(l="Reset", c=lambda x: keyTools.get_default_value_main(), h=20, w=40)
-    resetCurves_button_widget = wrapInstance(int(mui.MQtUtil.findControl(resetCurves_button)), QtWidgets.QPushButton)
-    resetCurves_button_widget.setToolTip("Reset the selected curves to their default values<br>")
-    if screen_width == 3840:
-        resetCurves_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #f39090;
-                background-color: #555555;
-                border-radius: 3px;
-                font: 16px;
-            }
-            QPushButton:hover:!pressed {
-                color: #ffffff;
-                background-color: #646464;
-                border-radius: 3px;
-                font: 16px;
-            }
-            QToolTip {
-                color: #ccc;
-                font-size: 20px;
-                border: 2px solid #333;
-                background-color:  #4a4a4a;
-                padding: 4px;
-                border-radius: 4px;
-            }
-
-            """)
-    else:
-        resetCurves_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #f39090;
-                background-color: #555555;
-                border-radius: 3px;
-                font: 11px;
-            }
-            QPushButton:hover:!pressed {
-                color: #ffffff;
-                background-color: #646464;
-                border-radius: 3px;
-                font: 11px;
-            }
-            QToolTip {
-                color: #ccc;
-                font-size: 12px;
-                border: 2px solid #333;
-                background-color:  #4a4a4a;
-                padding: 4px;
-                border-radius: 4px;
-            }
-
-            """)
+    create_tkm_button(
+        icon=media.reset_animation_image,
+        text="R",
+        tooltip="Reset",
+        description="Reset the selected curves to their default values.",
+        command=lambda: keyTools.get_default_value_main(),
+        p=flowtoolbar_layout,
+    )
 
     # ________________  SelSets Buttons  ____________________#
-    separator = cmds.separator(style="none", width=10)
-    set01 = cmds.button(l=" 1 ", h=20, w=22, annotation="SelSet 01")
-    set01_button_widget = wrapInstance(int(mui.MQtUtil.findControl(set01)), QtWidgets.QPushButton)
-    if screen_width == 3840:
-        set01_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #333333;
-                background-color: #CBC8AD;
-                border-radius: 3px;
-                font: 16px;
-            }
-            QPushButton:hover:!pressed {
-                color: #333333;
-                background-color: #E0DDBE;
-                border-radius: 3px;
-                font: 16px;
-            }
+    flowtoolbar_layout.addSpacing(5)
+    color_map = {
+        "1": "#CBC8AD",
+        "2": "#7BA399",
+        "3": "#93C2AD",
+        "4": "#C29591",
+        "5": "#A86465",
+    }
+    for i in range(1, 6):
+        s_id = str(i)
+        s_name = "button_" + s_id
+        btn = create_tkm_button(
+            text=s_id, tooltip="SelSet 0{}".format(s_id), description="Left-click to select, Right-click for options.", p=flowtoolbar_layout
+        )
+        btn.setStyleSheet("QPushButton {{ background-color: {}; color: #333; }}".format(color_map.get(s_id, "#555")))
 
-            """)
-    else:
-        set01_button_widget.setStyleSheet("""
-        QPushButton {
-            color: #333333;
-            background-color: #CBC8AD;
-            border-radius: 3px;
-            font: 11px;
-        }
-        QPushButton:hover:!pressed {
-            color: #333333;
-            background-color: #E0DDBE;
-            border-radius: 3px;
-            font: 11px;
-        }
+        # Action menu
+        menu = cw.MenuWidget(parent=btn)
+        menu.addAction("Set", partial(selSets.set_button_value, s_name))
+        menu.addSeparator()
+        menu.addAction("Add", partial(selSets.add_button_selection, s_name))
+        menu.addAction("Remove", partial(selSets.remove_button_selection, s_name))
+        menu.addSeparator()
+        menu.addAction("Lock", partial(selSets.lock_button_selection, s_name))
+        menu.addAction("Unlock", partial(selSets.unlock_button_selection, s_name))
 
-        """)
+        btn.clicked.connect(partial(selSets.handle_button_selection, s_name))
+        btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        btn.customContextMenuRequested.connect(lambda pos, m=menu, b=btn: m.exec_(b.mapToGlobal(pos)))
 
-    set02 = cmds.button(l=" 2 ", h=20, w=22, annotation="SelSet 02")
-    set02_button_widget = wrapInstance(int(mui.MQtUtil.findControl(set02)), QtWidgets.QPushButton)
-    if screen_width == 3840:
-        set02_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #333333;
-                background-color: #7BA399;
-                border-radius: 3px;
-                font: 16px;
-            }
-            QPushButton:hover:!pressed {
-                color: #333333;
-                background-color: #97C7BB;
-                border-radius: 3px;
-                font: 16px;
-            }
-
-            """)
-    else:
-        set02_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #333333;
-                background-color: #7BA399;
-                border-radius: 3px;
-                font: 11px;
-            }
-            QPushButton:hover:!pressed {
-                color: #333333;
-                background-color: #97C7BB;
-                border-radius: 3px;
-                font: 11px;
-            }
-
-            """)
-
-    set03 = cmds.button(l=" 3 ", h=20, w=22, annotation="SelSet 03")
-    set03_button_widget = wrapInstance(int(mui.MQtUtil.findControl(set03)), QtWidgets.QPushButton)
-    if screen_width == 3840:
-        set03_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #333333;
-                background-color: #93C2AD;
-                border-radius: 3px;
-                font: 16px;
-            }
-            QPushButton:hover:!pressed {
-                color: #333333;
-                background-color: #A4DCC3;
-                border-radius: 3px;
-                font: 16px;
-            }
-
-            """)
-    else:
-        set03_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #333333;
-                background-color: #93C2AD;
-                border-radius: 3px;
-                font: 11px;
-            }
-            QPushButton:hover:!pressed {
-                color: #333333;
-                background-color: #A4DCC3;
-                border-radius: 3px;
-                font: 11px;
-            }
-
-            """)
-
-    set04 = cmds.button(l=" 4 ", h=20, w=22, annotation="SelSet 04")
-    set04_button_widget = wrapInstance(int(mui.MQtUtil.findControl(set04)), QtWidgets.QPushButton)
-    if screen_width == 3840:
-        set04_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #333333;
-                background-color: #C29591;
-                border-radius: 3px;
-                font: 16px;
-            }
-            QPushButton:hover:!pressed {
-                color: #333333;
-                background-color: #DCA9A4;
-                border-radius: 3px;
-                font: 16px;
-            }
-
-            """)
-    else:
-        set04_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #333333;
-                background-color: #C29591;
-                border-radius: 3px;
-                font: 11px;
-            }
-            QPushButton:hover:!pressed {
-                color: #333333;
-                background-color: #DCA9A4;
-                border-radius: 3px;
-                font: 11px;
-            }
-
-            """)
-
-    set05 = cmds.button(l=" 5 ", h=20, w=22, annotation="SelSet 05")
-    set05_button_widget = wrapInstance(int(mui.MQtUtil.findControl(set05)), QtWidgets.QPushButton)
-    if screen_width == 3840:
-        set05_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #333333;
-                background-color: #A86465;
-                border-radius: 3px;
-                font: 16px;
-            }
-            QPushButton:hover:!pressed {
-                color: #333333;
-                background-color: #CD7C7E;
-                border-radius: 3px;
-                font: 16px;
-            }
-
-            """)
-    else:
-        set05_button_widget.setStyleSheet("""
-            QPushButton {
-                color: #333333;
-                background-color: #A86465;
-                border-radius: 3px;
-                font: 11px;
-            }
-            QPushButton:hover:!pressed {
-                color: #333333;
-                background-color: #CD7C7E;
-                border-radius: 3px;
-                font: 11px;
-            }
-
-            """)
-
-    # ____________________________
-
-    separator = cmds.separator(style="none", width=10)
-    match_curve_cycle_button = cmds.iconTextButton(l="", w=22, h=24, image=media.match_curve_cycle_image, c=keyTools.match_curve_cycle)
-    match_curve_cycle_button_widget = wrapInstance(int(mui.MQtUtil.findControl(match_curve_cycle_button)), QtWidgets.QPushButton)
-    match_curve_cycle_button_widget.setToolTip("Curve cycle matcher.")
-
-    match_curve_cycle_button_widget.setStyleSheet("""
-        QPushButton {
-
-        }
-        QPushButton:hover:!pressed {
-
-        }
-        QToolTip {
-            color: #ccc;
-            font-size: 12px;
-            border: 2px solid #333;
-            background-color:  #4a4a4a;
-            padding: 4px;
-            border-radius: 4px;
-        }
-
-        """)
-
-    bouncy_curve_button = cmds.iconTextButton(l="", w=22, h=24, image=media.bouncy_curve_image, c=keyTools.bouncy_tangets)
-    bouncy_curve_button_widget = wrapInstance(int(mui.MQtUtil.findControl(bouncy_curve_button)), QtWidgets.QPushButton)
-    bouncy_curve_button_widget.setToolTip("Set bouncy tangents.")
-
-    bouncy_curve_button_widget.setStyleSheet("""
-        QPushButton {
-
-        }
-        QPushButton:hover:!pressed {
-
-        }
-        QToolTip {
-            color: #ccc;
-            font-size: 12px;
-            border: 2px solid #333;
-            background-color:  #4a4a4a;
-            padding: 4px;
-            border-radius: 4px;
-        }
-
-        """)
+    # ________________ Cycle / Bouncy ___________________#
+    flowtoolbar_layout.addSpacing(5)
+    create_tkm_button(
+        icon=media.match_curve_cycle_image,
+        tooltip="Cycle Matcher",
+        description="Curve cycle matcher.",
+        command=keyTools.match_curve_cycle,
+        p=flowtoolbar_layout,
+    )
+    create_tkm_button(
+        icon=media.bouncy_curve_image, tooltip="Bouncy", description="Set bouncy tangents.", command=keyTools.bouncy_tangets, p=flowtoolbar_layout
+    )
 
     # _________________  Opacity Slider  ____________________#
 
     def set_opacity_from_slider(value):
+        # Normalize percent to 0..1
+        v = value / 100.0
         graph_editor_window = get_graph_editor_window()
         if graph_editor_window is None:
             cmds.warning("GraphEditor opacity is not available when it's docked")
         else:
-            graph_editor_window.setWindowOpacity(value)
+            graph_editor_window.setWindowOpacity(v)
 
     def get_graph_editor_window():
         if not cmds.window("graphEditor1Window", exists=True):
             cmds.GraphEditor()
         ptr = mui.MQtUtil.findWindow("graphEditor1Window")
         if ptr is not None:
-            return wrapInstance(int(ptr), QtWidgets.QWidget)
+            return wutil.get_maya_qt(ptr, QtWidgets.QWidget)
         else:
             return None
 
-    # La opacidad si graph editor esta docked hace crashear Maya. Si GE esta en modo docked se elimina el slider
-    separator = cmds.separator(style="none", width=10)
+    flowtoolbar_layout.addSpacing(10)
+    # Opacity slider (optional, can be enabled via config later)
 
-    if cmds.window("graphEditor1Window", exists=True):
-        float_slider = cmds.floatSlider(min=0.1, max=1.0, v=1.0, dragCommand=lambda x: set_opacity_from_slider(x), w=40, hr=True)
-        separator = cmds.separator(style="none", width=5)
-
-    # ______________________  iMenu  ________________________#
-    about_button = cmds.iconTextButton(l="  i  ", image=media.settings_cg_image, h=22, w=22, annotation="About")
-    popup_menu = cmds.popupMenu(parent=about_button, button=1, ctl=False, alt=False)
-
-    customGraph_help_submenu = cmds.menuItem(subMenu=True, label="Help", image=media.help_menu_image, parent=popup_menu)
-    cmds.menuItem(
-        l="Discord Community", image=media.help_menu_image, c=lambda x: general.open_url("https://discord.gg/G2J5yyjz"), p=customGraph_help_submenu
-    )
-    cmds.menuItem(
-        label="Knowledge base",
-        image=media.help_menu_image,
-        parent=customGraph_help_submenu,
-        c=lambda x: general.open_url("https://thekeymachine.gitbook.io/base"),
-    )
-    cmds.menuItem(
-        label="Youtube channel",
-        image=media.help_menu_image,
-        parent=customGraph_help_submenu,
-        c=lambda x: general.open_url("https://www.youtube.com/@TheKeyMachineMayaTools"),
-    )
-
-    cmds.menuItem(divider=True, parent=popup_menu)  # Agregar un separador
-    cmds.menuItem(label="About", parent=popup_menu, image=media.about_image, command=lambda x: ui.about_window())
-
-    # ________________________________________________________  SelSets Menus __________________________________________________________ #
-
-    button_ids = {}
-
-    # ______identificadores
-    set01_name = "button_1"
-    set02_name = "button_2"
-    set03_name = "button_3"
-    set04_name = "button_4"
-    set05_name = "button_5"
-
-    # Conexión del evento al botón 1
-    cmds.button(set01, edit=True, ebg=True)
-    popup_menu = cmds.popupMenu(parent=set01)
-    cmds.menuItem(label="Set", command=lambda x: selSets.set_button_value(set01_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Add", command=lambda x: selSets.add_button_selection(set01_name), parent=popup_menu)
-    cmds.menuItem(label="Remove", command=lambda x: selSets.remove_button_selection(set01_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Lock", command=lambda x: selSets.lock_button_selection(set01_name), parent=popup_menu)
-    cmds.menuItem(label="Unlock", command=lambda x: selSets.unlock_button_selection(set01_name), parent=popup_menu)
-    cmds.button(set01, edit=True, c=lambda x: selSets.handle_button_selection(set01_name))
-
-    # Conexión del evento al botón 2
-    cmds.button(set02, edit=True, ebg=True)
-    popup_menu = cmds.popupMenu(parent=set02)
-    cmds.menuItem(label="Set", command=lambda x: selSets.set_button_value(set02_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Add", command=lambda x: selSets.add_button_selection(set02_name), parent=popup_menu)
-    cmds.menuItem(label="Remove", command=lambda x: selSets.remove_button_selection(set02_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Lock", command=lambda x: selSets.lock_button_selection(set02_name), parent=popup_menu)
-    cmds.menuItem(label="Unlock", command=lambda x: selSets.unlock_button_selection(set02_name), parent=popup_menu)
-    cmds.button(set02, edit=True, c=lambda x: selSets.handle_button_selection(set02_name))
-
-    # Conexión del evento al botón 3
-    cmds.button(set03, edit=True, ebg=True)
-    popup_menu = cmds.popupMenu(parent=set03)
-    cmds.menuItem(label="Set", command=lambda x: selSets.set_button_value(set03_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Add", command=lambda x: selSets.add_button_selection(set03_name), parent=popup_menu)
-    cmds.menuItem(label="Remove", command=lambda x: selSets.remove_button_selection(set03_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Lock", command=lambda x: selSets.lock_button_selection(set03_name), parent=popup_menu)
-    cmds.menuItem(label="Unlock", command=lambda x: selSets.unlock_button_selection(set03_name), parent=popup_menu)
-    cmds.button(set03, edit=True, c=lambda x: selSets.handle_button_selection(set03_name))
-
-    # Conexión del evento al botón 4
-    cmds.button(set04, edit=True, ebg=True)
-    popup_menu = cmds.popupMenu(parent=set04)
-    cmds.menuItem(label="Set", command=lambda x: selSets.set_button_value(set04_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Add", command=lambda x: selSets.add_button_selection(set04_name), parent=popup_menu)
-    cmds.menuItem(label="Remove", command=lambda x: selSets.remove_button_selection(set04_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Lock", command=lambda x: selSets.lock_button_selection(set04_name), parent=popup_menu)
-    cmds.menuItem(label="Unlock", command=lambda x: selSets.unlock_button_selection(set04_name), parent=popup_menu)
-    cmds.button(set04, edit=True, c=lambda x: selSets.handle_button_selection(set04_name))
-
-    # Conexión del evento al botón 5
-    cmds.button(set05, edit=True, ebg=True)
-    popup_menu = cmds.popupMenu(parent=set05)
-    cmds.menuItem(label="Set", command=lambda x: selSets.set_button_value(set05_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Add", command=lambda x: selSets.add_button_selection(set05_name), parent=popup_menu)
-    cmds.menuItem(label="Remove", command=lambda x: selSets.remove_button_selection(set05_name), parent=popup_menu)
-    cmds.menuItem(divider=True, parent=popup_menu)
-    cmds.menuItem(label="Lock", command=lambda x: selSets.lock_button_selection(set05_name), parent=popup_menu)
-    cmds.menuItem(label="Unlock", command=lambda x: selSets.unlock_button_selection(set05_name), parent=popup_menu)
-    cmds.button(set05, edit=True, c=lambda x: selSets.handle_button_selection(set05_name))
+    # Deferred height sync: ensures the container gets the right height on
+    # the very first show (before any user-triggered resize fires).
+    QtCore.QTimer.singleShot(0, flow_qw._update_height)

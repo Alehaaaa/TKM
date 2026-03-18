@@ -46,4 +46,4 @@ def reload():
 def toggle():
     import TheKeyMachine.core.toolbar as t
 
-    t.show()
+    t.toggle()

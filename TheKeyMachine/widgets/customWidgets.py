@@ -296,11 +296,15 @@ class QFlatSpinBox(TooltipMixin, QtWidgets.QSpinBox):
 
 
 class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
-    def __init__(self, parent=None, icon=None, tooltip=None, description=None, shortcuts=None, highlight=False, pressed_color=None):
+    def __init__(self, parent=None, icon=None, text=None, tooltip=None, description=None, shortcuts=None, highlight=False, pressed_color=None):
         super().__init__(parent)
         self.setCursor(QtCore.Qt.PointingHandCursor)
         self.setAutoRaise(True)
         self.pressed_color = pressed_color or "#666666"
+        
+        if text:
+            self.setText(text)
+            self.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon if icon else QtCore.Qt.ToolButtonTextOnly)
 
         # Enforce styling: squared corners, no border on hover, background on press
         self.setStyleSheet(f"""
@@ -308,10 +312,12 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 border: none;
                 border-radius: 0px;
                 background-color: transparent;
+                color: #bfbfbf;
             }}
             QToolButton:hover {{
                 border: none;
                 background-color: transparent;
+                color: #ffffff;
             }}
             QToolButton:pressed {{
                 background-color: {self.pressed_color};
@@ -370,6 +376,12 @@ class QFlowLayout(QtWidgets.QLayout):
 
     def addItem(self, item):
         self._item_list.append(item)
+
+    def addSpacing(self, size):
+        self.addItem(QtWidgets.QSpacerItem(size, 0, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum))
+
+    def addStretch(self, stretch=0):
+        self.addItem(QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum))
 
     def count(self):
         return len(self._item_list)
@@ -475,6 +487,30 @@ class QFlowLayout(QtWidgets.QLayout):
 
         # Total layout height required
         return y + line_height - rect.y() + margins.bottom()
+
+
+
+class QFlowContainer(QtWidgets.QWidget):
+    """A QWidget that automatically sizes its height to its QFlowLayout.
+
+    Drop-in replacement for a plain QWidget when using QFlowLayout as its
+    layout.  Whenever the widget is resized (including the initial show or
+    a parent resize after a tool reload) it recomputes ``heightForWidth``
+    and pins itself to exactly that height via ``setFixedHeight``.  This
+    prevents the "only first row visible" bug that occurs when Maya's
+    columnLayout wrapper doesn't propagate Qt's heightForWidth protocol.
+    """
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_height()
+
+    def _update_height(self):
+        lay = self.layout()
+        if lay is not None and lay.hasHeightForWidth():
+            new_h = lay.heightForWidth(self.width())
+            if new_h > 0 and self.height() != new_h:
+                self.setFixedHeight(new_h)
 
 
 # QPainter for the shelf tabBar
