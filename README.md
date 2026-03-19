@@ -1,4 +1,24 @@
 
+
+## ⚠️ Project Status: No Longer in Active Development
+
+Thank you to everyone who has used, supported, and donated to **The Key Machine** over the years. 
+
+Unfortunately, due to the lack of financial support needed to sustain server costs and development time, this project is no longer in active development. Furthermore, the official website and domain (`thekeymachine.xyz`) will be permanently shut down around **mid-September 2026**.
+
+**What does this mean for the tools?**
+* There will be no further updates, bug fixes, or new features added by the original developer.
+* The source code will remain freely available here on GitHub under the **GPL-3.0 License**.
+* You are completely free to fork this repository, modify the code, and keep the project alive or adapt it to your own studio's pipeline.
+
+A huge thank you to the animation community for using the toolset, and a special shout-out to the few who contributed with donations. Your support meant a lot!
+
+Happy animating! 🎬
+
+
+
+
+
 <img width="269px" src="./TheKeyMachine/data/img/tkm_logo_small.png" />
 
 # TheKeyMachine - Animation tool for Maya Animators
