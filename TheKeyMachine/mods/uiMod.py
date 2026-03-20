@@ -100,6 +100,9 @@ class Color:
         orange = "#C9844B"
         yellow = "#E6DC54"
         green = "#45C46B"
+        blue = "#58e1ff"
+        red = "#AD4D4E"
+        purple = "#8190B8"
 
         def __init__(self):
             for k, v in self.__class__.__dict__.items():

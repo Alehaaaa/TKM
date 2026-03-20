@@ -72,6 +72,7 @@ from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.tooltips as tooltips  # type: ignore
 import TheKeyMachine.tooltips.tooltip as tt  # type: ignore
+import TheKeyMachine.sliders as sliders  # type: ignore
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -342,10 +343,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Check if it was just created
         if cmds.workspaceControl(workspace_control, q=True, exists=True):
             try:
-                # Apply initial docking if it's new (or just ensure it's correct)
-                # We can't easily know if it's 'new' after self.show() since self.show() creates it
-                # but we can try to apply it anyway if it's not already docked where we want.
-                # Cams.py uses evalDeferred for some things.
                 layout, orient = self.docking_position
                 if wutil.check_visible_layout(layout):
                     dock_to = self.get_dock_to_control_name(layout)
@@ -2408,9 +2405,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     # _______________________________________  end center toolbar _____________________________________
 
-    def startUI(self):
-        self.showWindow()
-
+    def start_selection_sets_UI(self):
         # Crea el selection sets workspace
         target_dock = WorkspaceName + "WorkspaceControl"
         if cmds.workspaceControl(selection_sets_workspace, query=True, exists=True) is False:
@@ -2421,9 +2416,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 tp=["west", True],
                 floating=False,
                 dtc=[target_dock, "bottom"],
-                retain=True,
                 vis=False,
-                uiScript="from TheKeyMachine.core.toolbar import get_toolbar\ntb = get_toolbar()\nif tb: tb.create_selection_sets_workspace()",
             )
             cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
         else:
@@ -2453,9 +2446,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 tp=["west", True],
                 floating=False,
                 dtc=["k", "bottom"],
-                retain=True,
                 vis=True,
-                uiScript="from TheKeyMachine.core.toolbar import get_toolbar\ntb = get_toolbar()\nif tb: tb.create_selection_sets_workspace()",
             )
             cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
             self.update_selectionSets_on_new_scene()
@@ -2657,16 +2648,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if self.bar_center_value is None:
             self.bar_center_value = 1
 
-        def parse_tt(html):
-            if not html:
-                return "", ""
-            # Separate the header (title + icon) from the description body
-            parts = re.split(r"<br\s*/?>\s*<br\s*/?>", html, maxsplit=1, flags=re.IGNORECASE)
-            header = parts[0].strip()
-            # If no double break, check if it's just a single line title
-            description = parts[1].strip() if len(parts) > 1 else ""
-            return header, description
-
         # Reconstruir column y row layouts
         if cmds.rowLayout("rowtoolbar", exists=True):
             cmds.deleteUI("rowtoolbar")
@@ -2736,93 +2717,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         ### ______________________________________________________ TOOLTIPS ___________________________________________________
 
-        def read_show_tooltips():
-            return settings.get_setting("show_tooltips", True)
-
-        def update_show_tooltips(value):
-            settings.set_setting("show_tooltips", value)
-
-        def toggle_tooltips(value):
-            # Actualizar el valor de `show_tooltips` en el archivo de configuración
-            update_show_tooltips(value)
-            update_tooltips()
-
-        # Mirar en el fichero de configuracion si los tooltips estan en True o False
-        show_tooltips = read_show_tooltips()
-
-        def update_tooltips():
-            # Leer el valor actual de show_tooltips
-            show_tooltips = read_show_tooltips()
-
-            # Lista que contiene los widgets y los textos de los tooltips
-            # Convertimos las tuplas para que incluyan el texto base.
-            # QFlatTooltipManager se encargará del resto si el widget tiene TooltipMixin.
-            def get_safe_helper(attr_name):
-                try:
-                    return getattr(helper, attr_name)
-                except AttributeError:
-                    print(f"Error: helperMod has no attribute '{attr_name}'")
-                    return ""
-
-            buttons_and_tooltips = [
-                (pointer_button_widget, get_safe_helper("pointer_tooltip_text")),
-                (isolate_button_widget, get_safe_helper("isolate_tooltip_text")),
-                (block_keys_button_widget, get_safe_helper("block_keys_tooltip_text")),
-                (createLocator_button_widget, get_safe_helper("createLocator_tooltip_text")),
-                (align_button_widget, get_safe_helper("align_tooltip_text")),
-                (tracer_button_widget, get_safe_helper("tracer_tooltip_text")),
-                (deleteAnim_button_widget, get_safe_helper("delete_animation_tooltip_text")),
-                (reset_values_button_widget, get_safe_helper("reset_values_tooltip_text")),
-                (select_opposite_button_widget, get_safe_helper("select_opposite_tooltip_text")),
-                (copy_opposite_button_widget, get_safe_helper("copy_opposite_tooltip_text")),
-                (mirror_button_widget, get_safe_helper("mirror_tooltip_text")),
-                (copy_paste_animation_button_widget, get_safe_helper("copy_paste_animation_tooltip_text")),
-                (selector_button_widget, get_safe_helper("selector_tooltip_text")),
-                (select_hierarchy_button_widget, get_safe_helper("select_hierarchy_tooltip_text")),
-                (animation_offset_button_widget, get_safe_helper("animation_offset_tooltip_text")),
-                (link_objects_button_widget, get_safe_helper("link_objects_tooltip_text")),
-                (create_follow_cam_button_widget, get_safe_helper("follow_cam_tooltip_text")),
-                (copy_worldspace_button_widget, get_safe_helper("copy_worldspace_tooltip_text")),
-                (temp_pivot_button_widget, get_safe_helper("temp_pivot_tooltip_text")),
-                (micro_move_button_widget, get_safe_helper("micro_move_tooltip_text")),
-                (selection_sets_button_widget, get_safe_helper("selection_sets_tooltip_text")),
-                (open_custom_graph_button_widget, get_safe_helper("customGraph_tooltip_text")),
-                (toolBox_button_widget, get_safe_helper("custom_tools_tooltip_text")),
-                (customScripts_button_widget, get_safe_helper("custom_scripts_tooltip_text")),
-                (auto_tangent_b, get_safe_helper("auto_tangent_tooltip_text")),
-                (spline_tangent_b, get_safe_helper("spline_tangent_tooltip_text")),
-                (linear_tangent_b, get_safe_helper("linear_tangent_tooltip_text")),
-                (step_tangent_b, get_safe_helper("step_tangent_tooltip_text")),
-                (self.move_keyframes_intField, get_safe_helper("move_keyframes_intField_widget_tooltip_text")),
-                (move_key_left_b_widget, get_safe_helper("move_key_left_b_widget_tooltip_text")),
-                (remove_inbetween_b_widget, get_safe_helper("remove_inbetween_b_widget_tooltip_text")),
-                (add_inbetween_b_widget, get_safe_helper("add_inbetween_b_widget_tooltip_text")),
-                (move_key_right_b_widget, get_safe_helper("move_key_right_b_widget_tooltip_text")),
-                (clear_selected_keys_widget, get_safe_helper("clear_selected_keys_widget_tooltip_text")),
-                (select_scene_animation_widget, get_safe_helper("select_scene_animation_widget_tooltip_text")),
-                (barBlendSlider_widget, get_safe_helper("blend_tooltip_text")),
-                (barTweenSlider_widget, get_safe_helper("tweener_tooltip_text")),
-                (toolbar_config_button_widget, "<b>Config</b><br><br>Open TheKeyMachine configuration and help menu."),
-            ]
-
-            # Iterar sobre cada botón y su tooltip para establecer el tooltip según el valor de show_tooltips
-            for button_widget, tooltip_html in buttons_and_tooltips:
-                try:
-                    if hasattr(button_widget, "set_tooltip_info"):
-                        if show_tooltips:
-                            button_widget.set_tooltip_info(*parse_tt(tooltip_html))
-                        else:
-                            button_widget.set_tooltip_info("", "")
-                    elif hasattr(button_widget, "set_tooltip_data"):
-                        if show_tooltips:
-                            button_widget.set_tooltip_data(text=tooltip_html)
-                        else:
-                            button_widget.set_tooltip_data(text="")
-                    else:
-                        # Fallback for standard widgets
-                        button_widget.setToolTip(tooltip_html if show_tooltips else "")
-                except Exception as e:
-                    print(f"Error setting tooltip for {button_widget}: {e}")
+        ### ______________________________________________________ TOOLBAR LAYOUT _____________________________________________________________________###
 
         ### ______________________________________________________ TOOLBAR LAYOUT _____________________________________________________________________###
 
@@ -2845,59 +2740,60 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         rowtoolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=18, Hspacing=6, alignment=qt_alignment)
 
-        def new_section():
-            sec = QtWidgets.QWidget()
-            sec_layout = QtWidgets.QHBoxLayout(sec)
-            sec_layout.setContentsMargins(0, 0, 0, 0)
-            sec_layout.setSpacing(2)
+        def new_section(spacing=2):
+            sec = cw.QFlatSectionWidget(spacing=spacing)
             rowtoolbar_layout.addWidget(sec)
-            return sec_layout
+            return sec
 
-        sec_layout = new_section()
+        # Placeholder for tooltip functions to be defined later
+        show_tooltips = settings.get_setting("show_tooltips", True)
+
+        def toggle_tooltips(value):
+            pass
+
+        sec = new_section(spacing=8)
 
         col_layout.addWidget(self.main_toolbar_widget)
 
-        # _____________________ keyBox__________________________________________________ #
+        # _____________________ Key Editing Section __________________________________________________ #
+        sec = new_section(spacing=2)
 
-        move_key_left_b_widget = cw.QFlatToolButton(tooltip=helper.move_key_left_b_widget_tooltip_text)
+        move_key_left_b_widget = cw.QFlatToolButton()
         move_key_left_b_widget.setText(" < ")
         move_key_left_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(-self.move_keyframes_intField.value()))
-        sec_layout.addWidget(move_key_left_b_widget)
+        sec.addWidget(move_key_left_b_widget, "Move Left", "move_left")
 
         remove_inbetween_b_widget = cw.QFlatToolButton()
         remove_inbetween_b_widget.setText(" - ")
         remove_inbetween_b_widget.clicked.connect(keyTools.remove_inbetween)
-        sec_layout.addWidget(remove_inbetween_b_widget)
+        sec.addWidget(remove_inbetween_b_widget, "Remove Inbetween", "remove_inbetween")
 
         self.move_keyframes_intField = cw.QFlatSpinBox()
         self.move_keyframes_intField.setFixedSize(50, 24)
         self.move_keyframes_intField.setMinimum(1)
         self.move_keyframes_intField.setValue(1)
         self.move_keyframes_intField.setStyleSheet("border: 0px;border-radius: 5px;")
-
-        sec_layout.addWidget(self.move_keyframes_intField)
+        sec.addWidget(self.move_keyframes_intField, "Nudge Value", "nudge_val")
 
         add_inbetween_b_widget = cw.QFlatToolButton()
         add_inbetween_b_widget.setText(" + ")
         add_inbetween_b_widget.clicked.connect(keyTools.add_inbetween)
-        sec_layout.addWidget(add_inbetween_b_widget)
+        sec.addWidget(add_inbetween_b_widget, "Add Inbetween", "add_inbetween")
 
         move_key_right_b_widget = cw.QFlatToolButton()
         move_key_right_b_widget.setText(" > ")
         move_key_right_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(self.move_keyframes_intField.value()))
-        sec_layout.addWidget(move_key_right_b_widget)
+        sec.addWidget(move_key_right_b_widget, "Move Right", "move_right")
 
-        sec_layout.addSpacing(8)
-
-        clear_selected_keys_widget = cw.QFlatToolButton(tooltip=helper.clear_selected_keys_widget_tooltip_text)
+        clear_selected_keys_widget = cw.QFlatToolButton()
         clear_selected_keys_widget.setText(" x ")
         clear_selected_keys_widget.clicked.connect(keyTools.clear_selected_keys)
-        sec_layout.addWidget(clear_selected_keys_widget)
+        sec.addWidget(clear_selected_keys_widget, "Clear Selection", "clear_sel")
 
-        select_scene_animation_widget = cw.QFlatToolButton(tooltip=helper.select_scene_animation_widget_tooltip_text)
+        select_scene_animation_widget = cw.QFlatToolButton()
         select_scene_animation_widget.setText(" s ")
         select_scene_animation_widget.clicked.connect(keyTools.select_all_animation_curves)
-        sec_layout.addWidget(select_scene_animation_widget)
+        sec.addWidget(select_scene_animation_widget, "Select Scene Anim", "select_scene")
 
         # _____________________ BlendSlider ____________________________ #
 
@@ -2963,25 +2859,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
             # update_blend_label_with_slider_value(value)
 
-        def blend_slider_wrapper(value):
-            keyTools.handle_autokey_start()
-            keyTools.blend_to_key(value)  # Llama a la función tween original
-            # update_blend_label_with_slider_value(value)
 
-        # def reset_blend_slider_label_after_drag(value):
-        #     global current_blend_slider_mode
-        #     # Restablece la etiqueta a "0"
-        #     label = "BL"
-        #     if current_blend_slider_mode == 'pull_push':
-        #         label = "PP"
-        #     if current_blend_slider_mode == 'blend_to_frame':
-        #         label = "BK"
-        #     if current_blend_slider_mode == 'blend_to_default':
-        #         label = "BD"
-        #     cmds.text('barBlendSliderLabelText', edit=True, label=label)
-        #     # Llama a la función tweenSliderReset
-        #     keyTools.handle_autokey_end()
-        #     keyTools.blendSliderReset(barBlendSlider)
 
         def update_button_with_current_frame(button_name):
             # Obtener el número del frame actual
@@ -2989,193 +2867,131 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             # Actualizar el texto del botón con el número del frame
             cmds.button(button_name, edit=True, label=str(int(current_frame)))
 
-        def set_blend_slider_command(mode):
-            self.current_blend_slider_mode = mode
-            settings.set_setting("current_blend_slider_mode", mode)
 
-            match mode:
-                case "pull_push":
-                    barBlendSlider_widget.setText("PP")
-                    barBlendSlider_widget.setTooltipInfo(*parse_tt(helper.pull_push_tooltip_text))
-                    barBlendSlider_widget.setDragCommand(pull_push_wrapper)
 
-                    blend_to_key_left_b_qt.hide()
-                    blend_to_key_right_b_qt.hide()
-
-                case "blend_to_neighbor":
-                    barBlendSlider_widget.setText("BN")
-                    barBlendSlider_widget.setTooltipInfo(*parse_tt(helper.blend_tooltip_text))
-                    barBlendSlider_widget.setDragCommand(blend_slider_wrapper)
-
-                    blend_to_key_left_b_qt.hide()
-                    blend_to_key_right_b_qt.hide()
-
-                case "blend_to_default":
-                    barBlendSlider_widget.setText("BD")
-                    barBlendSlider_widget.setTooltipInfo(*parse_tt(helper.blend_to_default_tooltip_text))
-                    barBlendSlider_widget.setDragCommand(blend_to_default_wrapper)
-
-                    blend_to_key_left_b_qt.hide()
-                    blend_to_key_right_b_qt.hide()
-
-                case "blend_to_frame":
-                    barBlendSlider_widget.setText("BK")
-                    barBlendSlider_widget.setTooltipInfo(*parse_tt(helper.blend_to_frame_tooltip_text))
-                    barBlendSlider_widget.setDragCommand(blend_to_frame_wrapper)
-
-                    blend_to_key_left_b_qt.show()
-                    blend_to_key_right_b_qt.show()
-
-            barBlendSlider_widget.startFlash()
-
-        def blend_to_frame_with_button_values(percentage):
-            left_frame_label = blend_to_key_left_b_qt.text()
-            right_frame_label = blend_to_key_right_b_qt.text()
-
-            # Convierte las etiquetas a números si es posible, de lo contrario usa None
-            try:
-                left_frame = int(left_frame_label)
-            except ValueError:
-                left_frame = None
-
-            try:
-                right_frame = int(right_frame_label)
-            except ValueError:
-                right_frame = None
-
-            # Llama a blend_to_frame con los valores de los botones
-            keyTools.blend_to_frame(percentage, left_frame, right_frame)
-
-        sec_layout = new_section()
-
+        # _____________________ Sliders Sections ____________________________ #
         blend_to_key_left_b_qt = cw.QFlatToolButton()
         blend_to_key_left_b_qt.setText("1")
         blend_to_key_left_b_qt.setFixedSize(25, 16)
         blend_to_key_left_b_qt.hide()
         blend_to_key_left_b_qt.clicked.connect(lambda: blend_to_key_left_b_qt.setText(str(int(cmds.currentTime(q=True)))))
-        sec_layout.addWidget(blend_to_key_left_b_qt)
-
-        title, desc = parse_tt(helper.blend_tooltip_text)
-        barBlendSlider_widget = sw.QFlatSliderWidget(
-            "bar_blend_slider",
-            min=-100,
-            max=100,
-            value=0,
-            text="BN",
-            color=COLOR.color.green,
-            dragCommand=blend_slider_wrapper,
-            p=sec_layout,
-            tooltipTitle=title,
-            tooltipDescription=desc,
-        )
 
         blend_to_key_right_b_qt = cw.QFlatToolButton()
         blend_to_key_right_b_qt.setText("1")
         blend_to_key_right_b_qt.setFixedSize(25, 16)
         blend_to_key_right_b_qt.hide()
         blend_to_key_right_b_qt.clicked.connect(lambda: blend_to_key_right_b_qt.setText(str(int(cmds.currentTime(q=True)))))
-        sec_layout.addWidget(blend_to_key_right_b_qt)
 
-        # Blend slider menu (Qt version)
-        barBlendSlider_menu = QtWidgets.QMenu(barBlendSlider_widget)
-        blend_action_group = QActionGroup(barBlendSlider_menu)
+        def blend_to_frame_with_button_values(percentage):
+            left_frame_label = blend_to_key_left_b_qt.text()
+            right_frame_label = blend_to_key_right_b_qt.text()
+            try:
+                left_frame = int(left_frame_label)
+            except ValueError:
+                left_frame = None
+            try:
+                right_frame = int(right_frame_label)
+            except ValueError:
+                right_frame = None
+            keyTools.blend_to_frame(percentage, left_frame, right_frame)
 
-        bn_action = barBlendSlider_menu.addAction("Blend to Neighbor")
-        bn_action.setCheckable(True)
-        bn_action.setChecked(True)
-        bn_action.setActionGroup(blend_action_group)
-        bn_action.triggered.connect(lambda: set_blend_slider_command("blend_to_neighbor"))
+        def add_mode_sliders(modes_list, default_key_setting, prefix, color, change_func, drop_func, ws_support=False):
+            # Create a new section for each slider color/type
+            sec = new_section(spacing=4)
 
-        bd_action = barBlendSlider_menu.addAction("Blend to Default")
-        bd_action.setCheckable(True)
-        bd_action.setActionGroup(blend_action_group)
-        bd_action.triggered.connect(lambda: set_blend_slider_command("blend_to_default"))
+            current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
+            default_keys = []
+            
+            for m in modes_list:
+                if m == "separator":
+                    sec.addSeparator()
+                    continue
+                if not isinstance(m, dict):
+                    continue
+                
+                key = m["key"]
+                label = m["label"]
+                desc = m.get("description", "")
+                icon = m.get("icon", "SL")
+                
+                # Check for specialized commands
+                command = None
+                show_frames = False
+                
+                if key == "blend_to_frame":
+                    command = blend_to_frame_with_button_values
+                    show_frames = True
+                
+                # Create a slider for every mode
+                is_visible = (key == current_default)
+                if is_visible:
+                    default_keys.append(f"{prefix}_{key}")
+                
+                s = sw.QFlatSliderWidget(
+                    f"bar_{prefix}_{key}",
+                    min=-120 if prefix == "tween" else -100,
+                    max=120 if prefix == "tween" else 100,
+                    value=0,
+                    text=icon,
+                    color=color,
+                    dragCommand=command or (lambda v, k=key: change_func(k, v)),
+                    dropCommand=drop_func,
+                    tooltipTitle=label,
+                    tooltipDescription=desc,
+                )
+                s.setModes(modes_list)
+                
+                # Setup mode switching
+                def make_mode_setter(slider_instance, prefix_val, show_f):
+                    def setter(new_mode):
+                        settings.set_setting(f"current_{prefix_val}_slider_mode", new_mode)
+                        slider_instance.setCurrentMode(new_mode)
+                        m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
+                        if m_info:
+                            slider_instance.set_tooltip_info(m_info["label"], m_info.get("description", ""))
+                        
+                        # Handle specialized frames visibility
+                        if new_mode == "blend_to_frame":
+                            blend_to_key_left_b_qt.show()
+                            blend_to_key_right_b_qt.show()
+                            slider_instance.setDragCommand(blend_to_frame_with_button_values)
+                        else:
+                            blend_to_key_left_b_qt.hide()
+                            blend_to_key_right_b_qt.hide()
+                            slider_instance.setDragCommand(lambda v, nk=new_mode: change_func(nk, v))
+                        
+                        slider_instance.startFlash()
+                    return setter
 
-        bk_action = barBlendSlider_menu.addAction("Blend to Frame")
-        bk_action.setCheckable(True)
-        bk_action.setActionGroup(blend_action_group)
-        bk_action.triggered.connect(lambda: set_blend_slider_command("blend_to_frame"))
+                s.modeSelected.connect(make_mode_setter(s, prefix, show_frames))
+                
+                if ws_support:
+                    is_ws = "worldspace" in key.lower() or "world space" in key.lower()
+                    s.setWorldSpace(is_ws)
 
-        pp_action = barBlendSlider_menu.addAction("Pull / Push")
-        pp_action.setCheckable(True)
-        pp_action.setActionGroup(blend_action_group)
-        pp_action.triggered.connect(lambda: set_blend_slider_command("pull_push"))
+                # Add to section with registration
+                sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
 
-        barBlendSlider_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        barBlendSlider_widget.customContextMenuRequested.connect(lambda pos: barBlendSlider_menu.exec_(barBlendSlider_widget.mapToGlobal(pos)))
+            # Add the final pin actions (Pin Defaults/All)
+            sec.add_final_actions(default_keys)
 
-        # _____________________ TweenSlider ____________________________ #
+        # Helper wrappers
+        def bar_tween_change(m, v): sliders.execute_tween(m, v)
+        def bar_blend_change(m, v): sliders.execute_curve_modifier(m, v, graph_editor=False)
 
-        # Al final de customGraph.py hay un if-else para mostrar u ocultar el tween slider dependiendo de
-        # si el graph editor esta en modo dock o no. Con esto se evita duplicar el slider
-
-        def tween_wrapper(value):
-            keyTools.handle_autokey_start()
-            keyTools.tween(value)  # Llama a la función tween original
-
-        def tween_drop_wrapper():
-            keyTools.handle_autokey_end()
-            keyTools.tweenSliderReset(barTweenSlider_widget.objectName())
-
-        def set_tween_slider_command(mode, *args):
-            match mode:
-                case "tweener":
-                    # barTweenSlider_widget.setText("TW")
-                    barTweenSlider_widget.setTooltipInfo(*parse_tt(helper.tweener_tooltip_text))
-                    barTweenSlider_widget.setWorldSpace(False)
-                    barTweenSlider_widget.setDragCommand(tween_wrapper)
-                case "tweener_worldspace":
-                    # barTweenSlider_widget.setText("WL")
-                    barTweenSlider_widget.setTooltipInfo(*parse_tt(helper.tweener_world_space_tooltip_text))
-                    barTweenSlider_widget.setWorldSpace(True)
-                    barTweenSlider_widget.setDragCommand(tween_wrapper)
-
-            barTweenSlider_widget.startFlash()
-
-        sec_layout = new_section()
-        title, desc = parse_tt(helper.tweener_tooltip_text)
-        barTweenSlider_widget = sw.QFlatSliderWidget(
-            "bar_tween_slider",
-            min=-120,
-            max=120,
-            value=0,
-            text="TW",
-            color=COLOR.color.yellow,
-            dragCommand=tween_wrapper,
-            dropCommand=tween_drop_wrapper,
-            p=sec_layout,
-            tooltipTitle=title,
-            tooltipDescription=desc,
-        )
-
-        # Tween slider menu (Qt version)
-        barTweenSlider_menu = QtWidgets.QMenu(barTweenSlider_widget)
-        action_group = QtGui.QActionGroup(barTweenSlider_menu)
-
-        tw_action = barTweenSlider_menu.addAction("Tweener")
-        tw_action.setCheckable(True)
-        tw_action.setChecked(True)
-        tw_action.setActionGroup(action_group)
-        tw_action.triggered.connect(lambda: set_tween_slider_command("tweener"))
-
-        tw_ws_action = barTweenSlider_menu.addAction("Tweener World Space")
-        tw_ws_action.setCheckable(True)
-        tw_ws_action.setActionGroup(action_group)
-        tw_ws_action.triggered.connect(lambda: set_tween_slider_command("tweener_worldspace"))
-
-        barTweenSlider_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        # Fix: mapToGlobal requires a point, but customContextMenuRequested provides one relative to the widget
-        barTweenSlider_widget.customContextMenuRequested.connect(lambda pos: barTweenSlider_menu.exec_(barTweenSlider_widget.mapToGlobal(pos)))
+        # Create separate sections for Blend and Tween sliders
+        add_mode_sliders(sliders.BLEND_MODES, "current_blend_slider_mode", "blend", COLOR.color.green, bar_blend_change, sliders.stop_dragging)
+        add_mode_sliders(sliders.TWEEN_MODES, "current_tween_slider_mode", "tween", COLOR.color.yellow, bar_tween_change, sliders.stop_dragging, ws_support=True)
 
         # ----------------------------------------------- ToolsButtons -------------------------------------------------------- #
 
         # Pointer  -------------------------------------------------------------------------
 
-        sec_layout = new_section()
+        sec = new_section()
 
         pointer_button_widget = cw.QFlatToolButton(icon=media.pointer_image, tooltip=helper.pointer_tooltip_text)
         pointer_button_widget.clicked.connect(bar.isolate_master)
-        sec_layout.addWidget(pointer_button_widget)
+        sec.addWidget(pointer_button_widget, "Pointer", "pointer")
 
         pointer_menu = QtWidgets.QMenu(pointer_button_widget)
         pointer_menu.addAction(QtGui.QIcon(media.select_rig_controls_image), "Select Rig Controls", bar.select_rig_controls)
@@ -3192,7 +3008,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         isolate_button_widget = cw.QFlatToolButton(icon=media.isolate_image, tooltip=helper.isolate_tooltip_text)
         isolate_button_widget.clicked.connect(bar.isolate_master)
-        sec_layout.addWidget(isolate_button_widget)
+        sec.addWidget(isolate_button_widget, "Isolate", "isolate")
 
         isolate_menu = QtWidgets.QMenu(isolate_button_widget)
         isolate_menu.addAction(QtGui.QIcon(media.ibookmarks_menu_image), "Bookmarks", self.create_ibookmarks_window)
@@ -3215,7 +3031,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Create Locators  ----------------------------------------------------------------
         createLocator_button_widget = cw.QFlatToolButton(icon=media.create_locator_image, tooltip=helper.createLocator_tooltip_text)
         createLocator_button_widget.clicked.connect(bar.createLocator)
-        sec_layout.addWidget(createLocator_button_widget)
+        sec.addWidget(createLocator_button_widget, "Create Locator", "create_locator")
 
         createLocator_menu = QtWidgets.QMenu(createLocator_button_widget)
         createLocator_menu.addAction(QtGui.QIcon(media.create_locator_image), "Select temp locators", bar.selectTempLocators)
@@ -3230,7 +3046,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         align_button_widget = cw.QFlatToolButton(icon=media.match_image, tooltip=helper.align_tooltip_text)
         align_button_widget.clicked.connect(bar.align_selected_objects)
-        sec_layout.addWidget(align_button_widget)
+        sec.addWidget(align_button_widget, "Align", "align")
         align_menu = QtWidgets.QMenu(align_button_widget)
         align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Translation", partial(bar.align_selected_objects, pos=True, rot=False, scl=False))
         align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Rotation", partial(bar.align_selected_objects, pos=False, rot=True, scl=False))
@@ -3250,7 +3066,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Tracer -----------------------------------------------------------------------------
         tracer_button_widget = cw.QFlatToolButton(icon=media.tracer_menu_image, tooltip=helper.tracer_tooltip_text)
         tracer_button_widget.clicked.connect(bar.mod_tracer)
-        sec_layout.addWidget(tracer_button_widget)
+        sec.addWidget(tracer_button_widget, "Tracer", "tracer")
 
         tracer_menu = QtWidgets.QMenu(tracer_button_widget)
         action_tracer_connected = tracer_menu.addAction("Connected")
@@ -3277,7 +3093,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Reset anim  -------------------------------------------------------------------------
         reset_values_button_widget = cw.QFlatToolButton(icon=media.reset_animation_image, tooltip=helper.reset_values_tooltip_text)
         reset_values_button_widget.clicked.connect(keyTools.reset_objects_mods)
-        sec_layout.addWidget(reset_values_button_widget)
+        sec.addWidget(reset_values_button_widget, "Reset Values", "reset_values")
 
         reset_values_menu = QtWidgets.QMenu(reset_values_button_widget)
         reset_values_menu.addAction(QtGui.QIcon(media.reset_animation_image), "Set Default Values For Selected", keyTools.save_default_values)
@@ -3301,12 +3117,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Delete anim -------------------------------------------------------------------------
         deleteAnim_button_widget = cw.QFlatToolButton(icon=media.delete_animation_image, tooltip=helper.delete_animation_tooltip_text)
         deleteAnim_button_widget.clicked.connect(bar.mod_delete_animation)
-        sec_layout.addWidget(deleteAnim_button_widget)
+        sec.addWidget(deleteAnim_button_widget, "Delete Anim", "delete_anim")
 
         selector_button_widget = cw.QFlatToolButton(tooltip=helper.selector_tooltip_text)
         selector_button_widget.setText("0")
         selector_button_widget.clicked.connect(bar.selector_window)
-        sec_layout.addWidget(selector_button_widget)
+        sec.addWidget(selector_button_widget, "Selector", "selector")
 
         def update_selector_button_text():
             if not wutil.is_valid_widget(selector_button_widget):
@@ -3320,22 +3136,22 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         toolbar.selection_script_job = cmds.scriptJob(event=["SelectionChanged", update_selector_button_text])
         update_selector_button_text()
 
-        sec_layout = new_section()
+        sec = new_section()
 
         # Select opposite ---------------------------------------------------------------------
         select_opposite_button_widget = cw.QFlatToolButton(icon=media.select_opposite_image, tooltip=helper.select_opposite_tooltip_text)
         select_opposite_button_widget.clicked.connect(keyTools.selectOppositeHandler)
-        sec_layout.addWidget(select_opposite_button_widget)
+        sec.addWidget(select_opposite_button_widget, "Select Opposite", "select_opposite")
 
         # Copy opposite -----------------------------------------------------------------------
         copy_opposite_button_widget = cw.QFlatToolButton(icon=media.copy_opposite_image, tooltip=helper.copy_opposite_tooltip_text)
         copy_opposite_button_widget.clicked.connect(keyTools.copyOpposite)
-        sec_layout.addWidget(copy_opposite_button_widget)
+        sec.addWidget(copy_opposite_button_widget, "Copy Opposite", "copy_opposite")
 
         # Mirror -----------------------------------------------------------------------
         mirror_button_widget = cw.QFlatToolButton(icon=media.mirror_image, tooltip=helper.mirror_tooltip_text)
         mirror_button_widget.clicked.connect(keyTools.mirror)
-        sec_layout.addWidget(mirror_button_widget)
+        sec.addWidget(mirror_button_widget, "Mirror", "mirror")
 
         mirror_menu = QtWidgets.QMenu(mirror_button_widget)
         mirror_menu.addAction(QtGui.QIcon(media.mirror_image), "Add Excepction Invert", keyTools.add_mirror_invert_exception)
@@ -3356,7 +3172,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             icon=media.copy_paste_animation_image, tooltip=helper.copy_paste_animation_tooltip_text
         )
         copy_paste_animation_button_widget.clicked.connect(keyTools.copy_animation)
-        sec_layout.addWidget(copy_paste_animation_button_widget)
+        sec.addWidget(copy_paste_animation_button_widget, "Copy/Paste Anim", "copy_paste_anim")
 
         cp_menu = QtWidgets.QMenu(copy_paste_animation_button_widget)
         cp_menu.addAction(QtGui.QIcon(media.copy_paste_animation_image), "Copy Animation", keyTools.copy_animation)
@@ -3382,18 +3198,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Select hierarchy -----------------------------------------------------------------------
         select_hierarchy_button_widget = cw.QFlatToolButton(icon=media.select_hierarchy_image, tooltip=helper.select_hierarchy_tooltip_text)
         select_hierarchy_button_widget.clicked.connect(bar.selectHierarchy)
-        sec_layout.addWidget(select_hierarchy_button_widget)
+        sec.addWidget(select_hierarchy_button_widget, "Select Hierarchy", "select_hierarchy")
 
         # Animation offset -----------------------------------------------------------------------
         animation_offset_button_widget = cw.QFlatToolButton(icon=media.animation_offset_image, tooltip=helper.animation_offset_tooltip_text)
         animation_offset_button_widget.setObjectName("anim_offset_button")
         animation_offset_button_widget.clicked.connect(self.toggleAnimOffsetButton)
-        sec_layout.addWidget(animation_offset_button_widget)
+        sec.addWidget(animation_offset_button_widget, "Anim Offset", "anim_offset")
 
         # FollowCam------------------------------------------------------------------------------
         create_follow_cam_button_widget = cw.QFlatToolButton(icon=media.follow_cam_image, tooltip=helper.follow_cam_tooltip_text)
         create_follow_cam_button_widget.clicked.connect(lambda *args: bar.create_follow_cam(translation=True, rotation=True))
-        sec_layout.addWidget(create_follow_cam_button_widget)
+        sec.addWidget(create_follow_cam_button_widget, "Follow Cam", "follow_cam")
 
         follow_cam_menu = QtWidgets.QMenu(create_follow_cam_button_widget)
         follow_cam_menu.addAction(
@@ -3419,7 +3235,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         link_objects_button_widget = cw.QFlatToolButton(icon=media.link_objects_image, tooltip=helper.link_objects_tooltip_text)
         link_objects_button_widget.clicked.connect(keyTools.mod_link_objects)
-        sec_layout.addWidget(link_objects_button_widget)
+        sec.addWidget(link_objects_button_widget, "Link Objects", "link_objects")
 
         # ------funciones para crear el flashing icon al crear el auto-link callback
 
@@ -3494,7 +3310,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Copy WorldSpace ----------------------------------------------------------------------------
         copy_worldspace_button_widget = cw.QFlatToolButton(icon=media.copy_worldspace_animation_image, tooltip=helper.copy_worldspace_tooltip_text)
         copy_worldspace_button_widget.clicked.connect(bar.mod_copy_worldspace_animation)
-        sec_layout.addWidget(copy_worldspace_button_widget)
+        sec.addWidget(copy_worldspace_button_widget, "Worldspace", "worldspace")
 
         ws_menu = QtWidgets.QMenu(copy_worldspace_button_widget)
         ws_menu.addAction(QtGui.QIcon(media.copy_worldspace_animation_image), "Copy Worldspace - All Animation", bar.color_copy_worldspace_animation)
@@ -3518,7 +3334,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Temp Pivot ----------------------------------------------------------------------------
         temp_pivot_button_widget = cw.QFlatToolButton(icon=media.temp_pivot_image, tooltip=helper.temp_pivot_tooltip_text)
         temp_pivot_button_widget.clicked.connect(lambda *args: bar.create_temp_pivot(False))
-        sec_layout.addWidget(temp_pivot_button_widget)
+        sec.addWidget(temp_pivot_button_widget, "Temp Pivot", "temp_pivot")
 
         tp_menu = QtWidgets.QMenu(temp_pivot_button_widget)
         tp_menu.addAction(QtGui.QIcon(media.temp_pivot_image), "Last pivot used", lambda *args: bar.create_temp_pivot(True))
@@ -3536,12 +3352,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         micro_move_button_widget = cw.QFlatToolButton(icon=media.ruler_image, tooltip=helper.micro_move_tooltip_text)
         micro_move_button_widget.setObjectName("micro_move_button")
         micro_move_button_widget.clicked.connect(self.toggle_micro_move_button)
-        sec_layout.addWidget(micro_move_button_widget)
+        sec.addWidget(micro_move_button_widget, "Micro Move", "micro_move")
 
         # Key Menu -------------------------------------------------------------------------------
         block_keys_button_widget = cw.QFlatToolButton(icon=media.reblock_keys_image, tooltip=helper.block_keys_tooltip_text)
         block_keys_button_widget.clicked.connect(keyTools.share_keys)
-        sec_layout.addWidget(block_keys_button_widget)
+        sec.addWidget(block_keys_button_widget, "Block Keys", "block_keys")
 
         block_keys_menu = QtWidgets.QMenu(block_keys_button_widget)
         block_keys_menu.addAction(QtGui.QIcon(media.reblock_keys_image), "reBlock", keyTools.reblock_move)
@@ -3553,32 +3369,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         block_keys_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         block_keys_button_widget.customContextMenuRequested.connect(lambda pos: block_keys_menu.exec_(block_keys_button_widget.mapToGlobal(pos)))
 
-        # Anim tangents ----------------------------------------------------------------------------
-        sec_layout = new_section()
-
-        auto_tangent_b = cw.QFlatToolButton(icon=media.auto_tangent_image, tooltip="Auto Tangent")
-        auto_tangent_b.clicked.connect(lambda: bar.setTangent("auto"))
-        sec_layout.addWidget(auto_tangent_b)
-
-        spline_tangent_b = cw.QFlatToolButton(icon=media.spline_tangent_image, tooltip="Spline Tangent")
-        spline_tangent_b.clicked.connect(lambda: bar.setTangent("spline"))
-        sec_layout.addWidget(spline_tangent_b)
-
-        linear_tangent_b = cw.QFlatToolButton(icon=media.linear_tangent_image, tooltip="Linear Tangent")
-        linear_tangent_b.clicked.connect(lambda: bar.setTangent("linear"))
-        sec_layout.addWidget(linear_tangent_b)
-
-        step_tangent_b = cw.QFlatToolButton(icon=media.step_tangent_image, tooltip="Step Tangent")
-        step_tangent_b.clicked.connect(lambda: bar.setTangent("step"))
-        sec_layout.addWidget(step_tangent_b)
-
-        sec_layout = new_section()
+        sec = new_section()
 
         # Selection Sets  ----------------------------------------------------------------------------
         selection_sets_button_widget = cw.QFlatToolButton(icon=media.selection_sets_image, tooltip=helper.selection_sets_tooltip_text)
         selection_sets_button_widget.setObjectName("toggle_selection_sets_workspace_b")
         selection_sets_button_widget.clicked.connect(self.toggle_selection_sets_workspace)
-        sec_layout.addWidget(selection_sets_button_widget)
+        sec.addWidget(selection_sets_button_widget, "Selection Sets", "selection_sets")
 
         # customGraph ----------------------------------------------------------------------------
         def open_customGraph():
@@ -3588,7 +3385,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         open_custom_graph_button_widget = cw.QFlatToolButton(icon=media.customGraph_image, tooltip=helper.customGraph_tooltip_text)
         open_custom_graph_button_widget.clicked.connect(open_customGraph)
-        sec_layout.addWidget(open_custom_graph_button_widget)
+        sec.addWidget(open_custom_graph_button_widget, "Custom Graph", "custom_graph")
 
         # custom tools ----------------------------------------------------------------------------
         importlib.invalidate_caches()
@@ -3657,7 +3454,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         toolBox_button_widget = cw.QFlatToolButton(icon=media.custom_tools_image, tooltip=helper.custom_tools_tooltip_text)
         toolBox_button_widget.setVisible(bool(CUSTOM_TOOLS_MENU))
-        sec_layout.addWidget(toolBox_button_widget)
+        sec.addWidget(toolBox_button_widget, "Custom Tools", "custom_tools")
 
         toolBox_menu = QtWidgets.QMenu(toolBox_button_widget)
         toolBox_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -3732,7 +3529,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         customScripts_button_widget = cw.QFlatToolButton(icon=media.custom_scripts_image, tooltip=helper.custom_scripts_tooltip_text)
         customScripts_button_widget.setVisible(bool(CUSTOM_SCRIPTS_MENU))
-        sec_layout.addWidget(customScripts_button_widget)
+        sec.addWidget(customScripts_button_widget, "Custom Scripts", "custom_scripts")
 
         customScripts_menu = QtWidgets.QMenu(customScripts_button_widget)
         customScripts_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -3743,19 +3540,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         initialize_scripts_menu()
 
-        # _____________________ configAbout Menu _____________________________#
+        # _____________________ Workspaces Section ____________________________ #
+        sec = new_section(spacing=2)
 
-        overshootSliders = False
+        overshootSliders = settings.get_setting("sliders_overshoot", False)
 
         def _setOvershoot(state):
-            for slider in {barBlendSlider_widget, barTweenSlider_widget}:
-                slider.setOvershoot(state)
-
-        _setOvershoot(overshootSliders)
+            settings.set_setting("sliders_overshoot", state)
+            sw.globalSignals.overshootChanged.emit(state)
 
         toolbar_config_button_widget = cw.QFlatToolButton(icon=media.settings_image)
         toolbar_config_button_widget.setObjectName("settings_toolbar_button")
-        sec_layout.addWidget(toolbar_config_button_widget)
+        sec.addWidget(toolbar_config_button_widget, "Settings", "settings")
 
         # Build your menu with your cw.MenuWidget; make sure the button is the PARENT
         toolbar_menu = cw.MenuWidget(parent=toolbar_config_button_widget)
@@ -3847,15 +3643,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         toolbar_menu.addSeparator()
         toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
 
-        # --- OPEN AT CURSOR POSITION (left & right click) ---
-        # IMPORTANT: don't call setMenu(); we handle showing explicitly at the cursor
         def _open_menu_at_cursor():
             toolbar_menu.popup(QtGui.QCursor.pos())
 
         def _on_toolbar_context_menu(pos):
-            # Only show the main config menu if we are clicking on the background empty space.
-            # If there's a child widget (button, slider, etc.) at this position, we abort
-            # and let that widget handle its own right-click.
             if self.main_toolbar_widget.childAt(pos):
                 return
             _open_menu_at_cursor()
@@ -3867,7 +3658,81 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.main_toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.main_toolbar_widget.customContextMenuRequested.connect(_on_toolbar_context_menu)
 
-        # crea los tooltips
+        def read_show_tooltips():
+            return settings.get_setting("show_tooltips", True)
+
+        def update_show_tooltips(value):
+            settings.set_setting("show_tooltips", value)
+
+        def toggle_tooltips(value):
+            update_show_tooltips(value)
+            update_tooltips()
+
+        def update_tooltips():
+            show_tooltips_val = read_show_tooltips()
+
+            def get_safe_helper(attr_name):
+                return getattr(helper, attr_name, "")
+
+            buttons_and_tooltips = [
+                (pointer_button_widget, get_safe_helper("pointer_tooltip_text")),
+                (isolate_button_widget, get_safe_helper("isolate_tooltip_text")),
+                (block_keys_button_widget, get_safe_helper("block_keys_tooltip_text")),
+                (createLocator_button_widget, get_safe_helper("createLocator_tooltip_text")),
+                (align_button_widget, get_safe_helper("align_tooltip_text")),
+                (tracer_button_widget, get_safe_helper("tracer_tooltip_text")),
+                (deleteAnim_button_widget, get_safe_helper("delete_animation_tooltip_text")),
+                (reset_values_button_widget, get_safe_helper("reset_values_tooltip_text")),
+                (select_opposite_button_widget, get_safe_helper("select_opposite_tooltip_text")),
+                (copy_opposite_button_widget, get_safe_helper("copy_opposite_tooltip_text")),
+                (mirror_button_widget, get_safe_helper("mirror_tooltip_text")),
+                (copy_paste_animation_button_widget, get_safe_helper("copy_paste_animation_tooltip_text")),
+                (selector_button_widget, get_safe_helper("selector_tooltip_text")),
+                (select_hierarchy_button_widget, get_safe_helper("select_hierarchy_tooltip_text")),
+                (animation_offset_button_widget, get_safe_helper("animation_offset_tooltip_text")),
+                (link_objects_button_widget, get_safe_helper("link_objects_tooltip_text")),
+                (create_follow_cam_button_widget, get_safe_helper("follow_cam_tooltip_text")),
+                (copy_worldspace_button_widget, get_safe_helper("copy_worldspace_tooltip_text")),
+                (temp_pivot_button_widget, get_safe_helper("temp_pivot_tooltip_text")),
+                (micro_move_button_widget, get_safe_helper("micro_move_tooltip_text")),
+                (selection_sets_button_widget, get_safe_helper("selection_sets_tooltip_text")),
+                (open_custom_graph_button_widget, get_safe_helper("customGraph_tooltip_text")),
+                (toolBox_button_widget, get_safe_helper("custom_tools_tooltip_text")),
+                (customScripts_button_widget, get_safe_helper("custom_scripts_tooltip_text")),
+                (self.move_keyframes_intField, get_safe_helper("move_keyframes_intField_widget_tooltip_text")),
+                (move_key_left_b_widget, get_safe_helper("move_key_left_b_widget_tooltip_text")),
+                (remove_inbetween_b_widget, get_safe_helper("remove_inbetween_b_widget_tooltip_text")),
+                (add_inbetween_b_widget, get_safe_helper("add_inbetween_b_widget_tooltip_text")),
+                (move_key_right_b_widget, get_safe_helper("move_key_right_b_widget_tooltip_text")),
+                (clear_selected_keys_widget, get_safe_helper("clear_selected_keys_widget_tooltip_text")),
+                (select_scene_animation_widget, get_safe_helper("select_scene_animation_widget_tooltip_text")),
+
+                (toolbar_config_button_widget, "<b>Config</b><br><br>Open TheKeyMachine configuration and help menu."),
+            ]
+
+            for button_widget, tooltip_html in buttons_and_tooltips:
+                try:
+                    if hasattr(button_widget, "set_tooltip_info"):
+                        if show_tooltips_val:
+                            button_widget.set_tooltip_info(*sliders.parse_tt(tooltip_html))
+                        else:
+                            button_widget.set_tooltip_info("", "")
+                    elif hasattr(button_widget, "set_tooltip_data"):
+                        if show_tooltips_val:
+                            button_widget.set_tooltip_data(text=tooltip_html)
+                        else:
+                            button_widget.set_tooltip_data(text="")
+                    else:
+                        button_widget.setToolTip(tooltip_html if show_tooltips_val else "")
+                except Exception:
+                    pass
+
+        # Update config menu check state
+        show_tooltips_action.setChecked(show_tooltips)
+        show_tooltips_action.toggled.disconnect()
+        show_tooltips_action.toggled.connect(toggle_tooltips)
+
+        # Initial call
         update_tooltips()
 
 
@@ -3898,25 +3763,23 @@ def show():
             pass
 
     _toolbar_instance = toolbar()
-    _toolbar_instance.startUI()
+    _toolbar_instance.showWindow()
 
 
 def toggle():
     global _toolbar_instance
+
     try:
         workspace_control = WorkspaceName + "WorkspaceControl"
-        if cmds.workspaceControl(workspace_control, q=True, exists=True):
-            cmds.deleteUI(workspace_control, control=True)
+        if cmds.workspaceControl(workspace_control, query=True, exists=True):
+            vis_state = cmds.workspaceControl(workspace_control, query=True, visible=True)
+
+            if vis_state:
+                cmds.workspaceControl(workspace_control, edit=True, visible=False)
+            else:
+                cmds.workspaceControl(workspace_control, edit=True, restore=True)
+            return
     except Exception:
         pass
-
-    # 2. Try to re-show the existing instance if it's alive.
-    try:
-        if _toolbar_instance and isValid(_toolbar_instance):
-            _toolbar_instance.startUI()
-            return
-    except (RuntimeError, AttributeError):
-        pass
-
-    # 3. Fallback: recreate the tool
-    show()
+    _toolbar_instance = toolbar()
+    _toolbar_instance.showWindow()

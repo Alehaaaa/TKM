@@ -565,3 +565,18 @@ class QFlatTooltipManager(object):
         cls._timer.timeout.connect(_safe_show)
         cls._timer.setInterval(delay)
         cls._timer.start()
+
+def parse_tt(html):
+    """
+    Parses TKM HTML tooltips into (Header, Description).
+    Preserves HTML formatting for rich tooltips.
+    """
+    if not html:
+        return "", ""
+    
+    # Split by double break (common TKM separator)
+    parts = re.split(r"<br\s*/?>\s*<br\s*/?>", html, maxsplit=1, flags=re.IGNORECASE)
+    header = parts[0].strip()
+    description = parts[1].strip() if len(parts) > 1 else ""
+    
+    return header, description

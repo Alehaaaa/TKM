@@ -207,21 +207,19 @@ class MenuWidget(QtWidgets.QMenu):
 class OpenMenuWidget(MenuWidget):
     def __init__(self, *args, **kwargs):
         MenuWidget.__init__(self, *args, **kwargs)
+        self.setTearOffEnabled(True)
 
     def mouseReleaseEvent(self, e):
         action = self.actionAt(e.pos())
         if action and action.isEnabled():
             if action.isCheckable():
-                action.setEnabled(False)
-                MenuWidget.mouseReleaseEvent(self, e)
-                action.setEnabled(True)
-                action.trigger()
+                action.toggle()
+                return
             elif action.data() == "keep_open":
                 action.trigger()
-            else:
-                MenuWidget.mouseReleaseEvent(self, e)
-        else:
-            MenuWidget.mouseReleaseEvent(self, e)
+                return
+
+        MenuWidget.mouseReleaseEvent(self, e)
 
 
 class TooltipMixin:
@@ -301,7 +299,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self.setCursor(QtCore.Qt.PointingHandCursor)
         self.setAutoRaise(True)
         self.pressed_color = pressed_color or "#666666"
-        
+
         if text:
             self.setText(text)
             self.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon if icon else QtCore.Qt.ToolButtonTextOnly)
@@ -489,7 +487,6 @@ class QFlowLayout(QtWidgets.QLayout):
         return y + line_height - rect.y() + margins.bottom()
 
 
-
 class QFlowContainer(QtWidgets.QWidget):
     """A QWidget that automatically sizes its height to its QFlowLayout.
 
@@ -514,6 +511,104 @@ class QFlowContainer(QtWidgets.QWidget):
 
 
 # QPainter for the shelf tabBar
+
+
+class QFlatSectionWidget(QtWidgets.QWidget):
+    """
+    A container for toolbar sections that provides a hover-activated overlay
+    for toggling the visibility of its child widgets.
+    """
+
+    def __init__(self, parent=None, spacing=2):
+        super().__init__(parent)
+        self.setLayout(QtWidgets.QHBoxLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
+        self.layout().setSpacing(spacing)
+
+        # Overlay button: tiny checkbox in the bottom-left
+        self._overlay_btn = QtWidgets.QToolButton(self)
+        self._overlay_btn.setFixedSize(10, 8)
+        self._overlay_btn.setCursor(QtCore.Qt.PointingHandCursor)
+        self._overlay_btn.setVisible(False)
+        self._overlay_btn.setStyleSheet("""
+            QToolButton {
+                border: 1px solid #555;
+                background-color: #333;
+                border-radius: 2px;
+            }
+            QToolButton:hover {
+                background-color: #444;
+                border-color: #777;
+            }
+        """)
+
+        # Menu for toggling children
+        self._menu = OpenMenuWidget(self)
+        self._overlay_btn.clicked.connect(self._show_menu)
+
+        self._widgets = {}  # key -> widget mapping
+        self._actions = {}  # key -> QAction mapping
+
+    def addWidget(self, widget, label, key, default_visible=True, description=None):
+        """Add a widget to the section with a toggle key."""
+        self.layout().addWidget(widget)
+        self._widgets[key] = widget
+
+        # Create checkable action for the menu
+        action = self._menu.addAction(label, description=description)
+        action.setCheckable(True)
+        action.setChecked(default_visible)
+        action.triggered.connect(lambda checked=False, k=key: self.toggle_widget(k, checked))
+
+        self._actions[key] = action
+        widget.setVisible(default_visible)
+        return widget
+
+    def toggle_widget(self, key, visible):
+        """Toggle widget visibility and update menu/settings if needed."""
+        widget = self._widgets.get(key)
+        if widget:
+            widget.setHidden(not visible)
+
+        action = self._actions.get(key)
+        if action:
+            action.setChecked(visible)
+
+    def addSeparator(self):
+        """Add a separator to the customization menu."""
+        self._menu.addSeparator()
+
+    def add_final_actions(self, default_keys):
+        """Add Pin Defaults and Pin All at the bottom."""
+        self._menu.addSeparator()
+
+        pin_defaults_action = self._menu.addAction("Pin Defaults")
+        pin_defaults_action.triggered.connect(lambda: self.pin_defaults(default_keys))
+
+        pin_all_action = self._menu.addAction("Pin All")
+        pin_all_action.triggered.connect(self.pin_all)
+
+    def pin_defaults(self, default_keys):
+        for key in self._widgets:
+            self.toggle_widget(key, key in default_keys)
+
+    def pin_all(self):
+        for key in self._widgets:
+            self.toggle_widget(key, True)
+
+    def _show_menu(self):
+        self._menu.exec_(QtGui.QCursor.pos())
+
+    def enterEvent(self, event):
+        self._overlay_btn.setVisible(True)
+        self._overlay_btn.raise_()
+        pos = QtCore.QPoint(self.width() - self._overlay_btn.width(), self.height() - self._overlay_btn.height())
+        self._overlay_btn.move(pos)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._overlay_btn.setVisible(False)
+        super().leaveEvent(event)
 
 
 class QFlatShelfPainter(QtWidgets.QWidget):

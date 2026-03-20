@@ -166,7 +166,7 @@ blend_to_frame_tooltip_text = (
 )
 
 pull_push_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Pull / Push</b></font><br><br>Soften or intessify the animation.<br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Pull | Push</b></font><br><br>Soften or intessify the animation.<br><br>"
 )
 
 tweener_tooltip_text = (

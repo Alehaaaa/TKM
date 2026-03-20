@@ -4,21 +4,36 @@ from typing import Optional
 import importlib
 
 try:
-    from PySide6.QtCore import Qt, QRect, Signal, QTimer
-    from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath
+    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint
+    from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup
     from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton
 except ImportError:
-    from PySide2.QtCore import Qt, QRect, Signal, QTimer
+    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint
     from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath
-    from PySide2.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton
+    from PySide2.QtWidgets import (
+        QWidget,
+        QHBoxLayout,
+        QSizePolicy,
+        QSlider,
+        QPushButton,
+        QActionGroup,
+    )
 
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.widgets.util as util
 import TheKeyMachine.widgets.customWidgets as cw
+import TheKeyMachine.mods.settingsMod as settings
 
 importlib.reload(ui)
 importlib.reload(util)
 importlib.reload(cw)
+
+
+class _GlobalSignals(QObject):
+    overshootChanged = Signal(bool)
+
+
+globalSignals = _GlobalSignals()
 
 """
 QFlatSliderWidget — COLOR-faithful, single-file recreation (no picks)
@@ -493,6 +508,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     valueChanged = Signal(float)
     dragStarted = Signal()
     dragFinished = Signal()
+    modeSelected = Signal(str)
 
     def __init__(
         self,
@@ -518,6 +534,14 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._worldSpace = worldSpace
         self._tooltipTitle = tooltipTitle
         self._tooltipDescription = tooltipDescription
+
+        self._modes = []
+        self._mode_actions = {}
+        self._current_mode = ""
+        self._menu = None
+
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
 
         # base layout: only the slider; buttons live in overlay containers
         base = QHBoxLayout(self)
@@ -582,10 +606,19 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         self._update_buttons()
 
+        # Connect to global signal and initialize
+        self.setOvershoot(settings.get_setting("sliders_overshoot", False))
+        globalSignals.overshootChanged.connect(self.setOvershoot)
+
         # add to provided layout, if any
         if p is not None:
             try:
-                p.addWidget(self)
+                # If parent is a QFlatSectionWidget, use its custom addWidget
+                # that registers the widget in the toggle menu.
+                if hasattr(p, "addWidget") and hasattr(p, "_widgets"):
+                    p.addWidget(self, tooltipTitle or text, name or "slider")
+                else:
+                    p.addWidget(self)
             except Exception as e:
                 print("QFlatSliderWidget: could not add to provided layout:", e)
 
@@ -595,19 +628,31 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     # --- public API -------------------------------------------------------------
     def setText(self, text: str):
         self._slider._text = text
+        self._slider.update()
 
     def setColor(self, color: str):
         self._slider._color = color
         self._slider._apply_stylesheet(thick=False)
+        self._slider.update()
 
     def setTooltipInfo(self, title: str, description: str = ""):
+        """Sets tooltip and status tip info for the widget and all its components."""
         self._tooltipTitle = title
         self._tooltipDescription = description
+
+        # Update the mixin state for the main widget (handles statusTip)
+        cw.TooltipMixin.set_tooltip_info(self, title, description)
+
+        # Update inner components
         self._slider.set_tooltip_info(title, description)
         for b in self._leftButtons:
             b.set_tooltip_info(title, description)
         for b in self._rightButtons:
             b.set_tooltip_info(title, description)
+
+    def set_tooltip_info(self, title: str, description: str = ""):
+        """Snake-case alias for compatibility."""
+        self.setTooltipInfo(title, description)
 
     def setWorldSpace(self, enabled: int):
         if enabled == self._worldSpace:
@@ -687,6 +732,55 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         delta = e.angleDelta().x() + e.angleDelta().y()
         self._slider.apply_wheel_delta(delta)
         e.accept()
+
+    def setModes(self, modes: list[dict]):
+        """
+        Stores a list of mode definitions.
+        Format: [{'label': 'Name', 'key': 'mode_key', 'icon': 'SH'}, 'separator', ...]
+        """
+        self._modes = modes
+
+    def setCurrentMode(self, identifier: str):
+        """Updates the current mode and automatically sets the handle text if an icon is defined."""
+        self._current_mode = identifier
+        for item in self._modes:
+            if not isinstance(item, dict):
+                continue
+            if item.get("label") == identifier or item.get("key") == identifier:
+                # Use 'icon' or 'text' from the mode definition if available
+                icon = item.get("icon") or item.get("text")
+                if icon:
+                    self.setText(icon)
+                break
+
+    def _show_context_menu(self, pos: QPoint):
+        if not self._modes:
+            return
+
+        menu = cw.MenuWidget(parent=self)
+        group = QActionGroup(menu)
+
+        for item in self._modes:
+            if item == "separator":
+                menu.addSeparator()
+                continue
+
+            label = item.get("label", "Mode")
+            key = item.get("key", label)
+            description = item.get("description", "")
+
+            act = menu.addAction(label, description=description)
+            act.setCheckable(True)
+            act.setActionGroup(group)
+
+            is_current = key == self._current_mode
+            act.setChecked(is_current)
+            act.setEnabled(not is_current)
+
+            act.triggered.connect(lambda *args, k=key: self.modeSelected.emit(k))
+
+        menu.exec_(self.mapToGlobal(pos))
+        menu.deleteLater()
 
     # --- geometry mgmt for overlays --------------------------------------------
     def resizeEvent(self, e):
