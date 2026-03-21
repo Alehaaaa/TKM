@@ -690,28 +690,43 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         # Step 4: reassign free sliders to unoccupied desired modes
         free_iter = iter(free_slots)
+        newly_assigned = set()
         for mode_key in unoccupied:
             slot = next(free_iter, None)
             if slot is None:
                 break  # Pool exhausted (more modes than sliders)
             # setCurrentMode triggers notify_mode_changed → updates _mode_to_slot
             pool[slot].setCurrentMode(mode_key)
+            newly_assigned.add(slot)
 
-        # Step 5: reconcile visibility — show sliders whose mode is desired, hide others
+        active_slots = set(covered.values()).union(newly_assigned)
+
+        # Step 5: reconcile visibility — show EXACTLY the authorized representative sliders
         for slot, widget in pool.items():
-            cm = getattr(widget, "_current_mode", None)
-            visible = cm is not None and cm.key in desired_mode_keys
+            visible = slot in active_slots
             widget.setVisible(visible)
             settings.set_setting(f"pin_{slot}", visible)
 
         # Step 6: sync check states in the active menu (keyed by mode key)
         if self._active_menu and isValid(self._active_menu):
             actions = getattr(self._active_menu, "_tkm_actions", {})
+            
+            # Recalculate which modes actively have a visible slider representative
+            actual_visible_modes = {
+                getattr(pool[slot], "_current_mode", None).key 
+                for slot in active_slots 
+                if getattr(pool[slot], "_current_mode", None)
+            }
+            
             for mode_key, action in actions.items():
                 if isValid(action):
                     action.blockSignals(True)
-                    action.setChecked(mode_key in desired_mode_keys)
+                    action.setChecked(mode_key in actual_visible_modes)
                     action.blockSignals(False)
+            
+            # Force the menu to repaint so the visual check marks reflect the new state immediately
+            self._active_menu.update()
+            self._active_menu.repaint()
 
         self._refresh_layout()
 
