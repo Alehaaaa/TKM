@@ -7,7 +7,6 @@ try:
     from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint
     from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup
     from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider
-    from PySide6 import QtWidgets
 except ImportError:
     from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint
     from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath
@@ -21,7 +20,6 @@ except ImportError:
         QStyle,
         QStyleOptionSlider,
     )
-    from PySide2 import QtWidgets
 
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.widgets.util as util
@@ -31,6 +29,7 @@ import TheKeyMachine.mods.settingsMod as settings
 importlib.reload(ui)
 importlib.reload(util)
 importlib.reload(cw)
+importlib.reload(settings)
 
 
 class _GlobalSignals(QObject):

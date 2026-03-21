@@ -21,7 +21,6 @@ import maya.cmds as cmds
 import maya.OpenMayaUI as mui
 
 import importlib
-from functools import partial
 
 try:
     from PySide2 import QtCore, QtGui, QtWidgets
@@ -191,8 +190,8 @@ def createCustomGraph():
 
     flowtoolbar_layout = cw.QFlowLayout(flow_qw, margin=2, Wspacing=18, Hspacing=6, alignment=align_val)
 
-    def new_section():
-        sec = cw.QFlatSectionWidget()
+    def new_section(hiddeable=True):
+        sec = cw.QFlatSectionWidget(hiddeable=hiddeable)
         flowtoolbar_layout.addWidget(sec)
         return sec
 
@@ -200,15 +199,6 @@ def createCustomGraph():
     parent_qw = wutil.get_maya_qt(parent_ptr, QtWidgets.QWidget)
     if parent_qw and parent_qw.layout():
         parent_qw.layout().addWidget(flow_qw)
-
-    # ________________ System/Core Section ___________________#
-    sec = new_section()
-
-    config_btn = create_tool_button(icon=media.settings_image, tooltip="Config", description="Tool configuration and preferences.")
-    sec.addWidget(config_btn, "Config", "config")
-
-    config_menu = create_config_menu(config_btn)
-    config_btn.clicked.connect(lambda: config_menu.exec_(QtGui.QCursor.pos()))
 
     # ________________ Key Tools Buttons  ___________________#
     sec = new_section()
@@ -269,7 +259,9 @@ def createCustomGraph():
         command=keyTools.reblock_move,
     )
     sec.addWidget(btn_reblock, "reBlock", "reblock")
-    extra_btn = create_tool_button(text="E", tooltip="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes())
+    extra_btn = create_tool_button(
+        text="E", tooltip="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes()
+    )
     sec.addWidget(extra_btn, "Extra Tools", "extra")
     extra_menu = cw.MenuWidget(parent=extra_btn)
     extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
@@ -284,7 +276,9 @@ def createCustomGraph():
         # Create a new section for each slider color/type
         sec = new_section()
 
-        current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
+        current_default = settings.get_setting(
+            default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"]
+        )
 
         # Static default list for "Pin Defaults"
         if default_modes:
@@ -387,10 +381,14 @@ def createCustomGraph():
     )
     sec.addWidget(btn_iso, "Isolate", "iso")
 
-    btn_mute = create_tool_button(text="Mt", tooltip="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute())
+    btn_mute = create_tool_button(
+        text="Mt", tooltip="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute()
+    )
     sec.addWidget(btn_mute, "Mute", "mute")
 
-    btn_lock = create_tool_button(text="Lk", tooltip="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock())
+    btn_lock = create_tool_button(
+        text="Lk", tooltip="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock()
+    )
     sec.addWidget(btn_lock, "Lock", "lock")
 
     btn_fi = create_tool_button(
@@ -481,5 +479,28 @@ def createCustomGraph():
             return wutil.get_maya_qt(ptr, QtWidgets.QWidget)
         else:
             return None
+
+    # ________________ System/Core Section ___________________#
+    sec = new_section(hiddeable=False)
+
+    config_btn = create_tool_button(icon=media.settings_image, tooltip="Config", description="Tool configuration and preferences.")
+    sec.addWidget(config_btn, "Config", "config")
+
+    config_menu = create_config_menu(config_btn)
+
+    def _open_config_menu():
+        config_menu.exec_(QtGui.QCursor.pos())
+
+    def _on_toolbar_context_menu(pos):
+        if flow_qw.childAt(pos):
+            return
+        _open_config_menu()
+
+    config_btn.clicked.connect(_open_config_menu)
+    config_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+    config_btn.customContextMenuRequested.connect(lambda pos: _open_config_menu())
+
+    flow_qw.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+    flow_qw.customContextMenuRequested.connect(_on_toolbar_context_menu)
 
     QtCore.QTimer.singleShot(50, flow_qw._update_height)
