@@ -311,7 +311,6 @@ def createCustomGraph():
                 f"customGraph_{prefix}_{key}",
                 min=-100,
                 max=100,
-                value=0,
                 text=icon,
                 color=color,
                 dragCommand=lambda v, k=key: change_func(k, v),
@@ -320,6 +319,7 @@ def createCustomGraph():
                 tooltipDescription=desc,
             )
             s.setModes(modes_list)
+            s.setCurrentMode(key)
 
             # Setup mode switching for this specific slider instance
             def make_mode_setter(slider_instance, prefix_val):
@@ -347,27 +347,32 @@ def createCustomGraph():
         # Add the final pin actions at the bottom of the section menu
         sec.add_final_actions(static_default_keys)
 
-    # Helper wrappers to match sliders.execute_* signatures
-    def tween_change(m, v):
-        sliders.execute_tween(m, v)
-
-    def blend_change(m, v):
-        sliders.execute_curve_modifier(m, v, graph_editor=True)
-
-    def tangent_change(m, v):
-        sliders.execute_tangent_blend(m, v, graph_editor=True)
-
     add_mode_sliders(
-        sliders.TWEEN_MODES, "graph_tween_mode", "tween", COLOR.color.yellow, tween_change, sliders.stop_dragging,
+        sliders.TWEEN_MODES,
+        "graph_tween_mode",
+        "tween",
+        COLOR.color.yellow,
+        sliders.execute_tween,
+        sliders.stop_dragging,
         default_modes=["tweener"],
         ws_support=True,
     )
     add_mode_sliders(
-        sliders.BLEND_MODES, "graph_blend_mode", "blend", COLOR.color.green, blend_change, sliders.stop_dragging,
+        sliders.BLEND_MODES,
+        "graph_blend_mode",
+        "blend",
+        COLOR.color.green,
+        sliders.execute_curve_modifier,
+        sliders.stop_dragging,
         default_modes=["connect_neighbors"],
     )
     add_mode_sliders(
-        sliders.TANGENT_MODES, "graph_tangent_mode", "tangent", COLOR.color.orange, tangent_change, sliders.stop_dragging,
+        sliders.TANGENT_MODES,
+        "graph_tangent_mode",
+        "tangent",
+        COLOR.color.orange,
+        sliders.execute_tangent_blend,
+        sliders.stop_dragging,
         default_modes=["blend_spline"],
     )
 

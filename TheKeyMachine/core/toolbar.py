@@ -1383,11 +1383,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 button.setFixedSize(34, 34)
             hover_color = ui.color_codes_hover.get(color_suffix, hex_code)  # Asegura un valor por defecto
             button.setStyleSheet(
-                "QPushButton {"
+                "QPushButton {{"
                 f"    background-color: {hex_code};"
                 "    border-radius: 5px;"
-                "}"
-                f"QPushButton:hover {{"
+                "}}"
+                "QPushButton:hover {{"
                 f"    background-color: {hover_color};"
                 "    border-radius: 5px;"
                 "}}"
@@ -2799,9 +2799,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
                 s = sw.QFlatSliderWidget(
                     f"bar_{prefix}_{key}",
-                    min=-120 if prefix == "tween" else -100,
-                    max=120 if prefix == "tween" else 100,
-                    value=0,
+                    min=-100,
+                    max=100,
                     text=icon,
                     color=color,
                     dragCommand=command or (lambda v, k=key: change_func(k, v)),
@@ -2810,6 +2809,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     tooltipDescription=desc,
                 )
                 s.setModes(modes_list)
+                s.setCurrentMode(key)
 
                 # Setup mode switching
                 def make_mode_setter(slider_instance, prefix_val, show_f):
@@ -2847,20 +2847,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             # Add the final pin actions (Pin Defaults/All)
             sec.add_final_actions(static_default_keys)
 
-        # Helper wrappers
-        def bar_tween_change(m, v):
-            sliders.execute_tween(m, v)
-
-        def bar_blend_change(m, v):
-            sliders.execute_curve_modifier(m, v, graph_editor=False)
-
         # Create separate sections for Blend and Tween sliders - Standardized setting names
         add_mode_sliders(
             sliders.BLEND_MODES,
             "current_blend_mode",
             "blend",
             COLOR.color.green,
-            bar_blend_change,
+            sliders.execute_curve_modifier,
             sliders.stop_dragging,
             default_modes=["connect_neighbors"],
         )
@@ -2869,7 +2862,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             "current_tween_mode",
             "tween",
             COLOR.color.yellow,
-            bar_tween_change,
+            sliders.execute_tween,
             sliders.stop_dragging,
             default_modes=["tweener"],
             ws_support=True,

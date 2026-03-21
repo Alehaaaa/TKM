@@ -189,6 +189,9 @@ blue_dot_image = getImage("blue_dot.png")
 yellow_dot_image = getImage("yellow_dot.png")
 
 
+default_dot_image = getImage("dot.png")
+
+
 # ________________ Selection Sets ________________________________________#
 
 move_selection_set_image = getImage("move_selection_set.svg")

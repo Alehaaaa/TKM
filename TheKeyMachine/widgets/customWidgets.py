@@ -3,23 +3,19 @@ from .util import DPI
 import re
 
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
-
-try:
-    from PySide6 import QtWidgets, QtCore, QtGui
-    from shiboken6 import isValid
-
-    PYSIDE = 6
-except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui
-    from shiboken2 import isValid
-
-    PYSIDE = 2
-
+import TheKeyMachine.mods.mediaMod as media  # type: ignore
 
 try:
     import TheKeyMachine_user_data.preferences.user_preferences as user_preferences  # type: ignore
 except ImportError:
     user_preferences = None
+
+try:
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from shiboken6 import isValid
+except ImportError:
+    from PySide2 import QtWidgets, QtCore, QtGui
+    from shiboken2 import isValid
 
 
 """
@@ -562,6 +558,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self.layout().setSpacing(spacing)
         self._hiddeable = hiddeable
 
+        self._widgets = {}  # slot_key -> widget mapping
+        self._menu_metadata = []  # for non-slider sections (toolbar buttons etc.)
+        self._default_keys = []
+        self._active_menu = None
+        self._all_modes = []       # Full ordered mode list (SliderMode objects + "separator")
+        self._mode_to_slot = {}   # mode_key -> slot_key (live, authoritative mapping)
+
         if self._hiddeable:
             # Overlay button: tiny checkbox in the bottom-left
             self._overlay_btn = QtWidgets.QToolButton(self)
@@ -579,72 +582,155 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             """)
 
             self._overlay_btn.clicked.connect(self._show_menu)
-            # Menu for toggling children
-            self._menu = OpenMenuWidget(self)
-
-        self._widgets = {}  # key -> widget mapping
-        self._actions = {}  # key -> QAction mapping
 
     def addWidget(self, widget, label, key, default_visible=True, description=None):
         """Add a widget to the section with a toggle key."""
         self.layout().addWidget(widget)
         self._widgets[key] = widget
 
+        # Propagate section context to widget
+        from TheKeyMachine.widgets.util import is_valid_widget
+        if is_valid_widget(widget) and hasattr(widget, "on_added_to_section"):
+            widget.on_added_to_section(self, key)
+
+        # If the widget is a mode-aware slider, restore its saved mode assignment
+        if is_valid_widget(widget) and hasattr(widget, "_current_mode"):
+            cm = getattr(widget, "_current_mode", None)
+            if cm:
+                saved_mode_key = settings.get_setting(f"slider_mode_{key}", cm.key)
+                if saved_mode_key != cm.key and hasattr(widget, "setCurrentMode"):
+                    widget.setCurrentMode(saved_mode_key)
+                # Register current mode in the section's live map
+                current_cm = getattr(widget, "_current_mode", None)
+                if current_cm:
+                    self._mode_to_slot[current_cm.key] = key
+
         if self._hiddeable:
-            # Create checkable action for the menu
-            action = self._menu.addAction(label, description=description)
-            action.setCheckable(True)
-            action.setChecked(default_visible)
+            self._menu_metadata.append({"type": "widget", "key": key, "label": label, "description": description, "default": default_visible})
 
-            # Connect using a closure-like method to ensure 'key' is frozen at addition time
-            action.triggered.connect(self._make_toggle_handler(key))
-            widget.setVisible(default_visible)
+            # Load stored visibility or use default
+            visible = settings.get_setting(f"pin_{key}", default_visible)
+            widget.setVisible(visible)
 
-            self._actions[key] = action
         return widget
 
     def toggle_widget(self, key, visible, save_setting=True):
-        if self._hiddeable:
-            """Toggle widget visibility and update menu/settings if needed."""
-            widget = self._widgets.get(key)
-            if widget and isValid(widget):
-                widget.setHidden(not visible)
+        """Toggle widget visibility and update menu/settings if needed."""
+        widget = self._widgets.get(key)
+        if widget and isValid(widget):
+            widget.setVisible(visible)
 
-            action = self._actions.get(key)
+        if save_setting:
+            settings.set_setting(f"pin_{key}", visible)
+
+        # Update action in active menu (keyed by mode_key for mode-driven sections)
+        if self._active_menu and isValid(self._active_menu):
+            # Try to look up by slot key or by current mode key of that widget
+            widget = self._widgets.get(key)
+            current_cm = getattr(widget, "_current_mode", None) if widget else None
+            action_key = current_cm.key if current_cm else key
+            action = getattr(self._active_menu, "_tkm_actions", {}).get(action_key)
             if action and isValid(action):
                 action.blockSignals(True)
                 action.setChecked(visible)
                 action.blockSignals(False)
 
-            if save_setting:
-                settings.set_setting(f"pin_{key}", visible)
-
-            self._menu.update()
-
     def addSeparator(self):
         """Add a separator to the customization menu."""
-        self._menu.addSeparator()
+        if self._hiddeable:
+            self._menu_metadata.append({"type": "separator"})
 
     def add_final_actions(self, default_keys):
-        """Add Pin Defaults and Pin All at the bottom."""
-        self._menu.addSeparator()
+        """Store default keys and extract the full mode list from registered sliders."""
+        self._default_keys = default_keys
+        # Extract the full ordered mode list from the first slider that has one
+        for w in self._widgets.values():
+            if isValid(w) and hasattr(w, "_modes") and w._modes:
+                self._all_modes = w._modes
+                break
 
-        # Use default values for the signal's 'checked' state to prevent missing argument errors.
-        pin_defaults_action = self._menu.addAction("Pin Defaults")
-        pin_defaults_action.triggered.connect(lambda checked=False, d=default_keys: self.pin_defaults(d))
+    def notify_mode_changed(self, widget, old_key, new_key):
+        """Called by a slider when its mode changes. Updates the authoritative mode map."""
+        slot_key = next((k for k, v in self._widgets.items() if v is widget), None)
+        if not slot_key:
+            return
+        if old_key:
+            self._mode_to_slot.pop(old_key, None)
+        if new_key:
+            self._mode_to_slot[new_key] = slot_key
+            settings.set_setting(f"slider_mode_{slot_key}", new_key)
 
-        pin_all_action = self._menu.addAction("Pin All")
-        pin_all_action.triggered.connect(lambda checked=False: self.pin_all())
+    def _set_visible_modes(self, desired_mode_keys):
+        """
+        Show exactly the given modes, reassigning sliders from the pool as needed.
+        This is the single source of truth for all pin operations.
+        """
+        from TheKeyMachine.widgets.util import is_valid_widget
+
+        # Pool: only mode-aware sliders
+        pool = {slot: w for slot, w in self._widgets.items()
+                if is_valid_widget(w) and hasattr(w, "_current_mode")}
+
+        # Step 1: which desired modes are already covered by a slider?
+        covered = {
+            cm.key: slot
+            for slot, w in pool.items()
+            if (cm := getattr(w, "_current_mode", None)) and cm.key in desired_mode_keys
+        }
+
+        # Step 2: which desired modes have NO slider yet?
+        unoccupied = [mk for mk in desired_mode_keys if mk not in covered]
+
+        # Step 3: free sliders — those whose current mode is NOT in the desired set
+        free_slots = [
+            slot for slot, w in pool.items()
+            if getattr(getattr(w, "_current_mode", None), "key", None) not in desired_mode_keys
+        ]
+
+        # Step 4: reassign free sliders to unoccupied desired modes
+        free_iter = iter(free_slots)
+        for mode_key in unoccupied:
+            slot = next(free_iter, None)
+            if slot is None:
+                break  # Pool exhausted (more modes than sliders)
+            # setCurrentMode triggers notify_mode_changed → updates _mode_to_slot
+            pool[slot].setCurrentMode(mode_key)
+
+        # Step 5: reconcile visibility — show sliders whose mode is desired, hide others
+        for slot, widget in pool.items():
+            cm = getattr(widget, "_current_mode", None)
+            visible = cm is not None and cm.key in desired_mode_keys
+            widget.setVisible(visible)
+            settings.set_setting(f"pin_{slot}", visible)
+
+        # Step 6: sync check states in the active menu (keyed by mode key)
+        if self._active_menu and isValid(self._active_menu):
+            actions = getattr(self._active_menu, "_tkm_actions", {})
+            for mode_key, action in actions.items():
+                if isValid(action):
+                    action.blockSignals(True)
+                    action.setChecked(mode_key in desired_mode_keys)
+                    action.blockSignals(False)
+
+        self._refresh_layout()
 
     def pin_defaults(self, default_keys):
-        for key in self._widgets:
-            self.toggle_widget(key, key in default_keys)
-        self._refresh_layout()
+        """Show only the default modes, reassigning sliders as needed."""
+        all_mode_keys = {m.key for m in self._all_modes if hasattr(m, "key")}
+        default_mode_keys = set()
+        for dk in default_keys:
+            # default_keys are like "tween_tweener" — match against known mode keys
+            for mk in all_mode_keys:
+                if dk == mk or dk.endswith(f"_{mk}"):
+                    default_mode_keys.add(mk)
+                    break
+        self._set_visible_modes(default_mode_keys)
 
     def pin_all(self):
-        for key in self._widgets:
-            self.toggle_widget(key, True)
-        self._refresh_layout()
+        """Show ALL modes, reassigning sliders to cover every mode in the list."""
+        all_mode_keys = {m.key for m in self._all_modes if hasattr(m, "key")}
+        self._set_visible_modes(all_mode_keys)
+
 
     def _make_toggle_handler(self, key):
         """Creates a handler function that captures 'key'."""
@@ -657,11 +743,83 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
     def _refresh_layout(self):
         """Trigger a height recalculation."""
-        QtCore.QTimer.singleShot(100, self.parent()._update_height)
+        if not isValid(self):
+            return
+
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, "_update_height"):
+                QtCore.QTimer.singleShot(100, parent._update_height)
+                break
+            parent = parent.parent()
 
     def _show_menu(self):
-        if self._hiddeable:
-            self._menu.exec_(QtGui.QCursor.pos())
+        if not self._hiddeable:
+            return
+
+        menu = OpenMenuWidget(self)
+        menu._tkm_actions = {}
+        self._active_menu = menu
+
+        if self._all_modes:
+            # Mode-driven sections (sliders): build from the full mode list.
+            # Checked = a visible slider currently operates in that mode.
+            for mode in self._all_modes:
+                if mode == "separator":
+                    menu.addSeparator()
+                    continue
+
+                slot_key = self._mode_to_slot.get(mode.key)
+                widget = self._widgets.get(slot_key) if slot_key else None
+                is_visible = widget is not None and isValid(widget) and widget.isVisible()
+
+                action = menu.addAction(mode.label, description=mode.description)
+                action.setCheckable(True)
+                action.setChecked(is_visible)
+                menu._tkm_actions[mode.key] = action
+
+                def make_mode_toggle(mk):
+                    def handler(checked):
+                        # Compute the new desired visible set and apply it
+                        current = {
+                            getattr(w, "_current_mode", None).key
+                            for w in self._widgets.values()
+                            if w.isVisible() and getattr(w, "_current_mode", None)
+                        }
+                        if checked:
+                            current.add(mk)
+                        else:
+                            current.discard(mk)
+                        self._set_visible_modes(current)
+                    return handler
+
+                action.triggered.connect(make_mode_toggle(mode.key))
+
+        else:
+            # Non-slider sections (toolbar buttons): build from registration metadata
+            for item in self._menu_metadata:
+                if item["type"] == "separator":
+                    menu.addSeparator()
+                elif item["type"] == "widget":
+                    key = item["key"]
+                    widget = self._widgets.get(key)
+                    if not widget or not isValid(widget):
+                        continue
+                    action = menu.addAction(item["label"], description=item["description"])
+                    action.setCheckable(True)
+                    action.setChecked(widget.isVisible())
+                    action.triggered.connect(self._make_toggle_handler(key))
+                    menu._tkm_actions[key] = action
+
+        menu.addSeparator()
+        pin_def_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin Defaults")
+        pin_def_action.triggered.connect(lambda: self.pin_defaults(self._default_keys))
+        pin_all_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin All")
+        pin_all_action.triggered.connect(self.pin_all)
+
+        menu.exec_(QtGui.QCursor.pos())
+        self._active_menu = None
+
 
     def enterEvent(self, event):
         if self._hiddeable:
