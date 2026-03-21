@@ -424,7 +424,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         control.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
 
-        if not self.isFloating():
+        if self.isFloating():
             return tab_handle.tabBar().setVisible(False)
 
         self.shelf_painter = cw.QFlatShelfPainter(tab_handle)
