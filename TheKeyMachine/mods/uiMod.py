@@ -24,15 +24,11 @@ import maya.OpenMayaUI as mui
 try:
     from shiboken2 import wrapInstance
     from PySide2.QtWidgets import QApplication, QDesktopWidget
-    from PySide2.QtGui import QPixmap
-    from PySide2.QtCore import QTimer
     from PySide2.QtWidgets import QAction
 
     from PySide2 import QtCore, QtGui, QtWidgets
 except ImportError:
     from shiboken6 import wrapInstance
-    from PySide6.QtWidgets import QApplication
-    from PySide6.QtGui import QPixmap
     from PySide6.QtCore import QTimer
     from PySide6.QtGui import QAction
 
@@ -52,7 +48,7 @@ from functools import partial
 # import TheKeyMachine.core.customGraph as cg
 # import TheKeyMachine.core.toolbar as tb
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.uiMod as ui
+
 import TheKeyMachine.mods.keyToolsMod as keyTools
 
 # import TheKeyMachine.mods.selSetsMod as selSets
@@ -752,293 +748,143 @@ def orbit_window_close():
 
 
 def donate_window():
-    screen_width, screen_height = get_screen_resolution()
-    screen_width = screen_width
+    from TheKeyMachine.widgets.dialogs import QFlatConfirmDialog
+    import TheKeyMachine.mods.mediaMod as media
+    from TheKeyMachine.mods import generalMod as general
 
-    if cmds.window("tkm_donate_window", exists=True):
-        cmds.deleteUI("tkm_donate_window")
+    screen_width, screen_height = general.get_screen_resolution()
 
-    drag = {"active": False, "position": QtCore.QPoint()}
-
-    def mousePressEvent(event):
-        if event.button() == QtCore.Qt.LeftButton:
-            drag["active"] = True
-            drag["position"] = event.globalPos() - window.frameGeometry().topLeft()
-            event.accept()
-
-    def mouseMoveEvent(event):
-        if event.buttons() == QtCore.Qt.LeftButton and drag["active"]:
-            window.move(event.globalPos() - drag["position"])
-            event.accept()
-
-    def mouseReleaseEvent(event):
-        drag["active"] = False
-
-    parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
-
-    window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
-    window.resize(350, 330)
-    window.setWindowOpacity(1.0)
-    window.setObjectName("tkm_donate_window")
-    window.setWindowTitle("Donate")
-    window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-
-    window.mousePressEvent = mousePressEvent
-    window.mouseMoveEvent = mouseMoveEvent
-    window.mouseReleaseEvent = mouseReleaseEvent
-
-    central_widget = QtWidgets.QWidget(window)
-    central_widget.setStyleSheet("""
-    QWidget {
-        background-color: #454545; 
-        border-radius: 10px;
-        border: 1px solid #393939;
-    }
-    QLabel {
-        border: none;
-    }
-    """)
-    layout = QtWidgets.QVBoxLayout(central_widget)
-    layout.setSpacing(0)
-    layout.setContentsMargins(10, 10, 10, 10)
-
-    header_layout = QtWidgets.QHBoxLayout()
-    header_layout.addStretch()
-
-    close_button = QtWidgets.QPushButton("X")
-    close_button.setFixedSize(22, 22)
-    close_button.setStyleSheet(
-        "QPushButton {"
-        "    background-color: #585858;"
-        "    border: none;"
-        "    color: #ccc;"
-        "    border-radius: 5px;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #c56054;"
-        "    border-radius: 5px;"
-        "}"
-    )
-    close_button.clicked.connect(window.close)
-    header_layout.addWidget(close_button)
-    layout.addLayout(header_layout)
-
-    # Código para mostrar la imagen
-    image_label = QtWidgets.QLabel()
-    image_label.setAlignment(QtCore.Qt.AlignCenter)
-    layout.addWidget(image_label, 0, QtCore.Qt.AlignHCenter)
-
-    # fix pyside6
-    try:
-        about_image = ui.getImage(image="stripe.png")
-        image_label.setPixmap(about_image)
-        image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-    except Exception:
-        # Cargar la imagen como QPixmap
-        about_image = ui.getImage(image="stripe.png")
-        set_about_image = QPixmap(about_image)
-        image_label.setPixmap(set_about_image)
-        image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-
-    # TheKeyMachine_version = general.get_thekeymachine_version()
-    # TheKeyMachine_build_version = general.get_thekeymachine_build_version()
-
-    if screen_width == 3840:
-        label6 = QtWidgets.QLabel(
+    msg = (
+        (
             "<br><span style='font-size: 14px; color:#cccccc'>"
             "The development of TheKeyMachine is a big effort in terms of energy and time.<br><br>If you use this tool professionally or regularly, please try to make a donation.<br> This will greatly help the project grow and have continuity. Every small amount counts.<br>"
             "Thank you!<br><br><br>"
             "Support TheKeyMachine <a href='http://thekeymachine.xyz/donate.php' style='color:#86CDAD;'><br>http://thekeymachine.xyz/donate</a></span><br><br>"
         )
-
-    else:
-        label6 = QtWidgets.QLabel(
+        if screen_width == 3840
+        else (
             "<br><span style='font-size: 12px; color:#cccccc'>"
             "The development of TheKeyMachine is a big effort<br>in terms of time and energy.<br><br>If you use this tool professionally or regularly,<br>please try to make a donation.<br><br> This will greatly help the project grow<br> and have continuity. Every small amount counts.<br>"
             "Thank you!<br><br><br>"
-            "Support TheKeyMachine<a href='http://thekeymachine.xyz/donate.php' style='color:#86CDAD;'><br>http://thekeymachine.xyz/donate</a></span><br><br>"
+            "Support TheKeyMachine <a href='http://thekeymachine.xyz/donate.php' style='color:#86CDAD;'><br>http://thekeymachine.xyz/donate</a></span><br><br>"
         )
+    )
 
-        # Habilitar interacciones de enlaces
-        label6.setOpenExternalLinks(True)
-
-    label6.setAlignment(QtCore.Qt.AlignCenter)
-    layout.addWidget(label6)
-
-    if screen_width == 3840:
-        window.resize(480, 420)
-        close_button.setFixedSize(32, 32)
-
-    window_layout = QtWidgets.QVBoxLayout(window)
-    window_layout.addWidget(central_widget)
-    window.setLayout(window_layout)
-
-    # Centrar la ventana en la ventana principal de Maya
-    maya_geometry = general.get_maya_window_geometry()
-    x = maya_geometry.x() + (maya_geometry.width() - window.width()) / 2
-    y = maya_geometry.y() + (maya_geometry.height() - window.height()) / 2
-    window.move(x, y)
-
-    window.show()
-
-
-# ________________________________________________ About window  ______________________________________________________ #
+    # Convert a label-like hack in QFlatConfirmDialog to support link opening
+    dlg = QFlatConfirmDialog(
+        parent=None,
+        window="Donate",
+        title="",
+        message=msg,
+        icon=media.getImage("stripe.png"),
+        closeButton=True,
+    )
+    dlg.message_label.setOpenExternalLinks(True)
+    dlg.exec_()
 
 
 def about_window():
-    screen_width, screen_height = get_screen_resolution()
-    screen_width = screen_width
+    from TheKeyMachine.widgets.dialogs import QFlatDialog
+    from TheKeyMachine.widgets.util import DPI
 
-    multiplier = 1.0
-    if screen_width == 3840:
-        multiplier = 1.5
-
-    if cmds.window("tkm_about_window", exists=True):
-        cmds.deleteUI("tkm_about_window")
-
-    drag = {"active": False, "position": QtCore.QPoint()}
-
-    def mousePressEvent(event):
-        if event.button() == QtCore.Qt.LeftButton:
-            drag["active"] = True
-            drag["position"] = event.globalPos() - window.frameGeometry().topLeft()
-            event.accept()
-
-    def mouseMoveEvent(event):
-        if event.buttons() == QtCore.Qt.LeftButton and drag["active"]:
-            window.move(event.globalPos() - drag["position"])
-            event.accept()
-
-    def mouseReleaseEvent(event):
-        drag["active"] = False
-
-    parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
-
-    window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
-    window.resize(350, 330)
-    window.setWindowOpacity(1.0)
-    window.setObjectName("tkm_about_window")
-    window.setWindowTitle("About")
-    window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-
-    window.mousePressEvent = mousePressEvent
-    window.mouseMoveEvent = mouseMoveEvent
-    window.mouseReleaseEvent = mouseReleaseEvent
-
-    central_widget = QtWidgets.QWidget(window)
-    central_widget.setStyleSheet("""
-    QWidget {
-        background-color: #454545; 
-        border-radius: 10px;
-        border: 1px solid #393939;
-    }
-    QLabel {
-        border: none;
-    }
-    """)
-    layout = QtWidgets.QVBoxLayout(central_widget)
-    layout.setSpacing(0)
-    layout.setContentsMargins(10, 10, 10, 10)
-
-    header_layout = QtWidgets.QHBoxLayout()
-    header_layout.addStretch()
-
-    close_button = QtWidgets.QPushButton("X")
-    close_button.setFixedSize(22, 22)
-    close_button.setStyleSheet(
-        "QPushButton {"
-        "    background-color: #585858;"
-        "    border: none;"
-        "    color: #ccc;"
-        "    border-radius: 5px;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #c56054;"
-        "    border-radius: 5px;"
-        "}"
-    )
-    close_button.clicked.connect(window.close)
-    header_layout.addWidget(close_button)
-    layout.addLayout(header_layout)
-
-    # Código para mostrar la imagen
-    image_label = QtWidgets.QLabel()
-    image_label.setAlignment(QtCore.Qt.AlignCenter)
-    layout.addWidget(image_label, 0, QtCore.Qt.AlignHCenter)
-
-    # fix pyside6
     try:
-        about_image = ui.getImage(image="TheKeyMachine_logo_250.png")
-        image_label.setPixmap(about_image)
-        image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-    except Exception:
-        # Cargar la imagen como QPixmap
-        about_image = ui.getImage(image="TheKeyMachine_logo_250.png")
-        set_about_image = QPixmap(about_image)
-        image_label.setPixmap(set_about_image)
-        image_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        from PySide6 import QtWidgets, QtCore, QtGui
+    except ImportError:
+        from PySide2 import QtWidgets, QtCore, QtGui
+
+    import TheKeyMachine.mods.mediaMod as media
+    from TheKeyMachine.mods import generalMod as general
 
     TheKeyMachine_stage_version = general.get_thekeymachine_stage_version()
     TheKeyMachine_version = general.get_thekeymachine_version()
     TheKeyMachine_build_version = general.get_thekeymachine_build_version()
 
-    label2 = QtWidgets.QLabel(
-        (
-            "<span style='font-size: {}px; color:#cccccc'>Animation toolset for Maya Animators<br><br><br></span>"
-            "<br><span style='font-size: {}px; color:#cccccc'><b>Version:&nbsp;&nbsp;</b></span>"
-            "<span style='font-size: {}px; color:#86CDAD'>{} v{}</span>"
-            "<span style='font-size: {}px; color:#cccccc'><b>&nbsp;&nbsp;&nbsp;&nbsp;Build:&nbsp;&nbsp;</b></span>"
-            "<span style='font-size: {}px; color:#86CDAD'>{}</span><br><br><br>"
-        ).format(
-            16 * multiplier,
-            14 * multiplier,
-            14 * multiplier,
-            TheKeyMachine_stage_version,
-            TheKeyMachine_version,
-            14 * multiplier,
-            14 * multiplier,
-            TheKeyMachine_build_version,
-        )
-    )
+    class TKMAboutDialog(QFlatDialog):
+        def __init__(self, parent=None):
+            QFlatDialog.__init__(self, parent)
+            self.setWindowTitle("About TheKeyMachine")
 
-    label2.setAlignment(QtCore.Qt.AlignCenter)
-    layout.addWidget(label2, 0, QtCore.Qt.AlignHCenter)
-    label2.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+            content_widget = QtWidgets.QWidget()
+            content_layout = QtWidgets.QVBoxLayout(content_widget)
+            content_layout.setContentsMargins(DPI(20), DPI(20), DPI(20), 0)
+            content_layout.setSpacing(DPI(12))
 
-    label6 = QtWidgets.QLabel(
-        f"<br><span style='font-size: {14 if screen_width == 3840 else 10}px; color:#cccccc'>"
-        "This tool is licensed under the GNU General Public License v3.0.<br>"
-        "For more details, see <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color:#86CDAD;'>GNU GPL 3.0</a>.<br><br>"
-        "Developed by: "
-        "Rodrigo Torres - <a href='http://rodritorres.com' style='color:#86CDAD;'>rodritorres.com</a><br>"
-        "Modified by: "
-        "Alehaaaa - <a href='http://alehaaaa.github.io' style='color:#86CDAD;'>alehaaaa.github.io</a></span><br><br>"
-        "<span style='font-size: 10px; color:#cccccc'>"
-        "<a href='http://www.thekeymachine.xyz' style='color:#86CDAD;'>www.thekeymachine.xyz</a> / "
-        "<a href='mailto:x@thekeymachine.xyz' style='color:#86CDAD;'>x@thekeymachine.xyz</a></span>"
-    )
+            # Logo
+            logo_label = QtWidgets.QLabel()
+            logo_label.setAlignment(QtCore.Qt.AlignCenter)
+            logo_pixmap = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_250.png")).scaled(
+                DPI(250), DPI(250), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation
+            )
+            logo_label.setPixmap(logo_pixmap)
+            content_layout.addWidget(logo_label)
 
-    # Habilitar interacciones de enlaces
-    label6.setOpenExternalLinks(True)
+            # Tool Name & Title
+            tool_name = QtWidgets.QLabel("Animation toolset for Maya Animators")
+            tool_name.setAlignment(QtCore.Qt.AlignCenter)
+            tool_name.setStyleSheet("font-size: %spx; font-weight: bold; color: #ececec;" % DPI(16))
+            content_layout.addWidget(tool_name)
 
-    label6.setAlignment(QtCore.Qt.AlignCenter)
-    layout.addWidget(label6)
+            # Version Badge
+            version_btn = QtWidgets.QPushButton(f"{TheKeyMachine_stage_version} v{TheKeyMachine_version}")
+            version_btn.setCursor(QtCore.Qt.PointingHandCursor)
+            version_btn.setStyleSheet(
+                """
+                QPushButton {
+                    background-color: rgba(76, 175, 80, 0.15);
+                    border: 1px solid #4CAF50;
+                    color: #81C784;
+                    border-radius: %spx;
+                    padding: %spx %spx;
+                    font-size: %spx;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #4CAF50;
+                    color: white;
+                }
+                """
+                % (DPI(4), DPI(4), DPI(8), DPI(12))
+            )
 
-    if screen_width == 3840:
-        window.resize(480, 420)
-        close_button.setFixedSize(32, 32)
+            def _check_updates():
+                from TheKeyMachine.mods import updater
 
-    window_layout = QtWidgets.QVBoxLayout(window)
-    window_layout.addWidget(central_widget)
-    window.setLayout(window_layout)
+                updater.check_for_updates(self, force=True)
 
-    # Centrar la ventana en la ventana principal de Maya
-    maya_geometry = general.get_maya_window_geometry()
-    x = maya_geometry.x() + (maya_geometry.width() - window.width()) / 2
-    y = maya_geometry.y() + (maya_geometry.height() - window.height()) / 2
-    window.move(x, y)
+            version_btn.clicked.connect(_check_updates)
+            content_layout.addWidget(version_btn, alignment=QtCore.Qt.AlignCenter)
 
-    window.show()
+            build_label = QtWidgets.QLabel(f"Build: {TheKeyMachine_build_version}")
+            build_label.setAlignment(QtCore.Qt.AlignCenter)
+            build_label.setStyleSheet("font-size: %spx; color: #888888;" % DPI(11))
+            content_layout.addWidget(build_label)
+
+            info_text = """
+                <div style='text-align: center; color: #888888; font-size: %spx;'>
+                    <p>This tool is licensed under the <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color: #67b9e0; text-decoration: none;'>GNU GPL 3.0</a>.</p>
+                    <div style='margin-top: 10px;'>
+                        Developed by <a href='http://rodritorres.com' style='color: #67b9e0; text-decoration: none;'>Rodrigo Torres</a>
+                    </div>
+                    <div style='margin-top: 5px;'>
+                        Modified by <a href='http://alehaaaa.github.io' style='color: #67b9e0; text-decoration: none;'>Alehaaaa</a>
+                    </div>
+                </div>
+            """ % (DPI(11))
+
+            info_label = QtWidgets.QLabel(info_text)
+            info_label.setAlignment(QtCore.Qt.AlignCenter)
+            info_label.setTextFormat(QtCore.Qt.RichText)
+            info_label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
+            info_label.setOpenExternalLinks(True)
+            info_label.setStyleSheet("background: transparent;")
+            content_layout.addWidget(info_label)
+
+            self.root_layout.addWidget(content_widget)
+            self.setBottomBar(closeButton=True)
+            self.adjustSize()
+
+    dlg = TKMAboutDialog(parent=None)
+    dlg.exec_()
 
 
 # ___________________________________________________ BUG Report ___________________________________________________________ #

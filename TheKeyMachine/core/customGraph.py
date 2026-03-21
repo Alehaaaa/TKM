@@ -47,6 +47,7 @@ from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
+import TheKeyMachine.mods.updater as updater
 
 mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders]
 
@@ -141,7 +142,12 @@ def create_config_menu(parent_button):
     config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", createCustomGraph, description="Refresh the TKM interface.")
 
     menu.addSeparator()
-    menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall, description="Remove TKM from Maya.")
+    menu.addAction(
+        QtGui.QIcon(media.updater_image),
+        "Check for updates",
+        lambda: updater.check_for_updates(parent_button, force=True),
+        description="Check if there is a new version available.",
+    )
     menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
 
     return menu
@@ -502,5 +508,8 @@ def createCustomGraph():
 
     flow_qw.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
     flow_qw.customContextMenuRequested.connect(_on_toolbar_context_menu)
+
+    # Launch background update check silently
+    updater.check_for_updates(config_btn, warning=False, force=False)
 
     QtCore.QTimer.singleShot(50, flow_qw._update_height)

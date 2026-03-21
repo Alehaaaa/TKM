@@ -33,7 +33,7 @@ def getImage(image):
 
 # __________________ Install _________________________________ #
 
-shelf_icon = getImage("TheKeyMachine_shelf_icon.png")
+tool_icon = getImage("TheKeyMachine_icon.png")
 
 
 # __________________ Nodes _________________________________ #

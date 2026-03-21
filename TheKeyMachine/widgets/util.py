@@ -83,3 +83,22 @@ class ResetWithoutEmit:
             self._slider._apply_stylesheet(thick=False)  # type: ignore[attr-defined]
         if hasattr(self._slider, "_pressOffset"):
             self._slider._pressOffset = None  # type: ignore[attr-defined]
+
+
+def make_inViewMessage(message, icon=None):
+    from TheKeyMachine.mods import mediaMod as media
+
+    if not icon:
+        icon = media.tool_icon
+    else:
+        icon = media.getImage(icon)
+    if not icon:
+        icon = ""
+
+    cmds.inViewMessage(
+        amg='<div style="text-align:center"><img src=' + icon + ">\n" + message + "\n",
+        pos="midCenter",
+        a=0.9,
+        fade=True,
+        fst=3000,
+    )

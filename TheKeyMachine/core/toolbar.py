@@ -66,6 +66,7 @@ import TheKeyMachine.mods.barMod as bar  # type: ignore
 import TheKeyMachine.mods.hotkeysMod as hotkeys  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.core.customGraph as cg  # type: ignore
+import TheKeyMachine.mods.updater as updater  # type: ignore
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
@@ -574,7 +575,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def create_shelf_icon(self, *args):
         button_name = "TheKeyMachine"
         command = "import TheKeyMachine;TheKeyMachine.toggle()"
-        icon_path = media.shelf_icon
+        icon_path = media.tool_icon
         icon_path = os.path.normpath(icon_path)
         current_shelf_tab = cmds.tabLayout("ShelfLayout", query=True, selectTab=True)
         cmds.shelfButton(parent=current_shelf_tab, image=icon_path, command=command, label=button_name)
@@ -3617,13 +3618,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         config_menu.addSection("General")
         config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")
+        config_menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
 
         toolbar_menu.addMenu(self._create_dock_menu(), description="Dock the toolbar to different Maya UI panels.")
 
         # Separators and others
         toolbar_menu.addSeparator()
-        toolbar_menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
-        toolbar_menu.addSeparator()
+        toolbar_menu.addAction(
+            QtGui.QIcon(media.updater_image),
+            "Check for updates",
+            lambda: updater.check_for_updates(toolbar_config_button_widget, force=True),
+            description="Check if there is a new version available.",
+        )
         toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
 
         def _open_menu_at_cursor():
@@ -3640,6 +3646,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         self.main_toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.main_toolbar_widget.customContextMenuRequested.connect(_on_toolbar_context_menu)
+
+        # Launch background update check
+        updater.check_for_updates(toolbar_config_button_widget, warning=False, force=False)
 
 
 _toolbar_instance = None
