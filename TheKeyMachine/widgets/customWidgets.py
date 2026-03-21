@@ -13,9 +13,13 @@ except ImportError:
 try:
     from PySide6 import QtWidgets, QtCore, QtGui
     from shiboken6 import isValid
+
+    QAction = QtGui.QAction
 except ImportError:
     from PySide2 import QtWidgets, QtCore, QtGui
     from shiboken2 import isValid
+
+    QAction = QtWidgets.QAction
 
 
 """
@@ -69,7 +73,7 @@ class HelpSystem:
             widget_or_action.setProperty("description", description)  # Legacy support
 
         # 3. If it's an action, also try to push to its parent menu's status bar
-        if isinstance(widget_or_action, QtGui.QAction) and widget_or_action.parent():
+        if isinstance(widget_or_action, QAction) and widget_or_action.parent():
             p = widget_or_action.parent()
             if hasattr(p, "setStatusTip"):
                 p.setStatusTip(status)
@@ -321,7 +325,9 @@ class QFlatSpinBox(TooltipMixin, QtWidgets.QSpinBox):
 
 
 class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
-    def __init__(self, parent=None, icon=None, text=None, tooltip=None, description=None, shortcuts=None, highlight=False, pressed_color=None):
+    def __init__(
+        self, parent=None, icon=None, text=None, tooltip=None, description=None, shortcuts=None, highlight=False, pressed_color=None
+    ):
         super().__init__(parent)
         self.setAutoRaise(True)
         self.pressed_color = pressed_color or "#666666"
@@ -562,8 +568,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._menu_metadata = []  # for non-slider sections (toolbar buttons etc.)
         self._default_keys = []
         self._active_menu = None
-        self._all_modes = []       # Full ordered mode list (SliderMode objects + "separator")
-        self._mode_to_slot = {}   # mode_key -> slot_key (live, authoritative mapping)
+        self._all_modes = []  # Full ordered mode list (SliderMode objects + "separator")
+        self._mode_to_slot = {}  # mode_key -> slot_key (live, authoritative mapping)
 
         if self._hiddeable:
             # Overlay button: tiny checkbox in the bottom-left
@@ -590,6 +596,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         # Propagate section context to widget
         from TheKeyMachine.widgets.util import is_valid_widget
+
         if is_valid_widget(widget) and hasattr(widget, "on_added_to_section"):
             widget.on_added_to_section(self, key)
 
@@ -606,7 +613,9 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     self._mode_to_slot[current_cm.key] = key
 
         if self._hiddeable:
-            self._menu_metadata.append({"type": "widget", "key": key, "label": label, "description": description, "default": default_visible})
+            self._menu_metadata.append(
+                {"type": "widget", "key": key, "label": label, "description": description, "default": default_visible}
+            )
 
             # Load stored visibility or use default
             visible = settings.get_setting(f"pin_{key}", default_visible)
@@ -668,24 +677,16 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         from TheKeyMachine.widgets.util import is_valid_widget
 
         # Pool: only mode-aware sliders
-        pool = {slot: w for slot, w in self._widgets.items()
-                if is_valid_widget(w) and hasattr(w, "_current_mode")}
+        pool = {slot: w for slot, w in self._widgets.items() if is_valid_widget(w) and hasattr(w, "_current_mode")}
 
         # Step 1: which desired modes are already covered by a slider?
-        covered = {
-            cm.key: slot
-            for slot, w in pool.items()
-            if (cm := getattr(w, "_current_mode", None)) and cm.key in desired_mode_keys
-        }
+        covered = {cm.key: slot for slot, w in pool.items() if (cm := getattr(w, "_current_mode", None)) and cm.key in desired_mode_keys}
 
         # Step 2: which desired modes have NO slider yet?
         unoccupied = [mk for mk in desired_mode_keys if mk not in covered]
 
         # Step 3: free sliders — those whose current mode is NOT in the desired set
-        free_slots = [
-            slot for slot, w in pool.items()
-            if getattr(getattr(w, "_current_mode", None), "key", None) not in desired_mode_keys
-        ]
+        free_slots = [slot for slot, w in pool.items() if getattr(getattr(w, "_current_mode", None), "key", None) not in desired_mode_keys]
 
         # Step 4: reassign free sliders to unoccupied desired modes
         free_iter = iter(free_slots)
@@ -730,7 +731,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         """Show ALL modes, reassigning sliders to cover every mode in the list."""
         all_mode_keys = {m.key for m in self._all_modes if hasattr(m, "key")}
         self._set_visible_modes(all_mode_keys)
-
 
     def _make_toggle_handler(self, key):
         """Creates a handler function that captures 'key'."""
@@ -791,6 +791,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         else:
                             current.discard(mk)
                         self._set_visible_modes(current)
+
                     return handler
 
                 action.triggered.connect(make_mode_toggle(mode.key))
@@ -819,7 +820,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         menu.exec_(QtGui.QCursor.pos())
         self._active_menu = None
-
 
     def enterEvent(self, event):
         if self._hiddeable:

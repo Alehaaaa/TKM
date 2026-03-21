@@ -81,7 +81,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
         super().__init__(parent)
         self._percent = percent
         self._color = color
-        self._box_sz = util.DPI(6) if abs(percent) == 100 else util.DPI(3)
+        self._box_sz = util.DPI(7) if abs(percent) == 100 else util.DPI(3)
         self.setFixedHeight(parent.height())
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -154,7 +154,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
             if self._worldSpace:
                 cx, cy = w // 2, h // 2
-                r = int(min(w, h) * 0.275)  # smaller globe
+                r = util.DPI(int(min(w, h) * 0.24))  # smaller globe
 
                 p.setPen(Qt.NoPen)
                 p.setBrush(glow_color if is_glow else main_color)
@@ -852,11 +852,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                 occupying_slot = section._mode_to_slot.get(mode.key)
                 if occupying_slot:
                     occupying_widget = section._widgets.get(occupying_slot)
-                    is_already_pinned = (
-                        occupying_widget is not None
-                        and occupying_widget is not self
-                        and occupying_widget.isVisible()
-                    )
+                    is_already_pinned = occupying_widget is not None and occupying_widget is not self and occupying_widget.isVisible()
 
             if is_current or is_already_pinned:
                 act.setEnabled(False)

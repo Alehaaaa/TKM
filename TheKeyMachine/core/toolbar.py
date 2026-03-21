@@ -421,7 +421,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         control = wutil.get_maya_qt(qctrl)
         tab_handle = control.parent().parent()
 
-        if self.isFloating():
+        control.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+
+        if not self.isFloating():
             return tab_handle.tabBar().setVisible(False)
 
         self.shelf_painter = cw.QFlatShelfPainter(tab_handle)
@@ -430,7 +432,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.shelf_painter.move(tab_handle.tabBar().pos())
 
         self.shelf_painter.show()
-        tab_handle.tabBar().setVisible(True)
+        # tab_handle.tabBar().setVisible(True)
 
     def update_height(self):
         if not self.isFloating():
@@ -515,7 +517,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 action.setEnabled(wutil.check_visible_layout(layout))
 
     def _create_dock_menu(self):
-        self.dock_menu = cw.MenuWidget(QtGui.QIcon(media.dock_image), "Dock Window", description="Dock the toolbar to different Maya UI panels.")
+        self.dock_menu = cw.MenuWidget(
+            QtGui.QIcon(media.dock_image), "Dock Window", description="Dock the toolbar to different Maya UI panels."
+        )
 
         self.pos_ac_group = QActionGroup(self)
         for orient, name in self.docking_orients.items():
@@ -762,7 +766,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     split_name = sub_sel_set.split("_")
                     color_suffix = split_name[-1]
                     set_name = "_".join(split_name[:-1])
-                    set_group_data["sets"].append({"name": set_name, "color_suffix": color_suffix, "objects": cmds.sets(sub_sel_set, q=True)})
+                    set_group_data["sets"].append(
+                        {"name": set_name, "color_suffix": color_suffix, "objects": cmds.sets(sub_sel_set, q=True)}
+                    )
             set_data["set_groups"].append(set_group_data)
 
         with open(file_path, "w") as file:
@@ -836,7 +842,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         QTimer.singleShot(500, self.create_buttons_for_sel_sets)
 
     def rename_setgroup(self, old_setgroup_name, new_setgroup_name, *args):
-
         # Check that the new name is not empty
         if not new_setgroup_name.strip():
             cmds.warning("Please enter a valid set group name")
@@ -881,7 +886,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         cmds.evalDeferred(self.create_buttons_for_sel_sets)
 
     def change_setgroup_name_window(self, setgroup_name, *args):
-
         if cmds.window("SetGroupNameWindow", exists=True):
             cmds.deleteUI("SetGroupNameWindow")
 
@@ -1026,7 +1030,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         cmds.evalDeferred(self.create_buttons_for_sel_sets)
 
     def change_set_name_window(self, set_name, set_group=None, *args):
-
         if cmds.window("SetNameWindow", exists=True):
             cmds.deleteUI("SetNameWindow")
 
@@ -1216,7 +1219,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.warning(f"{new_set_group_name} already exists")
 
     def open_set_creation_window(self):
-
         if cmds.window("SetCreationWindow", exists=True):
             cmds.deleteUI("SetCreationWindow")
 
@@ -1490,7 +1492,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             return []
 
     def create_new_set_and_update_buttons(self, color_suffix, set_name_field, set_group_combo, *args):
-
         selection = cmds.ls(selection=True)
 
         if not selection:
@@ -1593,7 +1594,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 cmds.select(set_name)
 
     def add_selection_to_set(self, set_name, *args):
-
         # Añade la selección actual a un conjunto de selección dado.
 
         # Asegúrate de que haya algo seleccionado en la escena
@@ -1610,7 +1610,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         cmds.sets(cmds.ls(selection=True), add=set_name)
 
     def remove_selection_from_set(self, set_name, *args):
-
         if not cmds.ls(selection=True):
             print("Select at least one object")
             return
@@ -1623,7 +1622,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Elimina la selección del conjunto de selección
         cmds.sets(cmds.ls(selection=True), remove=set_name)
 
-    color_names = {"_01": "Gray", "_02": "Beige", "_03": "Aqua", "_04": "Blue", "_05": "Purple", "_06": "Green", "_07": "Mute red", "_08": "Red"}
+    color_names = {
+        "_01": "Gray",
+        "_02": "Beige",
+        "_03": "Aqua",
+        "_04": "Blue",
+        "_05": "Purple",
+        "_06": "Green",
+        "_07": "Mute red",
+        "_08": "Red",
+    }
 
     def create_color_submenu(self, set_name, parent_menu):
         # Los botones de color
@@ -1818,7 +1826,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.menuItem(label="Export Group", command=lambda x, g=set_group: self.export_single_subgroup(g))
             cmds.menuItem(label="Delete Group", command=lambda x, g=set_group: self.remove_set_group_and_update_buttons(g))
 
-        cmds.separator(style="none", width=10, p="selection_sets_flow_layout")  # Espacio entre los botones de los sets pertenecientes a cada grupo
+        cmds.separator(
+            style="none", width=10, p="selection_sets_flow_layout"
+        )  # Espacio entre los botones de los sets pertenecientes a cada grupo
 
         # Para cada grupo de conjuntos, obtén sus conjuntos de selección y crea botones para ellos
         for set_group in set_groups:
@@ -1842,7 +1852,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     set_name = "_".join(split_name[:-2])  # Une todas las partes del nombre, excepto las dos últimas partes.
 
                     # Obtiene el valor del color del código de color
-                    button_color_hex = ui.color_codes.get(f"_{color_suffix}", "#333333")  # Default to white (#FFFFFF) if color_suffix not found
+                    button_color_hex = ui.color_codes.get(
+                        f"_{color_suffix}", "#333333"
+                    )  # Default to white (#FFFFFF) if color_suffix not found
                     button_color_hex_hover = ui.color_codes_hover.get(
                         f"_{color_suffix}", "#333333"
                     )  # Default to white (#FFFFFF) if color_suffix not found
@@ -1928,7 +1940,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     )
                     cmds.menuItem(divider=True, p=selset_button)
 
-                    color_menu = cmds.menuItem(subMenu=True, label="Change Color", image=media.change_selection_set_color_image, p=selset_button)
+                    color_menu = cmds.menuItem(
+                        subMenu=True, label="Change Color", image=media.change_selection_set_color_image, p=selset_button
+                    )
                     self.create_color_submenu(sub_sel_set, color_menu)
 
                     cmds.menuItem(
@@ -1954,7 +1968,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                         command=lambda x, s=sub_sel_set: self.select_set_items_window(s),
                         p=selset_button,
                     )
-                    move_selset_submenu = cmds.menuItem(subMenu=True, image=media.move_selection_set_image, label="Nudge to ...", p=selset_button)
+                    move_selset_submenu = cmds.menuItem(
+                        subMenu=True, image=media.move_selection_set_image, label="Nudge to ...", p=selset_button
+                    )
 
                     # Obtener los setgroups que están dentro de "TheKeyMachine_SelectionSet"
                     valid_setgroups = [sg for sg in set_groups if cmds.sets(sg, isMember=sel_set_name)]
@@ -2005,7 +2021,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         cmds.select(selected_items, replace=True)
 
     def remove_set_and_update_buttons(self, set_name, set_group, *args):
-
         if cmds.objExists(set_name):
             # Si el set existe, quitarlo del setgroup
             if cmds.objExists(set_name) and cmds.objExists(set_group):
@@ -2112,7 +2127,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                         keyframes = cmds.keyframe(obj, attribute=attr, query=True)
                         if keyframes:
                             self.animation_offset_original_values[obj][attr] = {
-                                frame: cmds.getAttr(attr_full_name, time=frame) for frame in keyframes if timeRange[0] <= frame <= timeRange[1]
+                                frame: cmds.getAttr(attr_full_name, time=frame)
+                                for frame in keyframes
+                                if timeRange[0] <= frame <= timeRange[1]
                             }
 
         # borra selected range slider
@@ -2121,7 +2138,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         cmds.select(obj)
 
     def adjust_keyframes(self):
-
         def _as_scalar(value):
             v = value
             while isinstance(v, (list, tuple)) and len(v) == 1:
@@ -2201,7 +2217,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
                     for fr in keyframes:
                         if timeRange[0] <= fr <= timeRange[1]:
-                            self.animation_offset_original_values.setdefault(obj, {}).setdefault(attr, {})[fr] = cmds.getAttr(attr_full_name, time=fr)
+                            self.animation_offset_original_values.setdefault(obj, {}).setdefault(attr, {})[fr] = cmds.getAttr(
+                                attr_full_name, time=fr
+                            )
 
                     break  # salimos del bucle de frames (ya aplicamos el offset para este attr)
 
@@ -2216,7 +2234,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             utils.executeDeferred(adjust_offset_animation)
 
     def toggleAnimOffsetButton(self, *args):
-
         selection = cmds.ls(selection=True)
 
         if not selection:
@@ -2248,7 +2265,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     # ---------------------------------------------------------------
 
     def toggle_micro_move_button(self, *args):
-
         self.micro_move_button_state = not self.micro_move_button_state
         settings.set_setting("micro_move_button_state", self.micro_move_button_state)
 
@@ -2289,7 +2305,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.run_centerToolbar = False
 
     def show_sys_info(self):
-
         os_info = platform.system() + " " + platform.release()
 
         tkm_stage = general.get_thekeymachine_version()
@@ -2381,7 +2396,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             self.update_selectionSets_on_new_scene()
 
     def set_reload(self):
-
         import TheKeyMachine.core.toolbar as t  # type: ignore
 
         importlib.reload(t)
@@ -2421,7 +2435,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
             # Validar el nombre del bookmark usando una expresión regular
             if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", bookmark_name):
-                cmds.warning("Invalid bookmark name. It should start with a letter or underscore and contain only letters, numbers, and underscores")
+                cmds.warning(
+                    "Invalid bookmark name. It should start with a letter or underscore and contain only letters, numbers, and underscores"
+                )
                 return
 
             self.create_ibookmark_node()
@@ -2529,7 +2545,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.textScrollList(list_widget, edit=True, append=text)
 
     def create_ibookmarks_window(self, *args):
-
         original_selection = cmds.ls(selection=True)
 
         if cmds.window("iBookmarksWindow", exists=True):
@@ -2683,7 +2698,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             # update_blend_label_with_slider_value(value)
 
         def blend_to_default_wrapper(value):
-
             selected_objects = cmds.ls(selection=True, long=True)
             if not selected_objects:
                 return
@@ -2933,9 +2947,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         align_button_widget.clicked.connect(bar.align_selected_objects)
         sec.addWidget(align_button_widget, "Align", "align")
         align_menu = QtWidgets.QMenu(align_button_widget)
-        align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Translation", partial(bar.align_selected_objects, pos=True, rot=False, scl=False))
-        align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Rotation", partial(bar.align_selected_objects, pos=False, rot=True, scl=False))
-        align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Scale", partial(bar.align_selected_objects, pos=False, rot=False, scl=True))
+        align_menu.addAction(
+            QtGui.QIcon(media.align_menu_image), "Translation", partial(bar.align_selected_objects, pos=True, rot=False, scl=False)
+        )
+        align_menu.addAction(
+            QtGui.QIcon(media.align_menu_image), "Rotation", partial(bar.align_selected_objects, pos=False, rot=True, scl=False)
+        )
+        align_menu.addAction(
+            QtGui.QIcon(media.align_menu_image), "Scale", partial(bar.align_selected_objects, pos=False, rot=False, scl=True)
+        )
         align_menu.addSeparator()
         align_menu.addAction(QtGui.QIcon(media.match_image), "Match Range", bar.align_range)
         align_menu.addSeparator()
@@ -2981,9 +3001,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidget(reset_values_button_widget, "Reset Values", "reset_values")
 
         reset_values_menu = QtWidgets.QMenu(reset_values_button_widget)
-        reset_values_menu.addAction(QtGui.QIcon(media.reset_animation_image), "Set Default Values For Selected", keyTools.save_default_values)
         reset_values_menu.addAction(
-            QtGui.QIcon(media.reset_animation_image), "Restore Default Values For Selected", keyTools.remove_default_values_for_selected_object
+            QtGui.QIcon(media.reset_animation_image), "Set Default Values For Selected", keyTools.save_default_values
+        )
+        reset_values_menu.addAction(
+            QtGui.QIcon(media.reset_animation_image),
+            "Restore Default Values For Selected",
+            keyTools.remove_default_values_for_selected_object,
         )
         reset_values_menu.addSeparator()
         reset_values_menu.addAction(QtGui.QIcon(media.reset_animation_image), "Clear All Saved Data", keyTools.restore_default_data)
@@ -3098,10 +3122,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         follow_cam_menu = QtWidgets.QMenu(create_follow_cam_button_widget)
         follow_cam_menu.addAction(
-            QtGui.QIcon(media.follow_cam_image), "Follow only Translation", lambda *args: bar.create_follow_cam(translation=True, rotation=False)
+            QtGui.QIcon(media.follow_cam_image),
+            "Follow only Translation",
+            lambda *args: bar.create_follow_cam(translation=True, rotation=False),
         )
         follow_cam_menu.addAction(
-            QtGui.QIcon(media.follow_cam_image), "Follow only Rotation", lambda *args: bar.create_follow_cam(translation=False, rotation=True)
+            QtGui.QIcon(media.follow_cam_image),
+            "Follow only Rotation",
+            lambda *args: bar.create_follow_cam(translation=False, rotation=True),
         )
         follow_cam_menu.addSeparator()
         follow_cam_menu.addAction(QtGui.QIcon(media.remove_followCam), "Remove followCam", bar.remove_followCam)
@@ -3193,13 +3221,19 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         )
 
         # Copy WorldSpace ----------------------------------------------------------------------------
-        copy_worldspace_button_widget = cw.QFlatToolButton(icon=media.copy_worldspace_animation_image, tooltip=helper.copy_worldspace_tooltip_text)
+        copy_worldspace_button_widget = cw.QFlatToolButton(
+            icon=media.copy_worldspace_animation_image, tooltip=helper.copy_worldspace_tooltip_text
+        )
         copy_worldspace_button_widget.clicked.connect(bar.mod_copy_worldspace_animation)
         sec.addWidget(copy_worldspace_button_widget, "Worldspace", "worldspace")
 
         ws_menu = QtWidgets.QMenu(copy_worldspace_button_widget)
-        ws_menu.addAction(QtGui.QIcon(media.copy_worldspace_animation_image), "Copy Worldspace - All Animation", bar.color_copy_worldspace_animation)
-        ws_menu.addAction(QtGui.QIcon(media.copy_worldspace_animation_image), "Copy Worldspace - Selected Range", bar.copy_range_worldspace_animation)
+        ws_menu.addAction(
+            QtGui.QIcon(media.copy_worldspace_animation_image), "Copy Worldspace - All Animation", bar.color_copy_worldspace_animation
+        )
+        ws_menu.addAction(
+            QtGui.QIcon(media.copy_worldspace_animation_image), "Copy Worldspace - Selected Range", bar.copy_range_worldspace_animation
+        )
         ws_menu.addAction(QtGui.QIcon(media.paste_worldspace_animation_image), "Paste Worldspace", bar.color_paste_worldspace_animation)
         ws_menu.addSeparator()
         ws_menu.addAction(
@@ -3214,7 +3248,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         )
 
         copy_worldspace_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        copy_worldspace_button_widget.customContextMenuRequested.connect(lambda pos: ws_menu.exec_(copy_worldspace_button_widget.mapToGlobal(pos)))
+        copy_worldspace_button_widget.customContextMenuRequested.connect(
+            lambda pos: ws_menu.exec_(copy_worldspace_button_widget.mapToGlobal(pos))
+        )
 
         # Temp Pivot ----------------------------------------------------------------------------
         temp_pivot_button_widget = cw.QFlatToolButton(icon=media.temp_pivot_image, tooltip=helper.temp_pivot_tooltip_text)
@@ -3252,7 +3288,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         block_keys_menu.addAction(QtGui.QIcon(media.reblock_keys_image), "Gimbal Fixer", bar.gimbal_fixer_window)
 
         block_keys_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        block_keys_button_widget.customContextMenuRequested.connect(lambda pos: block_keys_menu.exec_(block_keys_button_widget.mapToGlobal(pos)))
+        block_keys_button_widget.customContextMenuRequested.connect(
+            lambda pos: block_keys_menu.exec_(block_keys_button_widget.mapToGlobal(pos))
+        )
 
         sec = new_section()
 
@@ -3467,7 +3505,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         config_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Config")
         toolbar_menu.addMenu(config_menu, description="Tool configuration, hotkeys and UI preferences.")
         config_menu.addSection("Shelf icon")
-        config_menu.addAction("Add Toggle Button To Shelf", self.create_shelf_icon, description="Creates a shelf button to show/hide this toolbar.")
+        config_menu.addAction(
+            "Add Toggle Button To Shelf", self.create_shelf_icon, description="Creates a shelf button to show/hide this toolbar."
+        )
 
         config_menu.addSection("Tools settings")
         show_tooltips_action = config_menu.addAction("Show tooltips", description="Show or hide floating tooltips.")
@@ -3566,12 +3606,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         right_align_action.triggered.connect(lambda: update_toolbar_icon_alignment("Right"))
 
         current_align = get_current_icon_alignment()
-        {"Left": left_align_action, "Center": center_align_action, "Right": right_align_action}.get(current_align, center_align_action).setChecked(
-            True
-        )
+        {"Left": left_align_action, "Center": center_align_action, "Right": right_align_action}.get(
+            current_align, center_align_action
+        ).setChecked(True)
 
         config_menu.addSection("Hotkeys")
-        config_menu.addAction("Add TheKeyMachine Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys for TKM tools.")
+        config_menu.addAction(
+            "Add TheKeyMachine Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys for TKM tools."
+        )
 
         config_menu.addSection("General")
         config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")

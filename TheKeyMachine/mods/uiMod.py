@@ -24,7 +24,7 @@ import maya.OpenMayaUI as mui
 try:
     from shiboken2 import wrapInstance
     from PySide2.QtWidgets import QApplication, QDesktopWidget
-    from PySide6.QtGui import QPixmap
+    from PySide2.QtGui import QPixmap
     from PySide2.QtCore import QTimer
     from PySide2.QtWidgets import QAction
 
@@ -595,7 +595,6 @@ class CustomButton(QtWidgets.QPushButton):
 
 
 def orbit_window(*args, offset_x=0, offset_y=0):
-
     screen_width, screen_height = get_screen_resolution()
     screen_width = screen_width
 
@@ -753,7 +752,6 @@ def orbit_window_close():
 
 
 def donate_window():
-
     screen_width, screen_height = get_screen_resolution()
     screen_width = screen_width
 
@@ -888,7 +886,6 @@ def donate_window():
 
 
 def about_window():
-
     screen_width, screen_height = get_screen_resolution()
     screen_width = screen_width
 
