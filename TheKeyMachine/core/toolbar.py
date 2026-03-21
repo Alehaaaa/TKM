@@ -2640,8 +2640,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         show_tooltips = settings.get_setting("show_tooltips", True)
         self._toggle_tooltips_func = None
 
-        sec = new_section(spacing=8)
-
         # _____________________ Key Editing Section __________________________________________________ #
         sec = new_section(spacing=2)
 
