@@ -285,12 +285,12 @@ def createCustomGraph():
             is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys)
 
             s = sw.QFlatSliderWidget(
-                f"customGraph_{prefix}_{key}",
+                f"graph_{prefix}_{key}",
                 min=-100,
                 max=100,
                 text=icon,
                 color=color,
-                dragCommand=lambda v, k=key: change_func(k, v),
+                dragCommand=None or (lambda v, k=key: change_func(k, v)),
                 dropCommand=drop_func,
                 tooltipTitle=label,
                 tooltipDescription=desc,
@@ -308,16 +308,12 @@ def createCustomGraph():
                     # Find info for new mode to update tooltip
                     m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
                     if m_info:
-                        slider_instance.set_tooltip_info(m_info["label"], m_info.get("description", ""))
+                        slider_instance.setTooltipInfo(m_info["label"], m_info.get("description", ""))
                     slider_instance.startFlash()
 
                 return setter
 
             s.modeSelected.connect(make_mode_setter(s, prefix))
-
-            if ws_support:
-                is_ws = "worldspace" in key.lower() or "world space" in key.lower()
-                s.setWorldSpace(is_ws)
 
             sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
 
@@ -357,8 +353,7 @@ def createCustomGraph():
     sec = new_section()
     btn_iso = create_tool_button(
         icon=media.isolate_image,
-        text="I",
-        tooltip="Iso",
+        tooltip="Isolate Curves",
         description="Isolate selected curves.",
         command=lambda: keyTools.isolateCurve(),
     )

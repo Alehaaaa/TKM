@@ -311,7 +311,7 @@ class TooltipMixin:
         self._has_tooltip = True
         self.setData(**kwargs)
 
-    def set_tooltip_info(self, title: str, description: str = ""):
+    def setTooltipInfo(self, title: str, description: str = ""):
         self.setToolTipData(text=title, description=description)
 
     def enterEvent(self, event: QtCore.QEvent):

@@ -1451,9 +1451,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def create_new_set_and_update_buttons(self, color_suffix, set_name_field, set_group_combo, *args):
         selection = cmds.ls(selection=True)
 
-        if not selection:
-            print("Select at least on object")
-        else:
+        if selection:
             new_set_name = set_name_field.text()
             set_group_name = set_group_combo.currentText()
 
@@ -1551,30 +1549,19 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 cmds.select(set_name)
 
     def add_selection_to_set(self, set_name, *args):
-        # Añade la selección actual a un conjunto de selección dado.
-
-        # Asegúrate de que haya algo seleccionado en la escena
         if not cmds.ls(selection=True):
-            print("Select at least one object")
             return
-
-        # Asegúrate de que el set exista
-        if not cmds.objExists(set_name):
-            cmds.warning(f"Set {set_name} does not exist")
-            return
+        elif not cmds.objExists(set_name):
+            return cmds.warning(f"Set {set_name} does not exist")
 
         # Añade la selección al conjunto de selección
         cmds.sets(cmds.ls(selection=True), add=set_name)
 
     def remove_selection_from_set(self, set_name, *args):
         if not cmds.ls(selection=True):
-            print("Select at least one object")
             return
-
-        # Asegúrate de que el set exista
-        if not cmds.objExists(set_name):
-            cmds.warning(f"Set {set_name} does not exist")
-            return
+        elif not cmds.objExists(set_name):
+            return cmds.warning(f"Set {set_name} does not exist")
 
         # Elimina la selección del conjunto de selección
         cmds.sets(cmds.ls(selection=True), remove=set_name)
@@ -2181,10 +2168,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def toggleAnimOffsetButton(self, *args):
         selection = cmds.ls(selection=True)
 
-        if not selection:
-            # Si no hay objetos seleccionados, muestra un mensaje de error
-            print("Select one object")
-        else:
+        if selection:
             # Toggle button state
             self.toggleAnimOffsetButtonState = not self.toggleAnimOffsetButtonState
             settings.set_setting("toggleAnimOffsetButtonState", self.toggleAnimOffsetButtonState)
@@ -2360,7 +2344,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def create_bookmark(self, list_widget, *args):
         current_selection = cmds.ls(selection=True)
         if not current_selection:
-            print("Select at least one object")
             return
 
         text = cmds.promptDialog(
@@ -2715,7 +2698,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 right_frame = None
             keyTools.blend_to_frame(percentage, left_frame, right_frame)
 
-        def add_mode_sliders(modes_list, default_key_setting, prefix, color, change_func, drop_func, default_modes=None, ws_support=False):
+        def add_mode_sliders(modes_list, default_key_setting, prefix, color, change_func, drop_func, default_modes=None):
             # Create a new section for each slider color/type
             sec = new_section(spacing=4)
 
@@ -2774,7 +2757,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                         slider_instance.setCurrentMode(new_mode)
                         m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
                         if m_info:
-                            slider_instance.set_tooltip_info(m_info["label"], m_info.get("description", ""))
+                            slider_instance.setTooltipInfo(m_info["label"], m_info.get("description", ""))
 
                         # Handle specialized frames visibility
                         if new_mode == "blend_to_frame":
@@ -2791,10 +2774,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     return setter
 
                 s.modeSelected.connect(make_mode_setter(s, prefix, show_frames))
-
-                if ws_support:
-                    is_ws = "worldspace" in key.lower() or "world space" in key.lower()
-                    s.setWorldSpace(is_ws)
 
                 # Add to section with registration
                 sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
@@ -2820,7 +2799,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             sliders.execute_tween,
             sliders.stop_dragging,
             default_modes=["tweener"],
-            ws_support=True,
         )
 
         # ----------------------------------------------- ToolsButtons -------------------------------------------------------- #
@@ -3491,8 +3469,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     if not show_tooltips_val:
                         pass
 
-                    if hasattr(button_widget, "set_tooltip_info"):
-                        button_widget.set_tooltip_info(*sliders.parse_tt(tooltip_html))
+                    if hasattr(button_widget, "setTooltipInfo"):
+                        button_widget.setTooltipInfo(*sliders.parse_tt(tooltip_html))
                     elif hasattr(button_widget, "setToolTipData"):
                         button_widget.setToolTipData(text=tooltip_html)
                 except Exception:

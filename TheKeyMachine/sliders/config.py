@@ -69,6 +69,7 @@ TWEEN_MODES = [
         "key": "tweener_worldspace",
         "icon": "TW",
         "description": "Performs tweening in world space for more accurate spatial interpolations.",
+        "worldSpace": True,
     },
     "separator",
     {
@@ -95,6 +96,7 @@ TWEEN_MODES = [
         "key": "blend_to_frame_ws",
         "icon": "BF",
         "description": "Blends toward a specific frame value using world space coordinates.",
+        "worldSpace": True,
     },
     {
         "label": "Blend to Neighbors",
@@ -107,6 +109,7 @@ TWEEN_MODES = [
         "key": "blend_to_neighbors_ws",
         "icon": "BN",
         "description": "Blends toward neighbors using world space coordinates.",
+        "worldSpace": True,
     },
     {
         "label": "Blend to Infinity",
@@ -119,6 +122,7 @@ TWEEN_MODES = [
         "key": "blend_to_infinity_ws",
         "icon": "BI",
         "description": "Blends toward infinity values in world space.",
+        "worldSpace": True,
     },
     {
         "label": "Blend to Undo",

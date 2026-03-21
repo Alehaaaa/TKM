@@ -6,7 +6,7 @@ import importlib
 try:
     from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint
     from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup
-    from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider
+    from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout
 except ImportError:
     from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint
     from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath
@@ -19,6 +19,7 @@ except ImportError:
         QActionGroup,
         QStyle,
         QStyleOptionSlider,
+        QLayout,
     )
 
 import TheKeyMachine.mods.uiMod as ui
@@ -42,11 +43,12 @@ globalSignals = _GlobalSignals()
 class SliderMode:
     """Professional object representation of a slider mode."""
 
-    def __init__(self, key, label=None, icon=None, description=""):
+    def __init__(self, key, label=None, icon=None, description="", worldSpace=False):
         self.key = key
         self.label = label or key.replace("_", " ").title()
         self.icon = icon  # Short text for the handle
         self.description = description
+        self.worldSpace = worldSpace
 
     def __repr__(self):
         return f"<SliderMode {self.key}>"
@@ -88,7 +90,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
             f"QPushButton {{ background: none; border-radius: 0; }}QPushButton:pressed {{ background-color: {self._color}; border-radius: 0; }}"
         )
 
-        self._worldSpace = worldSpace if abs(percent) == 100 else False
+        self._worldSpace = worldSpace
         self._hover = False
 
         self._tooltip_title = ""
@@ -100,7 +102,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
         title = self._tooltip_title or "Value"
         self.setToolTipData(text=f"{title}: {self._percent}%", description=self._tooltip_description)
 
-    def set_tooltip_info(self, title: str, description: str = ""):
+    def setTooltipInfo(self, title: str, description: str = ""):
         self._tooltip_title = title
         self._tooltip_description = description
         self._update_tooltip()
@@ -188,7 +190,6 @@ class SliderButton(cw.TooltipMixin, QPushButton):
                 p.drawRect(QRect(x, y, s, s))
 
             p.restore()
-
         p.end()
 
 
@@ -245,7 +246,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
         self._apply_stylesheet(thick=False)
 
-    def set_tooltip_info(self, title: str, description: str = ""):
+    def setTooltipInfo(self, title: str, description: str = ""):
         self._tooltip_title = title
         self._tooltip_description = description
         self._update_self_tooltip()
@@ -547,21 +548,20 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def __init__(
         self,
-        name: str,
-        min: int = -100,
+        name: str = "TKM_Slider",
+        min: int = 0,
         max: int = 100,
-        text: str = "SL",
-        color: str = "#444444",
-        dragCommand=None,
-        dropCommand=None,
-        worldSpace=None,
-        p=None,
+        color: str = "#AAAAAA",
+        text: str = "",
+        dragCommand: Optional[callable] = None,
+        dropCommand: Optional[callable] = None,
         tooltipTitle: str = "",
         tooltipDescription: str = "",
+        p: Optional[QLayout] = None,
+        worldSpace: bool = False,
     ):
         super().__init__(None)
-        if name:
-            self.setObjectName(name)
+        self.setObjectName(name)
 
         self._scale = 1000  # internal units per 1%
         self._color = color
@@ -610,7 +610,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         # left side buttons (near handle => AlignRight)
         self._leftButtons = []
         for v in values:
-            b = SliderButton(self._leftOverlay, percent=-abs(v), color=color, worldSpace=self._worldSpace)
+            if self._worldSpace:
+                _worldSpace = self._worldSpace if v == 100 else False
+            else:
+                _worldSpace = False
+            b = SliderButton(self._leftOverlay, percent=-abs(v), color=color, worldSpace=_worldSpace)
             b.clicked.connect(lambda _c=False, btn=b: self._on_button_clicked(btn))
             self._leftLayout.addWidget(b, 1)
             self._leftButtons.append(b)
@@ -618,7 +622,12 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         # right side buttons (AlignLeft)
         self._rightButtons = []
         for v in reversed(values):
-            b = SliderButton(self._rightOverlay, percent=v, color=color)
+            if self._worldSpace:
+                _worldSpace = self._worldSpace if v == 100 else False
+            else:
+                _worldSpace = False
+
+            b = SliderButton(self._rightOverlay, percent=v, color=color, worldSpace=_worldSpace)
             b.clicked.connect(lambda _c=False, btn=b: self._on_button_clicked(btn))
             self._rightLayout.addWidget(b, 1)
             self._rightButtons.append(b)
@@ -677,34 +686,21 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._tooltipDescription = description
 
         # Update the mixin state for the main widget (handles statusTip)
-        cw.TooltipMixin.set_tooltip_info(self, title, description)
+        cw.TooltipMixin.setTooltipInfo(self, title, description)
 
         # Update inner components
-        self._slider.set_tooltip_info(title, description)
+        self._slider.setTooltipInfo(title, description)
         for b in self._leftButtons:
-            b.set_tooltip_info(title, description)
+            b.setTooltipInfo(title, description)
         for b in self._rightButtons:
-            b.set_tooltip_info(title, description)
+            b.setTooltipInfo(title, description)
 
-    def set_tooltip_info(self, title: str, description: str = ""):
-        """Snake-case alias for compatibility."""
-        self.setTooltipInfo(title, description)
-
-    def setWorldSpace(self, enabled: int):
-        if enabled == self._worldSpace:
-            return
-
-        for b in self._leftButtons:
-            p = int(b.percent)
-            if abs(p) == 100:
-                b.setWorldSpace(enabled)
-
-        for b in self._rightButtons:
-            p = int(b.percent)
-            if abs(p) == 100:
-                b.setWorldSpace(enabled)
-
+    def setWorldSpace(self, enabled: bool):
         self._worldSpace = enabled
+        for btn in self._leftButtons + self._rightButtons:
+            if abs(int(btn.percent)) == 100:
+                # Call SliderButton.setWorldSpace directly
+                btn.setWorldSpace(enabled)
 
     def setDragCommand(self, dragCommand):
         try:
@@ -801,6 +797,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
             # Update Tooltips/StatusTip
             self.setTooltipInfo(found.label, found.description)
+            self.setWorldSpace(found.worldSpace)
         else:
             # Fallback for initialization or unknown keys
             self._current_mode = None
