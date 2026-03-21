@@ -31,10 +31,16 @@ except ImportError:
 
 from TheKeyMachine.mods.generalMod import get_thekeymachine_version
 
-from TheKeyMachine.widgets.dialogs import QFlatConfirmDialog, QFlatTooltipConfirm
+from TheKeyMachine.widgets.customDialogs import QFlatConfirmDialog, QFlatTooltipConfirm
 
 from TheKeyMachine.mods import mediaMod as media
 import TheKeyMachine.widgets.util as util
+import TheKeyMachine.mods.settingsMod as settings
+
+try:
+    from PySide6 import QtGui
+except ImportError:
+    from PySide2 import QtGui
 
 
 # Constants
@@ -55,10 +61,10 @@ def formatPath(path):
 
 
 def compare_versions(version1, version2):
+    import re
+
     def normalize(v):
         return [int(x) for x in re.sub(r"[^0-9.]", "", str(v)).split(".") if x]
-
-    import re
 
     v1 = normalize(version1)
     v2 = normalize(version2)
@@ -321,28 +327,54 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 util.make_inViewMessage("<hl>" + installed_version + "</hl>\nYou are up-to-date.")
             return
 
+        # Update the icon
+        if anchor_widget and hasattr(anchor_widget, "setIcon"):
+            anchor_widget.setIcon(QtGui.QIcon(media.settings_update_image))
+
+        # If we are skipping updates and this isn't a forced check, don't do anything else
+        if not force and settings.get_setting("skip_updates", False):
+            return
+
         template = (
             "<title>Version {} available\n(using {})</title>\n".format(latest_version, installed_version)
             + "<text>A new version of TheKeyMachine is available to download and install.</text>\n"
         )
 
-        result = QFlatTooltipConfirm.question(
-            anchor_widget,
-            title="Update available",
-            template=template,
-            icon=media.getImage("update.svg"),
-            buttons=[
-                QFlatTooltipConfirm.CustomButton("Install", positive=True, icon=media.getImage("install.png")),
-                QFlatTooltipConfirm.CustomButton("Skip", positive=True, icon=media.getImage("skip.png")),
-                QFlatTooltipConfirm.No,
-            ],
-            highlight="Install",
-        )
+        if anchor_widget:
+            result = QFlatTooltipConfirm.question(
+                anchor_widget,
+                title="Update available",
+                template=template,
+                icon=media.getImage("update.svg"),
+                buttons=[
+                    QFlatTooltipConfirm.CustomButton("Install", positive=True, icon=media.getImage("install.png")),
+                    QFlatTooltipConfirm.CustomButton("Skip", positive=True, icon=media.getImage("skip.png")),
+                    QFlatTooltipConfirm.No,
+                ],
+                highlight="Install",
+            )
+        else:
+            result = QFlatConfirmDialog.question(
+                None,
+                "Update available",
+                title=f"Version {latest_version.strip()} available",
+                message="A new version of TheKeyMachine is available to download and install.",
+                icon=media.getImage("update.svg"),
+                buttons=[
+                    QFlatConfirmDialog.CustomButton("Install", positive=True, icon=media.getImage("install.png")),
+                    QFlatConfirmDialog.CustomButton("Skip", positive=True, icon=media.getImage("skip.png")),
+                    QFlatConfirmDialog.No,
+                ],
+                highlight="Install",
+            )
 
         if result and result.get("positive"):
             if result.get("name") == "Install":
                 if not install():
                     return
+
+                # Reset skip setting on successful manual install
+                settings.set_setting("skip_updates", False)
 
                 def _post_update():
                     import TheKeyMachine.core.toolbar as ui
@@ -361,7 +393,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 QTimer.singleShot(100, _post_update)
 
             elif result.get("name") == "Skip":
-                pass
+                settings.set_setting("skip_updates", True)
 
     delay = 0 if warning or force else 1000
     updater_worker = UpdateCheckWorker(installed_version, force=force, delay=delay)

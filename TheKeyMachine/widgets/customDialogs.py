@@ -670,25 +670,25 @@ class QFlatTooltipConfirm(QFlatDialog):
             # Final fallback: point to cursor if widget is dead
             self._global_anc = QRect(cursor_pos, QSize(0, 0))
 
-        self.side = "top"
-        self.root_layout.setContentsMargins(0, ah, 0, 0)
+        self.side = "bottom"
+        self.root_layout.setContentsMargins(0, 0, 0, ah)
         self.root_layout.activate()
         self.adjustSize()
         w, h = self.width(), self.height()
 
         target_x = self._global_anc.left()
-        pos = QPoint(target_x - w // 2, self._global_anc.bottom() + DPI(2))
+        pos = QPoint(target_x - w // 2, self._global_anc.top() - h - DPI(2))
 
         screen = QGuiApplication.screenAt(cursor_pos) or QGuiApplication.primaryScreen()
         geo = screen.availableGeometry()
 
-        if pos.y() + h > geo.bottom():
-            self.side = "bottom"
-            self.root_layout.setContentsMargins(0, 0, 0, ah)
+        if pos.y() < geo.top():
+            self.side = "top"
+            self.root_layout.setContentsMargins(0, ah, 0, 0)
             self.root_layout.activate()
             self.adjustSize()
             w, h = self.width(), self.height()
-            pos.setY(self._global_anc.top() - h - DPI(2))
+            pos.setY(self._global_anc.bottom() + DPI(2))
 
         # Horizontal screen safety (keep it within screen bounds while trying to stay centered on target_x)
         final_x = max(geo.left() + DPI(5), min(pos.x(), geo.right() - w - DPI(5)))

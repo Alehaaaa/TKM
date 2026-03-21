@@ -98,7 +98,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
     def _update_tooltip(self):
         title = self._tooltip_title or "Value"
-        self.set_tooltip_data(text=f"{title}: {self._percent}%", description=self._tooltip_description)
+        self.setToolTipData(text=f"{title}: {self._percent}%", description=self._tooltip_description)
 
     def set_tooltip_info(self, title: str, description: str = ""):
         self._tooltip_title = title
@@ -271,7 +271,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
     def _update_self_tooltip(self, _v=None):
         title = self._tooltip_title or self._text
-        self.set_tooltip_data(text=title, description=self._tooltip_description)
+        self.setToolTipData(text=title, description=self._tooltip_description)
 
     # --- public helpers ---------------------------------------------------------
     def handle_size(self) -> int:
@@ -798,6 +798,9 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._current_mode = found
             if found.icon:
                 self.setText(found.icon)
+
+            # Update Tooltips/StatusTip
+            self.setTooltipInfo(found.label, found.description)
         else:
             # Fallback for initialization or unknown keys
             self._current_mode = None

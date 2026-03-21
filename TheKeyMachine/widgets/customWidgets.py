@@ -168,6 +168,32 @@ class QFlatHoverableIcon:
         return QtGui.QIcon(out_pix)
 
 
+class LogoAction(QtWidgets.QWidgetAction):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self._container = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(self._container)
+        layout.setContentsMargins(0, 10, 0, 10)
+        layout.setSpacing(0)
+
+        logo_pix = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_small.png"))
+        if not logo_pix.isNull():
+            self.logo_label = QtWidgets.QLabel()
+            self.logo_label.setPixmap(logo_pix.scaledToHeight(DPI(60), QtCore.Qt.SmoothTransformation))
+            self.logo_label.setAlignment(QtCore.Qt.AlignCenter)
+            layout.addWidget(self.logo_label)
+
+        self.setDefaultWidget(self._container)
+        self._container.mouseReleaseEvent = self._on_clicked
+
+    def _on_clicked(self, event):
+        import webbrowser
+
+        webbrowser.open("https://github.com/Alehaaaa/TKM")
+        if self.parent() and hasattr(self.parent(), "hide"):
+            self.parent().hide()
+
+
 class MenuWidget(QtWidgets.QMenu):
     def __init__(self, *args, **kwargs):
         description = kwargs.pop("description", None)
@@ -181,6 +207,7 @@ class MenuWidget(QtWidgets.QMenu):
                 new_args.append(arg)
 
         QtWidgets.QMenu.__init__(self, *new_args, **kwargs)
+        self.setTearOffEnabled(True)
 
         if self.parent() and hasattr(self.parent(), "destroyed"):
             self.parent().destroyed.connect(self.close)
@@ -197,7 +224,8 @@ class MenuWidget(QtWidgets.QMenu):
 
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
-        action = QtWidgets.QMenu.addAction(self, *args, **kwargs)
+        res = QtWidgets.QMenu.addAction(self, *args, **kwargs)
+        action = args[0] if (len(args) > 0 and isinstance(args[0], QAction)) else res
 
         # Get the label: skip the icon and parent if provided in args
         label = ""
@@ -279,12 +307,12 @@ class TooltipMixin:
         self._help_data = {"text": text, "description": description, "shortcuts": shortcuts or [], "icon": icon}
         HelpSystem.push(self, text, description)
 
-    def set_tooltip_data(self, **kwargs):
+    def setToolTipData(self, **kwargs):
         self._has_tooltip = True
         self.setData(**kwargs)
 
     def set_tooltip_info(self, title: str, description: str = ""):
-        self.set_tooltip_data(text=title, description=description)
+        self.setToolTipData(text=title, description=description)
 
     def enterEvent(self, event: QtCore.QEvent):
         # Refresh description and trigger Maya event
@@ -313,7 +341,7 @@ class QFlatSpinBox(TooltipMixin, QtWidgets.QSpinBox):
         super().__init__(*args, **kwargs)
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         if tooltip:
-            self.set_tooltip_data(text=tooltip)
+            self.setToolTipData(text=tooltip)
 
     def enterEvent(self, event: QtCore.QEvent):
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
@@ -325,9 +353,7 @@ class QFlatSpinBox(TooltipMixin, QtWidgets.QSpinBox):
 
 
 class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
-    def __init__(
-        self, parent=None, icon=None, text=None, tooltip=None, description=None, shortcuts=None, highlight=False, pressed_color=None
-    ):
+    def __init__(self, parent=None, icon=None, text=None, tooltip=None, description=None, shortcuts=None, highlight=False, pressed_color=None):
         super().__init__(parent)
         self.setAutoRaise(True)
         self.pressed_color = pressed_color or "#666666"
@@ -366,20 +392,18 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self.setIconSize(QtCore.QSize(w - 2, h - 2))
 
         self._icon_path = icon
+        self._highlight = highlight
         if icon:
-            QFlatHoverableIcon.apply(self, icon, highlight=highlight)
+            self.setIcon(icon)
+        self.setToolTipData(text=tooltip, description=description, shortcuts=shortcuts)
 
-        self.set_tooltip_data(text=tooltip, description=description, shortcuts=shortcuts)
-
-    def enterEvent(self, event: QtCore.QEvent):
-        if hasattr(self, "_icon_hover"):
-            self.setIcon(self._icon_hover)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event: QtCore.QEvent):
-        if hasattr(self, "_icon_normal"):
-            self.setIcon(self._icon_normal)
-        super().leaveEvent(event)
+    def setIcon(self, icon):
+        """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
+        if isinstance(icon, (str, bytes)):
+            self._icon_path = str(icon)
+            QFlatHoverableIcon.apply(self, self._icon_path, highlight=self._highlight)
+        elif icon:
+            super().setIcon(icon)
 
 
 class QFlowLayout(QtWidgets.QLayout):
@@ -613,9 +637,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     self._mode_to_slot[current_cm.key] = key
 
         if self._hiddeable:
-            self._menu_metadata.append(
-                {"type": "widget", "key": key, "label": label, "description": description, "default": default_visible}
-            )
+            self._menu_metadata.append({"type": "widget", "key": key, "label": label, "description": description, "default": default_visible})
 
             # Load stored visibility or use default
             visible = settings.get_setting(f"pin_{key}", default_visible)
@@ -679,16 +701,14 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         # Pool: only mode-aware sliders
         pool = {slot: w for slot, w in self._widgets.items() if is_valid_widget(w) and hasattr(w, "_current_mode")}
 
-        # Step 1: which desired modes are already covered by a slider?
+        # which desired modes are already covered by a slider?
         covered = {cm.key: slot for slot, w in pool.items() if (cm := getattr(w, "_current_mode", None)) and cm.key in desired_mode_keys}
 
-        # Step 2: which desired modes have NO slider yet?
+        # which desired modes have NO slider yet?
         unoccupied = [mk for mk in desired_mode_keys if mk not in covered]
-
-        # Step 3: free sliders — those whose current mode is NOT in the desired set
         free_slots = [slot for slot, w in pool.items() if getattr(getattr(w, "_current_mode", None), "key", None) not in desired_mode_keys]
 
-        # Step 4: reassign free sliders to unoccupied desired modes
+        # reassign free sliders to unoccupied desired modes
         free_iter = iter(free_slots)
         newly_assigned = set()
         for mode_key in unoccupied:
@@ -701,29 +721,27 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         active_slots = set(covered.values()).union(newly_assigned)
 
-        # Step 5: reconcile visibility — show EXACTLY the authorized representative sliders
+        # reconcile visibility — show EXACTLY the authorized representative sliders
         for slot, widget in pool.items():
             visible = slot in active_slots
             widget.setVisible(visible)
             settings.set_setting(f"pin_{slot}", visible)
 
-        # Step 6: sync check states in the active menu (keyed by mode key)
+        # sync check states in the active menu (keyed by mode key)
         if self._active_menu and isValid(self._active_menu):
             actions = getattr(self._active_menu, "_tkm_actions", {})
-            
+
             # Recalculate which modes actively have a visible slider representative
             actual_visible_modes = {
-                getattr(pool[slot], "_current_mode", None).key 
-                for slot in active_slots 
-                if getattr(pool[slot], "_current_mode", None)
+                getattr(pool[slot], "_current_mode", None).key for slot in active_slots if getattr(pool[slot], "_current_mode", None)
             }
-            
+
             for mode_key, action in actions.items():
                 if isValid(action):
                     action.blockSignals(True)
                     action.setChecked(mode_key in actual_visible_modes)
                     action.blockSignals(False)
-            
+
             # Force the menu to repaint so the visual check marks reflect the new state immediately
             self._active_menu.update()
             self._active_menu.repaint()

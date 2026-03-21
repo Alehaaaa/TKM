@@ -34,6 +34,12 @@ except ImportError:
 
     from PySide6 import QtCore, QtGui, QtWidgets
 
+try:
+    from importlib import reload
+except ImportError:
+    from imp import reload
+except ImportError:
+    pass
 
 import ssl
 import os
@@ -44,21 +50,21 @@ import urllib.parse
 import shutil
 from functools import partial
 
-
-# import TheKeyMachine.core.customGraph as cg
-# import TheKeyMachine.core.toolbar as tb
 import TheKeyMachine.mods.generalMod as general
-
 import TheKeyMachine.mods.keyToolsMod as keyTools
-
-# import TheKeyMachine.mods.selSetsMod as selSets
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.barMod as bar
+import TheKeyMachine.mods.updater as updater
 
-from TheKeyMachine.mods.generalMod import config
+from TheKeyMachine.widgets import customDialogs, util as wutil
 
-INSTALL_PATH = config["INSTALL_PATH"]
-USER_FOLDER_PATH = config["USER_FOLDER_PATH"]
+mods = [general, keyTools, media, bar, customDialogs, wutil, updater]
+
+for m in mods:
+    reload(m)
+
+INSTALL_PATH = general.config["INSTALL_PATH"]
+USER_FOLDER_PATH = general.config["USER_FOLDER_PATH"]
 
 
 color_codes = {
@@ -748,9 +754,7 @@ def orbit_window_close():
 
 
 def donate_window():
-    from TheKeyMachine.widgets.dialogs import QFlatConfirmDialog
-    import TheKeyMachine.mods.mediaMod as media
-    from TheKeyMachine.mods import generalMod as general
+    from TheKeyMachine.widgets.customDialogs import QFlatConfirmDialog
 
     screen_width, screen_height = general.get_screen_resolution()
 
@@ -784,48 +788,37 @@ def donate_window():
 
 
 def about_window():
-    from TheKeyMachine.widgets.dialogs import QFlatDialog
-    from TheKeyMachine.widgets.util import DPI
-
-    try:
-        from PySide6 import QtWidgets, QtCore, QtGui
-    except ImportError:
-        from PySide2 import QtWidgets, QtCore, QtGui
-
-    import TheKeyMachine.mods.mediaMod as media
-    from TheKeyMachine.mods import generalMod as general
 
     TheKeyMachine_stage_version = general.get_thekeymachine_stage_version()
     TheKeyMachine_version = general.get_thekeymachine_version()
     TheKeyMachine_build_version = general.get_thekeymachine_build_version()
+    TheKeyMachine_codename = general.get_thekeymachine_codename()
 
-    class TKMAboutDialog(QFlatDialog):
+    class TKMAboutDialog(customDialogs.QFlatDialog):
         def __init__(self, parent=None):
-            QFlatDialog.__init__(self, parent)
+            customDialogs.QFlatDialog.__init__(self, parent)
             self.setWindowTitle("About TheKeyMachine")
 
             content_widget = QtWidgets.QWidget()
             content_layout = QtWidgets.QVBoxLayout(content_widget)
-            content_layout.setContentsMargins(DPI(20), DPI(20), DPI(20), 0)
-            content_layout.setSpacing(DPI(12))
+            content_layout.setContentsMargins(wutil.DPI(20), wutil.DPI(20), wutil.DPI(20), 0)
+            content_layout.setSpacing(wutil.DPI(12))
 
             # Logo
             logo_label = QtWidgets.QLabel()
             logo_label.setAlignment(QtCore.Qt.AlignCenter)
-            logo_pixmap = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_250.png")).scaled(
-                DPI(250), DPI(250), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation
-            )
+            logo_pixmap = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_250.png"))
             logo_label.setPixmap(logo_pixmap)
             content_layout.addWidget(logo_label)
 
             # Tool Name & Title
             tool_name = QtWidgets.QLabel("Animation toolset for Maya Animators")
             tool_name.setAlignment(QtCore.Qt.AlignCenter)
-            tool_name.setStyleSheet("font-size: %spx; font-weight: bold; color: #ececec;" % DPI(16))
+            tool_name.setStyleSheet("font-size: %spx; font-weight: bold; color: #ececec;" % wutil.DPI(16))
             content_layout.addWidget(tool_name)
 
             # Version Badge
-            version_btn = QtWidgets.QPushButton(f"{TheKeyMachine_stage_version} v{TheKeyMachine_version}")
+            version_btn = QtWidgets.QPushButton(f"v{TheKeyMachine_version} {TheKeyMachine_stage_version}")
             version_btn.setCursor(QtCore.Qt.PointingHandCursor)
             version_btn.setStyleSheet(
                 """
@@ -843,20 +836,19 @@ def about_window():
                     color: white;
                 }
                 """
-                % (DPI(4), DPI(4), DPI(8), DPI(12))
+                % (wutil.DPI(4), wutil.DPI(4), wutil.DPI(8), wutil.DPI(12))
             )
 
             def _check_updates():
-                from TheKeyMachine.mods import updater
 
-                updater.check_for_updates(self, force=True)
+                updater.check_for_updates(force=True)
 
             version_btn.clicked.connect(_check_updates)
             content_layout.addWidget(version_btn, alignment=QtCore.Qt.AlignCenter)
 
-            build_label = QtWidgets.QLabel(f"Build: {TheKeyMachine_build_version}")
+            build_label = QtWidgets.QLabel(f"Build: {TheKeyMachine_build_version} | {TheKeyMachine_codename}")
             build_label.setAlignment(QtCore.Qt.AlignCenter)
-            build_label.setStyleSheet("font-size: %spx; color: #888888;" % DPI(11))
+            build_label.setStyleSheet("font-size: %spx; color: #888888;" % wutil.DPI(11))
             content_layout.addWidget(build_label)
 
             info_text = """
@@ -869,7 +861,7 @@ def about_window():
                         Modified by <a href='http://alehaaaa.github.io' style='color: #67b9e0; text-decoration: none;'>Alehaaaa</a>
                     </div>
                 </div>
-            """ % (DPI(11))
+            """ % (wutil.DPI(11))
 
             info_label = QtWidgets.QLabel(info_text)
             info_label.setAlignment(QtCore.Qt.AlignCenter)

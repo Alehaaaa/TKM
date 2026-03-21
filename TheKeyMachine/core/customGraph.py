@@ -47,7 +47,6 @@ from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
-import TheKeyMachine.mods.updater as updater
 
 mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders]
 
@@ -68,12 +67,12 @@ def apply_base_stylesheet(button):
     pass
 
 
-def create_config_menu(parent_button):
+def create_settings_menu(parent_button):
     """Creates a config menu consistent with the main toolbar"""
-    from TheKeyMachine.tooltips import QFlatTooltipManager
     import TheKeyMachine.mods.hotkeysMod as hotkeys
 
     menu = cw.MenuWidget(parent=parent_button)
+    menu.addAction(cw.LogoAction(menu))
 
     # Help submenu
     help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help", description="Resources for help and learning.")
@@ -97,27 +96,15 @@ def create_config_menu(parent_button):
         description="Watch tutorials.",
     )
 
-    # Config submenu
-    config_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Config", description="Tool configuration and preferences.")
-    menu.addMenu(config_menu)
+    # Settings submenu
+    settings_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Settings", description="Tool configuration and preferences.")
+    menu.addMenu(settings_menu)
 
-    config_menu.addSection("Tools settings")
-    show_tt = settings.get_setting("show_tooltips", True)
-    tt_action = config_menu.addAction("Show tooltips", description="Show or hide floating tooltips.")
-    tt_action.setCheckable(True)
-    tt_action.setChecked(show_tt)
-
-    def toggle_tt(state):
-        settings.set_setting("show_tooltips", state)
-        QFlatTooltipManager.hide()
-
-    tt_action.toggled.connect(toggle_tt)
-
-    config_menu.addSection("Toolbar's icons alignment")
-    align_group = QActionGroup(config_menu)
-    left_align = config_menu.addAction("Left", description="Align icons to the left.")
-    center_align = config_menu.addAction("Center", description="Align icons to the center.")
-    right_align = config_menu.addAction("Right", description="Align icons to the right.")
+    settings_menu.addSection("Toolbar's icons alignment")
+    align_group = QActionGroup(settings_menu)
+    left_align = settings_menu.addAction("Left", description="Align icons to the left.")
+    center_align = settings_menu.addAction("Center", description="Align icons to the center.")
+    right_align = settings_menu.addAction("Right", description="Align icons to the right.")
 
     current_align = settings.get_setting("graph_toolbar_alignment", "Center")
     align_map = {"Left": left_align, "Center": center_align, "Right": right_align}
@@ -135,19 +122,13 @@ def create_config_menu(parent_button):
 
         act.toggled.connect(set_align)
 
-    config_menu.addSection("Hotkeys")
-    config_menu.addAction("Add TKM Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys.")
+    settings_menu.addSection("Hotkeys")
+    settings_menu.addAction("Add TKM Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys.")
 
-    config_menu.addSection("General")
-    config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", createCustomGraph, description="Refresh the TKM interface.")
+    settings_menu.addSection("General")
+    settings_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", createCustomGraph, description="Refresh the TKM interface.")
 
     menu.addSeparator()
-    menu.addAction(
-        QtGui.QIcon(media.updater_image),
-        "Check for updates",
-        lambda: updater.check_for_updates(parent_button, force=True),
-        description="Check if there is a new version available.",
-    )
     menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
 
     return menu
@@ -157,7 +138,7 @@ def create_tool_button(icon=None, text="", tooltip="", description="", command=N
     """Helper to create a QFlatToolButton with our tooltip system"""
     btn = cw.QFlatToolButton(icon=icon, text=text)
     if tooltip:
-        btn.set_tooltip_data(text=tooltip, description=description)
+        btn.setToolTipData(text=tooltip, description=description)
     if command:
         btn.clicked.connect(command)
     if p:
@@ -265,9 +246,7 @@ def createCustomGraph():
         command=keyTools.reblock_move,
     )
     sec.addWidget(btn_reblock, "reBlock", "reblock")
-    extra_btn = create_tool_button(
-        text="E", tooltip="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes()
-    )
+    extra_btn = create_tool_button(text="E", tooltip="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes())
     sec.addWidget(extra_btn, "Extra Tools", "extra")
     extra_menu = cw.MenuWidget(parent=extra_btn)
     extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
@@ -282,9 +261,7 @@ def createCustomGraph():
         # Create a new section for each slider color/type
         sec = new_section()
 
-        current_default = settings.get_setting(
-            default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"]
-        )
+        current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
 
         # Static default list for "Pin Defaults"
         if default_modes:
@@ -373,7 +350,7 @@ def createCustomGraph():
         COLOR.color.orange,
         sliders.execute_tangent_blend,
         sliders.stop_dragging,
-        default_modes=["blend_spline"],
+        default_modes=["blend_best_guess"],
     )
 
     # _________________  Iso / Mute / Lock  _________________#
@@ -387,14 +364,10 @@ def createCustomGraph():
     )
     sec.addWidget(btn_iso, "Isolate", "iso")
 
-    btn_mute = create_tool_button(
-        text="Mt", tooltip="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute()
-    )
+    btn_mute = create_tool_button(text="Mt", tooltip="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute())
     sec.addWidget(btn_mute, "Mute", "mute")
 
-    btn_lock = create_tool_button(
-        text="Lk", tooltip="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock()
-    )
+    btn_lock = create_tool_button(text="Lk", tooltip="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock())
     sec.addWidget(btn_lock, "Lock", "lock")
 
     btn_fi = create_tool_button(
@@ -417,14 +390,14 @@ def createCustomGraph():
     sec.addWidget(btn_reset, "Reset", "reset")
 
     # ________________  SelSets Buttons  ____________________#
-    sec = new_section()
-    color_map = {
-        "1": "#CBC8AD",
-        "2": "#7BA399",
-        "3": "#93C2AD",
-        "4": "#C29591",
-        "5": "#A86465",
-    }
+    # sec = new_section()
+    # color_map = {
+    #     "1": "#CBC8AD",
+    #     "2": "#7BA399",
+    #     "3": "#93C2AD",
+    #     "4": "#C29591",
+    #     "5": "#A86465",
+    # }
     # for i in range(1, 6):
     #     s_id = str(i)
     #     s_name = "button_" + s_id
@@ -492,24 +465,21 @@ def createCustomGraph():
     config_btn = create_tool_button(icon=media.settings_image, tooltip="Config", description="Tool configuration and preferences.")
     sec.addWidget(config_btn, "Config", "config")
 
-    config_menu = create_config_menu(config_btn)
+    settings_menu = create_settings_menu(config_btn)
 
-    def _open_config_menu():
-        config_menu.exec_(QtGui.QCursor.pos())
+    def _open_settings_menu():
+        settings_menu.exec_(QtGui.QCursor.pos())
 
     def _on_toolbar_context_menu(pos):
         if flow_qw.childAt(pos):
             return
-        _open_config_menu()
+        _open_settings_menu()
 
-    config_btn.clicked.connect(_open_config_menu)
+    config_btn.clicked.connect(_open_settings_menu)
     config_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-    config_btn.customContextMenuRequested.connect(lambda pos: _open_config_menu())
+    config_btn.customContextMenuRequested.connect(lambda pos: _open_settings_menu())
 
     flow_qw.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
     flow_qw.customContextMenuRequested.connect(_on_toolbar_context_menu)
-
-    # Launch background update check silently
-    updater.check_for_updates(config_btn, warning=False, force=False)
 
     QtCore.QTimer.singleShot(50, flow_qw._update_height)

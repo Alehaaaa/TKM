@@ -171,7 +171,6 @@ custom_tools_image = getImage("tools_folder.svg")
 custom_scripts_image = getImage("scripts_folder.svg")
 
 settings_image = getImage("settings.svg")
-settings_cg_image = getImage("settings.svg")
 settings_update_image = getImage("settings_update.svg")
 
 
@@ -212,7 +211,8 @@ reload_image = getImage("reload.png")
 remove_small_image = getImage("remove_small.png")
 uninstall_image = getImage("uninstall.svg")
 dock_image = getImage("dock.png")
-updater_image = getImage("update.svg")
+check_updates_image = getImage("check_updates.svg")
+check_updates_image_available = getImage("check_updates_available.svg")
 report_a_bug_image = getImage("bug.svg")
 about_image = getImage("about.svg")
 
