@@ -95,9 +95,9 @@ font_size_enun, font_size = get_font_sizes()
 # -------- KeyBox
 
 
-move_key_left_b_widget_tooltip_text = (
+nudge_keyleft_b_widget_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Nudge Keys Left</b></font><br><br>"
-    "Move the selected keyframes by the number of frames specified in the central box.<br><br>"
+    "Nudge the selected keyframes by the number of frames specified in the central box.<br><br>"
     ""
 )
 
@@ -113,14 +113,14 @@ move_keyframes_intField_widget_tooltip_text = (
     ""
 )
 
-add_inbetween_b_widget_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Add Inbetween</b></font><br><br>Add one inbetween<br><br>"
+insert_inbetween_b_widget_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Insert Inbetween</b></font><br><br>Add one inbetween<br><br>"
 )
 
 
-move_key_right_b_widget_tooltip_text = (
+nudge_keyright_b_widget_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Nudge Keys Right</b></font><br><br>"
-    "Move the selected keyframes by the number of frames specified in the central box.<br><br>"
+    "Nudge the selected keyframes by the number of frames specified in the central box.<br><br>"
     ""
 )
 

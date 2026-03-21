@@ -1,7 +1,26 @@
-from __future__ import annotations
 from TheKeyMachine.tooltips import QFlatTooltipManager
 from .util import DPI
 import re
+
+import TheKeyMachine.mods.settingsMod as settings  # type: ignore
+
+try:
+    from PySide6 import QtWidgets, QtCore, QtGui
+    from shiboken6 import isValid
+
+    PYSIDE = 6
+except ImportError:
+    from PySide2 import QtWidgets, QtCore, QtGui
+    from shiboken2 import isValid
+
+    PYSIDE = 2
+
+
+try:
+    import TheKeyMachine_user_data.preferences.user_preferences as user_preferences  # type: ignore
+except ImportError:
+    user_preferences = None
+
 
 """
 TheKeyMachine Custom Widgets
@@ -11,20 +30,53 @@ Includes QFlatToolButton with automated sizing, hover effects (glow),
 and user preference integration.
 """
 
-try:
-    from PySide6 import QtWidgets, QtCore, QtGui
 
-    PYSIDE = 6
-except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui
+class HelpSystem:
+    """Centralized utility for pushing help text to all Maya help channels."""
 
-    PYSIDE = 2
+    @staticmethod
+    def clean(raw):
+        if not raw:
+            return ""
+        # Strip HTML and normalize
+        res = re.sub(r"<[^>]*>", "", str(raw))
+        return re.sub(r"\s+", " ", res).strip()
 
+    @staticmethod
+    def get_desc(raw):
+        if not raw:
+            return ""
+        # Get first line of description
+        parts = re.split(r"<br\s*/?>|\r?\n", str(raw), flags=re.IGNORECASE)
+        for p in parts:
+            clean = HelpSystem.clean(p)
+            if clean:
+                return clean
+        return ""
 
-try:
-    import TheKeyMachine_user_data.preferences.user_preferences as user_preferences  # type: ignore
-except ImportError:
-    user_preferences = None
+    @classmethod
+    def push(cls, widget_or_action, title="", description=""):
+        """Pushes data to StatusTip, ToolTip, and internal properties."""
+        c_title = cls.clean(title or widget_or_action.objectName())
+        c_desc = cls.get_desc(description)
+
+        status = f"{c_title} - {c_desc}" if (c_title and c_desc) else (c_title or c_desc)
+
+        # 1. Update standard Qt properties (triggers Maya's status bar)
+        if hasattr(widget_or_action, "setStatusTip"):
+            widget_or_action.setStatusTip(status)
+
+        # 2. Store for our custom TKM floating tooltips
+        if hasattr(widget_or_action, "setProperty"):
+            widget_or_action.setProperty("tkm_title", title)
+            widget_or_action.setProperty("tkm_description", description)
+            widget_or_action.setProperty("description", description)  # Legacy support
+
+        # 3. If it's an action, also try to push to its parent menu's status bar
+        if isinstance(widget_or_action, QtGui.QAction) and widget_or_action.parent():
+            p = widget_or_action.parent()
+            if hasattr(p, "setStatusTip"):
+                p.setStatusTip(status)
 
 
 class QFlatHoverableIcon:
@@ -136,10 +188,8 @@ class MenuWidget(QtWidgets.QMenu):
         if icon:
             self.setIcon(icon)
 
-        if description:
-            self.setProperty("description", description)
-            title = self.title().replace("&", "").strip()
-            self.setStatusTip("{} - {}".format(title, description))
+        if description or self.title():
+            HelpSystem.push(self, self.title(), description)
 
         self.triggered.connect(self._on_action_triggered)
         self.hovered.connect(self._on_action_hovered)
@@ -148,21 +198,26 @@ class MenuWidget(QtWidgets.QMenu):
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
         action = QtWidgets.QMenu.addAction(self, *args, **kwargs)
-        if description:
-            action.setProperty("description", description)
-            title = action.text().replace("&", "").strip()
-            action.setStatusTip("{} - {}".format(title, description))
+
+        # Get the label: skip the icon and parent if provided in args
+        label = ""
+        for arg in args:
+            if isinstance(arg, (str, bytes)):
+                label = arg
+                break
+
+        HelpSystem.push(action, label, description)
         return action
 
     def addMenu(self, *args, **kwargs):
         description = kwargs.pop("description", None)
         item = QtWidgets.QMenu.addMenu(self, *args, **kwargs)
-        if description:
-            # item can be QMenu or QAction depending on the overload
-            action = item.menuAction() if hasattr(item, "menuAction") else item
-            action.setProperty("description", description)
-            title = action.text().replace("&", "").strip()
-            action.setStatusTip("{} - {}".format(title, description))
+
+        # item can be QMenu or QAction depending on the overload
+        action = item.menuAction() if hasattr(item, "menuAction") else item
+        label = action.text()
+
+        HelpSystem.push(action, label, description)
         return item
 
     def _on_action_hovered(self, action):
@@ -175,14 +230,16 @@ class MenuWidget(QtWidgets.QMenu):
         QFlatTooltipManager.hide()
         self._last_hovered_action = action
 
-        desc = action.property("description")
-        if desc:
-            title = action.text().replace("&", "").strip()
-            template = "<b>{}</b><br><br>{}".format(title, desc)
+        # Force push to Maya channels
+        title = action.property("tkm_title") or action.text()
+        desc = action.property("tkm_description") or ""
+        HelpSystem.push(action, title, desc)
 
+        # Floating Tooltip
+        if QFlatTooltipManager.enabled:
+            template = f"<b>{title}</b><br><br>{desc}" if desc else f"<b>{title}</b>"
             geometry = self.actionGeometry(action)
             target_rect = QtCore.QRect(self.mapToGlobal(geometry.topLeft()), geometry.size())
-
             icon = action.icon() if not action.icon().isNull() else None
             QFlatTooltipManager.delayed_show(
                 text=title, anchor_widget=self, target_rect=target_rect, description=desc, template=template, icon_obj=icon
@@ -212,65 +269,39 @@ class OpenMenuWidget(MenuWidget):
     def mouseReleaseEvent(self, e):
         action = self.actionAt(e.pos())
         if action and action.isEnabled():
-            if action.isCheckable():
-                action.toggle()
-                return
-            elif action.data() == "keep_open":
-                action.trigger()
-                return
-
+            action.trigger()
+            return
         MenuWidget.mouseReleaseEvent(self, e)
 
 
 class TooltipMixin:
-    def set_tooltip_data(self, text="", description="", shortcuts=None, icon=None):
-        self._tooltip_data = {"text": text, "description": description, "shortcuts": shortcuts or [], "icon": icon}
+    def setData(self, text="", description="", shortcuts=None, icon=None):
+        self._help_data = {"text": text, "description": description, "shortcuts": shortcuts or [], "icon": icon}
+        HelpSystem.push(self, text, description)
 
-        def clean_line(raw):
-            if not raw:
-                return ""
-            # Remove all tags
-            res = re.sub(r"<[^>]*>", "", raw)
-            # Normalize whitespace
-            res = re.sub(r"\s+", " ", res).strip()
-            return res
-
-        def get_status_desc(raw):
-            if not raw:
-                return ""
-            # Split by line breakers to get the first actual line/paragraph
-            parts = re.split(r"<br\s*/?>|\r?\n", raw, flags=re.IGNORECASE)
-            for p in parts:
-                clean = clean_line(p)
-                if clean:
-                    return clean
-            return ""
-
-        c_text = clean_line(text)
-        c_desc = get_status_desc(description)
-
-        if c_text and c_desc:
-            status = f"{c_text} - {c_desc}"
-        else:
-            status = c_text or c_desc
-
-        if hasattr(self, "setStatusTip"):
-            self.setStatusTip(status)
+    def set_tooltip_data(self, **kwargs):
+        self._has_tooltip = True
+        self.setData(**kwargs)
 
     def set_tooltip_info(self, title: str, description: str = ""):
         self.set_tooltip_data(text=title, description=description)
 
     def enterEvent(self, event: QtCore.QEvent):
+        # Refresh description and trigger Maya event
+        data = getattr(self, "_help_data", {})
+        HelpSystem.push(self, data.get("text", ""), data.get("description", ""))
 
-        if hasattr(self, "_tooltip_data") and (self._tooltip_data.get("text") or self._tooltip_data.get("description")):
-            QFlatTooltipManager.delayed_show(anchor_widget=self, **self._tooltip_data)
         try:
             super().enterEvent(event)
         except (AttributeError, TypeError):
             pass
 
+        if QFlatTooltipManager.enabled and getattr(self, "_has_tooltip", False):
+            if data.get("text") or data.get("description"):
+                QFlatTooltipManager.delayed_show(anchor_widget=self, **data)
+
     def leaveEvent(self, event: QtCore.QEvent):
-        # QFlatTooltipManager.hide()  <-- Removed to let tooltip's internal check_auto_close handle it
+        QFlatTooltipManager.cancel_timer()
         try:
             super().leaveEvent(event)
         except (AttributeError, TypeError):
@@ -498,6 +529,12 @@ class QFlowContainer(QtWidgets.QWidget):
     columnLayout wrapper doesn't propagate Qt's heightForWidth protocol.
     """
 
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSizeHint(self):
+        return self.minimumSize()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_height()
@@ -519,32 +556,33 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     for toggling the visibility of its child widgets.
     """
 
-    def __init__(self, parent=None, spacing=2):
+    def __init__(self, parent=None, spacing=2, hiddeable=True):
         super().__init__(parent)
         self.setLayout(QtWidgets.QHBoxLayout())
-        self.layout().setContentsMargins(0, 0, 0, 0)
+        self.layout().setContentsMargins(0, 3, 0, 3)
         self.layout().setSpacing(spacing)
+        self._hiddeable = hiddeable
 
-        # Overlay button: tiny checkbox in the bottom-left
-        self._overlay_btn = QtWidgets.QToolButton(self)
-        self._overlay_btn.setFixedSize(10, 8)
-        self._overlay_btn.setCursor(QtCore.Qt.PointingHandCursor)
-        self._overlay_btn.setVisible(False)
-        self._overlay_btn.setStyleSheet("""
-            QToolButton {
-                border: 1px solid #555;
-                background-color: #333;
-                border-radius: 2px;
-            }
-            QToolButton:hover {
-                background-color: #444;
-                border-color: #777;
-            }
-        """)
+        if self._hiddeable:
+            # Overlay button: tiny checkbox in the bottom-left
+            self._overlay_btn = QtWidgets.QToolButton(self)
+            self._overlay_btn.setFixedSize(8, 8)
+            self._overlay_btn.setCursor(QtCore.Qt.PointingHandCursor)
+            self._overlay_btn.setVisible(False)
+            self._overlay_btn.setToolTip("Pin hidden tools for this Section")
+            self._overlay_btn.setStyleSheet("""
+                QToolButton {
+                    border: none;
+                    background-color: #333333;
+                }
+                QToolButton:hover {
+                    background-color: #383838;
+                }
+            """)
 
-        # Menu for toggling children
-        self._menu = OpenMenuWidget(self)
-        self._overlay_btn.clicked.connect(self._show_menu)
+            self._overlay_btn.clicked.connect(self._show_menu)
+            # Menu for toggling children
+            self._menu = OpenMenuWidget(self)
 
         self._widgets = {}  # key -> widget mapping
         self._actions = {}  # key -> QAction mapping
@@ -554,25 +592,36 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self.layout().addWidget(widget)
         self._widgets[key] = widget
 
-        # Create checkable action for the menu
-        action = self._menu.addAction(label, description=description)
-        action.setCheckable(True)
-        action.setChecked(default_visible)
-        action.triggered.connect(lambda checked=False, k=key: self.toggle_widget(k, checked))
+        if self._hiddeable:
+            # Create checkable action for the menu
+            action = self._menu.addAction(label, description=description)
+            action.setCheckable(True)
+            action.setChecked(default_visible)
 
-        self._actions[key] = action
-        widget.setVisible(default_visible)
+            # Connect using a closure-like method to ensure 'key' is frozen at addition time
+            action.triggered.connect(self._make_toggle_handler(key))
+            widget.setVisible(default_visible)
+
+            self._actions[key] = action
         return widget
 
-    def toggle_widget(self, key, visible):
-        """Toggle widget visibility and update menu/settings if needed."""
-        widget = self._widgets.get(key)
-        if widget:
-            widget.setHidden(not visible)
+    def toggle_widget(self, key, visible, save_setting=True):
+        if self._hiddeable:
+            """Toggle widget visibility and update menu/settings if needed."""
+            widget = self._widgets.get(key)
+            if widget and isValid(widget):
+                widget.setHidden(not visible)
 
-        action = self._actions.get(key)
-        if action:
-            action.setChecked(visible)
+            action = self._actions.get(key)
+            if action and isValid(action):
+                action.blockSignals(True)
+                action.setChecked(visible)
+                action.blockSignals(False)
+
+            if save_setting:
+                settings.set_setting(f"pin_{key}", visible)
+
+            self._menu.update()
 
     def addSeparator(self):
         """Add a separator to the customization menu."""
@@ -582,32 +631,51 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         """Add Pin Defaults and Pin All at the bottom."""
         self._menu.addSeparator()
 
+        # Use default values for the signal's 'checked' state to prevent missing argument errors.
         pin_defaults_action = self._menu.addAction("Pin Defaults")
-        pin_defaults_action.triggered.connect(lambda: self.pin_defaults(default_keys))
+        pin_defaults_action.triggered.connect(lambda checked=False, d=default_keys: self.pin_defaults(d))
 
         pin_all_action = self._menu.addAction("Pin All")
-        pin_all_action.triggered.connect(self.pin_all)
+        pin_all_action.triggered.connect(lambda checked=False: self.pin_all())
 
     def pin_defaults(self, default_keys):
         for key in self._widgets:
             self.toggle_widget(key, key in default_keys)
+        self._refresh_layout()
 
     def pin_all(self):
         for key in self._widgets:
             self.toggle_widget(key, True)
+        self._refresh_layout()
+
+    def _make_toggle_handler(self, key):
+        """Creates a handler function that captures 'key'."""
+
+        def handler(checked):
+            self.toggle_widget(key, checked)
+            self._refresh_layout()
+
+        return handler
+
+    def _refresh_layout(self):
+        """Trigger a height recalculation."""
+        QtCore.QTimer.singleShot(100, self.parent()._update_height)
 
     def _show_menu(self):
-        self._menu.exec_(QtGui.QCursor.pos())
+        if self._hiddeable:
+            self._menu.exec_(QtGui.QCursor.pos())
 
     def enterEvent(self, event):
-        self._overlay_btn.setVisible(True)
-        self._overlay_btn.raise_()
-        pos = QtCore.QPoint(self.width() - self._overlay_btn.width(), self.height() - self._overlay_btn.height())
-        self._overlay_btn.move(pos)
+        if self._hiddeable:
+            self._overlay_btn.setVisible(True)
+            self._overlay_btn.raise_()
+            pos = QtCore.QPoint(self.width() - self._overlay_btn.width(), self.height() - self._overlay_btn.height())
+            self._overlay_btn.move(pos)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self._overlay_btn.setVisible(False)
+        if self._hiddeable:
+            self._overlay_btn.setVisible(False)
         super().leaveEvent(event)
 
 

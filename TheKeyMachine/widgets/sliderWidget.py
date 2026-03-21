@@ -35,6 +35,20 @@ class _GlobalSignals(QObject):
 
 globalSignals = _GlobalSignals()
 
+
+class SliderMode:
+    """Professional object representation of a slider mode."""
+
+    def __init__(self, key, label=None, icon=None, description=""):
+        self.key = key
+        self.label = label or key.replace("_", " ").title()
+        self.icon = icon  # Short text for the handle
+        self.description = description
+
+    def __repr__(self):
+        return f"<SliderMode {self.key}>"
+
+
 """
 QFlatSliderWidget — COLOR-faithful, single-file recreation (no picks)
 ===============================================================
@@ -535,9 +549,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._tooltipTitle = tooltipTitle
         self._tooltipDescription = tooltipDescription
 
-        self._modes = []
-        self._mode_actions = {}
-        self._current_mode = ""
+        self._modes: list[SliderMode | str] = []
+        self._current_mode: Optional[SliderMode] = None
         self._menu = None
 
         self.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -733,25 +746,41 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._slider.apply_wheel_delta(delta)
         e.accept()
 
-    def setModes(self, modes: list[dict]):
+    def setModes(self, modes: list[dict | str]):
         """
-        Stores a list of mode definitions.
-        Format: [{'label': 'Name', 'key': 'mode_key', 'icon': 'SH'}, 'separator', ...]
+        Stores a list of mode definitions as SliderMode objects.
         """
-        self._modes = modes
+        self._modes = []
+        for m in modes:
+            if isinstance(m, dict):
+                self._modes.append(SliderMode(**m))
+            else:
+                self._modes.append(m)  # Likely "separator"
 
     def setCurrentMode(self, identifier: str):
-        """Updates the current mode and automatically sets the handle text if an icon is defined."""
-        self._current_mode = identifier
-        for item in self._modes:
-            if not isinstance(item, dict):
-                continue
-            if item.get("label") == identifier or item.get("key") == identifier:
-                # Use 'icon' or 'text' from the mode definition if available
-                icon = item.get("icon") or item.get("text")
-                if icon:
-                    self.setText(icon)
+        """Updates the current mode and adjusts UI accordingly."""
+        found = None
+        for m in self._modes:
+            if isinstance(m, SliderMode) and (m.key == identifier or m.label == identifier):
+                found = m
                 break
+
+        if found:
+            self._current_mode = found
+            if found.icon:
+                self.setText(found.icon)
+        else:
+            # Fallback for initialization or unknown keys
+            self._current_mode = None
+
+    def _get_active_mode(self) -> Optional[SliderMode]:
+        """Returns the current mode object, or the first available one as fallback."""
+        if self._current_mode:
+            return self._current_mode
+        for m in self._modes:
+            if isinstance(m, SliderMode):
+                return m
+        return None
 
     def _show_context_menu(self, pos: QPoint):
         if not self._modes:
@@ -759,25 +788,23 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         menu = cw.MenuWidget(parent=self)
         group = QActionGroup(menu)
+        active = self._get_active_mode()
 
-        for item in self._modes:
-            if item == "separator":
+        for mode in self._modes:
+            if mode == "separator":
                 menu.addSeparator()
                 continue
 
-            label = item.get("label", "Mode")
-            key = item.get("key", label)
-            description = item.get("description", "")
-
-            act = menu.addAction(label, description=description)
+            act = menu.addAction(mode.label, description=mode.description)
             act.setCheckable(True)
             act.setActionGroup(group)
 
-            is_current = key == self._current_mode
+            is_current = active and (mode.key == active.key or mode.label == active.label)
             act.setChecked(is_current)
-            act.setEnabled(not is_current)
+            if is_current:
+                act.setEnabled(False)
 
-            act.triggered.connect(lambda *args, k=key: self.modeSelected.emit(k))
+            act.triggered.connect(lambda *args, m=mode: self.modeSelected.emit(m.key))
 
         menu.exec_(self.mapToGlobal(pos))
         menu.deleteLater()

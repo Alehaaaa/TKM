@@ -356,8 +356,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.workspaceControl(workspace_control, **kwargs)
 
         # Force initial resize
-        QTimer.singleShot(100, self.update_height)
         QTimer.singleShot(200, self.shelf_tabbar)
+        QTimer.singleShot(500, self.update_height)
 
     def visible_change_command(self, *args):
         if not isValid(self):
@@ -433,89 +433,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         tab_handle.tabBar().setVisible(True)
 
     def update_height(self):
-        if not isValid(self):
-            return
-
-        if not hasattr(self, "main_toolbar_widget") or not self.main_toolbar_widget or not isValid(self.main_toolbar_widget):
-            return
-
-        # Calculate height based on flow layout
-        layout = self.main_toolbar_widget.layout()
-        if not layout or not hasattr(layout, "heightForWidth"):
-            return
-
-        w = self.width()
-        if w <= 0:
-            w = 900
-
-        needed_h = layout.heightForWidth(w)
-        # Add some padding for safety
-        needed_h += 4
-
-        def get_qt():
-            try:
-                parent = self.parent()
-                workspace_control = parent.objectName() if parent and isValid(parent) else self.objectName() + "WorkspaceControl"
-            except (AttributeError, RuntimeError):
-                workspace_control = self.objectName() + "WorkspaceControl"
-
-            return wutil.get_control_widget(workspace_control)
-
-        # Get the real Maya Main Window handle to avoid accidental re-sizing of it
-        m_win_ptr = mui.MQtUtil.mainWindow()
-        maya_win = wrapInstance(int(m_win_ptr), QtWidgets.QWidget) if m_win_ptr else None
-
-        if self.isFloating():
-            tkm_ui = get_qt()
-            if not tkm_ui or not isValid(tkm_ui):
+        if not self.isFloating():
+            workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
+            tkm_widget = mui.MQtUtil.findControl(workspace_control)
+            if not tkm_widget:
                 return
+            tkm_ui = wutil.get_maya_qt(tkm_widget, QtWidgets.QWidget)
+            tkm_ui = tkm_ui.parent().parent()
 
-            parents = []
-            curr = tkm_ui
-            try:
-                while True:
-                    p = curr.parent()
-                    if p and isValid(p):
-                        parents.append(p)
-                        if isinstance(p, QtWidgets.QMainWindow) or p.objectName() == "MayaWindow":
-                            break
-                        curr = p
-                    else:
-                        break
-
-                target = None
-                if parents:
-                    if isinstance(parents[-1], QtWidgets.QMainWindow) or parents[-1].objectName() == "MayaWindow":
-                        if len(parents) >= 2:
-                            target = parents[-2]
-                    else:
-                        target = parents[-1]
-
-                if target and isValid(target):
-                    # SAFETY: Never resize the main window or its direct children if they are the top window
-                    if target == maya_win or target.objectName() == "MayaWindow" or isinstance(target, QtWidgets.QMainWindow):
-                        return
-                    # Use setFixedHeight to lock it to necessary space
-                    target.setFixedHeight(needed_h + 30)
-            except (RuntimeError, AttributeError):
-                pass
-        else:
-            tkm_ui = get_qt()
-            if not tkm_ui or not isValid(tkm_ui):
-                return
-
-            try:
-                # Match cams.py hierarchy: root of the workspaceControl is often parent of parent
-                target = tkm_ui.parent().parent() if tkm_ui.parent() and tkm_ui.parent().parent() else tkm_ui
-
-                if target and isValid(target):
-                    # SAFETY: Never resize the main window!
-                    if target == maya_win or target.objectName() == "MayaWindow" or isinstance(target, QtWidgets.QMainWindow):
-                        return
-                    # Use setFixedHeight as in cams.py for proper docking behavior
-                    target.setFixedHeight(needed_h)
-            except (RuntimeError, AttributeError):
-                pass
+            self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+            self.main_toolbar_widget._update_height()
+            tkm_ui.resize(tkm_ui.width(), wutil.DPI(self.main_toolbar_widget.height() + 4))
+            # tkm_ui.setFixedHeight(wutil.DPI(self.main_toolbar_widget.height() + 4))
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -586,7 +515,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 action.setEnabled(wutil.check_visible_layout(layout))
 
     def _create_dock_menu(self):
-        self.dock_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Dock Window")
+        self.dock_menu = cw.MenuWidget(QtGui.QIcon(media.dock_image), "Dock Window", description="Dock the toolbar to different Maya UI panels.")
 
         self.pos_ac_group = QActionGroup(self)
         for orient, name in self.docking_orients.items():
@@ -2025,7 +1954,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                         command=lambda x, s=sub_sel_set: self.select_set_items_window(s),
                         p=selset_button,
                     )
-                    move_selset_submenu = cmds.menuItem(subMenu=True, image=media.move_selection_set_image, label="Move to ...", p=selset_button)
+                    move_selset_submenu = cmds.menuItem(subMenu=True, image=media.move_selection_set_image, label="Nudge to ...", p=selset_button)
 
                     # Obtener los setgroups que están dentro de "TheKeyMachine_SelectionSet"
                     valid_setgroups = [sg for sg in set_groups if cmds.sets(sg, isMember=sel_set_name)]
@@ -2654,43 +2583,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         ### ______________________________________________________ TOOLBAR ICON SIZE  ___________________________________________________
 
-        def get_current_icon_size():
-            w, h, size = read_toolbar_icon_size()
-            if w == 26 and h == 26:
-                return "Small"
-            elif w == 28 and h == 28:
-                return "Medium"
-            elif w == 31 and h == 31:
-                return "Big"
-            else:
-                return None  # Esta línea es en caso de que las dimensiones no coincidan con ninguno de los tamaños esperados
-
-        def read_toolbar_icon_size():
-            w = settings.get_setting("toolbar_icon_w", 28)
-            h = settings.get_setting("toolbar_icon_h", 28)
-            size = settings.get_setting("toolbar_size", 1550)
-            return w, h, size
-
-        def update_toolbar_icon_size(w, h, size):
-            settings.set_setting("toolbar_icon_w", w)
-            settings.set_setting("toolbar_icon_h", h)
-            settings.set_setting("toolbar_size", size)
-
-        def set_icon_size_small(value):
-            if value:
-                update_toolbar_icon_size(26, 26, 1550)
-                self.reload()
-
-        def set_icon_size_medium(value):
-            if value:
-                update_toolbar_icon_size(28, 28, 1580)
-                self.reload()
-
-        def set_icon_size_big(value):
-            if value:
-                update_toolbar_icon_size(31, 31, 1650)
-                self.reload()
-
         def get_current_icon_alignment():
             return read_toolbar_icon_alignment()
 
@@ -2698,38 +2590,21 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             return settings.get_setting("toolbar_icon_alignment", "Center")
 
         def update_toolbar_icon_alignment(alignment):
-            settings.set_setting("toolbar_icon_alignment", alignment)
-
-        def set_icon_alignment_left(value):
-            if value:
-                update_toolbar_icon_alignment("Left")
+            if alignment:
+                settings.set_setting("toolbar_icon_alignment", alignment)
                 self.reload()
-
-        def set_icon_alignment_center(value):
-            if value:
-                update_toolbar_icon_alignment("Center")
-                self.reload()
-
-        def set_icon_alignment_right(value):
-            if value:
-                update_toolbar_icon_alignment("Right")
-                self.reload()
-
-        ### ______________________________________________________ TOOLTIPS ___________________________________________________
-
-        ### ______________________________________________________ TOOLBAR LAYOUT _____________________________________________________________________###
 
         ### ______________________________________________________ TOOLBAR LAYOUT _____________________________________________________________________###
 
         if self.layout():
             QtWidgets.QWidget().setLayout(self.layout())
 
-        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(0)
-        col_layout = self.main_layout
+        self.main_toolbar_widget = cw.QFlowContainer()
+        self.main_layout.addWidget(self.main_toolbar_widget)
 
-        self.main_toolbar_widget = QtWidgets.QWidget()
         # Use QFlowLayout to allow wrapping
         toolbar_alignment_str = get_current_icon_alignment()
         qt_alignment = QtCore.Qt.AlignLeft
@@ -2740,33 +2615,27 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         rowtoolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=18, Hspacing=6, alignment=qt_alignment)
 
-        def new_section(spacing=2):
-            sec = cw.QFlatSectionWidget(spacing=spacing)
+        def new_section(spacing=2, hiddeable=True):
+            sec = cw.QFlatSectionWidget(spacing=spacing, hiddeable=hiddeable)
             rowtoolbar_layout.addWidget(sec)
             return sec
 
         # Placeholder for tooltip functions to be defined later
         show_tooltips = settings.get_setting("show_tooltips", True)
-
-        def toggle_tooltips(value):
-            pass
+        self._toggle_tooltips_func = None
 
         sec = new_section(spacing=8)
-
-        col_layout.addWidget(self.main_toolbar_widget)
 
         # _____________________ Key Editing Section __________________________________________________ #
         sec = new_section(spacing=2)
 
-        move_key_left_b_widget = cw.QFlatToolButton()
-        move_key_left_b_widget.setText(" < ")
-        move_key_left_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(-self.move_keyframes_intField.value()))
-        sec.addWidget(move_key_left_b_widget, "Move Left", "move_left")
+        nudge_keyleft_b_widget = cw.QFlatToolButton(icon=media.nudge_left_image, description="Nudge Left")
+        nudge_keyleft_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(-self.move_keyframes_intField.value()))
+        sec.addWidget(nudge_keyleft_b_widget, "Nudge Left", "move_left")
 
-        remove_inbetween_b_widget = cw.QFlatToolButton()
-        remove_inbetween_b_widget.setText(" - ")
-        remove_inbetween_b_widget.clicked.connect(keyTools.remove_inbetween)
-        sec.addWidget(remove_inbetween_b_widget, "Remove Inbetween", "remove_inbetween")
+        nudge_keyright_b_widget = cw.QFlatToolButton(icon=media.nudge_right_image, description="Nudge Right")
+        nudge_keyright_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(self.move_keyframes_intField.value()))
+        sec.addWidget(nudge_keyright_b_widget, "Nudge Right", "move_right")
 
         self.move_keyframes_intField = cw.QFlatSpinBox()
         self.move_keyframes_intField.setFixedSize(50, 24)
@@ -2775,15 +2644,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.move_keyframes_intField.setStyleSheet("border: 0px;border-radius: 5px;")
         sec.addWidget(self.move_keyframes_intField, "Nudge Value", "nudge_val")
 
-        add_inbetween_b_widget = cw.QFlatToolButton()
-        add_inbetween_b_widget.setText(" + ")
-        add_inbetween_b_widget.clicked.connect(keyTools.add_inbetween)
-        sec.addWidget(add_inbetween_b_widget, "Add Inbetween", "add_inbetween")
+        remove_inbetween_b_widget = cw.QFlatToolButton()
+        remove_inbetween_b_widget.setText(" - ")
+        remove_inbetween_b_widget.clicked.connect(keyTools.remove_inbetween)
+        sec.addWidget(remove_inbetween_b_widget, "Remove Inbetween", "remove_inbetween")
 
-        move_key_right_b_widget = cw.QFlatToolButton()
-        move_key_right_b_widget.setText(" > ")
-        move_key_right_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(self.move_keyframes_intField.value()))
-        sec.addWidget(move_key_right_b_widget, "Move Right", "move_right")
+        insert_inbetween_b_widget = cw.QFlatToolButton()
+        insert_inbetween_b_widget.setText(" + ")
+        insert_inbetween_b_widget.clicked.connect(keyTools.insert_inbetween)
+        sec.addWidget(insert_inbetween_b_widget, "Insert Inbetween", "insert_inbetween")
 
         clear_selected_keys_widget = cw.QFlatToolButton()
         clear_selected_keys_widget.setText(" x ")
@@ -2859,15 +2728,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
             # update_blend_label_with_slider_value(value)
 
-
-
         def update_button_with_current_frame(button_name):
             # Obtener el número del frame actual
             current_frame = cmds.currentTime(query=True)
             # Actualizar el texto del botón con el número del frame
             cmds.button(button_name, edit=True, label=str(int(current_frame)))
-
-
 
         # _____________________ Sliders Sections ____________________________ #
         blend_to_key_left_b_qt = cw.QFlatToolButton()
@@ -2895,38 +2760,43 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 right_frame = None
             keyTools.blend_to_frame(percentage, left_frame, right_frame)
 
-        def add_mode_sliders(modes_list, default_key_setting, prefix, color, change_func, drop_func, ws_support=False):
+        def add_mode_sliders(modes_list, default_key_setting, prefix, color, change_func, drop_func, default_modes=None, ws_support=False):
             # Create a new section for each slider color/type
             sec = new_section(spacing=4)
 
-            current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
-            default_keys = []
-            
+            current_default = settings.get_setting(
+                default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"]
+            )
+
+            # Static default list for "Pin Defaults" — uses provided list or falls back to current default
+            if default_modes:
+                static_default_keys = [f"{prefix}_{k}" for k in default_modes]
+            else:
+                static_default_keys = [f"{prefix}_{current_default}"]
+
             for m in modes_list:
                 if m == "separator":
                     sec.addSeparator()
                     continue
                 if not isinstance(m, dict):
                     continue
-                
+
                 key = m["key"]
                 label = m["label"]
                 desc = m.get("description", "")
                 icon = m.get("icon", "SL")
-                
+
                 # Check for specialized commands
                 command = None
                 show_frames = False
-                
+
                 if key == "blend_to_frame":
                     command = blend_to_frame_with_button_values
                     show_frames = True
-                
-                # Create a slider for every mode
-                is_visible = (key == current_default)
-                if is_visible:
-                    default_keys.append(f"{prefix}_{key}")
-                
+
+                # Determine initial visibility: pinned setting takes priority, fallback to default_modes membership
+                is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys)
+
                 s = sw.QFlatSliderWidget(
                     f"bar_{prefix}_{key}",
                     min=-120 if prefix == "tween" else -100,
@@ -2940,16 +2810,17 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     tooltipDescription=desc,
                 )
                 s.setModes(modes_list)
-                
+
                 # Setup mode switching
                 def make_mode_setter(slider_instance, prefix_val, show_f):
                     def setter(new_mode):
-                        settings.set_setting(f"current_{prefix_val}_slider_mode", new_mode)
+                        # Use standardized setting names: current_blend_mode, current_tween_mode
+                        settings.set_setting(f"current_{prefix_val}_mode", new_mode)
                         slider_instance.setCurrentMode(new_mode)
                         m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
                         if m_info:
                             slider_instance.set_tooltip_info(m_info["label"], m_info.get("description", ""))
-                        
+
                         # Handle specialized frames visibility
                         if new_mode == "blend_to_frame":
                             blend_to_key_left_b_qt.show()
@@ -2959,12 +2830,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                             blend_to_key_left_b_qt.hide()
                             blend_to_key_right_b_qt.hide()
                             slider_instance.setDragCommand(lambda v, nk=new_mode: change_func(nk, v))
-                        
+
                         slider_instance.startFlash()
+
                     return setter
 
                 s.modeSelected.connect(make_mode_setter(s, prefix, show_frames))
-                
+
                 if ws_support:
                     is_ws = "worldspace" in key.lower() or "world space" in key.lower()
                     s.setWorldSpace(is_ws)
@@ -2973,15 +2845,35 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
 
             # Add the final pin actions (Pin Defaults/All)
-            sec.add_final_actions(default_keys)
+            sec.add_final_actions(static_default_keys)
 
         # Helper wrappers
-        def bar_tween_change(m, v): sliders.execute_tween(m, v)
-        def bar_blend_change(m, v): sliders.execute_curve_modifier(m, v, graph_editor=False)
+        def bar_tween_change(m, v):
+            sliders.execute_tween(m, v)
 
-        # Create separate sections for Blend and Tween sliders
-        add_mode_sliders(sliders.BLEND_MODES, "current_blend_slider_mode", "blend", COLOR.color.green, bar_blend_change, sliders.stop_dragging)
-        add_mode_sliders(sliders.TWEEN_MODES, "current_tween_slider_mode", "tween", COLOR.color.yellow, bar_tween_change, sliders.stop_dragging, ws_support=True)
+        def bar_blend_change(m, v):
+            sliders.execute_curve_modifier(m, v, graph_editor=False)
+
+        # Create separate sections for Blend and Tween sliders - Standardized setting names
+        add_mode_sliders(
+            sliders.BLEND_MODES,
+            "current_blend_mode",
+            "blend",
+            COLOR.color.green,
+            bar_blend_change,
+            sliders.stop_dragging,
+            default_modes=["connect_neighbors"],
+        )
+        add_mode_sliders(
+            sliders.TWEEN_MODES,
+            "current_tween_mode",
+            "tween",
+            COLOR.color.yellow,
+            bar_tween_change,
+            sliders.stop_dragging,
+            default_modes=["tweener"],
+            ws_support=True,
+        )
 
         # ----------------------------------------------- ToolsButtons -------------------------------------------------------- #
 
@@ -3541,7 +3433,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         initialize_scripts_menu()
 
         # _____________________ Workspaces Section ____________________________ #
-        sec = new_section(spacing=2)
+        sec = new_section(spacing=2, hiddeable=False)
 
         overshootSliders = settings.get_setting("sliders_overshoot", False)
 
@@ -3557,8 +3449,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         toolbar_menu = cw.MenuWidget(parent=toolbar_config_button_widget)
 
         # === Help submenu ===
-        help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help", description="Resources for help and learning.")
-        toolbar_menu.addMenu(help_menu)
+        help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help")
+        toolbar_menu.addMenu(help_menu, description="Resources for help, documentation and community.")
         help_menu.addAction(
             QtGui.QIcon(media.discord_image),
             "Discord Community",
@@ -3579,84 +3471,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         )
 
         # === Config submenu ===
-        config_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Config", description="Tool configuration and preferences.")
-        toolbar_menu.addMenu(config_menu)
+        config_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Config")
+        toolbar_menu.addMenu(config_menu, description="Tool configuration, hotkeys and UI preferences.")
         config_menu.addSection("Shelf icon")
         config_menu.addAction("Add Toggle Button To Shelf", self.create_shelf_icon, description="Creates a shelf button to show/hide this toolbar.")
 
         config_menu.addSection("Tools settings")
         show_tooltips_action = config_menu.addAction("Show tooltips", description="Show or hide floating tooltips.")
         show_tooltips_action.setCheckable(True)
-        show_tooltips_action.setChecked(show_tooltips)
-        show_tooltips_action.toggled.connect(toggle_tooltips)
-
-        overshoot_action = config_menu.addAction("Overshoot Sliders", description="Allow sliders to reach values beyond -100 to 100.")
-        overshoot_action.setCheckable(True)
-        overshoot_action.setChecked(overshootSliders)
-        overshoot_action.toggled.connect(_setOvershoot)
-
-        config_menu.addSection("Toolbar's icons size")
-        size_group = QActionGroup(config_menu)
-        small_action = config_menu.addAction("Small", description="Set icon size to Small.")
-        medium_action = config_menu.addAction("Medium", description="Set icon size to Medium.")
-        big_action = config_menu.addAction("Big", description="Set icon size to Big.")
-        for act in (small_action, medium_action, big_action):
-            act.setCheckable(True)
-            size_group.addAction(act)
-
-        small_action.triggered.connect(set_icon_size_small)
-        medium_action.triggered.connect(set_icon_size_medium)
-        big_action.triggered.connect(set_icon_size_big)
-
-        current_size = get_current_icon_size()
-        {"Small": small_action, "Medium": medium_action, "Big": big_action}.get(current_size, medium_action).setChecked(True)
-
-        config_menu.addSection("Toolbar's icons alignment")
-        align_group = QActionGroup(config_menu)
-        left_align_action = config_menu.addAction("Left", description="Align icons to the left.")
-        center_align_action = config_menu.addAction("Center", description="Align icons to the center.")
-        right_align_action = config_menu.addAction("Right", description="Align icons to the right.")
-        for act in (left_align_action, center_align_action, right_align_action):
-            act.setCheckable(True)
-            align_group.addAction(act)
-
-        left_align_action.triggered.connect(set_icon_alignment_left)
-        center_align_action.triggered.connect(set_icon_alignment_center)
-        right_align_action.triggered.connect(set_icon_alignment_right)
-
-        current_align = get_current_icon_alignment()
-        {"Left": left_align_action, "Center": center_align_action, "Right": right_align_action}.get(current_align, center_align_action).setChecked(
-            True
-        )
-
-        config_menu.addSection("Hotkeys")
-        config_menu.addAction("Add TheKeyMachine Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys for TKM tools.")
-
-        config_menu.addSection("General")
-        config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")
-
-        toolbar_menu.addMenu(self._create_dock_menu())
-
-        # Separators and others
-        toolbar_menu.addSeparator()
-        toolbar_menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
-        toolbar_menu.addSeparator()
-        toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
-
-        def _open_menu_at_cursor():
-            toolbar_menu.popup(QtGui.QCursor.pos())
-
-        def _on_toolbar_context_menu(pos):
-            if self.main_toolbar_widget.childAt(pos):
-                return
-            _open_menu_at_cursor()
-
-        toolbar_config_button_widget.clicked.connect(_open_menu_at_cursor)
-        toolbar_config_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        toolbar_config_button_widget.customContextMenuRequested.connect(lambda _pos: _open_menu_at_cursor())
-
-        self.main_toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.main_toolbar_widget.customContextMenuRequested.connect(_on_toolbar_context_menu)
 
         def read_show_tooltips():
             return settings.get_setting("show_tooltips", True)
@@ -3664,12 +3486,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         def update_show_tooltips(value):
             settings.set_setting("show_tooltips", value)
 
-        def toggle_tooltips(value):
-            update_show_tooltips(value)
-            update_tooltips()
-
         def update_tooltips():
             show_tooltips_val = read_show_tooltips()
+
+            from TheKeyMachine.tooltips import QFlatTooltipManager
+
+            QFlatTooltipManager.enabled = show_tooltips_val
 
             def get_safe_helper(attr_name):
                 return getattr(helper, attr_name, "")
@@ -3700,40 +3522,89 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 (toolBox_button_widget, get_safe_helper("custom_tools_tooltip_text")),
                 (customScripts_button_widget, get_safe_helper("custom_scripts_tooltip_text")),
                 (self.move_keyframes_intField, get_safe_helper("move_keyframes_intField_widget_tooltip_text")),
-                (move_key_left_b_widget, get_safe_helper("move_key_left_b_widget_tooltip_text")),
+                (nudge_keyleft_b_widget, get_safe_helper("nudge_keyleft_b_widget_tooltip_text")),
                 (remove_inbetween_b_widget, get_safe_helper("remove_inbetween_b_widget_tooltip_text")),
-                (add_inbetween_b_widget, get_safe_helper("add_inbetween_b_widget_tooltip_text")),
-                (move_key_right_b_widget, get_safe_helper("move_key_right_b_widget_tooltip_text")),
+                (insert_inbetween_b_widget, get_safe_helper("insert_inbetween_b_widget_tooltip_text")),
+                (nudge_keyright_b_widget, get_safe_helper("nudge_keyright_b_widget_tooltip_text")),
                 (clear_selected_keys_widget, get_safe_helper("clear_selected_keys_widget_tooltip_text")),
                 (select_scene_animation_widget, get_safe_helper("select_scene_animation_widget_tooltip_text")),
-
                 (toolbar_config_button_widget, "<b>Config</b><br><br>Open TheKeyMachine configuration and help menu."),
             ]
 
             for button_widget, tooltip_html in buttons_and_tooltips:
                 try:
+                    if not show_tooltips_val:
+                        pass
+
                     if hasattr(button_widget, "set_tooltip_info"):
-                        if show_tooltips_val:
-                            button_widget.set_tooltip_info(*sliders.parse_tt(tooltip_html))
-                        else:
-                            button_widget.set_tooltip_info("", "")
+                        button_widget.set_tooltip_info(*sliders.parse_tt(tooltip_html))
                     elif hasattr(button_widget, "set_tooltip_data"):
-                        if show_tooltips_val:
-                            button_widget.set_tooltip_data(text=tooltip_html)
-                        else:
-                            button_widget.set_tooltip_data(text="")
-                    else:
-                        button_widget.setToolTip(tooltip_html if show_tooltips_val else "")
+                        button_widget.set_tooltip_data(text=tooltip_html)
                 except Exception:
                     pass
 
-        # Update config menu check state
+        def toggle_tooltips(value):
+            update_show_tooltips(value)
+            update_tooltips()
+
+        self._toggle_tooltips_func = toggle_tooltips
         show_tooltips_action.setChecked(show_tooltips)
-        show_tooltips_action.toggled.disconnect()
-        show_tooltips_action.toggled.connect(toggle_tooltips)
+        show_tooltips_action.toggled.connect(self._toggle_tooltips_func)
 
         # Initial call
         update_tooltips()
+
+        overshoot_action = config_menu.addAction("Overshoot Sliders", description="Allow sliders to reach values beyond -100 to 100.")
+        overshoot_action.setCheckable(True)
+        overshoot_action.setChecked(overshootSliders)
+        overshoot_action.toggled.connect(_setOvershoot)
+
+        config_menu.addSection("Toolbar's icons alignment")
+        align_group = QActionGroup(config_menu)
+        left_align_action = config_menu.addAction("Left", description="Align icons to the left.")
+        center_align_action = config_menu.addAction("Center", description="Align icons to the center.")
+        right_align_action = config_menu.addAction("Right", description="Align icons to the right.")
+        for act in (left_align_action, center_align_action, right_align_action):
+            act.setCheckable(True)
+            align_group.addAction(act)
+
+        left_align_action.triggered.connect(lambda: update_toolbar_icon_alignment("Left"))
+        center_align_action.triggered.connect(lambda: update_toolbar_icon_alignment("Center"))
+        right_align_action.triggered.connect(lambda: update_toolbar_icon_alignment("Right"))
+
+        current_align = get_current_icon_alignment()
+        {"Left": left_align_action, "Center": center_align_action, "Right": right_align_action}.get(current_align, center_align_action).setChecked(
+            True
+        )
+
+        config_menu.addSection("Hotkeys")
+        config_menu.addAction("Add TheKeyMachine Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys for TKM tools.")
+
+        config_menu.addSection("General")
+        config_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")
+
+        toolbar_menu.addMenu(self._create_dock_menu(), description="Dock the toolbar to different Maya UI panels.")
+
+        # Separators and others
+        toolbar_menu.addSeparator()
+        toolbar_menu.addAction(QtGui.QIcon(media.uninstall_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
+        toolbar_menu.addSeparator()
+        toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
+
+        def _open_menu_at_cursor():
+            toolbar_menu.popup(QtGui.QCursor.pos())
+
+        def _on_toolbar_context_menu(pos):
+            if self.main_toolbar_widget.childAt(pos):
+                return
+            _open_menu_at_cursor()
+
+        toolbar_config_button_widget.clicked.connect(_open_menu_at_cursor)
+        toolbar_config_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        toolbar_config_button_widget.customContextMenuRequested.connect(lambda _pos: _open_menu_at_cursor())
+
+        self.main_toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.main_toolbar_widget.customContextMenuRequested.connect(_on_toolbar_context_menu)
 
 
 _toolbar_instance = None

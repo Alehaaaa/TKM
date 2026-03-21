@@ -493,6 +493,7 @@ class QFlatTooltipManager(object):
 
     _current_tooltip = None
     _timer = None
+    enabled = True
 
     @classmethod
     def is_active(cls):
@@ -526,6 +527,8 @@ class QFlatTooltipManager(object):
         icon_obj=None,
         target_rect=None,
     ):
+        if not cls.enabled:
+            return
         if cls._timer:
             cls._timer.stop()
         # Guard: if anchor_widget has been deleted by the time we show, bail out
@@ -545,6 +548,8 @@ class QFlatTooltipManager(object):
 
     @classmethod
     def delayed_show(cls, delay=800, **kwargs):
+        if not cls.enabled:
+            return
         if cls._timer and cls._timer.isActive():
             cls._timer.stop()
 
@@ -558,13 +563,16 @@ class QFlatTooltipManager(object):
             pass
 
         anchor = kwargs.get("anchor_widget")
+
         def _safe_show():
             if anchor is not None and not wutil.is_valid_widget(anchor):
                 return
             cls.show(**kwargs)
+
         cls._timer.timeout.connect(_safe_show)
         cls._timer.setInterval(delay)
         cls._timer.start()
+
 
 def parse_tt(html):
     """
@@ -573,10 +581,10 @@ def parse_tt(html):
     """
     if not html:
         return "", ""
-    
+
     # Split by double break (common TKM separator)
     parts = re.split(r"<br\s*/?>\s*<br\s*/?>", html, maxsplit=1, flags=re.IGNORECASE)
     header = parts[0].strip()
     description = parts[1].strip() if len(parts) > 1 else ""
-    
+
     return header, description

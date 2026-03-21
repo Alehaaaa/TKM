@@ -886,6 +886,7 @@ def clear_selected_keys(*args):
 def __get_move_keyframes_offset():
     try:
         from TheKeyMachine.core.toolbar import get_toolbar
+
         tb = get_toolbar()
 
         if tb and hasattr(tb, "move_keyframes_intField"):
@@ -908,7 +909,7 @@ def hotkey_move_keyframes_right():
 # _____
 
 
-def add_inbetween(*args):
+def insert_inbetween(*args):
     mel.eval("timeSliderEditKeys addInbetween")
     currentT = cmds.currentTime(q=True)
     moveLeft = currentT + 1
@@ -923,79 +924,91 @@ def remove_inbetween(*args):
 
 
 def move_keyframes_in_range(*args):
-
-    # Use explicitly passed offset, or fetch from the toolbar spinbox
     if args and isinstance(args[0], (int, float)):
-        desplazamiento = int(args[0])
+        offset = int(args[0])
     else:
-        desplazamiento = __get_move_keyframes_offset()
-        # Fallback for old behaviour where -1 was passed as a direction flag
+        offset = __get_move_keyframes_offset()
         if args and args[0] == -1:
-            desplazamiento = -desplazamiento
+            offset = -offset
 
-    currentT = cmds.currentTime(q=True)
+    if not offset:
+        return
 
-    # Obtén el control deslizante de tiempo actual
-    aTimeSlider = mel.eval("$tmpVar=$gPlayBackSlider")
+    current_time = cmds.currentTime(q=True)
 
-    # Obtén el rango seleccionado en el rangeSlider
-    timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
+    time_slider = mel.eval("$tmpVar=$gPlayBackSlider")
+    time_range = cmds.timeControl(time_slider, q=True, rangeArray=True)
 
-    start_frame = int(timeRange[0])
-    end_frame = int(timeRange[1])
+    start_frame = int(time_range[0])
+    end_frame = int(time_range[1])
+    has_range = abs(end_frame - start_frame) > 1
 
-    # Verifica si hay un rango seleccionado
-    if abs(end_frame - start_frame) > 1:
-        cmds.undoInfo(openChunk=True)
+    selection = cmds.ls(selection=True, long=True) or []
 
-        # Obtén todas las curvas de animación en la escena
-        animation_curves = cmds.ls(type="animCurve")
-        cmds.selectKey(clear=True)
+    cmds.undoInfo(openChunk=True)
+    try:
+        if has_range:
+            if selection:
+                animation_curves = cmds.keyframe(selection, q=True, name=True) or []
+            else:
+                animation_curves = cmds.ls(type="animCurve") or []
 
-        for curve in animation_curves:
-            # Filtra las curvas que no tienen keyframes en el rango de tiempo
-            if not cmds.keyframe(curve, query=True, time=(start_frame, end_frame)):
+            animation_curves = list(set(animation_curves))
+            if not animation_curves:
+                return
+
+            curves_in_range = [curve for curve in animation_curves if cmds.keyframe(curve, query=True, time=(start_frame, end_frame))]
+
+            if not curves_in_range:
+                return
+
+            cmds.keyframe(
+                curves_in_range, edit=True, relative=True, includeUpperBound=True, option="over", time=(start_frame, end_frame), timeChange=offset
+            )
+            cmds.currentTime(current_time + offset)
+            return
+
+        selected_keys = cmds.keyframe(query=True, selected=True, tc=True) or []
+        if selected_keys:
+            cmds.keyframe(edit=True, animation="keys", relative=True, includeUpperBound=True, option="over", timeChange=offset)
+            return
+
+        if not selection:
+            return
+
+        objects_with_key_at_current = []
+        grouped_source_times = {}
+
+        for obj in selection:
+            key_times = cmds.keyframe(obj, query=True, tc=True) or []
+            if not key_times:
                 continue
 
-            # Selecciona todos los keyframes de la curva dentro del rango seleccionado
-            cmds.selectKey(curve, time=(start_frame, end_frame), add=True)
+            key_times = sorted(set(key_times))
 
-        # Mueve los keyframes seleccionados
-        # Inicia un nuevo bloque de deshacer
-        cmds.keyframe(edit=True, includeUpperBound=True, animation="keys", relative=True, option="over", timeChange=desplazamiento)
+            if current_time in key_times:
+                objects_with_key_at_current.append(obj)
+                continue
 
-        # Mover el tiempo un frame a la izquierda
-        moveLeft = currentT + desplazamiento
-        cmds.currentTime(moveLeft)
-        cmds.undoInfo(closeChunk=True)
-
-    else:
-        selection = cmds.ls(selection=True)
-
-        if selection:
-            # Comprobar si hay keyframes seleccionados
-            selected_keys = mel.eval("keyframe -query -selected")
-            if selected_keys:
-                # Si hay keyframes seleccionados, moverlos
-                mel.eval("keyframe -e -iub true -animation keys -r -o over -tc {}".format(desplazamiento))
+            if offset > 0:
+                candidates = [t for t in key_times if t < current_time]
+                source_time = candidates[-1] if candidates else None
             else:
-                for obj in selection:
-                    # Verificar si el objeto seleccionado tiene un keyframe en el tiempo actual
-                    hasKeyframe = cmds.keyframe(obj, query=True, time=(currentT, currentT))
-                    if hasKeyframe:
-                        # Comprobar si hay un keyframe en currentT + 1
-                        hasKeyframeBefore = cmds.keyframe(obj, query=True, time=(currentT + 1, currentT + 1))
+                candidates = [t for t in key_times if t > current_time]
+                source_time = candidates[0] if candidates else None
 
-                        # Opción 2: mover el keyframe en currentT - 1 a currentT - 2
-                        if hasKeyframeBefore:
-                            cmds.keyframe(obj, edit=True, timeChange=desplazamiento, relative=True, time=(currentT + 1, currentT + 1))
+            if source_time is not None:
+                grouped_source_times.setdefault(source_time, []).append(obj)
 
-                        # Mover el keyframe un frame a la izquierda
-                        cmds.keyframe(obj, edit=True, timeChange=desplazamiento, relative=True, time=(currentT, currentT))
+        if objects_with_key_at_current:
+            cmds.keyframe(objects_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset)
+            cmds.currentTime(current_time + offset)
+            return
 
-                # Mover el tiempo un frame a la izquierda
-                moveLeft = currentT + desplazamiento
-                cmds.currentTime(moveLeft)
+        for source_time, objects in grouped_source_times.items():
+            cmds.keyframe(objects, edit=True, absolute=True, option="over", time=(source_time, source_time), timeChange=current_time)
+    finally:
+        cmds.undoInfo(closeChunk=True)
 
 
 # _____________________________________________________________________________________________________________________

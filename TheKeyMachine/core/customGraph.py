@@ -148,7 +148,7 @@ def create_config_menu(parent_button):
     return menu
 
 
-def create_tkm_button(icon=None, text="", tooltip="", description="", command=None, p=None):
+def create_tool_button(icon=None, text="", tooltip="", description="", command=None, p=None):
     """Helper to create a QFlatToolButton with our tooltip system"""
     btn = cw.QFlatToolButton(icon=icon, text=text)
     if tooltip:
@@ -167,16 +167,17 @@ def createCustomGraph():
         return widget
 
     graph_vis = cmds.getPanel(vis=True)
+    layout = "customGraph_columnLayout"
 
     if "graphEditor1" in graph_vis:
-        if cmds.columnLayout("customGraph_columnLayout", exists=True):
-            cmds.deleteUI("customGraph_columnLayout")
-            cmds.columnLayout("customGraph_columnLayout", adj=1, p="graphEditor1")
+        if cmds.columnLayout(layout, exists=True):
+            cmds.deleteUI(layout)
+            cmds.columnLayout(layout, adj=1, p="graphEditor1")
         else:
-            cmds.columnLayout("customGraph_columnLayout", adj=1, p="graphEditor1")
+            cmds.columnLayout(layout, adj=1, p="graphEditor1")
     else:
         cmds.GraphEditor()
-        cmds.columnLayout("customGraph_columnLayout", adj=1, p="graphEditor1")
+        cmds.columnLayout(layout, adj=1, p="graphEditor1")
 
     flow_qw = cw.QFlowContainer()
     flow_qw.setObjectName("tkm_customGraph_flowToolbar")
@@ -195,7 +196,7 @@ def createCustomGraph():
         flowtoolbar_layout.addWidget(sec)
         return sec
 
-    parent_ptr = mui.MQtUtil.findControl("customGraph_columnLayout")
+    parent_ptr = mui.MQtUtil.findControl(layout)
     parent_qw = wutil.get_maya_qt(parent_ptr, QtWidgets.QWidget)
     if parent_qw and parent_qw.layout():
         parent_qw.layout().addWidget(flow_qw)
@@ -203,7 +204,7 @@ def createCustomGraph():
     # ________________ System/Core Section ___________________#
     sec = new_section()
 
-    config_btn = create_tkm_button(icon=media.settings_image, tooltip="Config", description="Tool configuration and preferences.")
+    config_btn = create_tool_button(icon=media.settings_image, tooltip="Config", description="Tool configuration and preferences.")
     sec.addWidget(config_btn, "Config", "config")
 
     config_menu = create_config_menu(config_btn)
@@ -212,7 +213,7 @@ def createCustomGraph():
     # ________________ Key Tools Buttons  ___________________#
     sec = new_section()
 
-    btn_static = create_tkm_button(
+    btn_static = create_tool_button(
         icon=media.delete_animation_image,
         text="S",
         tooltip="Static",
@@ -221,7 +222,7 @@ def createCustomGraph():
     )
     sec.addWidget(btn_static, "Static", "static")
 
-    btn_share = create_tkm_button(
+    btn_share = create_tool_button(
         icon=media.share_keys_image,
         text="H",
         tooltip="Share",
@@ -230,7 +231,7 @@ def createCustomGraph():
     )
     sec.addWidget(btn_share, "Share", "share")
 
-    btn_match = create_tkm_button(
+    btn_match = create_tool_button(
         icon=media.match_image,
         text="M",
         tooltip="Match",
@@ -239,12 +240,12 @@ def createCustomGraph():
     )
     sec.addWidget(btn_match, "Match", "match")
 
-    btn_flip = create_tkm_button(
+    btn_flip = create_tool_button(
         text="F", tooltip="Flip", description="Inverts the selected curve vertically.", command=lambda: keyTools.flipCurves()
     )
     sec.addWidget(btn_flip, "Flip", "flip")
 
-    btn_snap = create_tkm_button(
+    btn_snap = create_tool_button(
         text="Sn",
         tooltip="Snap",
         description="Performs a cleanup and repositioning of the keys that are in a sub-frame to the nearest frame.",
@@ -252,7 +253,7 @@ def createCustomGraph():
     )
     sec.addWidget(btn_snap, "Snap", "snap")
 
-    btn_overlap = create_tkm_button(
+    btn_overlap = create_tool_button(
         text="O",
         tooltip="Overlap",
         description="Applies an overlap frame to the selected curves.",
@@ -260,7 +261,7 @@ def createCustomGraph():
     )
     sec.addWidget(btn_overlap, "Overlap", "overlap")
 
-    btn_reblock = create_tkm_button(
+    btn_reblock = create_tool_button(
         icon=media.reblock_keys_image,
         text="rB",
         tooltip="reBlock",
@@ -268,7 +269,7 @@ def createCustomGraph():
         command=keyTools.reblock_move,
     )
     sec.addWidget(btn_reblock, "reBlock", "reblock")
-    extra_btn = create_tkm_button(text="E", tooltip="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes())
+    extra_btn = create_tool_button(text="E", tooltip="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes())
     sec.addWidget(extra_btn, "Extra Tools", "extra")
     extra_menu = cw.MenuWidget(parent=extra_btn)
     extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
@@ -278,33 +279,34 @@ def createCustomGraph():
 
     # _________________  Slider Logic & Wrappers ____________________#
 
-
-
     # 1. Sliders Sections - Tween, Blend, and Tangent
-    def add_mode_sliders(modes_list, default_key_setting, prefix, color, change_func, drop_func, ws_support=False):
+    def add_mode_sliders(modes_list, default_key_setting, prefix, color, change_func, drop_func, default_modes=None, ws_support=False):
         # Create a new section for each slider color/type
         sec = new_section()
-        
+
         current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
-        default_keys = []
-        
+
+        # Static default list for "Pin Defaults"
+        if default_modes:
+            static_default_keys = [f"{prefix}_{k}" for k in default_modes]
+        else:
+            static_default_keys = [f"{prefix}_{current_default}"]
+
         for m in modes_list:
             if m == "separator":
                 sec.addSeparator()
                 continue
             if not isinstance(m, dict):
                 continue
-            
+
             key = m["key"]
             label = m["label"]
             desc = m.get("description", "")
             icon = m.get("icon", "SL")
-            
-            # We create a slider for every mode, but only the current default is visible by default
-            is_visible = (key == current_default)
-            if is_visible:
-                default_keys.append(f"{prefix}_{key}")
-            
+
+            # Determine initial visibility: pinned setting takes priority, fallback to default_modes membership
+            is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys)
+
             s = sw.QFlatSliderWidget(
                 f"customGraph_{prefix}_{key}",
                 min=-100,
@@ -318,7 +320,7 @@ def createCustomGraph():
                 tooltipDescription=desc,
             )
             s.setModes(modes_list)
-            
+
             # Setup mode switching for this specific slider instance
             def make_mode_setter(slider_instance, prefix_val):
                 def setter(new_mode):
@@ -331,10 +333,11 @@ def createCustomGraph():
                     if m_info:
                         slider_instance.set_tooltip_info(m_info["label"], m_info.get("description", ""))
                     slider_instance.startFlash()
+
                 return setter
 
             s.modeSelected.connect(make_mode_setter(s, prefix))
-            
+
             if ws_support:
                 is_ws = "worldspace" in key.lower() or "world space" in key.lower()
                 s.setWorldSpace(is_ws)
@@ -342,21 +345,35 @@ def createCustomGraph():
             sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
 
         # Add the final pin actions at the bottom of the section menu
-        sec.add_final_actions(default_keys)
+        sec.add_final_actions(static_default_keys)
 
     # Helper wrappers to match sliders.execute_* signatures
-    def tween_change(m, v): sliders.execute_tween(m, v)
-    def blend_change(m, v): sliders.execute_curve_modifier(m, v, graph_editor=True)
-    def tangent_change(m, v): sliders.execute_tangent_blend(m, v, graph_editor=True)
+    def tween_change(m, v):
+        sliders.execute_tween(m, v)
 
-    add_mode_sliders(sliders.TWEEN_MODES, "graph_tween_mode", "tween", COLOR.color.yellow, tween_change, sliders.stop_dragging, ws_support=True)
-    add_mode_sliders(sliders.BLEND_MODES, "graph_blend_mode", "blend", COLOR.color.green, blend_change, sliders.stop_dragging)
-    add_mode_sliders(sliders.TANGENT_MODES, "graph_tangent_mode", "tangent", COLOR.color.orange, tangent_change, sliders.stop_dragging)
+    def blend_change(m, v):
+        sliders.execute_curve_modifier(m, v, graph_editor=True)
 
+    def tangent_change(m, v):
+        sliders.execute_tangent_blend(m, v, graph_editor=True)
+
+    add_mode_sliders(
+        sliders.TWEEN_MODES, "graph_tween_mode", "tween", COLOR.color.yellow, tween_change, sliders.stop_dragging,
+        default_modes=["tweener"],
+        ws_support=True,
+    )
+    add_mode_sliders(
+        sliders.BLEND_MODES, "graph_blend_mode", "blend", COLOR.color.green, blend_change, sliders.stop_dragging,
+        default_modes=["connect_neighbors"],
+    )
+    add_mode_sliders(
+        sliders.TANGENT_MODES, "graph_tangent_mode", "tangent", COLOR.color.orange, tangent_change, sliders.stop_dragging,
+        default_modes=["blend_spline"],
+    )
 
     # _________________  Iso / Mute / Lock  _________________#
     sec = new_section()
-    btn_iso = create_tkm_button(
+    btn_iso = create_tool_button(
         icon=media.isolate_image,
         text="I",
         tooltip="Iso",
@@ -365,13 +382,13 @@ def createCustomGraph():
     )
     sec.addWidget(btn_iso, "Isolate", "iso")
 
-    btn_mute = create_tkm_button(text="Mt", tooltip="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute())
+    btn_mute = create_tool_button(text="Mt", tooltip="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute())
     sec.addWidget(btn_mute, "Mute", "mute")
 
-    btn_lock = create_tkm_button(text="Lk", tooltip="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock())
+    btn_lock = create_tool_button(text="Lk", tooltip="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock())
     sec.addWidget(btn_lock, "Lock", "lock")
 
-    btn_fi = create_tkm_button(
+    btn_fi = create_tool_button(
         text="Fi",
         tooltip="Filter",
         command=lambda: ui.customGraph_filter_mods(),
@@ -381,7 +398,7 @@ def createCustomGraph():
 
     # ____________________  Resets  _________________________#
     sec = new_section()
-    btn_reset = create_tkm_button(
+    btn_reset = create_tool_button(
         icon=media.reset_animation_image,
         text="R",
         tooltip="Reset",
@@ -399,35 +416,35 @@ def createCustomGraph():
         "4": "#C29591",
         "5": "#A86465",
     }
-    for i in range(1, 6):
-        s_id = str(i)
-        s_name = "button_" + s_id
-        btn = create_tkm_button(text=s_id, tooltip="SelSet 0{}".format(s_id), description="Left-click to select, Right-click for options.", p=sec)
-        btn.setStyleSheet("QPushButton {{ background-color: {}; color: #333; }}".format(color_map.get(s_id, "#555")))
+    # for i in range(1, 6):
+    #     s_id = str(i)
+    #     s_name = "button_" + s_id
+    #     btn = create_tool_button(text=s_id, tooltip="SelSet 0{}".format(s_id), description="Left-click to select, Right-click for options.", p=sec)
+    #     btn.setStyleSheet("QPushButton {{ background-color: {}; color: #333; }}".format(color_map.get(s_id, "#555")))
 
-        # Action menu
-        menu = cw.MenuWidget(parent=btn)
-        menu.addAction("Set", partial(selSets.set_button_value, s_name))
-        menu.addSeparator()
-        menu.addAction("Add", partial(selSets.add_button_selection, s_name))
-        menu.addAction("Remove", partial(selSets.remove_button_selection, s_name))
-        menu.addSeparator()
-        menu.addAction("Lock", partial(selSets.lock_button_selection, s_name))
-        menu.addAction("Unlock", partial(selSets.unlock_button_selection, s_name))
+    #     # Action menu
+    #     menu = cw.MenuWidget(parent=btn)
+    #     menu.addAction("Set", partial(selSets.set_button_value, s_name))
+    #     menu.addSeparator()
+    #     menu.addAction("Add", partial(selSets.add_button_selection, s_name))
+    #     menu.addAction("Remove", partial(selSets.remove_button_selection, s_name))
+    #     menu.addSeparator()
+    #     menu.addAction("Lock", partial(selSets.lock_button_selection, s_name))
+    #     menu.addAction("Unlock", partial(selSets.unlock_button_selection, s_name))
 
-        btn = create_tkm_button(text=s_id, tooltip="SelSet 0{}".format(s_id), description="Left-click to select, Right-click for options.")
-        sec.addWidget(btn, "Set 0{}".format(s_id), "set_{}".format(s_id))
-        btn.setStyleSheet("QPushButton {{ background-color: {}; color: #333; }}".format(color_map.get(s_id, "#555")))
+    #     btn = create_tool_button(text=s_id, tooltip="SelSet 0{}".format(s_id), description="Left-click to select, Right-click for options.")
+    #     sec.addWidget(btn, "Set 0{}".format(s_id), "set_{}".format(s_id))
+    #     btn.setStyleSheet("QPushButton {{ background-color: {}; color: #333; }}".format(color_map.get(s_id, "#555")))
 
-        # Re-parent the menu to the button after it's created
-        menu.setParent(btn)
-        btn.clicked.connect(partial(selSets.handle_button_selection, s_name))
-        btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        btn.customContextMenuRequested.connect(lambda pos, m=menu, b=btn: m.exec_(b.mapToGlobal(pos)))
+    #     # Re-parent the menu to the button after it's created
+    #     menu.setParent(btn)
+    #     btn.clicked.connect(partial(selSets.handle_button_selection, s_name))
+    #     btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+    #     btn.customContextMenuRequested.connect(lambda pos, m=menu, b=btn: m.exec_(b.mapToGlobal(pos)))
 
     # ________________ Cycle / Bouncy ___________________#
     sec = new_section()
-    btn_cycle = create_tkm_button(
+    btn_cycle = create_tool_button(
         icon=media.match_curve_cycle_image,
         tooltip="Cycle Matcher",
         description="Curve cycle matcher.",
@@ -435,7 +452,7 @@ def createCustomGraph():
     )
     sec.addWidget(btn_cycle, "Cycle Matcher", "cycle")
 
-    btn_bouncy = create_tkm_button(
+    btn_bouncy = create_tool_button(
         icon=media.bouncy_curve_image, tooltip="Bouncy", description="Set bouncy tangents.", command=keyTools.bouncy_tangets
     )
     sec.addWidget(btn_bouncy, "Bouncy", "bouncy")
@@ -460,5 +477,4 @@ def createCustomGraph():
         else:
             return None
 
-    # Opacity slider (optional, can be enabled via config later)
-    QtCore.QTimer.singleShot(0, flow_qw._update_height)
+    QtCore.QTimer.singleShot(50, flow_qw._update_height)
