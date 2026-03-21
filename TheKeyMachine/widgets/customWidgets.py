@@ -327,7 +327,6 @@ class QFlatSpinBox(TooltipMixin, QtWidgets.QSpinBox):
 class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
     def __init__(self, parent=None, icon=None, text=None, tooltip=None, description=None, shortcuts=None, highlight=False, pressed_color=None):
         super().__init__(parent)
-        self.setCursor(QtCore.Qt.PointingHandCursor)
         self.setAutoRaise(True)
         self.pressed_color = pressed_color or "#666666"
 
@@ -567,7 +566,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             # Overlay button: tiny checkbox in the bottom-left
             self._overlay_btn = QtWidgets.QToolButton(self)
             self._overlay_btn.setFixedSize(8, 8)
-            self._overlay_btn.setCursor(QtCore.Qt.PointingHandCursor)
             self._overlay_btn.setVisible(False)
             self._overlay_btn.setToolTip("Pin hidden tools for this Section")
             self._overlay_btn.setStyleSheet("""
