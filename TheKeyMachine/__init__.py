@@ -25,7 +25,13 @@ __codename__ = "Iced Coffee"
 
 def reload():
     import sys
-    import importlib
+
+    try:
+        from importlib import reload
+    except ImportError:
+        from imp import reload
+    except ImportError:
+        pass
 
     modules_to_delete = [m for m in list(sys.modules.keys()) if m.startswith("TheKeyMachine")]
 
@@ -34,7 +40,7 @@ def reload():
 
     import TheKeyMachine.core.toolbar as t
 
-    importlib.reload(t)
+    reload(t)
 
     tb = t.get_toolbar()
     if tb:
