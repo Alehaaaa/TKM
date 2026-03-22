@@ -40,6 +40,7 @@ import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.selSetsMod as selSets
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
+import TheKeyMachine.core.toolbox as toolbox
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
@@ -48,7 +49,7 @@ import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 
-mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders]
+mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolbox]
 
 for m in mods:
     importlib.reload(m)
@@ -188,67 +189,22 @@ def createCustomGraph():
 
     # ________________ Key Tools Buttons  ___________________#
     sec = new_section()
+    
+    sec.addWidgetGroup(
+        [
+            toolbox.get_tool("static", text="S", icon_path=media.delete_animation_image, tooltip_template="Static", description="Remove all statics curves", callback=lambda: keyTools.deleteStaticCurves(), default=True),
+            toolbox.get_tool("share_keys", text="sK", default=True),
+            toolbox.get_tool("match", text="M", default=True),
+            toolbox.get_tool("flip", text="F", default=True),
+            toolbox.get_tool("snap", text="Sn", default=True),
+            toolbox.get_tool("overlap", text="O", default=True),
+            toolbox.get_tool("reblock", text="rB", default=True),
+            toolbox.get_tool("extra_tools", text="E", default=True),
+        ]
+    )
 
-    btn_static = create_tool_button(
-        icon=media.delete_animation_image,
-        text="S",
-        tooltip_template="Static",
-        description="Remove all statics curves",
-        command=lambda: keyTools.deleteStaticCurves(),
-    )
-    sec.addWidget(btn_static, "Static", "static")
-
-    btn_share = create_tool_button(
-        icon=media.share_keys_image,
-        text="H",
-        tooltip_template="Share",
-        description="Share keys between curves to ensure both curves have the same keys in the same position.",
-        command=lambda: keyTools.shareKeys(),
-    )
-    sec.addWidget(btn_share, "Share", "share")
-
-    btn_match = create_tool_button(
-        icon=media.match_image,
-        text="M",
-        tooltip_template="Match",
-        description="Makes a match of one curve with another, in this way both curves will be the same.",
-        command=lambda: keyTools.match_keys(),
-    )
-    sec.addWidget(btn_match, "Match", "match")
-
-    btn_flip = create_tool_button(
-        text="F", tooltip_template="Flip", description="Inverts the selected curve vertically.", command=lambda: keyTools.flipCurves()
-    )
-    sec.addWidget(btn_flip, "Flip", "flip")
-
-    btn_snap = create_tool_button(
-        text="Sn",
-        tooltip_template="Snap",
-        description="Performs a cleanup and repositioning of the keys that are in a sub-frame to the nearest frame.",
-        command=lambda: keyTools.snapKeyframes(),
-    )
-    sec.addWidget(btn_snap, "Snap", "snap")
-
-    btn_overlap = create_tool_button(
-        text="O",
-        tooltip_template="Overlap",
-        description="Applies an overlap frame to the selected curves.",
-        command=keyTools.mod_overlap_animation,
-    )
-    sec.addWidget(btn_overlap, "Overlap", "overlap")
-
-    btn_reblock = create_tool_button(
-        icon=media.reblock_keys_image,
-        text="rB",
-        tooltip_template=helper.reblock_move_tooltip_text,
-        description="reBlock allows you to realign all the curves so that all their keyframes match up.",
-        command=keyTools.reblock_move,
-    )
-    sec.addWidget(btn_reblock, "reBlock", "reblock")
-    extra_btn = create_tool_button(
-        text="E", tooltip_template="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes()
-    )
-    sec.addWidget(extra_btn, "Extra Tools", "extra")
+    # Extra/Misc (Retrieving the object to add a menu)
+    extra_btn = sec._widgets.get("extra")
     extra_menu = cw.MenuWidget(parent=extra_btn)
     extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
     extra_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)

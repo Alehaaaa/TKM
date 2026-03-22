@@ -108,8 +108,9 @@ class QFlatTooltip(QWidget):
         self.description = description
         self.icon_path = icon  # Store for reference
 
-        # 1. Build the base template
-        if tooltip_template is None:
+        # 1. Build base template if not provided
+        if not tooltip_template:
+            # If text has HTML-like markers, use it directly
             if text and ("<" in text or ">" in text or "<br" in text.lower()):
                 tooltip_template = text
             else:
@@ -119,13 +120,15 @@ class QFlatTooltip(QWidget):
                 if text:
                     tooltip_template += f"<b>{text.strip()}</b>"
 
-            # Always append description if provided
-            if description:
-                # Ensure we have a separator if there was already content
+        # 2. Add description if missing from template body
+        if description:
+            # Check if template already has a body break
+            has_body = tooltip_template and ("<br" in tooltip_template.lower() or "\n" in tooltip_template)
+            if not has_body:
                 prefix = "<br><br>" if tooltip_template else ""
                 tooltip_template = f"{tooltip_template}{prefix}{description.strip()}"
 
-        self.tooltip_template = tooltip_template
+        self.tooltip_template = tooltip_template or ""
 
         self._auto_close_timer = QTimer(self)
         self._auto_close_timer.setInterval(200)
@@ -293,12 +296,15 @@ class QFlatTooltip(QWidget):
         elif self.has_header and len(parts) == 1:
             # If there's no <br>, and we extracted everything into the header, body should be empty
             cleaned_all = re.sub(r"<[^>]*>", "", body_html).strip()
-            if not cleaned_all or (extracted_title and extracted_title.lower() == cleaned_all.lower()):
+            if not cleaned_all or (header_title and header_title.lower() == cleaned_all.lower()):
                 body_html = ""
 
         content_layout = QVBoxLayout()
         top_margin = wutil.DPI(0) if self.has_header else wutil.DPI(12)
         content_layout.setContentsMargins(wutil.DPI(12), top_margin, wutil.DPI(12), wutil.DPI(8))
+
+        if not body_html.strip() and self.description:
+            body_html = self.description
 
         if body_html.strip():
             raw_lbl = QLabel(body_html)

@@ -352,13 +352,13 @@ class TooltipMixin:
         # Automatically pick up the widget's icon if not provided
         if not icon and hasattr(self, "_icon_path"):
             icon = self._icon_path
-        
+
         self._help_data = {
-            "text": text, 
-            "description": description, 
-            "shortcuts": shortcuts or [], 
-            "icon": icon, 
-            "tooltip_template": tooltip_template
+            "text": text,
+            "description": description,
+            "shortcuts": shortcuts or [],
+            "icon": icon,
+            "tooltip_template": tooltip_template,
         }
         HelpSystem.push(self, tooltip_template or text, description)
 
@@ -415,7 +415,15 @@ class QFlatSpinBox(QtWidgets.QSpinBox):
 
 class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
     def __init__(
-        self, parent=None, icon=None, text=None, tooltip_template=None, description=None, shortcuts=None, highlight=False, pressed_color=None
+        self,
+        parent=None,
+        icon=None,
+        text=None,
+        tooltip_template=None,
+        description=None,
+        shortcuts=None,
+        highlight=False,
+        pressed_color=None,
     ):
         super().__init__(parent)
         self.setAutoRaise(True)
@@ -423,7 +431,9 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
 
         if text:
             self.setText(text)
-            self.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon if icon else QtCore.Qt.ToolButtonTextOnly)
+            self.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly if icon else QtCore.Qt.ToolButtonTextOnly)
+        else:
+            self.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly)
 
         # Enforce styling: squared corners, no border on hover, background on press
         self.setStyleSheet(f"""
@@ -432,6 +442,9 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 border-radius: 0px;
                 background-color: transparent;
                 color: #bfbfbf;
+                font-size: 11px;
+                font-weight: bold;
+
             }}
             QToolButton:hover {{
                 border: none;
@@ -462,7 +475,9 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self._highlight = highlight
         if icon:
             self.setIcon(icon)
-        self.setToolTipData(text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon)
+        self.setToolTipData(
+            text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon
+        )
 
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
@@ -677,12 +692,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._overlay_btn.setFixedSize(8, 8)
             self._overlay_btn.setVisible(False)
             HelpSystem.push(self._overlay_btn, "Section Config", "Manage which tools are pinned for quick access.")
-            
+
             # Ensure the tiny button pushes its help to Maya on hover
             def _push_help(event, btn=self._overlay_btn):
                 HelpSystem.push(btn, btn.property("tkm_title"), btn.property("tkm_description"))
                 return QtWidgets.QToolButton.enterEvent(btn, event)
-            
+
             self._overlay_btn.enterEvent = _push_help
             self._overlay_btn.setStyleSheet("""
                 QToolButton {
@@ -786,6 +801,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for default_item in default_items:
             widget = QFlatToolButton(
                 icon=default_item.get("icon_path"),
+                text=default_item.get("text"),
                 tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or default_item.get("label"),
                 description=default_item.get("description") or "",
             )
@@ -1255,7 +1271,11 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     if not widget or not isValid(widget):
                         continue
                     action = menu.addAction(item["label"], description=item["description"])
-                    HelpSystem.push(action, title=item.get("tooltip_template") or item.get("tooltip") or item["label"], description=item.get("description") or "")
+                    HelpSystem.push(
+                        action,
+                        title=item.get("tooltip_template") or item.get("tooltip") or item["label"],
+                        description=item.get("description") or "",
+                    )
                     action.setCheckable(True)
                     action.setChecked(widget.isVisible())
                     action.triggered.connect(self._make_toggle_handler(key))
@@ -1279,7 +1299,9 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                             sub_action = menu.addAction(QtGui.QIcon(act_icon_path or ""), act_label)
                             HelpSystem.push(
-                                sub_action, title=act_info.get("tooltip_template") or act_info.get("tooltip") or act_label, description=act_info.get("description") or ""
+                                sub_action,
+                                title=act_info.get("tooltip_template") or act_info.get("tooltip") or act_label,
+                                description=act_info.get("description") or "",
                             )
                             sub_action.setCheckable(True)
                             sub_action.setChecked(is_pinned)

@@ -71,13 +71,14 @@ import TheKeyMachine.mods.hotkeysMod as hotkeys  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.core.customGraph as cg  # type: ignore
 import TheKeyMachine.mods.updater as updater  # type: ignore
+import TheKeyMachine.core.toolbox as toolbox  # type: ignore
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 
-mods = [general, ui, keyTools, helper, media, bar, hotkeys, settings, cg, updater, style, sw, cw, wutil, sliders]
+mods = [general, ui, keyTools, helper, media, bar, hotkeys, settings, cg, updater, style, sw, cw, wutil, sliders, toolbox]
 
 for m in mods:
     if m:
@@ -3399,45 +3400,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Copy WorldSpace ----------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                {
-                    "key": "worldspace",
-                    "label": "Worldspace",
-                    "icon_path": media.copy_worldspace_animation_image,
-                    "callback": bar.mod_copy_worldspace_animation,
-                    "tooltip_template": helper.copy_worldspace_tooltip_text,
-                    "default": True,
-                },
-                {
-                    "key": "ws_copy_all",
-                    "label": "Copy Worldspace - All Animation",
-                    "icon_path": media.copy_worldspace_animation_image,
-                    "callback": bar.color_copy_worldspace_animation,
-                },
-                {
-                    "key": "ws_copy_range",
-                    "label": "Copy Worldspace - Selected Range",
-                    "icon_path": media.copy_worldspace_animation_image,
-                    "callback": bar.copy_range_worldspace_animation,
-                },
-                {
-                    "key": "ws_paste",
-                    "label": "Paste Worldspace",
-                    "icon_path": media.paste_worldspace_animation_image,
-                    "callback": bar.color_paste_worldspace_animation,
-                },
+                toolbox.get_tool("worldspace", default=True),
+                toolbox.get_tool("ws_copy_all", label="Copy Worldspace - All Animation", icon_path=media.copy_worldspace_animation_image, callback=bar.color_copy_worldspace_animation),
+                toolbox.get_tool("ws_copy_range", label="Copy Worldspace - Selected Range", icon_path=media.copy_worldspace_animation_image, callback=bar.copy_range_worldspace_animation),
+                toolbox.get_tool("ws_paste", label="Paste Worldspace", icon_path=media.paste_worldspace_animation_image, callback=bar.color_paste_worldspace_animation),
                 "separator",
-                {
-                    "key": "ws_copy_frame",
-                    "label": "Copy Worldspace - Current Frame",
-                    "icon_path": media.copy_worldspace_frame_animation_image,
-                    "callback": bar.copy_worldspace_single_frame,
-                },
-                {
-                    "key": "ws_paste_frame",
-                    "label": "Paste Worldspace - Current Frame",
-                    "icon_path": media.paste_worldspace_frame_animation_image,
-                    "callback": bar.paste_worldspace_single_frame,
-                },
+                toolbox.get_tool("ws_copy_frame", label="Copy Worldspace - Current Frame", icon_path=media.copy_worldspace_frame_animation_image, callback=bar.copy_worldspace_single_frame),
+                toolbox.get_tool("ws_paste_frame", label="Paste Worldspace - Current Frame", icon_path=media.paste_worldspace_frame_animation_image, callback=bar.paste_worldspace_single_frame),
                 "separator",
                 {
                     "key": "ws_help",
@@ -3454,20 +3423,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Temp Pivot ----------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                {
-                    "key": "temp_pivot",
-                    "label": "Temp Pivot",
-                    "icon_path": media.temp_pivot_image,
-                    "callback": lambda *args: bar.create_temp_pivot(False),
-                    "tooltip_template": helper.temp_pivot_tooltip_text,
-                    "default": True,
-                },
-                {
-                    "key": "tp_last_used",
-                    "label": "Last pivot used",
-                    "icon_path": media.temp_pivot_image,
-                    "callback": lambda: bar.create_temp_pivot(True),
-                },
+                toolbox.get_tool("temp_pivot", default=True),
+                toolbox.get_tool("tp_last_used", label="Last pivot used", icon_path=media.temp_pivot_image, callback=lambda: bar.create_temp_pivot(True)),
                 "separator",
                 {
                     "key": "tp_help",
@@ -3490,42 +3447,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Key Menu -------------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                {
-                    "key": "share_keys",
-                    "label": "Share Keys",
-                    "icon_path": media.share_keys_image,
-                    "callback": keyTools.share_keys,
-                    "tooltip_template": helper.share_keys_tooltip_text,
-                    "default": True,
-                },
-                {
-                    "key": "bk_reblock",
-                    "label": "reBlock",
-                    "icon_path": media.reblock_keys_image,
-                    "callback": keyTools.reblock_move,
-                    "tooltip_template": helper.reblock_move_tooltip_text,
-                },
-                {
-                    "key": "bk_bake_anim",
-                    "label": "Bake Anim",
-                    "icon_path": media.reblock_keys_image,
-                    "callback": keyTools.bake_anim_window,
-                    "tooltip_template": helper.bake_anim_tooltip_text,
-                },
-                {
-                    "key": "bk_orbit",
-                    "label": "ToolBox Orbit",
-                    "icon_path": media.reblock_keys_image,
-                    "callback": lambda: ui.orbit_window(0, 0),
-                    "tooltip_template": helper.orbit_tooltip_text,
-                },
-                {
-                    "key": "bk_gimbal",
-                    "label": "Gimbal Fixer",
-                    "icon_path": media.reblock_keys_image,
-                    "callback": bar.gimbal_fixer_window,
-                    "tooltip_template": helper.gimbal_fixer_tooltip_text,
-                },
+                toolbox.get_tool("share_keys", default=True),
+                toolbox.get_tool("reblock", key="bk_reblock"),
+                toolbox.get_tool("bake_anim", key="bk_bake_anim"),
+                toolbox.get_tool("orbit", key="bk_orbit"),
+                toolbox.get_tool("gimbal", key="bk_gimbal"),
             ],
         )
 
@@ -3534,35 +3460,20 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Selection Sets  ----------------------------------------------------------------------------
         selection_sets_button_widget = sec.addWidgetGroup(
             [
-                {
-                    "key": "selection_sets",
-                    "label": "Selection Sets",
-                    "icon_path": media.selection_sets_image,
-                    "callback": self.toggle_selection_sets_workspace,
-                    "tooltip_template": helper.selection_sets_tooltip_text,
-                    "default": True,
-                }
+                toolbox.get_tool("selection_sets", callback=self.toggle_selection_sets_workspace, default=True)
             ]
         )
-        selection_sets_button_widget.setObjectName("toggle_selection_sets_workspace_b")
+        if selection_sets_button_widget:
+            selection_sets_button_widget.setObjectName("toggle_selection_sets_workspace_b")
 
         # customGraph ----------------------------------------------------------------------------
         def open_customGraph():
             import TheKeyMachine.core.customGraph as cg  # type: ignore
-
             cg.createCustomGraph()
 
-        # customGraph ----------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                {
-                    "key": "custom_graph",
-                    "label": "Custom Graph",
-                    "icon_path": media.customGraph_image,
-                    "callback": open_customGraph,
-                    "tooltip_template": helper.customGraph_tooltip_text,
-                    "default": True,
-                }
+                toolbox.get_tool("custom_graph", callback=open_customGraph, default=True)
             ]
         )
 
