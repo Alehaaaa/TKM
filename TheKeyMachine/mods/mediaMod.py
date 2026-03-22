@@ -42,6 +42,9 @@ tkm_node_image = getImage("tkm_node.png")
 nudge_left_image = getImage("nudge_left.svg")
 nudge_right_image = getImage("nudge_right.svg")
 
+insert_inbetween_image = getImage("nudge_insert_inbetween.svg")
+remove_inbetween_image = getImage("nudge_remove_inbetween.svg")
+
 pointer_image = getImage("pointer.svg")
 depth_mover_image = getImage("depth_mover.svg")
 select_rig_controls_image = getImage("select_rig_controls.svg")
@@ -68,6 +71,11 @@ copy_pose_image = getImage("copy_pose.svg")
 paste_pose_image = getImage("paste_pose.svg")
 reblock_keys_image = getImage("reblock.svg")
 share_keys_image = getImage("share_keys.svg")
+
+bake_animation_custom_image = getImage("bake_animation_custom.svg")
+bake_animation_1_image = getImage("bake_animation_1.svg")
+bake_animation_2_image = getImage("bake_animation_2.svg")
+bake_animation_3_image = getImage("bake_animation_3.svg")
 bake_animation_image = getImage("bake_animation.svg")
 
 selector_image = getImage("selector.svg")

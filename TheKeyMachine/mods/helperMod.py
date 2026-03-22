@@ -211,14 +211,39 @@ reblock_move_tooltip_text = (
     "</font>"
 )
 
-bake_anim_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake Anim</b></font><img src='{media.bake_animation_image}' width='30'><br><br>"
+
+bake_animation_custom_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake Custom Interval</b></font><img src='{media.bake_animation_custom_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "A simple way of baking all your animation. By default this tool switch your curves to step mode.<br><br>"
     "Select the objects you want to bake and run the tool.<br><br>"
-    "Use: Add '2' in interval to bake you animation every 2 frames.<br><br>"
     "</font>"
 )
+
+bake_animation_1_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake on Ones</b></font><img src='{media.bake_animation_1_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "A simple way of baking all your animation. By default this tool switch your curves to step mode.<br><br>"
+    "Select the objects you want to bake and run the tool.<br><br>"
+    "</font>"
+)
+
+bake_animation_2_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake on Twos</b></font><img src='{media.bake_animation_2_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "A simple way of baking all your animation. By default this tool switch your curves to step mode.<br><br>"
+    "Select the objects you want to bake and run the tool.<br><br>"
+    "</font>"
+)
+
+bake_animation_3_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake on Threes</b></font><img src='{media.bake_animation_3_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "A simple way of baking all your animation. By default this tool switch your curves to step mode.<br><br>"
+    "Select the objects you want to bake and run the tool.<br><br>"
+    "</font>"
+)
+
 
 gimbal_fixer_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Gimbal Fixer</b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"

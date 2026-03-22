@@ -6,51 +6,25 @@ from functools import partial
 
 try:
     from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6.QtGui import QRegularExpressionValidator
+    from PySide6.QtCore import QRegularExpression
 
     PYSIDE_VERSION = 6
 except ImportError:
     from PySide2 import QtWidgets, QtCore, QtGui
+    from PySide2.QtGui import QRegExpValidator
+    from PySide2.QtCore import QRegExp
 
     PYSIDE_VERSION = 2
+
+    QRegularExpression = QRegExp
+    QRegularExpressionValidator = QRegExpValidator
 
 from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
 from TheKeyMachine.tooltips.tooltip import QFlatTooltipManager
 
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.widgets.customWidgets as cw
-
-
-# # Compatibility with aleha_tools imports
-# QtWidgets.QWidget = QtWidgets.QWidget
-# QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout
-# QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout
-# QtWidgets.QLabel = QtWidgets.QLabel
-# QtWidgets.QPushButton = QtWidgets.QtWidgets.QPushButton
-# QtWidgets.QDialog = QtWidgets.QDialog
-# QFrame = QtWidgets.QFrame
-# QtWidgets.QSizePolicy = QtWidgets.QSizePolicy
-# QtWidgets.QLayout = QtWidgets.QLayout
-# QtWidgets.QMenu = QtWidgets.QMenu
-# QtWidgets.QMenuBar = QtWidgets.QMenuBar
-# QtWidgets.QApplication = QtWidgets.QApplication
-
-# QtGui.QIcon = QtGui.QIcon
-# QtGui.QColor = QtGui.QColor
-# QtGui.QPixmap = QtGui.QPixmap
-# QtGui.QPainter = QtGui.QPainter
-# QtGui.QPolygonF = QtGui.QPolygonF
-# QtGui.QCursor = QtGui.QCursor
-# QtGui.QGuiApplication = QtGui.QGuiApplication
-# QtGui.QMovie = QtGui.QMovie
-# QtGui.QFontMetrics = QtGui.QFontMetrics
-
-# Qt = QtCore.Qt
-# QSize = QtCore.QSize
-# QtCore.QEventLoop = QtCore.QEventLoop
-# QtCore.QPoint = QtCore.QPoint
-# QtCore.QPointF = QtCore.QPointF
-# QtCore.QTimer = QtCore.QTimer
-# QtCore.QRect = QtCore.QRect
 
 
 class QFlatDialogButton(dict):
@@ -182,6 +156,28 @@ class QFlatDialog(QtWidgets.QDialog):
         if created_buttons:
             self.bottomBar = cw.QFlatBottomBar(buttons=created_buttons, margins=margins, spacing=spacing, parent=self)
             self.root_layout.addWidget(self.bottomBar)
+
+    def _ensure_close_button(self):
+        if not self.bottomBar:
+            # No bottom bar yet → just create one with close
+            self.setBottomBar(closeButton=True)
+            return
+
+        # Check if a close button already exists (avoid duplicates)
+        for btn in self.bottomBar.findChildren(QtWidgets.QPushButton):
+            if btn.text().lower() in ("close", "cancel"):
+                return
+
+        # Create close config
+        close_cfg = self.Close.copy()
+        if not close_cfg.get("callback"):
+            close_cfg["callback"] = self.close
+
+        # Build button using same pipeline
+        new_btns = self._defineButtons([close_cfg])
+
+        for btn in new_btns:
+            self.bottomBar.layout().addWidget(btn)
 
 
 class QFlatConfirmDialog(QFlatDialog):
@@ -380,9 +376,7 @@ class QFlatTooltipConfirm(QFlatDialog):
 
         # Style the frame
         self.setStyleSheet(
-            "QFlatTooltipConfirm > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(
-                self.BG_COLOR, DPI(self.BORDER_RADIUS)
-            )
+            "QFlatTooltipConfirm > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(self.BG_COLOR, DPI(self.BORDER_RADIUS))
         )
 
         self.bg_frame = QtWidgets.QFrame()
@@ -433,13 +427,10 @@ class QFlatTooltipConfirm(QFlatDialog):
                     has_header = True
             elif child.tag == "title":
                 inner_text = (child.text or "") + "".join(
-                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
-                    for c in child
+                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode") for c in child
                 )
                 lbl = QtWidgets.QLabel(inner_text)
-                lbl.setStyleSheet(
-                    "color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(self.TEXT_COLOR, DPI(18))
-                )
+                lbl.setStyleSheet("color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(self.TEXT_COLOR, DPI(18)))
                 lbl.setWordWrap(True)
                 header_layout.addWidget(lbl)
                 has_header = True
@@ -462,8 +453,7 @@ class QFlatTooltipConfirm(QFlatDialog):
 
             if child.tag == "text":
                 inner_text = (child.text or "") + "".join(
-                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
-                    for c in child
+                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode") for c in child
                 )
                 lbl = QtWidgets.QLabel(inner_text)
                 lbl.setWordWrap(True)
@@ -650,13 +640,17 @@ class QFlatFloatingWidget(QFlatDialog):
 
     TEXT_COLOR = "#bbbbbb"
     COLOR_BG_TRACK = "#444444"
+    DARK_BG_COLOR = "#333333"
 
-    def __init__(self, popup=False, parent=None):
+    def __init__(self, popup=False, closeButton=False, parent=None):
         QFlatDialog.__init__(self, parent)
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
         self.setMouseTracking(True)
+
+        self._popup = popup
+        self._closeButton = closeButton
 
         self._is_dragging = False
         self._drag_offset = QtCore.QPoint()
@@ -745,52 +739,77 @@ class QFlatFloatingWidget(QFlatDialog):
     def mouseReleaseEvent(self, e):
         if e.button() == QtCore.Qt.LeftButton and self._is_dragging:
             self._is_dragging = False
+            if self._popup and self._closeButton:
+                self._ensure_close_button()
         QFlatDialog.mouseReleaseEvent(self, e)
 
 
-class QFlatSelectorDialog(QFlatFloatingWidget):
+class QFlatToolBarDialog(QFlatFloatingWidget):
     """
-    A modern successor to the Maya textScrollList selector.
-    Displays a list of currently selected objects, allowing for quick
-    re-selection and focus.
+    A modern successor to the Maya tool bar.
     """
 
-    def __init__(self, title="Selector", parent=None):
-        super().__init__(parent=parent)
-        self.setWindowTitle(title or "Selector")
+    title = "Dialog"
+    icon_path = None
+
+    def __init__(self, parent=None, *args, **kwargs):
+        super().__init__(parent=parent, *args, **kwargs)
+        self.setWindowTitle(self.title)
         self.setMinimumWidth(DPI(230))
         self.setMinimumHeight(DPI(300))
 
         self._opened = False
 
         # Header
-        selection_layout = QtWidgets.QHBoxLayout()
-        selection_layout.setContentsMargins(DPI(6), DPI(10), 0, DPI(4))
-        selection_layout.setSpacing(DPI(6))
+        title_layout = QtWidgets.QHBoxLayout()
+        title_layout.setContentsMargins(DPI(6), DPI(10), 0, DPI(4))
+        title_layout.setSpacing(DPI(6))
 
-        self.selection_title = QtWidgets.QLabel("0")
-        self.selection_title.setObjectName("selection_title")
-        self.selection_title.setStyleSheet(
-            "#selection_title{font-size: %spx; color: %s; font-weight: bold; background: transparent;}" % (DPI(24), self.TEXT_COLOR)
+        self.title_label = QtWidgets.QLabel()
+        self.title_label.setObjectName("title_label")
+        self.title_label.setStyleSheet(
+            "#title_label{font-size: %spx; color: %s; font-weight: bold; background: transparent;}" % (DPI(24), self.TEXT_COLOR)
         )
-        self.selection_title.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        self.selection_title.setWordWrap(False)
+        self.title_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.title_label.setWordWrap(False)
+        title_layout.addWidget(self.title_label)
 
-        # Icon
-        icon_label = QtWidgets.QLabel()
-        icon_size = DPI(30)  # same as font size
+        if self.icon_path:
+            icon_label = QtWidgets.QLabel()
+            icon_size = DPI(30)
 
-        icon = QtGui.QIcon(media.selector_image)  # SVG file
-        pixmap = icon.pixmap(icon_size, icon_size)
-        icon_label.setPixmap(pixmap)
-        icon_label.setFixedSize(icon_size, icon_size)
-        icon_label.setAlignment(QtCore.Qt.AlignCenter)
+            icon = QtGui.QIcon(self.icon_path)
+            pixmap = icon.pixmap(icon_size, icon_size)
 
-        # Layout
-        selection_layout.addWidget(self.selection_title)
-        selection_layout.addWidget(icon_label, alignment=QtCore.Qt.AlignVCenter)
+            icon_label.setPixmap(pixmap)
+            icon_label.setFixedSize(icon_size, icon_size)
+            icon_label.setAlignment(QtCore.Qt.AlignCenter)
 
-        self.mainLayout.addLayout(selection_layout)
+            title_layout.addWidget(icon_label, alignment=QtCore.Qt.AlignVCenter)
+
+        self.mainLayout.addLayout(title_layout)
+
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.ActivationChange:
+            if self._opened:
+                self.close()
+            self._opened = True
+            return
+        super().changeEvent(event)
+
+
+class QFlatSelectorDialog(QFlatToolBarDialog):
+    """
+    A modern successor to the Maya textScrollList selector.
+    Displays a list of currently selected objects, allowing for quick
+    re-selection and focus.
+    """
+
+    def __init__(self, parent=None):
+        self.title = "Selector"
+        self.icon_path = media.selector_image
+        super().__init__(parent=parent)
+        self.title_label.setText("0")
 
         # List
         self.list_widget = QtWidgets.QListWidget()
@@ -819,7 +838,7 @@ class QFlatSelectorDialog(QFlatFloatingWidget):
             self.list_widget.addItem(item)
             item.setSelected(True)
 
-        self.selection_title.setText(str(len(selected)))
+        self.title_label.setText(str(len(selected)))
         self.list_widget.blockSignals(False)
 
     def _on_list_selection_changed(self):
@@ -838,10 +857,73 @@ class QFlatSelectorDialog(QFlatFloatingWidget):
         else:
             cmds.select(clear=True)
 
-    def changeEvent(self, event):
-        if event.type() == QtCore.QEvent.ActivationChange:
-            if self._opened:
-                self.close()
-            self._opened = True
-            return
-        super().changeEvent(event)
+
+class QFlatNumberInput(QFlatToolBarDialog):
+    """
+    Flat floating dialog with:
+        - title
+        - optional icon
+        - numeric input (spinbox)
+        - action button
+    """
+
+    def __init__(
+        self,
+        callback=None,
+        width=DPI(230),
+        popup=True,
+        closeButton=True,
+        parent=None,
+    ):
+        self.title = "Bake Custom Interval"
+        self.icon_path = media.bake_animation_custom_image
+        self.start_value = 1.0
+
+        self.COLOR_BG_TRACK = self.DARK_BG_COLOR
+
+        super().__init__(parent=parent, popup=popup, closeButton=closeButton)
+
+        self.setMinimumWidth(width)
+        self.title_label.setText(self.title)
+
+        self._callback = callback
+
+        # Spinbox (replaces line edit)
+        self.spinbox = cw.QFlatSpinBox()
+        self.spinbox.setFixedHeight(DPI(30))
+
+        # Configure behavior
+        self.spinbox.setValue(self.start_value)
+        self.spinbox.setSingleStep(1.0)  # step size
+
+        # Enter key support (depends on your widget internals)
+        if hasattr(self.spinbox, "lineEdit"):
+            self.spinbox.lineEdit().returnPressed.connect(self._on_accept)
+
+        self.mainLayout.addWidget(self.spinbox)
+
+        bake_button = QFlatDialogButton(
+            "Bake",
+            icon=media.apply_image,
+            callback=self._on_accept,
+            highlight=True,
+        )
+
+        self.setBottomBar([bake_button], margins=0, spacing=2)
+
+        self.spinbox.setFocus()
+
+    # --- Value helpers ---
+    def value(self):
+        return self.spinbox.value()
+
+    def int_value(self):
+        return int(self.spinbox.value())
+
+    def float_value(self):
+        return float(self.spinbox.value())
+
+    # --- Action ---
+    def _on_accept(self, *args):
+        if self._callback:
+            self._callback(self.value(), self)

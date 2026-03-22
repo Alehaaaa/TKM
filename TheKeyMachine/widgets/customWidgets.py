@@ -140,7 +140,7 @@ class QFlatHoverableIcon:
         btn.setIcon(btn._icon_normal)
 
     @staticmethod
-    def _color_icon(icon: QtGui.QIcon, color: str | QtGui.QColor, size: QtCore.QSize) -> QtGui.QIcon:
+    def _color_icon(icon: QtGui.QIcon, color: QtGui.QColor, size: QtCore.QSize) -> QtGui.QIcon:
         if isinstance(color, (str, bytes)):
             color = QtGui.QColor(color)
 
@@ -525,7 +525,7 @@ class QFlatBottomBar(QtWidgets.QFrame):
 class QFlatSpinBox(QtWidgets.QSpinBox):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setFixedSize(50, 24)
+        self.setFixedHeight(24)
         self.setMinimum(1)
         self.setMaximum(99999)
         self.setValue(1)
@@ -860,10 +860,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._overlay_btn.setStyleSheet("""
                 QToolButton {
                     border: none;
-                    background-color: #333333;
+                    background-color: #2e2e2e;
                 }
                 QToolButton:hover {
-                    background-color: #383838;
+                    background-color: #313131;
                 }
             """)
 

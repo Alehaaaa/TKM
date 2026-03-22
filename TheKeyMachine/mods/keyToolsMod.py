@@ -22,23 +22,19 @@ import maya.mel as mel
 
 try:
     import maya.OpenMaya as om
-    import maya.OpenMayaUI as mui
 except ImportError:
     import maya.api.OpenMaya as om
-    import maya.api.OpenMayaUI as mui
 
 try:
-    from shiboken6 import wrapInstance
-    from PySide6.QtWidgets import QApplication, QWidget, QLineEdit, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+    from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QRegularExpressionValidator
-    from PySide6.QtCore import QRegularExpression, Qt, QPoint
+    from PySide6.QtCore import QRegularExpression
 except ImportError:
-    from shiboken2 import wrapInstance
-    from PySide2.QtWidgets import QApplication, QWidget, QLineEdit, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+    from PySide2.QtWidgets import QApplication
     from PySide2.QtWidgets import QDesktopWidget
 
     from PySide2.QtGui import QRegExpValidator
-    from PySide2.QtCore import QRegExp, Qt, QPoint
+    from PySide2.QtCore import QRegExp
 
     QRegularExpression = QRegExp
     QRegularExpressionValidator = QRegExpValidator
@@ -646,147 +642,16 @@ def bake_animation(bake_interval=1, window=None):
         window.close()
 
 
-def bake_anim_window(*args):
-    screen_width, screen_height = get_screen_resolution()
-    screen_width = screen_width
+def bake_animation_1(*args):
+    bake_animation(bake_interval=1)
 
-    # Variables para implementar el drag
-    drag = {"active": False, "position": QPoint()}
 
-    def mousePressEvent(event):
-        if event.button() == Qt.LeftButton:
-            drag["active"] = True
-            drag["position"] = event.globalPos() - window.frameGeometry().topLeft()
-            event.accept()
+def bake_animation_2(*args):
+    bake_animation(bake_interval=2)
 
-    def mouseMoveEvent(event):
-        if event.buttons() == Qt.LeftButton and drag["active"]:
-            window.move(event.globalPos() - drag["position"])
-            event.accept()
 
-    def mouseReleaseEvent(event):
-        drag["active"] = False
-
-    def bake_button_clicked():
-        interval = bake_interval_line_edit.text()
-
-        if interval:
-            try:
-                bake_interval = float(interval)
-                bake_animation(bake_interval=bake_interval, window=window)
-
-            except ValueError:
-                cmds.warning("Please enter a valid number for bake interval")
-
-    parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QWidget)
-
-    window = QWidget(parent, Qt.Window | Qt.FramelessWindowHint)
-    window.resize(200, 100)
-    window.setObjectName("BakeAnimWindow")
-    window.setWindowTitle("Bake Anim")
-    window.setWindowOpacity(1.0)
-    window.setAttribute(Qt.WA_TranslucentBackground)
-
-    window.mousePressEvent = mousePressEvent
-    window.mouseMoveEvent = mouseMoveEvent
-    window.mouseReleaseEvent = mouseReleaseEvent
-
-    central_widget = QWidget(window)
-    central_widget.setStyleSheet("""
-        QWidget {
-            background-color: #454545; 
-            border-radius: 10px;
-            border: 2px solid #393939;
-        }
-        QLabel {
-            border: none;
-        }
-        """)
-    layout = QVBoxLayout(central_widget)
-    layout.setContentsMargins(10, 10, 10, 10)
-
-    window_layout = QVBoxLayout(window)
-    window_layout.addWidget(central_widget)
-    window.setLayout(window_layout)
-
-    close_button = QPushButton("X")
-    close_button.setFixedSize(20, 20)
-    close_button.setStyleSheet(
-        "QPushButton {"
-        "    background-color: #585858;"
-        "    color: #ccc;"
-        "    border-radius: 4px;"
-        "    border: none;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #c56054;"
-        "    border-radius: 4px;"
-        "    border: none;"
-        "}"
-    )
-    close_button.clicked.connect(window.close)
-
-    # Definición de los widgets
-    bake_label = QLabel("Add interval to bake:")
-    bake_label.setStyleSheet("color: #ccc;")
-
-    bake_interval_line_edit = QLineEdit()
-    bake_interval_line_edit.setStyleSheet("background-color: #282828; color: #ccc; border-radius: 5px; padding: 5px; border: none;")
-    bake_interval_line_edit.setFixedSize(40, 30)
-    # Limitar la entrada a dos dígitos numéricos
-
-    def create_regex(pattern):
-        return QRegularExpression(pattern)
-
-    def create_validator(pattern, parent=None):
-        return QRegularExpressionValidator(QRegularExpression(pattern), parent)
-
-    # reg_ex = create_regex("^[0-9]{1,2}$")
-    input_validator = create_validator("^[0-9]{1,2}$", bake_interval_line_edit)
-    bake_interval_line_edit.setValidator(input_validator)
-
-    bake_button = QPushButton("Bake")
-    bake_button.setFixedSize(80, 30)
-    bake_button.setStyleSheet(
-        "QPushButton {"
-        "    background-color: #525252;"
-        "    border: none;"
-        "    border-radius: 5px;"
-        "    color: #ccc;"
-        "    border: none;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #626262;"
-        "    border-radius: 5px;"
-        "    border: none;"
-        "}"
-    )
-
-    if screen_width == 3840:
-        window.resize(350, 100)
-        layout.setContentsMargins(20, 20, 20, 20)
-        close_button.setFixedSize(40, 40)
-        bake_label.setStyleSheet("color: #ccc; font: 20px;")
-        bake_interval_line_edit.setStyleSheet("background-color: #282828; color: #ccc; border-radius: 5px; padding: 5px; border: none;")
-        bake_interval_line_edit.setFixedSize(100, 50)
-        bake_button.setFixedSize(150, 50)
-
-    bake_button.clicked.connect(bake_button_clicked)
-
-    # Crear un QHBoxLayout para el QLineEdit y el QPushButton
-    bake_layout = QHBoxLayout()
-    bake_layout.addWidget(bake_interval_line_edit)
-    bake_layout.addWidget(bake_button)
-
-    layout.addWidget(close_button, alignment=Qt.AlignRight)
-    layout.addWidget(bake_label, alignment=Qt.AlignLeft)
-    layout.addLayout(bake_layout)
-    window.show()
-    # Adjust the window position
-    parent_geometry = parent.geometry()
-    x = parent_geometry.x() + parent_geometry.width() / 2 - window.width() + 15
-    y = parent_geometry.y() + parent_geometry.height() / 2 - window.height() / 2 + 250
-    window.move(x, y)
+def bake_animation_3(*args):
+    bake_animation(bake_interval=3)
 
 
 # ____________________________________________________ ShiftKeys Box _____________________________________________________________#
@@ -893,23 +758,19 @@ def hotkey_move_keyframes_right():
 
 
 def insert_inbetween(count=1, *args):
-    if not isinstance(count, int):
-        count = 1
-    for _ in range(count):
-        mel.eval("timeSliderEditKeys addInbetween")
-    currentT = cmds.currentTime(q=True)
-    moveLeft = currentT + count
-    cmds.currentTime(moveLeft)
+    _relative_timechange(count)
 
 
 def remove_inbetween(count=1, *args):
-    if not isinstance(count, int):
-        count = 1
-    for _ in range(count):
-        mel.eval("timeSliderEditKeys removeInbetween")
-    currentT = cmds.currentTime(q=True)
-    moveLeft = currentT - count
-    cmds.currentTime(moveLeft)
+    _relative_timechange(-count)
+
+
+def _relative_timechange(count):
+    if not cmds.keyframe(query=True):
+        return
+    count = int(count)
+    current = cmds.currentTime(q=True)
+    cmds.keyframe(time=("{}:".format(current + 1),), relative=True, timeChange=count, option="over")
 
 
 def move_keyframes_in_range(*args):
@@ -929,7 +790,7 @@ def move_keyframes_in_range(*args):
     time_range = cmds.timeControl(time_slider, q=True, rangeArray=True)
 
     start_frame = int(time_range[0])
-    end_frame = int(time_range[1])
+    end_frame = int(time_range[1] - 1)
     has_range = abs(end_frame - start_frame) > 1
 
     selection = cmds.ls(selection=True, long=True) or []
@@ -961,6 +822,10 @@ def move_keyframes_in_range(*args):
                 timeChange=offset,
             )
             cmds.currentTime(current_time + offset)
+            try:
+                cmds.playbackOptions(sst=start_frame + offset, set=end_frame + offset, sv=True)
+            except Exception:
+                pass
             return
 
         selected_keys = cmds.keyframe(query=True, selected=True, tc=True) or []
@@ -996,9 +861,7 @@ def move_keyframes_in_range(*args):
                 grouped_source_times.setdefault(source_time, []).append(obj)
 
         if objects_with_key_at_current:
-            cmds.keyframe(
-                objects_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset
-            )
+            cmds.keyframe(objects_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset)
             cmds.currentTime(current_time + offset)
             return
 
@@ -2932,9 +2795,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             source_control_name = available_sources[0]
         else:
             cmds.warning(
-                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(
-                    ", ".join(available_sources)
-                )
+                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(", ".join(available_sources))
             )
             return
     else:
@@ -2949,9 +2810,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             break
 
     if matched_source is None:
-        cmds.warning(
-            "Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources))
-        )
+        cmds.warning("Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources)))
         return
 
     src_channels = animation_data.get(matched_source, {})
@@ -3013,9 +2872,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
         mode = "inserted at current time" if insert_at_current else "pasted"
         repl = " (replaced existing keys)" if replace else ""
         cmds.warning(
-            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(
-                mode, _short(matched_source), len(targets), repl, total_keys_set
-            )
+            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(mode, _short(matched_source), len(targets), repl, total_keys_set)
         )
 
 

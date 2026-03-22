@@ -2541,3 +2541,30 @@ def activate_micro_move(*args):
                     mode=0,
                 )
                 cmds.setToolTo(microMoveContext)
+
+
+# _______________________________________________ BAKE CUSTOM INTERVAL __________________________________________________
+
+
+def bake_animation_custom_window(*args):
+    def on_bake(value, dialog):
+        try:
+            bake_interval = float(value)
+        except ValueError:
+            cmds.warning("Please enter a valid number for bake interval")
+            return
+
+        keyTools.bake_animation(bake_interval=bake_interval, window=dialog)
+        dialog.close()
+
+    # close previous instances
+    for widget in QtWidgets.QApplication.topLevelWidgets():
+        if isinstance(widget, customDialogs.QFlatNumberInput) and widget.windowTitle() == "Bake Custom Interval":
+            widget.close()
+            widget.deleteLater()
+
+    dlg = customDialogs.QFlatNumberInput(
+        callback=on_bake,
+        parent=None,
+    )
+    dlg.place_near_cursor()
