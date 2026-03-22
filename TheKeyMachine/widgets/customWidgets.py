@@ -90,16 +90,16 @@ class HelpSystem:
             c_title = cls.clean(widget_or_action.objectName())
 
         c_desc = cls.get_desc(raw_desc)
-        
-        # Avoid redundancy: if description starts with the title, strip the title from the start of the description
-        if c_title and c_desc.lower().startswith(c_title.lower()):
-            # Use a more exact match to avoid stripping partial names
-            # e.g. "FollowCam" from "FollowCam creates..."
-            pattern = re.compile(re.escape(c_title), re.IGNORECASE)
-            c_desc = pattern.sub("", c_desc, count=1).strip()
-            # Restore sentence case safely (capitalize() can lower-case other letters)
-            if c_desc:
-                c_desc = c_desc[0].upper() + c_desc[1:]
+        # Avoid redundancy: if description starts with/is the title, strip it
+        if c_title and c_desc:
+            if c_title.lower() == c_desc.lower():
+                c_desc = ""
+            elif c_desc.lower().startswith(c_title.lower()):
+                pattern = re.compile(re.escape(c_title), re.IGNORECASE)
+                c_desc = pattern.sub("", c_desc, count=1).strip()
+                # Restore sentence case safely
+                if c_desc:
+                    c_desc = c_desc[0].upper() + c_desc[1:]
 
         status = f"{c_title} - {c_desc}" if (c_title and c_desc) else (c_title or c_desc)
 
@@ -362,6 +362,9 @@ class TooltipMixin:
         }
         HelpSystem.push(self, tooltip_template or text, description)
 
+    def get_help_data(self):
+        return getattr(self, "_help_data", {})
+
     def setToolTipData(self, **kwargs):
         self._has_tooltip = True
         self.setData(**kwargs)
@@ -438,6 +441,10 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             QToolButton:pressed {{
                 background-color: {self.pressed_color};
             }}
+            QToolButton:checked {{
+                background-color: #444444;
+                color: #ffffff;
+            }}
         """)
 
         # Centralized size
@@ -455,7 +462,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self._highlight = highlight
         if icon:
             self.setIcon(icon)
-        self.setToolTipData(text=text or tooltip_template, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon)
+        self.setToolTipData(text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon)
 
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
@@ -691,6 +698,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
     def addWidget(self, widget, label, key, default_visible=True, description=None, tooltip_template=None):
         """Add a widget to the section with a toggle key."""
+        # Auto-extract help metadata from widget if not provided
+        if (not tooltip_template or not description) and hasattr(widget, "get_help_data"):
+            data = widget.get_help_data()
+            tooltip_template = tooltip_template or data.get("tooltip_template") or data.get("text")
+            description = description or data.get("description")
+
         self.layout().addWidget(widget)
         self._widgets[key] = widget
 
@@ -730,7 +743,15 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         # Push documentation to the widget (syncs Maya Status Bar and TKM tooltips)
         if hasattr(widget, "setToolTipData"):
-            widget.setToolTipData(text=label, description=description or "", tooltip_template=tooltip_template)
+            # If no description/template provided to addWidget, try to preserve widget's own data
+            d = description
+            tt = tooltip_template
+            if not d and not tt and hasattr(widget, "_help_data"):
+                existing = widget._help_data
+                d = existing.get("description")
+                tt = existing.get("tooltip_template")
+
+            widget.setToolTipData(text=label, description=d or "", tooltip_template=tt)
         else:
             HelpSystem.push(widget, tooltip_template or label, description or "")
 
@@ -765,7 +786,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for default_item in default_items:
             widget = QFlatToolButton(
                 icon=default_item.get("icon_path"),
-                tooltip_template=default_item.get("tooltip") or default_item.get("label"),
+                tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or default_item.get("label"),
                 description=default_item.get("description") or "",
             )
             label = default_item.get("label", "Unknown")
@@ -781,7 +802,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 key,
                 default_visible=default_visible,
                 description=default_item.get("description"),
-                tooltip_template=default_item.get("tooltip") or label,
+                tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or label,
             )
             group_widgets.append((key, widget))
 
@@ -804,7 +825,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         "callback": item.get("callback"),
                         "checkable": item.get("checkable", False),
                         "is_checked_fn": item.get("is_checked_fn"),
-                        "tooltip": item.get("tooltip"),
+                        "tooltip_template": item.get("tooltip_template") or item.get("tooltip"),
                         "description": item.get("description"),
                     }
                 )
@@ -829,7 +850,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                 if item.get("key") == source_key:
                     continue
-
                 act_icon_p = item.get("icon_path") or ""
                 cb = item.get("callback")
                 checkable = item.get("checkable", False)
@@ -837,7 +857,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                 # Use raw label for display, but full tooltip for documentation
                 display_label = item.get("label", "")
-                full_tooltip = item.get("tooltip") or display_label
+                full_tooltip = item.get("tooltip_template") or item.get("tooltip") or display_label
                 full_desc = item.get("description") or ""
 
                 if checkable:
@@ -959,7 +979,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         group_info = self._tool_groups.get(group_key, {})
         icon_path = act_info.get("icon_path") or group_info.get("icon_path") or ""
-        tooltip_template = act_info.get("tooltip") or act_info.get("label", "")
+        tooltip_template = act_info.get("tooltip_template") or act_info.get("tooltip") or act_info.get("label", "")
         description = act_info.get("description", "")
         callback = act_info.get("callback")
         checkable = act_info.get("checkable", False)
@@ -1235,7 +1255,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     if not widget or not isValid(widget):
                         continue
                     action = menu.addAction(item["label"], description=item["description"])
-                    HelpSystem.push(action, title=item.get("tooltip") or item["label"], description=item.get("description") or "")
+                    HelpSystem.push(action, title=item.get("tooltip_template") or item.get("tooltip") or item["label"], description=item.get("description") or "")
                     action.setCheckable(True)
                     action.setChecked(widget.isVisible())
                     action.triggered.connect(self._make_toggle_handler(key))
@@ -1259,7 +1279,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                             sub_action = menu.addAction(QtGui.QIcon(act_icon_path or ""), act_label)
                             HelpSystem.push(
-                                sub_action, title=act_info.get("tooltip") or act_label, description=act_info.get("description") or ""
+                                sub_action, title=act_info.get("tooltip_template") or act_info.get("tooltip") or act_label, description=act_info.get("description") or ""
                             )
                             sub_action.setCheckable(True)
                             sub_action.setChecked(is_pinned)

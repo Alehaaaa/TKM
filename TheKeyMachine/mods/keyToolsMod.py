@@ -82,7 +82,6 @@ def get_screen_resolution():
 
 
 def clear_timeslider_selection():
-
     # fix temporal para limpiar el timeslider
     selection = cmds.ls(selection=True)
 
@@ -249,7 +248,6 @@ def load_relative_data():
 
 
 def copy_link(*args):
-
     matrix_file_path = general.get_copy_link_data_file()
 
     seleccion = cmds.ls(selection=True)
@@ -287,7 +285,6 @@ def copy_link(*args):
 
 
 def paste_link(*args):
-
     global relative_data
 
     main_obj = relative_data.get("main_obj")
@@ -336,7 +333,6 @@ def paste_link(*args):
 
 
 def paste_link_callback():
-
     global relative_data
 
     main_obj = relative_data.get("main_obj")
@@ -371,7 +367,6 @@ process_callback = False
 
 
 def add_link_obj_callbacks(*args):
-
     global relative_data, attribute_callback_id, time_callback_id, eval_callback_id, process_callback
 
     process_callback = True
@@ -395,7 +390,6 @@ def add_link_obj_callbacks(*args):
 
 
 def attribute_callback_function(msg, plug, otherPlug, clientData):
-
     global process_callback
 
     if not process_callback:
@@ -408,7 +402,6 @@ def attribute_callback_function(msg, plug, otherPlug, clientData):
 
 
 def time_callback_function(clientData):
-
     global process_callback
     if not process_callback:
         return
@@ -418,7 +411,6 @@ def time_callback_function(clientData):
 
 
 def remove_link_obj_callbacks(*args):
-
     global attribute_callback_id, time_callback_id
 
     try:
@@ -489,7 +481,6 @@ def reblock_move(*args):
 
     # Verificar que haya al menos un objeto seleccionado
     if len(objetos) < 1:
-        print("Select at least one object")
         return
 
     # Obtener las curvas de animación de los objetos seleccionados y sus shapes
@@ -611,7 +602,6 @@ def reblock_insert(*args):
 
 
 def bake_animation(bake_interval=1, window=None):
-
     cmds.undoInfo(openChunk=True)
 
     try:
@@ -969,7 +959,13 @@ def move_keyframes_in_range(*args):
                 return
 
             cmds.keyframe(
-                curves_in_range, edit=True, relative=True, includeUpperBound=True, option="over", time=(start_frame, end_frame), timeChange=offset
+                curves_in_range,
+                edit=True,
+                relative=True,
+                includeUpperBound=True,
+                option="over",
+                time=(start_frame, end_frame),
+                timeChange=offset,
             )
             cmds.currentTime(current_time + offset)
             return
@@ -1007,7 +1003,9 @@ def move_keyframes_in_range(*args):
                 grouped_source_times.setdefault(source_time, []).append(obj)
 
         if objects_with_key_at_current:
-            cmds.keyframe(objects_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset)
+            cmds.keyframe(
+                objects_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset
+            )
             cmds.currentTime(current_time + offset)
             return
 
@@ -1198,7 +1196,6 @@ def cache_keyframe_data(objs):
 
 
 def blend_to_key(percentage, objs=None, selection=True):
-
     global is_dragging, frame_data_cache, is_cached, last_autokey_time, autokey_interval
 
     if not is_dragging:
@@ -1702,7 +1699,6 @@ def flipCurves():
 
 
 def flipKeyGroup():
-
     # Obtener las curvas con keyframes seleccionados
     selectedCurves = cmds.keyframe(q=True, name=True, sl=True)
 
@@ -1954,7 +1950,6 @@ def save_default_values(*args):
 
 
 def restore_default_data(*args):
-
     json_file_path = general.get_set_default_data_file()
 
     # Verificar si el archivo existe y vaciar su contenido
@@ -1968,7 +1963,6 @@ def restore_default_data(*args):
 
 
 def remove_default_values_for_selected_object(*args):
-
     json_file_path = general.get_set_default_data_file()
 
     # Leer datos existentes del archivo JSON, si existe
@@ -2008,7 +2002,6 @@ def remove_default_values_for_selected_object(*args):
 
 
 def reset_object_values(reset_translations=False, reset_rotations=False):
-
     cmds.undoInfo(openChunk=True)
 
     try:
@@ -2320,7 +2313,6 @@ def load_exceptions():
 
 
 def mirror(*args):
-
     cmds.undoInfo(openChunk=True)
 
     try:
@@ -2855,7 +2847,6 @@ def paste_insert_animation(*args):
 
 
 def paste_opposite_animation(*args):
-
     mirror_exceptions_file_path = general.get_mirror_exceptions_file()
 
     # ATTRIBUTES_TO_IGNORE = {"tag"}
@@ -2908,7 +2899,6 @@ def paste_opposite_animation(*args):
 
 
 def paste_animation_to(source_control_name=None, replace=True, insert_at_current=False, *args, **kwargs):
-
     # Utilidades locales
     def _short(name):
         # quita namespace si lo hay
@@ -2960,7 +2950,9 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             source_control_name = available_sources[0]
         else:
             cmds.warning(
-                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(", ".join(available_sources))
+                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(
+                    ", ".join(available_sources)
+                )
             )
             return
     else:
@@ -2975,7 +2967,9 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             break
 
     if matched_source is None:
-        cmds.warning("Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources)))
+        cmds.warning(
+            "Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources))
+        )
         return
 
     src_channels = animation_data.get(matched_source, {})
@@ -3037,7 +3031,9 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
         mode = "inserted at current time" if insert_at_current else "pasted"
         repl = " (replaced existing keys)" if replace else ""
         cmds.warning(
-            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(mode, _short(matched_source), len(targets), repl, total_keys_set)
+            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(
+                mode, _short(matched_source), len(targets), repl, total_keys_set
+            )
         )
 
 

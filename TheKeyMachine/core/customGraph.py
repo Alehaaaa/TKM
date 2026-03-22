@@ -136,9 +136,8 @@ def create_settings_menu(parent_button):
 
 def create_tool_button(icon=None, text="", tooltip_template="", description="", command=None, p=None):
     """Helper to create a QFlatToolButton with our tooltip system"""
-    btn = cw.QFlatToolButton(icon=icon, text=text)
-    if tooltip_template:
-        btn.setToolTipData(text=tooltip_template, description=description)
+    # Initialize with all help context directly in the constructor
+    btn = cw.QFlatToolButton(icon=icon, text=text, tooltip_template=tooltip_template, description=description)
     if command:
         btn.clicked.connect(command)
     if p:
@@ -241,12 +240,14 @@ def createCustomGraph():
     btn_reblock = create_tool_button(
         icon=media.reblock_keys_image,
         text="rB",
-        tooltip_template="reBlock",
+        tooltip_template=helper.reblock_move_tooltip_text,
         description="reBlock allows you to realign all the curves so that all their keyframes match up.",
         command=keyTools.reblock_move,
     )
     sec.addWidget(btn_reblock, "reBlock", "reblock")
-    extra_btn = create_tool_button(text="E", tooltip_template="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes())
+    extra_btn = create_tool_button(
+        text="E", tooltip_template="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes()
+    )
     sec.addWidget(extra_btn, "Extra Tools", "extra")
     extra_menu = cw.MenuWidget(parent=extra_btn)
     extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
@@ -261,7 +262,9 @@ def createCustomGraph():
         # Create a new section for each slider color/type
         sec = new_section()
 
-        current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
+        current_default = settings.get_setting(
+            default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"]
+        )
 
         # Static default list for "Pin Defaults"
         if default_modes:
@@ -359,10 +362,14 @@ def createCustomGraph():
     )
     sec.addWidget(btn_iso, "Isolate", "iso")
 
-    btn_mute = create_tool_button(text="Mt", tooltip_template="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute())
+    btn_mute = create_tool_button(
+        text="Mt", tooltip_template="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute()
+    )
     sec.addWidget(btn_mute, "Mute", "mute")
 
-    btn_lock = create_tool_button(text="Lk", tooltip_template="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock())
+    btn_lock = create_tool_button(
+        text="Lk", tooltip_template="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock()
+    )
     sec.addWidget(btn_lock, "Lock", "lock")
 
     btn_fi = create_tool_button(

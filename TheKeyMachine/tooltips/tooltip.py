@@ -275,9 +275,9 @@ class QFlatTooltip(QWidget):
             is_header_line = False
             if not cleaned_first:
                 is_header_line = True
-            elif extracted_title and extracted_title.lower() in cleaned_first.lower():
+            elif header_title and header_title.lower() in cleaned_first.lower():
                 # Ensure it's not a long paragraph that just happens to contain the title
-                if len(cleaned_first) < len(extracted_title) + 30:
+                if len(cleaned_first) < len(header_title) + 30:
                     is_header_line = True
 
             if is_header_line:

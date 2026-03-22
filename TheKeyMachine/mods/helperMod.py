@@ -203,13 +203,33 @@ step_tangent_tooltip_text = (
 
 # ----- ReBlock, ShareKeys, BakeKeys
 
-block_keys_tooltip_text = (
+reblock_move_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>reBlock</b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "reBlock helps you place all animation keys where your main poses are. Especially useful when some keyframes have moved out of place.<br><br>"
     "Use: Simply select the objects and run the tool.<br>"
     "</font>"
-    "<br><br>"
+)
+
+bake_anim_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake Anim</b></font><img src='{media.bake_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "A simple way of baking all your animation. By default this tool switch your curves to step mode.<br><br>"
+    "Select the objects you want to bake and run the tool.<br><br>"
+    "Use: Add '2' in interval to bake you animation every 2 frames.<br><br>"
+    "</font>"
+)
+
+gimbal_fixer_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Gimbal Fixer</b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "Gimbal Fixer allows you to change the rotation order of a control or object without altering the existing animation.<br>"
+    "It is ideal for changing the rotation order when we have a control with gimbal lock.<br><br>"
+    "The tool displays a list of options where the lowest percentage is the best choice.<br><br>"
+    "</font>"
+)
+
+share_keys_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Share Keys</b></font><img src='{media.share_keys_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool allows you to share keys position between one object and another so that both objects have the same keyframes position.<br><br>"
@@ -217,18 +237,14 @@ block_keys_tooltip_text = (
     "Select a range in the Range Slider to share keys only in that range.<br><br>"
     "Use: First select the object that has the keyframes, followed by the objects you want to share the keyframes with.<br>"
     "</font>"
-    "<br><br>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Bake Anim</b></font><img src='{media.bake_animation_image}' width='30'><br><br>"
+)
+
+orbit_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Orbit</b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "A simple way of baking all your animation. By default this tool switch your curves to step mode.<br><br>"
-    "Select the objects you want to bake and run the tool.<br><br>"
-    "Use: Add '2' in interval to bake you animation every 2 frames.<br><br>"
-    "</font>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Gimbal Fixer</b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
-    f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Gimbal Fixer allows you to change the rotation order of a control or object without altering the existing animation.<br>"
-    "It is ideal for changing the rotation order when we have a control with gimbal lock.<br><br>"
-    "The tool displays a list of options where the lowest percentage is the best choice.<br><br>"
+    "This tool allows you to orbit the entire rig by selecting just a single control.<br><br>"
+    "You can utilize this tool to orbit multiple rigs simultaneously or select both<br>"
+    "objects and rigs. In either scenario, the tool will orbit the top node in every hierarchy.<br><br>"
     "</font>"
 )
 
@@ -241,7 +257,6 @@ select_rig_controls_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool selects all rig controls. Selected controls will be only nurbs curves."
     "</font>"
-    "<br><br>"
 )
 
 select_animated_rig_controls_tooltip_text = (
@@ -249,7 +264,6 @@ select_animated_rig_controls_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool selects all animated rig controls. Selected controls will be only nurbs curves."
     "</font>"
-    "<br><br>"
 )
 
 depth_mover_tooltip_text = (
@@ -462,7 +476,6 @@ temp_pivot_tooltip_text = (
     "Temp pivot allows you to create temporary pivots.<br><br>"
     "These pivots are created without affecting object's animation or pivot and without using any kind of constraint.<br><br>"
     "Temp pivots can be applied to multiple objects at once. The temp pivots are destroyed when selection is changed."
-    "<br><br>"
     "Right-click for options.<br>"
     "</font>"
 )
@@ -474,7 +487,6 @@ micro_move_tooltip_text = (
     "The tool allows you to move and rotate controls at a much slower speed than usual.<br><br>"
     "It is especially useful for adjusting facial controls. The tool has some limitations:<br><br>"
     "It works only with rotations in Gimbal mode and translations in Local or World mode."
-    "<br><br>"
     "</font>"
 )
 

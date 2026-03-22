@@ -147,7 +147,6 @@ def delete_time_slider_animation():
 
     # Verificar si hay algo seleccionado
     if not selection:
-        print("Select at least one object")
         return
 
     mel.eval("timeSliderClearKey;")
@@ -162,7 +161,6 @@ def delete_animation():
 
     # Verificar si hay algo seleccionado
     if not selection:
-        print("Select at least one object")
         return
 
     # Si hay canales seleccionados, solo borra esos canales
@@ -388,7 +386,6 @@ def isolate_master():
 
     # Si no hay objetos seleccionados y el estado de aislamiento es 0, salimos de la función.
     if not selected_objects and currentState == 0:
-        print("Select at least one object")
         return
     # Si no hay objetos seleccionados pero el aislamiento está activado, lo desactivamos.
     elif not selected_objects and currentState == 1:
@@ -402,7 +399,7 @@ def isolate_master():
 
         # Fix para activar/desactivar el icono isolate que en maya 2024 esta en otro layout
 
-        maya_version = cmds.about(version=True)
+        new_maya_version = cmds.about(version=True) in ["2024", "2025"]
 
         if currentState == 0:
             cmds.isolateSelect(currentPanel, state=1)
@@ -410,7 +407,7 @@ def isolate_master():
 
             # Fix para activar y desactivar el icono de maya del isolate
             if currentPanel == "modelPanel1":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn",
                         edit=True,
@@ -424,7 +421,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel2":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn",
                         edit=True,
@@ -438,7 +435,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel3":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn",
                         edit=True,
@@ -452,7 +449,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel4":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn",
                         edit=True,
@@ -471,7 +468,7 @@ def isolate_master():
 
             # Fix para activar y desactivar el icono de maya del isolate
             if currentPanel == "modelPanel1":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn",
                         edit=True,
@@ -485,7 +482,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel2":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn",
                         edit=True,
@@ -499,7 +496,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel3":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn",
                         edit=True,
@@ -513,7 +510,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel4":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn",
                         edit=True,
@@ -563,8 +560,6 @@ def selectHierarchy():
     if selection:
         for obj in selection:
             select_curves_with_ctrl(obj)
-    else:
-        print("Select at least one object")
 
 
 # ---------------------------------------------------  TEMP PIVOT ------------------------------------------------------#
@@ -578,7 +573,6 @@ def create_temp_pivot(use_saved_position=False, *args):
     seleccion = cmds.ls(selection=True)
 
     if not seleccion:
-        print("Select at least one object")
         return
 
     if cmds.objExists("tkm_temp_pivot"):
@@ -733,7 +727,8 @@ def create_temp_pivot(use_saved_position=False, *args):
         # Obtén el MObject del objeto principal
         selection_list = om.MSelectionList()
         selection_list.add(temp_pivot_obj_name)
-        temp_pivot_obj_mobject = selection_list.getDependNode(0)
+        temp_pivot_obj_mobject = om.MObject()
+        selection_list.getDependNode(0, temp_pivot_obj_mobject)
 
         # Registra el callback de atributo
         attribute_callback_id = om.MNodeMessage.addAttributeChangedCallback(temp_pivot_obj_mobject, attribute_callback_function)
@@ -845,7 +840,6 @@ def color_paste_worldspace_animation(*args):
 def copy_worldspace_animation(*args):
     selected_objects = cmds.ls(selection=True)
     if not selected_objects:
-        print("Select at least one object")
         return
 
     # Comprobar si los objetos seleccionados tienen claves de animación
@@ -2250,7 +2244,8 @@ def micro_move_attribute_callback_function(msg, plug, other_plug, client_data):
 def add_micro_move_callback(object_name):
     selection_list = om.MSelectionList()
     selection_list.add(object_name)
-    mobject = selection_list.getDependNode(0)
+    mobject = om.MObject()
+    selection_list.getDependNode(0, mobject)
 
     callback_id = om.MNodeMessage.addAttributeChangedCallback(mobject, micro_move_attribute_callback_function, object_name)
     micro_move_callback_ids.append(callback_id)
@@ -2391,7 +2386,8 @@ def micro_rotate_pack_funtion():
     def add_micro_rotate_callback(source_object, target_object):
         selection_list = om.MSelectionList()
         selection_list.add(source_object)
-        mobject = selection_list.getDependNode(0)
+        mobject = om.MObject()
+        selection_list.getDependNode(0, mobject)
 
         def add_micro_rotate_dirty_callback(mobject, plug, client_data):
             if plug.partialName() in ("r", "rx", "ry", "rz"):

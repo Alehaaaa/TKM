@@ -86,8 +86,6 @@ for m in mods:
 # -----------------------------------------------------------------------------------------------------------------------------
 #              TheKeyMachine configuration is loaded from the JSON, or the default installation paths are used.               #
 # -----------------------------------------------------------------------------------------------------------------------------
-
-
 INSTALL_PATH = general.config["INSTALL_PATH"]
 USER_FOLDER_PATH = general.config["USER_FOLDER_PATH"]
 UPDATER = general.config["UPDATER"]
@@ -2208,8 +2206,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     # ---------------------------------------------------------------
 
-    def toggle_micro_move_button(self, *args):
-        self.micro_move_button_state = not self.micro_move_button_state
+    def toggle_micro_move_button(self, checked=None):
+        if checked is not None:
+            self.micro_move_button_state = checked
+        else:
+            self.micro_move_button_state = not self.micro_move_button_state
+
         settings.set_setting("micro_move_button_state", self.micro_move_button_state)
 
         if self.micro_move_button_state:
@@ -2219,8 +2221,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             bar.activate_micro_move()
 
             # Initialize thread variable if not already
-            self.micro_move_thread = threading.Thread(target=self.micro_move_thread, args=(0.5,))
-            self.micro_move_thread.start()
+            self.micro_move_thread_obj = threading.Thread(target=self.micro_move_thread, args=(0.5,))
+            self.micro_move_thread_obj.start()
 
         else:
             self.micro_move_run_timer = False
@@ -2233,8 +2235,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             # El thread tarda en pararse así que necesitamos crear esto y así salirnos en barMod de la ejecución
             cmds.manipMoveContext("dummyCtx")
             cmds.setToolTo("dummyCtx")
-            if self.micro_move_thread and self.micro_move_thread.is_alive():
-                self.micro_move_thread.join()  # Wait for the thread to finish
+            if hasattr(self, "micro_move_thread_obj") and self.micro_move_thread_obj and self.micro_move_thread_obj.is_alive():
+                self.micro_move_thread_obj.join()  # Wait for the thread to finish
 
     def micro_move_thread(self, interval):
         def micro_move_run():
@@ -2629,7 +2631,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         clear_btn = cw.QFlatToolButton(text="x")
         clear_btn.clicked.connect(keyTools.clear_selected_keys)
         sec.addWidget(
-            clear_btn, "Clear Selection", "clear_sel", default_visible=False, tooltip_template=helper.clear_selected_keys_widget_tooltip_text
+            clear_btn,
+            "Clear Selection",
+            "clear_sel",
+            default_visible=False,
+            tooltip_template=helper.clear_selected_keys_widget_tooltip_text,
         )
         select_scene_btn = cw.QFlatToolButton(text="s")
         select_scene_btn.clicked.connect(keyTools.select_all_animation_curves)
@@ -2839,7 +2845,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Select Rig Controls",
                     "icon_path": media.select_rig_controls_image,
                     "callback": bar.select_rig_controls,
-                    "tooltip": helper.select_rig_controls_tooltip_text,
+                    "tooltip_template": helper.select_rig_controls_tooltip_text,
                     "default": True,
                 },
                 {
@@ -2862,7 +2868,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Isolate",
                     "icon_path": media.isolate_image,
                     "callback": bar.isolate_master,
-                    "tooltip": helper.isolate_tooltip_text,
+                    "tooltip_template": helper.isolate_tooltip_text,
                     "default": True,
                 },
                 {
@@ -2900,7 +2906,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Create Locator",
                     "icon_path": media.create_locator_image,
                     "callback": bar.createLocator,
-                    "tooltip": helper.createLocator_tooltip_text,
+                    "tooltip_template": helper.createLocator_tooltip_text,
                     "default": True,
                 },
                 {
@@ -2927,7 +2933,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Align",
                     "icon_path": media.match_image,
                     "callback": bar.align_selected_objects,
-                    "tooltip": helper.align_tooltip_text,
+                    "tooltip_template": helper.align_tooltip_text,
                     "default": True,
                 },
                 {
@@ -2969,7 +2975,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Tracer",
                     "icon_path": media.tracer_menu_image,
                     "callback": bar.mod_tracer,
-                    "tooltip": helper.tracer_tooltip_text,
+                    "tooltip_template": helper.tracer_tooltip_text,
                     "default": True,
                 },
                 {
@@ -3036,7 +3042,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Reset Values",
                     "icon_path": media.reset_animation_image,
                     "callback": keyTools.reset_objects_mods,
-                    "tooltip": helper.reset_values_tooltip_text,
+                    "tooltip_template": helper.reset_values_tooltip_text,
                     "default": True,
                 },
                 {
@@ -3103,7 +3109,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Select Opposite",
                     "icon_path": media.select_opposite_image,
                     "callback": keyTools.selectOpposite,
-                    "tooltip": helper.select_opposite_tooltip_text,
+                    "tooltip_template": helper.select_opposite_tooltip_text,
                     "default": True,
                 },
                 {
@@ -3111,14 +3117,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Add Opposite",
                     "icon_path": media.select_opposite_image,
                     "callback": keyTools.addSelectOpposite,
-                    "tooltip": helper.add_opposite_tooltip_text,
+                    "tooltip_template": helper.add_opposite_tooltip_text,
                 },
                 {
                     "key": "copy_opposite",
                     "label": "Copy Opposite",
                     "icon_path": media.copy_opposite_image,
                     "callback": keyTools.copyOpposite,
-                    "tooltip": helper.copy_opposite_tooltip_text,
+                    "tooltip_template": helper.copy_opposite_tooltip_text,
                     "default": True,
                 },
             ]
@@ -3132,7 +3138,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Mirror",
                     "icon_path": media.mirror_image,
                     "callback": keyTools.mirror,
-                    "tooltip": helper.mirror_tooltip_text,
+                    "tooltip_template": helper.mirror_tooltip_text,
                     "default": True,
                 },
                 {
@@ -3172,7 +3178,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Copy Pose",
                     "icon_path": media.copy_pose_image,
                     "callback": keyTools.copy_pose,
-                    "tooltip": helper.copy_pose_tooltip_text,
+                    "tooltip_template": helper.copy_pose_tooltip_text,
                     "default": True,
                 },
                 {"key": "cp_paste_pose", "label": "Paste Pose", "icon_path": media.paste_pose_image, "callback": keyTools.paste_pose},
@@ -3197,7 +3203,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Copy/Paste Anim",
                     "icon_path": media.copy_animation_image,
                     "callback": keyTools.copy_animation,
-                    "tooltip": helper.copy_animation_tooltip_text,
+                    "tooltip_template": helper.copy_animation_tooltip_text,
                     "default": True,
                 },
                 {
@@ -3240,12 +3246,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec = new_section()
 
         # Select hierarchy -----------------------------------------------------------------------
-        select_hierarchy_button_widget = cw.QFlatToolButton(icon=media.select_hierarchy_image, tooltip_template=helper.select_hierarchy_tooltip_text)
+        select_hierarchy_button_widget = cw.QFlatToolButton(
+            icon=media.select_hierarchy_image, tooltip_template=helper.select_hierarchy_tooltip_text
+        )
         select_hierarchy_button_widget.clicked.connect(bar.selectHierarchy)
-        sec.addWidget(select_hierarchy_button_widget, "Select Hierarchy", "select_hierarchy", tooltip_template=helper.select_hierarchy_tooltip_text)
+        sec.addWidget(
+            select_hierarchy_button_widget, "Select Hierarchy", "select_hierarchy", tooltip_template=helper.select_hierarchy_tooltip_text
+        )
 
         # Animation offset -----------------------------------------------------------------------
-        animation_offset_button_widget = cw.QFlatToolButton(icon=media.animation_offset_image, tooltip_template=helper.animation_offset_tooltip_text)
+        animation_offset_button_widget = cw.QFlatToolButton(
+            icon=media.animation_offset_image, tooltip_template=helper.animation_offset_tooltip_text
+        )
         animation_offset_button_widget.setObjectName("anim_offset_button")
         animation_offset_button_widget.clicked.connect(self.toggleAnimOffsetButton)
         sec.addWidget(animation_offset_button_widget, "Anim Offset", "anim_offset", tooltip_template=helper.animation_offset_tooltip_text)
@@ -3257,7 +3269,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Follow Cam",
                     "icon_path": media.follow_cam_image,
                     "callback": lambda *args: bar.create_follow_cam(translation=True, rotation=True),
-                    "tooltip": helper.follow_cam_tooltip_text,
+                    "tooltip_template": helper.follow_cam_tooltip_text,
                     "default": True,
                 },
                 {
@@ -3353,7 +3365,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Link Objects",
                     "icon_path": media.link_objects_image,
                     "callback": keyTools.mod_link_objects,
-                    "tooltip": helper.link_objects_tooltip_text,
+                    "tooltip_template": helper.link_objects_tooltip_text,
                     "default": True,
                 },
                 {"key": "link_copy", "label": "Copy Link Position", "icon_path": media.link_objects_image, "callback": keyTools.copy_link},
@@ -3392,7 +3404,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Worldspace",
                     "icon_path": media.copy_worldspace_animation_image,
                     "callback": bar.mod_copy_worldspace_animation,
-                    "tooltip": helper.copy_worldspace_tooltip_text,
+                    "tooltip_template": helper.copy_worldspace_tooltip_text,
                     "default": True,
                 },
                 {
@@ -3447,7 +3459,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Temp Pivot",
                     "icon_path": media.temp_pivot_image,
                     "callback": lambda *args: bar.create_temp_pivot(False),
-                    "tooltip": helper.temp_pivot_tooltip_text,
+                    "tooltip_template": helper.temp_pivot_tooltip_text,
                     "default": True,
                 },
                 {
@@ -3470,6 +3482,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Micro Move ----------------------------------------------------------------------------
         micro_move_button_widget = cw.QFlatToolButton(icon=media.ruler_image, tooltip_template=helper.micro_move_tooltip_text)
         micro_move_button_widget.setObjectName("micro_move_button")
+        micro_move_button_widget.setCheckable(True)
+        micro_move_button_widget.setChecked(self.micro_move_button_state)
         micro_move_button_widget.clicked.connect(self.toggle_micro_move_button)
         sec.addWidget(micro_move_button_widget, "Micro Move", "micro_move", tooltip_template=helper.micro_move_tooltip_text)
 
@@ -3477,22 +3491,41 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(
             [
                 {
-                    "key": "block_keys",
-                    "label": "Block Keys",
-                    "icon_path": media.reblock_keys_image,
+                    "key": "share_keys",
+                    "label": "Share Keys",
+                    "icon_path": media.share_keys_image,
                     "callback": keyTools.share_keys,
-                    "tooltip": helper.block_keys_tooltip_text,
+                    "tooltip_template": helper.share_keys_tooltip_text,
                     "default": True,
                 },
-                {"key": "bk_reblock", "label": "reBlock", "icon_path": media.reblock_keys_image, "callback": keyTools.reblock_move},
-                {"key": "bk_bake_anim", "label": "Bake Anim", "icon_path": media.reblock_keys_image, "callback": keyTools.bake_anim_window},
+                {
+                    "key": "bk_reblock",
+                    "label": "reBlock",
+                    "icon_path": media.reblock_keys_image,
+                    "callback": keyTools.reblock_move,
+                    "tooltip_template": helper.reblock_move_tooltip_text,
+                },
+                {
+                    "key": "bk_bake_anim",
+                    "label": "Bake Anim",
+                    "icon_path": media.reblock_keys_image,
+                    "callback": keyTools.bake_anim_window,
+                    "tooltip_template": helper.bake_anim_tooltip_text,
+                },
                 {
                     "key": "bk_orbit",
                     "label": "ToolBox Orbit",
                     "icon_path": media.reblock_keys_image,
                     "callback": lambda: ui.orbit_window(0, 0),
+                    "tooltip_template": helper.orbit_tooltip_text,
                 },
-                {"key": "bk_gimbal", "label": "Gimbal Fixer", "icon_path": media.reblock_keys_image, "callback": bar.gimbal_fixer_window},
+                {
+                    "key": "bk_gimbal",
+                    "label": "Gimbal Fixer",
+                    "icon_path": media.reblock_keys_image,
+                    "callback": bar.gimbal_fixer_window,
+                    "tooltip_template": helper.gimbal_fixer_tooltip_text,
+                },
             ],
         )
 
@@ -3506,7 +3539,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Selection Sets",
                     "icon_path": media.selection_sets_image,
                     "callback": self.toggle_selection_sets_workspace,
-                    "tooltip": helper.selection_sets_tooltip_text,
+                    "tooltip_template": helper.selection_sets_tooltip_text,
                     "default": True,
                 }
             ]
@@ -3527,7 +3560,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Custom Graph",
                     "icon_path": media.customGraph_image,
                     "callback": open_customGraph,
-                    "tooltip": helper.customGraph_tooltip_text,
+                    "tooltip_template": helper.customGraph_tooltip_text,
                     "default": True,
                 }
             ]
@@ -3673,7 +3706,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             )
             customScripts_menu.addAction(QtGui.QIcon(media.reload_image), "Reload menu", initialize_scripts_menu)
 
-        customScripts_button_widget = cw.QFlatToolButton(icon=media.custom_scripts_image, tooltip_template=helper.custom_scripts_tooltip_text)
+        customScripts_button_widget = cw.QFlatToolButton(
+            icon=media.custom_scripts_image, tooltip_template=helper.custom_scripts_tooltip_text
+        )
         customScripts_button_widget.setVisible(bool(CUSTOM_SCRIPTS_MENU))
         sec.addWidget(customScripts_button_widget, "Custom Scripts", "custom_scripts", tooltip_template=helper.custom_scripts_tooltip_text)
 
@@ -3698,10 +3733,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         toolbar_config_button_widget = cw.QFlatToolButton(icon=media.settings_image)
         toolbar_config_button_widget.setObjectName("settings_toolbar_button")
         sec.addWidget(
-            toolbar_config_button_widget, 
-            "Settings", 
+            toolbar_config_button_widget,
+            "Settings",
             "settings",
-            description="Access global preferences, check for updates, and view credits."
+            description="Access global preferences, check for updates, and view credits.",
         )
 
         # Build your menu with your cw.MenuWidget; make sure the button is the PARENT
