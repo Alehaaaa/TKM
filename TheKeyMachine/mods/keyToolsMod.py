@@ -1003,9 +1003,7 @@ def move_keyframes_in_range(*args):
                 grouped_source_times.setdefault(source_time, []).append(obj)
 
         if objects_with_key_at_current:
-            cmds.keyframe(
-                objects_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset
-            )
+            cmds.keyframe(objects_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset)
             cmds.currentTime(current_time + offset)
             return
 
@@ -2731,7 +2729,6 @@ def copy_animation(*args):
     selected_objects = cmds.ls(selection=True)
 
     if not selected_objects:
-        print("Select at least one control")
         return
 
     time_range = get_selected_time_range()
@@ -2792,7 +2789,6 @@ def paste_animation(*args):
     selected_objects = cmds.ls(selection=True)
 
     if not selected_objects:
-        print("Select at least one control")
         return
 
     json_file_path = general.get_copy_animation_file()
@@ -2832,7 +2828,6 @@ def paste_insert_animation(*args):
     current_time = cmds.currentTime(query=True)
 
     if not selected_objects:
-        print("Select at least one control")
         return
 
     json_file_path = general.get_copy_animation_file()
@@ -2950,9 +2945,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             source_control_name = available_sources[0]
         else:
             cmds.warning(
-                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(
-                    ", ".join(available_sources)
-                )
+                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(", ".join(available_sources))
             )
             return
     else:
@@ -2967,9 +2960,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             break
 
     if matched_source is None:
-        cmds.warning(
-            "Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources))
-        )
+        cmds.warning("Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources)))
         return
 
     src_channels = animation_data.get(matched_source, {})
@@ -3031,9 +3022,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
         mode = "inserted at current time" if insert_at_current else "pasted"
         repl = " (replaced existing keys)" if replace else ""
         cmds.warning(
-            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(
-                mode, _short(matched_source), len(targets), repl, total_keys_set
-            )
+            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(mode, _short(matched_source), len(targets), repl, total_keys_set)
         )
 
 
@@ -3049,7 +3038,6 @@ def copy_pose(*args):
     selected_objects = cmds.ls(selection=True)
 
     if not selected_objects:
-        print("Select at least one control")
         return
 
     pose_data = {}
@@ -3125,7 +3113,6 @@ def paste_pose(*args):
     selected_objects = cmds.ls(selection=True)
 
     if not selected_objects:
-        print("Select at least one control")
         return
 
     json_file_path = general.get_copy_paste_pose_file()

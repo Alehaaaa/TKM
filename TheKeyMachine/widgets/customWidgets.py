@@ -1,6 +1,7 @@
 from TheKeyMachine.tooltips import QFlatTooltipManager
 from .util import DPI
 import re
+from functools import partial
 
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
@@ -264,19 +265,25 @@ class MenuWidget(QtWidgets.QMenu):
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
         tooltip_template = kwargs.pop("tooltip_template", kwargs.pop("template", kwargs.pop("tooltip", None)))
+        callback = kwargs.pop("callback", None)
+        label_override = kwargs.pop("label", None)
+
         res = QtWidgets.QMenu.addAction(self, *args, **kwargs)
         # Use QAction if it was passed directly as the first arg, else the result of addAction
         action = args[0] if (len(args) > 0 and isinstance(args[0], QAction)) else res
 
-        # Determine the display label and help title
+        if callback:
+            action.triggered.connect(callback)
+
+        # Determine the display label and help title from positional args if no override
         label = ""
         for arg in args:
             if isinstance(arg, (str, bytes)):
                 label = arg
                 break
 
-        # Push documentation (use tooltip_template or label as help source)
-        HelpSystem.push(action, tooltip_template or label or action.text(), description)
+        # Push documentation (use label_override, tooltip_template or label as help source)
+        HelpSystem.push(action, label_override or tooltip_template or label or action.text(), description)
         return action
 
     def addMenu(self, *args, **kwargs):
@@ -400,9 +407,31 @@ class QFlatSpinBox(QtWidgets.QSpinBox):
         super().__init__(*args, **kwargs)
         self.setFixedSize(50, 24)
         self.setMinimum(1)
+        self.setMaximum(99999)
         self.setValue(1)
         self.setStyleSheet("border: 0px;border-radius: 5px;")
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
+
+    def _show_context_menu(self, pos):
+        menu = MenuWidget(self)
+        for val in [1, 2, 3, 4, 5]:
+            menu.addAction(
+                str(val),
+                label="Set Nudge Value: " + str(val),
+                description="Sets the number of frames to nudge or inbetween.",
+                callback=partial(self.setValue, val),
+            )
+        menu.addSeparator()
+        for val in [10, 20, 50, 100]:
+            menu.addAction(
+                str(val),
+                label="Set Nudge Value: " + str(val),
+                description="Sets the number of frames to nudge or inbetween.",
+                callback=partial(self.setValue, val),
+            )
+        menu.exec_(self.mapToGlobal(pos))
 
     def enterEvent(self, event: QtCore.QEvent):
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
@@ -411,6 +440,19 @@ class QFlatSpinBox(QtWidgets.QSpinBox):
     def leaveEvent(self, event: QtCore.QEvent):
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         super().leaveEvent(event)
+
+    def on_added_to_section(self, section, key):
+        """Automatically called when the widget is added to a QFlatSectionWidget."""
+        self._persistence_key = f"spinbox_{key}"
+        # Load value from persistent settings
+        saved_val = settings.get_setting(self._persistence_key, self.value())
+        self.setValue(saved_val)
+        # Link value changes to persistence
+        self.valueChanged.connect(self._save_value)
+
+    def _save_value(self, val):
+        if hasattr(self, "_persistence_key"):
+            settings.set_setting(self._persistence_key, val)
 
 
 class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
@@ -475,9 +517,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self._highlight = highlight
         if icon:
             self.setIcon(icon)
-        self.setToolTipData(
-            text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon
-        )
+        self.setToolTipData(text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon)
 
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
@@ -772,7 +812,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         return widget
 
-    def addWidgetGroup(self, widgets_list, default_visible=True, description=None):
+    def addWidgetGroup(self, widgets_list, default_visible=True):
         """
         All-in-one: adds a widget to the section AND builds its right-click menu
         from a descriptor list, enabling individual action pinning.

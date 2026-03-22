@@ -189,10 +189,18 @@ def createCustomGraph():
 
     # ________________ Key Tools Buttons  ___________________#
     sec = new_section()
-    
+
     sec.addWidgetGroup(
         [
-            toolbox.get_tool("static", text="S", icon_path=media.delete_animation_image, tooltip_template="Static", description="Remove all statics curves", callback=lambda: keyTools.deleteStaticCurves(), default=True),
+            toolbox.get_tool(
+                "static",
+                text="S",
+                icon_path=media.delete_animation_image,
+                tooltip_template="Static",
+                description="Remove all statics curves",
+                callback=lambda: keyTools.deleteStaticCurves(),
+                default=True,
+            ),
             toolbox.get_tool("share_keys", text="sK", default=True),
             toolbox.get_tool("match", text="M", default=True),
             toolbox.get_tool("flip", text="F", default=True),
@@ -218,9 +226,7 @@ def createCustomGraph():
         # Create a new section for each slider color/type
         sec = new_section()
 
-        current_default = settings.get_setting(
-            default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"]
-        )
+        current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
 
         # Static default list for "Pin Defaults"
         if default_modes:
@@ -420,10 +426,10 @@ def createCustomGraph():
     # ________________ System/Core Section ___________________#
     sec = new_section(hiddeable=False)
 
-    config_btn = create_tool_button(icon=media.settings_image, tooltip_template="Config", description="Tool configuration and preferences.")
-    sec.addWidget(config_btn, "Config", "config")
+    settings_btn = create_tool_button(icon=media.settings_image, description="Access Graph Editor toolbar preferences, and view credits.")
+    sec.addWidget(settings_btn, "Settings", "settings")
 
-    settings_menu = create_settings_menu(config_btn)
+    settings_menu = create_settings_menu(settings_btn)
 
     def _open_settings_menu():
         settings_menu.exec_(QtGui.QCursor.pos())
@@ -433,9 +439,9 @@ def createCustomGraph():
             return
         _open_settings_menu()
 
-    config_btn.clicked.connect(_open_settings_menu)
-    config_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-    config_btn.customContextMenuRequested.connect(lambda pos: _open_settings_menu())
+    settings_btn.clicked.connect(_open_settings_menu)
+    settings_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+    settings_btn.customContextMenuRequested.connect(lambda pos: _open_settings_menu())
 
     flow_qw.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
     flow_qw.customContextMenuRequested.connect(_on_toolbar_context_menu)

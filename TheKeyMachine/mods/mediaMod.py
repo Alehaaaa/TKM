@@ -71,17 +71,19 @@ share_keys_image = getImage("share_keys.svg")
 bake_animation_image = getImage("bake_animation.svg")
 
 selector_image = getImage("selector.svg")
-selector_30_image = getImage("selector_30.svg")
 select_hierarchy_image = getImage("select_hierarchy.svg")
 animation_offset_image = getImage("animation_offset.svg")
 follow_cam_image = getImage("camera.svg")
+
 link_objects_image = getImage("link_relative.svg")
+link_objects_copy_image = getImage("link_relative_copy.svg")
+link_objects_paste_image = getImage("link_relative_paste.svg")
 link_objects_on_image = getImage("link_relative_on.svg")
 
-copy_worldspace_animation_image = getImage("copy_worldspace_animation.svg")
-copy_worldspace_frame_animation_image = getImage("copy_worldspace_frame_animation.svg")
-paste_worldspace_frame_animation_image = getImage("paste_worldspace_frame_animation.svg")
-paste_worldspace_animation_image = getImage("paste_worldspace_animation.svg")
+worldspace_copy_animation_image = getImage("worldspace_copy_animation.svg")
+worldspace_paste_animation_image = getImage("worldspace_paste_animation.svg")
+worldspace_copy_frame_image = getImage("worldspace_copy_frame.svg")
+worldspace_paste_frame_image = getImage("worldspace_paste_frame.svg")
 
 temp_pivot_image = getImage("temp_pivot.svg")
 ruler_image = getImage("ruler.svg")
@@ -92,7 +94,6 @@ linear_tangent_image = getImage("linear_tangent.svg")
 step_tangent_image = getImage("step_tangent.svg")
 match_curve_cycle_image = getImage("match_curve_cycle.svg")
 bouncy_curve_image = getImage("bouncy_curve.svg")
-end_tangent_match_image = getImage("end_tangent_match.svg")
 
 playblast_image = getImage("playblast.svg")
 selection_sets_image = getImage("selection_sets.svg")
@@ -109,8 +110,6 @@ settings_update_image = getImage("settings_update.svg")
 close_image = getImage("close.png")
 apply_image = getImage("apply.png")
 cancel_image = getImage("cancel.png")
-
-remove_followCam = getImage("remove_followCam.svg")
 
 # ________________ dot colors __________________________________________#
 

@@ -92,9 +92,7 @@ def create_TheKeyMachine_hotkeys(*args):
 
     selectHierarchy = "import TheKeyMachine.mods.barMod as bar; bar.selectHierarchy()"
 
-    toggleAnimOffsetButton = (
-        "from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggleAnimOffsetButton() if tb else None"
-    )
+    toggleAnimOffsetButton = "from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggleAnimOffsetButton() if tb else None"
 
     create_follow_cam = "import TheKeyMachine.mods.barMod as bar; bar.create_follow_cam(translation=True, rotation=True)"
 
@@ -102,9 +100,9 @@ def create_TheKeyMachine_hotkeys(*args):
 
     paste_link = "import TheKeyMachine.mods.keyToolsMod as key; key.copy_link()"
 
-    color_copy_worldspace_animation = "import TheKeyMachine.mods.barMod as bar; bar.color_copy_worldspace_animation()"
+    color_worldspace_copy_animation = "import TheKeyMachine.mods.barMod as bar; bar.color_worldspace_copy_animation()"
 
-    color_paste_worldspace_animation = "import TheKeyMachine.mods.barMod as bar; bar.color_paste_worldspace_animation()"
+    color_worldspace_paste_animation = "import TheKeyMachine.mods.barMod as bar; bar.color_worldspace_paste_animation()"
 
     copy_range_worldspace_animation = "import TheKeyMachine.mods.barMod as bar; bar.copy_range_worldspace_animation()"
 
@@ -169,8 +167,8 @@ def create_TheKeyMachine_hotkeys(*args):
         ("create_follow_cam", "Create Follow Cam", create_follow_cam),
         ("copy_link", "Link Objects Copy", copy_link),
         ("paste_link", "Link Objets Paste", paste_link),
-        ("copy_worldspace_animation", "Copy Worldspace - All Animation", color_copy_worldspace_animation),
-        ("paste_worldspace_animation", "Paste Worldspace", color_paste_worldspace_animation),
+        ("worldspace_copy_animation", "Copy Worldspace - All Animation", color_worldspace_copy_animation),
+        ("worldspace_paste_animation", "Paste Worldspace", color_worldspace_paste_animation),
         ("copy_range_worldspace_animation", "Copy Worldspace - Selected Range", copy_range_worldspace_animation),
         ("copy_worldspace_single_frame", "Copy Worldspace - Current Frame", copy_worldspace_single_frame),
         ("paste_worldspace_single_frame", "Paste Worldspace - Current Frame", paste_worldspace_single_frame),

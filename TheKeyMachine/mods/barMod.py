@@ -814,30 +814,30 @@ def create_temp_pivot(use_saved_position=False, *args):
 # ---------------------------------------------------  COPY/PASTE WORLDSPACE ANIMATION  ------------------------------------------------------#
 
 
-def mod_copy_worldspace_animation(*args):
+def mod_worldspace_copy_animation(*args):
     # Get the current state of the modifiers
     mods = mel.eval("getModifiers")
     shift_pressed = bool(mods % 2)  # Check if Shift is pressed
 
     if shift_pressed:
-        color_paste_worldspace_animation()
+        color_worldspace_paste_animation()
     else:
-        color_copy_worldspace_animation()
+        color_worldspace_copy_animation()
 
 
-def color_copy_worldspace_animation(*args):
+def color_worldspace_copy_animation(*args):
     # set_temp_timeslider_colors()
-    cmds.evalDeferred(copy_worldspace_animation)
+    cmds.evalDeferred(worldspace_copy_animation)
     # cmds.evalDeferred(restore_timeslider_colors)
 
 
-def color_paste_worldspace_animation(*args):
+def color_worldspace_paste_animation(*args):
     # set_temp_timeslider_colors()
-    cmds.evalDeferred(paste_worldspace_animation)
+    cmds.evalDeferred(worldspace_paste_animation)
     # cmds.evalDeferred(restore_timeslider_colors)
 
 
-def copy_worldspace_animation(*args):
+def worldspace_copy_animation(*args):
     selected_objects = cmds.ls(selection=True)
     if not selected_objects:
         return
@@ -922,8 +922,6 @@ def copy_range_worldspace_animation(*args):
         return
 
     time_range = keyTools.get_selected_time_range()
-    if time_range is None:
-        return
 
     animation_data = {}
 
@@ -933,9 +931,15 @@ def copy_range_worldspace_animation(*args):
     # Suspender la actualización de la vista
     cmds.refresh(suspend=True)
 
+    attributes = {
+        "query": True,
+    }
+    if time_range:
+        attributes["time"] = (time_range[0], time_range[1])
+
     # Crear una barra de progreso
     gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
-    all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, query=True, time=(time_range[0], time_range[1])))))
+    all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, **attributes))))
     total_frames = len(all_keyframes)
     cmds.progressBar(
         gMainProgressBar,
@@ -1045,7 +1049,7 @@ def paste_worldspace_single_frame(*args):
     cmds.warning("Worldspace values applied")
 
 
-def paste_worldspace_animation(*args):
+def worldspace_paste_animation(*args):
     original_time = cmds.currentTime(query=True)
 
     # Rutas
@@ -1398,7 +1402,6 @@ def select_rig_controls(*args):
     selected = cmds.ls(selection=True, long=True)
 
     if not selected:
-        print("Select at least one control")
         return
 
     # Obtener los namespaces de los objetos seleccionados
@@ -1498,7 +1501,6 @@ def select_animated_rig_controls(*args):
     selected = cmds.ls(selection=True, long=True)
 
     if not selected:
-        print("Select at least one control")
         return
 
     namespaces = set()

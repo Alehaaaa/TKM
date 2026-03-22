@@ -57,8 +57,8 @@ TOOL_DEFINITIONS = {
         "key": "worldspace",
         "label": "Worldspace",
         "text": "WS",
-        "icon_path": media.copy_worldspace_animation_image,
-        "callback": bar.mod_copy_worldspace_animation,
+        "icon_path": media.worldspace_copy_animation_image,
+        "callback": bar.mod_worldspace_copy_animation,
         "tooltip_template": helper.copy_worldspace_tooltip_text,
     },
     "temp_pivot": {
@@ -139,7 +139,9 @@ TOOL_DEFINITIONS = {
 def get_tool(tool_id, **overrides):
     """Retrieve a tool definition with optional overrides."""
     if tool_id not in TOOL_DEFINITIONS:
-        return {"key": tool_id, "label": tool_id.capitalize()}
+        res = {"key": tool_id, "label": tool_id.replace("_", " ").capitalize()}
+        res.update(overrides)
+        return res
 
     # Merge base definition with overrides
     tool = TOOL_DEFINITIONS[tool_id].copy()

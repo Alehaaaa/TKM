@@ -357,8 +357,8 @@ iconos_acciones = {
     "accion_temp_pivot": media.temp_pivot_image,
     "keyTools.copy_pose": media.copy_pose_image,
     "keyTools.paste_pose": media.paste_pose_image,
-    "bar.copy_worldspace_single_frame": media.copy_worldspace_frame_animation_image,
-    "bar.paste_worldspace_single_frame": media.paste_worldspace_frame_animation_image,
+    "bar.copy_worldspace_single_frame": media.worldspace_copy_frame_image,
+    "bar.paste_worldspace_single_frame": media.worldspace_paste_frame_image,
 }
 
 
@@ -504,8 +504,8 @@ class CustomButton(QtWidgets.QPushButton):
         action14 = QAction(QtGui.QIcon(media.select_hierarchy_image), "Select Hierarchy", self)
         action15 = QAction(QtGui.QIcon(media.link_objects_image), "Copy/Paste Link", self)
         action16 = QAction(QtGui.QIcon(media.temp_pivot_image), "Temp Pivot", self)
-        action17 = QAction(QtGui.QIcon(media.copy_worldspace_frame_animation_image), "Copy Worldspace Current Frame", self)
-        action18 = QAction(QtGui.QIcon(media.paste_worldspace_frame_animation_image), "Paste Worldspace Current Frame", self)
+        action17 = QAction(QtGui.QIcon(media.worldspace_copy_frame_image), "Copy Worldspace Current Frame", self)
+        action18 = QAction(QtGui.QIcon(media.worldspace_paste_frame_image), "Paste Worldspace Current Frame", self)
         action_opacity = QAction("Toggle Dynamic Opacity", self)
 
         menu.addAction(action1)
@@ -564,9 +564,9 @@ class CustomButton(QtWidgets.QPushButton):
         elif action == action16:
             self.updateButton(media.temp_pivot_image, "accion_temp_pivot")
         elif action == action17:
-            self.updateButton(media.copy_worldspace_frame_animation_image, "copy_worldspace_single_frame")
+            self.updateButton(media.worldspace_copy_frame_image, "copy_worldspace_single_frame")
         elif action == action18:
-            self.updateButton(media.paste_worldspace_frame_animation_image, "paste_worldspace_single_frame")
+            self.updateButton(media.worldspace_paste_frame_image, "paste_worldspace_single_frame")
         elif action == action_opacity:
             self.toggleDynamicOpacity()
 

@@ -455,7 +455,7 @@ follow_cam_tooltip_text = (
 )
 
 copy_worldspace_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace</b></font><img src='{media.copy_worldspace_animation_image}' width='28'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace</b></font><img src='{media.worldspace_copy_animation_image}' width='28'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy and paste world space positions. Useful for reseting, for example, the master control in a walking cycle.<br><br>"
     "To 'Copy' select a group of controls and click 'Copy worldspace'.<br><br>"
@@ -464,7 +464,7 @@ copy_worldspace_tooltip_text = (
     f"<font style='color: #869fac; font-size:{font_size};'>Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Copy worldspace</font><br>"
     f"<font style='color: #869fac; font-size:{font_size};'>Shift + Click &nbsp;&nbsp;&nbsp; Paste worldspace</font>"
     "</font><br><br>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace Current Frame</b></font><img src='{media.copy_worldspace_frame_animation_image}' width='28'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace Current Frame</b></font><img src='{media.worldspace_copy_frame_image}' width='28'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy and paste world space values for the current frame.<br><br>"
     "</font>"
