@@ -42,12 +42,12 @@ def getImage(image):
 
 # images -------------------------------------
 
-isolate_image = getImage("isolate.png")
-create_locator_image = getImage("cube.png")
-match_image = getImage("magnet.png")
-tracer_image = getImage("tracer.png")
-reset_animation_image = getImage("eraser.png")
-delete_animation_image = getImage("trash.png")
+isolate_image = getImage("isolate.svg")
+create_locator_image = getImage("cube.svg")
+match_image = getImage("magnet.svg")
+tracer_image = getImage("tracer.svg")
+reset_animation_image = getImage("eraser.svg")
+delete_animation_image = getImage("trash.svg")
 
 
 # style ------------------------------------
