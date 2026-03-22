@@ -1,7 +1,5 @@
-from __future__ import annotations
 import sys
 import re
-
 
 try:
     from PySide6.QtWidgets import (  # type: ignore
@@ -65,6 +63,15 @@ except ImportError:
 from TheKeyMachine.widgets import util as wutil
 
 
+# Pre-compiled regular expressions for high-performance tooltip parsing
+RE_BR_SPLIT = re.compile(r"<br\s*/?>", re.IGNORECASE)
+RE_DBL_BR_SPLIT = re.compile(r"<br\s*/?>\s*<br\s*/?>", re.IGNORECASE)
+RE_TITLE_EXTRACT = re.compile(r"<(b|title)>(.*?)</\1>", re.IGNORECASE)
+RE_IMG_EXTRACT = re.compile(r"<img[^>]*src=['\"](.*?)['\"]", re.IGNORECASE)
+RE_TAG_STRIP = re.compile(r"<[^>]*>")
+RE_LEADING_BR = re.compile(r"^\s*<br\s*/?>", re.IGNORECASE)
+
+
 class QFlatTooltip(QWidget):
     """A floating tooltip with an arrow pointing to its source."""
 
@@ -88,7 +95,7 @@ class QFlatTooltip(QWidget):
     }
     KEY_ORDER = [Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift]
 
-    def __init__(self, text="", anchor_widget=None, icon=None, shortcuts=None, description=None, template=None, icon_obj=None):
+    def __init__(self, text="", anchor_widget=None, icon=None, shortcuts=None, description=None, tooltip_template=None, icon_obj=None):
         QWidget.__init__(self, wutil.get_maya_qt())
         self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -102,23 +109,23 @@ class QFlatTooltip(QWidget):
         self.icon_path = icon  # Store for reference
 
         # 1. Build the base template
-        if template is None:
+        if tooltip_template is None:
             if text and ("<" in text or ">" in text or "<br" in text.lower()):
-                template = text
+                tooltip_template = text
             else:
-                template = ""
+                tooltip_template = ""
                 if icon:
-                    template += f"<img src='{icon}'>"
+                    tooltip_template += f"<img src='{icon}'>"
                 if text:
-                    template += f"<b>{text.strip()}</b>"
+                    tooltip_template += f"<b>{text.strip()}</b>"
 
             # Always append description if provided
             if description:
                 # Ensure we have a separator if there was already content
-                prefix = "<br><br>" if template else ""
-                template = f"{template}{prefix}{description.strip()}"
+                prefix = "<br><br>" if tooltip_template else ""
+                tooltip_template = f"{tooltip_template}{prefix}{description.strip()}"
 
-        self.template = template
+        self.tooltip_template = tooltip_template
 
         self._auto_close_timer = QTimer(self)
         self._auto_close_timer.setInterval(200)
@@ -219,16 +226,16 @@ class QFlatTooltip(QWidget):
         extracted_icon_path = ""
 
         # Split by first <br> to restrict extraction to the "header line"
-        parts = re.split(r"<br\s*/?>", self.template, maxsplit=1, flags=re.IGNORECASE)
-        header_candidate = parts[0] if parts else self.template
+        parts = RE_BR_SPLIT.split(self.tooltip_template, maxsplit=1)
+        header_candidate = parts[0] if parts else self.tooltip_template
 
         # Look for <b>Title</b> or <title>Title</title> in the header line
-        title_match = re.search(r"<(b|title)>(.*?)</\1>", header_candidate, re.IGNORECASE)
+        title_match = RE_TITLE_EXTRACT.search(header_candidate)
         if title_match:
             extracted_title = title_match.group(2).strip()
 
         # Look for <img src='...'> in the header line
-        img_match = re.search(r"<img[^>]*src=['\"](.*?)['\"]", header_candidate, re.IGNORECASE)
+        img_match = RE_IMG_EXTRACT.search(header_candidate)
         if img_match:
             extracted_icon_path = img_match.group(1)
 
@@ -258,11 +265,11 @@ class QFlatTooltip(QWidget):
 
         # 4. Clean up the template for the body
         # We remove the first 'header' line if it contains the title/icon to avoid duplication
-        body_html = self.template
+        body_html = self.tooltip_template
 
         if self.has_header and len(parts) > 1:
             header_line = parts[0]
-            cleaned_first = re.sub(r"<[^>]*>", "", header_line).strip()
+            cleaned_first = RE_TAG_STRIP.sub("", header_line).strip()
 
             # If the extracted title is in the first line, we assume it's the header to remove
             is_header_line = False
@@ -276,8 +283,9 @@ class QFlatTooltip(QWidget):
             if is_header_line:
                 # Discard the first line and EVERY following <br> to start at real content
                 body_html = parts[1].strip()
+
                 while True:
-                    next_br = re.match(r"^\s*<br\s*/?>", body_html, re.IGNORECASE)
+                    next_br = RE_LEADING_BR.match(body_html)
                     if next_br:
                         body_html = body_html[next_br.end() :].strip()
                     else:
@@ -305,10 +313,7 @@ class QFlatTooltip(QWidget):
         self.bg_layout.addSpacing(wutil.DPI(4))
 
         # 5. Shortcuts detection
-        # Logic: If the word "Shortcuts" (or similar consistent pattern) is in the HTML,
-        # we skip building the auto-section because it's already in the HTML.
-        # User said "Shortcuts title will always be the same text in the helpers"
-        if self.shortcuts and "Shortcuts" not in self.template:
+        if self.shortcuts and "Shortcuts" not in self.tooltip_template:
             self._build_shortcuts_section()
 
     def _create_section_frame(self, color):
@@ -533,10 +538,11 @@ class QFlatTooltipManager(object):
         icon=None,
         shortcuts=None,
         description=None,
-        template=None,
+        tooltip_template=None,
         action_rect=None,
         icon_obj=None,
         target_rect=None,
+        **kwargs,
     ):
         if not cls.enabled:
             return
@@ -556,7 +562,7 @@ class QFlatTooltipManager(object):
             icon=icon,
             shortcuts=shortcuts,
             description=description,
-            template=template,
+            tooltip_template=tooltip_template,
             icon_obj=icon_obj,
         )
         cls._current_tooltip.show_around(anchor_widget, action_rect, target_rect=target_rect)

@@ -31,6 +31,15 @@ and user preference integration.
 """
 
 
+# Pre-compiled regular expressions for performance
+RE_HTML_TAGS = re.compile(r"<[^>]*>")
+RE_WHITESPACE = re.compile(r"\s+")
+RE_BR_SPLIT = re.compile(r"<br\s*/?>", re.IGNORECASE)
+RE_NEWLINE_SPLIT = re.compile(r"<br\s*/?>|\r?\n", re.IGNORECASE)
+RE_TKM_TT_SPLIT = re.compile(r"(?:<br\s*/?>\s*){2,}", re.IGNORECASE)
+RE_HELP_SPLIT = re.compile(r"(\.[\s\r\n]|<br\s*/?>|\r?\n)", re.IGNORECASE)
+
+
 class HelpSystem:
     """Centralized utility for pushing help text to all Maya help channels."""
 
@@ -38,18 +47,24 @@ class HelpSystem:
     def clean(raw):
         if not raw:
             return ""
-        # Strip HTML and normalize
-        res = re.sub(r"<[^>]*>", "", str(raw))
-        return re.sub(r"\s+", " ", res).strip()
+        # 1. Replace all HTML tags with a space to avoid joining words
+        res = RE_HTML_TAGS.sub(" ", str(raw))
+        # 2. Normalize whitespace and strip
+        return RE_WHITESPACE.sub(" ", res).strip()
 
     @staticmethod
     def get_desc(raw):
         if not raw:
             return ""
-        # Get first line of description
-        parts = re.split(r"<br\s*/?>|\r?\n", str(raw), flags=re.IGNORECASE)
-        for p in parts:
-            clean = HelpSystem.clean(p)
+        # Get first line or first sentence of description
+        parts = RE_HELP_SPLIT.split(str(raw), maxsplit=1)
+        if parts:
+            # Reconstruct the sentence if split by period
+            res = parts[0]
+            if len(parts) > 1 and parts[1].startswith("."):
+                res += "."
+
+            clean = HelpSystem.clean(res)
             if clean:
                 return clean
         return ""
@@ -57,20 +72,44 @@ class HelpSystem:
     @classmethod
     def push(cls, widget_or_action, title="", description=""):
         """Pushes data to StatusTip, ToolTip, and internal properties."""
-        c_title = cls.clean(title or widget_or_action.objectName())
-        c_desc = cls.get_desc(description)
+        raw_title = title or ""
+        raw_desc = description or ""
+
+        # If title contains TKM's double-break format, split it
+        if not raw_desc and "<br" in raw_title.lower():
+            parts = RE_TKM_TT_SPLIT.split(raw_title, maxsplit=1)
+            if len(parts) > 1:
+                raw_title, raw_desc = parts
+            else:
+                parts = RE_NEWLINE_SPLIT.split(raw_title, maxsplit=1)
+                if len(parts) > 1:
+                    raw_title, raw_desc = parts
+
+        c_title = cls.clean(raw_title)
+        if not c_title and hasattr(widget_or_action, "objectName"):
+            c_title = cls.clean(widget_or_action.objectName())
+
+        c_desc = cls.get_desc(raw_desc)
+        
+        # Avoid redundancy: if description starts with the title, strip the title from the start of the description
+        if c_title and c_desc.lower().startswith(c_title.lower()):
+            # Use a more exact match to avoid stripping partial names
+            # e.g. "FollowCam" from "FollowCam creates..."
+            pattern = re.compile(re.escape(c_title), re.IGNORECASE)
+            c_desc = pattern.sub("", c_desc, count=1).strip()
+            # Restore sentence case safely (capitalize() can lower-case other letters)
+            if c_desc:
+                c_desc = c_desc[0].upper() + c_desc[1:]
 
         status = f"{c_title} - {c_desc}" if (c_title and c_desc) else (c_title or c_desc)
 
-        # 1. Update standard Qt properties (triggers Maya's status bar)
         if hasattr(widget_or_action, "setStatusTip"):
             widget_or_action.setStatusTip(status)
 
-        # 2. Store for our custom TKM floating tooltips
         if hasattr(widget_or_action, "setProperty"):
-            widget_or_action.setProperty("tkm_title", title)
-            widget_or_action.setProperty("tkm_description", description)
-            widget_or_action.setProperty("description", description)  # Legacy support
+            widget_or_action.setProperty("tkm_title", raw_title)
+            widget_or_action.setProperty("tkm_description", raw_desc)
+            widget_or_action.setProperty("description", raw_desc)
 
         # 3. If it's an action, also try to push to its parent menu's status bar
         if isinstance(widget_or_action, QAction) and widget_or_action.parent():
@@ -224,17 +263,20 @@ class MenuWidget(QtWidgets.QMenu):
 
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
+        tooltip_template = kwargs.pop("tooltip_template", kwargs.pop("template", kwargs.pop("tooltip", None)))
         res = QtWidgets.QMenu.addAction(self, *args, **kwargs)
+        # Use QAction if it was passed directly as the first arg, else the result of addAction
         action = args[0] if (len(args) > 0 and isinstance(args[0], QAction)) else res
 
-        # Get the label: skip the icon and parent if provided in args
+        # Determine the display label and help title
         label = ""
         for arg in args:
             if isinstance(arg, (str, bytes)):
                 label = arg
                 break
 
-        HelpSystem.push(action, label, description)
+        # Push documentation (use tooltip_template or label as help source)
+        HelpSystem.push(action, tooltip_template or label or action.text(), description)
         return action
 
     def addMenu(self, *args, **kwargs):
@@ -265,12 +307,16 @@ class MenuWidget(QtWidgets.QMenu):
 
         # Floating Tooltip
         if QFlatTooltipManager.enabled:
-            template = f"<b>{title}</b><br><br>{desc}" if desc else f"<b>{title}</b>"
+            # Reconstruct the full HTML template from the split properties
+            # Note: we wrap the title in bold if it's plain text to ensure QFlatTooltip finds the header
+            display_title = title if ("<" in title or ">" in title) else f"<b>{title}</b>"
+            tooltip_template = f"{display_title}<br><br>{desc}" if desc else display_title
+
             geometry = self.actionGeometry(action)
             target_rect = QtCore.QRect(self.mapToGlobal(geometry.topLeft()), geometry.size())
             icon = action.icon() if not action.icon().isNull() else None
             QFlatTooltipManager.delayed_show(
-                text=title, anchor_widget=self, target_rect=target_rect, description=desc, template=template, icon_obj=icon
+                text=title, anchor_widget=self, target_rect=target_rect, description=desc, tooltip_template=tooltip_template, icon_obj=icon
             )
 
     def hideEvent(self, event):
@@ -280,7 +326,6 @@ class MenuWidget(QtWidgets.QMenu):
 
     def leaveEvent(self, event):
         self._last_hovered_action = None
-
         QFlatTooltipManager.cancel_timer()
         QtWidgets.QMenu.leaveEvent(self, event)
 
@@ -303,9 +348,19 @@ class OpenMenuWidget(MenuWidget):
 
 
 class TooltipMixin:
-    def setData(self, text="", description="", shortcuts=None, icon=None):
-        self._help_data = {"text": text, "description": description, "shortcuts": shortcuts or [], "icon": icon}
-        HelpSystem.push(self, text, description)
+    def setData(self, text="", description="", shortcuts=None, icon=None, tooltip_template=None):
+        # Automatically pick up the widget's icon if not provided
+        if not icon and hasattr(self, "_icon_path"):
+            icon = self._icon_path
+        
+        self._help_data = {
+            "text": text, 
+            "description": description, 
+            "shortcuts": shortcuts or [], 
+            "icon": icon, 
+            "tooltip_template": tooltip_template
+        }
+        HelpSystem.push(self, tooltip_template or text, description)
 
     def setToolTipData(self, **kwargs):
         self._has_tooltip = True
@@ -317,7 +372,7 @@ class TooltipMixin:
     def enterEvent(self, event: QtCore.QEvent):
         # Refresh description and trigger Maya event
         data = getattr(self, "_help_data", {})
-        HelpSystem.push(self, data.get("text", ""), data.get("description", ""))
+        HelpSystem.push(self, data.get("tooltip_template") or data.get("text", ""), data.get("description", ""))
 
         try:
             super().enterEvent(event)
@@ -325,7 +380,8 @@ class TooltipMixin:
             pass
 
         if QFlatTooltipManager.enabled and getattr(self, "_has_tooltip", False):
-            if data.get("text") or data.get("description"):
+            if data.get("text") or data.get("description") or data.get("tooltip_template"):
+                # Pass the template directly to the tooltip manager
                 QFlatTooltipManager.delayed_show(anchor_widget=self, **data)
 
     def leaveEvent(self, event: QtCore.QEvent):
@@ -336,12 +392,14 @@ class TooltipMixin:
             pass
 
 
-class QFlatSpinBox(TooltipMixin, QtWidgets.QSpinBox):
-    def __init__(self, *args, tooltip=None, **kwargs):
+class QFlatSpinBox(QtWidgets.QSpinBox):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.setFixedSize(50, 24)
+        self.setMinimum(1)
+        self.setValue(1)
+        self.setStyleSheet("border: 0px;border-radius: 5px;")
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        if tooltip:
-            self.setToolTipData(text=tooltip)
 
     def enterEvent(self, event: QtCore.QEvent):
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
@@ -353,7 +411,9 @@ class QFlatSpinBox(TooltipMixin, QtWidgets.QSpinBox):
 
 
 class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
-    def __init__(self, parent=None, icon=None, text=None, tooltip=None, description=None, shortcuts=None, highlight=False, pressed_color=None):
+    def __init__(
+        self, parent=None, icon=None, text=None, tooltip_template=None, description=None, shortcuts=None, highlight=False, pressed_color=None
+    ):
         super().__init__(parent)
         self.setAutoRaise(True)
         self.pressed_color = pressed_color or "#666666"
@@ -395,7 +455,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self._highlight = highlight
         if icon:
             self.setIcon(icon)
-        self.setToolTipData(text=tooltip, description=description, shortcuts=shortcuts, icon=icon)
+        self.setToolTipData(text=text or tooltip_template, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon)
 
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
@@ -404,12 +464,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             QFlatHoverableIcon.apply(self, self._icon_path, highlight=self._highlight)
             # Update tooltip icon as well
             data = getattr(self, "_help_data", {})
-            self.setToolTipData(
-                text=data.get("text", ""),
-                description=data.get("description", ""),
-                shortcuts=data.get("shortcuts", []),
-                icon=self._icon_path,
-            )
+            self.setToolTipData(icon=self._icon_path, **data)
         elif icon:
             super().setIcon(icon)
 
@@ -614,7 +669,14 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._overlay_btn = QtWidgets.QToolButton(self)
             self._overlay_btn.setFixedSize(8, 8)
             self._overlay_btn.setVisible(False)
-            self._overlay_btn.setToolTip("Pin hidden tools for this Section")
+            HelpSystem.push(self._overlay_btn, "Section Config", "Manage which tools are pinned for quick access.")
+            
+            # Ensure the tiny button pushes its help to Maya on hover
+            def _push_help(event, btn=self._overlay_btn):
+                HelpSystem.push(btn, btn.property("tkm_title"), btn.property("tkm_description"))
+                return QtWidgets.QToolButton.enterEvent(btn, event)
+            
+            self._overlay_btn.enterEvent = _push_help
             self._overlay_btn.setStyleSheet("""
                 QToolButton {
                     border: none;
@@ -627,7 +689,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
             self._overlay_btn.clicked.connect(self._show_menu)
 
-    def addWidget(self, widget, label, key, default_visible=True, description=None):
+    def addWidget(self, widget, label, key, default_visible=True, description=None, tooltip_template=None):
         """Add a widget to the section with a toggle key."""
         self.layout().addWidget(widget)
         self._widgets[key] = widget
@@ -651,15 +713,30 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     self._mode_to_slot[current_cm.key] = key
 
         if self._hiddeable:
-            self._menu_metadata.append({"type": "widget", "key": key, "label": label, "description": description, "default": default_visible})
+            self._menu_metadata.append(
+                {
+                    "type": "widget",
+                    "key": key,
+                    "label": label,
+                    "description": description,
+                    "tooltip_template": tooltip_template,
+                    "default": default_visible,
+                }
+            )
 
             # Load stored visibility or use default
             visible = settings.get_setting(f"pin_{key}", default_visible)
             widget.setVisible(visible)
 
+        # Push documentation to the widget (syncs Maya Status Bar and TKM tooltips)
+        if hasattr(widget, "setToolTipData"):
+            widget.setToolTipData(text=label, description=description or "", tooltip_template=tooltip_template)
+        else:
+            HelpSystem.push(widget, tooltip_template or label, description or "")
+
         return widget
 
-    def addWidgetGroup(self, widget, label, key, widgets, default_visible=True, description=None):
+    def addWidgetGroup(self, widgets_list, default_visible=True, description=None):
         """
         All-in-one: adds a widget to the section AND builds its right-click menu
         from a descriptor list, enabling individual action pinning.
@@ -680,80 +757,138 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         default_visible : bool
         description : str
         """
-        # 1. Register the main widget in the section
-        self.addWidget(widget, label, key, default_visible=default_visible, description=description)
+        default_items = [i for i in widgets_list if isinstance(i, dict) and i.get("default")]
+        if not default_items:
+            default_items = [widgets_list[0]] if widgets_list else []
 
-        # 2. Resolve the group icon from the widget's stored path
-        group_icon_path = getattr(widget, "_icon_path", None) or ""
+        group_widgets = []
+        for default_item in default_items:
+            widget = QFlatToolButton(
+                icon=default_item.get("icon_path"),
+                tooltip_template=default_item.get("tooltip") or default_item.get("label"),
+                description=default_item.get("description") or "",
+            )
+            label = default_item.get("label", "Unknown")
+            key = default_item.get("key", "unknown")
+
+            if "callback" in default_item:
+                widget.clicked.connect(default_item["callback"])
+
+            # 1. Register the main widget in the section
+            self.addWidget(
+                widget,
+                label,
+                key,
+                default_visible=default_visible,
+                description=default_item.get("description"),
+                tooltip_template=default_item.get("tooltip") or label,
+            )
+            group_widgets.append((key, widget))
+
+        # 2. Resolve the group properties from the first default tool
+        first_item = default_items[0] if default_items else {}
+        group_label = first_item.get("label", "Group")
+        group_icon_p = first_item.get("icon_path") or ""
 
         # 3. Build QMenu + pinnable_actions from the descriptor list
-        menu = QtWidgets.QMenu(widget)
         pinnable_actions = []
-        checkable_sync_pairs = []  # (QAction, is_checked_fn) for aboutToShow refresh
-
-        for item in widgets:
+        for item in widgets_list:
             if item == "separator":
-                menu.addSeparator()
                 continue
-
-            act_icon_path = item.get("icon_path") or ""
-            act_label    = item.get("label", "")
-            callback     = item.get("callback")
-            checkable    = item.get("checkable", False)
-            is_checked_fn = item.get("is_checked_fn")
-
-            if checkable:
-                action = menu.addAction(QtGui.QIcon(act_icon_path), act_label)
-                action.setCheckable(True)
-                if is_checked_fn:
-                    try:
-                        action.setChecked(is_checked_fn())
-                    except Exception:
-                        pass
-                    checkable_sync_pairs.append((action, is_checked_fn))
-                if callback:
-                    action.triggered.connect(callback)
-            else:
-                if callback:
-                    menu.addAction(QtGui.QIcon(act_icon_path), act_label, callback)
-                else:
-                    menu.addAction(QtGui.QIcon(act_icon_path), act_label)
-
             if item.get("pinnable") is not False:
-                pinnable_actions.append({
-                    "key":          item["key"],
-                    "label":        act_label,
-                    "icon_path":    item.get("icon_path"),
-                    "callback":     callback,
-                    "checkable":    checkable,
-                    "is_checked_fn": is_checked_fn,
-                    "tooltip":      item.get("tooltip"),
-                    "description":  item.get("description"),
-                })
+                pinnable_actions.append(
+                    {
+                        "key": item["key"],
+                        "label": item.get("label", ""),
+                        "icon_path": item.get("icon_path"),
+                        "callback": item.get("callback"),
+                        "checkable": item.get("checkable", False),
+                        "is_checked_fn": item.get("is_checked_fn"),
+                        "tooltip": item.get("tooltip"),
+                        "description": item.get("description"),
+                    }
+                )
 
-        # Sync check states on every menu open (handles mutable state)
-        if checkable_sync_pairs:
-            def _sync(pairs=checkable_sync_pairs):
-                for act, fn in pairs:
-                    if isValid(act):
+        # 3. Build QMenu from the descriptor list (factory will manage visibility)
+        def menu_factory(section=self, source_widget=None, widgets=widgets_list, group_pin_actions=pinnable_actions):
+            menu = MenuWidget(source_widget)
+            menu.setTearOffEnabled(True)
+
+            source_key = None
+            if source_widget and isValid(source_widget):
+                for k, w in section._widgets.items():
+                    if w == source_widget:
+                        source_key = k
+                        break
+
+            checkable_sync_pairs = []
+            for item in widgets:
+                if item == "separator":
+                    menu.addSeparator()
+                    continue
+
+                if item.get("key") == source_key:
+                    continue
+
+                act_icon_p = item.get("icon_path") or ""
+                cb = item.get("callback")
+                checkable = item.get("checkable", False)
+                is_checked_f = item.get("is_checked_fn")
+
+                # Use raw label for display, but full tooltip for documentation
+                display_label = item.get("label", "")
+                full_tooltip = item.get("tooltip") or display_label
+                full_desc = item.get("description") or ""
+
+                if checkable:
+                    action = menu.addAction(QtGui.QIcon(act_icon_p), display_label, template=full_tooltip, description=full_desc)
+                    action.setCheckable(True)
+                    if is_checked_f:
                         try:
-                            act.setChecked(fn())
+                            action.setChecked(is_checked_f())
                         except Exception:
                             pass
-            menu.aboutToShow.connect(_sync)
+                        checkable_sync_pairs.append((action, is_checked_f))
+                    if cb:
+                        action.triggered.connect(cb)
+                else:
+                    if cb:
+                        menu.addAction(QtGui.QIcon(act_icon_p), display_label, cb, tooltip_template=full_tooltip, description=full_desc)
+                    else:
+                        menu.addAction(QtGui.QIcon(act_icon_p), display_label, tooltip_template=full_tooltip, description=full_desc)
 
-        # 4. Register group: wires right-click + tear-off on the parent widget
-        self.register_action_group(key, label, group_icon_path, pinnable_actions, menu_factory=lambda: menu)
+            if checkable_sync_pairs:
 
-        return widget
-    def register_action_group(self, widget_key, group_label, group_icon_path, pinnable_actions, menu_factory=None):
+                def _sync(pairs=checkable_sync_pairs):
+                    for act, fn in pairs:
+                        if isValid(act):
+                            try:
+                                act.setChecked(fn())
+                            except Exception:
+                                pass
+
+                menu.aboutToShow.connect(_sync)
+            return menu
+
+        # 4. Register group: wires right-click + tear-off on the parent widget(s)
+        self.register_action_group(
+            [k for k, w in group_widgets],
+            group_label,
+            group_icon_p,
+            pinnable_actions,
+            menu_factory=menu_factory,
+        )
+
+        return group_widgets[0][1] if group_widgets else None
+
+    def register_action_group(self, widget_keys, group_label, group_icon_path, pinnable_actions, menu_factory=None):
         """
         Register a tool group so its sub-actions can be pinned as standalone buttons.
 
         Parameters
         ----------
-        widget_key : str
-            The key used when the parent button was added via addWidget.
+        widget_keys : str or list of str
+            The key(s) used when the parent button(s) were added via addWidget.
         group_label : str
             Display label for the group (e.g. "Pointer").
         group_icon_path : str
@@ -771,42 +906,47 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         menu_factory : callable() -> QMenu (optional)
             Returns the live right-click menu shared by all pinned buttons in this group.
         """
-        self._tool_groups[widget_key] = {
-            "label": group_label,
-            "icon_path": group_icon_path,
-            "menu_factory": menu_factory,
-            "actions": pinnable_actions,
-        }
+        keys_list = [widget_keys] if isinstance(widget_keys, str) else widget_keys
 
-        # Auto-wire right-click on the parent widget + enable tear-off
-        if menu_factory:
-            widget = self._widgets.get(widget_key)
-            if widget and isValid(widget):
-                # Enable tear-off once on the live menu object
-                try:
-                    m = menu_factory()
-                    if m and isValid(m):
-                        m.setTearOffEnabled(True)
-                except Exception:
-                    pass
+        for w_key in keys_list:
+            self._tool_groups[w_key] = {
+                "label": group_label,
+                "icon_path": group_icon_path,
+                "menu_factory": menu_factory,
+                "actions": pinnable_actions,
+            }
 
-                widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-
-                def _ctx(pos, mf=menu_factory, w=widget):
+            # Auto-wire right-click on the parent widget + enable tear-off
+            if menu_factory:
+                widget = self._widgets.get(w_key)
+                if widget and isValid(widget):
+                    # Enable tear-off once on the live menu object
                     try:
-                        m = mf()
+                        m = menu_factory()
                         if m and isValid(m):
-                            m.exec_(w.mapToGlobal(pos))
+                            m.setTearOffEnabled(True)
                     except Exception:
                         pass
 
-                widget.customContextMenuRequested.connect(_ctx)
+                    widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+
+                    def _ctx(pos, mf=menu_factory, w=widget):
+                        try:
+                            m = mf(source_widget=w)
+                            if m and isValid(m):
+                                m.exec_(w.mapToGlobal(pos))
+                        except Exception:
+                            pass
+
+                    widget.customContextMenuRequested.connect(_ctx)
 
         # Restore any previously pinned sub-actions on load
-        for act_info in pinnable_actions:
-            act_key = act_info["key"]
-            if settings.get_setting(f"pin_action_{act_key}", False):
-                self._create_pinned_action_button(widget_key, act_info)
+        if keys_list:
+            group_key = keys_list[0]
+            for act_info in pinnable_actions:
+                act_key = act_info["key"]
+                if settings.get_setting(f"pin_action_{act_key}", False):
+                    self._create_pinned_action_button(group_key, act_info)
 
     def _create_pinned_action_button(self, group_key, act_info):
         """Create and insert a pinned sub-action button into the section layout."""
@@ -819,13 +959,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         group_info = self._tool_groups.get(group_key, {})
         icon_path = act_info.get("icon_path") or group_info.get("icon_path") or ""
-        tooltip = act_info.get("tooltip") or act_info.get("label", "")
+        tooltip_template = act_info.get("tooltip") or act_info.get("label", "")
         description = act_info.get("description", "")
         callback = act_info.get("callback")
         checkable = act_info.get("checkable", False)
         is_checked_fn = act_info.get("is_checked_fn")
 
-        btn = QFlatToolButton(icon=icon_path or None, tooltip=tooltip, description=description)
+        btn = QFlatToolButton(icon=icon_path or None, tooltip_template=tooltip_template, description=description)
         btn.setCheckable(checkable)
         if checkable and is_checked_fn:
             try:
@@ -835,6 +975,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         if callback:
             if checkable:
+
                 def _checked_cb(checked, cb=callback, b=btn, fn=is_checked_fn):
                     cb(checked)
                     if fn and isValid(b):
@@ -842,6 +983,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                             b.setChecked(fn())
                         except Exception:
                             pass
+
                 btn.clicked.connect(_checked_cb)
             else:
                 btn.clicked.connect(lambda *_: callback())
@@ -1093,6 +1235,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     if not widget or not isValid(widget):
                         continue
                     action = menu.addAction(item["label"], description=item["description"])
+                    HelpSystem.push(action, title=item.get("tooltip") or item["label"], description=item.get("description") or "")
                     action.setCheckable(True)
                     action.setChecked(widget.isVisible())
                     action.triggered.connect(self._make_toggle_handler(key))
@@ -1106,12 +1249,18 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                         for act_info in group_info["actions"]:
                             act_key = act_info["key"]
+                            if act_key == key:
+                                continue
+
                             act_label = act_info.get("label", "")
                             act_icon_path = act_info.get("icon_path") or group_icon_path
                             existing_btn = self._pinned_action_buttons.get(act_key)
                             is_pinned = bool(existing_btn and isValid(existing_btn))
 
                             sub_action = menu.addAction(QtGui.QIcon(act_icon_path or ""), act_label)
+                            HelpSystem.push(
+                                sub_action, title=act_info.get("tooltip") or act_label, description=act_info.get("description") or ""
+                            )
                             sub_action.setCheckable(True)
                             sub_action.setChecked(is_pinned)
 
@@ -1123,6 +1272,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                                     else:
                                         settings.set_setting(f"pin_action_{ak}", False)
                                         self._remove_pinned_action_button(ak)
+
                                 return handler
 
                             sub_action.triggered.connect(_make_pin_handler(key, act_info, act_key))

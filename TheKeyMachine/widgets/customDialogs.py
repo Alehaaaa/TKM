@@ -458,7 +458,7 @@ class QFlatConfirmDialog(QFlatDialog):
 
 class QFlatTooltipConfirm(QFlatDialog):
     """
-    A hybrid widget combining the visual style of a QFlatTooltip (arrow, rounded, dark, XML template)
+    A hybrid widget combining the visual style of a QFlatTooltip (arrow, rounded, dark, XML tooltip_template)
     with the logic and button handling of a QFlatConfirmDialog.
     """
 
@@ -468,7 +468,7 @@ class QFlatTooltipConfirm(QFlatDialog):
     ARROW_W = 12
     ARROW_H = 8
 
-    def __init__(self, parent=None, title="", message="", buttons=None, icon=None, template=None, highlight=None):
+    def __init__(self, parent=None, title="", message="", buttons=None, icon=None, tooltip_template=None, highlight=None):
         QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight)
 
         # Tooltip-like window setup
@@ -476,22 +476,22 @@ class QFlatTooltipConfirm(QFlatDialog):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.clicked_button = None
 
-        # Build template if not provided (compatibility with standard title/message/icon)
-        if template is None:
-            template = ""
+        # Build tooltip_template if not provided (compatibility with standard title/message/icon)
+        if tooltip_template is None:
+            tooltip_template = ""
             if icon:
-                template += "<icon>{}</icon>".format(icon)
+                tooltip_template += "<icon>{}</icon>".format(icon)
             if title:
-                template += "<title>{}</title>".format(title)
+                tooltip_template += "<title>{}</title>".format(title)
             if message:
-                template += "<text>{}</text>".format(message)
+                tooltip_template += "<text>{}</text>".format(message)
         else:
-            # If template provided, ensure icon/title are included if passed as args and missing in xml
-            if icon and "<icon>" not in template:
-                template = "<icon>{}</icon>{}".format(icon, template)
-            if title and "<title>" not in template:
-                template = "<title>{}</title>{}".format(title, template)
-        self.template = template
+            # If tooltip_template provided, ensure icon/title are included if passed as args and missing in xml
+            if icon and "<icon>" not in tooltip_template:
+                tooltip_template = "<icon>{}</icon>{}".format(icon, tooltip_template)
+            if title and "<title>" not in tooltip_template:
+                tooltip_template = "<title>{}</title>{}".format(title, tooltip_template)
+        self.tooltip_template = tooltip_template
 
         # Style the frame
         self.setStyleSheet(
@@ -519,14 +519,14 @@ class QFlatTooltipConfirm(QFlatDialog):
             self.bg_layout.addSpacing(DPI(4))
 
     def _build_content(self):
-        """Parses the XML template and builds the body, same as QFlatTooltip."""
+        """Parses the XML tooltip_template and builds the body, same as QFlatTooltip."""
         try:
             # Basic sanitization
-            safe_template = self.template.replace("&", "&amp;")
-            if "<br>" in safe_template.lower():
-                safe_template = re.sub(r"(?i)<br\s*>", "<br/>", safe_template)
+            safe_tooltip_template = self.tooltip_template.replace("&", "&amp;")
+            if "<br>" in safe_tooltip_template.lower():
+                safe_tooltip_template = re.sub(r"(?i)<br\s*>", "<br/>", safe_tooltip_template)
 
-            root = ET.fromstring("<root>{}</root>".format(safe_template))
+            root = ET.fromstring("<root>{}</root>".format(safe_tooltip_template))
         except Exception as e:
             root = ET.fromstring("<root><text>Invalid XML: {}</text></root>".format(e))
 

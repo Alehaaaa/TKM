@@ -138,8 +138,7 @@ remove_selection_set_image = getImage("remove_selection_set.svg")
 grey_menu_image = getImage("grey_dot.png")
 
 reload_image = getImage("reload.png")
-remove_small_image = getImage("remove_small.png")
-uninstall_image = getImage("uninstall.svg")
+remove_image = getImage("remove.svg")
 dock_image = getImage("dock.png")
 check_updates_image = getImage("check_updates.svg")
 check_updates_image_available = getImage("check_updates_available.svg")
@@ -157,7 +156,6 @@ youtube_image = getImage("youtube.svg")
 # ___________________ Tracer ______________________________#
 
 tracer_show_hide_image = getImage("tracer_show_hide.svg")
-tracer_remove_image = getImage("remove_tracer.svg")
 tracer_refresh_image = getImage("tracer_refresh.svg")
 tracer_select_offset_image = getImage("tracer_select_offset.svg")
 tracer_set_color_image = getImage("tracer_set_color.svg")

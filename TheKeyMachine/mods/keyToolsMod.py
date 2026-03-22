@@ -909,17 +909,23 @@ def hotkey_move_keyframes_right():
 # _____
 
 
-def insert_inbetween(*args):
-    mel.eval("timeSliderEditKeys addInbetween")
+def insert_inbetween(count=1, *args):
+    if not isinstance(count, int):
+        count = 1
+    for _ in range(count):
+        mel.eval("timeSliderEditKeys addInbetween")
     currentT = cmds.currentTime(q=True)
-    moveLeft = currentT + 1
+    moveLeft = currentT + count
     cmds.currentTime(moveLeft)
 
 
-def remove_inbetween(*args):
-    mel.eval("timeSliderEditKeys removeInbetween")
+def remove_inbetween(count=1, *args):
+    if not isinstance(count, int):
+        count = 1
+    for _ in range(count):
+        mel.eval("timeSliderEditKeys removeInbetween")
     currentT = cmds.currentTime(q=True)
-    moveLeft = currentT - 1
+    moveLeft = currentT - count
     cmds.currentTime(moveLeft)
 
 
