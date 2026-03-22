@@ -395,13 +395,21 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self._highlight = highlight
         if icon:
             self.setIcon(icon)
-        self.setToolTipData(text=tooltip, description=description, shortcuts=shortcuts)
+        self.setToolTipData(text=tooltip, description=description, shortcuts=shortcuts, icon=icon)
 
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
         if isinstance(icon, (str, bytes)):
             self._icon_path = str(icon)
             QFlatHoverableIcon.apply(self, self._icon_path, highlight=self._highlight)
+            # Update tooltip icon as well
+            data = getattr(self, "_help_data", {})
+            self.setToolTipData(
+                text=data.get("text", ""),
+                description=data.get("description", ""),
+                shortcuts=data.get("shortcuts", []),
+                icon=self._icon_path,
+            )
         elif icon:
             super().setIcon(icon)
 

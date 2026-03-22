@@ -27,6 +27,8 @@ import TheKeyMachine.widgets.util as util
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
 
+from TheKeyMachine.tooltips import QFlatTooltipManager
+
 importlib.reload(ui)
 importlib.reload(util)
 importlib.reload(cw)
@@ -254,12 +256,11 @@ class SliderHandle(cw.TooltipMixin, QSlider):
     def enterEvent(self, e):
         self._hover = True
         self.update()
-        # super().enterEvent(e)
+        super().enterEvent(e)
 
     def leaveEvent(self, e):
         self._hover = False
         self._handle_hover = False
-        from TheKeyMachine.tooltips import QFlatTooltipManager
 
         QFlatTooltipManager.hide()
 
@@ -405,11 +406,10 @@ QSlider::handle:horizontal {{
 
         if is_handle_hover != was_handle_hover and not self._is_active():
             self.update()
-            from TheKeyMachine.tooltips import QFlatTooltipManager
 
             if is_handle_hover:
-                if hasattr(self, "_tooltip_data") and (self._tooltip_data.get("text") or self._tooltip_data.get("description")):
-                    QFlatTooltipManager.delayed_show(anchor_widget=self, **self._tooltip_data)
+                if hasattr(self, "_help_data") and (self._help_data.get("text") or self._help_data.get("description")):
+                    QFlatTooltipManager.delayed_show(anchor_widget=self, **self._help_data)
             else:
                 QFlatTooltipManager.cancel_timer()
 
@@ -912,8 +912,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     # --- signal plumbing --------------------------------------------------------
     def _on_drag_started(self):
-        from TheKeyMachine.tooltips import QFlatTooltipManager
-
         QFlatTooltipManager.hide()
 
         self.dragStarted.emit()

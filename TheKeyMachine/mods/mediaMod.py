@@ -25,88 +25,20 @@ INSTALL_PATH = config["INSTALL_PATH"]
 
 
 def getImage(image):
-    img_dir = os.path.join(INSTALL_PATH, "TheKeyMachine/data/img/")
-
-    fullImgDir = os.path.join(img_dir, image)
-    return fullImgDir
+    img_dir = os.path.join(INSTALL_PATH, "TheKeyMachine", "data", "img")
+    return os.path.join(img_dir, image)
 
 
 # __________________ Install _________________________________ #
 
 tool_icon = getImage("TheKeyMachine_icon.png")
 
-
 # __________________ Nodes _________________________________ #
 
 tkm_node_image = getImage("tkm_node.png")
 
-
 # __________________ Toolbar Images _________________________________ #
 
-# if platform.system() == "Darwin":
-#     pointer_image = getImage("100/pointer_105.svg")
-#     depth_mover_image = getImage("100/depth_mover_105.svg")
-#     select_rig_controls_image = getImage("100/select_rig_controls_105.svg")
-#     select_animated_rig_controls_image = getImage("100/select_animated_rig_controls_105.svg")
-#     isolate_image = getImage("100/isolate_105.svg")
-#     create_locator_image = getImage("100/cube_105.svg")
-#     align_menu_image = getImage("100/magnet_105.svg")
-#     tracer_menu_image = getImage("100/tracer_105.svg")
-#     reset_animation_image = getImage("100/eraser_105.svg")
-#     delete_animation_image = getImage("100/trash_105.svg")
-
-#     match_image = getImage("100/magnet_105.svg")
-
-#     select_opposite_image = getImage("100/select_opposite_105.svg")
-#     copy_opposite_image = getImage("100/copy_opposite_105.svg")
-#     mirror_image = getImage("100/mirror_105.svg")
-#     copy_animation_image = getImage("100/copy_animation_105.svg")
-#     paste_animation_image = getImage("100/paste_animation_105.svg")
-#     paste_insert_animation_image = getImage("100/paste_insert_animation_105.svg")
-#     paste_opposite_animation_image = getImage("100/paste_opposite_animation_105.svg")
-#     copy_pose_image = getImage("100/copy_pose_105.svg")
-#     paste_pose_image = getImage("100/paste_pose_105.svg")
-#     reblock_keys_image = getImage("100/reblock_105.svg")
-#     share_keys_image = getImage("100/share_keys_105.svg")
-#     bake_animation_image = getImage("100/bake_animation_105.svg")
-
-#     selector_image = getImage("100/selector_105.svg")
-#     select_hierarchy_image = getImage("100/select_hierarchy_105.svg")
-#     animation_offset_image = getImage("100/animation_offset_105.svg")
-
-#     follow_cam_image = getImage("100/camera_105.svg")
-
-#     link_objects_image = getImage("100/link_relative_105.svg")
-#     link_objects_on_image = getImage("100/link_relative_on_105.svg")
-
-#     copy_worldspace_animation_image = getImage("100/copy_worldspace_animation_105.svg")
-#     copy_worldspace_frame_animation_image = getImage("100/copy_worldspace_frame_animation_105.svg")
-#     paste_worldspace_frame_animation_image = getImage("100/paste_worldspace_frame_animation_105.svg")
-#     paste_worldspace_animation_image = getImage("100/paste_worldspace_animation_105.svg")
-
-#     temp_pivot_image = getImage("100/temp_pivot_105.svg")
-#     ruler_image = getImage("100/ruler_105.svg")
-
-#     auto_tangent_image = getImage("100/auto_tangent_105.svg")
-#     spline_tangent_image = getImage("100/spline_tangent_105.svg")
-#     linear_tangent_image = getImage("100/linear_tangent_105.svg")
-#     step_tangent_image = getImage("100/step_tangent_105.svg")
-#     match_curve_cycle_image = getImage("100/match_curve_cycle.svg")
-#     bouncy_curve_image = getImage("100/bouncy_curve.svg")
-
-#     playblast_image = getImage("100/playblast_105.svg")
-#     selection_sets_image = getImage("100/selection_sets_105.svg")
-#     add_selection_set_image = getImage("100/add_selection_set_105.svg")
-#     customGraph_image = getImage("100/customGraph_105.svg")
-
-#     custom_tools_image = getImage("100/tools_folder_105.svg")
-#     custom_scripts_image = getImage("100/scripts_folder_105.svg")
-
-#     settings_image = getImage("100/settings_105.svg")
-#     settings_cg_image = getImage("100/settings_75.svg")
-#     settings_update_image = getImage("100/settings_update_105.svg")
-
-# else:
 nudge_left_image = getImage("nudge_left.svg")
 nudge_right_image = getImage("nudge_right.svg")
 
@@ -175,7 +107,8 @@ settings_update_image = getImage("settings_update.svg")
 
 
 close_image = getImage("close.png")
-center_image = getImage("center.png")
+apply_image = getImage("apply.png")
+cancel_image = getImage("cancel.png")
 
 remove_followCam = getImage("remove_followCam.svg")
 
@@ -186,7 +119,6 @@ red_dot_image = getImage("red_dot.png")
 grey_dot_image = getImage("grey_dot.png")
 blue_dot_image = getImage("blue_dot.png")
 yellow_dot_image = getImage("yellow_dot.png")
-
 
 default_dot_image = getImage("dot.png")
 
@@ -201,11 +133,9 @@ rename_selection_set_image = getImage("rename_selection_set.svg")
 change_selection_set_color_image = getImage("change_selection_set_color.svg")
 remove_selection_set_image = getImage("remove_selection_set.svg")
 
-
 # ________________ Menus Images __________________________________________#
 
 grey_menu_image = getImage("grey_dot.png")
-
 
 reload_image = getImage("reload.png")
 remove_small_image = getImage("remove_small.png")
@@ -214,27 +144,15 @@ dock_image = getImage("dock.png")
 check_updates_image = getImage("check_updates.svg")
 check_updates_image_available = getImage("check_updates_available.svg")
 report_a_bug_image = getImage("bug.svg")
-about_image = getImage("about.svg")
-
+about_image = getImage("about.png")
 
 # ___________________Help / Tooltips Images ______________________________#
 
-donate_menu_image = getImage("donate_01.svg")
 help_menu_image = getImage("help.svg")
-uninstall_menu_image = getImage("uninstall_menu.png")
 ibookmarks_menu_image = getImage("ibookmarks_menu.png")
 
 discord_image = getImage("discord.svg")
 youtube_image = getImage("youtube.svg")
-
-
-# ___________________ Donate ______________________________#
-
-donate_image = getImage("stripe.png")
-
-# ___________________ Tools ______________________________#
-
-drop_down_arrow_image = getImage("drop_down_arrow.svg")
 
 # ___________________ Tracer ______________________________#
 

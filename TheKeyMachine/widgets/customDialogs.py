@@ -1,5 +1,5 @@
 import sys
-import os
+
 import re
 import xml.etree.ElementTree as ET
 from functools import partial
@@ -14,13 +14,9 @@ from TheKeyMachine.widgets.customWidgets import QFlatHoverableIcon
 import TheKeyMachine.mods.mediaMod as media
 from TheKeyMachine.tooltips.tooltip import QFlatTooltipManager
 
-def return_icon_path(name):
-    if name.endswith('.png') or name.endswith('.svg'):
-        return media.getImage(name)
-    png_path = media.getImage(name + ".png")
-    if os.path.exists(png_path):
-        return png_path
-    return media.getImage(name + ".svg")
+
+
+
 
 # Compatibility with aleha_tools imports
 QWidget = QtWidgets.QWidget
@@ -53,6 +49,7 @@ QPoint = QtCore.QPoint
 QPointF = QtCore.QPointF
 QTimer = QtCore.QTimer
 QRect = QtCore.QRect
+
 
 class QFlatDialogButton(dict):
     """A dictionary subclass that supports the | operator to return a list of buttons."""
@@ -203,12 +200,12 @@ class QFlatBottomBar(QFrame):
 
 class QFlatDialog(QDialog):
     # Button Preconfigurations
-    Yes = QFlatDialogButton("Yes", positive=True, icon=return_icon_path("apply"))
-    Ok = QFlatDialogButton("Ok", positive=True, icon=return_icon_path("apply"))
+    Yes = QFlatDialogButton("Yes", positive=True, icon=media.apply_image)
+    Ok = QFlatDialogButton("Ok", positive=True, icon=media.apply_image)
 
-    No = QFlatDialogButton("No", positive=False, icon=return_icon_path("cancel"))
-    Cancel = QFlatDialogButton("Cancel", positive=False, icon=return_icon_path("cancel"))
-    Close = QFlatDialogButton("Close", positive=False, icon=return_icon_path("close"))
+    No = QFlatDialogButton("No", positive=False, icon=media.cancel_image)
+    Cancel = QFlatDialogButton("Cancel", positive=False, icon=media.cancel_image)
+    Close = QFlatDialogButton("Close", positive=False, icon=media.close_image)
 
     CustomButton = QFlatDialogButton
 
@@ -498,7 +495,9 @@ class QFlatTooltipConfirm(QFlatDialog):
 
         # Style the frame
         self.setStyleSheet(
-            "QFlatTooltipConfirm > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(self.BG_COLOR, DPI(self.BORDER_RADIUS))
+            "QFlatTooltipConfirm > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(
+                self.BG_COLOR, DPI(self.BORDER_RADIUS)
+            )
         )
 
         self.bg_frame = QFrame()
@@ -548,9 +547,14 @@ class QFlatTooltipConfirm(QFlatDialog):
                     header_layout.addWidget(lbl)
                     has_header = True
             elif child.tag == "title":
-                inner_text = (child.text or "") + "".join(ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode") for c in child)
+                inner_text = (child.text or "") + "".join(
+                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
+                    for c in child
+                )
                 lbl = QLabel(inner_text)
-                lbl.setStyleSheet("color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(self.TEXT_COLOR, DPI(18)))
+                lbl.setStyleSheet(
+                    "color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(self.TEXT_COLOR, DPI(18))
+                )
                 lbl.setWordWrap(True)
                 header_layout.addWidget(lbl)
                 has_header = True
@@ -572,7 +576,10 @@ class QFlatTooltipConfirm(QFlatDialog):
                 continue
 
             if child.tag == "text":
-                inner_text = (child.text or "") + "".join(ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode") for c in child)
+                inner_text = (child.text or "") + "".join(
+                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
+                    for c in child
+                )
                 lbl = QLabel(inner_text)
                 lbl.setWordWrap(True)
                 lbl.setStyleSheet("color: {}; font-size: {}px; background: transparent;".format(self.TEXT_COLOR, DPI(11.5)))
@@ -630,7 +637,9 @@ class QFlatTooltipConfirm(QFlatDialog):
             poly = QPolygonF([QPointF(ax, 0), QPointF(ax - aw / 2, ah + 1), QPointF(ax + aw / 2, ah + 1)])
             painter.drawPolygon(poly)
         else:
-            poly = QPolygonF([QPointF(ax, self.height()), QPointF(ax - aw / 2, self.height() - ah - 1), QPointF(ax + aw / 2, self.height() - ah - 1)])
+            poly = QPolygonF(
+                [QPointF(ax, self.height()), QPointF(ax - aw / 2, self.height() - ah - 1), QPointF(ax + aw / 2, self.height() - ah - 1)]
+            )
             painter.drawPolygon(poly)
 
     def _show_around(self, widget, target_rect=None):
@@ -741,30 +750,32 @@ class QFlatTooltipConfirm(QFlatDialog):
             buttons = [cls.Ok]
         return cls._run(anchor_widget, title=title, message=message, buttons=buttons, **kwargs)
 
+
 class QFlatSelectorDialog(QFlatDialog):
     """
     A modern successor to the Maya textScrollList selector.
-    Displays a list of currently selected objects, allowing for quick 
+    Displays a list of currently selected objects, allowing for quick
     re-selection and focus.
     """
-    
+
     def __init__(self, title="Selector", parent=None):
         super().__init__(parent=parent)
         self.setWindowTitle(title or "Selector")
         self.setMinimumWidth(DPI(230))
         self.setMinimumHeight(DPI(380))
-        
+
         # UI Setup
         content_widget = QtWidgets.QWidget()
         self.root_layout.addWidget(content_widget)
-        
+
         layout = QtWidgets.QVBoxLayout(content_widget)
         layout.setContentsMargins(DPI(12), DPI(12), DPI(12), DPI(6))
         layout.setSpacing(DPI(8))
-        
+
         self.list_widget = QtWidgets.QListWidget()
         self.list_widget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.list_widget.setStyleSheet("""
+        self.list_widget.setStyleSheet(
+            """
             QListWidget {
                 background-color: #2b2b2b;
                 border: 1px solid #3d3d3d;
@@ -785,54 +796,52 @@ class QFlatSelectorDialog(QFlatDialog):
             QListWidget::item:hover {
                 background-color: #383838;
             }
-        """ % int(DPI(11)))
-        
-        # Add reload button
-        self.reload_btn = QFlatButton(
-            "Reload from Selection", 
-            icon_path=return_icon_path("refresh"),
-            background="#444444"
+        """
+            % int(DPI(11))
         )
+
+        # Add reload button
+        self.reload_btn = QFlatButton("Reload from Selection", icon_path=media.reload_image, background="#444444")
         self.reload_btn.clicked.connect(self.reload_objects)
-        
+
         layout.addWidget(self.list_widget)
         layout.addWidget(self.reload_btn)
-        
+
         # Add basic close button in bottom bar
-        self.setBottomBar([self.Close], closeButton=True)
-        
+        self.setBottomBar(closeButton=True)
+
         # Connections
         self.list_widget.itemSelectionChanged.connect(self._on_list_selection_changed)
-        
+
         # Initial fill
         self.reload_objects()
 
     def reload_objects(self):
         """Fills the list with current selection names."""
         import maya.cmds as cmds
-        
+
         self.list_widget.blockSignals(True)
         self.list_widget.clear()
-        
+
         # Get active selection names
         selected = cmds.ls(selection=True) or []
         for obj in sorted(selected):
             item = QtWidgets.QListWidgetItem(obj)
             self.list_widget.addItem(item)
-            
+
         self.list_widget.blockSignals(False)
 
     def _on_list_selection_changed(self):
         """Syncs the dialog selection back to the Maya scene."""
         import maya.cmds as cmds
-        
+
         # Get texts from selected items
         names = [item.text() for item in self.list_widget.selectedItems()]
-        
+
         if names:
             # Filter names to ensure they still exist in Maya
             valid_names = [n for n in names if cmds.objExists(n)]
             if valid_names:
                 cmds.select(valid_names, replace=True)
             else:
-                self.reload_objects() # Refresh if objects were deleted
+                self.reload_objects()  # Refresh if objects were deleted

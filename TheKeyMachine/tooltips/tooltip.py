@@ -232,14 +232,17 @@ class QFlatTooltip(QWidget):
         header_title = extracted_title or self.text
         header_pixmap = self.icon_obj if self.icon_obj and not self.icon_obj.isNull() else None
 
-        if not header_pixmap and extracted_icon_path:
-            header_pixmap = QPixmap(extracted_icon_path)
+        if not header_pixmap:
+            if extracted_icon_path:
+                header_pixmap = QPixmap(extracted_icon_path)
+            elif self.icon_path and isinstance(self.icon_path, (str, bytes)):
+                header_pixmap = QPixmap(self.icon_path)
 
         # 3. Build Header Section if we have a title or icon
         if header_title or header_pixmap:
             header_frame, header_layout = self._create_section_frame("")
             if header_pixmap:
-                lbl = self._create_icon_label(header_pixmap, dim=29)
+                lbl = self._create_icon_label(header_pixmap, dim=40)
                 header_layout.addWidget(lbl)
             if header_title:
                 title_lbl = self._create_text_label(header_title, size=18, bold=True, elide=True)
@@ -331,7 +334,7 @@ class QFlatTooltip(QWidget):
 
             icon_path = sh.get("icon", "default")
             pix = QPixmap(icon_path)
-            row.addWidget(self._create_icon_label(pix, dim=17))
+            row.addWidget(self._create_icon_label(pix, dim=24))
 
             name = QLabel(sh.get("label", ""))
             name.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5)))
@@ -349,7 +352,7 @@ class QFlatTooltip(QWidget):
 
         self.bg_layout.addSpacing(wutil.DPI(16))
 
-    def _create_icon_label(self, source, dim=16):
+    def _create_icon_label(self, source, dim=24):
         lbl = QLabel()
         px_dim = wutil.DPI(dim)
         if hasattr(source, "pixmap"):
@@ -531,9 +534,13 @@ class QFlatTooltipManager(object):
             return
         if cls._timer:
             cls._timer.stop()
-        # Guard: if anchor_widget has been deleted by the time we show, bail out
         if anchor_widget is not None and not wutil.is_valid_widget(anchor_widget):
             return
+
+        if icon and not isinstance(icon, (str, bytes)):
+            icon_obj = icon
+            icon = None
+
         cls.hide()
         cls._current_tooltip = QFlatTooltip(
             text=text,
