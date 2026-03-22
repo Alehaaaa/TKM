@@ -406,20 +406,20 @@ class QFlatButton(QtWidgets.QPushButton):
     """A customizable, flat-styled button for the bottom bar."""
 
     STYLE_SHEET = """
-        QtWidgets.QPushButton {
-            color: %s;
-            background-color: %s;
-            border-radius: %spx;
-            padding: %spx %spx;
-            font-weight: %s;
-            font-size: %spx;
-        }
-        QtWidgets.QPushButton:hover {
-            background-color: %s;
-        }
-        QtWidgets.QPushButton:pressed {
-            background-color: %s;
-        }
+    QPushButton {
+        color: %s;
+        background-color: %s;
+        border-radius: %spx;
+        padding: %spx %spx;
+        font-weight: %s;
+        font-size: %spx;
+    }
+    QPushButton:hover {
+        background-color: %s;
+    }
+    QPushButton:pressed {
+        background-color: %s;
+    }
     """
 
     DEFAULT_COLOR = "#ffffff"
@@ -507,7 +507,7 @@ class QFlatButton(QtWidgets.QPushButton):
 
 class QFlatBottomBar(QtWidgets.QFrame):
     """
-    A container widget for arranging QFlatButtons horizontally.
+    A container widget for arranging QFlat Buttons horizontally.
     """
 
     def __init__(self, buttons=[], margins=8, spacing=6, parent=None):
@@ -635,9 +635,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self._highlight = highlight
         if icon:
             self.setIcon(icon)
-        self.setToolTipData(
-            text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon
-        )
+        self.setToolTipData(text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon)
 
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
