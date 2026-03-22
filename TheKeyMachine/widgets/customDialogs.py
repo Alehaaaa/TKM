@@ -209,7 +209,7 @@ class QFlatDialog(QDialog):
 
     CustomButton = QFlatDialogButton
 
-    def __init__(self, parent=None, buttons=None, highlight=None, closeButton=False):
+    def __init__(self, parent=None, buttons=None, highlight=None, closeButton=False, **kwargs):
         if parent is None:
             parent = get_maya_qt()
 
@@ -316,8 +316,9 @@ class QFlatConfirmDialog(QFlatDialog):
         icon=None,
         exclusive=True,
         parent=None,
+        **kwargs
     ):
-        QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, closeButton=closeButton)
+        QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, closeButton=closeButton, **kwargs)
 
         new_flags = self.windowFlags() | Qt.Dialog
         if parent and (parent.windowFlags() & Qt.Tool):
@@ -468,8 +469,10 @@ class QFlatTooltipConfirm(QFlatDialog):
     ARROW_W = 12
     ARROW_H = 8
 
-    def __init__(self, parent=None, title="", message="", buttons=None, icon=None, tooltip_template=None, highlight=None):
-        QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight)
+    def __init__(self, parent=None, title="", message="", buttons=None, icon=None, tooltip_template=None, highlight=None, **kwargs):
+        # Support 'template' alias for tooltip_template (often used in updater.py)
+        tooltip_template = tooltip_template or kwargs.get("template")
+        QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, **kwargs)
 
         # Tooltip-like window setup
         self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
