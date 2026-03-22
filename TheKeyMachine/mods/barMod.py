@@ -43,6 +43,7 @@ import importlib
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.widgets.customDialogs as customDialogs
+import TheKeyMachine.widgets.util as util
 
 
 python_version = f"{sys.version_info.major}{sys.version_info.minor}"
@@ -282,8 +283,7 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False):
 
     # Asegurarse de que hay al menos dos objetos seleccionados
     if len(sel) < 2:
-        print("Select at least two objects")
-        return
+        return util.make_inViewMessage("Select at least two objects")
 
     # Obtener el objeto destino (último objeto en la lista de selección)
     target_obj = sel[-1]
@@ -590,8 +590,7 @@ def create_temp_pivot(use_saved_position=False, *args):
         seleccion = cmds.ls(selection=True)
 
         if not seleccion:
-            print("Select at least one obj")
-            return
+            return util.make_inViewMessage("Select at least one object")
 
         general.create_TheKeyMachine_node()
 
@@ -688,8 +687,7 @@ def create_temp_pivot(use_saved_position=False, *args):
 
         seleccion = cmds.ls(selection=True)
         if not seleccion:
-            print("Select one obj first")
-            return
+            return util.make_inViewMessage("Select at least one object")
 
         if temp_pivot_obj in seleccion:
             follow_objs = list(follow_temp_pivot_objs.keys())
@@ -906,7 +904,7 @@ def worldspace_copy_animation(*args):
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
         # Restaurar el tiempo actual a su estado original
         cmds.currentTime(original_time)
-        print("World Space animation copied")
+        util.make_inViewMessage("World Space animation copied")
 
 
 # -------------------- Copy range World Space
@@ -1056,8 +1054,7 @@ def worldspace_paste_animation(*args):
     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
 
     if not os.path.exists(worldspace_anim_data_file):
-        print("No World Space animation data found")
-        return
+        return util.make_inViewMessage("No World Space animation data found")
 
     with open(worldspace_anim_data_file, "r") as json_file:
         animation_data = json.load(json_file)
@@ -1138,8 +1135,7 @@ def create_tracer(*args):
 
     # Verificar si hay exactamente un objeto seleccionado.
     if len(selected_objects) != 1:
-        print("Select only one object")
-        return
+        return util.make_inViewMessage("Select only one object")
 
     # Verifica o crea el grupo 'TheKeyMachine'
     if not cmds.objExists("TheKeyMachine"):
@@ -1162,8 +1158,7 @@ def create_tracer(*args):
     selected_objects = cmds.ls(selection=True)
 
     if not selected_objects:
-        print("Select an object to trace")
-        return
+        return util.make_inViewMessage("Select an object to trace")
 
     if cmds.objExists("tracerHandle"):
         cmds.delete("tracerHandle")
@@ -1193,8 +1188,7 @@ def remove_tracer_node(*args):
 
 def tracer_connected(connected=False, update_cb=None, *args):
     if not cmds.objExists("tracerHandle"):
-        print("No tracer node in the scene")
-        return
+        return util.make_inViewMessage("No tracer node in the scene")
 
     is_connected = cmds.isConnected("tracer.points", "tracerHandleShape.points")
 
@@ -1219,7 +1213,7 @@ def tracer_update_checkbox(value):
 
 def tracer_refresh(*args):
     if not cmds.objExists("tracerHandle"):
-        print("No tracer node in the scene")
+        return util.make_inViewMessage("No tracer node in the scene")
     else:
         is_connected = cmds.isConnected("tracer.points", "tracerHandleShape.points")
         if not is_connected:
@@ -1273,8 +1267,7 @@ def create_follow_cam(translation=True, rotation=True, *args):
         general.create_TheKeyMachine_node()
 
     if not selected_objects:
-        print("Select at least one object.")
-        return
+        return util.make_inViewMessage("Select at least one object")
 
     target_object = selected_objects[0]
 
@@ -1342,7 +1335,7 @@ def remove_followCam(*args):
         print(followCam_original_camera)
         cmds.lookThru(panel, followCam_original_camera)
     else:
-        print("No followCam in the scene")
+        util.make_inViewMessage("No followCam in the scene")
 
 
 # ________________________SELECTOR______________
@@ -1696,14 +1689,13 @@ def gimbal_fixer_window(*args):
     if cmds.ls(sl=True):  # Verifica si hay una selección
         update_rotation_order(main_window)  # Ejecuta el botón "Reload"
     else:
-        print("Select a control and reload")
+        util.make_inViewMessage("Select a control and reload")
 
 
 def update_rotation_order(window):
     sel = cmds.ls(sl=True)
     if not sel:
-        print("Select a control")
-        return
+        return util.make_inViewMessage("Select a control")
 
     current_rotate_order = cmds.getAttr(f"{sel[0]}.rotateOrder")
     current_rotate_order_text = ROTATE_ORDERS[current_rotate_order]

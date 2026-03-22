@@ -105,5 +105,5 @@ def make_inViewMessage(message, icon=None):
         pos="midCenter",
         a=0.9,
         fade=True,
-        fst=3000,
+        fst=1000,
     )

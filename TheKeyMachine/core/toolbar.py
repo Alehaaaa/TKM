@@ -2335,7 +2335,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def create_selection_sets_workspace(self):
         if not cmds.workspaceControl(selection_sets_workspace, query=True, exists=True):
             return
-            
+
         cmds.setParent(selection_sets_workspace)
         if not cmds.control("selection_sets_flow_layout", query=True, exists=True):
             cmds.flowLayout("selection_sets_flow_layout", columnSpacing=1, wr=True, w=150)
@@ -2474,27 +2474,27 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
                     # Obtener el estado actual del aislamiento
                     currentPanel = cmds.getPanel(wf=True)
-                    panelType = cmds.getPanel(typeOf=currentPanel)
-                    if panelType == "modelPanel":
-                        currentState = cmds.isolateSelect(currentPanel, query=True, state=True)
-                        cmds.select(selected_objects)
-                        # If the isolation is not active, we activate it and add the selection
-                        if currentState == 0:
-                            cmds.isolateSelect(currentPanel, state=1)
-                            cmds.isolateSelect(currentPanel, addSelected=True)
-                        else:
-                            # Si el aislamiento está activo, vaciamos la selección actual y añadimos la nueva selección
-                            cmds.isolateSelect(currentPanel, state=0)
-                            cmds.isolateSelect(currentPanel, state=1)
-                            cmds.isolateSelect(currentPanel, addSelected=True)
+                    if cmds.getPanel(typeOf=currentPanel) != "modelPanel":
+                        currentPanel = cmds.playblast(activeEditor=True)
+                    if cmds.getPanel(typeOf=currentPanel) != "modelPanel":
+                        return wutil.inViewMessage("Focus on a camera or viewport")
 
+                    currentState = cmds.isolateSelect(currentPanel, query=True, state=True)
+                    cmds.select(selected_objects)
+                    # If the isolation is not active, we activate it and add the selection
+                    if currentState == 0:
+                        cmds.isolateSelect(currentPanel, state=1)
+                        cmds.isolateSelect(currentPanel, addSelected=True)
                     else:
-                        cmds.warning("Please set the focus on a camera or viewport")
+                        # Si el aislamiento está activo, vaciamos la selección actual y añadimos la nueva selección
+                        cmds.isolateSelect(currentPanel, state=0)
+                        cmds.isolateSelect(currentPanel, state=1)
+                        cmds.isolateSelect(currentPanel, addSelected=True)
 
                 else:
-                    cmds.warning(f"No hay objetos dentro del bookmark '{bookmark_name}'")
+                    cmds.warning(f"No objects in bookmark '{bookmark_name}'")
             else:
-                cmds.warning(f"Bookmark '{bookmark_name}' no encontrado en la escena")
+                cmds.warning(f"Bookmark '{bookmark_name}' not found")
         else:
             cmds.warning("No bookmark selected")
 
@@ -2905,6 +2905,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "checkable": True,
                     "is_checked_fn": lambda: bar.down_one_level,  # Assuming bar.down_one_level tracks state
                     "callback": bar.toggle_down_one_level,
+                    "pinnable": False,
                 },
                 "separator",
                 {
