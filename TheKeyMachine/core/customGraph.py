@@ -40,6 +40,7 @@ import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.selSetsMod as selSets
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
+import TheKeyMachine.core.toolbox as toolbox
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
@@ -48,7 +49,7 @@ import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 
-mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders]
+mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolbox]
 
 for m in mods:
     importlib.reload(m)
@@ -134,11 +135,10 @@ def create_settings_menu(parent_button):
     return menu
 
 
-def create_tool_button(icon=None, text="", tooltip="", description="", command=None, p=None):
+def create_tool_button(icon=None, text="", tooltip_template="", description="", command=None, p=None):
     """Helper to create a QFlatToolButton with our tooltip system"""
-    btn = cw.QFlatToolButton(icon=icon, text=text)
-    if tooltip:
-        btn.setToolTipData(text=tooltip, description=description)
+    # Initialize with all help context directly in the constructor
+    btn = cw.QFlatToolButton(icon=icon, text=text, tooltip_template=tooltip_template, description=description)
     if command:
         btn.clicked.connect(command)
     if p:
@@ -189,65 +189,22 @@ def createCustomGraph():
 
     # ________________ Key Tools Buttons  ___________________#
     sec = new_section()
-
-    btn_static = create_tool_button(
-        icon=media.delete_animation_image,
-        text="S",
-        tooltip="Static",
-        description="Remove all statics curves",
-        command=lambda: keyTools.deleteStaticCurves(),
+    
+    sec.addWidgetGroup(
+        [
+            toolbox.get_tool("static", text="S", icon_path=media.delete_animation_image, tooltip_template="Static", description="Remove all statics curves", callback=lambda: keyTools.deleteStaticCurves(), default=True),
+            toolbox.get_tool("share_keys", text="sK", default=True),
+            toolbox.get_tool("match", text="M", default=True),
+            toolbox.get_tool("flip", text="F", default=True),
+            toolbox.get_tool("snap", text="Sn", default=True),
+            toolbox.get_tool("overlap", text="O", default=True),
+            toolbox.get_tool("reblock", text="rB", default=True),
+            toolbox.get_tool("extra_tools", text="E", default=True),
+        ]
     )
-    sec.addWidget(btn_static, "Static", "static")
 
-    btn_share = create_tool_button(
-        icon=media.share_keys_image,
-        text="H",
-        tooltip="Share",
-        description="Share keys between curves to ensure both curves have the same keys in the same position.",
-        command=lambda: keyTools.shareKeys(),
-    )
-    sec.addWidget(btn_share, "Share", "share")
-
-    btn_match = create_tool_button(
-        icon=media.match_image,
-        text="M",
-        tooltip="Match",
-        description="Makes a match of one curve with another, in this way both curves will be the same.",
-        command=lambda: keyTools.match_keys(),
-    )
-    sec.addWidget(btn_match, "Match", "match")
-
-    btn_flip = create_tool_button(
-        text="F", tooltip="Flip", description="Inverts the selected curve vertically.", command=lambda: keyTools.flipCurves()
-    )
-    sec.addWidget(btn_flip, "Flip", "flip")
-
-    btn_snap = create_tool_button(
-        text="Sn",
-        tooltip="Snap",
-        description="Performs a cleanup and repositioning of the keys that are in a sub-frame to the nearest frame.",
-        command=lambda: keyTools.snapKeyframes(),
-    )
-    sec.addWidget(btn_snap, "Snap", "snap")
-
-    btn_overlap = create_tool_button(
-        text="O",
-        tooltip="Overlap",
-        description="Applies an overlap frame to the selected curves.",
-        command=keyTools.mod_overlap_animation,
-    )
-    sec.addWidget(btn_overlap, "Overlap", "overlap")
-
-    btn_reblock = create_tool_button(
-        icon=media.reblock_keys_image,
-        text="rB",
-        tooltip="reBlock",
-        description="reBlock allows you to realign all the curves so that all their keyframes match up.",
-        command=keyTools.reblock_move,
-    )
-    sec.addWidget(btn_reblock, "reBlock", "reblock")
-    extra_btn = create_tool_button(text="E", tooltip="Extra", description="Additional curve utilities.", command=lambda: keyTools.snapKeyframes())
-    sec.addWidget(extra_btn, "Extra Tools", "extra")
+    # Extra/Misc (Retrieving the object to add a menu)
+    extra_btn = sec._widgets.get("extra")
     extra_menu = cw.MenuWidget(parent=extra_btn)
     extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
     extra_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -261,7 +218,9 @@ def createCustomGraph():
         # Create a new section for each slider color/type
         sec = new_section()
 
-        current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
+        current_default = settings.get_setting(
+            default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"]
+        )
 
         # Static default list for "Pin Defaults"
         if default_modes:
@@ -353,21 +312,25 @@ def createCustomGraph():
     sec = new_section()
     btn_iso = create_tool_button(
         icon=media.isolate_image,
-        tooltip="Isolate Curves",
+        tooltip_template="Isolate Curves",
         description="Isolate selected curves.",
         command=lambda: keyTools.isolateCurve(),
     )
     sec.addWidget(btn_iso, "Isolate", "iso")
 
-    btn_mute = create_tool_button(text="Mt", tooltip="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute())
+    btn_mute = create_tool_button(
+        text="Mt", tooltip_template="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute()
+    )
     sec.addWidget(btn_mute, "Mute", "mute")
 
-    btn_lock = create_tool_button(text="Lk", tooltip="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock())
+    btn_lock = create_tool_button(
+        text="Lk", tooltip_template="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock()
+    )
     sec.addWidget(btn_lock, "Lock", "lock")
 
     btn_fi = create_tool_button(
         text="Fi",
-        tooltip="Filter",
+        tooltip_template="Filter",
         command=lambda: ui.customGraph_filter_mods(),
         description="Filter selection in the GraphEditor. Shift+Click to deactivate.",
     )
@@ -378,7 +341,7 @@ def createCustomGraph():
     btn_reset = create_tool_button(
         icon=media.reset_animation_image,
         text="R",
-        tooltip="Reset",
+        tooltip_template="Reset",
         description="Reset the selected curves to their default values.",
         command=lambda: keyTools.get_default_value_main(),
     )
@@ -423,14 +386,14 @@ def createCustomGraph():
     sec = new_section()
     btn_cycle = create_tool_button(
         icon=media.match_curve_cycle_image,
-        tooltip="Cycle Matcher",
+        tooltip_template="Cycle Matcher",
         description="Curve cycle matcher.",
         command=keyTools.match_curve_cycle,
     )
     sec.addWidget(btn_cycle, "Cycle Matcher", "cycle")
 
     btn_bouncy = create_tool_button(
-        icon=media.bouncy_curve_image, tooltip="Bouncy", description="Set bouncy tangents.", command=keyTools.bouncy_tangets
+        icon=media.bouncy_curve_image, tooltip_template="Bouncy", description="Set bouncy tangents.", command=keyTools.bouncy_tangets
     )
     sec.addWidget(btn_bouncy, "Bouncy", "bouncy")
 
@@ -457,7 +420,7 @@ def createCustomGraph():
     # ________________ System/Core Section ___________________#
     sec = new_section(hiddeable=False)
 
-    config_btn = create_tool_button(icon=media.settings_image, tooltip="Config", description="Tool configuration and preferences.")
+    config_btn = create_tool_button(icon=media.settings_image, tooltip_template="Config", description="Tool configuration and preferences.")
     sec.addWidget(config_btn, "Config", "config")
 
     settings_menu = create_settings_menu(config_btn)

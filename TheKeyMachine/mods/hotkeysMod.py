@@ -19,13 +19,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 import maya.cmds as cmds
 import maya.mel as mel
-import platform
-import sys
-import os
 
 
 def create_TheKeyMachine_hotkeys(*args):
-
     open_customGraph = "import TheKeyMachine;import TheKeyMachine.core.customGraph as cg; cg.createCustomGraph()"
 
     insert_inbetween = "import TheKeyMachine.mods.hotkeysMod as hotkeys; hotkeys.insert_inbetween()"
@@ -96,7 +92,9 @@ def create_TheKeyMachine_hotkeys(*args):
 
     selectHierarchy = "import TheKeyMachine.mods.barMod as bar; bar.selectHierarchy()"
 
-    toggleAnimOffsetButton = "from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggleAnimOffsetButton() if tb else None"
+    toggleAnimOffsetButton = (
+        "from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggleAnimOffsetButton() if tb else None"
+    )
 
     create_follow_cam = "import TheKeyMachine.mods.barMod as bar; bar.create_follow_cam(translation=True, rotation=True)"
 
@@ -200,14 +198,13 @@ def create_TheKeyMachine_hotkeys(*args):
 
 
 def set_smart_key():
-
     import maya.cmds as cmds
 
     # Obtén una lista de todos los objetos seleccionados
     selected_objects = cmds.ls(selection=True)
 
     if not selected_objects:
-        print("Select at least one object")
+        return
     else:
         # Obtén el tiempo actual
         current_time = cmds.currentTime(query=True)
@@ -221,7 +218,6 @@ def set_smart_key():
 
 
 def smart_rotation_manipulator():
-
     import maya.cmds as cmds
     import maya.mel as mel
 
@@ -254,12 +250,10 @@ def smart_rotation_manipulator_release():
 
 
 def smart_translate_manipulator():
-
     import maya.cmds as cmds
     import maya.mel as mel
 
     actual_mode = cmds.currentCtx()
-    actual_move_mode = cmds.manipMoveContext("Move", q=True, mode=True)
 
     mel.eval("buildTranslateMM")
     current_move_mode = cmds.manipMoveContext("Move", q=True, mode=True)
@@ -294,7 +288,6 @@ def remove_inbetween(*args):
 
 
 def move_keyframes_left():
-
     import TheKeyMachine.mods.keyToolsMod as keyTools
 
     desplazamiento = cmds.intField("move_keyframes_int", q=True, value=True)
@@ -303,7 +296,6 @@ def move_keyframes_left():
 
 
 def move_keyframes_right():
-
     import TheKeyMachine.mods.keyToolsMod as keyTools
 
     desplazamiento = cmds.intField("move_keyframes_int", q=True, value=True)

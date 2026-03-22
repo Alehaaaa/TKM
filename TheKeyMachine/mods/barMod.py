@@ -24,14 +24,10 @@ import maya.mel as mel
 
 try:
     from PySide2 import QtCore, QtWidgets
-    from PySide2.QtWidgets import QApplication, QDesktopWidget
     from shiboken2 import wrapInstance
 except ImportError:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore
-    from PySide6.QtWidgets import *
-    from PySide6.QtGui import *
-    from PySide6.QtCore import *
 
 
 import json
@@ -39,7 +35,6 @@ import os
 import sys
 import math
 import importlib
-import functools
 
 
 # ----------------------------------------------------------------------
@@ -65,9 +60,9 @@ original_key_color = None
 
 
 def get_screen_resolution():
-    app = QApplication.instance()
+    app = QtWidgets.QApplication.instance()
     if not app:
-        app = QApplication([])
+        app = QtWidgets.QApplication([])
 
     try:
         # PySide6
@@ -75,7 +70,7 @@ def get_screen_resolution():
         screen_rect = screen.geometry()
     except Exception:
         # PySide2
-        desktop = QDesktopWidget()
+        desktop = QtWidgets.QDesktopWidget()
         screen_rect = desktop.screenGeometry()
 
     screen_width = screen_rect.width()
@@ -129,7 +124,6 @@ def restore_timeslider_colors():
 
 
 def openCustomGraph():
-
     import TheKeyMachine.core.customGraph
 
     importlib.reload(TheKeyMachine.core.customGraph)
@@ -148,20 +142,17 @@ def mod_delete_animation(*args):
 
 
 def delete_time_slider_animation():
-
     # Obtener selección actual
     selection = cmds.ls(selection=True)
 
     # Verificar si hay algo seleccionado
     if not selection:
-        print("Select at least one object")
         return
 
     mel.eval("timeSliderClearKey;")
 
 
 def delete_animation():
-
     # Obtener canales seleccionados
     selected_channels = keyTools.get_selected_channels()
 
@@ -170,7 +161,6 @@ def delete_animation():
 
     # Verificar si hay algo seleccionado
     if not selection:
-        print("Select at least one object")
         return
 
     # Si hay canales seleccionados, solo borra esos canales
@@ -275,7 +265,6 @@ def get_graph_editor_selected_keyframes():
 
 
 def setTangent(tangent_type):
-
     selectedKeyframes = get_graph_editor_selected_keyframes()
 
     if selectedKeyframes:
@@ -397,7 +386,6 @@ def isolate_master():
 
     # Si no hay objetos seleccionados y el estado de aislamiento es 0, salimos de la función.
     if not selected_objects and currentState == 0:
-        print("Select at least one object")
         return
     # Si no hay objetos seleccionados pero el aislamiento está activado, lo desactivamos.
     elif not selected_objects and currentState == 1:
@@ -411,7 +399,7 @@ def isolate_master():
 
         # Fix para activar/desactivar el icono isolate que en maya 2024 esta en otro layout
 
-        maya_version = cmds.about(version=True)
+        new_maya_version = cmds.about(version=True) in ["2024", "2025"]
 
         if currentState == 0:
             cmds.isolateSelect(currentPanel, state=1)
@@ -419,7 +407,7 @@ def isolate_master():
 
             # Fix para activar y desactivar el icono de maya del isolate
             if currentPanel == "modelPanel1":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn",
                         edit=True,
@@ -433,7 +421,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel2":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn",
                         edit=True,
@@ -447,7 +435,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel3":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn",
                         edit=True,
@@ -461,7 +449,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel4":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn",
                         edit=True,
@@ -480,7 +468,7 @@ def isolate_master():
 
             # Fix para activar y desactivar el icono de maya del isolate
             if currentPanel == "modelPanel1":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel1|modelPanel1|modelEditorIconBar|flowLayout3|formLayout24|IsolateSelectedBtn",
                         edit=True,
@@ -494,7 +482,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel2":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel2|modelPanel2|modelEditorIconBar|flowLayout4|formLayout31|IsolateSelectedBtn",
                         edit=True,
@@ -508,7 +496,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel3":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel3|modelPanel3|modelEditorIconBar|flowLayout5|formLayout38|IsolateSelectedBtn",
                         edit=True,
@@ -522,7 +510,7 @@ def isolate_master():
                     )
 
             elif currentPanel == "modelPanel4":
-                if maya_version == "2024" or maya_version == "2025":
+                if new_maya_version:
                     cmds.iconTextCheckBox(
                         "MainPane|viewPanes|modelPanel4|modelPanel4|modelEditorIconBar|flowLayout6|formLayout45|IsolateSelectedBtn",
                         edit=True,
@@ -572,15 +560,12 @@ def selectHierarchy():
     if selection:
         for obj in selection:
             select_curves_with_ctrl(obj)
-    else:
-        print("Select at least one object")
 
 
 # ---------------------------------------------------  TEMP PIVOT ------------------------------------------------------#
 
 
 def create_temp_pivot(use_saved_position=False, *args):
-
     attribute_callback_id = None
     time_callback_id = None
     process_callback = True
@@ -588,7 +573,6 @@ def create_temp_pivot(use_saved_position=False, *args):
     seleccion = cmds.ls(selection=True)
 
     if not seleccion:
-        print("Select at least one object")
         return
 
     if cmds.objExists("tkm_temp_pivot"):
@@ -743,7 +727,8 @@ def create_temp_pivot(use_saved_position=False, *args):
         # Obtén el MObject del objeto principal
         selection_list = om.MSelectionList()
         selection_list.add(temp_pivot_obj_name)
-        temp_pivot_obj_mobject = selection_list.getDependNode(0)
+        temp_pivot_obj_mobject = om.MObject()
+        selection_list.getDependNode(0, temp_pivot_obj_mobject)
 
         # Registra el callback de atributo
         attribute_callback_id = om.MNodeMessage.addAttributeChangedCallback(temp_pivot_obj_mobject, attribute_callback_function)
@@ -786,7 +771,6 @@ def create_temp_pivot(use_saved_position=False, *args):
     add_callbacks_link()
 
     def update_temp_pivot_transform_in_file(position, rotation):
-
         matrix_file_path = general.get_temp_pivot_data_file()
 
         # Cargar datos actuales
@@ -802,7 +786,6 @@ def create_temp_pivot(use_saved_position=False, *args):
             json.dump(data, f)
 
     def temp_pivot_scriptJob_SelectionChanged():
-
         if not cmds.objExists("tkm_temp_pivot"):
             return
         else:
@@ -855,10 +838,8 @@ def color_paste_worldspace_animation(*args):
 
 
 def copy_worldspace_animation(*args):
-
     selected_objects = cmds.ls(selection=True)
     if not selected_objects:
-        print("Select at least one object")
         return
 
     # Comprobar si los objetos seleccionados tienen claves de animación
@@ -877,7 +858,12 @@ def copy_worldspace_animation(*args):
     gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
     total_frames = len(set(cmds.keyframe(selected_objects, query=True)))
     cmds.progressBar(
-        gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status="Copying worldspace animation...", maxValue=total_frames
+        gMainProgressBar,
+        edit=True,
+        beginProgress=True,
+        isInterruptable=True,
+        status="Copying worldspace animation...",
+        maxValue=total_frames,
     )
 
     try:
@@ -927,7 +913,6 @@ def copy_worldspace_animation(*args):
 
 
 def copy_range_worldspace_animation(*args):
-
     selected_objects = cmds.ls(selection=True)
     if not selected_objects:
         return
@@ -953,7 +938,12 @@ def copy_range_worldspace_animation(*args):
     all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, query=True, time=(time_range[0], time_range[1])))))
     total_frames = len(all_keyframes)
     cmds.progressBar(
-        gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status="Copying worldspace animation...", maxValue=total_frames
+        gMainProgressBar,
+        edit=True,
+        beginProgress=True,
+        isInterruptable=True,
+        status="Copying worldspace animation...",
+        maxValue=total_frames,
     )
 
     try:
@@ -1031,7 +1021,6 @@ def copy_worldspace_single_frame(*args):
 
 
 def paste_worldspace_single_frame(*args):
-
     # Rutas
     worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
 
@@ -1089,7 +1078,12 @@ def paste_worldspace_animation(*args):
     # Crear barra de progreso
     gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
     cmds.progressBar(
-        gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status="Pasting worldspace animation...", maxValue=len(all_frames)
+        gMainProgressBar,
+        edit=True,
+        beginProgress=True,
+        isInterruptable=True,
+        status="Pasting worldspace animation...",
+        maxValue=len(all_frames),
     )
 
     try:
@@ -1136,7 +1130,6 @@ def mod_tracer(*args):
 
 
 def create_tracer(*args):
-
     selected_objects = cmds.ls(selection=True)
 
     # Verificar si hay exactamente un objeto seleccionado.
@@ -1195,7 +1188,6 @@ def remove_tracer_node(*args):
 
 
 def tracer_connected(connected=False, update_cb=None, *args):
-
     if not cmds.objExists("tracerHandle"):
         print("No tracer node in the scene")
         return
@@ -1235,7 +1227,6 @@ def tracer_refresh(*args):
 
 
 def set_tracer_blue_color(*args):
-
     if cmds.objExists("tracerHandle"):
         cmds.setAttr("tracerHandleShape.extraTrailColor", 0.1615, 0.1766, 0.3581, type="double3")
         cmds.setAttr("tracerHandleShape.trailColor", 0.2879, 0.2932, 0.358, type="double3")
@@ -1243,7 +1234,6 @@ def set_tracer_blue_color(*args):
 
 
 def set_tracer_red_color(*args):
-
     if cmds.objExists("tracerHandle"):
         cmds.setAttr("tracerHandleShape.extraTrailColor", 0.8143, 0.5109, 0.5318, type="double3")
         cmds.setAttr("tracerHandleShape.trailColor", 0.4398, 0.1724, 0.1908, type="double3")
@@ -1251,7 +1241,6 @@ def set_tracer_red_color(*args):
 
 
 def set_tracer_grey_color(*args):
-
     if cmds.objExists("tracerHandle"):
         cmds.setAttr("tracerHandleShape.extraTrailColor", 0.2879, 0.2932, 0.358, type="double3")
         cmds.setAttr("tracerHandleShape.trailColor", 0.122, 0.122, 0.122, type="double3")
@@ -1259,7 +1248,6 @@ def set_tracer_grey_color(*args):
 
 
 def tracer_show_hide(*args):
-
     if cmds.objExists("tracerHandle"):
         visibility = cmds.getAttr("tracerHandle.visibility")
         cmds.setAttr("tracerHandle.visibility", not visibility)
@@ -1875,7 +1863,6 @@ def convert_rotation_order(rot_order="zxy"):
 
 
 def gimbal_fixer_build():
-
     screen_width, screen_height = get_screen_resolution()
     screen_width = screen_width
 
@@ -2257,7 +2244,8 @@ def micro_move_attribute_callback_function(msg, plug, other_plug, client_data):
 def add_micro_move_callback(object_name):
     selection_list = om.MSelectionList()
     selection_list.add(object_name)
-    mobject = selection_list.getDependNode(0)
+    mobject = om.MObject()
+    selection_list.getDependNode(0, mobject)
 
     callback_id = om.MNodeMessage.addAttributeChangedCallback(mobject, micro_move_attribute_callback_function, object_name)
     micro_move_callback_ids.append(callback_id)
@@ -2398,7 +2386,8 @@ def micro_rotate_pack_funtion():
     def add_micro_rotate_callback(source_object, target_object):
         selection_list = om.MSelectionList()
         selection_list.add(source_object)
-        mobject = selection_list.getDependNode(0)
+        mobject = om.MObject()
+        selection_list.getDependNode(0, mobject)
 
         def add_micro_rotate_dirty_callback(mobject, plug, client_data):
             if plug.partialName() in ("r", "rx", "ry", "rz"):
@@ -2512,7 +2501,6 @@ def micro_rotate_post_drag(*args):
 
 
 def activate_micro_move(*args):
-
     current_context = cmds.currentCtx()
     microMoveContext = "microMoveCtx"
     microRotateContext = "microRotateCtx"
