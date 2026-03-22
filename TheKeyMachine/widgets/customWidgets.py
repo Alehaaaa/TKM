@@ -402,6 +402,126 @@ class TooltipMixin:
             pass
 
 
+class QFlatButton(QtWidgets.QPushButton):
+    """A customizable, flat-styled button for the bottom bar."""
+
+    STYLE_SHEET = """
+        QtWidgets.QPushButton {
+            color: %s;
+            background-color: %s;
+            border-radius: %spx;
+            padding: %spx %spx;
+            font-weight: %s;
+            font-size: %spx;
+        }
+        QtWidgets.QPushButton:hover {
+            background-color: %s;
+        }
+        QtWidgets.QPushButton:pressed {
+            background-color: %s;
+        }
+    """
+
+    DEFAULT_COLOR = "#ffffff"
+    DEFAULT_BACKGROUND = "#5D5D5D"
+    DEFAULT_HOVER_BACKGROUND = "#707070"
+    DEFAULT_PRESSED_BACKGROUND = "#252525"
+
+    HIGHLIGHT_COLOR = "#282828"
+    HIGHLIGHT_BACKGROUND = "#bdbdbd"
+    HIGHLIGHT_HOVER_BACKGROUND = "#cfcfcf"
+    HIGHLIGHT_PRESSED_BACKGROUND = "#707070"
+
+    DEFAULT_FONT_SIZE = DPI(12)
+    HIGHLIGHT_FONT_SIZE = DPI(15)
+
+    BUTTON_BORDER_RADIUS = DPI(9)
+
+    def __init__(
+        self,
+        text,
+        color=DEFAULT_COLOR,
+        background=DEFAULT_BACKGROUND,
+        icon_path=None,
+        border=BUTTON_BORDER_RADIUS,
+        highlight=False,
+        parent=None,
+    ):
+        QtWidgets.QPushButton.__init__(self, text, parent)
+        self.setFlat(True)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.setFixedHeight(DPI(34))
+
+        # Consistent Icon Size
+        self.setIconSize(QtCore.QSize(DPI(19), DPI(19)))
+        if icon_path:
+            QFlatHoverableIcon.apply(self, icon_path, highlight=highlight)
+
+        v_padding = 2  # Tight padding since height is fixed
+
+        if highlight:
+            color = self.HIGHLIGHT_COLOR
+            background = self.HIGHLIGHT_BACKGROUND
+            hover_background = self.HIGHLIGHT_HOVER_BACKGROUND
+            pressed_background = self.HIGHLIGHT_PRESSED_BACKGROUND
+            font_size = self.HIGHLIGHT_FONT_SIZE
+            weight = "bold"
+        elif background != self.DEFAULT_BACKGROUND:
+            try:
+                base_background = int(background.lstrip("#"), 16)
+                r, g, b = (
+                    (base_background >> 16) & 0xFF,
+                    (base_background >> 8) & 0xFF,
+                    base_background & 0xFF,
+                )
+            except Exception:
+                r, g, b = 93, 93, 93
+            hover_background = "#%02x%02x%02x" % (min(r + 10, 255), min(g + 10, 255), min(b + 10, 255))
+            pressed_background = "#%02x%02x%02x" % (max(r - 10, 0), max(g - 10, 0), max(b - 10, 0))
+            font_size = self.DEFAULT_FONT_SIZE
+            weight = "normal"
+        else:
+            hover_background = self.DEFAULT_HOVER_BACKGROUND
+            pressed_background = self.DEFAULT_PRESSED_BACKGROUND
+            font_size = self.DEFAULT_FONT_SIZE
+            weight = "normal"
+
+        actual_border = min(int(border), int(DPI(34)) // 2)
+
+        self.setStyleSheet(
+            self.STYLE_SHEET
+            % (
+                color,
+                background,
+                actual_border,
+                int(DPI(v_padding)),
+                int(DPI(12)),
+                weight,
+                int(font_size),
+                hover_background,
+                pressed_background,
+            )
+        )
+
+
+class QFlatBottomBar(QtWidgets.QFrame):
+    """
+    A container widget for arranging QFlatButtons horizontally.
+    """
+
+    def __init__(self, buttons=[], margins=8, spacing=6, parent=None):
+        QtWidgets.QFrame.__init__(self, parent)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(DPI(margins), DPI(margins), DPI(margins), DPI(margins))
+        layout.setSpacing(DPI(spacing))
+
+        for button in buttons:
+            layout.addWidget(button)
+
+
 class QFlatSpinBox(QtWidgets.QSpinBox):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -515,7 +635,9 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self._highlight = highlight
         if icon:
             self.setIcon(icon)
-        self.setToolTipData(text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon)
+        self.setToolTipData(
+            text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon
+        )
 
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""

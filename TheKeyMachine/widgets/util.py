@@ -17,6 +17,11 @@ def DPI(val):
     return omui.MQtUtil.dpiScale(val)
 
 
+def DPR(val):
+    screen = QtWidgets.QApplication.primaryScreen()
+    return val * screen.devicePixelRatio()
+
+
 def get_screen_resolution():
     app = QtWidgets.QApplication.instance()
     if not app:

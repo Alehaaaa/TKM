@@ -173,7 +173,7 @@ tweener_tooltip_text = (
 
 tweener_world_space_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tweener World Space</b></font><br><br>"
-    "Tween between previous and next keyframe in world space.<br><br>"
+    "Tween between previous and next keyframe in World Space.<br><br>"
 )
 
 
@@ -455,18 +455,37 @@ follow_cam_tooltip_text = (
 )
 
 copy_worldspace_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace</b></font><img src='{media.worldspace_copy_animation_image}' width='28'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy World Space</b></font><img src='{media.worldspace_copy_animation_image}' width='28'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Copy and paste world space positions. Useful for reseting, for example, the master control in a walking cycle.<br><br>"
-    "To 'Copy' select a group of controls and click 'Copy worldspace'.<br><br>"
-    "To 'Paste' just click 'Paste worldspace' there is not need of selecting any control.<br><br>"
+    "Copy the World Space positions of selected objects in current frame. Useful for reseting, for example, the master control in a walking cycle.<br><br>"
+    "To 'Copy' select a group of controls and click 'Copy World Space'.<br><br>"
+    "To 'Paste' just click 'Paste World Space' there is not need of selecting any control.<br><br>"
     f"<font style='color: #869fac; font-size:{font_size};'><b>Shortcuts:</b></font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Copy worldspace</font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Shift + Click &nbsp;&nbsp;&nbsp; Paste worldspace</font>"
-    "</font><br><br>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy WorldSpace Current Frame</b></font><img src='{media.worldspace_copy_frame_image}' width='28'><br><br>"
+    f"<font style='color: #869fac; font-size:{font_size};'>Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Copy World Space</font><br>"
+    f"<font style='color: #869fac; font-size:{font_size};'>Shift + Click &nbsp;&nbsp;&nbsp; Paste World Space</font>"
+    "</font>"
+)
+
+copy_worldspace_range_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy World Space - Selected Range</b></font><img src='{media.worldspace_copy_animation_image}' width='28'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Copy and paste world space values for the current frame.<br><br>"
+    "Copy and paste World Space positions for a range of frames or whole animation. Useful for reseting, for example, the master control in a walking cycle.<br><br>"
+    "</font>"
+)
+
+paste_worldspace_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Paste World Space</b></font><img src='{media.worldspace_paste_animation_image}' width='28'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "Paste saved World Space position for the current frame.<br><br>"
+    "There is not need of selecting any control.<br><br>"
+    "</font>"
+)
+
+paste_worldspace_animation_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Paste World Space - All Animation</b></font><img src='{media.worldspace_paste_animation_image}' width='28'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "Paste World Space positions for a range of frames or whole animation.<br><br>"
+    "There is not need of selecting any control.<br><br>"
     "</font>"
 )
 

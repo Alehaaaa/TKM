@@ -92,7 +92,9 @@ def create_TheKeyMachine_hotkeys(*args):
 
     selectHierarchy = "import TheKeyMachine.mods.barMod as bar; bar.selectHierarchy()"
 
-    toggleAnimOffsetButton = "from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggleAnimOffsetButton() if tb else None"
+    toggleAnimOffsetButton = (
+        "from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggleAnimOffsetButton() if tb else None"
+    )
 
     create_follow_cam = "import TheKeyMachine.mods.barMod as bar; bar.create_follow_cam(translation=True, rotation=True)"
 
@@ -167,11 +169,11 @@ def create_TheKeyMachine_hotkeys(*args):
         ("create_follow_cam", "Create Follow Cam", create_follow_cam),
         ("copy_link", "Link Objects Copy", copy_link),
         ("paste_link", "Link Objets Paste", paste_link),
-        ("worldspace_copy_animation", "Copy Worldspace - All Animation", color_worldspace_copy_animation),
-        ("worldspace_paste_animation", "Paste Worldspace", color_worldspace_paste_animation),
-        ("copy_range_worldspace_animation", "Copy Worldspace - Selected Range", copy_range_worldspace_animation),
-        ("copy_worldspace_single_frame", "Copy Worldspace - Current Frame", copy_worldspace_single_frame),
-        ("paste_worldspace_single_frame", "Paste Worldspace - Current Frame", paste_worldspace_single_frame),
+        ("worldspace_copy_animation", "Copy World Space - All Animation", color_worldspace_copy_animation),
+        ("worldspace_paste_animation", "Paste World Space", color_worldspace_paste_animation),
+        ("copy_range_worldspace_animation", "Copy World Space - Selected Range", copy_range_worldspace_animation),
+        ("copy_worldspace_single_frame", "Copy World Space - Current Frame", copy_worldspace_single_frame),
+        ("paste_worldspace_single_frame", "Paste World Space - Current Frame", paste_worldspace_single_frame),
         ("create_temp_pivot", "Create Temp Pivot", create_temp_pivot),
         ("create_temp_pivot_last", "Create Temp Pivot - Last Pivot Used", create_temp_pivot_last),
         ("set_auto_tangent", "Set Auto Tangent", set_auto_tangent),

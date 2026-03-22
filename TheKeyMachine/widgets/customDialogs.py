@@ -6,49 +6,51 @@ from functools import partial
 
 try:
     from PySide6 import QtWidgets, QtCore, QtGui
+
+    PYSIDE_VERSION = 6
 except ImportError:
     from PySide2 import QtWidgets, QtCore, QtGui
 
+    PYSIDE_VERSION = 2
+
 from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
-from TheKeyMachine.widgets.customWidgets import QFlatHoverableIcon
-import TheKeyMachine.mods.mediaMod as media
 from TheKeyMachine.tooltips.tooltip import QFlatTooltipManager
 
+import TheKeyMachine.mods.mediaMod as media
+import TheKeyMachine.widgets.customWidgets as cw
 
 
+# # Compatibility with aleha_tools imports
+# QtWidgets.QWidget = QtWidgets.QWidget
+# QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout
+# QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout
+# QtWidgets.QLabel = QtWidgets.QLabel
+# QtWidgets.QPushButton = QtWidgets.QtWidgets.QPushButton
+# QtWidgets.QDialog = QtWidgets.QDialog
+# QFrame = QtWidgets.QFrame
+# QtWidgets.QSizePolicy = QtWidgets.QSizePolicy
+# QtWidgets.QLayout = QtWidgets.QLayout
+# QtWidgets.QMenu = QtWidgets.QMenu
+# QtWidgets.QMenuBar = QtWidgets.QMenuBar
+# QtWidgets.QApplication = QtWidgets.QApplication
 
+# QtGui.QIcon = QtGui.QIcon
+# QtGui.QColor = QtGui.QColor
+# QtGui.QPixmap = QtGui.QPixmap
+# QtGui.QPainter = QtGui.QPainter
+# QtGui.QPolygonF = QtGui.QPolygonF
+# QtGui.QCursor = QtGui.QCursor
+# QtGui.QGuiApplication = QtGui.QGuiApplication
+# QtGui.QMovie = QtGui.QMovie
+# QtGui.QFontMetrics = QtGui.QFontMetrics
 
-# Compatibility with aleha_tools imports
-QWidget = QtWidgets.QWidget
-QHBoxLayout = QtWidgets.QHBoxLayout
-QVBoxLayout = QtWidgets.QVBoxLayout
-QLabel = QtWidgets.QLabel
-QPushButton = QtWidgets.QPushButton
-QDialog = QtWidgets.QDialog
-QFrame = QtWidgets.QFrame
-QSizePolicy = QtWidgets.QSizePolicy
-QLayout = QtWidgets.QLayout
-QMenu = QtWidgets.QMenu
-QMenuBar = QtWidgets.QMenuBar
-QApplication = QtWidgets.QApplication
-
-QIcon = QtGui.QIcon
-QColor = QtGui.QColor
-QPixmap = QtGui.QPixmap
-QPainter = QtGui.QPainter
-QPolygonF = QtGui.QPolygonF
-QCursor = QtGui.QCursor
-QGuiApplication = QtGui.QGuiApplication
-QMovie = QtGui.QMovie
-QFontMetrics = QtGui.QFontMetrics
-
-Qt = QtCore.Qt
-QSize = QtCore.QSize
-QEventLoop = QtCore.QEventLoop
-QPoint = QtCore.QPoint
-QPointF = QtCore.QPointF
-QTimer = QtCore.QTimer
-QRect = QtCore.QRect
+# Qt = QtCore.Qt
+# QSize = QtCore.QSize
+# QtCore.QEventLoop = QtCore.QEventLoop
+# QtCore.QPoint = QtCore.QPoint
+# QtCore.QPointF = QtCore.QPointF
+# QtCore.QTimer = QtCore.QTimer
+# QtCore.QRect = QtCore.QRect
 
 
 class QFlatDialogButton(dict):
@@ -78,127 +80,7 @@ class QFlatDialogButton(dict):
         return not self.__eq__(other)
 
 
-class QFlatButton(QPushButton):
-    """A customizable, flat-styled button for the bottom bar."""
-
-    STYLE_SHEET = """
-        QPushButton {
-            color: %s;
-            background-color: %s;
-            border-radius: %spx;
-            padding: %spx %spx;
-            font-weight: %s;
-            font-size: %spx;
-        }
-        QPushButton:hover {
-            background-color: %s;
-        }
-        QPushButton:pressed {
-            background-color: %s;
-        }
-    """
-
-    DEFAULT_COLOR = "#ffffff"
-    DEFAULT_BACKGROUND = "#5D5D5D"
-    DEFAULT_HOVER_BACKGROUND = "#707070"
-    DEFAULT_PRESSED_BACKGROUND = "#252525"
-
-    HIGHLIGHT_COLOR = "#282828"
-    HIGHLIGHT_BACKGROUND = "#bdbdbd"
-    HIGHLIGHT_HOVER_BACKGROUND = "#cfcfcf"
-    HIGHLIGHT_PRESSED_BACKGROUND = "#707070"
-
-    DEFAULT_FONT_SIZE = DPI(12)
-    HIGHLIGHT_FONT_SIZE = DPI(15)
-
-    BUTTON_BORDER_RADIUS = DPI(9)
-
-    def __init__(
-        self,
-        text,
-        color=DEFAULT_COLOR,
-        background=DEFAULT_BACKGROUND,
-        icon_path=None,
-        border=BUTTON_BORDER_RADIUS,
-        highlight=False,
-        parent=None,
-    ):
-        QPushButton.__init__(self, text, parent)
-        self.setFlat(True)
-        self.setCursor(Qt.PointingHandCursor)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setFixedHeight(DPI(34))
-
-        # Consistent Icon Size
-        self.setIconSize(QSize(DPI(19), DPI(19)))
-        if icon_path:
-            QFlatHoverableIcon.apply(self, icon_path, highlight=highlight)
-
-        v_padding = 2  # Tight padding since height is fixed
-
-        if highlight:
-            color = self.HIGHLIGHT_COLOR
-            background = self.HIGHLIGHT_BACKGROUND
-            hover_background = self.HIGHLIGHT_HOVER_BACKGROUND
-            pressed_background = self.HIGHLIGHT_PRESSED_BACKGROUND
-            font_size = self.HIGHLIGHT_FONT_SIZE
-            weight = "bold"
-        elif background != self.DEFAULT_BACKGROUND:
-            try:
-                base_background = int(background.lstrip("#"), 16)
-                r, g, b = (
-                    (base_background >> 16) & 0xFF,
-                    (base_background >> 8) & 0xFF,
-                    base_background & 0xFF,
-                )
-            except Exception:
-                r, g, b = 93, 93, 93
-            hover_background = "#%02x%02x%02x" % (min(r + 10, 255), min(g + 10, 255), min(b + 10, 255))
-            pressed_background = "#%02x%02x%02x" % (max(r - 10, 0), max(g - 10, 0), max(b - 10, 0))
-            font_size = self.DEFAULT_FONT_SIZE
-            weight = "normal"
-        else:
-            hover_background = self.DEFAULT_HOVER_BACKGROUND
-            pressed_background = self.DEFAULT_PRESSED_BACKGROUND
-            font_size = self.DEFAULT_FONT_SIZE
-            weight = "normal"
-
-        actual_border = min(int(border), int(DPI(34)) // 2)
-
-        self.setStyleSheet(
-            self.STYLE_SHEET
-            % (
-                color,
-                background,
-                actual_border,
-                int(DPI(v_padding)),
-                int(DPI(12)),
-                weight,
-                int(font_size),
-                hover_background,
-                pressed_background,
-            )
-        )
-
-
-class QFlatBottomBar(QFrame):
-    """
-    A container widget for arranging QFlatButtons horizontally.
-    """
-
-    def __init__(self, buttons=[], margins=8, spacing=6, parent=None):
-        QFrame.__init__(self, parent)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(DPI(margins), DPI(margins), DPI(margins), DPI(margins))
-        layout.setSpacing(DPI(spacing))
-
-        for button in buttons:
-            layout.addWidget(button)
-
-
-class QFlatDialog(QDialog):
+class QFlatDialog(QtWidgets.QDialog):
     # Button Preconfigurations
     Yes = QFlatDialogButton("Yes", positive=True, icon=media.apply_image)
     Ok = QFlatDialogButton("Ok", positive=True, icon=media.apply_image)
@@ -213,12 +95,12 @@ class QFlatDialog(QDialog):
         if parent is None:
             parent = get_maya_qt()
 
-        QDialog.__init__(self, parent)
+        QtWidgets.QDialog.__init__(self, parent)
         if sys.platform != "win32":
-            self.setWindowFlags(self.windowFlags() | Qt.Tool)
+            self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool)
 
-        self.root_layout = QVBoxLayout(self)
-        self.root_layout.setSizeConstraint(QLayout.SetMinAndMaxSize)
+        self.root_layout = QtWidgets.QVBoxLayout(self)
+        self.root_layout.setSizeConstraint(QtWidgets.QLayout.SetMinAndMaxSize)
         self.root_layout.setContentsMargins(0, 0, 0, 0)
         self.root_layout.setSpacing(0)
 
@@ -246,7 +128,7 @@ class QFlatDialog(QDialog):
                 if btn_data == self._highlighted or config.get("name") == self._highlighted:
                     is_highlighted = True
 
-            btn = QFlatButton(
+            btn = cw.QFlatButton(
                 text=config.get("name", "Button"),
                 background=config.get("background", "#5D5D5D"),
                 icon_path=config.get("icon"),
@@ -266,11 +148,11 @@ class QFlatDialog(QDialog):
         return created_buttons
 
     def keyPressEvent(self, event):
-        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
             if self._default_button:
                 self._default_button.click()
                 return
-        QDialog.keyPressEvent(self, event)
+        QtWidgets.QDialog.keyPressEvent(self, event)
 
     def setBottomBar(self, buttons=None, margins=8, spacing=6, closeButton=False, highlight=None):
         if self.bottomBar:
@@ -298,7 +180,7 @@ class QFlatDialog(QDialog):
         created_buttons = self._defineButtons(btn_data)
 
         if created_buttons:
-            self.bottomBar = QFlatBottomBar(buttons=created_buttons, margins=margins, spacing=spacing, parent=self)
+            self.bottomBar = cw.QFlatBottomBar(buttons=created_buttons, margins=margins, spacing=spacing, parent=self)
             self.root_layout.addWidget(self.bottomBar)
 
 
@@ -316,51 +198,51 @@ class QFlatConfirmDialog(QFlatDialog):
         icon=None,
         exclusive=True,
         parent=None,
-        **kwargs
+        **kwargs,
     ):
         QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, closeButton=closeButton, **kwargs)
 
-        new_flags = self.windowFlags() | Qt.Dialog
-        if parent and (parent.windowFlags() & Qt.Tool):
-            new_flags |= Qt.Tool
+        new_flags = self.windowFlags() | QtCore.Qt.Dialog
+        if parent and (parent.windowFlags() & QtCore.Qt.Tool):
+            new_flags |= QtCore.Qt.Tool
 
         self.setWindowFlags(new_flags)
         if parent:
             self.setParent(parent)
 
-        self.setAttribute(Qt.WA_DeleteOnClose, False)
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
         self.setWindowTitle(window or "Confirm")
         self.clicked_button = None
 
         self._exclusive = exclusive
         self.setMinimumWidth(0)
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
 
-        content_widget = QWidget()
-        content_layout = QHBoxLayout(content_widget)
+        content_widget = QtWidgets.QWidget()
+        content_layout = QtWidgets.QHBoxLayout(content_widget)
         content_layout.setContentsMargins(DPI(25), DPI(20), DPI(25), DPI(20))
 
         if icon:
-            icon_label = QLabel()
-            pix = QPixmap(icon)
+            icon_label = QtWidgets.QLabel()
+            pix = QtGui.QPixmap(icon)
             if not pix.isNull():
                 icon_dim = DPI(80)
-                icon_label.setPixmap(pix.scaled(icon_dim, icon_dim, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                icon_label.setPixmap(pix.scaled(icon_dim, icon_dim, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
                 icon_label.setFixedSize(icon_dim, icon_dim)
-                content_layout.addWidget(icon_label, 0, Qt.AlignTop)
+                content_layout.addWidget(icon_label, 0, QtCore.Qt.AlignTop)
 
-        text_layout = QVBoxLayout()
+        text_layout = QtWidgets.QVBoxLayout()
         text_layout.setSpacing(DPI(5))
         content_layout.addLayout(text_layout, 1)
 
         if title:
-            self.title_label = QLabel(title)
+            self.title_label = QtWidgets.QLabel(title)
             self.title_label.setWordWrap(True)
-            self.title_label.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Minimum)
+            self.title_label.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
             self.title_label.setStyleSheet("font-size: %spx; color: %s; font-weight: bold;" % (DPI(18), self.TEXT_COLOR))
             text_layout.addWidget(self.title_label)
 
-        self.message_label = QLabel(message)
+        self.message_label = QtWidgets.QLabel(message)
         self.message_label.setWordWrap(True)
         self.message_label.setStyleSheet("font-size: %spx; color: %s;" % (DPI(11.5), self.TEXT_COLOR))
         text_layout.addWidget(self.message_label)
@@ -446,15 +328,15 @@ class QFlatConfirmDialog(QFlatDialog):
 
     def confirm(self):
         if self._exclusive:
-            return self.exec_() == QDialog.Accepted
+            return self.exec_() == QtWidgets.QDialog.Accepted
 
         self.show()
         self.raise_()
         self.activateWindow()
-        loop = QEventLoop()
+        loop = QtCore.QEventLoop()
         self.finished.connect(loop.quit)
         loop.exec_()
-        return self.result() == QDialog.Accepted
+        return self.result() == QtWidgets.QDialog.Accepted
 
 
 class QFlatTooltipConfirm(QFlatDialog):
@@ -475,8 +357,8 @@ class QFlatTooltipConfirm(QFlatDialog):
         QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, **kwargs)
 
         # Tooltip-like window setup
-        self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowFlags(QtCore.Qt.ToolTip | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.clicked_button = None
 
         # Build tooltip_template if not provided (compatibility with standard title/message/icon)
@@ -503,9 +385,9 @@ class QFlatTooltipConfirm(QFlatDialog):
             )
         )
 
-        self.bg_frame = QFrame()
+        self.bg_frame = QtWidgets.QFrame()
         self.bg_frame.setObjectName("BgFrame")
-        self.bg_layout = QVBoxLayout(self.bg_frame)
+        self.bg_layout = QtWidgets.QVBoxLayout(self.bg_frame)
         self.bg_layout.setContentsMargins(0, 0, 0, 0)
         self.bg_layout.setSpacing(0)
         self.root_layout.addWidget(self.bg_frame)
@@ -534,19 +416,19 @@ class QFlatTooltipConfirm(QFlatDialog):
             root = ET.fromstring("<root><text>Invalid XML: {}</text></root>".format(e))
 
         # 1. Header Area (Icon + Title)
-        header_frame = QFrame()
-        header_layout = QHBoxLayout(header_frame)
+        header_frame = QtWidgets.QFrame()
+        header_layout = QtWidgets.QHBoxLayout(header_frame)
         header_layout.setContentsMargins(DPI(18), DPI(15), DPI(18), DPI(10))
         header_layout.setSpacing(DPI(12))
 
         has_header = False
         for child in root:
             if child.tag == "icon":
-                pix = QPixmap(child.text)
+                pix = QtGui.QPixmap(child.text)
                 if not pix.isNull():
-                    lbl = QLabel()
+                    lbl = QtWidgets.QLabel()
                     dim = DPI(80)
-                    lbl.setPixmap(pix.scaled(dim, dim, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    lbl.setPixmap(pix.scaled(dim, dim, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
                     header_layout.addWidget(lbl)
                     has_header = True
             elif child.tag == "title":
@@ -554,7 +436,7 @@ class QFlatTooltipConfirm(QFlatDialog):
                     ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
                     for c in child
                 )
-                lbl = QLabel(inner_text)
+                lbl = QtWidgets.QLabel(inner_text)
                 lbl.setStyleSheet(
                     "color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(self.TEXT_COLOR, DPI(18))
                 )
@@ -567,7 +449,7 @@ class QFlatTooltipConfirm(QFlatDialog):
             self.bg_layout.addWidget(header_frame)
 
         # 2. Main Content Area (Text, Separators, Images)
-        content_layout = QVBoxLayout()
+        content_layout = QtWidgets.QVBoxLayout()
         content_layout.setContentsMargins(DPI(18), 0, DPI(18), 0)
         content_layout.setSpacing(DPI(6))
 
@@ -583,22 +465,22 @@ class QFlatTooltipConfirm(QFlatDialog):
                     ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
                     for c in child
                 )
-                lbl = QLabel(inner_text)
+                lbl = QtWidgets.QLabel(inner_text)
                 lbl.setWordWrap(True)
                 lbl.setStyleSheet("color: {}; font-size: {}px; background: transparent;".format(self.TEXT_COLOR, DPI(11.5)))
                 content_layout.addWidget(lbl)
             elif child.tag == "separator":
-                sep = QFrame()
+                sep = QtWidgets.QFrame()
                 sep.setFixedHeight(1)
                 sep.setStyleSheet("background-color: rgba(255,255,255,10); margin: {}px 0px;".format(DPI(4)))
                 content_layout.addWidget(sep)
             elif child.tag in ["image", "gif"]:
-                lbl = QLabel()
-                lbl.setAlignment(Qt.AlignCenter)
-                pix = QPixmap(child.text)
+                lbl = QtWidgets.QLabel()
+                lbl.setAlignment(QtCore.Qt.AlignCenter)
+                pix = QtGui.QPixmap(child.text)
                 if not pix.isNull():
                     if pix.width() > DPI(280):
-                        pix = pix.scaledToWidth(DPI(280), Qt.SmoothTransformation)
+                        pix = pix.scaledToWidth(DPI(280), QtCore.Qt.SmoothTransformation)
                     lbl.setPixmap(pix)
                     content_layout.addWidget(lbl)
 
@@ -626,10 +508,10 @@ class QFlatTooltipConfirm(QFlatDialog):
             self.reject()
 
     def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(self.BG_COLOR))
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(self.BG_COLOR))
 
         side = getattr(self, "side", "top")
         aw = DPI(self.ARROW_W)
@@ -637,50 +519,54 @@ class QFlatTooltipConfirm(QFlatDialog):
         ax = getattr(self, "arrow_x", self.width() / 2)
 
         if side == "top":
-            poly = QPolygonF([QPointF(ax, 0), QPointF(ax - aw / 2, ah + 1), QPointF(ax + aw / 2, ah + 1)])
+            poly = QtGui.QPolygonF([QtCore.QPointF(ax, 0), QtCore.QPointF(ax - aw / 2, ah + 1), QtCore.QPointF(ax + aw / 2, ah + 1)])
             painter.drawPolygon(poly)
         else:
-            poly = QPolygonF(
-                [QPointF(ax, self.height()), QPointF(ax - aw / 2, self.height() - ah - 1), QPointF(ax + aw / 2, self.height() - ah - 1)]
+            poly = QtGui.QPolygonF(
+                [
+                    QtCore.QPointF(ax, self.height()),
+                    QtCore.QPointF(ax - aw / 2, self.height() - ah - 1),
+                    QtCore.QPointF(ax + aw / 2, self.height() - ah - 1),
+                ]
             )
             painter.drawPolygon(poly)
 
     def _show_around(self, widget, target_rect=None):
         ah = DPI(self.ARROW_H)
-        cursor_pos = QCursor.pos()
+        cursor_pos = QtGui.QCursor.pos()
 
         if target_rect:
             self._global_anc = target_rect
         elif is_valid_widget(widget):
-            # 1. Handle QMenu (ui.version_bar) inside a QMenuBar
+            # 1. Handle QtWidgets.QMenu (ui.version_bar) inside a QtWidgets.QMenuBar
             if hasattr(widget, "menuAction"):
                 action = widget.menuAction()
                 parent_mb = widget.parent()
-                if not isinstance(parent_mb, QMenuBar):
+                if not isinstance(parent_mb, QtWidgets.QMenuBar):
                     win = widget.window()
-                    parent_mb = win.findChild(QMenuBar) if win else None
+                    parent_mb = win.findChild(QtWidgets.QMenuBar) if win else None
 
-                if isinstance(parent_mb, QMenuBar):
+                if isinstance(parent_mb, QtWidgets.QMenuBar):
                     geom = parent_mb.actionGeometry(action)
-                    self._global_anc = QRect(parent_mb.mapToGlobal(geom.topLeft()), geom.size())
+                    self._global_anc = QtCore.QRect(parent_mb.mapToGlobal(geom.topLeft()), geom.size())
                 else:
-                    self._global_anc = QRect(widget.mapToGlobal(QPoint(0, 0)), widget.size())
+                    self._global_anc = QtCore.QRect(widget.mapToGlobal(QtCore.QPoint(0, 0)), widget.size())
 
-            # 2. Handle QMenuBar itself (point to last item)
-            elif isinstance(widget, QMenuBar):
+            # 2. Handle QtWidgets.QMenuBar itself (point to last item)
+            elif isinstance(widget, QtWidgets.QMenuBar):
                 actions = widget.actions()
                 if actions:
                     geom = widget.actionGeometry(actions[-1])
-                    self._global_anc = QRect(widget.mapToGlobal(geom.topLeft()), geom.size())
+                    self._global_anc = QtCore.QRect(widget.mapToGlobal(geom.topLeft()), geom.size())
                 else:
-                    self._global_anc = QRect(widget.mapToGlobal(QPoint(0, 0)), widget.size())
+                    self._global_anc = QtCore.QRect(widget.mapToGlobal(QtCore.QPoint(0, 0)), widget.size())
 
             # 3. Standard Widget
             else:
-                self._global_anc = QRect(widget.mapToGlobal(QPoint(0, 0)), widget.size())
+                self._global_anc = QtCore.QRect(widget.mapToGlobal(QtCore.QPoint(0, 0)), widget.size())
         else:
             # Final fallback: point to cursor if widget is dead
-            self._global_anc = QRect(cursor_pos, QSize(0, 0))
+            self._global_anc = QtCore.QRect(cursor_pos, QtCore.QSize(0, 0))
 
         self.side = "bottom"
         self.root_layout.setContentsMargins(0, 0, 0, ah)
@@ -689,9 +575,9 @@ class QFlatTooltipConfirm(QFlatDialog):
         w, h = self.width(), self.height()
 
         target_x = self._global_anc.left()
-        pos = QPoint(target_x - w // 2, self._global_anc.top() - h - DPI(2))
+        pos = QtCore.QPoint(target_x - w // 2, self._global_anc.top() - h - DPI(2))
 
-        screen = QGuiApplication.screenAt(cursor_pos) or QGuiApplication.primaryScreen()
+        screen = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
         geo = screen.availableGeometry()
 
         if pos.y() < geo.top():
@@ -754,7 +640,115 @@ class QFlatTooltipConfirm(QFlatDialog):
         return cls._run(anchor_widget, title=title, message=message, buttons=buttons, **kwargs)
 
 
-class QFlatSelectorDialog(QFlatDialog):
+class QFlatFloatingWidget(QFlatDialog):
+    """
+    A draggable, frameless, rounded widget wrapper.
+    Can be instantiated as a temporary popup or a pinned window.
+    """
+
+    BORDER_RADIUS = DPI(5)
+
+    TEXT_COLOR = "#bbbbbb"
+    COLOR_BG_TRACK = "#444444"
+
+    def __init__(self, popup=False, parent=None):
+        QFlatDialog.__init__(self, parent)
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
+        self.setMouseTracking(True)
+
+        self._is_dragging = False
+        self._drag_offset = QtCore.QPoint()
+        self._drag_start_pos = QtCore.QPoint()
+
+        self._setup_ui()
+
+    def _setup_ui(self):
+        self.mainContent = QtWidgets.QWidget(self)
+        self.mainLayout = QtWidgets.QVBoxLayout(self.mainContent)
+        self.mainLayout.setContentsMargins(DPI(6), DPI(8), DPI(6), DPI(8))
+        self.mainLayout.setSpacing(2)
+
+        self.root_layout.insertWidget(0, self.mainContent, 1)
+
+        self.grip = QtWidgets.QSizeGrip(self)
+        self.grip.setCursor(QtCore.Qt.SizeBDiagCursor)
+
+    def paintEvent(self, event):
+        if not self.isVisible():
+            return
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        p.setPen(QtCore.Qt.NoPen)
+        p.setBrush(QtGui.QColor(self.COLOR_BG_TRACK))
+
+        # Use drawRoundedRect for clean, all-around rounded corners
+        rect = self.rect()
+        r = self.BORDER_RADIUS
+        p.drawRoundedRect(rect, r, r)
+
+    def place_near_cursor(self):
+        self.adjustSize()
+        w, h = self.width(), self.height()
+        cursor_pos = QtGui.QCursor.pos()
+        screen = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
+        geo = screen.availableGeometry()
+
+        # Vertical Placement: Prefer Above. If not enough space, place Below.
+        # We add an offset (DPI(30)) to avoid sitting exactly on the cursor
+        v_offset = DPI(30)
+        y = cursor_pos.y() - h - v_offset
+
+        if y < geo.top():
+            # Flip to below cursor
+            y = cursor_pos.y() + v_offset
+
+        # Horizontal Placement: Centered on cursor
+        x = cursor_pos.x() - w // 2
+
+        # Screen boundary clamping
+        x = max(geo.left(), min(x, geo.right() - w))
+        y = max(geo.top(), min(y, geo.bottom() - h))
+
+        self.move(x, y)
+        self.show()
+        self.raise_()
+
+    def resizeEvent(self, event):
+        s = self.grip.sizeHint()
+        self.grip.setFixedSize(s)
+        self.grip.move(self.width() - s.width(), 0)
+        self.grip.raise_()
+        QFlatDialog.resizeEvent(self, event)
+
+    def mousePressEvent(self, e):
+        if e.button() == QtCore.Qt.LeftButton:
+            self._is_dragging = True
+            if PYSIDE_VERSION < 6:
+                global_position = e.globalPos()
+            else:
+                global_position = e.globalPosition().toPoint()
+            self._drag_start_pos = global_position
+            self._drag_offset = global_position - self.frameGeometry().topLeft()
+        QFlatDialog.mousePressEvent(self, e)
+
+    def mouseMoveEvent(self, e):
+        if self._is_dragging and (e.buttons() & QtCore.Qt.LeftButton):
+            if PYSIDE_VERSION < 6:
+                global_position = e.globalPos()
+            else:
+                global_position = e.globalPosition().toPoint()
+            self.move(global_position - self._drag_offset)
+        QFlatDialog.mouseMoveEvent(self, e)
+
+    def mouseReleaseEvent(self, e):
+        if e.button() == QtCore.Qt.LeftButton and self._is_dragging:
+            self._is_dragging = False
+        QFlatDialog.mouseReleaseEvent(self, e)
+
+
+class QFlatSelectorDialog(QFlatFloatingWidget):
     """
     A modern successor to the Maya textScrollList selector.
     Displays a list of currently selected objects, allowing for quick
@@ -765,86 +759,89 @@ class QFlatSelectorDialog(QFlatDialog):
         super().__init__(parent=parent)
         self.setWindowTitle(title or "Selector")
         self.setMinimumWidth(DPI(230))
-        self.setMinimumHeight(DPI(380))
+        self.setMinimumHeight(DPI(300))
 
-        # UI Setup
-        content_widget = QtWidgets.QWidget()
-        self.root_layout.addWidget(content_widget)
+        self._opened = False
 
-        layout = QtWidgets.QVBoxLayout(content_widget)
-        layout.setContentsMargins(DPI(12), DPI(12), DPI(12), DPI(6))
-        layout.setSpacing(DPI(8))
+        # Header
+        selection_layout = QtWidgets.QHBoxLayout()
+        selection_layout.setContentsMargins(DPI(6), DPI(10), 0, DPI(4))
+        selection_layout.setSpacing(DPI(6))
 
+        self.selection_title = QtWidgets.QLabel("0")
+        self.selection_title.setObjectName("selection_title")
+        self.selection_title.setStyleSheet(
+            "#selection_title{font-size: %spx; color: %s; font-weight: bold; background: transparent;}" % (DPI(24), self.TEXT_COLOR)
+        )
+        self.selection_title.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.selection_title.setWordWrap(False)
+
+        # Icon
+        icon_label = QtWidgets.QLabel()
+        icon_size = DPI(30)  # same as font size
+
+        icon = QtGui.QIcon(media.selector_image)  # SVG file
+        pixmap = icon.pixmap(icon_size, icon_size)
+        icon_label.setPixmap(pixmap)
+        icon_label.setFixedSize(icon_size, icon_size)
+        icon_label.setAlignment(QtCore.Qt.AlignCenter)
+
+        # Layout
+        selection_layout.addWidget(self.selection_title)
+        selection_layout.addWidget(icon_label, alignment=QtCore.Qt.AlignVCenter)
+
+        self.mainLayout.addLayout(selection_layout)
+
+        # List
         self.list_widget = QtWidgets.QListWidget()
         self.list_widget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.list_widget.setStyleSheet(
-            """
-            QListWidget {
-                background-color: #2b2b2b;
-                border: 1px solid #3d3d3d;
-                border-radius: 4px;
-                color: #bbbbbb;
-                padding: 1px;
-                font-size: %spx;
-            }
-            QListWidget::item {
-                padding: 6px 8px;
-                border-bottom: 1px solid #333333;
-            }
-            QListWidget::item:selected {
-                background-color: #444444;
-                color: #ffffff;
-                border: none;
-            }
-            QListWidget::item:hover {
-                background-color: #383838;
-            }
-        """
-            % int(DPI(11))
-        )
-
-        # Add reload button
-        self.reload_btn = QFlatButton("Reload from Selection", icon_path=media.reload_image, background="#444444")
-        self.reload_btn.clicked.connect(self.reload_objects)
-
-        layout.addWidget(self.list_widget)
-        layout.addWidget(self.reload_btn)
-
-        # Add basic close button in bottom bar
-        self.setBottomBar(closeButton=True)
-
-        # Connections
+        self.list_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.list_widget.itemSelectionChanged.connect(self._on_list_selection_changed)
 
-        # Initial fill
+        self.mainLayout.addWidget(self.list_widget, 1)
+
+        reload_btn = QFlatDialogButton("Reload", icon=media.reload_image, callback=self.reload_objects)
+        # Reload button
+        self.setBottomBar([reload_btn], margins=0, spacing=0)
         self.reload_objects()
 
     def reload_objects(self):
-        """Fills the list with current selection names."""
+        """Fills the list with current selection names and preserves active selection in the UI."""
         import maya.cmds as cmds
 
         self.list_widget.blockSignals(True)
         self.list_widget.clear()
 
-        # Get active selection names
-        selected = cmds.ls(selection=True) or []
+        selected = cmds.ls(selection=True, long=True) or []
+
         for obj in sorted(selected):
             item = QtWidgets.QListWidgetItem(obj)
             self.list_widget.addItem(item)
+            item.setSelected(True)
 
+        self.selection_title.setText(str(len(selected)))
         self.list_widget.blockSignals(False)
 
     def _on_list_selection_changed(self):
         """Syncs the dialog selection back to the Maya scene."""
         import maya.cmds as cmds
 
-        # Get texts from selected items
         names = [item.text() for item in self.list_widget.selectedItems()]
+        valid_names = [n for n in names if cmds.objExists(n)]
 
-        if names:
-            # Filter names to ensure they still exist in Maya
-            valid_names = [n for n in names if cmds.objExists(n)]
-            if valid_names:
-                cmds.select(valid_names, replace=True)
-            else:
-                self.reload_objects()  # Refresh if objects were deleted
+        if names and not valid_names:
+            self.reload_objects()
+            return
+
+        if valid_names:
+            cmds.select(valid_names, replace=True)
+        else:
+            cmds.select(clear=True)
+
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.ActivationChange:
+            if self._opened:
+                self.close()
+            self._opened = True
+            return
+        super().changeEvent(event)

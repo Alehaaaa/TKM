@@ -504,8 +504,8 @@ class CustomButton(QtWidgets.QPushButton):
         action14 = QAction(QtGui.QIcon(media.select_hierarchy_image), "Select Hierarchy", self)
         action15 = QAction(QtGui.QIcon(media.link_objects_image), "Copy/Paste Link", self)
         action16 = QAction(QtGui.QIcon(media.temp_pivot_image), "Temp Pivot", self)
-        action17 = QAction(QtGui.QIcon(media.worldspace_copy_frame_image), "Copy Worldspace Current Frame", self)
-        action18 = QAction(QtGui.QIcon(media.worldspace_paste_frame_image), "Paste Worldspace Current Frame", self)
+        action17 = QAction(QtGui.QIcon(media.worldspace_copy_frame_image), "Copy World Space Current Frame", self)
+        action18 = QAction(QtGui.QIcon(media.worldspace_paste_frame_image), "Paste World Space Current Frame", self)
         action_opacity = QAction("Toggle Dynamic Opacity", self)
 
         menu.addAction(action1)
@@ -788,7 +788,6 @@ def donate_window():
 
 
 def about_window():
-
     TheKeyMachine_stage_version = general.get_thekeymachine_stage_version()
     TheKeyMachine_version = general.get_thekeymachine_version()
     TheKeyMachine_build_version = general.get_thekeymachine_build_version()
@@ -840,7 +839,6 @@ def about_window():
             )
 
             def _check_updates():
-
                 updater.check_for_updates(force=True)
 
             version_btn.clicked.connect(_check_updates)

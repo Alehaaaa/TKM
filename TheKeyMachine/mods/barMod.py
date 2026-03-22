@@ -862,7 +862,7 @@ def worldspace_copy_animation(*args):
         edit=True,
         beginProgress=True,
         isInterruptable=True,
-        status="Copying worldspace animation...",
+        status="Copying World Space animation...",
         maxValue=total_frames,
     )
 
@@ -906,10 +906,10 @@ def worldspace_copy_animation(*args):
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
         # Restaurar el tiempo actual a su estado original
         cmds.currentTime(original_time)
-        print("Worldspace animation copied")
+        print("World Space animation copied")
 
 
-# -------------------- Copy range worldspace
+# -------------------- Copy range World Space
 
 
 def copy_range_worldspace_animation(*args):
@@ -946,7 +946,7 @@ def copy_range_worldspace_animation(*args):
         edit=True,
         beginProgress=True,
         isInterruptable=True,
-        status="Copying worldspace animation...",
+        status="Copying World Space animation...",
         maxValue=total_frames,
     )
 
@@ -989,10 +989,10 @@ def copy_range_worldspace_animation(*args):
         # Restaurar el tiempo actual a su estado original
         keyTools.clear_timeslider_selection()
         cmds.currentTime(original_time)
-        cmds.warning("Worldspace animation copied")
+        cmds.warning("World Space animation copied")
 
 
-# ............. copy single frame worldspace
+# ............. copy single frame World Space
 
 
 def copy_worldspace_single_frame(*args):
@@ -1021,7 +1021,7 @@ def copy_worldspace_single_frame(*args):
     with open(worldspace_anim_data_file, "w") as json_file:
         json.dump(animation_data, json_file)
 
-    cmds.warning("Worldspace values for current frame copied")
+    cmds.warning("World Space values for current frame copied")
 
 
 def paste_worldspace_single_frame(*args):
@@ -1029,13 +1029,13 @@ def paste_worldspace_single_frame(*args):
     worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
 
     if not os.path.exists(worldspace_anim_data_file):
-        cmds.warning("No worldspace data found")
+        cmds.warning("No World Space data found")
         return
 
     with open(worldspace_anim_data_file, "r") as json_file:
         animation_data = json.load(json_file)
 
-    # Aplicar valores de worldspace guardados del primer frame disponible
+    # Aplicar valores de World Space guardados del primer frame disponible
     for obj, obj_data in animation_data.items():
         # Tomar el primer frame disponible
         first_frame = next(iter(obj_data))
@@ -1046,7 +1046,7 @@ def paste_worldspace_single_frame(*args):
         else:
             cmds.warning(f"Object {obj} not found in the scene")
 
-    cmds.warning("Worldspace values applied")
+    cmds.warning("World Space values applied")
 
 
 def worldspace_paste_animation(*args):
@@ -1056,7 +1056,7 @@ def worldspace_paste_animation(*args):
     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
 
     if not os.path.exists(worldspace_anim_data_file):
-        print("No worldspace animation data found")
+        print("No World Space animation data found")
         return
 
     with open(worldspace_anim_data_file, "r") as json_file:
@@ -1086,7 +1086,7 @@ def worldspace_paste_animation(*args):
         edit=True,
         beginProgress=True,
         isInterruptable=True,
-        status="Pasting worldspace animation...",
+        status="Pasting World Space animation...",
         maxValue=len(all_frames),
     )
 
@@ -1109,7 +1109,7 @@ def worldspace_paste_animation(*args):
         cmds.refresh(suspend=False)
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
         cmds.currentTime(original_time)
-        cmds.warning("Worldspace animation restored successfully")
+        cmds.warning("World Space animation restored successfully")
 
 
 # ____________________________________ Tracer _______________________________________________
@@ -1349,18 +1349,19 @@ def remove_followCam(*args):
 
 
 def selector_window(*args):
+    # Check if anything is selected first
+    if not cmds.ls(selection=True):
+        return
+
     # Search for an existing instance of the selector window
     for widget in QtWidgets.QApplication.topLevelWidgets():
         if isinstance(widget, customDialogs.QFlatSelectorDialog):
-            widget.show()
-            widget.raise_()
-            widget.activateWindow()
-            widget.reload_objects()
-            return
+            widget.close()
+            widget.deleteLater()
 
     # If no instance exists, create a new one
     dlg = customDialogs.QFlatSelectorDialog()
-    dlg.show()
+    dlg.place_near_cursor()
 
 
 def select_objects_from_list(list_name, *args):

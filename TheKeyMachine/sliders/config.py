@@ -29,7 +29,12 @@ TANGENT_MODES = [
         "icon": "BO",
         "description": "Sets tangents to create a sharp 'bounce' effect at the keyframe.",
     },
-    {"label": "Blend to Auto Tangent", "key": "blend_auto", "icon": "AU", "description": "Blends toward the standard Maya 'Auto' tangent type."},
+    {
+        "label": "Blend to Auto Tangent",
+        "key": "blend_auto",
+        "icon": "AU",
+        "description": "Blends toward the standard Maya 'Auto' tangent type.",
+    },
     {
         "label": "Blend to Spline Tangent",
         "key": "blend_spline",
@@ -48,7 +53,12 @@ TANGENT_MODES = [
         "icon": "LI",
         "description": "Blends toward the standard Maya 'Linear' tangent type.",
     },
-    {"label": "Blend to Flat Tangent", "key": "blend_flat", "icon": "FT", "description": "Blends toward the standard Maya 'Flat' tangent type."},
+    {
+        "label": "Blend to Flat Tangent",
+        "key": "blend_flat",
+        "icon": "FT",
+        "description": "Blends toward the standard Maya 'Flat' tangent type.",
+    },
     {
         "label": "Blend to Plateau Tangent",
         "key": "blend_plateau",
@@ -68,7 +78,7 @@ TWEEN_MODES = [
         "label": "Tweener World Space",
         "key": "tweener_worldspace",
         "icon": "TW",
-        "description": "Performs tweening in world space for more accurate spatial interpolations.",
+        "description": "Performs tweening in World Space for more accurate spatial interpolations.",
         "worldSpace": True,
     },
     "separator",
@@ -84,7 +94,12 @@ TWEEN_MODES = [
         "icon": "BD",
         "description": "Blends the current pose toward the object's default/bind pose.",
     },
-    {"label": "Blend to Ease", "key": "blend_to_ease", "icon": "BE", "description": "Applies an ease in/out curve blending to the current value."},
+    {
+        "label": "Blend to Ease",
+        "key": "blend_to_ease",
+        "icon": "BE",
+        "description": "Applies an ease in/out curve blending to the current value.",
+    },
     {
         "label": "Blend to Frame",
         "key": "blend_to_frame",
@@ -95,7 +110,7 @@ TWEEN_MODES = [
         "label": "Blend to Frame World Space",
         "key": "blend_to_frame_ws",
         "icon": "BF",
-        "description": "Blends toward a specific frame value using world space coordinates.",
+        "description": "Blends toward a specific frame value using World Space coordinates.",
         "worldSpace": True,
     },
     {
@@ -108,7 +123,7 @@ TWEEN_MODES = [
         "label": "Blend to Neighbors World Space",
         "key": "blend_to_neighbors_ws",
         "icon": "BN",
-        "description": "Blends toward neighbors using world space coordinates.",
+        "description": "Blends toward neighbors using World Space coordinates.",
         "worldSpace": True,
     },
     {
@@ -121,7 +136,7 @@ TWEEN_MODES = [
         "label": "Blend to Infinity World Space",
         "key": "blend_to_infinity_ws",
         "icon": "BI",
-        "description": "Blends toward infinity values in world space.",
+        "description": "Blends toward infinity values in World Space.",
         "worldSpace": True,
     },
     {
@@ -145,7 +160,12 @@ BLEND_MODES = [
         "icon": "EI",
         "description": "Applies an ease-in/ease-out transformation to the selected curve segment.",
     },
-    {"label": "Gap Stitcher", "key": "gap_stitcher", "icon": "GS", "description": "Closes gaps in animation by stitching curve segments together."},
+    {
+        "label": "Gap Stitcher",
+        "key": "gap_stitcher",
+        "icon": "GS",
+        "description": "Closes gaps in animation by stitching curve segments together.",
+    },
     {
         "label": "Noise | Wave",
         "key": "noise_wave",
@@ -183,14 +203,24 @@ BLEND_MODES = [
         "description": "Applies a staggered time offset across multiple selected objects.",
     },
     "separator",
-    {"label": "Scale From Average", "key": "scale_average", "icon": "SA", "description": "Scales the curve values relative to their average value."},
+    {
+        "label": "Scale From Average",
+        "key": "scale_average",
+        "icon": "SA",
+        "description": "Scales the curve values relative to their average value.",
+    },
     {
         "label": "Scale From Default",
         "key": "scale_default",
         "icon": "SD",
         "description": "Scales the curve values relative to the default zero-point.",
     },
-    {"label": "Scale From Frame", "key": "scale_frame", "icon": "SF", "description": "Scales the curve relative to the value at the current frame."},
+    {
+        "label": "Scale From Frame",
+        "key": "scale_frame",
+        "icon": "SF",
+        "description": "Scales the curve relative to the value at the current frame.",
+    },
     {
         "label": "Scale From Neighbor Left",
         "key": "scale_neighbor_left",

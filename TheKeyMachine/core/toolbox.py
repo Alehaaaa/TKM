@@ -55,7 +55,7 @@ TOOL_DEFINITIONS = {
     },
     "worldspace": {
         "key": "worldspace",
-        "label": "Worldspace",
+        "label": "World Space",
         "text": "WS",
         "icon_path": media.worldspace_copy_animation_image,
         "callback": bar.mod_worldspace_copy_animation,

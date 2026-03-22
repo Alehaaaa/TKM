@@ -204,7 +204,9 @@ class QFlatTooltip(QWidget):
 
         self.main_layout.setSizeConstraint(QVBoxLayout.SetMinAndMaxSize)
         self.setStyleSheet(
-            "QFlatTooltip > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(self.BG_COLOR, wutil.DPI(self.BORDER_RADIUS))
+            "QFlatTooltip > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(
+                self.BG_COLOR, wutil.DPI(self.BORDER_RADIUS)
+            )
         )
 
         self.bg_frame = QFrame()
@@ -367,7 +369,7 @@ class QFlatTooltip(QWidget):
 
     def _create_icon_label(self, source, dim=32):
         lbl = QLabel()
-        px_dim = wutil.DPI(dim)
+        px_dim = wutil.DPR(wutil.DPI(dim))
         if hasattr(source, "pixmap"):
             pix = source.pixmap(px_dim, px_dim)
         elif isinstance(source, QPixmap):
@@ -385,7 +387,9 @@ class QFlatTooltip(QWidget):
         lbl.setToolTip(text)
         lbl.setWordWrap(True)
 
-        style = "#text_label {{ color: {0}; font-size: {1}px; {2}}}".format(self.TEXT_COLOR, wutil.DPI(size), "font-weight: bold;" if bold else "")
+        style = "#text_label {{ color: {0}; font-size: {1}px; {2}}}".format(
+            self.TEXT_COLOR, wutil.DPI(size), "font-weight: bold;" if bold else ""
+        )
         lbl.setStyleSheet(style)
         if align:
             lbl.setAlignment(align)
@@ -434,7 +438,9 @@ class QFlatTooltip(QWidget):
             poly = QPolygonF([QPointF(ax, 0), QPointF(ax - aw / 2, ah + 1), QPointF(ax + aw / 2, ah + 1)])
             painter.drawPolygon(poly)
         else:
-            poly = QPolygonF([QPointF(ax, self.height()), QPointF(ax - aw / 2, self.height() - ah - 1), QPointF(ax + aw / 2, self.height() - ah - 1)])
+            poly = QPolygonF(
+                [QPointF(ax, self.height()), QPointF(ax - aw / 2, self.height() - ah - 1), QPointF(ax + aw / 2, self.height() - ah - 1)]
+            )
             painter.drawPolygon(poly)
 
     def show_around(self, widget, action_rect=None, target_rect=None):
