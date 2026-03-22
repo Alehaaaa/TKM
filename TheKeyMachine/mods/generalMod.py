@@ -207,9 +207,9 @@ def create_TheKeyMachine_node():
     # Guardar la selección inicial
     initial_selection = cmds.ls(selection=True)
 
-    tkm_stage = get_thekeymachine_version()
     tkm_version = get_thekeymachine_version()
-    tkm_full_version = "{} v{}".format(tkm_stage, tkm_version)
+    tkm_stage = get_thekeymachine_stage_version()
+    tkm_full_version = "v{} {}".format(tkm_version, tkm_stage)
 
     tkm_codename = get_thekeymachine_codename()
 
