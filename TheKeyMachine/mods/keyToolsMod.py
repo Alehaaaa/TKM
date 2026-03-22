@@ -2756,7 +2756,7 @@ def copy_animation(*args):
                     values = cmds.keyframe(f"{control}.{channel}", query=True, vc=True)
                 animation_data[control_name][channel] = {"keyframes": keyframes, "values": values}
 
-        json_file_path = general.get_copy_paste_animation_file()
+        json_file_path = general.get_copy_animation_file()
 
         save_animation_to_json(json_file_path, animation_data)
 
@@ -2797,7 +2797,7 @@ def paste_animation(*args):
         print("Select at least one control")
         return
 
-    json_file_path = general.get_copy_paste_animation_file()
+    json_file_path = general.get_copy_animation_file()
 
     # Aplicar animación a los objetos seleccionados
     apply_animation_from_json(json_file_path, selected_objects)
@@ -2837,7 +2837,7 @@ def paste_insert_animation(*args):
         print("Select at least one control")
         return
 
-    json_file_path = general.get_copy_paste_animation_file()
+    json_file_path = general.get_copy_animation_file()
 
     # Aplicar animación a los objetos seleccionados en el tiempo actual
     apply_animation_from_json(json_file_path, selected_objects, current_time)
@@ -2879,7 +2879,7 @@ def paste_opposite_animation(*args):
             return -value
         return value
 
-    json_file_path = general.get_copy_paste_animation_file()
+    json_file_path = general.get_copy_animation_file()
 
     with open(json_file_path, "r") as json_file:
         animation_data = json.load(json_file)
@@ -2931,7 +2931,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
         return
 
     # Cargar JSON
-    json_file_path = general.get_copy_paste_animation_file()
+    json_file_path = general.get_copy_animation_file()
     if not os.path.exists(json_file_path):
         cmds.warning("No animation file found. Please copy animation first")
         return

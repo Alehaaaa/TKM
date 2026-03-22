@@ -349,7 +349,7 @@ iconos_acciones = {
     "keyTools.selectOpposite": media.select_opposite_image,
     "keyTools.copyOpposite": media.copy_opposite_image,
     "keyTools.mirror": media.mirror_image,
-    "keyTools.copy_animation": media.copy_paste_animation_image,
+    "keyTools.copy_animation": media.copy_animation_image,
     "keyTools.paste_animation": media.paste_animation_image,
     "keyTools.paste_insert_animation": media.paste_insert_animation_image,
     "bar.selectHierarchy": media.select_hierarchy_image,
@@ -496,7 +496,7 @@ class CustomButton(QtWidgets.QPushButton):
         action6 = QAction(QtGui.QIcon(media.select_opposite_image), "Select Opposite", self)
         action7 = QAction(QtGui.QIcon(media.copy_opposite_image), "Copy Opposite", self)
         action8 = QAction(QtGui.QIcon(media.mirror_image), "Mirror", self)
-        action9 = QAction(QtGui.QIcon(media.copy_paste_animation_image), "Copy Animation", self)
+        action9 = QAction(QtGui.QIcon(media.copy_animation_image), "Copy Animation", self)
         action10 = QAction(QtGui.QIcon(media.paste_animation_image), "Paste Animation", self)
         action11 = QAction(QtGui.QIcon(media.paste_insert_animation_image), "Paste Insert Animation", self)
         action12 = QAction(QtGui.QIcon(media.copy_pose_image), "Copy Pose", self)
@@ -548,7 +548,7 @@ class CustomButton(QtWidgets.QPushButton):
         elif action == action8:
             self.updateButton(media.mirror_image, "mirror")
         elif action == action9:
-            self.updateButton(media.copy_paste_animation_image, "copy_animation")
+            self.updateButton(media.copy_animation_image, "copy_animation")
         elif action == action10:
             self.updateButton(media.paste_animation_image, "paste_animation")
         elif action == action11:

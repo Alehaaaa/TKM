@@ -242,17 +242,23 @@ block_keys_tooltip_text = (
 # ----- Pointer
 
 
-pointer_tooltip_text = (
+select_rig_controls_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Rig Controls</b></font><img src='{media.select_rig_controls_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool selects all rig controls. Selected controls will be only nurbs curves."
     "</font>"
     "<br><br>"
+)
+
+select_animated_rig_controls_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Animated Rig Controls</b></font><img src='{media.select_animated_rig_controls_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool selects all animated rig controls. Selected controls will be only nurbs curves."
     "</font>"
     "<br><br>"
+)
+
+depth_mover_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Depth Mover</b></font><img src='{media.depth_mover_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Adjust object depth without altering its camera-relative position or angle.<br><br>"
@@ -370,17 +376,22 @@ mirror_tooltip_text = (
     "</font>"
 )
 
-copy_paste_animation_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Animation</b></font><img src='{media.copy_paste_animation_image}' width='30'><br><br>"
+copy_animation_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Animation</b></font><img src='{media.copy_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy and paste animations of objects or controls.<br>"
     "The animation is saved in a file, so it can be pasted in another Maya session.<br><br>"
     "If you have copied only one side of the controls, you can paste them on the opposite side.<br><br>"
+    ""
     "</font>"
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Pose</b></font><img src='{media.copy_pose_image}' width='30'><br><br>"
+)
+
+copy_pose_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Pose</b></font><img src='{media.copy_pose_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy and paste poses between the same or different character. The pose is saved in a file, so it can be pasted in another Maya session.<br><br>"
     "To paste poses between characters, they must have the same control name.<br><br>"
+    ""
     "</font>"
 )
 

@@ -595,6 +595,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._all_modes = []  # Full ordered mode list (SliderMode objects + "separator")
         self._mode_to_slot = {}  # mode_key -> slot_key (live, authoritative mapping)
 
+        # Tool-group action pinning support
+        # _tool_groups: widget_key -> {label, icon_path, menu_factory, actions: [...]}
+        self._tool_groups = {}
+        # _pinned_action_buttons: action_key -> QFlatToolButton (live instances)
+        self._pinned_action_buttons = {}
+
         if self._hiddeable:
             # Overlay button: tiny checkbox in the bottom-left
             self._overlay_btn = QtWidgets.QToolButton(self)
@@ -644,6 +650,245 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             widget.setVisible(visible)
 
         return widget
+
+    def addWidgetGroup(self, widget, label, key, widgets, default_visible=True, description=None):
+        """
+        All-in-one: adds a widget to the section AND builds its right-click menu
+        from a descriptor list, enabling individual action pinning.
+
+        Parameters
+        ----------
+        widget : QWidget
+            The primary button/widget.
+        label : str
+            Display label in the section's pin menu.
+        key : str
+            Unique slot key.
+        widgets : list
+            List of action descriptors or the string ``"separator"``.
+            Each descriptor dict may contain:
+              key, label, icon_path, callback,
+              checkable (bool), is_checked_fn (callable), tooltip, description.
+        default_visible : bool
+        description : str
+        """
+        # 1. Register the main widget in the section
+        self.addWidget(widget, label, key, default_visible=default_visible, description=description)
+
+        # 2. Resolve the group icon from the widget's stored path
+        group_icon_path = getattr(widget, "_icon_path", None) or ""
+
+        # 3. Build QMenu + pinnable_actions from the descriptor list
+        menu = QtWidgets.QMenu(widget)
+        pinnable_actions = []
+        checkable_sync_pairs = []  # (QAction, is_checked_fn) for aboutToShow refresh
+
+        for item in widgets:
+            if item == "separator":
+                menu.addSeparator()
+                continue
+
+            act_icon_path = item.get("icon_path") or ""
+            act_label    = item.get("label", "")
+            callback     = item.get("callback")
+            checkable    = item.get("checkable", False)
+            is_checked_fn = item.get("is_checked_fn")
+
+            if checkable:
+                action = menu.addAction(QtGui.QIcon(act_icon_path), act_label)
+                action.setCheckable(True)
+                if is_checked_fn:
+                    try:
+                        action.setChecked(is_checked_fn())
+                    except Exception:
+                        pass
+                    checkable_sync_pairs.append((action, is_checked_fn))
+                if callback:
+                    action.triggered.connect(callback)
+            else:
+                if callback:
+                    menu.addAction(QtGui.QIcon(act_icon_path), act_label, callback)
+                else:
+                    menu.addAction(QtGui.QIcon(act_icon_path), act_label)
+
+            if item.get("pinnable") is not False:
+                pinnable_actions.append({
+                    "key":          item["key"],
+                    "label":        act_label,
+                    "icon_path":    item.get("icon_path"),
+                    "callback":     callback,
+                    "checkable":    checkable,
+                    "is_checked_fn": is_checked_fn,
+                    "tooltip":      item.get("tooltip"),
+                    "description":  item.get("description"),
+                })
+
+        # Sync check states on every menu open (handles mutable state)
+        if checkable_sync_pairs:
+            def _sync(pairs=checkable_sync_pairs):
+                for act, fn in pairs:
+                    if isValid(act):
+                        try:
+                            act.setChecked(fn())
+                        except Exception:
+                            pass
+            menu.aboutToShow.connect(_sync)
+
+        # 4. Register group: wires right-click + tear-off on the parent widget
+        self.register_action_group(key, label, group_icon_path, pinnable_actions, menu_factory=lambda: menu)
+
+        return widget
+    def register_action_group(self, widget_key, group_label, group_icon_path, pinnable_actions, menu_factory=None):
+        """
+        Register a tool group so its sub-actions can be pinned as standalone buttons.
+
+        Parameters
+        ----------
+        widget_key : str
+            The key used when the parent button was added via addWidget.
+        group_label : str
+            Display label for the group (e.g. "Pointer").
+        group_icon_path : str
+            Path to the group's main icon (used as fallback for actions).
+        pinnable_actions : list of dict
+            Each dict must contain:
+                key         - unique string key for this action (scoped to section)
+                label       - display label
+                icon_path   - path to icon (or None)
+                callback    - callable to invoke on click
+                checkable   - bool (optional, default False)
+                is_checked_fn - callable() -> bool (optional, for checkable items)
+                tooltip     - str (optional)
+                description - str (optional)
+        menu_factory : callable() -> QMenu (optional)
+            Returns the live right-click menu shared by all pinned buttons in this group.
+        """
+        self._tool_groups[widget_key] = {
+            "label": group_label,
+            "icon_path": group_icon_path,
+            "menu_factory": menu_factory,
+            "actions": pinnable_actions,
+        }
+
+        # Auto-wire right-click on the parent widget + enable tear-off
+        if menu_factory:
+            widget = self._widgets.get(widget_key)
+            if widget and isValid(widget):
+                # Enable tear-off once on the live menu object
+                try:
+                    m = menu_factory()
+                    if m and isValid(m):
+                        m.setTearOffEnabled(True)
+                except Exception:
+                    pass
+
+                widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+
+                def _ctx(pos, mf=menu_factory, w=widget):
+                    try:
+                        m = mf()
+                        if m and isValid(m):
+                            m.exec_(w.mapToGlobal(pos))
+                    except Exception:
+                        pass
+
+                widget.customContextMenuRequested.connect(_ctx)
+
+        # Restore any previously pinned sub-actions on load
+        for act_info in pinnable_actions:
+            act_key = act_info["key"]
+            if settings.get_setting(f"pin_action_{act_key}", False):
+                self._create_pinned_action_button(widget_key, act_info)
+
+    def _create_pinned_action_button(self, group_key, act_info):
+        """Create and insert a pinned sub-action button into the section layout."""
+        act_key = act_info["key"]
+        # If already alive, just make sure it is visible
+        existing = self._pinned_action_buttons.get(act_key)
+        if existing and isValid(existing):
+            existing.setVisible(True)
+            return existing
+
+        group_info = self._tool_groups.get(group_key, {})
+        icon_path = act_info.get("icon_path") or group_info.get("icon_path") or ""
+        tooltip = act_info.get("tooltip") or act_info.get("label", "")
+        description = act_info.get("description", "")
+        callback = act_info.get("callback")
+        checkable = act_info.get("checkable", False)
+        is_checked_fn = act_info.get("is_checked_fn")
+
+        btn = QFlatToolButton(icon=icon_path or None, tooltip=tooltip, description=description)
+        btn.setCheckable(checkable)
+        if checkable and is_checked_fn:
+            try:
+                btn.setChecked(is_checked_fn())
+            except Exception:
+                pass
+
+        if callback:
+            if checkable:
+                def _checked_cb(checked, cb=callback, b=btn, fn=is_checked_fn):
+                    cb(checked)
+                    if fn and isValid(b):
+                        try:
+                            b.setChecked(fn())
+                        except Exception:
+                            pass
+                btn.clicked.connect(_checked_cb)
+            else:
+                btn.clicked.connect(lambda *_: callback())
+
+        # Right-click: show the group's shared context menu
+        menu_factory = group_info.get("menu_factory")
+        if menu_factory:
+            btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+
+            def _show_group_menu(pos, mf=menu_factory, b=btn):
+                try:
+                    m = mf()
+                    if m and isValid(m):
+                        m.exec_(b.mapToGlobal(pos))
+                except Exception:
+                    pass
+
+            btn.customContextMenuRequested.connect(_show_group_menu)
+
+        # Tag this button for later identification
+        btn.setProperty("tkm_pinned_action_key", act_key)
+        btn.setProperty("tkm_group_key", group_key)
+
+        # Insert into layout right after the group's parent widget (and any existing siblings)
+        layout = self.layout()
+        group_widget = self._widgets.get(group_key)
+        insert_index = layout.count()
+        if group_widget and isValid(group_widget):
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item and item.widget() is group_widget:
+                    insert_index = i + 1
+                    # Skip over already-inserted siblings for the same group
+                    while insert_index < layout.count():
+                        sib_item = layout.itemAt(insert_index)
+                        sib_w = sib_item.widget() if sib_item else None
+                        if sib_w and sib_w.property("tkm_group_key") == group_key:
+                            insert_index += 1
+                        else:
+                            break
+                    break
+
+        layout.insertWidget(insert_index, btn)
+        self._pinned_action_buttons[act_key] = btn
+        self._refresh_layout()
+        return btn
+
+    def _remove_pinned_action_button(self, act_key):
+        """Remove a pinned sub-action button from the section layout."""
+        btn = self._pinned_action_buttons.pop(act_key, None)
+        if btn and isValid(btn):
+            self.layout().removeWidget(btn)
+            btn.setParent(None)
+            btn.deleteLater()
+        self._refresh_layout()
 
     def toggle_widget(self, key, visible, save_setting=True):
         """Toggle widget visibility and update menu/settings if needed."""
@@ -844,6 +1089,37 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     action.setChecked(widget.isVisible())
                     action.triggered.connect(self._make_toggle_handler(key))
                     menu._tkm_actions[key] = action
+
+                    # If this widget has a registered action group, show its pinnable
+                    # sub-actions inline (separated) so the user can pin them as buttons.
+                    group_info = self._tool_groups.get(key)
+                    if group_info and group_info.get("actions"):
+                        group_icon_path = group_info.get("icon_path") or ""
+
+                        for act_info in group_info["actions"]:
+                            act_key = act_info["key"]
+                            act_label = act_info.get("label", "")
+                            act_icon_path = act_info.get("icon_path") or group_icon_path
+                            existing_btn = self._pinned_action_buttons.get(act_key)
+                            is_pinned = bool(existing_btn and isValid(existing_btn))
+
+                            sub_action = menu.addAction(QtGui.QIcon(act_icon_path or ""), act_label)
+                            sub_action.setCheckable(True)
+                            sub_action.setChecked(is_pinned)
+
+                            def _make_pin_handler(gk, ai, ak):
+                                def handler(checked):
+                                    if checked:
+                                        settings.set_setting(f"pin_action_{ak}", True)
+                                        self._create_pinned_action_button(gk, ai)
+                                    else:
+                                        settings.set_setting(f"pin_action_{ak}", False)
+                                        self._remove_pinned_action_button(ak)
+                                return handler
+
+                            sub_action.triggered.connect(_make_pin_handler(key, act_info, act_key))
+
+                        menu.addSeparator()
 
         menu.addSeparator()
         pin_def_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin Defaults")

@@ -384,7 +384,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         control.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
 
-        if self.isFloating():
+        if not self.isFloating() if platform.system() == "Windows" else self.isFloating():
             return tab_handle.tabBar().setVisible(False)
 
         self.shelf_painter = cw.QFlatShelfPainter(tab_handle)
@@ -2570,11 +2570,25 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         nudge_keyleft_b_widget = cw.QFlatToolButton(icon=media.nudge_left_image, description="Nudge Left")
         nudge_keyleft_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(-self.move_keyframes_intField.value()))
-        sec.addWidget(nudge_keyleft_b_widget, "Nudge Left", "move_left")
+        sec.addWidgetGroup(
+            nudge_keyleft_b_widget,
+            "Nudge Left",
+            "move_left",
+            widgets=[
+                {"key": "nudge_remove_inbetween", "label": "Remove Inbetween", "icon_path": None, "callback": keyTools.remove_inbetween},
+            ],
+        )
 
         nudge_keyright_b_widget = cw.QFlatToolButton(icon=media.nudge_right_image, description="Nudge Right")
         nudge_keyright_b_widget.clicked.connect(lambda: keyTools.move_keyframes_in_range(self.move_keyframes_intField.value()))
-        sec.addWidget(nudge_keyright_b_widget, "Nudge Right", "move_right")
+        sec.addWidgetGroup(
+            nudge_keyright_b_widget,
+            "Nudge Right",
+            "move_right",
+            widgets=[
+                {"key": "nudge_insert_inbetween", "label": "Insert Inbetween", "icon_path": None, "callback": keyTools.insert_inbetween},
+            ],
+        )
 
         self.move_keyframes_intField = cw.QFlatSpinBox()
         self.move_keyframes_intField.setFixedSize(50, 24)
@@ -2807,131 +2821,193 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         sec = new_section()
 
-        pointer_button_widget = cw.QFlatToolButton(icon=media.pointer_image, tooltip=helper.pointer_tooltip_text)
-        pointer_button_widget.clicked.connect(bar.isolate_master)
-        sec.addWidget(pointer_button_widget, "Pointer", "pointer")
-
-        pointer_menu = QtWidgets.QMenu(pointer_button_widget)
-        pointer_menu.addAction(QtGui.QIcon(media.select_rig_controls_image), "Select Rig Controls", bar.select_rig_controls)
-        pointer_menu.addAction(
-            QtGui.QIcon(media.select_animated_rig_controls_image), "Select Animated Rig Controls", bar.select_animated_rig_controls
+        pointer_select_rig_widget = cw.QFlatToolButton(icon=media.select_rig_controls_image, tooltip=helper.select_rig_controls_tooltip_text)
+        pointer_select_rig_widget.clicked.connect(bar.select_rig_controls)
+        sec.addWidgetGroup(
+            pointer_select_rig_widget,
+            "Select Rig Controls",
+            "select_rig_controls",
+            widgets=[
+                {
+                    "key": "pointer_sel_anim_rig",
+                    "label": "Select Animated Rig Controls",
+                    "icon_path": media.select_animated_rig_controls_image,
+                    "callback": bar.select_animated_rig_controls,
+                },
+                "separator",
+                {"key": "pointer_depth_mover", "label": "Depth Mover", "icon_path": media.depth_mover_image, "callback": bar.depth_mover},
+            ],
         )
-        pointer_menu.addSeparator()
-        pointer_menu.addAction(QtGui.QIcon(media.depth_mover_image), "Depth Mover", bar.depth_mover)
-
-        pointer_button_widget.setMenu(pointer_menu)
-        pointer_button_widget.setPopupMode(QtWidgets.QToolButton.InstantPopup)
 
         # Isolate -------------------------------------------------------------------------
 
         isolate_button_widget = cw.QFlatToolButton(icon=media.isolate_image, tooltip=helper.isolate_tooltip_text)
         isolate_button_widget.clicked.connect(bar.isolate_master)
-        sec.addWidget(isolate_button_widget, "Isolate", "isolate")
-
-        isolate_menu = QtWidgets.QMenu(isolate_button_widget)
-        isolate_menu.addAction(QtGui.QIcon(media.ibookmarks_menu_image), "Bookmarks", self.create_ibookmarks_window)
-        isolate_menu.addSeparator()
-        action_down_level = isolate_menu.addAction("Down one level")
-        action_down_level.setCheckable(True)
-        action_down_level.triggered.connect(bar.toggle_down_one_level)
-        isolate_menu.addSeparator()
-        isolate_menu.addAction(
-            QtGui.QIcon(media.help_menu_image),
-            "Help",
-            lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/isolate"),
+        sec.addWidgetGroup(
+            isolate_button_widget,
+            "Isolate",
+            "isolate",
+            widgets=[
+                {
+                    "key": "isolate_bookmarks",
+                    "label": "Bookmarks",
+                    "icon_path": media.ibookmarks_menu_image,
+                    "callback": self.create_ibookmarks_window,
+                },
+                "separator",
+                {
+                    "key": "isolate_down_level",
+                    "label": "Down one level",
+                    "checkable": True,
+                    "is_checked_fn": lambda: bar.down_one_level,  # Assuming bar.down_one_level tracks state
+                    "callback": bar.toggle_down_one_level,
+                },
+                "separator",
+                {
+                    "key": "isolate_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/isolate"),
+                    "pinnable": False,
+                },
+            ],
         )
-
-        isolate_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        isolate_button_widget.customContextMenuRequested.connect(lambda pos: isolate_menu.exec_(isolate_button_widget.mapToGlobal(pos)))
 
         self.update_selectionSets_on_new_scene()
 
         # Create Locators  ----------------------------------------------------------------
         createLocator_button_widget = cw.QFlatToolButton(icon=media.create_locator_image, tooltip=helper.createLocator_tooltip_text)
         createLocator_button_widget.clicked.connect(bar.createLocator)
-        sec.addWidget(createLocator_button_widget, "Create Locator", "create_locator")
-
-        createLocator_menu = QtWidgets.QMenu(createLocator_button_widget)
-        createLocator_menu.addAction(QtGui.QIcon(media.create_locator_image), "Select temp locators", bar.selectTempLocators)
-        createLocator_menu.addAction(QtGui.QIcon(media.create_locator_image), "Remove temp locators", bar.deleteTempLocators)
-
-        createLocator_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        createLocator_button_widget.customContextMenuRequested.connect(
-            lambda pos: createLocator_menu.exec_(createLocator_button_widget.mapToGlobal(pos))
+        sec.addWidgetGroup(
+            createLocator_button_widget,
+            "Create Locator",
+            "create_locator",
+            widgets=[
+                {
+                    "key": "locator_select_temp",
+                    "label": "Select temp locators",
+                    "icon_path": media.create_locator_image,
+                    "callback": bar.selectTempLocators,
+                },
+                {
+                    "key": "locator_remove_temp",
+                    "label": "Remove temp locators",
+                    "icon_path": media.create_locator_image,
+                    "callback": bar.deleteTempLocators,
+                },
+            ],
         )
 
         # align / match transforms ----------------------------------------------------------
 
         align_button_widget = cw.QFlatToolButton(icon=media.match_image, tooltip=helper.align_tooltip_text)
         align_button_widget.clicked.connect(bar.align_selected_objects)
-        sec.addWidget(align_button_widget, "Align", "align")
-        align_menu = QtWidgets.QMenu(align_button_widget)
-        align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Translation", partial(bar.align_selected_objects, pos=True, rot=False, scl=False))
-        align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Rotation", partial(bar.align_selected_objects, pos=False, rot=True, scl=False))
-        align_menu.addAction(QtGui.QIcon(media.align_menu_image), "Scale", partial(bar.align_selected_objects, pos=False, rot=False, scl=True))
-        align_menu.addSeparator()
-        align_menu.addAction(QtGui.QIcon(media.match_image), "Match Range", bar.align_range)
-        align_menu.addSeparator()
-        align_menu.addAction(
-            QtGui.QIcon(media.help_menu_image),
-            "Help",
-            lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/match-align"),
+        sec.addWidgetGroup(
+            align_button_widget,
+            "Align",
+            "align",
+            widgets=[
+                {
+                    "key": "align_translation",
+                    "label": "Translation",
+                    "icon_path": media.align_menu_image,
+                    "callback": partial(bar.align_selected_objects, pos=True, rot=False, scl=False),
+                },
+                {
+                    "key": "align_rotation",
+                    "label": "Rotation",
+                    "icon_path": media.align_menu_image,
+                    "callback": partial(bar.align_selected_objects, pos=False, rot=True, scl=False),
+                },
+                {
+                    "key": "align_scale",
+                    "label": "Scale",
+                    "icon_path": media.align_menu_image,
+                    "callback": partial(bar.align_selected_objects, pos=False, rot=False, scl=True),
+                },
+                "separator",
+                {"key": "align_range", "label": "Match Range", "icon_path": media.match_image, "callback": bar.align_range},
+                "separator",
+                {
+                    "key": "align_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/match-align"),
+                    "pinnable": False,
+                },
+            ],
         )
-
-        align_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        align_button_widget.customContextMenuRequested.connect(lambda pos: align_menu.exec_(align_button_widget.mapToGlobal(pos)))
 
         # Tracer -----------------------------------------------------------------------------
         tracer_button_widget = cw.QFlatToolButton(icon=media.tracer_menu_image, tooltip=helper.tracer_tooltip_text)
         tracer_button_widget.clicked.connect(bar.mod_tracer)
-        sec.addWidget(tracer_button_widget, "Tracer", "tracer")
-
-        tracer_menu = QtWidgets.QMenu(tracer_button_widget)
-        action_tracer_connected = tracer_menu.addAction("Connected")
-        action_tracer_connected.setCheckable(True)
-        action_tracer_connected.triggered.connect(lambda x: bar.tracer_connected(connected=x, update_cb=bar.tracer_update_checkbox))
-
-        tracer_menu.addAction(QtGui.QIcon(media.tracer_refresh_image), "Refresh", bar.tracer_refresh)
-        tracer_menu.addAction(QtGui.QIcon(media.tracer_show_hide_image), "Show/Hide", bar.tracer_show_hide)
-        tracer_menu.addAction(QtGui.QIcon(media.tracer_select_offset_image), "Select offset node", bar.select_tracer_offset_node)
-        tracer_menu.addSeparator()
-
-        tracer_style_sub_menu = tracer_menu.addMenu("Style")
-        tracer_style_sub_menu.setIcon(QtGui.QIcon(media.tracer_set_color_image))
-        tracer_style_sub_menu.addAction(QtGui.QIcon(media.tracer_grey_image), "Grey", bar.set_tracer_grey_color)
-        tracer_style_sub_menu.addAction(QtGui.QIcon(media.tracer_red_image), "Red", bar.set_tracer_red_color)
-        tracer_style_sub_menu.addAction(QtGui.QIcon(media.tracer_blue_image), "Blue", bar.set_tracer_blue_color)
-
-        tracer_menu.addSeparator()
-        tracer_menu.addAction(QtGui.QIcon(media.tracer_remove_image), "Remove", bar.remove_tracer_node)
-
-        tracer_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        tracer_button_widget.customContextMenuRequested.connect(lambda pos: tracer_menu.exec_(tracer_button_widget.mapToGlobal(pos)))
+        sec.addWidgetGroup(
+            tracer_button_widget,
+            "Tracer",
+            "tracer",
+            widgets=[
+                {
+                    "key": "tracer_connected",
+                    "label": "Connected",
+                    "checkable": True,
+                    "is_checked_fn": lambda: getattr(bar, "is_tracer_connected", lambda: False)(),  # Assuming a state check exists
+                    "callback": lambda x: bar.tracer_connected(connected=x, update_cb=bar.tracer_update_checkbox),
+                },
+                "separator",
+                {"key": "tracer_refresh", "label": "Refresh", "icon_path": media.tracer_refresh_image, "callback": bar.tracer_refresh},
+                {"key": "tracer_show_hide", "label": "Show/Hide", "icon_path": media.tracer_show_hide_image, "callback": bar.tracer_show_hide},
+                {
+                    "key": "tracer_offset_node",
+                    "label": "Select offset node",
+                    "icon_path": media.tracer_select_offset_image,
+                    "callback": bar.select_tracer_offset_node,
+                },
+                "separator",
+                # Flattened style menu
+                {"key": "tracer_grey", "label": "Style: Grey", "icon_path": media.tracer_grey_image, "callback": bar.set_tracer_grey_color},
+                {"key": "tracer_red", "label": "Style: Red", "icon_path": media.tracer_red_image, "callback": bar.set_tracer_red_color},
+                {"key": "tracer_blue", "label": "Style: Blue", "icon_path": media.tracer_blue_image, "callback": bar.set_tracer_blue_color},
+                "separator",
+                {"key": "tracer_remove", "label": "Remove", "icon_path": media.tracer_remove_image, "callback": bar.remove_tracer_node},
+            ],
+        )
 
         # Reset anim  -------------------------------------------------------------------------
         reset_values_button_widget = cw.QFlatToolButton(icon=media.reset_animation_image, tooltip=helper.reset_values_tooltip_text)
         reset_values_button_widget.clicked.connect(keyTools.reset_objects_mods)
-        sec.addWidget(reset_values_button_widget, "Reset Values", "reset_values")
-
-        reset_values_menu = QtWidgets.QMenu(reset_values_button_widget)
-        reset_values_menu.addAction(QtGui.QIcon(media.reset_animation_image), "Set Default Values For Selected", keyTools.save_default_values)
-        reset_values_menu.addAction(
-            QtGui.QIcon(media.reset_animation_image),
-            "Restore Default Values For Selected",
-            keyTools.remove_default_values_for_selected_object,
-        )
-        reset_values_menu.addSeparator()
-        reset_values_menu.addAction(QtGui.QIcon(media.reset_animation_image), "Clear All Saved Data", keyTools.restore_default_data)
-        reset_values_menu.addSeparator()
-        reset_values_menu.addAction(
-            QtGui.QIcon(media.help_menu_image),
-            "Help",
-            lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/reset-to-default"),
-        )
-
-        reset_values_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        reset_values_button_widget.customContextMenuRequested.connect(
-            lambda pos: reset_values_menu.exec_(reset_values_button_widget.mapToGlobal(pos))
+        sec.addWidgetGroup(
+            reset_values_button_widget,
+            "Reset Values",
+            "reset_values",
+            widgets=[
+                {
+                    "key": "reset_set_defaults",
+                    "label": "Set Default Values For Selected",
+                    "icon_path": media.reset_animation_image,
+                    "callback": keyTools.save_default_values,
+                },
+                {
+                    "key": "reset_restore_defaults",
+                    "label": "Restore Default Values For Selected",
+                    "icon_path": media.reset_animation_image,
+                    "callback": keyTools.remove_default_values_for_selected_object,
+                },
+                "separator",
+                {
+                    "key": "reset_clear_all",
+                    "label": "Clear All Saved Data",
+                    "icon_path": media.reset_animation_image,
+                    "callback": keyTools.restore_default_data,
+                },
+                "separator",
+                {
+                    "key": "reset_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/reset-to-default"),
+                    "pinnable": False,
+                },
+            ],
         )
 
         # Delete anim -------------------------------------------------------------------------
@@ -2971,50 +3047,94 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Mirror -----------------------------------------------------------------------
         mirror_button_widget = cw.QFlatToolButton(icon=media.mirror_image, tooltip=helper.mirror_tooltip_text)
         mirror_button_widget.clicked.connect(keyTools.mirror)
-        sec.addWidget(mirror_button_widget, "Mirror", "mirror")
-
-        mirror_menu = QtWidgets.QMenu(mirror_button_widget)
-        mirror_menu.addAction(QtGui.QIcon(media.mirror_image), "Add Excepction Invert", keyTools.add_mirror_invert_exception)
-        mirror_menu.addAction(QtGui.QIcon(media.mirror_image), "Add Excepction Keep", keyTools.add_mirror_keep_exception)
-        mirror_menu.addAction(QtGui.QIcon(media.mirror_image), "Remove Exception", keyTools.remove_mirror_invert_exception)
-        mirror_menu.addSeparator()
-        mirror_menu.addAction(
-            QtGui.QIcon(media.help_menu_image),
-            "Help",
-            lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/mirror"),
+        sec.addWidgetGroup(
+            mirror_button_widget,
+            "Mirror",
+            "mirror",
+            widgets=[
+                {
+                    "key": "mirror_add_invert",
+                    "label": "Add Exception Invert",
+                    "icon_path": media.mirror_image,
+                    "callback": keyTools.add_mirror_invert_exception,
+                },
+                {
+                    "key": "mirror_add_keep",
+                    "label": "Add Exception Keep",
+                    "icon_path": media.mirror_image,
+                    "callback": keyTools.add_mirror_keep_exception,
+                },
+                {
+                    "key": "mirror_remove_exc",
+                    "label": "Remove Exception",
+                    "icon_path": media.mirror_image,
+                    "callback": keyTools.remove_mirror_invert_exception,
+                },
+                "separator",
+                {
+                    "key": "mirror_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/mirror"),
+                    "pinnable": False,
+                },
+            ],
         )
 
-        mirror_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        mirror_button_widget.customContextMenuRequested.connect(lambda pos: mirror_menu.exec_(mirror_button_widget.mapToGlobal(pos)))
+        # Copy Paste Pose -----------------------------------------------------------------------
+        copy_pose_button_widget = cw.QFlatToolButton(icon=media.copy_pose_image, tooltip=helper.copy_pose_tooltip_text)
+        copy_pose_button_widget.clicked.connect(keyTools.copy_pose)
+        sec.addWidgetGroup(
+            copy_pose_button_widget,
+            "Copy Pose",
+            "copy_pose",
+            widgets=[
+                {"key": "cp_paste_pose", "label": "Paste Pose", "icon_path": media.paste_pose_image, "callback": keyTools.paste_pose},
+                "separator",
+                {
+                    "key": "pose_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url(
+                        "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-paste-animation#pose-tools"
+                    ),
+                    "pinnable": False,
+                },
+            ],
+        )
 
         # Copy Paste Animation -----------------------------------------------------------------------
-        copy_paste_animation_button_widget = cw.QFlatToolButton(
-            icon=media.copy_paste_animation_image, tooltip=helper.copy_paste_animation_tooltip_text
+        copy_animation_button_widget = cw.QFlatToolButton(icon=media.copy_animation_image, tooltip=helper.copy_animation_tooltip_text)
+        copy_animation_button_widget.clicked.connect(keyTools.copy_animation)
+        sec.addWidgetGroup(
+            copy_animation_button_widget,
+            "Copy/Paste Anim",
+            "copy_paste_anim",
+            widgets=[
+                {"key": "cp_paste_anim", "label": "Paste Animation", "icon_path": media.paste_animation_image, "callback": keyTools.paste_animation},
+                {
+                    "key": "cp_paste_ins",
+                    "label": "Paste Insert",
+                    "icon_path": media.paste_insert_animation_image,
+                    "callback": keyTools.paste_insert_animation,
+                },
+                {
+                    "key": "cp_paste_opp",
+                    "label": "Paste Opposite",
+                    "icon_path": media.paste_opposite_animation_image,
+                    "callback": keyTools.paste_opposite_animation,
+                },
+                {"key": "cp_paste_to", "label": "Paste To", "icon_path": media.paste_animation_image, "callback": keyTools.paste_animation_to},
+                "separator",
+                {
+                    "key": "cp_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-paste-animation"),
+                    "pinnable": False,
+                },
+            ],
         )
-        copy_paste_animation_button_widget.clicked.connect(keyTools.copy_animation)
-        sec.addWidget(copy_paste_animation_button_widget, "Copy/Paste Anim", "copy_paste_anim")
-
-        cp_menu = QtWidgets.QMenu(copy_paste_animation_button_widget)
-        cp_menu.addAction(QtGui.QIcon(media.copy_paste_animation_image), "Copy Animation", keyTools.copy_animation)
-        cp_menu.addAction(QtGui.QIcon(media.paste_animation_image), "Paste Animation", keyTools.paste_animation)
-        cp_menu.addAction(QtGui.QIcon(media.paste_insert_animation_image), "Paste Insert", keyTools.paste_insert_animation)
-        cp_menu.addAction(QtGui.QIcon(media.paste_opposite_animation_image), "Paste Opposite", keyTools.paste_opposite_animation)
-        cp_menu.addAction(QtGui.QIcon(media.paste_animation_image), "Paste To", lambda: keyTools.paste_animation_to())
-        cp_menu.addSeparator()
-        cp_menu.addAction(QtGui.QIcon(media.copy_pose_image), "Copy Pose", keyTools.copy_pose)
-        cp_menu.addAction(QtGui.QIcon(media.paste_pose_image), "Paste Pose", keyTools.paste_pose)
-        cp_menu.addSeparator()
-        cp_menu.addAction(
-            QtGui.QIcon(media.help_menu_image),
-            "Help",
-            lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-paste-animation"),
-        )
-
-        copy_paste_animation_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        copy_paste_animation_button_widget.customContextMenuRequested.connect(
-            lambda pos: cp_menu.exec_(copy_paste_animation_button_widget.mapToGlobal(pos))
-        )
-
         # Select hierarchy -----------------------------------------------------------------------
         select_hierarchy_button_widget = cw.QFlatToolButton(icon=media.select_hierarchy_image, tooltip=helper.select_hierarchy_tooltip_text)
         select_hierarchy_button_widget.clicked.connect(bar.selectHierarchy)
@@ -3026,28 +3146,28 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         animation_offset_button_widget.clicked.connect(self.toggleAnimOffsetButton)
         sec.addWidget(animation_offset_button_widget, "Anim Offset", "anim_offset")
 
-        # FollowCam------------------------------------------------------------------------------
         create_follow_cam_button_widget = cw.QFlatToolButton(icon=media.follow_cam_image, tooltip=helper.follow_cam_tooltip_text)
         create_follow_cam_button_widget.clicked.connect(lambda *args: bar.create_follow_cam(translation=True, rotation=True))
-        sec.addWidget(create_follow_cam_button_widget, "Follow Cam", "follow_cam")
-
-        follow_cam_menu = QtWidgets.QMenu(create_follow_cam_button_widget)
-        follow_cam_menu.addAction(
-            QtGui.QIcon(media.follow_cam_image),
-            "Follow only Translation",
-            lambda *args: bar.create_follow_cam(translation=True, rotation=False),
-        )
-        follow_cam_menu.addAction(
-            QtGui.QIcon(media.follow_cam_image),
-            "Follow only Rotation",
-            lambda *args: bar.create_follow_cam(translation=False, rotation=True),
-        )
-        follow_cam_menu.addSeparator()
-        follow_cam_menu.addAction(QtGui.QIcon(media.remove_followCam), "Remove followCam", bar.remove_followCam)
-
-        create_follow_cam_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        create_follow_cam_button_widget.customContextMenuRequested.connect(
-            lambda pos: follow_cam_menu.exec_(create_follow_cam_button_widget.mapToGlobal(pos))
+        sec.addWidgetGroup(
+            create_follow_cam_button_widget,
+            "Follow Cam",
+            "follow_cam",
+            widgets=[
+                {
+                    "key": "fcam_trans_only",
+                    "label": "Follow only Translation",
+                    "icon_path": media.follow_cam_image,
+                    "callback": lambda: bar.create_follow_cam(translation=True, rotation=False),
+                },
+                {
+                    "key": "fcam_rot_only",
+                    "label": "Follow only Rotation",
+                    "icon_path": media.follow_cam_image,
+                    "callback": lambda: bar.create_follow_cam(translation=False, rotation=True),
+                },
+                "separator",
+                {"key": "fcam_remove", "label": "Remove followCam", "icon_path": media.remove_followCam, "callback": bar.remove_followCam},
+            ],
         )
 
         # Copy Link -----------------------------------------------------------------------
@@ -3056,10 +3176,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.link_obj_image_timer = False
         self.link_obj_thread = None
         self.link_obj_toggle_state = False
-
-        link_objects_button_widget = cw.QFlatToolButton(icon=media.link_objects_image, tooltip=helper.link_objects_tooltip_text)
-        link_objects_button_widget.clicked.connect(keyTools.mod_link_objects)
-        sec.addWidget(link_objects_button_widget, "Link Objects", "link_objects")
 
         # ------funciones para crear el flashing icon al crear el auto-link callback
 
@@ -3100,7 +3216,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             link_objects_button_widget.setIcon(QtGui.QIcon(media.link_objects_image))
 
         def toggle_auto_link_callback(*args):
-            self.link_checkbox_state = not self.link_checkbox_state
+            # If toggle_auto_link_callback is called from the menu, it should toggle the state.
+            # If called from initialize_on_startup, it should just set it up based on current state.
+            if args and isinstance(args[0], bool):
+                # menu triggered
+                self.link_checkbox_state = args[0]
+            else:
+                # manual call or no-arg (we don't want to toggle if it's already set)
+                pass
+
             settings.set_setting("link_checkbox_state", self.link_checkbox_state)
 
             if self.link_checkbox_state:
@@ -3108,69 +3232,114 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             else:
                 remove_link_objects_callback()
 
-            action_auto_link.setChecked(self.link_checkbox_state)
+        link_objects_button_widget = cw.QFlatToolButton(icon=media.link_objects_image, tooltip=helper.link_objects_tooltip_text)
+        link_objects_button_widget.clicked.connect(keyTools.mod_link_objects)
 
-        link_objects_menu = QtWidgets.QMenu(link_objects_button_widget)
-        link_objects_menu.addAction(QtGui.QIcon(media.link_objects_image), "Copy Link Position", keyTools.copy_link)
-        link_objects_menu.addAction(QtGui.QIcon(media.link_objects_image), "Paste Link Position", keyTools.paste_link)
-        link_objects_menu.addSeparator()
-        action_auto_link = link_objects_menu.addAction("Auto-link")
-        action_auto_link.setCheckable(True)
-        action_auto_link.setChecked(self.link_checkbox_state)
-        action_auto_link.triggered.connect(toggle_auto_link_callback)
+        # Initialize on startup
+        if self.link_checkbox_state:
+            add_link_objects_callback()
 
-        link_objects_menu.addSeparator()
-        link_objects_menu.addAction(
-            QtGui.QIcon(media.help_menu_image),
-            "Help",
-            lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/link-objects"),
-        )
-
-        link_objects_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        link_objects_button_widget.customContextMenuRequested.connect(
-            lambda pos: link_objects_menu.exec_(link_objects_button_widget.mapToGlobal(pos))
+        sec.addWidgetGroup(
+            link_objects_button_widget,
+            "Link Objects",
+            "link_objects",
+            widgets=[
+                {"key": "link_copy", "label": "Copy Link Position", "icon_path": media.link_objects_image, "callback": keyTools.copy_link},
+                {"key": "link_paste", "label": "Paste Link Position", "icon_path": media.link_objects_image, "callback": keyTools.paste_link},
+                "separator",
+                {
+                    "key": "link_autolink",
+                    "label": "Auto-link",
+                    "icon_path": media.link_objects_image,
+                    "callback": toggle_auto_link_callback,
+                    "checkable": True,
+                    "is_checked_fn": lambda: self.link_checkbox_state,
+                },
+                "separator",
+                {
+                    "key": "link_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/link-objects"),
+                    "pinnable": False,
+                },
+            ],
         )
 
         # Copy WorldSpace ----------------------------------------------------------------------------
         copy_worldspace_button_widget = cw.QFlatToolButton(icon=media.copy_worldspace_animation_image, tooltip=helper.copy_worldspace_tooltip_text)
         copy_worldspace_button_widget.clicked.connect(bar.mod_copy_worldspace_animation)
-        sec.addWidget(copy_worldspace_button_widget, "Worldspace", "worldspace")
-
-        ws_menu = QtWidgets.QMenu(copy_worldspace_button_widget)
-        ws_menu.addAction(QtGui.QIcon(media.copy_worldspace_animation_image), "Copy Worldspace - All Animation", bar.color_copy_worldspace_animation)
-        ws_menu.addAction(QtGui.QIcon(media.copy_worldspace_animation_image), "Copy Worldspace - Selected Range", bar.copy_range_worldspace_animation)
-        ws_menu.addAction(QtGui.QIcon(media.paste_worldspace_animation_image), "Paste Worldspace", bar.color_paste_worldspace_animation)
-        ws_menu.addSeparator()
-        ws_menu.addAction(
-            QtGui.QIcon(media.copy_worldspace_frame_animation_image), "Copy Worldspace - Current Frame", bar.copy_worldspace_single_frame
+        sec.addWidgetGroup(
+            copy_worldspace_button_widget,
+            "Worldspace",
+            "worldspace",
+            widgets=[
+                {
+                    "key": "ws_copy_all",
+                    "label": "Copy Worldspace - All Animation",
+                    "icon_path": media.copy_worldspace_animation_image,
+                    "callback": bar.color_copy_worldspace_animation,
+                },
+                {
+                    "key": "ws_copy_range",
+                    "label": "Copy Worldspace - Selected Range",
+                    "icon_path": media.copy_worldspace_animation_image,
+                    "callback": bar.copy_range_worldspace_animation,
+                },
+                {
+                    "key": "ws_paste",
+                    "label": "Paste Worldspace",
+                    "icon_path": media.paste_worldspace_animation_image,
+                    "callback": bar.color_paste_worldspace_animation,
+                },
+                "separator",
+                {
+                    "key": "ws_copy_frame",
+                    "label": "Copy Worldspace - Current Frame",
+                    "icon_path": media.copy_worldspace_frame_animation_image,
+                    "callback": bar.copy_worldspace_single_frame,
+                },
+                {
+                    "key": "ws_paste_frame",
+                    "label": "Paste Worldspace - Current Frame",
+                    "icon_path": media.paste_worldspace_frame_animation_image,
+                    "callback": bar.paste_worldspace_single_frame,
+                },
+                "separator",
+                {
+                    "key": "ws_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-worldspace"),
+                    "pinnable": False,
+                },
+            ],
         )
-        ws_menu.addAction(QtGui.QIcon(media.paste_worldspace_frame_animation_image), "Paste Worldspace", bar.paste_worldspace_single_frame)
-        ws_menu.addSeparator()
-        ws_menu.addAction(
-            QtGui.QIcon(media.help_menu_image),
-            "Help",
-            lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-worldspace"),
-        )
-
-        copy_worldspace_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        copy_worldspace_button_widget.customContextMenuRequested.connect(lambda pos: ws_menu.exec_(copy_worldspace_button_widget.mapToGlobal(pos)))
 
         # Temp Pivot ----------------------------------------------------------------------------
         temp_pivot_button_widget = cw.QFlatToolButton(icon=media.temp_pivot_image, tooltip=helper.temp_pivot_tooltip_text)
         temp_pivot_button_widget.clicked.connect(lambda *args: bar.create_temp_pivot(False))
-        sec.addWidget(temp_pivot_button_widget, "Temp Pivot", "temp_pivot")
-
-        tp_menu = QtWidgets.QMenu(temp_pivot_button_widget)
-        tp_menu.addAction(QtGui.QIcon(media.temp_pivot_image), "Last pivot used", lambda *args: bar.create_temp_pivot(True))
-        tp_menu.addSeparator()
-        tp_menu.addAction(
-            QtGui.QIcon(media.help_menu_image),
-            "Help",
-            lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/temp-pivots"),
+        sec.addWidgetGroup(
+            temp_pivot_button_widget,
+            "Temp Pivot",
+            "temp_pivot",
+            widgets=[
+                {
+                    "key": "tp_last_used",
+                    "label": "Last pivot used",
+                    "icon_path": media.temp_pivot_image,
+                    "callback": lambda: bar.create_temp_pivot(True),
+                },
+                "separator",
+                {
+                    "key": "tp_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/temp-pivots"),
+                    "pinnable": False,
+                },
+            ],
         )
-
-        temp_pivot_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        temp_pivot_button_widget.customContextMenuRequested.connect(lambda pos: tp_menu.exec_(temp_pivot_button_widget.mapToGlobal(pos)))
 
         # Micro Move ----------------------------------------------------------------------------
         micro_move_button_widget = cw.QFlatToolButton(icon=media.ruler_image, tooltip=helper.micro_move_tooltip_text)
@@ -3181,17 +3350,17 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Key Menu -------------------------------------------------------------------------------
         block_keys_button_widget = cw.QFlatToolButton(icon=media.reblock_keys_image, tooltip=helper.block_keys_tooltip_text)
         block_keys_button_widget.clicked.connect(keyTools.share_keys)
-        sec.addWidget(block_keys_button_widget, "Block Keys", "block_keys")
-
-        block_keys_menu = QtWidgets.QMenu(block_keys_button_widget)
-        block_keys_menu.addAction(QtGui.QIcon(media.reblock_keys_image), "reBlock", keyTools.reblock_move)
-        block_keys_menu.addAction(QtGui.QIcon(media.reblock_keys_image), "Share Keys", keyTools.share_keys)
-        block_keys_menu.addAction(QtGui.QIcon(media.reblock_keys_image), "Bake Anim", keyTools.bake_anim_window)
-        block_keys_menu.addAction(QtGui.QIcon(media.reblock_keys_image), "ToolBox Orbit", lambda: ui.orbit_window(0, 0))
-        block_keys_menu.addAction(QtGui.QIcon(media.reblock_keys_image), "Gimbal Fixer", bar.gimbal_fixer_window)
-
-        block_keys_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        block_keys_button_widget.customContextMenuRequested.connect(lambda pos: block_keys_menu.exec_(block_keys_button_widget.mapToGlobal(pos)))
+        sec.addWidgetGroup(
+            block_keys_button_widget,
+            "Block Keys",
+            "block_keys",
+            widgets=[
+                {"key": "bk_reblock", "label": "reBlock", "icon_path": media.reblock_keys_image, "callback": keyTools.reblock_move},
+                {"key": "bk_bake_anim", "label": "Bake Anim", "icon_path": media.reblock_keys_image, "callback": keyTools.bake_anim_window},
+                {"key": "bk_orbit", "label": "ToolBox Orbit", "icon_path": media.reblock_keys_image, "callback": lambda: ui.orbit_window(0, 0)},
+                {"key": "bk_gimbal", "label": "Gimbal Fixer", "icon_path": media.reblock_keys_image, "callback": bar.gimbal_fixer_window},
+            ],
+        )
 
         sec = new_section()
 
@@ -3430,7 +3599,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 return getattr(helper, attr_name, "")
 
             buttons_and_tooltips = [
-                (pointer_button_widget, get_safe_helper("pointer_tooltip_text")),
+                (pointer_select_rig_widget, get_safe_helper("select_rig_controls_tooltip_text")),
                 (isolate_button_widget, get_safe_helper("isolate_tooltip_text")),
                 (block_keys_button_widget, get_safe_helper("block_keys_tooltip_text")),
                 (createLocator_button_widget, get_safe_helper("createLocator_tooltip_text")),
@@ -3441,7 +3610,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 (select_opposite_button_widget, get_safe_helper("select_opposite_tooltip_text")),
                 (copy_opposite_button_widget, get_safe_helper("copy_opposite_tooltip_text")),
                 (mirror_button_widget, get_safe_helper("mirror_tooltip_text")),
-                (copy_paste_animation_button_widget, get_safe_helper("copy_paste_animation_tooltip_text")),
+                (copy_animation_button_widget, get_safe_helper("copy_animation_tooltip_text")),
                 (selector_button_widget, get_safe_helper("selector_tooltip_text")),
                 (select_hierarchy_button_widget, get_safe_helper("select_hierarchy_tooltip_text")),
                 (animation_offset_button_widget, get_safe_helper("animation_offset_tooltip_text")),

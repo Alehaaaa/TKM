@@ -133,10 +133,10 @@ def get_set_default_data_folder():
 
 
 # COPY PASTE ANIMATION ___________________
-def get_copy_paste_animation_file():
-    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_paste_animation")
-    copy_paste_animation_file_path = os.path.join(cache_folder, "copy_paste_animation_data.json")
-    return copy_paste_animation_file_path
+def get_copy_animation_file():
+    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_animation")
+    copy_animation_file_path = os.path.join(cache_folder, "copy_animation_data.json")
+    return copy_animation_file_path
 
 
 # COPY PASTE POSE ___________________

@@ -47,6 +47,7 @@ import functools
 
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.generalMod as general
+import TheKeyMachine.widgets.customDialogs as customDialogs
 
 
 python_version = f"{sys.version_info.major}{sys.version_info.minor}"
@@ -383,10 +384,8 @@ def get_root_node(node, down_one_level=False):
 
 
 def isolate_master():
-    global down_one_level_var
+    # Use the global state for down_one_level
     down_one_level = down_one_level_var
-
-    down_one_level = cmds.menuItem("down_level_checkbox", query=True, checkBox=True)
 
     # Guardar la selección actual
     current_selection = cmds.ls(selection=True)
@@ -1358,21 +1357,18 @@ def remove_followCam(*args):
 
 
 def selector_window(*args):
-    window_name = "selectedObjectsWindow"
-    if cmds.window(window_name, exists=True):
-        cmds.deleteUI(window_name)
+    # Search for an existing instance of the selector window
+    for widget in QtWidgets.QApplication.topLevelWidgets():
+        if isinstance(widget, customDialogs.QFlatSelectorDialog):
+            widget.show()
+            widget.raise_()
+            widget.activateWindow()
+            widget.reload_objects()
+            return
 
-    if cmds.button("selector_button", q=True, label=True) == "0":
-        return
-
-    window = cmds.window(window_name, title="Selector", widthHeight=(230, 365), sizeable=False)
-    cmds.columnLayout(adjustableColumn=True)
-
-    object_list = cmds.textScrollList(nr=30, allowMultiSelection=True, width=100, height=332)
-    reload_button = cmds.button(label="Reload", width=100, height=30, command=functools.partial(reload_selected_objects, object_list))
-    cmds.textScrollList(object_list, edit=True, sc=functools.partial(select_objects_from_list, object_list))
-    reload_selected_objects(object_list)
-    cmds.showWindow(window)
+    # If no instance exists, create a new one
+    dlg = customDialogs.QFlatSelectorDialog()
+    dlg.show()
 
 
 def select_objects_from_list(list_name, *args):

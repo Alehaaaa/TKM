@@ -740,3 +740,99 @@ class QFlatTooltipConfirm(QFlatDialog):
         if buttons is None:
             buttons = [cls.Ok]
         return cls._run(anchor_widget, title=title, message=message, buttons=buttons, **kwargs)
+
+class QFlatSelectorDialog(QFlatDialog):
+    """
+    A modern successor to the Maya textScrollList selector.
+    Displays a list of currently selected objects, allowing for quick 
+    re-selection and focus.
+    """
+    
+    def __init__(self, title="Selector", parent=None):
+        super().__init__(parent=parent)
+        self.setWindowTitle(title or "Selector")
+        self.setMinimumWidth(DPI(230))
+        self.setMinimumHeight(DPI(380))
+        
+        # UI Setup
+        content_widget = QtWidgets.QWidget()
+        self.root_layout.addWidget(content_widget)
+        
+        layout = QtWidgets.QVBoxLayout(content_widget)
+        layout.setContentsMargins(DPI(12), DPI(12), DPI(12), DPI(6))
+        layout.setSpacing(DPI(8))
+        
+        self.list_widget = QtWidgets.QListWidget()
+        self.list_widget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.list_widget.setStyleSheet("""
+            QListWidget {
+                background-color: #2b2b2b;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                color: #bbbbbb;
+                padding: 1px;
+                font-size: %spx;
+            }
+            QListWidget::item {
+                padding: 6px 8px;
+                border-bottom: 1px solid #333333;
+            }
+            QListWidget::item:selected {
+                background-color: #444444;
+                color: #ffffff;
+                border: none;
+            }
+            QListWidget::item:hover {
+                background-color: #383838;
+            }
+        """ % int(DPI(11)))
+        
+        # Add reload button
+        self.reload_btn = QFlatButton(
+            "Reload from Selection", 
+            icon_path=return_icon_path("refresh"),
+            background="#444444"
+        )
+        self.reload_btn.clicked.connect(self.reload_objects)
+        
+        layout.addWidget(self.list_widget)
+        layout.addWidget(self.reload_btn)
+        
+        # Add basic close button in bottom bar
+        self.setBottomBar([self.Close], closeButton=True)
+        
+        # Connections
+        self.list_widget.itemSelectionChanged.connect(self._on_list_selection_changed)
+        
+        # Initial fill
+        self.reload_objects()
+
+    def reload_objects(self):
+        """Fills the list with current selection names."""
+        import maya.cmds as cmds
+        
+        self.list_widget.blockSignals(True)
+        self.list_widget.clear()
+        
+        # Get active selection names
+        selected = cmds.ls(selection=True) or []
+        for obj in sorted(selected):
+            item = QtWidgets.QListWidgetItem(obj)
+            self.list_widget.addItem(item)
+            
+        self.list_widget.blockSignals(False)
+
+    def _on_list_selection_changed(self):
+        """Syncs the dialog selection back to the Maya scene."""
+        import maya.cmds as cmds
+        
+        # Get texts from selected items
+        names = [item.text() for item in self.list_widget.selectedItems()]
+        
+        if names:
+            # Filter names to ensure they still exist in Maya
+            valid_names = [n for n in names if cmds.objExists(n)]
+            if valid_names:
+                cmds.select(valid_names, replace=True)
+            else:
+                self.reload_objects() # Refresh if objects were deleted
