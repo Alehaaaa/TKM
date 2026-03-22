@@ -444,10 +444,8 @@ class QFlatSpinBox(QtWidgets.QSpinBox):
     def on_added_to_section(self, section, key):
         """Automatically called when the widget is added to a QFlatSectionWidget."""
         self._persistence_key = f"spinbox_{key}"
-        # Load value from persistent settings
         saved_val = settings.get_setting(self._persistence_key, self.value())
         self.setValue(saved_val)
-        # Link value changes to persistence
         self.valueChanged.connect(self._save_value)
 
     def _save_value(self, val):

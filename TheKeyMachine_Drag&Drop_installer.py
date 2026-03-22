@@ -1,66 +1,53 @@
+"""
 
-'''
-
-    TheKeyMachine - Animation Toolset for Maya Animators                                           
-                                                                                                                                              
-                                                                                                                                              
-    This file is part of TheKeyMachine an open source software for Autodesk Maya, licensed under the GNU General Public License v3.0 (GPL-3.0).                                           
-    You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.                                              
-    By using this code, you agree to keep it open source and share any modifications.                                                          
-    This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html            
-                                                                                                                                              
-                                                                                                                                              
-    Developed by: Rodrigo Torres / rodritorres.com                                                                                             
-                                                                                                                                             
+TheKeyMachine - Animation Toolset for Maya Animators
 
 
-'''
+This file is part of TheKeyMachine an open source software for Autodesk Maya, licensed under the GNU General Public License v3.0 (GPL-3.0).
+You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.
+By using this code, you agree to keep it open source and share any modifications.
+This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
 
 
+Developed by: Rodrigo Torres / rodritorres.com
+
+
+
+"""
 
 import sys
 import os
 import platform
 import shutil
-import logging
-from functools import partial
 
 import maya.cmds as cmds
-import maya.mel as mel
 import maya.utils as utils
 import maya.OpenMayaUI as omui
 
 try:
     from shiboken2 import wrapInstance
-    from PySide2 import QtWidgets
-    from PySide2.QtWidgets import QApplication, QDesktopWidget
-    from PySide2.QtCore import *
-    from PySide2.QtGui import *
-    from PySide2.QtWidgets import *
-    from PySide2.QtCore import QTimer
+    from PySide2 import QtWidgets, QtCore, QtGui
 except ImportError:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
-    from PySide6.QtWidgets import QApplication
-    from PySide6.QtCore import QTimer
-    from PySide6.QtCore import *
-    from PySide6.QtGui import *
-    from PySide6.QtWidgets import *
 
+__version__ = "0.1.73"
+__stage__ = "beta"
+__build__ = "311"
+__codename__ = "Iced Coffee"
 
-
-
-TKM_VERSION = "Beta 0.1.4 / Build 306"
+TKM_VERSION = f"{__version__} {__stage__} {__build__} {__codename__}"
 
 
 def get_screen_resolution():
-    app = QApplication.instance()
+    app = QtWidgets.QApplication.instance()
     if not app:
-        app = QApplication([])
+        app = QtWidgets.QApplication([])
 
     try:
         # PySide2
         from PySide2.QtGui import QDesktopWidget
+
         desktop = QDesktopWidget()
         screen_rect = desktop.screenGeometry()
     except ImportError:
@@ -70,7 +57,7 @@ def get_screen_resolution():
 
     screen_width = screen_rect.width()
     screen_height = screen_rect.height()
-    
+
     return screen_width, screen_height
 
 
@@ -78,14 +65,14 @@ def get_screen_resolution():
 #     version_maya = cmds.about(version=True)
 #     user_dir = cmds.internalVar(userAppDir=True)
 #     maya_dir = os.path.join(user_dir, version_maya)
-    
+
 #     env_file_path = os.path.join(maya_dir, "Maya.env")
-    
+
 #     user_app_folder = cmds.internalVar(userAppDir=True)
 #     tkm_img_folder = os.path.join(user_app_folder, "scripts/TheKeyMachine/data/img")
-    
+
 #     new_line = f"\n# THIS LINE IS HERE FOR UNINSTALLING PURPOSES, PLEASE DO NOT TOUCH. START OF THEKEYMACHINE CODE\nXBMLANGPATH = {tkm_img_folder};%XBMLANGPATH%\n# END OF THEKEYMACHINE CODE\n"
-    
+
 #     if platform.system() != 'Windows':
 #         new_line = f"\n# THIS LINE IS HERE FOR UNINSTALLING PURPOSES, PLEASE DO NOT TOUCH. START OF THEKEYMACHINE CODE\nXBMLANGPATH = {tkm_img_folder}:$XBMLANGPATH\n# END OF THEKEYMACHINE CODE\n"
 
@@ -97,29 +84,17 @@ def get_screen_resolution():
 #             file.write(new_line)
 
 
-
-
 def onMayaDroppedPythonFile(*args):
-    QApplication.processEvents()
+    QtWidgets.QApplication.processEvents()
     utils.executeDeferred(TheKeyMachine_installer)
 
-def install(button, checkbox, tkm_version, window):
+
+def install(button, tkm_version, window):
     screen_width, screen_height = get_screen_resolution()
     screen_width = screen_width
 
-    if not checkbox.isChecked():
-        msg_box = QtWidgets.QMessageBox()
-        msg_box.setWindowTitle("License Agreement")
-        msg_box.setText("You must accept the license agreement.")
-        msg_box.setIcon(QtWidgets.QMessageBox.Warning)
-        ok_button = msg_box.addButton('OK', QtWidgets.QMessageBox.AcceptRole)
-        ok_button.setMinimumHeight(30)
-        ok_button.setMinimumWidth(80)
-        msg_box.exec()
-        return
-
     current_dir = os.path.dirname(__file__)
-    source_dir = os.path.join(current_dir, 'TheKeyMachine')
+    source_dir = os.path.join(current_dir, "TheKeyMachine")
 
     user_dir = cmds.internalVar(userAppDir=True)
     destination_dir = os.path.join(user_dir, "scripts", "TheKeyMachine")
@@ -137,7 +112,7 @@ def install(button, checkbox, tkm_version, window):
             msg_box.setWindowTitle("Installation Warning")
             msg_box.setText("TheKeyMachine folder already exists in the scripts directory. Please remove it before proceeding with the installation.")
             msg_box.setIcon(QtWidgets.QMessageBox.Warning)
-            ok_button = msg_box.addButton('OK', QtWidgets.QMessageBox.AcceptRole)
+            ok_button = msg_box.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
             ok_button.setMinimumHeight(30)
             ok_button.setMinimumWidth(80)
             msg_box.exec()
@@ -146,33 +121,35 @@ def install(button, checkbox, tkm_version, window):
     try:
         shutil.copytree(source_dir, destination_dir)
     except Exception as e:
-        QtWidgets.QMessageBox.critical(
-            button, "Installation Error", f"An error occurred while copying files: {str(e)}")
+        QtWidgets.QMessageBox.critical(button, "Installation Error", f"An error occurred while copying files: {str(e)}")
         return
 
     # update_maya_env() # No need as images are referenced as filepath
 
     tkm_version.setText("<p style='color: #b9e861;'>Installation completed</p>")
-    tkm_version.setGeometry(222, 190, 250, 20) 
+    tkm_version.setGeometry(222, 190, 250, 20)
 
     if screen_width == 3840:
-        tkm_version.setGeometry(320, 190, 250, 20) 
+        tkm_version.setGeometry(320, 190, 250, 20)
 
-    QTimer.singleShot(1600, window.close)
-    QTimer.singleShot(1700, load_ui)
+    QtCore.QTimer.singleShot(1600, window.close)
+    QtCore.QTimer.singleShot(1700, load_ui)
 
 
 def load_ui():
 
     import importlib
     import TheKeyMachine.core.toolbar
+
     TheKeyMachine.core.toolbar.tb.create_shelf_icon()
     importlib.reload(TheKeyMachine.core.toolbar)
     TheKeyMachine.core.toolbar.tb.startUI()
 
+
 def maya_main_window():
     main_window_ptr = omui.MQtUtil.mainWindow()
     return wrapInstance(int(main_window_ptr), QtWidgets.QWidget)
+
 
 def TheKeyMachine_installer():
     screen_width, screen_height = get_screen_resolution()
@@ -180,16 +157,15 @@ def TheKeyMachine_installer():
 
     os_platform = platform.system()
     python_version = f"{sys.version_info.major}{sys.version_info.minor}"
-    supported_os = ['Windows', 'Linux', 'Darwin']
-    supported_python_versions = ['37', '39', '310', '311']
+    supported_os = ["Windows", "Linux", "Darwin"]
+    supported_python_versions = ["37", "39", "310", "311"]
 
     if os_platform in supported_os and python_version in supported_python_versions:
-
         global TKM_VERSION
 
         try:
             cmds.deleteUI("TheKeyMachineInstaller", window=True)
-        except:
+        except RuntimeError:
             pass
 
         parent = maya_main_window()
@@ -209,32 +185,34 @@ def TheKeyMachine_installer():
 
         window.move(center_x, center_y)
 
-        image_path = os.path.join(os.path.dirname(__file__), 'TheKeyMachine', 'data', 'img', 'TheKeyMachine_logo_250.png')
-        image_label = QLabel(window)
-        pixmap = QPixmap(image_path)
+        image_path = os.path.join(os.path.dirname(__file__), "TheKeyMachine", "data", "img", "TheKeyMachine_logo_250.png")
+        image_label = QtWidgets.QLabel(window)
+        pixmap = QtGui.QPixmap(image_path)
         image_label.setPixmap(pixmap)
         image_label.setGeometry(150, 1, 250, 200)
 
-        label_below_image = QLabel("Animation toolset for Maya Animators", window)
+        label_below_image = QtWidgets.QLabel("Animation toolset for Maya Animators", window)
         label_below_image.setGeometry(175, 152, 250, 20)
 
-        tkm_version = QLabel(TKM_VERSION, window)
+        tkm_version = QtWidgets.QLabel(TKM_VERSION, window)
         tkm_version.setGeometry(220, 190, 250, 20)
 
-        text_label = QLabel(window)
+        text_label = QtWidgets.QLabel(window)
         text_label.setGeometry(40, 230, 480, 100)
-        text_label.setText("This script will install TheKeyMachine on your computer. "
-                           "Please note that this is a beta version, so there may be errors and even Maya crashes. "
-                           "By installing this software, you agree to abide by the terms and conditions of the license agreement "
-                           "and the Privacy Policy. Please read both agreements carefully before proceeding.")
+        text_label.setText(
+            "This script will install TheKeyMachine on your computer. "
+            "Please note that this is a beta version, so there may be errors and even Maya crashes. "
+            "By installing this software, you agree to abide by the terms and conditions of the license agreement "
+            "and the Privacy Policy. Please read both agreements carefully before proceeding."
+        )
 
         text_label.setWordWrap(True)
-        text_label.setAlignment(Qt.AlignLeft)
+        text_label.setAlignment(QtCore.Qt.AlignLeft)
 
-        license_text = QTextEdit(window)
+        license_text = QtWidgets.QTextEdit(window)
         license_text.setGeometry(35, 320, 480, 150)
 
-        license_text_code = '''
+        license_text_code = """
         By using this software, you agree to be bound by the following terms and conditions based on the GNU General Public License (GPL) version 3.0:<br><br>
 
         <b>1. Freedom to Use:</b><br>
@@ -262,18 +240,17 @@ def TheKeyMachine_installer():
         In case of legal disputes, the GPL allows users to bring issues to courts under the jurisdiction of their local legal system. For further information, consult the full GPL 3.0 license.<br><br>
 
         By using or distributing this software, you acknowledge that you have read, understood, and agree to be bound by the terms and conditions of the GPL 3.0 license.
-        '''
-
+        """
 
         license_text.setHtml(license_text_code)
         license_text.setReadOnly(True)
-        license_text.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        license_text.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
-        license_checkbox = QCheckBox("I accept the terms and conditions of the license agreement and the Privacy Policy", window)
+        license_checkbox = QtWidgets.QCheckBox("I accept the terms and conditions of the license agreement and the Privacy Policy", window)
         license_checkbox.setGeometry(35, 500, 480, 30)
 
         button = QtWidgets.QPushButton("Install TheKeyMachine", window)
-        button.setStyleSheet('''
+        button.setStyleSheet("""
             QPushButton {
                 color: #ccc;
                 background-color: #5d5d5d;
@@ -282,13 +259,19 @@ def TheKeyMachine_installer():
             }
             QPushButton:hover:!pressed {
                 color: #ccc;
-                background-color: #7a7a7a;
+                background-color: #757575;
                 border-radius: 5px;
                 font: 12px;
             }
-        ''')
+            QPushButton:disabled {
+                background-color: #3d3d3d;
+                color: #8a8a8a;
+            }
+        """)
         button.setGeometry(35, 540, 480, 40)
-        button.clicked.connect(lambda: install(button, license_checkbox, tkm_version, window))
+        button.clicked.connect(lambda: install(button, tkm_version, window))
+        button.setEnabled(False)
+        license_checkbox.clicked.connect(lambda: button.setEnabled(license_checkbox.isChecked()))
 
         if screen_width == 3840:
             window.setFixedSize(800, 900)
@@ -300,7 +283,7 @@ def TheKeyMachine_installer():
             license_checkbox.setGeometry(35, 700, 750, 80)
             button.setGeometry(35, 800, 730, 60)
 
-            button.setStyleSheet('''
+            button.setStyleSheet("""
                 QPushButton {
                     color: #ccc;
                     background-color: #5d5d5d;
@@ -313,14 +296,13 @@ def TheKeyMachine_installer():
                     border-radius: 5px;
                     font: 18px;
                 }
-            ''')
-
+            """)
 
         window.show()
     else:
-        cmds.confirmDialog(title='Error',
-                           message='Oh no! Unfortunately, you are using an incompatible version of Maya or operating system. TheKeyMachine is only available for Maya 2022, 2023, 2024 on Linux, Windows and MacOS.',
-                           button=['Ok'],
-                           defaultButton='Ok')
-
-TheKeyMachine_installer()
+        cmds.confirmDialog(
+            title="Error",
+            message="Oh no! Unfortunately, you are using an incompatible version of Maya or operating system. TheKeyMachine is only available for Maya 2022, 2023, 2024 on Linux, Windows and MacOS.",
+            button=["Ok"],
+            defaultButton="Ok",
+        )
