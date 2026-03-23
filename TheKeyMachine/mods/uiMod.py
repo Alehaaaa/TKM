@@ -23,7 +23,7 @@ import maya.OpenMayaUI as mui
 
 try:
     from shiboken2 import wrapInstance
-    from PySide2.QtWidgets import QApplication, QDesktopWidget
+    from PySide2.QtWidgets import QDesktopWidget
     from PySide2.QtWidgets import QAction
 
     from PySide2 import QtCore, QtGui, QtWidgets
@@ -152,9 +152,9 @@ def getUiName():
 
 
 def get_screen_resolution():
-    app = QApplication.instance()
+    app = QtWidgets.QApplication.instance()
     if not app:
-        app = QApplication([])
+        app = QtWidgets.QApplication([])
 
     try:
         # PySide6
@@ -745,11 +745,6 @@ def orbit_window(*args, offset_x=0, offset_y=0):
     window.show()
 
 
-def orbit_window_close():
-    if cmds.window("orbit_window", exists=True):
-        cmds.deleteUI("orbit_window")
-
-
 # ________________________________________________ Donate window  ______________________________________________________ #
 
 
@@ -788,92 +783,7 @@ def donate_window():
 
 
 def about_window():
-    TheKeyMachine_stage_version = general.get_thekeymachine_stage_version()
-    TheKeyMachine_version = general.get_thekeymachine_version()
-    TheKeyMachine_build_version = general.get_thekeymachine_build_version()
-    TheKeyMachine_codename = general.get_thekeymachine_codename()
-
-    class TKMAboutDialog(customDialogs.QFlatDialog):
-        def __init__(self, parent=None):
-            customDialogs.QFlatDialog.__init__(self, parent)
-            self.setWindowTitle("About TheKeyMachine")
-
-            content_widget = QtWidgets.QWidget()
-            content_layout = QtWidgets.QVBoxLayout(content_widget)
-            content_layout.setContentsMargins(wutil.DPI(20), wutil.DPI(20), wutil.DPI(20), 0)
-            content_layout.setSpacing(wutil.DPI(12))
-
-            # Logo
-            logo_label = QtWidgets.QLabel()
-            logo_label.setAlignment(QtCore.Qt.AlignCenter)
-            logo_pixmap = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_250.png"))
-            logo_label.setPixmap(logo_pixmap)
-            content_layout.addWidget(logo_label)
-
-            # Tool Name & Title
-            tool_name = QtWidgets.QLabel("Animation toolset for Maya Animators")
-            tool_name.setAlignment(QtCore.Qt.AlignCenter)
-            tool_name.setStyleSheet("font-size: %spx; font-weight: bold; color: #ececec;" % wutil.DPI(16))
-            content_layout.addWidget(tool_name)
-
-            # Version Badge
-            version_btn = QtWidgets.QPushButton(f"v{TheKeyMachine_version} {TheKeyMachine_stage_version}")
-            version_btn.setCursor(QtCore.Qt.PointingHandCursor)
-            version_btn.setStyleSheet(
-                """
-                QPushButton {
-                    background-color: rgba(76, 175, 80, 0.15);
-                    border: 1px solid #4CAF50;
-                    color: #81C784;
-                    border-radius: %spx;
-                    padding: %spx %spx;
-                    font-size: %spx;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #4CAF50;
-                    color: white;
-                }
-                """
-                % (wutil.DPI(4), wutil.DPI(4), wutil.DPI(8), wutil.DPI(12))
-            )
-
-            def _check_updates():
-                updater.check_for_updates(force=True)
-
-            version_btn.clicked.connect(_check_updates)
-            content_layout.addWidget(version_btn, alignment=QtCore.Qt.AlignCenter)
-
-            build_label = QtWidgets.QLabel(f"Build: {TheKeyMachine_build_version} | {TheKeyMachine_codename}")
-            build_label.setAlignment(QtCore.Qt.AlignCenter)
-            build_label.setStyleSheet("font-size: %spx; color: #888888;" % wutil.DPI(11))
-            content_layout.addWidget(build_label)
-
-            info_text = """
-                <div style='text-align: center; color: #888888; font-size: %spx;'>
-                    <p>This tool is licensed under the <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color: #67b9e0; text-decoration: none;'>GNU GPL 3.0</a>.</p>
-                    <div style='margin-top: 10px;'>
-                        Developed by <a href='http://rodritorres.com' style='color: #67b9e0; text-decoration: none;'>Rodrigo Torres</a>
-                    </div>
-                    <div style='margin-top: 5px;'>
-                        Modified by <a href='http://alehaaaa.github.io' style='color: #67b9e0; text-decoration: none;'>Alehaaaa</a>
-                    </div>
-                </div>
-            """ % (wutil.DPI(11))
-
-            info_label = QtWidgets.QLabel(info_text)
-            info_label.setAlignment(QtCore.Qt.AlignCenter)
-            info_label.setTextFormat(QtCore.Qt.RichText)
-            info_label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
-            info_label.setOpenExternalLinks(True)
-            info_label.setStyleSheet("background: transparent;")
-            content_layout.addWidget(info_label)
-
-            self.root_layout.addWidget(content_widget)
-            self.setBottomBar(closeButton=True)
-            self.adjustSize()
-
-    dlg = TKMAboutDialog(parent=None)
+    dlg = customDialogs.TKMAboutDialog(parent=None)
     dlg.exec_()
 
 

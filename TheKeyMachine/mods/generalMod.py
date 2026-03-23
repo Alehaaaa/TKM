@@ -52,7 +52,7 @@ def load_config():
     default_config = {
         "INSTALL_PATH": os.path.join(USER_MAYA_DIR, "scripts"),
         "USER_FOLDER_PATH": os.path.join(USER_MAYA_DIR, "scripts"),
-        "UPDATER": False,
+        "INTERNET_CONNECTION": True,
         "BUG_REPORT": True,
         "CUSTOM_TOOLS_MENU": True,
         "CUSTOM_TOOLS_EDITABLE_BY_USER": True,

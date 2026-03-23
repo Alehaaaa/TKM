@@ -108,6 +108,7 @@ selection_sets_image = getImage("selection_sets.svg")
 add_selection_set_image = getImage("add_selection_set.svg")
 customGraph_image = getImage("customGraph.svg")
 
+orbit_ui_image = getImage("orbit_ui.svg")
 custom_tools_image = getImage("tools_folder.svg")
 custom_scripts_image = getImage("scripts_folder.svg")
 
@@ -127,7 +128,9 @@ grey_dot_image = getImage("grey_dot.png")
 blue_dot_image = getImage("blue_dot.png")
 yellow_dot_image = getImage("yellow_dot.png")
 
-default_dot_image = getImage("dot.png")
+grey_got_image = getImage("grey_dot.png")
+
+default_dot_image = getImage("round_dot.png")
 
 
 # ________________ Selection Sets ________________________________________#
@@ -141,8 +144,6 @@ change_selection_set_color_image = getImage("change_selection_set_color.svg")
 remove_selection_set_image = getImage("remove_selection_set.svg")
 
 # ________________ Menus Images __________________________________________#
-
-grey_menu_image = getImage("grey_dot.png")
 
 reload_image = getImage("reload.png")
 remove_image = getImage("remove.svg")

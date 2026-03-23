@@ -65,7 +65,7 @@ TOOL_DEFINITIONS = {
         "key": "orbit",
         "label": "ToolBox Orbit",
         "text": "Orb",
-        "icon_path": media.reblock_keys_image,
+        "icon_path": media.orbit_ui_image,
         "callback": lambda: ui.orbit_window(0, 0),
         "tooltip_template": helper.orbit_tooltip_text,
     },

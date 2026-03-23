@@ -78,6 +78,8 @@ from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 
+from TheKeyMachine.tooltips import QFlatTooltipManager
+
 mods = [general, ui, keyTools, helper, media, bar, hotkeys, settings, cg, updater, style, sw, cw, wutil, sliders, toolbox]
 
 for m in mods:
@@ -89,7 +91,7 @@ for m in mods:
 # -----------------------------------------------------------------------------------------------------------------------------
 INSTALL_PATH = general.config["INSTALL_PATH"]
 USER_FOLDER_PATH = general.config["USER_FOLDER_PATH"]
-UPDATER = general.config["UPDATER"]
+INTERNET_CONNECTION = general.config["INTERNET_CONNECTION"]
 BUG_REPORT = general.config["BUG_REPORT"]
 CUSTOM_TOOLS_MENU = general.config["CUSTOM_TOOLS_MENU"]
 CUSTOM_TOOLS_EDITABLE_BY_USER = general.config["CUSTOM_TOOLS_EDITABLE_BY_USER"]
@@ -205,13 +207,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             "Shelf": "Shelf",
         }
 
-        self.bar_center_value = 10
         self.anim_offset_run_timer = True
         self.micro_move_run_timer = True
         self.animation_offset_original_values = {}
         self.setgroup_states = {}
         self.setgroup_buttons = {}
-        self.run_centerToolbar = False
 
         # Link object runtime states
         self.link_obj_image_timer = False
@@ -586,7 +586,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 cmds.menuItem(
                     l=text,
                     parent="isolate_button_popupMenu",
-                    image=media.grey_menu_image,
+                    image=media.grey_got_image,
                     c=lambda x, text=text: self.isolate_bookmark(bookmark_name=text),
                 )
 
@@ -623,7 +623,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 cmds.menuItem(
                     l=text,
                     parent="isolate_button_popupMenu",
-                    image=media.grey_menu_image,
+                    image=media.grey_got_image,
                     c=lambda x, text=text: self.isolate_bookmark(bookmark_name=text),
                 )  # type: ignore
 
@@ -2249,8 +2249,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             time.sleep(interval)
             utils.executeDeferred(micro_move_run)
 
-        self.run_centerToolbar = False
-
     def show_sys_info(self):
         os_info = platform.system() + " " + platform.release()
 
@@ -2293,8 +2291,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         print(f"Toolbar push: {margen}")
         print("")
         print("_________________________________________________________")
-
-    # _______________________________________  end center toolbar _____________________________________
 
     def start_selection_sets_UI(self):
         # Crea el selection sets workspace
@@ -2535,27 +2531,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.select(clear=True)
 
     def buildUI(self):
-        # Fix para que no de error, por si no lee el ancho del ViewPanel
-
-        if self.bar_center_value is None:
-            self.bar_center_value = 1
-
-        # Reconstruir column y row layouts
-        if cmds.rowLayout("rowtoolbar", exists=True):
-            cmds.deleteUI("rowtoolbar")
-
         ### ______________________________________________________ TOOLBAR ICON SIZE  ___________________________________________________
+        alignments = {"Left": QtCore.Qt.AlignLeft, "Center": QtCore.Qt.AlignHCenter, "Right": QtCore.Qt.AlignRight}
 
         def get_current_icon_alignment():
-            return read_toolbar_icon_alignment()
+            toolbar_alignment_str = settings.get_setting("toolbar_icon_alignment", "Center")
+            return alignments.get(toolbar_alignment_str, QtCore.Qt.AlignHCenter)
 
-        def read_toolbar_icon_alignment():
-            return settings.get_setting("toolbar_icon_alignment", "Center")
-
-        def update_toolbar_icon_alignment(alignment):
-            if alignment:
+        def update_toolbar_icon_alignment(alignment, value):
+            if alignment and value:
                 settings.set_setting("toolbar_icon_alignment", alignment)
-                self.reload()
+                self.toolbar_layout.setAlignment(value)
+                self.toolbar_layout.update()
 
         ### ______________________________________________________ TOOLBAR LAYOUT _____________________________________________________________________###
 
@@ -2569,23 +2556,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.main_layout.addWidget(self.main_toolbar_widget)
 
         # Use QFlowLayout to allow wrapping
-        toolbar_alignment_str = get_current_icon_alignment()
-        qt_alignment = QtCore.Qt.AlignLeft
-        if toolbar_alignment_str == "Right":
-            qt_alignment = QtCore.Qt.AlignRight
-        elif toolbar_alignment_str == "Center":
-            qt_alignment = QtCore.Qt.AlignHCenter
-
-        rowtoolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=18, Hspacing=6, alignment=qt_alignment)
+        toolbar_alignment = get_current_icon_alignment()
+        self.toolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=18, Hspacing=6, alignment=toolbar_alignment)
 
         def new_section(spacing=2, hiddeable=True):
             sec = cw.QFlatSectionWidget(spacing=spacing, hiddeable=hiddeable)
-            rowtoolbar_layout.addWidget(sec)
+            self.toolbar_layout.addWidget(sec)
             return sec
 
         # Placeholder for tooltip functions to be defined later
         show_tooltips = settings.get_setting("show_tooltips", True)
-        self._toggle_tooltips_func = None
 
         # _____________________ Key Editing Section __________________________________________________ #
         sec = new_section()
@@ -3483,7 +3463,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             [
                 toolbox.get_tool("share_keys", default=True),
                 toolbox.get_tool("reblock", key="bk_reblock"),
-                toolbox.get_tool("orbit", key="bk_orbit"),
                 toolbox.get_tool("gimbal", key="bk_gimbal"),
             ],
         )
@@ -3506,6 +3485,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup([toolbox.get_tool("custom_graph", callback=open_customGraph, default=True)])
 
         # custom tools ----------------------------------------------------------------------------
+        sec = new_section()
+        sec.addWidgetGroup([toolbox.get_tool("orbit", default=True)])
+
         invalidate_caches()
         import TheKeyMachine_user_data.connect.tools.tools as connectToolBox  # type: ignore
 
@@ -3570,7 +3552,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             )
             toolBox_menu.addAction(QtGui.QIcon(media.reload_image), "Reload menu", initialize_tool_menu)
 
-        toolBox_button_widget = cw.QFlatToolButton(icon=media.custom_tools_image, tooltip_template=helper.custom_tools_tooltip_text)
+        toolBox_button_widget = cw.QFlatToolButton(icon=media.custom_tools_image)
         toolBox_button_widget.setVisible(bool(CUSTOM_TOOLS_MENU))
         sec.addWidget(toolBox_button_widget, "Custom Tools", "custom_tools", tooltip_template=helper.custom_tools_tooltip_text)
 
@@ -3684,6 +3666,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help")
         toolbar_menu.addMenu(help_menu, description="Resources for help, documentation and community.")
         help_menu.addAction(
+            QtGui.QIcon(media.report_a_bug_image),
+            "Report a bug",
+            ui.bug_report_window,
+            description="Report any bug you may have encountered whilst using the software.",
+        )
+        help_menu.addSeparator()
+        help_menu.addAction(
             QtGui.QIcon(media.discord_image),
             "Discord Community",
             lambda: general.open_url("https://discord.gg/G2J5yyjz"),
@@ -3712,24 +3701,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         show_tooltips_action = settings_menu.addAction("Show tooltips", description="Show or hide floating tooltips.")
         show_tooltips_action.setCheckable(True)
 
-        def read_show_tooltips():
-            return settings.get_setting("show_tooltips", True)
-
         def update_show_tooltips(value):
             settings.set_setting("show_tooltips", value)
-            from TheKeyMachine.tooltips import QFlatTooltipManager
-
             QFlatTooltipManager.enabled = value
 
-        def toggle_tooltips(value):
-            update_show_tooltips(value)
-
-        self._toggle_tooltips_func = toggle_tooltips
         show_tooltips_action.setChecked(show_tooltips)
-        show_tooltips_action.toggled.connect(self._toggle_tooltips_func)
-
-        # Initial call to sync the manager state
-        update_show_tooltips(read_show_tooltips())
+        show_tooltips_action.toggled.connect(update_show_tooltips)
 
         overshoot_action = settings_menu.addAction("Overshoot Sliders", description="Allow sliders to reach values beyond -100 to 100.")
         overshoot_action.setCheckable(True)
@@ -3738,21 +3715,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         settings_menu.addSection("Toolbar's icons alignment")
         align_group = QActionGroup(settings_menu)
-        left_align_action = settings_menu.addAction("Left", description="Align icons to the left.")
-        center_align_action = settings_menu.addAction("Center", description="Align icons to the center.")
-        right_align_action = settings_menu.addAction("Right", description="Align icons to the right.")
-        for act in (left_align_action, center_align_action, right_align_action):
-            act.setCheckable(True)
-            align_group.addAction(act)
-
-        left_align_action.triggered.connect(lambda: update_toolbar_icon_alignment("Left"))
-        center_align_action.triggered.connect(lambda: update_toolbar_icon_alignment("Center"))
-        right_align_action.triggered.connect(lambda: update_toolbar_icon_alignment("Right"))
-
-        current_align = get_current_icon_alignment()
-        {"Left": left_align_action, "Center": center_align_action, "Right": right_align_action}.get(current_align, center_align_action).setChecked(
-            True
-        )
+        for align_name, align_value in alignments.items():
+            action = settings_menu.addAction(align_name, description=f"Align icons to the {align_name.lower()}.")
+            action.setCheckable(True)
+            align_group.addAction(action)
+            if align_value == toolbar_alignment:
+                action.setChecked(True)
+            action.triggered.connect(lambda align_name=align_name, align_value=align_value: update_toolbar_icon_alignment(align_name, align_value))
 
         settings_menu.addSection("Hotkeys")
         settings_menu.addAction("Add TheKeyMachine Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys for TKM tools.")
@@ -3765,12 +3734,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Separators and others
         toolbar_menu.addSeparator()
-        toolbar_menu.addAction(
-            QtGui.QIcon(media.check_updates_image),
-            "Check for updates",
-            lambda: updater.check_for_updates(toolbar_config_button_widget, force=True),
-            description="Check if there is a new version available.",
-        )
+        if INTERNET_CONNECTION:
+            toolbar_menu.addAction(
+                QtGui.QIcon(media.check_updates_image),
+                "Check for updates",
+                lambda: updater.check_for_updates(toolbar_config_button_widget, force=True),
+                description="Check if there is a new version available.",
+            )
         toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
 
         def _open_menu_at_cursor():
@@ -3788,8 +3758,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.main_toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.main_toolbar_widget.customContextMenuRequested.connect(_on_toolbar_context_menu)
 
-        # Launch background update check
-        updater.check_for_updates(toolbar_config_button_widget, warning=False, force=False)
+        if INTERNET_CONNECTION:
+            # Launch background update check
+            updater.check_for_updates(toolbar_config_button_widget, warning=False, force=False)
 
 
 _toolbar_instance = None

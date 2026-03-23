@@ -42,8 +42,6 @@ def create_TheKeyMachine_hotkeys(*args):
 
     open_orbit_window = "import TheKeyMachine.mods.uiMod as ui; ui.orbit_window(offset_x=-160, offset_y=-10)"
 
-    close_orbit_window = "import TheKeyMachine.mods.uiMod as ui; ui.orbit_window_close()"
-
     isolate_master = "import TheKeyMachine.mods.barMod as bar; bar.isolate_master()"
 
     select_rig_controls = "import TheKeyMachine.mods.barMod as bar; bar.select_rig_controls()"
@@ -92,9 +90,7 @@ def create_TheKeyMachine_hotkeys(*args):
 
     selectHierarchy = "import TheKeyMachine.mods.barMod as bar; bar.selectHierarchy()"
 
-    toggleAnimOffsetButton = (
-        "from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggleAnimOffsetButton() if tb else None"
-    )
+    toggleAnimOffsetButton = "from TheKeyMachine.core.toolbar import get_toolbar; tb = get_toolbar(); tb.toggleAnimOffsetButton() if tb else None"
 
     create_follow_cam = "import TheKeyMachine.mods.barMod as bar; bar.create_follow_cam(translation=True, rotation=True)"
 
@@ -140,7 +136,6 @@ def create_TheKeyMachine_hotkeys(*args):
         ("smartTranslation", "Smart Translation Manipulator", smart_translation),
         ("smartTranslationRelease", "Smart Translation Manipulator Release", smart_translation_release),
         ("orbitWindow", "Open Orbit Window", open_orbit_window),
-        ("orbitWindowRelease", "Close Orbit Window - Release", close_orbit_window),
         ("isolate", "Isolate tool", isolate_master),
         ("selectRigControls", "Select Rig Controls", select_rig_controls),
         ("selectAnimatedRigControls", "Select Animated Rig Controls", select_animated_rig_controls),

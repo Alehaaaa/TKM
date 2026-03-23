@@ -216,7 +216,7 @@ class LogoAction(QtWidgets.QWidgetAction):
         layout.setContentsMargins(0, 10, 0, 10)
         layout.setSpacing(0)
 
-        logo_pix = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_small.png"))
+        logo_pix = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_250.png"))
         if not logo_pix.isNull():
             self.logo_label = QtWidgets.QLabel()
             self.logo_label.setPixmap(logo_pix.scaledToHeight(DPI(60), QtCore.Qt.SmoothTransformation))

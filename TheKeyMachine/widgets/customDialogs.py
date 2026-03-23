@@ -24,6 +24,7 @@ from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
 from TheKeyMachine.tooltips.tooltip import QFlatTooltipManager
 
 import TheKeyMachine.mods.mediaMod as media
+import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.widgets.customWidgets as cw
 
 
@@ -348,7 +349,6 @@ class QFlatTooltipConfirm(QFlatDialog):
     ARROW_H = 8
 
     def __init__(self, parent=None, title="", message="", buttons=None, icon=None, tooltip_template=None, highlight=None, **kwargs):
-        # Support 'template' alias for tooltip_template (often used in updater.py)
         tooltip_template = tooltip_template or kwargs.get("template")
         QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, **kwargs)
 
@@ -856,6 +856,110 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
             cmds.select(valid_names, replace=True)
         else:
             cmds.select(clear=True)
+
+
+class TKMAboutDialog(QFlatDialog):
+    def __init__(self, parent=None):
+        QFlatDialog.__init__(self, parent)
+        self.setWindowTitle("About TheKeyMachine")
+
+        content_widget = QtWidgets.QWidget()
+        content_layout = QtWidgets.QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(DPI(20), DPI(20), DPI(20), 0)
+        content_layout.setSpacing(DPI(12))
+
+        # Logo
+        logo_label = QtWidgets.QLabel()
+        logo_label.setAlignment(QtCore.Qt.AlignCenter)
+        logo_pixmap = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_250.png"))
+        logo_label.setPixmap(logo_pixmap)
+        content_layout.addWidget(logo_label)
+
+        TheKeyMachine_stage_version = general.get_thekeymachine_stage_version()
+        TheKeyMachine_version = general.get_thekeymachine_version()
+        TheKeyMachine_build_version = general.get_thekeymachine_build_version()
+        TheKeyMachine_codename = general.get_thekeymachine_codename()
+
+        # Tool Name & Title
+        tool_name = QtWidgets.QLabel("Animation toolset for Maya Animators")
+        tool_name.setAlignment(QtCore.Qt.AlignCenter)
+        tool_name.setStyleSheet("font-size: %spx; font-weight: bold; color: #ececec;" % DPI(16))
+        content_layout.addWidget(tool_name)
+
+        # Version Badge
+        version_btn = QtWidgets.QPushButton(f"v{TheKeyMachine_version} {TheKeyMachine_stage_version}")
+
+        if general.config["INTERNET_CONNECTION"]:
+            version_btn.setCursor(QtCore.Qt.PointingHandCursor)
+
+            clickable_style = """
+                QPushButton:hover {
+                    background-color: #498042;
+                    color: white;
+                }
+                QPushButton:pressed {
+                    background-color: #3a5a3d;
+                    color: #98ae97;
+                }
+                """
+
+            def _check_updates():
+                import TheKeyMachine.core.updater as updater
+                from importlib import reload
+
+                reload(updater)
+
+                updater.check_for_updates(force=True)
+
+            version_btn.clicked.connect(_check_updates)
+        else:
+            clickable_style = ""
+
+        version_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: rgba(76, 175, 80, 0.15);
+                border: 1px solid #4CAF50;
+                color: #81C784;
+                border-radius: %spx;
+                padding: %spx %spx;
+                font-size: %spx;
+                font-weight: bold;
+            }
+            %s
+            """
+            % (DPI(4), DPI(4), DPI(8), DPI(12), clickable_style)
+        )
+        content_layout.addWidget(version_btn, alignment=QtCore.Qt.AlignCenter)
+
+        build_label = QtWidgets.QLabel(f"Build: {TheKeyMachine_build_version} | {TheKeyMachine_codename}")
+        build_label.setAlignment(QtCore.Qt.AlignCenter)
+        build_label.setStyleSheet("font-size: %spx; color: #888888;" % DPI(11))
+        content_layout.addWidget(build_label)
+
+        info_text = """
+            <div style='text-align: center; color: #888888; font-size: %spx;'>
+                <p>This tool is licensed under the <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color: #67b9e0; text-decoration: none;'>GNU GPL 3.0</a>.</p>
+                <div style='margin-top: 10px;'>
+                    Developed by <a href='http://rodritorres.com' style='color: #67b9e0; text-decoration: none;'>Rodrigo Torres</a>
+                </div>
+                <div style='margin-top: 5px;'>
+                    Modified by <a href='http://alehaaaa.github.io' style='color: #67b9e0; text-decoration: none;'>Alehaaaa</a>
+                </div>
+            </div>
+        """ % (DPI(11))
+
+        info_label = QtWidgets.QLabel(info_text)
+        info_label.setAlignment(QtCore.Qt.AlignCenter)
+        info_label.setTextFormat(QtCore.Qt.RichText)
+        info_label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
+        info_label.setOpenExternalLinks(True)
+        info_label.setStyleSheet("background: transparent;")
+        content_layout.addWidget(info_label)
+
+        self.root_layout.addWidget(content_widget)
+        self.setBottomBar(closeButton=True)
+        self.adjustSize()
 
 
 class QFlatNumberInput(QFlatToolBarDialog):

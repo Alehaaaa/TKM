@@ -265,7 +265,7 @@ share_keys_tooltip_text = (
 )
 
 orbit_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Orbit</b></font><img src='{media.reblock_keys_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Orbit</b></font><img src='{media.orbit_ui_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool allows you to orbit the entire rig by selecting just a single control.<br><br>"
     "You can utilize this tool to orbit multiple rigs simultaneously or select both<br>"
