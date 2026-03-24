@@ -22,6 +22,8 @@ else:
 try:
     from importlib import reload
 except ImportError:
+    from imp import reload
+except ImportError:
     pass
 
 try:

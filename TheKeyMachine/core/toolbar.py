@@ -52,6 +52,11 @@ try:
 except ImportError:
     import_module = None
     invalidate_caches = None
+    from imp import reload
+except ImportError:
+    import_module = None
+    invalidate_caches = None
+    pass
 
 # -----------------------------------------------------------------------------------------------------------------------------
 #                                    We load the necessary modules for TheKeyMachine                                          #
@@ -3486,7 +3491,20 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # custom tools ----------------------------------------------------------------------------
         sec = new_section()
-        sec.addWidgetGroup([toolbox.get_tool("orbit", default=True)])
+        sec.addWidgetGroup(
+            [
+                toolbox.get_tool("orbit", default=True),
+                {
+                    "key": "orbit_auto_transparency",
+                    "label": "Auto Transparency",
+                    "description": "Make the Orbit window translucent when not hovered.",
+                    "checkable": True,
+                    "is_checked_fn": lambda: settings.get_setting("orbit_auto_transparency", False),
+                    "callback": lambda state: settings.set_setting("orbit_auto_transparency", state),
+                    "pinnable": False,
+                },
+            ]
+        )
 
         invalidate_caches()
         import TheKeyMachine_user_data.connect.tools.tools as connectToolBox  # type: ignore
@@ -3695,7 +3713,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         settings_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Settings")
         toolbar_menu.addMenu(settings_menu, description="Tool configuration, hotkeys and UI preferences.")
         settings_menu.addSection("Shelf icon")
-        settings_menu.addAction("Add Toggle Button To Shelf", self.create_shelf_icon, description="Creates a shelf button to show/hide this toolbar.")
+        settings_menu.addAction(
+            QtGui.QIcon(media.tool_icon),
+            "Add Toggle Button To Shelf",
+            self.create_shelf_icon,
+            description="Creates a shelf button to show/hide this toolbar.",
+        )
+
+        run_on_startup_action = settings_menu.addAction(
+            "Run on Startup", ui.install_userSetup, description="Make TKM run automatically when Maya starts."
+        )
+        run_on_startup_action.setCheckable(True)
+        run_on_startup_action.setChecked(ui.check_userSetup())
 
         settings_menu.addSection("Tools settings")
         show_tooltips_action = settings_menu.addAction("Show tooltips", description="Show or hide floating tooltips.")

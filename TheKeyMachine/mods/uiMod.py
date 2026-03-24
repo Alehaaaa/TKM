@@ -24,13 +24,11 @@ import maya.OpenMayaUI as mui
 try:
     from shiboken2 import wrapInstance
     from PySide2.QtWidgets import QDesktopWidget
-    from PySide2.QtWidgets import QAction
 
     from PySide2 import QtCore, QtGui, QtWidgets
 except ImportError:
     from shiboken6 import wrapInstance
     from PySide6.QtCore import QTimer
-    from PySide6.QtGui import QAction
 
     from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -56,9 +54,10 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.updater as updater
 
-from TheKeyMachine.widgets import customDialogs, util as wutil
+from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
+from TheKeyMachine.mods import settingsMod as settings
 
-mods = [general, keyTools, media, bar, customDialogs, wutil, updater]
+mods = [general, keyTools, media, bar, customDialogs, cw, wutil, updater, settings]
 
 for m in mods:
     reload(m)
@@ -234,6 +233,72 @@ def customGraph_filter_mods(*args):
         filterMode_sync_on()
 
 
+# ---------------------------------------------------- STARTUP SCRIPT ----------------------------------------------------------------------------
+
+
+def check_userSetup():
+    userSetupFile = os.path.join(os.getenv("MAYA_APP_DIR"), "scripts", "userSetup.py")
+
+    startCode = "# start TheKeyMachine"
+
+    try:
+        with open(userSetupFile, "r") as input_file:
+            lines = input_file.readlines()
+            for line in lines:
+                if line.strip() == startCode:
+                    return True
+    except IOError:
+        pass
+
+    return False
+
+
+def install_userSetup(install=True):
+    userSetupFile = os.path.join(os.getenv("MAYA_APP_DIR"), "scripts", "userSetup.py")
+
+    cmds_import = "from maya import cmds\n"
+    newUserSetup = ""
+    startCode, endCode = "# start TheKeyMachine", "# end TheKeyMachine"
+
+    try:
+        with open(userSetupFile, "r") as input_file:
+            lines = input_file.readlines()
+
+            # Remove existing block between startCode and endCode
+            inside_block = False
+            for line in lines:
+                if line == cmds_import:
+                    cmds_import = ""
+                if line.strip() == startCode:
+                    inside_block = True
+                if not inside_block:
+                    newUserSetup += line
+                if line.strip() == endCode:
+                    inside_block = False
+
+            # Ensure there's always a two-line gap at the end
+            newUserSetup = newUserSetup.rstrip() + "\n\n"
+
+    except IOError:
+        newUserSetup = ""
+
+    run_script = "import TheKeyMachine; TheKeyMachine.toggle()"
+    tkm_run_code = (
+        "{}\n\n".format(startCode)
+        + "{0}".format(cmds_import)
+        + "if not cmds.about(batch=True):\n"
+        + '    cmds.evalDeferred(lambda: cmds.evalDeferred("{}", lowestPriority=True))\n\n'.format(run_script)
+        + "{}".format(endCode)
+    )
+
+    if install:
+        newUserSetup += tkm_run_code
+
+    # Write the updated userSetup file
+    with open(userSetupFile, "w") as output_file:
+        output_file.write(newUserSetup)
+
+
 # ---------------------------------------------------- UNINSTALL ---------------------------------------------------------------------------------
 
 
@@ -250,16 +315,11 @@ def uninstall():
 
     if result == "Uninstall":
         try:
-            # Desactiva el thread para centrar la toolbar
-            # run_centerToolbar = False
-
-            # # Definiendo las rutas
-            # user_app_dir = cmds.internalVar(userAppDir=True)
-            # user_dir = cmds.internalVar(userScriptDir=True)
-            tkm_folder_path = os.path.join(INSTALL_PATH, "TheKeyMachine")
-
-            # version_maya = cmds.about(version=True)
-            # maya_dir = os.path.join(user_app_dir, version_maya)
+            tkm_folder_path = (
+                os.path.join(INSTALL_PATH, "TheKeyMachine")
+                if INSTALL_PATH
+                else os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            )
 
             # Crear una carpeta llamada "uninstalled" dentro de TheKeyMachine si no existe
             uninstalled_folder_path = os.path.join(tkm_folder_path, "uninstalled")
@@ -463,286 +523,263 @@ def leer_configuracion_orbit():
 configuracion_orbit = leer_configuracion_orbit()
 
 
-class CustomButton(QtWidgets.QPushButton):
-    def __init__(self, icon_path, button_id, parent=None, window=None):
-        super(CustomButton, self).__init__(parent)
-        self.setIcon(QtGui.QIcon(icon_path))
-        self.window = window
-        self.button_id = button_id
+class OrbitWindowMixin:
+    def _get_menu_items(self):
+        import TheKeyMachine.mods.helperMod as helper
 
-        screen_width, screen_height = get_screen_resolution()
-        screen_width = screen_width
+        return [
+            (media.isolate_image, "Isolate", "isolate_master", getattr(helper, "isolate_tooltip_text", "Isolate")),
+            (media.align_menu_image, "Align", "align_selected_objects", getattr(helper, "align_tooltip_text", "Align")),
+            (media.tracer_menu_image, "Tracer", "mod_tracer", getattr(helper, "tracer_tooltip_text", "Tracer")),
+            (media.reset_animation_image, "Reset Values", "reset_objects_mods", getattr(helper, "reset_values_tooltip_text", "Reset Values")),
+            (
+                media.delete_animation_image,
+                "Delete Animation",
+                "deleteAnimation",
+                getattr(helper, "delete_animation_tooltip_text", "Delete Animation"),
+            ),
+            (media.select_opposite_image, "Select Opposite", "selectOpposite", getattr(helper, "select_opposite_tooltip_text", "Select Opposite")),
+            (media.copy_opposite_image, "Copy Opposite", "copyOpposite", getattr(helper, "copy_opposite_tooltip_text", "Copy Opposite")),
+            (media.mirror_image, "Mirror", "mirror", getattr(helper, "mirror_tooltip_text", "Mirror")),
+            (media.copy_animation_image, "Copy Animation", "copy_animation", getattr(helper, "copy_animation_tooltip_text", "Copy Animation")),
+            (media.paste_animation_image, "Paste Animation", "paste_animation", getattr(helper, "copy_animation_tooltip_text", "Paste Animation")),
+            (
+                media.paste_insert_animation_image,
+                "Paste Insert Animation",
+                "paste_insert_animation",
+                getattr(helper, "copy_animation_tooltip_text", "Paste Insert Animation"),
+            ),
+            (media.copy_pose_image, "Copy Pose", "copy_pose", getattr(helper, "copy_pose_tooltip_text", "Copy Pose")),
+            (media.paste_pose_image, "Paste Pose", "paste_pose", getattr(helper, "copy_pose_tooltip_text", "Paste Pose")),
+            (
+                media.select_hierarchy_image,
+                "Select Hierarchy",
+                "selectHierarchy",
+                getattr(helper, "select_hierarchy_tooltip_text", "Select Hierarchy"),
+            ),
+            (media.link_objects_image, "Copy/Paste Link", "mod_link_objects", getattr(helper, "link_objects_tooltip_text", "Link objects")),
+            (media.temp_pivot_image, "Temp Pivot", "accion_temp_pivot", getattr(helper, "temp_pivot_tooltip_text", "Temp Pivot")),
+            (
+                media.worldspace_copy_frame_image,
+                "Copy World Space Current Frame",
+                "copy_worldspace_single_frame",
+                getattr(helper, "copy_worldspace_tooltip_text", "Copy World Space"),
+            ),
+            (
+                media.worldspace_paste_frame_image,
+                "Paste World Space Current Frame",
+                "paste_worldspace_single_frame",
+                getattr(helper, "paste_worldspace_tooltip_text", "Paste World Space"),
+            ),
+        ]
 
-        if screen_width == 3840:
-            self.setIconSize(QtCore.QSize(45, 45))
-        else:
-            self.setIconSize(QtCore.QSize(25, 25))
+    def _setup_orbit_ui(self):
 
-    def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.RightButton:
-            self.showContextMenu(event.pos())
-        else:
-            super(CustomButton, self).mousePressEvent(event)
+        if hasattr(self, "top_bar_layout") and self.top_bar_layout.parentWidget() == self:
+            self.top_bar_layout.setParent(None)
+            self.top_bar_layout.deleteLater()
 
-    def showContextMenu(self, position):
-        menu = QtWidgets.QMenu()
+        self.orbit_layout = QtWidgets.QHBoxLayout()
+        self.orbit_layout.setContentsMargins(0, 0, 0, 0)
+        self.orbit_layout.setSpacing(wutil.DPI(15))
 
-        # Crear acciones con íconos
-        action1 = QAction(QtGui.QIcon(media.isolate_image), "Isolate", self)
-        action2 = QAction(QtGui.QIcon(media.align_menu_image), "Align", self)
-        action3 = QAction(QtGui.QIcon(media.tracer_menu_image), "Tracer", self)
-        action4 = QAction(QtGui.QIcon(media.reset_animation_image), "Reset Values", self)
-        action5 = QAction(QtGui.QIcon(media.delete_animation_image), "Delete Animation", self)
-        action6 = QAction(QtGui.QIcon(media.select_opposite_image), "Select Opposite", self)
-        action7 = QAction(QtGui.QIcon(media.copy_opposite_image), "Copy Opposite", self)
-        action8 = QAction(QtGui.QIcon(media.mirror_image), "Mirror", self)
-        action9 = QAction(QtGui.QIcon(media.copy_animation_image), "Copy Animation", self)
-        action10 = QAction(QtGui.QIcon(media.paste_animation_image), "Paste Animation", self)
-        action11 = QAction(QtGui.QIcon(media.paste_insert_animation_image), "Paste Insert Animation", self)
-        action12 = QAction(QtGui.QIcon(media.copy_pose_image), "Copy Pose", self)
-        action13 = QAction(QtGui.QIcon(media.paste_pose_image), "Paste Pose", self)
-        action14 = QAction(QtGui.QIcon(media.select_hierarchy_image), "Select Hierarchy", self)
-        action15 = QAction(QtGui.QIcon(media.link_objects_image), "Copy/Paste Link", self)
-        action16 = QAction(QtGui.QIcon(media.temp_pivot_image), "Temp Pivot", self)
-        action17 = QAction(QtGui.QIcon(media.worldspace_copy_frame_image), "Copy World Space Current Frame", self)
-        action18 = QAction(QtGui.QIcon(media.worldspace_paste_frame_image), "Paste World Space Current Frame", self)
-        action_opacity = QAction("Toggle Dynamic Opacity", self)
+        self.mainLayout.addLayout(self.orbit_layout)
 
-        menu.addAction(action1)
-        menu.addAction(action2)
-        menu.addAction(action3)
-        menu.addAction(action4)
-        menu.addAction(action5)
-        menu.addAction(action6)
-        menu.addAction(action7)
-        menu.addAction(action8)
-        menu.addAction(action9)
-        menu.addAction(action10)
-        menu.addAction(action11)
-        menu.addAction(action12)
-        menu.addAction(action13)
-        menu.addAction(action14)
-        menu.addAction(action15)
-        menu.addAction(action16)
-        menu.addAction(action17)
-        menu.addAction(action18)
-        menu.addSeparator()
-        menu.addAction(action_opacity)
+        self.botones = []
+        configuracion_orbit = leer_configuracion_orbit()
 
-        action = menu.exec_(self.mapToGlobal(position))
+        button_keys = sorted(
+            [k for k in configuracion_orbit.keys() if k.startswith("button")],
+            key=lambda x: int(x.replace("button", "")) if x.replace("button", "").isdigit() else 99,
+        )
 
-        if action == action1:
-            self.updateButton(media.isolate_image, "isolate_master")
-        elif action == action2:
-            self.updateButton(media.align_menu_image, "align_selected_objects")
-        elif action == action3:
-            self.updateButton(media.tracer_menu_image, "mod_tracer")
-        elif action == action4:
-            self.updateButton(media.reset_animation_image, "reset_objects_mods")
-        elif action == action5:
-            self.updateButton(media.delete_animation_image, "deleteAnimation")
-        elif action == action6:
-            self.updateButton(media.select_opposite_image, "selectOpposite")
-        elif action == action7:
-            self.updateButton(media.copy_opposite_image, "copyOpposite")
-        elif action == action8:
-            self.updateButton(media.mirror_image, "mirror")
-        elif action == action9:
-            self.updateButton(media.copy_animation_image, "copy_animation")
-        elif action == action10:
-            self.updateButton(media.paste_animation_image, "paste_animation")
-        elif action == action11:
-            self.updateButton(media.paste_insert_animation_image, "paste_insert_animation")
-        elif action == action12:
-            self.updateButton(media.copy_pose_image, "copy_pose")
-        elif action == action13:
-            self.updateButton(media.paste_pose_image, "paste_pose")
-        elif action == action14:
-            self.updateButton(media.select_hierarchy_image, "selectHierarchy")
-        elif action == action15:
-            self.updateButton(media.link_objects_image, "mod_link_objects")
-        elif action == action16:
-            self.updateButton(media.temp_pivot_image, "accion_temp_pivot")
-        elif action == action17:
-            self.updateButton(media.worldspace_copy_frame_image, "copy_worldspace_single_frame")
-        elif action == action18:
-            self.updateButton(media.worldspace_paste_frame_image, "paste_worldspace_single_frame")
-        elif action == action_opacity:
-            self.toggleDynamicOpacity()
+        for button_id in button_keys:
+            action_name = configuracion_orbit.get(button_id, "")
+            icon_path = iconos_acciones.get(acciones.get(action_name, ""), media.isolate_image)
 
-    def updateButton(self, icon_path, action_identifier):
-        self.setIcon(QtGui.QIcon(icon_path))
+            label = "Tool"
+            tooltip_text = label
+            for ic, lbl, a, tt in self._get_menu_items():
+                if a == action_name:
+                    label = lbl
+                    tooltip_text = tt
+                    break
 
-        # Desconectar y reconectar la señal
+            btn = cw.QFlatToolButton(icon=icon_path or None, tooltip_template=tooltip_text)
+
+            btn.setFixedSize(wutil.DPI(26), wutil.DPI(26))
+            btn.setIconSize(QtCore.QSize(wutil.DPI(20), wutil.DPI(20)))
+
+            btn.clicked.connect(partial(ejecutar_accion, action_name))
+
+            btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+            btn.customContextMenuRequested.connect(lambda pos: self._setup_orbit_button_menu(btn, button_id))
+
+            self.orbit_layout.addWidget(btn)
+            self.botones.append(btn)
+
+        separator = QtWidgets.QFrame()
+        separator.setFrameShape(QtWidgets.QFrame.VLine)
+        separator.setFrameShadow(QtWidgets.QFrame.Sunken)
+        separator.setFixedSize(2, wutil.DPI(20))
+        separator.setStyleSheet("QFrame { background-color: #3d3d3d; border: none; }")
+        self.orbit_layout.addWidget(separator)
+
+        self.add_button = cw.QFlatToolButton(text="+", tooltip_template="Add Tool Option", description="Assign an extra tool to your Orbit window.")
+        self.add_button.setFixedSize(wutil.DPI(20), wutil.DPI(20))
+
+        self.add_button.setStyleSheet(
+            self.add_button.styleSheet()
+            + " QToolButton { color: #888888; font-size: "
+            + str(wutil.DPI(18))
+            + "px; } QToolButton:hover { color: #ffffff; }"
+        )
+        self.add_button.clicked.connect(self._setup_add_button_menu)
+
+        self.orbit_layout.addWidget(self.add_button)
+        self.close_button.setFixedSize(wutil.DPI(20), wutil.DPI(20))
+
+        self.close_button.setParent(None)
+        self.orbit_layout.addWidget(self.close_button)
+
+    def _update_button(self, btn, icon_path, action_identifier, label, button_id):
+        btn.setIcon(QtGui.QIcon(icon_path))
+        btn.setToolTipData(tooltip_template=label)
         try:
-            self.clicked.disconnect()
-        except RuntimeError:
+            btn.clicked.disconnect()
+        except Exception:
             pass
-        self.clicked.connect(lambda: ejecutar_accion(action_identifier))
-
-        # Verificar si el identificador está en el diccionario de acciones
+        btn.clicked.connect(lambda: ejecutar_accion(action_identifier))
         if action_identifier in acciones:
-            configuracion_orbit[self.button_id] = action_identifier
+            configuracion_orbit[button_id] = action_identifier
             guardar_configuracion_botones()
+
+    def _setup_orbit_button_menu(self, btn, button_id):
+        menu = cw.MenuWidget()
+        for icon_path, label, action_ident, tooltip_text in self._get_menu_items():
+            action = menu.addAction(QtGui.QIcon(icon_path), label)
+            action.triggered.connect(partial(self._update_button, btn, icon_path, action_ident, tooltip_text, button_id))
+
+        menu.addSeparator()
+        remove_action = menu.addAction("Remove this Button")
+        remove_action.triggered.connect(partial(self._remove_button, button_id))
+
+        menu.exec_(QtGui.QCursor.pos())
+
+    def _setup_add_button_menu(self, pos):
+        menu = cw.MenuWidget()
+        for icon_path, label, action_ident, tooltip_text in self._get_menu_items():
+            action = menu.addAction(QtGui.QIcon(icon_path), label)
+            action.triggered.connect(partial(self._add_new_tool, action_ident))
+            if configuracion_orbit.get(action_ident):
+                action.setEnabled(False)
+
+        menu.exec_(QtGui.QCursor.pos())
+
+    def _add_new_tool(self, action_identifier):
+        new_idx = max([int(k.replace("button", "")) for k in configuracion_orbit.keys() if k.startswith("button")] + [0]) + 1
+        button_id = f"button{new_idx}"
+        configuracion_orbit[button_id] = action_identifier
+        guardar_configuracion_botones()
+        QtCore.QTimer.singleShot(50, lambda: orbit_window(rebuild=True))
+
+    def _remove_button(self, button_id):
+        if button_id in configuracion_orbit:
+            del configuracion_orbit[button_id]
+            guardar_configuracion_botones()
+        QtCore.QTimer.singleShot(50, lambda: orbit_window(rebuild=True))
+
+
+class OrbitWindow(customDialogs.QFlatCloseableFloatingWidget, OrbitWindowMixin):
+    def __init__(self, parent=None, offset_x=0, offset_y=0, rebuild=False):
+        super().__init__(popup=False, parent=parent)
+        self.setObjectName("orbit_window")
+        self.setWindowTitle("Orbit")
+
+        self._setup_orbit_ui()
+        self._hovered = False
+
+        self.fade_timer = QtCore.QTimer(self)
+        self.fade_timer.setSingleShot(True)
+        self.fade_timer.timeout.connect(self._apply_transparency)
+
+        self.settings_timer = QtCore.QTimer(self)
+        self.settings_timer.timeout.connect(self._check_settings)
+        self.settings_timer.start(500)
+
+        from TheKeyMachine.mods import settingsMod as settings
+
+        saved_geom = settings.get_setting("orbit_geometry")
+
+        self.adjustSize()
+
+        if saved_geom and len(saved_geom) == 4 and not rebuild:
+            x, y, w, h = saved_geom
+            self.setGeometry(x, y, w, h)
+        elif saved_geom and len(saved_geom) >= 2:
+            x, y = saved_geom[0], saved_geom[1]
+            if rebuild:
+                self.move(x, y)
+            else:
+                self.setGeometry(x, y, self.width(), self.height())
         else:
-            pass
+            if offset_x != 0 or offset_y != 0:
+                cursor_pos = QtGui.QCursor.pos()
+                self.move(cursor_pos + QtCore.QPoint(offset_x, offset_y))
+            else:
+                self.place_near_cursor()
 
-    def toggleDynamicOpacity(self):
-        global dynamic_opacity
-        dynamic_opacity = not dynamic_opacity
-        if not dynamic_opacity:
-            self.window.setWindowOpacity(1.0)
-        else:
-            self.window.setWindowOpacity(0.60)
+        self.update_transparency_state(False)
+
+    def _check_settings(self):
+        if not self._hovered:
+            from TheKeyMachine.mods import settingsMod as settings
+
+            auto_transparency = settings.get_setting("orbit_auto_transparency", False)
+            if auto_transparency and not self.fade_timer.isActive():
+                self.setWindowOpacity(0.60)
+            elif not auto_transparency:
+                self.setWindowOpacity(1.0)
+
+    def _apply_transparency(self):
+        from TheKeyMachine.mods import settingsMod as settings
+
+        if not self._hovered and settings.get_setting("orbit_auto_transparency", False):
+            self.setWindowOpacity(0.60)
+
+    def enterEvent(self, event):
+        super().enterEvent(event)
+        self.update_transparency_state(True)
+
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+        self.update_transparency_state(False)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.update_transparency_state(self.rect().contains(self.mapFromGlobal(QtGui.QCursor.pos())))
+
+    def update_transparency_state(self, hovered):
+        self._hovered = hovered
+        self.fade_timer.stop()
+        self.setWindowOpacity(1.0)
+        if not hovered:
+            self.fade_timer.start(800)
+
+    def hideEvent(self, event):
+        from TheKeyMachine.mods import settingsMod as settings
+
+        settings.set_setting("orbit_geometry", [self.pos().x(), self.pos().y(), self.width(), self.height()])
+        super().hideEvent(event)
 
 
-def orbit_window(*args, offset_x=0, offset_y=0):
-    screen_width, screen_height = get_screen_resolution()
-    screen_width = screen_width
-
-    global dynamic_opacity
-    dynamic_opacity = False
-
+def orbit_window(*args, offset_x=0, offset_y=0, rebuild=False):
     if cmds.window("orbit_window", exists=True):
         cmds.deleteUI("orbit_window")
 
-    # Variables para implementar el drag
-    drag = {"active": False, "position": QtCore.QPoint()}
-
-    def mousePressEvent(event):
-        if event.button() == QtCore.Qt.LeftButton:
-            drag["active"] = True
-            drag["position"] = event.globalPos() - window.frameGeometry().topLeft()
-            event.accept()
-
-    def mouseMoveEvent(event):
-        if event.buttons() == QtCore.Qt.LeftButton and drag["active"]:
-            window.move(event.globalPos() - drag["position"])
-            event.accept()
-
-    def mouseReleaseEvent(event):
-        drag["active"] = False
-
-    def change_opacity():
-        # Verificar si el cursor aún está dentro de la ventana
-        if window.rect().contains(window.mapFromGlobal(QtGui.QCursor.pos())):
-            window.setWindowOpacity(1.0)  # Aumentar la opacidad
-
-    # Crear un QTimer
-    timer = QtCore.QTimer()
-    timer.timeout.connect(change_opacity)
-    timer.setSingleShot(True)  # El timer se dispara solo una vez
-
-    def enterEvent(event):
-        global dynamic_opacity
-        if dynamic_opacity:
-            timer.start(100)
-
-    def leaveEvent(event):
-        global dynamic_opacity
-        if dynamic_opacity:
-            timer.stop()  # Detener el timer si el mouse sale antes del retardo
-            window.setWindowOpacity(0.60)
-
     parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
-    window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
-
-    if screen_width == 3840:
-        window.resize(600, 60)
-    else:
-        window.resize(360, 15)
-
-    window.setObjectName("orbit_window")
-    window.setWindowTitle("Orbit")
-    window.setWindowOpacity(1.0)
-    window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-    window.mousePressEvent = mousePressEvent
-    window.mouseMoveEvent = mouseMoveEvent
-    window.mouseReleaseEvent = mouseReleaseEvent
-    window.enterEvent = enterEvent
-    window.leaveEvent = leaveEvent
-
-    central_widget = QtWidgets.QWidget(window)
-    central_widget.setStyleSheet("""
-        QWidget {
-            background-color: #444444; 
-            border-radius: 6px;
-            border: 1px solid #393939;
-        }
-        QLabel {
-            border: none;
-        }
-        """)
-    window_layout = QtWidgets.QVBoxLayout(window)
-    window_layout.addWidget(central_widget)
-
-    # Layout principal para todos los botones
-    main_layout = QtWidgets.QHBoxLayout()
-    central_widget.setLayout(main_layout)
-
-    botones = []  # Lista para almacenar los botones
-
-    for button_id in ["button1", "button2", "button3", "button4", "button5", "button6", "button7"]:
-        action_name = configuracion_orbit.get(button_id, "")  # Obtener el nombre de la acción desde la configuración
-        icon_path = iconos_acciones.get(acciones.get(action_name, ""), media.isolate_image)  # Obtener la ruta del icono
-
-        boton = CustomButton(icon_path, button_id, window=window)
-
-        # Conectar el botón a la acción correspondiente
-        boton.clicked.connect(partial(ejecutar_accion, action_name))
-
-        botones.append(boton)
-
-        # Establecer el estilo del botón aquí (si es necesario)
-
-        main_layout.addWidget(boton)
-        spacer = QtWidgets.QSpacerItem(50, 10, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        main_layout.addSpacerItem(spacer)
-
-        # Estilo para los botones
-        button_style = """
-            QPushButton {
-                /* Estilos para el estado normal del botón */
-                border: 0px solid #444444;
-                border-radius: 0px;
-            }
-            QPushButton:hover {
-                /* Estilos para cuando el cursor está sobre el botón */
-                background-color: #505050;
-            }
-        """
-        boton.setStyleSheet(button_style)
-
-    # Botón de cierre
-    close_button = QtWidgets.QPushButton("X")
-    if screen_width == 3840:
-        close_button.setFixedSize(30, 30)
-    else:
-        close_button.setFixedSize(20, 20)
-    close_button.setStyleSheet(
-        "QPushButton {"
-        "    background-color: #585858;"
-        "    color: #ccc;"
-        "    border-radius: 4px;"
-        "    border: none;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #c56054;"
-        "    border-radius: 4px;"
-        "    border: none;"
-        "}"
-    )
-    close_button.clicked.connect(window.close)
-    main_layout.addWidget(close_button)
-
-    cursor_pos = QtGui.QCursor.pos()
-
-    # Mover la ventana solo si los offsets no son ambos cero
-    if not (offset_x == 0 and offset_y == 0):
-        adjusted_pos = cursor_pos + QtCore.QPoint(offset_x, offset_y)
-        window.move(adjusted_pos)
-
-    window.show()
+    win = OrbitWindow(parent=parent, offset_x=offset_x, offset_y=offset_y, rebuild=rebuild)
+    win.show()
 
 
 # ________________________________________________ Donate window  ______________________________________________________ #

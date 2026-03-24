@@ -1,7 +1,7 @@
 {
     "INSTALL_PATH": "",
     "USER_FOLDER_PATH": "",
-    "UPDATER": false,
+    "INTERNET_CONNECTION": true,
     "BUG_REPORT": true,
     "CUSTOM_TOOLS_MENU": true,
     "CUSTOM_SCRIPTS_MENU": true,

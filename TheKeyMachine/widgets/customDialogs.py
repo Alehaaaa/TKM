@@ -744,6 +744,44 @@ class QFlatFloatingWidget(QFlatDialog):
         QFlatDialog.mouseReleaseEvent(self, e)
 
 
+class QFlatCloseableFloatingWidget(QFlatFloatingWidget):
+    """
+    A default floating widget with a right close button, no titles, normal main layout.
+    """
+
+    def __init__(self, popup=False, parent=None):
+        super().__init__(popup=popup, closeButton=False, parent=parent)
+
+        # Close button at the top right
+        self.top_bar_layout = QtWidgets.QHBoxLayout()
+        self.top_bar_layout.setContentsMargins(0, 0, 0, 0)
+        self.top_bar_layout.setSpacing(0)
+
+        self.close_button = QtWidgets.QPushButton("X")
+        self.close_button.setFixedSize(DPI(16), DPI(16))
+        self.close_button.setStyleSheet(
+            "QPushButton {"
+            "    background-color: transparent;"
+            "    color: #ccc;"
+            "    border: none;"
+            "    font-weight: bold;"
+            "    font-size: %dpx;"
+            "}"
+            "QPushButton:hover {"
+            "    color: #ffffff;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: #333333;"
+            "}" % (DPI(10))
+        )
+        self.close_button.clicked.connect(self.close)
+
+        self.top_bar_layout.addStretch()
+        self.top_bar_layout.addWidget(self.close_button)
+
+        self.mainLayout.insertLayout(0, self.top_bar_layout)
+
+
 class QFlatToolBarDialog(QFlatFloatingWidget):
     """
     A modern successor to the Maya tool bar.
@@ -905,7 +943,13 @@ class TKMAboutDialog(QFlatDialog):
 
             def _check_updates():
                 import TheKeyMachine.core.updater as updater
-                from importlib import reload
+
+                try:
+                    from importlib import reload
+                except ImportError:
+                    from imp import reload
+                except ImportError:
+                    pass
 
                 reload(updater)
 
