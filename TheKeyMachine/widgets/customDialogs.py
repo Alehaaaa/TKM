@@ -994,7 +994,7 @@ class QFlatBugReportDialog(QFlatDialog):
         QFlatDialog.__init__(self, parent)
         self.setWindowTitle("Report a Bug")
         # More horizontal / less tall default footprint.
-        self.setMinimumSize(DPI(560), DPI(490))
+        self.setMinimumSize(DPI(600), DPI(450))
 
         self._info_color = "#9bbbca"
         self._error_color = "#CA6161"
@@ -1052,13 +1052,15 @@ class QFlatBugReportDialog(QFlatDialog):
             "Please describe the problem or error you're experiencing. Include the steps and tool used so the issue can be reproduced."
         )
         self.explanation_textbox.setAcceptRichText(False)
-        self.explanation_textbox.setMinimumHeight(DPI(180))
+        self.explanation_textbox.setMinimumHeight(DPI(110))
+        self.explanation_textbox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.explanation_textbox.textChanged.connect(lambda: self._enforce_text_limit(self.explanation_textbox))
 
         self.script_error_textbox = QtWidgets.QTextEdit()
         self.script_error_textbox.setPlaceholderText("If you see any errors in the Script Editor, copy and paste the last 3 or 4 lines here.")
         self.script_error_textbox.setAcceptRichText(False)
-        self.script_error_textbox.setMinimumHeight(DPI(180))
+        self.script_error_textbox.setMinimumHeight(DPI(80))
+        self.script_error_textbox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.script_error_textbox.textChanged.connect(lambda: self._enforce_text_limit(self.script_error_textbox))
 
         for widget in (self.name_input, self.email_input):
@@ -1069,20 +1071,12 @@ class QFlatBugReportDialog(QFlatDialog):
             widget.setStyleSheet(self._textedit_style())
             widget.textChanged.connect(self._clear_status_message)
 
-        info_row = QtWidgets.QHBoxLayout()
-        info_row.setContentsMargins(0, 0, 0, 0)
-        info_row.setSpacing(DPI(10))
-        info_row.addWidget(self.name_input, 1)
-        info_row.addWidget(self.email_input, 1)
-        content_layout.addLayout(info_row)
-
-        text_row = QtWidgets.QHBoxLayout()
-        text_row.setContentsMargins(0, 0, 0, 0)
-        text_row.setSpacing(DPI(10))
-        text_row.addWidget(self.explanation_textbox, 3)
-        text_row.addWidget(self.script_error_textbox, 2)
-        content_layout.addLayout(text_row, 1)
-        content_layout.addStretch(1)
+        # Keep fields in a single vertical column for faster scanning/filling.
+        content_layout.addWidget(self.name_input)
+        content_layout.addWidget(self.email_input)
+        # Stretch with a modest ratio; keep the fields from becoming huge by default.
+        content_layout.addWidget(self.explanation_textbox, 2)
+        content_layout.addWidget(self.script_error_textbox, 1)
 
         self.root_layout.addWidget(content_widget, 1)
 
@@ -1091,7 +1085,8 @@ class QFlatBugReportDialog(QFlatDialog):
         self.setBottomBar([send_cfg], closeButton=True, highlight="Send bug")
         self._send_button = self._find_button("Send bug")
 
-        self.resize(DPI(640), DPI(560))
+        # Keep a horizontal rectangle feel even with vertical fields.
+        self.resize(DPI(680), DPI(500))
 
     def _input_style(self):
         return (
@@ -1193,7 +1188,8 @@ class QFlatBugReportDialog(QFlatDialog):
                 self._send_button.setEnabled(True)
 
     def show_centered(self):
-        self.adjustSize()
+        # Avoid adjustSize() here: it tends to make this dialog overly tall based on content hints.
+        self.resize(DPI(680), DPI(500))
         parent = self.parentWidget() or get_maya_qt()
         if parent:
             geo = parent.frameGeometry()
