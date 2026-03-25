@@ -9,11 +9,21 @@ try:
     from PySide6.QtGui import QRegularExpressionValidator
     from PySide6.QtCore import QRegularExpression
 
+    try:
+        from PySide6.QtSvg import QSvgRenderer  # type: ignore
+    except ImportError:
+        QSvgRenderer = None  # type: ignore
+
     PYSIDE_VERSION = 6
 except ImportError:
     from PySide2 import QtWidgets, QtCore, QtGui
     from PySide2.QtGui import QRegExpValidator
     from PySide2.QtCore import QRegExp
+
+    try:
+        from PySide2.QtSvg import QSvgRenderer  # type: ignore
+    except ImportError:
+        QSvgRenderer = None  # type: ignore
 
     PYSIDE_VERSION = 2
 
@@ -752,34 +762,109 @@ class QFlatCloseableFloatingWidget(QFlatFloatingWidget):
     def __init__(self, popup=False, parent=None):
         super().__init__(popup=popup, closeButton=False, parent=parent)
 
-        # Close button at the top right
+        # Header row. Subclasses can optionally populate:
+        # - left content via set_header_left_widget(...)
+        # - right-side widgets via add_header_right_widget(...), placed before close.
         self.top_bar_layout = QtWidgets.QHBoxLayout()
         self.top_bar_layout.setContentsMargins(0, 0, 0, 0)
         self.top_bar_layout.setSpacing(0)
 
-        self.close_button = QtWidgets.QPushButton("X")
-        self.close_button.setFixedSize(DPI(16), DPI(16))
+        self.header_left_container = QtWidgets.QWidget()
+        self.header_left_container.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.header_left_layout = QtWidgets.QHBoxLayout(self.header_left_container)
+        self.header_left_layout.setContentsMargins(0, 0, 0, 0)
+        self.header_left_layout.setSpacing(0)
+
+        self._header_left_spacing = QtWidgets.QWidget()
+        self._header_left_spacing.setFixedWidth(DPI(8))
+        self._header_left_spacing.setVisible(False)
+
+        self.header_separator = QtWidgets.QFrame()
+        self.header_separator.setFrameShape(QtWidgets.QFrame.VLine)
+        self.header_separator.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.header_separator.setStyleSheet("QFrame { background-color: #3d3d3d; border: none; }")
+        self.header_separator.setFixedWidth(max(1, DPI(2)))
+        self.header_separator.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
+        self.header_separator.setVisible(False)
+
+        self._header_right_spacing = QtWidgets.QWidget()
+        self._header_right_spacing.setFixedWidth(DPI(8))
+        self._header_right_spacing.setVisible(False)
+
+        self.header_right_container = QtWidgets.QWidget()
+        self.header_right_container.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Expanding)
+        self.header_right_layout = QtWidgets.QHBoxLayout(self.header_right_container)
+        self.header_right_layout.setContentsMargins(0, 0, 0, 0)
+        self.header_right_layout.setSpacing(DPI(2))
+        self.header_right_layout.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+
+        self.close_button = QtWidgets.QToolButton()
+        self.close_button.setAutoRaise(True)
+        self.close_button.setCursor(QtCore.Qt.PointingHandCursor)
+        self.close_button.setIcon(QtGui.QIcon(media.close_image))
+        self.close_button.setIconSize(QtCore.QSize(DPI(18), DPI(18)))
+        # Orbit (and other floating tools) expect a compact close button.
+        self.close_button.setFixedSize(DPI(20), DPI(20))
         self.close_button.setStyleSheet(
-            "QPushButton {"
-            "    background-color: transparent;"
-            "    color: #ccc;"
-            "    border: none;"
-            "    font-weight: bold;"
-            "    font-size: %dpx;"
-            "}"
-            "QPushButton:hover {"
-            "    color: #ffffff;"
-            "}"
-            "QPushButton:pressed {"
-            "    background-color: #333333;"
-            "}" % (DPI(10))
+            """
+            QToolButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 0px;
+            }
+            QToolButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+            }
+            QToolButton:pressed {
+                background-color: rgba(0, 0, 0, 0.45);
+            }
+            """
         )
         self.close_button.clicked.connect(self.close)
 
-        self.top_bar_layout.addStretch()
-        self.top_bar_layout.addWidget(self.close_button)
+        self.header_right_layout.addWidget(self.close_button)
+
+        self.top_bar_layout.addWidget(self.header_left_container, 1)
+        self.top_bar_layout.addWidget(self._header_left_spacing, 0)
+        self.top_bar_layout.addWidget(self.header_separator, 0)
+        self.top_bar_layout.addWidget(self._header_right_spacing, 0)
+        self.top_bar_layout.addWidget(self.header_right_container, 0)
 
         self.mainLayout.insertLayout(0, self.top_bar_layout)
+
+    def _set_header_divider_visible(self, visible):
+        self._header_left_spacing.setVisible(bool(visible))
+        self.header_separator.setVisible(bool(visible))
+        self._header_right_spacing.setVisible(bool(visible))
+
+    def set_header_left_widget(self, widget, stretch=1):
+        while self.header_left_layout.count():
+            item = self.header_left_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+        if widget:
+            self.header_left_layout.addWidget(widget, stretch)
+            self._set_header_divider_visible(True)
+
+    def clear_header_right_widgets(self):
+        # Keep the close button; remove any extra widgets.
+        for i in reversed(range(self.header_right_layout.count())):
+            item = self.header_right_layout.itemAt(i)
+            w = item.widget()
+            if w and w is not self.close_button:
+                self.header_right_layout.takeAt(i)
+                w.setParent(None)
+
+    def add_header_right_widget(self, widget, before_close=True):
+        if not widget:
+            return
+        self._set_header_divider_visible(True)
+        if before_close:
+            idx = max(0, self.header_right_layout.indexOf(self.close_button))
+            self.header_right_layout.insertWidget(idx, widget)
+        else:
+            self.header_right_layout.addWidget(widget)
 
 
 class QFlatToolBarDialog(QFlatFloatingWidget):
@@ -894,6 +979,235 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
             cmds.select(valid_names, replace=True)
         else:
             cmds.select(clear=True)
+
+
+class QFlatBugReportDialog(QFlatDialog):
+    """
+    Modern bug report dialog that reuses QFlatDialog styling.
+    """
+
+    MAX_TEXT_CHARS = 1200
+
+    def __init__(self, parent=None, submit_callback=None):
+        self._submit_callback = submit_callback
+        self._send_button = None
+        QFlatDialog.__init__(self, parent)
+        self.setWindowTitle("Report a Bug")
+        # More horizontal / less tall default footprint.
+        self.setMinimumSize(DPI(560), DPI(490))
+
+        self._info_color = "#9bbbca"
+        self._error_color = "#CA6161"
+
+        content_widget = QtWidgets.QWidget()
+        content_layout = QtWidgets.QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(DPI(24), DPI(20), DPI(24), DPI(10))
+        content_layout.setSpacing(DPI(12))
+
+        header_layout = QtWidgets.QHBoxLayout()
+        header_layout.setSpacing(DPI(12))
+
+        icon_label = QtWidgets.QLabel()
+        icon_size = QtCore.QSize(DPI(72), DPI(72))
+        icon_label.setFixedSize(icon_size)
+        icon_label.setScaledContents(False)
+        bug_pixmap = self._bug_icon_pixmap(icon_size)
+        if not bug_pixmap.isNull():
+            icon_label.setPixmap(bug_pixmap)
+        header_layout.addWidget(icon_label, alignment=QtCore.Qt.AlignTop)
+
+        text_layout = QtWidgets.QVBoxLayout()
+        text_layout.setSpacing(DPI(4))
+
+        title = QtWidgets.QLabel("<b>Report a Bug</b>")
+        title.setAlignment(QtCore.Qt.AlignLeft)
+        title.setStyleSheet("color: #CA6161; font-size: %spx;" % DPI(18))
+        text_layout.addWidget(title)
+
+        subtitle = QtWidgets.QLabel("Have you found a bug? Please fill the report and I will do my best to fix it in the next update.")
+        subtitle.setAlignment(QtCore.Qt.AlignLeft)
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color: #cccccc; font-size: %spx;" % DPI(11))
+        text_layout.addWidget(subtitle)
+
+        header_layout.addLayout(text_layout, stretch=1)
+        content_layout.addLayout(header_layout)
+
+        self.status_label = QtWidgets.QLabel("")
+        self.status_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.status_label.setWordWrap(True)
+        self.status_label.setStyleSheet("color: %s;" % self._info_color)
+        content_layout.addWidget(self.status_label)
+
+        self.name_input = QtWidgets.QLineEdit()
+        self.name_input.setPlaceholderText("Your name (required)")
+        self.name_input.setMaxLength(50)
+
+        self.email_input = QtWidgets.QLineEdit()
+        self.email_input.setPlaceholderText("Your email")
+        self.email_input.setMaxLength(50)
+
+        self.explanation_textbox = QtWidgets.QTextEdit()
+        self.explanation_textbox.setPlaceholderText(
+            "Please describe the problem or error you're experiencing. Include the steps and tool used so the issue can be reproduced."
+        )
+        self.explanation_textbox.setAcceptRichText(False)
+        self.explanation_textbox.setMinimumHeight(DPI(180))
+        self.explanation_textbox.textChanged.connect(lambda: self._enforce_text_limit(self.explanation_textbox))
+
+        self.script_error_textbox = QtWidgets.QTextEdit()
+        self.script_error_textbox.setPlaceholderText("If you see any errors in the Script Editor, copy and paste the last 3 or 4 lines here.")
+        self.script_error_textbox.setAcceptRichText(False)
+        self.script_error_textbox.setMinimumHeight(DPI(180))
+        self.script_error_textbox.textChanged.connect(lambda: self._enforce_text_limit(self.script_error_textbox))
+
+        for widget in (self.name_input, self.email_input):
+            widget.setStyleSheet(self._input_style())
+            widget.textChanged.connect(self._clear_status_message)
+
+        for widget in (self.explanation_textbox, self.script_error_textbox):
+            widget.setStyleSheet(self._textedit_style())
+            widget.textChanged.connect(self._clear_status_message)
+
+        info_row = QtWidgets.QHBoxLayout()
+        info_row.setContentsMargins(0, 0, 0, 0)
+        info_row.setSpacing(DPI(10))
+        info_row.addWidget(self.name_input, 1)
+        info_row.addWidget(self.email_input, 1)
+        content_layout.addLayout(info_row)
+
+        text_row = QtWidgets.QHBoxLayout()
+        text_row.setContentsMargins(0, 0, 0, 0)
+        text_row.setSpacing(DPI(10))
+        text_row.addWidget(self.explanation_textbox, 3)
+        text_row.addWidget(self.script_error_textbox, 2)
+        content_layout.addLayout(text_row, 1)
+        content_layout.addStretch(1)
+
+        self.root_layout.addWidget(content_widget, 1)
+
+        send_cfg = QFlatDialogButton("Send bug", highlight=True, icon=media.apply_image)
+        send_cfg["callback"] = self._on_send_clicked
+        self.setBottomBar([send_cfg], closeButton=True, highlight="Send bug")
+        self._send_button = self._find_button("Send bug")
+
+        self.resize(DPI(640), DPI(560))
+
+    def _input_style(self):
+        return (
+            "QLineEdit {background-color: #2d2d2d;border: 1px solid #393939;border-radius: %spx;color: #cccccc;padding: %spx;font-size: %spx;}"
+        ) % (DPI(4), DPI(6), DPI(11))
+
+    def _textedit_style(self):
+        return (
+            "QTextEdit {background-color: #2d2d2d;border: 1px solid #393939;border-radius: %spx;color: #cccccc;padding: %spx;font-size: %spx;}"
+        ) % (DPI(4), DPI(6), DPI(11))
+
+    def _bug_icon_pixmap(self, size):
+        path = media.report_a_bug_image
+        if not path:
+            return QtGui.QPixmap()
+
+        lower = path.lower()
+        if lower.endswith(".svg") and QSvgRenderer:
+            renderer = QSvgRenderer(path)
+            if renderer.isValid():
+                screen = QtGui.QGuiApplication.primaryScreen()
+                dpr = screen.devicePixelRatio() if screen else 1.0
+                width = max(1, int(size.width() * dpr))
+                height = max(1, int(size.height() * dpr))
+                pixmap = QtGui.QPixmap(width, height)
+                pixmap.fill(QtCore.Qt.transparent)
+                painter = QtGui.QPainter(pixmap)
+                renderer.render(painter, QtCore.QRectF(0, 0, width, height))
+                painter.end()
+                pixmap.setDevicePixelRatio(dpr)
+                return pixmap
+
+        pixmap = QtGui.QPixmap(path)
+        if pixmap.isNull():
+            return pixmap
+        return pixmap.scaled(size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+
+    def _find_button(self, name):
+        if not self.bottomBar:
+            return None
+        for btn in self.bottomBar.findChildren(QtWidgets.QPushButton):
+            if btn.text().strip().lower() == name.lower():
+                return btn
+        return None
+
+    def _set_status(self, message, error=False):
+        color = self._error_color if error else self._info_color
+        self.status_label.setStyleSheet("color: %s;" % color)
+        self.status_label.setText(message)
+
+    def _clear_status_message(self):
+        if self._send_button and not self._send_button.isEnabled():
+            return
+        self.status_label.clear()
+
+    def _enforce_text_limit(self, widget):
+        text = widget.toPlainText()
+        if len(text) <= self.MAX_TEXT_CHARS:
+            return
+        cursor = widget.textCursor()
+        pos = cursor.position()
+        widget.blockSignals(True)
+        widget.setPlainText(text[: self.MAX_TEXT_CHARS])
+        cursor.setPosition(min(pos, self.MAX_TEXT_CHARS))
+        widget.setTextCursor(cursor)
+        widget.blockSignals(False)
+
+    def _on_send_clicked(self):
+        name = self.name_input.text().strip()
+        explanation = self.explanation_textbox.toPlainText().strip()
+
+        if not name or not explanation:
+            self._set_status("Please fill in the required fields.", error=True)
+            return
+
+        if not self._submit_callback:
+            self._set_status("Bug reporting is unavailable right now.", error=True)
+            return
+
+        email = self.email_input.text().strip()
+        script_error = self.script_error_textbox.toPlainText().strip()
+
+        self._set_status("Sending bug report...", error=False)
+        if self._send_button:
+            self._send_button.setEnabled(False)
+
+        success = False
+        try:
+            success = bool(self._submit_callback(name, email, explanation, script_error))
+        except Exception as exc:
+            print("[TheKeyMachine] Bug report submission failed:", exc)
+
+        if success:
+            self._set_status("Report sent successfully. Thanks!", error=False)
+            QtCore.QTimer.singleShot(3100, self.close)
+        else:
+            self._set_status("Failed to send the report. Try again later.", error=True)
+            if self._send_button:
+                self._send_button.setEnabled(True)
+
+    def show_centered(self):
+        self.adjustSize()
+        parent = self.parentWidget() or get_maya_qt()
+        if parent:
+            geo = parent.frameGeometry()
+            x = geo.x() + (geo.width() - self.width()) / 2
+            y = geo.y() + (geo.height() - self.height()) / 2
+        else:
+            geo = QtGui.QGuiApplication.primaryScreen().availableGeometry()
+            x = geo.x() + (geo.width() - self.width()) / 2
+            y = geo.y() + (geo.height() - self.height()) / 2
+
+        self.move(int(x), int(y))
+        self.show()
+        self.raise_()
+        self.activateWindow()
 
 
 class TKMAboutDialog(QFlatDialog):

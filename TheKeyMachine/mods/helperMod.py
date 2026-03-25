@@ -412,9 +412,27 @@ mirror_tooltip_text = (
 )
 
 copy_animation_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Paste Animation</b></font><img src='{media.copy_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy Animation</b></font><img src='{media.copy_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Copy and paste animations of objects or controls.<br>"
+    "Copy animations of objects or controls.<br>"
+    "The animation is saved in a file, so it can be pasted in another Maya session.<br><br>"
+    "If you have copied only one side of the controls, you can paste them on the opposite side.<br><br>"
+    "</font>"
+)
+
+paste_animation_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Paste Animation</b></font><img src='{media.paste_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "Paste animations of copied objects or controls.<br>"
+    "The animation is saved in a file, so it can be pasted in another Maya session.<br><br>"
+    "If you have copied only one side of the controls, you can paste them on the opposite side.<br><br>"
+    "</font>"
+)
+
+paste_insert_animation_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Paste Insert Animation</b></font><img src='{media.paste_insert_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "Paste animations of copied objects or controls.<br>"
     "The animation is saved in a file, so it can be pasted in another Maya session.<br><br>"
     "If you have copied only one side of the controls, you can paste them on the opposite side.<br><br>"
     "</font>"
@@ -480,7 +498,7 @@ follow_cam_tooltip_text = (
 )
 
 copy_worldspace_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy World Space</b></font><img src='{media.worldspace_copy_animation_image}' width='28'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy World Space</b></font><img src='{media.worldspace_copy_frame_image}' width='28'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy the World Space positions of selected objects in current frame. Useful for reseting, for example, the master control in a walking cycle.<br><br>"
     "To 'Copy' select a group of controls and click 'Copy World Space'.<br><br>"

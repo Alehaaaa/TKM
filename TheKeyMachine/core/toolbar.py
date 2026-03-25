@@ -196,6 +196,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.toggleAnimOffsetButtonState = settings.get_setting("toggleAnimOffsetButtonState", False)
         self.micro_move_button_state = settings.get_setting("micro_move_button_state", False)
         self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
+        self.orbit_button_widget = None
 
         self.docking_position = settings.get_setting("docking_position", ["TimeSlider", "top"])
         self.docking_orients = {
@@ -1179,260 +1180,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.warning(f"{new_set_group_name} already exists")
 
     def open_set_creation_window(self):
-        if cmds.window("SetCreationWindow", exists=True):
-            cmds.deleteUI("SetCreationWindow")
-
-        sel_set_name = "TheKeyMachine_SelectionSet"
-        main_setgroup_name = "main_setgroup"
-
-        if not cmds.objExists(sel_set_name):
-            # Crea el conjunto de selección si no existe
-            cmds.sets(name=sel_set_name, empty=True)
-
-        if not cmds.objExists(main_setgroup_name):
-            # Crea el conjunto de selección genérico si no existe
-            cmds.sets(name=main_setgroup_name, empty=True)
-
-            # Añade el conjunto genérico al conjunto principal "TheKeyMachine_SelectionSet"
-            cmds.sets(main_setgroup_name, add=sel_set_name)
-
-        # Variables para el drag
-        drag = {"active": False, "position": QtCore.QPoint()}
-
-        def mousePressEvent(event):
-            if event.button() == QtCore.Qt.LeftButton:
-                drag["active"] = True
-                drag["position"] = event.globalPos() - window.frameGeometry().topLeft()
-                event.accept()
-
-        def mouseMoveEvent(event):
-            if event.buttons() == QtCore.Qt.LeftButton and drag["active"]:
-                window.move(event.globalPos() - drag["position"])
-                event.accept()
-
-        def mouseReleaseEvent(event):
-            drag["active"] = False
-
-        parent = self.maya_main_window()
-
-        window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
-        window.resize(200, 120)
-        window.setObjectName("SetCreationWindow")
-        window.setWindowTitle("Set Creation")
-        window.setWindowOpacity(1.0)
-        window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-
-        window.mousePressEvent = mousePressEvent
-        window.mouseMoveEvent = mouseMoveEvent
-        window.mouseReleaseEvent = mouseReleaseEvent
-
-        central_widget = QtWidgets.QWidget(window)
-        # central_widget.setStyleSheet("background-color: #444; border-radius: 10px;")
-        layout = QtWidgets.QVBoxLayout(central_widget)
-        layout.setContentsMargins(10, 10, 10, 10)
-
-        window_layout = QtWidgets.QVBoxLayout(window)
-        window_layout.addWidget(central_widget)
-        window.setLayout(window_layout)
-
-        close_button = QtWidgets.QPushButton("X")
-        close_button.setFixedSize(20, 20)
-        close_button.setStyleSheet(
-            "QPushButton {"
-            "    background-color: #585858;"
-            "    border: none;"
-            "    color: #ccc;"
-            "    border-radius: 5px;"
-            "}"
-            "QPushButton:hover {"
-            "    background-color: #c56054;"
-            "    border-radius: 5px;"
-            "}"
-        )
-        close_button.clicked.connect(window.close)
-
-        set_name_field = QtWidgets.QLineEdit(central_widget)
-        set_name_field.setPlaceholderText("Set name and click a color")
-        set_name_field.setFixedSize(340, 30)
-        set_name_field.setStyleSheet(
-            "QLineEdit {"
-            "    background-color: #252525;"
-            "    font-size: 13px;"
-            "    color: #cccccc;"
-            "    border: none;"
-            "    padding: 2px;"
-            "    border-radius: 4px;"
-            "}"
-        )
-
-        set_group_combo = QtWidgets.QComboBox(central_widget)
-        set_group_combo.setFixedSize(260, 30)
-        self.update_set_group_menu(set_group_combo)  # Asumiendo que esto llena el combo box
-
-        image_path = media.getImage("drop_down_arrow.svg")  # Asumiendo que esta función devuelve la ruta completa de la imagen.
-        image_path = image_path.replace("\\", "/")
-
-        set_group_combo.setStyleSheet(f"""
-            QComboBox {{
-                background-color: #353535;
-                border-radius: 5px;
-                padding: 5px;
-                font-size: 13px;
-                border: 1px solid #444;
-                color: #999;
-            }}
-            QComboBox::drop-down {{
-                border: none;
-                padding: 5px;
-                color: #cccccc;
-                font-size: 16px;
-            }}
-            QComboBox::down-arrow {{
-                image: url({image_path});
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: #333333;
-                border-radius: 0px;
-                selection-background-color: #555555;
-                color: #cccccc;
-            }}
-            QComboBox QAbstractItemView::item {{
-                min-height: 30px;  # Ajusta la altura según tus necesidades
-                padding-left: 5px;
-            }}
-            QComboBox QAbstractItemView::item::selected {{
-                border-radius: 0px;
-                padding: 5px;
-            }}
-        """)
-
-        create_setgroup_button = QtWidgets.QPushButton("Group")
-        create_setgroup_button.setFixedSize(70, 28)
-
-        create_setgroup_button.setStyleSheet(
-            "QPushButton {"
-            "    color: #aaa;"
-            "    background-color: #585858;"
-            "    border-radius: 5px;"
-            "    font: 12px;"
-            "}"
-            "QPushButton:hover:!pressed {"
-            "    color: #ccc;"
-            "    background-color: #656565;"
-            "    border-radius: 5px;"
-            "    font: 12px;"
-            "}"
-        )
-        create_setgroup_button.clicked.connect(lambda: self.create_new_set_group(set_name_field, set_group_combo))
-
-        # Crea un nuevo layout horizontal y añade ambos widgets:
-        group_layout = QtWidgets.QHBoxLayout()
-        group_layout.addWidget(set_group_combo)
-        group_layout.addWidget(create_setgroup_button)
-
-        # Luego, añade este nuevo layout al layout principal:
-        layout.addWidget(close_button, alignment=QtCore.Qt.AlignRight)
-        layout.addWidget(set_name_field)
-        layout.addLayout(group_layout)
-
-        color_button_layout = QtWidgets.QHBoxLayout()
-
-        for color_suffix, hex_code in ui.color_codes.items():
-            button = QtWidgets.QPushButton("")
-            if self.screen_width == 3840:
-                button.setFixedSize(50, 50)
-            else:
-                button.setFixedSize(34, 34)
-            hover_color = ui.color_codes_hover.get(color_suffix, hex_code)  # Asegura un valor por defecto
-            button.setStyleSheet(
-                "QPushButton {{"
-                f"    background-color: {hex_code};"
-                "    border-radius: 5px;"
-                "}}"
-                "QPushButton:hover {{"
-                f"    background-color: {hover_color};"
-                "    border-radius: 5px;"
-                "}}"
-            )
-            button.clicked.connect(
-                lambda c=color_suffix, field=set_name_field, combo=set_group_combo: self.create_new_set_and_update_buttons(c, field, combo)
-            )
-
-            color_button_layout.addWidget(button)
-
-        if self.screen_width == 3840:
-            window.resize(750, 350)
-            layout.setContentsMargins(20, 20, 20, 20)
-            close_button.setFixedSize(35, 35)
-            set_name_field.setFixedSize(700, 50)
-            set_name_field.setStyleSheet(
-                "QLineEdit {"
-                "    background-color: #252525;"
-                "    font-size: 20px;"
-                "    color: #cccccc;"
-                "    border: none;"
-                "    padding: 2px;"
-                "    border-radius: 4px;"
-                "}"
-            )
-            set_group_combo.setFixedSize(535, 50)
-            set_group_combo.setStyleSheet(f"""
-                QComboBox {{
-                    background-color: #353535;
-                    border-radius: 5px;
-                    padding: 5px;
-                    font-size: 18px;
-                    border: 1px solid #444;
-                    color: #999;
-                }}
-                QComboBox::drop-down {{
-                    border: none;
-                    padding: 5px;
-                    color: #cccccc;
-                    font-size: 18px;
-                }}
-                QComboBox::down-arrow {{
-                    image: url({image_path});
-                }}
-                QComboBox QAbstractItemView {{
-                    background-color: #333333;
-                    border-radius: 0px;
-                    selection-background-color: #555555;
-                    color: #cccccc;
-                }}
-                QComboBox QAbstractItemView::item {{
-                    min-height: 30px;  # Ajusta la altura según tus necesidades
-                    padding-left: 5px;
-                }}
-                QComboBox QAbstractItemView::item::selected {{
-                    border-radius: 0px;
-                    padding: 5px;
-                }}
-            """)
-            create_setgroup_button.setFixedSize(150, 50)
-            create_setgroup_button.setStyleSheet(
-                "QPushButton {"
-                "    color: #aaa;"
-                "    background-color: #585858;"
-                "    border-radius: 5px;"
-                "    font: 18px;"
-                "}"
-                "QPushButton:hover:!pressed {"
-                "    color: #ccc;"
-                "    background-color: #656565;"
-                "    border-radius: 5px;"
-                "    font: 18px;"
-                "}"
-            )
-
-        layout.addLayout(color_button_layout)
-        window.show()
-
-        # Ajustar la posición de la ventana
-        parent_geometry = parent.geometry()
-        x = parent_geometry.x() + parent_geometry.width() / 2 - window.width() / 2 - 100
-        y = parent_geometry.y() + parent_geometry.height() / 2 - window.height() / 2 + 100
-        window.move(x, y)
+        ui.open_selection_set_creation_dialog(controller=self)
 
     def update_set_group_menu(self, combo_widget):
         # Limpiar elementos existentes
@@ -1609,338 +1357,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             )
 
     def clear_selection_sets(self, *args):
-        # Asegurarse de que el layout existe
-        if not cmds.control("selection_sets_flow_layout", query=True, exists=True):
-            return
-
-        # Borra todos los botones existentes
-        children = cmds.flowLayout("selection_sets_flow_layout", q=True, ca=True)
-        if children:
-            for child in children:
-                cmds.deleteUI(child)
-
-        # Crea el botón 'SET' sin importar si hay conjuntos de selección o no
-        cmds.separator(style="none", width=5, p="selection_sets_flow_layout")
-        selset_button = cmds.iconTextButton(
-            l=" SET ", image=media.add_selection_set_image, h=28, w=28, c=self.open_set_creation_window, p="selection_sets_flow_layout"
-        )
-        cmds.separator(style="none", width=5, p="selection_sets_flow_layout")
-        cmds.popupMenu(parent=selset_button)
-        cmds.menuItem(label="Export Sets", c=self.export_sets)
-        cmds.menuItem(label="Import Sets", c=self.import_sets)
+        ui.refresh_selection_sets_window()
 
     def selection_sets_empty_setup(self, *args):
-        # Asegurarse de que el layout existe
-        if not cmds.control("selection_sets_flow_layout", query=True, exists=True):
-            self.create_selection_sets_workspace()
-            if not cmds.control("selection_sets_flow_layout", query=True, exists=True):
-                return
+        ui.refresh_selection_sets_window()
 
-        # Borra todos los botones existentes
-        children = cmds.flowLayout("selection_sets_flow_layout", q=True, ca=True)
-        if children:
-            for child in children:
-                cmds.deleteUI(child)
-
-        # Crear el botón 'SET' sin importar si hay conjuntos de selección o no
-        cmds.separator(style="none", width=5, p="selection_sets_flow_layout")
-        selset_button = cmds.iconTextButton(
-            l=" SET ", image=media.add_selection_set_image, h=32, w=32, c=self.selection_sets_setup, p="selection_sets_flow_layout"
-        )
-        cmds.separator(style="none", width=5, p="selection_sets_flow_layout")
-        cmds.popupMenu(parent=selset_button)
-        cmds.menuItem(label="Export Sets", c=self.export_sets)
-        cmds.menuItem(label="Import Sets", c=self.import_sets)
-
-    # Set workspace settings for selection sets based on interface when user loads Maya
     def selection_sets_setup(self, *args):
-        self.create_buttons_for_sel_sets()
-        self.open_set_creation_window()
+        ui.selection_sets_window(controller=self, reuse_existing=True)
 
     def create_buttons_for_sel_sets(self, *args):
-        mods = cmds.getModifiers()
-        shift_pressed = bool(mods % 2)  # Shift
-        ctrl_pressed = bool(mods % 4)  # Control
-
-        sel_set_name = "TheKeyMachine_SelectionSet"
-        main_setgroup_name = "main_setgroup"
-
-        if not cmds.objExists(sel_set_name):
-            # Crea el conjunto de selección si no existe
-            cmds.sets(name=sel_set_name, empty=True)
-
-        if not cmds.objExists(main_setgroup_name):
-            # Crea el conjunto de selección genérico si no existe
-            cmds.sets(name=main_setgroup_name, empty=True)
-
-            # Añade el conjunto genérico al conjunto principal "TheKeyMachine_SelectionSet"
-            cmds.sets(main_setgroup_name, add=sel_set_name)
-
-        # Asegurarse de que el layout existe
-        if not cmds.control("selection_sets_flow_layout", query=True, exists=True):
-            self.create_selection_sets_workspace()
-            if not cmds.control("selection_sets_flow_layout", query=True, exists=True):
-                return
-
-        # Borra todos los botones existentes
-        children = cmds.flowLayout("selection_sets_flow_layout", q=True, ca=True)
-        if children:
-            for child in children:
-                cmds.deleteUI(child)
-
-        # Crear el botón 'SET' sin importar si hay conjuntos de selección o no
-        cmds.separator(style="none", width=5, p="selection_sets_flow_layout")
-        selset_button = cmds.iconTextButton(
-            l=" SET ", image=media.add_selection_set_image, h=32, w=32, c=self.open_set_creation_window, p="selection_sets_flow_layout"
-        )
-        cmds.separator(style="none", width=5, p="selection_sets_flow_layout")
-        cmds.popupMenu(parent=selset_button)
-        cmds.menuItem(label="Export Sets", c=self.export_sets)
-        cmds.menuItem(label="Import Sets", c=self.import_sets)
-
-        # Obtiene todos los grupos de conjuntos
-        set_groups = self.get_set_groups()
-
-        # Ordenar los setgroups alfabéticamente, pero asegurándose de que "main_setgroup" esté primero
-        set_groups.sort(key=lambda g: (g != "main_setgroup", g))
-
-        # Si no hay grupos de conjuntos, no hay nada más que hacer
-        if not set_groups:
-            return
-
-        # Para cada grupo de conjuntos, obtén sus conjuntos de selección y crea botones para ellos
-        for set_group in set_groups:
-            # Obtiene todos los conjuntos de selección en el grupo de conjuntos actual
-            sub_sel_sets = cmds.sets(set_group, q=True) or []
-
-            # Ordena los conjuntos de selección por el código de color en el nombre
-            sub_sel_sets.sort(key=lambda s: (s.split("_")[-1], s.split("_")[:-1]))
-
-            # Obtener el estado de oculto o visible del setgroup
-            setgroup_hidden = all(cmds.getAttr(f"{sub_sel_set}.hidden") for sub_sel_set in sub_sel_sets)
-
-            # Establecer el color de fondo en función del estado del setgroup
-            button_color = "#393939" if setgroup_hidden else "#292929"
-            button_text_color = "#636363" if setgroup_hidden else "#66949d"
-
-            # Obtener el nombre del setgroup sin el sufijo "_setgroup"
-            setgroup_name_without_suffix = set_group.replace("_setgroup", "")
-            button_label = f"{setgroup_name_without_suffix}"
-
-            # Crear el botón del setgroup y asignarle un ID único
-            toggle_command = partial(self.toggle_setgroup_visibility, set_group)
-            setgroup_button_width = max(60, len(setgroup_name_without_suffix) * 9)
-            button = cmds.button(
-                f"setgroup_button_{set_group}",
-                label=button_label,
-                h=32,
-                width=setgroup_button_width,
-                parent="selection_sets_flow_layout",
-                command=toggle_command,
-            )
-            button_widget = wrapInstance(int(mui.MQtUtil.findControl(button)), QtWidgets.QPushButton)
-
-            if self.screen_width == 3840:
-                button_widget.setStyleSheet(
-                    """
-                    QPushButton {
-                        color: %s;
-                        background-color: %s;
-                        border-radius: 6px;
-                        border: 2px solid #333;
-                        font: 18px;
-                    }
-                    QPushButton:hover:!pressed {
-                        color: #5B8189;
-                        background-color: %s;
-                        border-radius: 6px;
-                        border: 2px solid #333;
-                        font: 18px;
-                    }
-                """
-                    % (button_text_color, button_color, button_color)
-                )
-            else:
-                button_widget.setStyleSheet(
-                    """
-                    QPushButton {
-                        color: %s;
-                        background-color: %s;
-                        border-radius: 6px;
-                        border: 2px solid #333;
-                        font: 11px;
-                    }
-                    QPushButton:hover:!pressed {
-                        color: #5B8189;
-                        background-color: %s;
-                        border-radius: 6px;
-                        border: 2px solid #333;
-                        font: 11px;
-                    }
-                """
-                    % (button_text_color, button_color, button_color)
-                )
-
-            cmds.popupMenu(parent=button)
-            # Verificar si el setgroup es el "main" y no agregar el menuItem "Rename Group" en ese caso
-            if set_group != "main_setgroup":
-                cmds.menuItem(label="Rename Group", command=lambda x, set_group=set_group: self.change_setgroup_name_window(set_group))
-                cmds.menuItem(divider=True)
-            cmds.menuItem(label="Export Group", command=lambda x, g=set_group: self.export_single_subgroup(g))
-            cmds.menuItem(label="Delete Group", command=lambda x, g=set_group: self.remove_set_group_and_update_buttons(g))
-
-        cmds.separator(style="none", width=10, p="selection_sets_flow_layout")  # Espacio entre los botones de los sets pertenecientes a cada grupo
-
-        # Para cada grupo de conjuntos, obtén sus conjuntos de selección y crea botones para ellos
-        for set_group in set_groups:
-            # Obtiene todos los conjuntos de selección en el grupo de conjuntos actual
-            sub_sel_sets = cmds.sets(set_group, q=True) or []
-
-            # Ordena los conjuntos de selección por el código de color en el nombre
-            sub_sel_sets.sort(key=lambda s: (s.split("_")[-1], s.split("_")[:-1]))
-
-            setgroup_hidden = all(cmds.getAttr(f"{sub_sel_set}.hidden") for sub_sel_set in sub_sel_sets)
-
-            # Crear botones para cada conjunto de selección
-            button_color = "#252525" if setgroup_hidden else "#333333"
-
-            for sub_sel_set in sub_sel_sets:
-                # Asegúrate de que el conjunto de selección es válido
-
-                if cmds.objExists(sub_sel_set):
-                    split_name = sub_sel_set.split("_")
-                    color_suffix = split_name[-1]
-                    set_name = "_".join(split_name[:-2])  # Une todas las partes del nombre, excepto las dos últimas partes.
-
-                    # Obtiene el valor del color del código de color
-                    button_color_hex = ui.color_codes.get(f"_{color_suffix}", "#333333")  # Default to white (#FFFFFF) if color_suffix not found
-                    button_color_hex_hover = ui.color_codes_hover.get(
-                        f"_{color_suffix}", "#333333"
-                    )  # Default to white (#FFFFFF) if color_suffix not found
-
-                    # Calcula el ancho del botón en función del número de caracteres en la etiqueta
-                    button_width = max(60, len(set_name) * 8)
-
-                    # Verificar el valor del atributo "hidden" del conjunto de selección
-                    is_hidden = cmds.getAttr(f"{sub_sel_set}.hidden")
-                    # Si el conjunto está oculto, no mostrar el botón
-                    if is_hidden:
-                        continue
-
-                    # # Obtiene los miembros del conjunto de selección
-                    # members = cmds.sets(sub_sel_set, q=True)
-
-                    # # Crea una cadena con los nombres de los miembros separados por comas
-                    # members_string = ", ".join(m for m in (members or []) if cmds.objExists(m))
-
-                    # El botón selecciona los miembros del conjunto de selección al hacer clic en él
-                    button = cmds.button(
-                        label=set_name,
-                        h=32,
-                        width=button_width,
-                        command=lambda x, s=sub_sel_set: self.handle_set_selection(s, shift_pressed, ctrl_pressed),
-                        parent="selection_sets_flow_layout",
-                    )
-                    button_widget = wrapInstance(int(mui.MQtUtil.findControl(button)), QtWidgets.QPushButton)
-
-                    if self.screen_width == 3840:
-                        style_sheet = """
-                            QPushButton {{
-                                color: #333333;
-                                background-color: {color};
-                                border-radius: 6px;
-                                border: 2px solid #333;
-                                font: 18px;
-                            }}
-                            QPushButton:hover:!pressed {{
-                                color: #333333;
-                                background-color: {color_over};
-                                border-radius: 6px;
-                                border: 2px solid #333;
-                                font: 18px;
-                            }}
-                        """.format(color=button_color_hex, color_over=button_color_hex_hover)
-                    else:
-                        style_sheet = """
-                            QPushButton {{
-                                color: #333333;
-                                background-color: {color};
-                                border-radius: 6px;
-                                border: 2px solid #333;
-                                font: 11px;
-                            }}
-                            QPushButton:hover:!pressed {{
-                                color: #333333;
-                                background-color: {color_over};
-                                border-radius: 6px;
-                                border: 2px solid #333;
-                                font: 11px;
-                            }}
-                        """.format(color=button_color_hex, color_over=button_color_hex_hover)
-
-                    button_widget.setStyleSheet(style_sheet)
-
-                    # Crea un menú emergente con una opción de "Delete set"
-                    selset_button = cmds.popupMenu(parent=button)
-
-                    # Menu button Selection Sets --------
-
-                    cmds.menuItem(
-                        label="Add Selection",
-                        image=media.add_to_selection_set_image,
-                        command=lambda x, s=sub_sel_set: self.add_selection_to_set(s),
-                        p=selset_button,
-                    )
-                    cmds.menuItem(
-                        label="Remove Selection",
-                        image=media.remove_from_selection_set_image,
-                        command=lambda x, s=sub_sel_set: self.remove_selection_from_set(s),
-                        p=selset_button,
-                    )
-                    cmds.menuItem(divider=True, p=selset_button)
-
-                    color_menu = cmds.menuItem(subMenu=True, label="Change Color", image=media.change_selection_set_color_image, p=selset_button)
-                    self.create_color_submenu(sub_sel_set, color_menu)
-
-                    cmds.menuItem(
-                        label="Rename Set",
-                        image=media.rename_selection_set_image,
-                        c=partial(self.change_set_name_window, sub_sel_set, set_group),
-                        p=selset_button,
-                    )
-                    cmds.menuItem(divider=True, p=selset_button)
-
-                    cmds.menuItem(
-                        label="Delete Set",
-                        image=media.remove_selection_set_image,
-                        command=lambda x, s=sub_sel_set, g=set_group: self.remove_set_and_update_buttons(s, g),
-                        p=selset_button,
-                    )
-                    cmds.menuItem(divider=True, p=selset_button)
-
-                    # Muestra ventana select items
-                    cmds.menuItem(
-                        label="Selector",
-                        image=media.selector_selection_set_image,
-                        command=lambda x, s=sub_sel_set: self.select_set_items_window(s),
-                        p=selset_button,
-                    )
-                    move_selset_submenu = cmds.menuItem(subMenu=True, image=media.move_selection_set_image, label="Nudge to ...", p=selset_button)
-
-                    # Obtener los setgroups que están dentro de "TheKeyMachine_SelectionSet"
-                    valid_setgroups = [sg for sg in set_groups if cmds.sets(sg, isMember=sel_set_name)]
-
-                    # Agregar un elemento en el menú emergente para cada setgroup válido
-                    for valid_setgroup in valid_setgroups:
-                        # Obtener el nombre del setgroup sin el sufijo "_setgroup"
-                        setgroup_name_without_suffix = valid_setgroup.replace("_setgroup", "")
-
-                        # Agregar un elemento en el menú emergente para cada setgroup válido
-                        cmds.menuItem(
-                            label=setgroup_name_without_suffix,
-                            command=lambda x, s=sub_sel_set, g=valid_setgroup: self.move_set_to_setgroup(s, g),
-                            p=move_selset_submenu,
-                        )
+        ui.refresh_selection_sets_window()
 
     def select_set_items_window(self, set_name):
         # Obtener los miembros del conjunto de selección
@@ -2254,6 +1680,27 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             time.sleep(interval)
             utils.executeDeferred(micro_move_run)
 
+    def _setup_orbit_toolbar_button(self, button_widget):
+        self.orbit_button_widget = button_widget
+        ui.bind_orbit_toolbar_button(button_widget)
+
+    def _on_orbit_button_toggled(self, checked):
+        if self._orbit_button_sync:
+            return
+        if checked:
+            ui.orbit_window(reuse_existing=True)
+        else:
+            ui.close_orbit_window()
+
+    def _on_orbit_window_state_changed(self, is_open):
+        if not self.orbit_button_widget:
+            return
+        self._orbit_button_sync = True
+        try:
+            self.orbit_button_widget.setChecked(is_open)
+        finally:
+            self._orbit_button_sync = False
+
     def show_sys_info(self):
         os_info = platform.system() + " " + platform.release()
 
@@ -2298,54 +1745,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         print("_________________________________________________________")
 
     def start_selection_sets_UI(self):
-        # Crea el selection sets workspace
-        target_dock = WorkspaceName + "WorkspaceControl"
-        if cmds.workspaceControl(selection_sets_workspace, query=True, exists=True) is False:
-            cmds.workspaceControl(
-                selection_sets_workspace,
-                ih=35,
-                li=True,
-                tp=["west", True],
-                floating=False,
-                dtc=[target_dock, "bottom"],
-                vis=False,
-            )
-            cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
-        else:
-            cmds.workspaceControl(selection_sets_workspace, edit=True, restore=False)
-            self.update_selectionSets_on_new_scene()
+        ui.selection_sets_window(controller=self, reuse_existing=True)
 
     # Crea el selection sets workspace ----------------------------------------------------------------------------
 
     def create_selection_sets_workspace(self):
-        if not cmds.workspaceControl(selection_sets_workspace, query=True, exists=True):
-            return
-
-        cmds.setParent(selection_sets_workspace)
-        if not cmds.control("selection_sets_flow_layout", query=True, exists=True):
-            cmds.flowLayout("selection_sets_flow_layout", columnSpacing=1, wr=True, w=150)
+        ui.selection_sets_window(controller=self, reuse_existing=True)
 
     def toggle_selection_sets_workspace(self, *args):
-        if cmds.workspaceControl(selection_sets_workspace, query=True, exists=True):
-            vis_state = cmds.workspaceControl(selection_sets_workspace, query=True, visible=True)
-
-            if vis_state:
-                cmds.workspaceControl(selection_sets_workspace, edit=True, visible=False)
-            else:
-                cmds.workspaceControl(selection_sets_workspace, edit=True, restore=True)
-                self.create_buttons_for_sel_sets()
-        else:
-            cmds.workspaceControl(
-                selection_sets_workspace,
-                ih=35,
-                li=True,
-                tp=["west", True],
-                floating=False,
-                dtc=["k", "bottom"],
-                vis=True,
-            )
-            cmds.workspaceControl(selection_sets_workspace, edit=True, tabPosition=["west", True])
-            self.update_selectionSets_on_new_scene()
+        ui.toggle_selection_sets_window(controller=self)
 
     def set_reload(self):
         import TheKeyMachine.core.toolbar as t  # type: ignore
@@ -2564,7 +1972,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         toolbar_alignment = get_current_icon_alignment()
         self.toolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=18, Hspacing=6, alignment=toolbar_alignment)
 
-        def new_section(spacing=2, hiddeable=True):
+        def new_section(spacing=0, hiddeable=True):
             sec = cw.QFlatSectionWidget(spacing=spacing, hiddeable=hiddeable)
             self.toolbar_layout.addWidget(sec)
             return sec
@@ -3187,8 +2595,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(
             [
                 {
-                    "key": "copy_paste_anim",
-                    "label": "Copy/Paste Anim",
+                    "key": "cp_copy_anim",
+                    "label": "Copy Animation",
                     "icon_path": media.copy_animation_image,
                     "callback": keyTools.copy_animation,
                     "tooltip_template": helper.copy_animation_tooltip_text,
@@ -3476,10 +2884,30 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Selection Sets  ----------------------------------------------------------------------------
         selection_sets_button_widget = sec.addWidgetGroup(
-            [toolbox.get_tool("selection_sets", callback=self.toggle_selection_sets_workspace, default=True)]
+            [
+                toolbox.get_tool("selection_sets", callback=None, default=True),
+                {
+                    "key": "orbit_auto_transparency",
+                    "label": "Auto Transparency",
+                    "description": "Make floating windows translucent when not hovered.",
+                    "checkable": True,
+                    "is_checked_fn": lambda: settings.get_setting(
+                        "orbit_auto_transparency",
+                        True,
+                        namespace=ui.ORBIT_SETTINGS_NAMESPACE,
+                    ),
+                    "callback": lambda state: settings.set_setting(
+                        "orbit_auto_transparency",
+                        state,
+                        namespace=ui.ORBIT_SETTINGS_NAMESPACE,
+                    ),
+                    "pinnable": False,
+                },
+            ]
         )
         if selection_sets_button_widget:
             selection_sets_button_widget.setObjectName("toggle_selection_sets_workspace_b")
+            ui.bind_selection_sets_toolbar_button(selection_sets_button_widget, controller=self)
 
         # customGraph ----------------------------------------------------------------------------
         def open_customGraph():
@@ -3491,20 +2919,30 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # custom tools ----------------------------------------------------------------------------
         sec = new_section()
-        sec.addWidgetGroup(
+        orbit_button_widget = sec.addWidgetGroup(
             [
-                toolbox.get_tool("orbit", default=True),
+                toolbox.get_tool("orbit", callback=None, default=True),
                 {
                     "key": "orbit_auto_transparency",
                     "label": "Auto Transparency",
                     "description": "Make the Orbit window translucent when not hovered.",
                     "checkable": True,
-                    "is_checked_fn": lambda: settings.get_setting("orbit_auto_transparency", False),
-                    "callback": lambda state: settings.set_setting("orbit_auto_transparency", state),
+                    "is_checked_fn": lambda: settings.get_setting(
+                        "orbit_auto_transparency",
+                        True,
+                        namespace=ui.ORBIT_SETTINGS_NAMESPACE,
+                    ),
+                    "callback": lambda state: settings.set_setting(
+                        "orbit_auto_transparency",
+                        state,
+                        namespace=ui.ORBIT_SETTINGS_NAMESPACE,
+                    ),
                     "pinnable": False,
                 },
             ]
         )
+        if orbit_button_widget:
+            self._setup_orbit_toolbar_button(orbit_button_widget)
 
         invalidate_caches()
         import TheKeyMachine_user_data.connect.tools.tools as connectToolBox  # type: ignore

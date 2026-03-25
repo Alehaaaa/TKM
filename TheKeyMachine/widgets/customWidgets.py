@@ -595,8 +595,10 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         else:
             self.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly)
 
-        # Enforce styling: squared corners, no border on hover, background on press
-        self.setStyleSheet(f"""
+        pressed_bg = self.pressed_color
+        # Enforce styling: squared corners, no border on hover, consistent pressed/checked colors
+        self.setStyleSheet(
+            f"""
             QToolButton {{
                 border: none;
                 border-radius: 0px;
@@ -604,21 +606,19 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 color: #bfbfbf;
                 font-size: 11px;
                 font-weight: bold;
-
             }}
             QToolButton:hover {{
                 border: none;
                 background-color: transparent;
                 color: #ffffff;
             }}
-            QToolButton:pressed {{
-                background-color: {self.pressed_color};
-            }}
+            QToolButton:pressed,
             QToolButton:checked {{
-                background-color: #444444;
+                background-color: {pressed_bg};
                 color: #ffffff;
             }}
-        """)
+            """
+        )
 
         # Centralized size
         w = 28
@@ -824,7 +824,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     for toggling the visibility of its child widgets.
     """
 
-    def __init__(self, parent=None, spacing=2, hiddeable=True):
+    def __init__(self, parent=None, spacing=0, hiddeable=True):
         super().__init__(parent)
         self.setLayout(QtWidgets.QHBoxLayout())
         self.layout().setContentsMargins(0, 3, 0, 3)
@@ -1354,6 +1354,28 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         all_mode_keys = {m.key for m in self._all_modes if hasattr(m, "key")}
         self._set_visible_modes(all_mode_keys)
 
+    def pin_widget_defaults(self):
+        """Non-slider sections: restore widget visibility to their registered defaults."""
+        for item in self._menu_metadata:
+            if item.get("type") != "widget":
+                continue
+            key = item.get("key")
+            if not key:
+                continue
+            self.toggle_widget(key, bool(item.get("default", True)), save_setting=True)
+        self._refresh_layout()
+
+    def pin_widget_all(self):
+        """Non-slider sections: show all registered widgets."""
+        for item in self._menu_metadata:
+            if item.get("type") != "widget":
+                continue
+            key = item.get("key")
+            if not key:
+                continue
+            self.toggle_widget(key, True, save_setting=True)
+        self._refresh_layout()
+
     def _make_toggle_handler(self, key):
         """Creates a handler function that captures 'key'."""
 
@@ -1481,9 +1503,15 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         menu.addSeparator()
         pin_def_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin Defaults")
-        pin_def_action.triggered.connect(lambda: self.pin_defaults(self._default_keys))
+        if self._all_modes:
+            pin_def_action.triggered.connect(lambda: self.pin_defaults(self._default_keys))
+        else:
+            pin_def_action.triggered.connect(self.pin_widget_defaults)
         pin_all_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin All")
-        pin_all_action.triggered.connect(self.pin_all)
+        if self._all_modes:
+            pin_all_action.triggered.connect(self.pin_all)
+        else:
+            pin_all_action.triggered.connect(self.pin_widget_all)
 
         menu.exec_(QtGui.QCursor.pos())
         self._active_menu = None
