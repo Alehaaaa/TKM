@@ -24,12 +24,10 @@ import maya.OpenMayaUI as mui
 try:
     from shiboken2 import wrapInstance
     from PySide2.QtWidgets import QDesktopWidget
-
     from PySide2 import QtCore, QtGui, QtWidgets
 except ImportError:
     from shiboken6 import wrapInstance
     from PySide6.QtCore import QTimer
-
     from PySide6 import QtCore, QtGui, QtWidgets
 
 try:
@@ -1016,7 +1014,7 @@ class OrbitWindow(customDialogs.QFlatCloseableFloatingWidget, OrbitWindowMixin):
         if self._hovered:
             return
         if self._auto_transparency:
-            self.setWindowOpacity(0.35)
+            self.setWindowOpacity(0.45)
         else:
             self.setWindowOpacity(1.0)
 
@@ -1040,9 +1038,9 @@ class OrbitWindow(customDialogs.QFlatCloseableFloatingWidget, OrbitWindowMixin):
             return
 
         if hovered:
-            self.setWindowOpacity(0.70)
+            self.setWindowOpacity(0.80)
         else:
-            self.setWindowOpacity(0.70)
+            self.setWindowOpacity(0.80)
             self.fade_timer.start(800)
 
     def hideEvent(self, event):
@@ -1664,7 +1662,7 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         if self._hovered:
             return
         if self._auto_transparency:
-            self.setWindowOpacity(0.35)
+            self.setWindowOpacity(0.45)
         else:
             self.setWindowOpacity(1.0)
 
@@ -1688,9 +1686,9 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
             return
 
         if hovered:
-            self.setWindowOpacity(0.70)
+            self.setWindowOpacity(0.80)
         else:
-            self.setWindowOpacity(0.70)
+            self.setWindowOpacity(0.80)
             self.fade_timer.start(800)
 
     def _restore_geometry(self):

@@ -18,9 +18,10 @@ TWEEN_MODIFIER_DISPATCH = {
     "tweener": lambda v, ws: keyframe_ops.execute_tween(v, world_space=ws),
     "tweener_worldspace": lambda v, ws: keyframe_ops.execute_tween(v, world_space=True),
     "blend_to_buffer": lambda v, ws: keyframe_ops.execute_blend_to_key(v),  # Placeholder logic
-    "blend_to_default": lambda v, ws: keyframe_ops.execute_blend_to_key(v),
+    "blend_to_default": lambda v, ws: keyframe_ops.execute_blend_to_default(v, world_space=ws),
     "blend_to_frame": lambda v, ws: keyframe_ops.execute_blend_to_frame(v),
-    "blend_to_neighbors": lambda v, ws: keyframe_ops.execute_blend_to_key(v),
+    "blend_to_neighbors": lambda v, ws: keyframe_ops.execute_blend_to_neighbors(v, world_space=ws),
+    "blend_to_neighbors_ws": lambda v, ws: keyframe_ops.execute_blend_to_neighbors(v, world_space=True),
 }
 
 # BLEND/MODIFIER MODES (Green Slider)

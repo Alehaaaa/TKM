@@ -77,6 +77,7 @@ import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.core.customGraph as cg  # type: ignore
 import TheKeyMachine.mods.updater as updater  # type: ignore
 import TheKeyMachine.core.toolbox as toolbox  # type: ignore
+import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
@@ -180,14 +181,15 @@ COLOR = ui.Color()
 
 
 class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
-    open_new_scene_scriptJob = None
-    selection_script_job = None
-
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setWindowTitle("TheKeyMachine")
         self.setObjectName(WorkspaceName)
         self.setContextMenuPolicy(QtCore.Qt.PreventContextMenu)
+
+        self._callback_manager = callbacks.get_callback_manager()
+        self._callback_manager.scene_opened.connect(self._on_scene_opened)
+        self._callback_manager.scene_new.connect(self._on_scene_opened)
 
         self.shelf_painter = None
         self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
@@ -224,20 +226,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.link_obj_toggle_state = False
         self.link_obj_thread = None
 
-        # When loading a new scene, the on_scene_opened() function is executed, which includes, among other things, the function to update the selectionSets.
-        # This first if statement checks whether the scriptJob exists; if not, it either creates or deletes it.
-        if toolbar.open_new_scene_scriptJob is not None and self.isScriptJobActive(toolbar.open_new_scene_scriptJob):
-            cmds.scriptJob(kill=toolbar.open_new_scene_scriptJob, force=True)
-
-        # Function that runs when new scenes are opened
-        def on_scene_opened():
-            if not isValid(self):
-                return
-            self.update_selectionSets_on_new_scene()
-            self.update_popup_menu()
-
-        toolbar.open_new_scene_scriptJob = cmds.scriptJob(event=("SceneOpened", on_scene_opened))
-
         # Utility for determining screen resolution
         screen_width, screen_height = wutil.get_screen_resolution()
         self.screen_width = screen_width
@@ -252,6 +240,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         Handles the close event for the toolbar window.
         Stops all background threads and performs necessary cleanup.
         """
+        global _toolbar_instance
+        _toolbar_instance = None
+
+        try:
+            callbacks.shutdown_callback_manager()
+        except Exception:
+            pass
+
         # Stop animation offset thread
         self.anim_offset_run_timer = False
         if hasattr(self, "anim_offset_thread") and self.anim_offset_thread and self.anim_offset_thread.is_alive():
@@ -277,6 +273,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             self.shelf_painter = None
 
         super().closeEvent(event)
+
+    def _on_scene_opened(self, *_args):
+        if not isValid(self):
+            return
+        self.update_selectionSets_on_new_scene()
+        self.update_popup_menu()
 
     def showWindow(self):
         # Build up kwargs for the visibleChangeCommand
@@ -542,14 +544,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         current_shelf_tab = cmds.tabLayout("ShelfLayout", query=True, selectTab=True)
         cmds.shelfButton(parent=current_shelf_tab, image=icon_path, command=command, label=button_name)
 
-    # Evaluate if the scriptJob that launches on_scene_opened() is active
-    def isScriptJobActive(self, jobId):
-        activeJobs = cmds.scriptJob(listJobs=True)
-        for job in activeJobs:
-            if str(jobId) in job:
-                return True
-        return False
-
     # Update the iBookmarks menu when scene changes
     def update_popup_menu(self, *args):
         if not isValid(self):
@@ -675,19 +669,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         toolbar_module_name = "TheKeyMachine.core.toolbar"
         customGraph_module_name = "TheKeyMachine.core.customGraph"
 
+        try:
+            callbacks.shutdown_callback_manager()
+        except Exception:
+            pass
+
         # Importa el módulo y recarga
         toolbar_module = import_module(toolbar_module_name)
         customGraph_module = import_module(customGraph_module_name)
-
-        # Force kill scriptjobs like cams.py
-        for j in cmds.scriptJob(listJobs=True):
-            if "TheKeyMachine" in j or "TheKeyMachine.core.toolbar" in j:
-                if ":" in j:
-                    try:
-                        _id = int(j.split(":")[0])
-                        cmds.scriptJob(kill=_id, force=True)
-                    except Exception:
-                        pass
 
         # Close and delete the UI
         try:
@@ -709,6 +698,33 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Use the global show() instead of module-level 'tb'
         toolbar_module.show()
+
+    def unload(self, *args):
+        """
+        Closes the tool and removes callbacks (safe to call multiple times).
+        """
+        global _toolbar_instance
+        _toolbar_instance = None
+
+        try:
+            callbacks.shutdown_callback_manager()
+        except Exception:
+            pass
+
+        try:
+            workspace_control = WorkspaceName + "WorkspaceControl"
+            if cmds.workspaceControl(workspace_control, q=True, exists=True):
+                cmds.deleteUI(workspace_control, control=True)
+        except Exception:
+            pass
+
+        try:
+            if isValid(self):
+                self.blockSignals(True)
+                self.close()
+                self.deleteLater()
+        except Exception:
+            pass
 
     # _______________________________________________________ SELECTION SET ________________________________________________________
 
@@ -1970,7 +1986,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Use QFlowLayout to allow wrapping
         toolbar_alignment = get_current_icon_alignment()
-        self.toolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=18, Hspacing=6, alignment=toolbar_alignment)
+        self.toolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=10, Hspacing=6, alignment=toolbar_alignment)
 
         def new_section(spacing=0, hiddeable=True):
             sec = cw.QFlatSectionWidget(spacing=spacing, hiddeable=hiddeable)
@@ -2490,9 +2506,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             num_selected = len(selected_objects)
             selector_button_widget.setText(str(num_selected))
 
-        if toolbar.selection_script_job is not None and self.isScriptJobActive(toolbar.selection_script_job):
-            cmds.scriptJob(kill=toolbar.selection_script_job, force=True)
-        toolbar.selection_script_job = cmds.scriptJob(event=["SelectionChanged", update_selector_button_text])
+        try:
+            self._callback_manager.selection_changed.connect(update_selector_button_text)
+        except Exception:
+            pass
         update_selector_button_text()
 
         sec = new_section()
@@ -2913,7 +2930,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         def open_customGraph():
             import TheKeyMachine.core.customGraph as cg  # type: ignore
 
-            cg.createCustomGraph()
+            cg.createCustomGraph(force=True)
 
         sec.addWidgetGroup([toolbox.get_tool("custom_graph", callback=open_customGraph, default=True)])
 
@@ -3011,7 +3028,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         toolBox_button_widget = cw.QFlatToolButton(icon=media.custom_tools_image)
         toolBox_button_widget.setVisible(bool(CUSTOM_TOOLS_MENU))
         sec.addWidget(toolBox_button_widget, "Custom Tools", "custom_tools", tooltip_template=helper.custom_tools_tooltip_text)
-
         toolBox_menu = QtWidgets.QMenu(toolBox_button_widget)
         toolBox_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         toolBox_button_widget.customContextMenuRequested.connect(lambda pos: toolBox_menu.exec_(toolBox_button_widget.mapToGlobal(pos)))
@@ -3180,6 +3196,68 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         overshoot_action.setChecked(overshootSliders)
         overshoot_action.toggled.connect(_setOvershoot)
 
+        graph_toolbar_enabled = settings.get_setting("graph_toolbar_enabled", True)
+        graph_toolbar_action = settings_menu.addAction(
+            QtGui.QIcon(media.customGraph_image),
+            "Graph Editor Toolbar",
+            description="Show or hide the TKM toolbar inside the Graph Editor.",
+        )
+        graph_toolbar_action.setCheckable(True)
+
+        def _on_graph_toolbar_toggled(state):
+            cg.set_graph_toolbar_enabled(bool(state))
+
+        try:
+            graph_toolbar_action.blockSignals(True)
+            graph_toolbar_action.setChecked(graph_toolbar_enabled)
+        finally:
+            graph_toolbar_action.blockSignals(False)
+
+        graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
+
+        def _sync_graph_toolbar_action(enabled):
+            try:
+                graph_toolbar_action.blockSignals(True)
+            except RuntimeError:
+                try:
+                    cg.custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
+                except Exception:
+                    pass
+                return
+
+            try:
+                graph_toolbar_action.setChecked(bool(enabled))
+            except RuntimeError:
+                try:
+                    cg.custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
+                except Exception:
+                    pass
+                return
+            finally:
+                try:
+                    graph_toolbar_action.blockSignals(False)
+                except RuntimeError:
+                    try:
+                        cg.custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
+                    except Exception:
+                        pass
+
+        try:
+            cg.custom_graph_bus.graph_toolbar_enabled_changed.connect(_sync_graph_toolbar_action)
+        except Exception:
+            pass
+
+        def _disconnect_graph_toolbar_action(*_args):
+            try:
+                cg.custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
+            except Exception:
+                pass
+
+        try:
+            graph_toolbar_action.destroyed.connect(_disconnect_graph_toolbar_action)
+        except Exception:
+            pass
+
         settings_menu.addSection("Toolbar's icons alignment")
         align_group = QActionGroup(settings_menu)
         for align_name, align_value in alignments.items():
@@ -3195,6 +3273,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         settings_menu.addSection("General")
         settings_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")
+        settings_menu.addAction(QtGui.QIcon(media.close_image), "Unload", self.unload, description="Close TheKeyMachine and remove callbacks.")
         settings_menu.addAction(QtGui.QIcon(media.remove_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
 
         toolbar_menu.addMenu(self._create_dock_menu(), description="Dock the toolbar to different Maya UI panels.")
@@ -3241,6 +3320,11 @@ def get_toolbar():
 def show():
     global _toolbar_instance
 
+    try:
+        callbacks.shutdown_callback_manager()
+    except Exception:
+        pass
+
     # Close existing UI robustly
     try:
         workspace_control = WorkspaceName + "WorkspaceControl"
@@ -3262,7 +3346,6 @@ def show():
 
 def toggle():
     global _toolbar_instance
-
     try:
         workspace_control = WorkspaceName + "WorkspaceControl"
         if cmds.workspaceControl(workspace_control, query=True, exists=True):

@@ -806,7 +806,16 @@ def create_temp_pivot(use_saved_position=False, *args):
             cmds.undoInfo(closeChunk=True)
             cmds.undoInfo(closeChunk=True)
 
-    cmds.scriptJob(runOnce=True, killWithScene=True, event=("SelectionChanged", temp_pivot_scriptJob_SelectionChanged))
+    import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
+
+    cb_id = callbacks.get_callback_manager().add_maya_event_callback(
+        "SelectionChanged",
+        temp_pivot_scriptJob_SelectionChanged,
+        key="temp_pivot_selection_changed",
+        one_shot=True,
+    )
+    if cb_id is None:
+        raise RuntimeError("TKM CallbackManager failed to register temp pivot SelectionChanged callback")
 
 
 # ---------------------------------------------------  COPY/PASTE WORLDSPACE ANIMATION  ------------------------------------------------------#

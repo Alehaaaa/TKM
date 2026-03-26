@@ -33,6 +33,13 @@ def reload():
     except ImportError:
         pass
 
+    try:
+        import TheKeyMachine.core.callback_manager as callbacks
+
+        callbacks.shutdown_callback_manager()
+    except Exception:
+        pass
+
     modules_to_delete = [m for m in list(sys.modules.keys()) if m.startswith("TheKeyMachine")]
 
     for mod_name in modules_to_delete:

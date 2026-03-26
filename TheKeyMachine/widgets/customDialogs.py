@@ -934,6 +934,11 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
         super().__init__(parent=parent)
         self.title_label.setText("0")
 
+        self._refresh_timer = QtCore.QTimer(self)
+        self._refresh_timer.setSingleShot(True)
+        self._refresh_timer.timeout.connect(self.reload_objects)
+        self._suppress_next_refresh = False
+
         # List
         self.list_widget = QtWidgets.QListWidget()
         self.list_widget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
@@ -942,10 +947,22 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
 
         self.mainLayout.addWidget(self.list_widget, 1)
 
-        reload_btn = QFlatDialogButton("Reload", icon=media.reload_image, callback=self.reload_objects)
-        # Reload button
-        self.setBottomBar([reload_btn], margins=0, spacing=0)
+        # Auto-refresh with Maya selection changes (no manual reload button).
+        try:
+            import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
+
+            callbacks.get_callback_manager().selection_changed.connect(self._schedule_reload)
+        except Exception:
+            pass
+
         self.reload_objects()
+
+    def _schedule_reload(self, *_args):
+        if self._suppress_next_refresh:
+            self._suppress_next_refresh = False
+            return
+        if not self._refresh_timer.isActive():
+            self._refresh_timer.start(0)
 
     def reload_objects(self):
         """Fills the list with current selection names and preserves active selection in the UI."""
@@ -957,7 +974,9 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
         selected = cmds.ls(selection=True, long=True) or []
 
         for obj in sorted(selected):
-            item = QtWidgets.QListWidgetItem(obj)
+            label = obj.rsplit("|", 1)[-1]
+            item = QtWidgets.QListWidgetItem(label)
+            item.setData(QtCore.Qt.UserRole, obj)
             self.list_widget.addItem(item)
             item.setSelected(True)
 
@@ -968,16 +987,22 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
         """Syncs the dialog selection back to the Maya scene."""
         import maya.cmds as cmds
 
-        names = [item.text() for item in self.list_widget.selectedItems()]
-        valid_names = [n for n in names if cmds.objExists(n)]
+        names = []
+        for item in self.list_widget.selectedItems():
+            full_path = item.data(QtCore.Qt.UserRole)
+            names.append(full_path or item.text())
+
+        valid_names = [n for n in names if n and cmds.objExists(n)]
 
         if names and not valid_names:
             self.reload_objects()
             return
 
         if valid_names:
+            self._suppress_next_refresh = True
             cmds.select(valid_names, replace=True)
         else:
+            self._suppress_next_refresh = True
             cmds.select(clear=True)
 
 

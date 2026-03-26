@@ -57,6 +57,44 @@ for m in mods:
 
 COLOR = ui.Color()
 
+_GRAPH_LAYOUT = "customGraph_columnLayout"
+
+
+class CustomGraphBus(QtCore.QObject):
+    graph_toolbar_enabled_changed = QtCore.Signal(bool)
+
+
+custom_graph_bus = CustomGraphBus()
+
+
+def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
+    settings.set_setting("graph_toolbar_enabled", bool(enabled))
+    try:
+        custom_graph_bus.graph_toolbar_enabled_changed.emit(bool(enabled))
+    except Exception:
+        pass
+    if not apply:
+        return
+    # Defer UI changes to avoid deleting UI while menus/actions are mid-execution.
+    try:
+        if enabled:
+            QtCore.QTimer.singleShot(0, createCustomGraph)
+        else:
+            QtCore.QTimer.singleShot(0, removeCustomGraph)
+    except Exception:
+        if enabled:
+            createCustomGraph()
+        else:
+            removeCustomGraph()
+
+
+def removeCustomGraph() -> None:
+    if cmds.columnLayout(_GRAPH_LAYOUT, exists=True):
+        try:
+            cmds.deleteUI(_GRAPH_LAYOUT)
+        except Exception:
+            pass
+
 
 # -----------------------------------------------------------------------------------------------------------------------------
 #                                                       customGraph build                                                     #
@@ -100,6 +138,65 @@ def create_settings_menu(parent_button):
     # Settings submenu
     settings_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Settings", description="Tool configuration and preferences.")
     menu.addMenu(settings_menu)
+
+    settings_menu.addSection("Graph toolbar")
+    graph_toolbar_action = settings_menu.addAction(
+        QtGui.QIcon(media.customGraph_image),
+        "Graph Editor Toolbar",
+        description="Show or hide the TKM toolbar inside the Graph Editor.",
+    )
+    graph_toolbar_action.setCheckable(True)
+
+    def _on_graph_toolbar_toggled(state):
+        set_graph_toolbar_enabled(bool(state))
+
+    try:
+        graph_toolbar_action.blockSignals(True)
+        graph_toolbar_action.setChecked(settings.get_setting("graph_toolbar_enabled", True))
+    finally:
+        graph_toolbar_action.blockSignals(False)
+
+    graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
+
+    def _sync_graph_toolbar_action(enabled):
+        try:
+            graph_toolbar_action.blockSignals(True)
+        except RuntimeError:
+            try:
+                custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
+            except Exception:
+                pass
+            return
+
+        try:
+            graph_toolbar_action.setChecked(bool(enabled))
+        except RuntimeError:
+            try:
+                custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
+            except Exception:
+                pass
+            return
+        finally:
+            try:
+                graph_toolbar_action.blockSignals(False)
+            except RuntimeError:
+                try:
+                    custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
+                except Exception:
+                    pass
+
+    custom_graph_bus.graph_toolbar_enabled_changed.connect(_sync_graph_toolbar_action)
+
+    def _disconnect_graph_toolbar_action(*_args):
+        try:
+            custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
+        except Exception:
+            pass
+
+    try:
+        graph_toolbar_action.destroyed.connect(_disconnect_graph_toolbar_action)
+    except Exception:
+        pass
 
     settings_menu.addSection("Toolbar's icons alignment")
     align_group = QActionGroup(settings_menu)
@@ -146,14 +243,18 @@ def create_tool_button(icon=None, text="", tooltip_template="", description="", 
     return btn
 
 
-def createCustomGraph():
+def createCustomGraph(*_args, force: bool = False, **_kwargs):
+    if not force and not settings.get_setting("graph_toolbar_enabled", True):
+        removeCustomGraph()
+        return
+
     def add_to_flow(widget):
         if widget and wutil.is_valid_widget(widget):
             flowtoolbar_layout.addWidget(widget)
         return widget
 
     graph_vis = cmds.getPanel(vis=True)
-    layout = "customGraph_columnLayout"
+    layout = _GRAPH_LAYOUT
 
     if "graphEditor1" in graph_vis:
         if cmds.columnLayout(layout, exists=True):
