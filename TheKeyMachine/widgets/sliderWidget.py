@@ -26,6 +26,7 @@ import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.widgets.util as util
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
+from TheKeyMachine.sliders import utils as slider_utils
 
 from TheKeyMachine.tooltips import QFlatTooltipManager
 
@@ -914,6 +915,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     def _on_drag_started(self):
         QFlatTooltipManager.hide()
 
+        try:
+            slider_utils.start_dragging()
+        except Exception:
+            pass
+
         self.dragStarted.emit()
         self._leftOverlay.hide()
         self._rightOverlay.hide()
@@ -923,11 +929,29 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def _on_inner_finished(self, pct: float):
         self.dragFinished.emit()
+
+        # If dropCommand isn't connected, make sure the undo chunk is closed.
+        try:
+            slider_utils.stop_dragging()
+        except Exception:
+            pass
+
         self._leftOverlay.show()
         self._rightOverlay.show()
 
     def _on_button_clicked(self, btn: SliderButton):
-        self.valueChanged.emit(float(btn.percent))
+        try:
+            slider_utils.start_dragging()
+        except Exception:
+            pass
+
+        try:
+            self.valueChanged.emit(float(btn.percent))
+        finally:
+            try:
+                slider_utils.stop_dragging()
+            except Exception:
+                pass
 
     def leaveEvent(self, e):
         # Finalize the interaction if we were wheeling when the mouse leaves the widget

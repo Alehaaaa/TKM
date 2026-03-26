@@ -845,7 +845,7 @@ def color_worldspace_paste_animation(*args):
 
 
 def worldspace_copy_animation(*args):
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
     if not selected_objects:
         return
 
@@ -904,8 +904,12 @@ def worldspace_copy_animation(*args):
         if not os.path.exists(worldspace_anim_data_folder):
             os.makedirs(worldspace_anim_data_folder)
 
+        payload = {
+            "meta": {"ordered_objects": selected_objects},
+            "data": animation_data,
+        }
         with open(worldspace_anim_data_file, "w") as json_file:
-            json.dump(animation_data, json_file)
+            json.dump(payload, json_file)
 
     finally:
         # Restaurar la actualización de la vista y cerrar la barra de progreso
@@ -920,7 +924,7 @@ def worldspace_copy_animation(*args):
 
 
 def copy_range_worldspace_animation(*args):
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
     if not selected_objects:
         return
 
@@ -986,8 +990,12 @@ def copy_range_worldspace_animation(*args):
         if not os.path.exists(worldspace_anim_data_folder):
             os.makedirs(worldspace_anim_data_folder)
 
+        payload = {
+            "meta": {"ordered_objects": selected_objects},
+            "data": animation_data,
+        }
         with open(worldspace_anim_data_file, "w") as json_file:
-            json.dump(animation_data, json_file)
+            json.dump(payload, json_file)
 
     finally:
         # Restaurar la actualización de la vista y cerrar la barra de progreso
@@ -996,14 +1004,14 @@ def copy_range_worldspace_animation(*args):
         # Restaurar el tiempo actual a su estado original
         keyTools.clear_timeslider_selection()
         cmds.currentTime(original_time)
-        cmds.warning("World Space animation copied")
+        util.make_inViewMessage("World Space animation copied")
 
 
 # ............. copy single frame World Space
 
 
 def copy_worldspace_single_frame(*args):
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
     if not selected_objects:
         return
 
@@ -1025,35 +1033,100 @@ def copy_worldspace_single_frame(*args):
     if not os.path.exists(worldspace_anim_data_folder):
         os.makedirs(worldspace_anim_data_folder)
 
+    payload = {
+        "meta": {"ordered_objects": selected_objects},
+        "data": animation_data,
+    }
     with open(worldspace_anim_data_file, "w") as json_file:
-        json.dump(animation_data, json_file)
+        json.dump(payload, json_file)
 
-    cmds.warning("World Space values for current frame copied")
+    util.make_inViewMessage("World Space values for current frame copied")
 
 
 def paste_worldspace_single_frame(*args):
+    chunk_opened = False
+    try:
+        cmds.undoInfo(openChunk=True, chunkName="TKM:paste_worldspace_single_frame")
+        chunk_opened = True
+    except Exception:
+        pass
+
     # Rutas
     worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
 
-    if not os.path.exists(worldspace_anim_data_file):
-        cmds.warning("No World Space data found")
+    try:
+        if not os.path.exists(worldspace_anim_data_file):
+            cmds.warning("No World Space data found")
+            return
+
+        with open(worldspace_anim_data_file, "r") as json_file:
+            payload = json.load(json_file)
+
+        selection_mismatch_message = "Selection missmatched to paste worldspace"
+
+        if isinstance(payload, dict) and "data" in payload:
+            animation_data = payload.get("data") or {}
+            ordered_sources = (payload.get("meta") or {}).get("ordered_objects") or list(animation_data.keys())
+        else:
+            animation_data = payload or {}
+            ordered_sources = list(animation_data.keys())
+
+        ordered_sources = [obj for obj in ordered_sources if obj in animation_data]
+        if not ordered_sources:
+            return util.make_inViewMessage("No World Space data found")
+
+        target_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
+
+        # No selection: paste back to the originally copied objects (if they still exist)
+        if not target_objects:
+            target_objects = ordered_sources
+            missing = [obj for obj in target_objects if not cmds.objExists(obj)]
+            if missing:
+                return util.make_inViewMessage(selection_mismatch_message)
+
+        source_count = len(ordered_sources)
+        target_count = len(target_objects)
+
+        # Multi-source pastes require matching selection size
+        if source_count > 1 and target_count != source_count:
+            return util.make_inViewMessage(selection_mismatch_message)
+
+        def _first_frame_values(obj_name):
+            obj_data = animation_data.get(obj_name) or {}
+            if not isinstance(obj_data, dict) or not obj_data:
+                return None
+            first_frame = next(iter(obj_data))
+            return obj_data[first_frame]
+
+        # Single-source: paste to any selection size (same transform for all targets)
+        if source_count == 1:
+            values = _first_frame_values(ordered_sources[0])
+            if not values:
+                return util.make_inViewMessage("No World Space data found")
+            for obj in target_objects:
+                if cmds.objExists(obj):
+                    cmds.xform(obj, translation=values[:3], worldSpace=True)
+                    cmds.xform(obj, rotation=values[3:], worldSpace=True)
+            return
+
+        # Multi-source: paste in order (source[0]->target[0], ...)
+        for idx, target_obj in enumerate(target_objects):
+            source_obj = ordered_sources[idx]
+            values = _first_frame_values(source_obj)
+            if not values:
+                return util.make_inViewMessage("No World Space data found")
+            if cmds.objExists(target_obj):
+                cmds.xform(target_obj, translation=values[:3], worldSpace=True)
+                cmds.xform(target_obj, rotation=values[3:], worldSpace=True)
+
         return
 
-    with open(worldspace_anim_data_file, "r") as json_file:
-        animation_data = json.load(json_file)
-
-    # Aplicar valores de World Space guardados del primer frame disponible
-    for obj, obj_data in animation_data.items():
-        # Tomar el primer frame disponible
-        first_frame = next(iter(obj_data))
-        values = obj_data[first_frame]
-        if cmds.objExists(obj):
-            cmds.xform(obj, translation=values[:3], worldSpace=True)
-            cmds.xform(obj, rotation=values[3:], worldSpace=True)
-        else:
-            cmds.warning(f"Object {obj} not found in the scene")
-
-    cmds.warning("World Space values applied")
+    finally:
+        if chunk_opened:
+            try:
+                cmds.undoInfo(closeChunk=True)
+            except Exception:
+                pass
 
 
 def worldspace_paste_animation(*args):
@@ -1066,9 +1139,13 @@ def worldspace_paste_animation(*args):
         return util.make_inViewMessage("No World Space animation data found")
 
     with open(worldspace_anim_data_file, "r") as json_file:
-        animation_data = json.load(json_file)
+        payload = json.load(json_file)
 
     # Filtrar solo objetos existentes en la escena
+    if isinstance(payload, dict) and "data" in payload:
+        animation_data = payload.get("data") or {}
+    else:
+        animation_data = payload or {}
     existing_objects = {obj: data for obj, data in animation_data.items() if cmds.objExists(obj)}
 
     if not existing_objects:
@@ -1115,7 +1192,131 @@ def worldspace_paste_animation(*args):
         cmds.refresh(suspend=False)
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
         cmds.currentTime(original_time)
-        cmds.warning("World Space animation restored successfully")
+        pass
+
+
+# Override: selection-aware World Space animation paste
+def worldspace_paste_animation(*args):
+    chunk_opened = False
+    try:
+        cmds.undoInfo(openChunk=True, chunkName="TKM:paste_worldspace_animation")
+        chunk_opened = True
+    except Exception:
+        pass
+
+    original_time = cmds.currentTime(query=True)
+
+    worldspace_anim_data_file = general.get_copy_worldspace_data_file()
+    try:
+        if not os.path.exists(worldspace_anim_data_file):
+            return util.make_inViewMessage("No World Space animation data found")
+
+        with open(worldspace_anim_data_file, "r") as json_file:
+            payload = json.load(json_file)
+
+        selection_mismatch_message = "Selection missmatched to paste worldspace"
+
+        if isinstance(payload, dict) and "data" in payload:
+            animation_data = payload.get("data") or {}
+            ordered_sources = (payload.get("meta") or {}).get("ordered_objects") or list(animation_data.keys())
+        else:
+            animation_data = payload or {}
+            ordered_sources = list(animation_data.keys())
+
+        ordered_sources = [obj for obj in ordered_sources if obj in animation_data]
+        if not ordered_sources:
+            return util.make_inViewMessage("No World Space animation data found")
+
+        target_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
+
+        # No selection: paste back to the originally copied objects (if they still exist)
+        if not target_objects:
+            target_objects = ordered_sources
+            missing = [obj for obj in target_objects if not cmds.objExists(obj)]
+            if missing:
+                return util.make_inViewMessage(selection_mismatch_message)
+
+        source_count = len(ordered_sources)
+        target_count = len(target_objects)
+
+        # Multi-source pastes require matching selection size
+        if source_count > 1 and target_count != source_count:
+            return util.make_inViewMessage(selection_mismatch_message)
+
+        # Map source data -> target objects (preserve order)
+        if source_count == 1:
+            mapping = [(ordered_sources[0], t) for t in target_objects]
+        else:
+            mapping = list(zip(ordered_sources, target_objects))
+
+        # Cut existing animation on targets
+        for _, target_obj in mapping:
+            if cmds.objExists(target_obj):
+                cmds.cutKey(target_obj, attribute=["tx", "ty", "tz", "rx", "ry", "rz"])
+
+        # Frames to paste (union of used sources)
+        frame_set = set()
+        for source_obj, _ in mapping:
+            obj_data = animation_data.get(source_obj) or {}
+            if isinstance(obj_data, dict):
+                for frame_key in obj_data.keys():
+                    try:
+                        frame_set.add(int(frame_key))
+                    except Exception:
+                        continue
+
+        all_frames = sorted(frame_set)
+        if not all_frames:
+            return util.make_inViewMessage("No World Space animation data found")
+
+        cmds.refresh(suspend=True)
+
+        gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
+        cmds.progressBar(
+            gMainProgressBar,
+            edit=True,
+            beginProgress=True,
+            isInterruptable=True,
+            status="Pasting World Space animation...",
+            maxValue=len(all_frames),
+        )
+
+        try:
+            for frame in all_frames:
+                cmds.progressBar(gMainProgressBar, edit=True, step=1)
+                if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
+                    break
+
+                cmds.currentTime(frame)
+                frame_key = str(frame)
+                for source_obj, target_obj in mapping:
+                    if not cmds.objExists(target_obj):
+                        continue
+                    obj_data = animation_data.get(source_obj) or {}
+                    if not isinstance(obj_data, dict):
+                        continue
+                    if frame_key not in obj_data:
+                        continue
+                    values = obj_data[frame_key]
+                    cmds.xform(target_obj, translation=values[:3], worldSpace=True)
+                    cmds.xform(target_obj, rotation=values[3:], worldSpace=True)
+                    cmds.setKeyframe(target_obj)
+
+        finally:
+            valid_targets = [t for _, t in mapping if cmds.objExists(t)]
+            if valid_targets:
+                cmds.filterCurve(valid_targets)
+            cmds.refresh(suspend=False)
+            cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
+            cmds.currentTime(original_time)
+            pass
+
+    finally:
+        if chunk_opened:
+            try:
+                cmds.undoInfo(closeChunk=True)
+            except Exception:
+                pass
 
 
 # ____________________________________ Tracer _______________________________________________

@@ -438,44 +438,53 @@ def normalize_action_identifier(action_identifier):
 def execute_action(action_identifier):
     action_identifier = normalize_action_identifier(action_identifier)
 
-    if action_identifier == "isolate_master":
-        bar.isolate_master()
-    elif action_identifier == "align_selected_objects":
-        bar.align_selected_objects()
-    elif action_identifier == "mod_tracer":
-        bar.mod_tracer()
-    elif action_identifier == "reset_objects_mods":
-        keyTools.reset_objects_mods()
-    elif action_identifier == "deleteAnimation":
-        bar.mod_delete_animation()
-    elif action_identifier == "selectOpposite":
-        keyTools.selectOpposite()
-    elif action_identifier == "copyOpposite":
-        keyTools.copyOpposite()
-    elif action_identifier == "mirror":
-        keyTools.mirror()
-    elif action_identifier == "copy_animation":
-        keyTools.copy_animation()
-    elif action_identifier == "paste_animation":
-        keyTools.paste_animation()
-    elif action_identifier == "paste_insert_animation":
-        keyTools.paste_insert_animation()
-    elif action_identifier == "copy_pose":
-        keyTools.copy_pose()
-    elif action_identifier == "paste_pose":
-        keyTools.paste_pose()
-    elif action_identifier == "selectHierarchy":
-        bar.selectHierarchy()
-    elif action_identifier == "mod_link_objects":
-        keyTools.mod_link_objects()
-    elif action_identifier == "temp_pivot":
-        temp_pivot_action()
-    elif action_identifier == "copy_worldspace_single_frame":
-        bar.copy_worldspace_single_frame()
-    elif action_identifier == "paste_worldspace_single_frame":
-        bar.paste_worldspace_single_frame()
-    else:
-        pass
+    chunk_opened = False
+    try:
+        cmds.undoInfo(openChunk=True, chunkName=f"TKM:{action_identifier}")
+        chunk_opened = True
+
+        if action_identifier == "isolate_master":
+            bar.isolate_master()
+        elif action_identifier == "align_selected_objects":
+            bar.align_selected_objects()
+        elif action_identifier == "mod_tracer":
+            bar.mod_tracer()
+        elif action_identifier == "reset_objects_mods":
+            keyTools.reset_objects_mods()
+        elif action_identifier == "deleteAnimation":
+            bar.mod_delete_animation()
+        elif action_identifier == "selectOpposite":
+            keyTools.selectOpposite()
+        elif action_identifier == "copyOpposite":
+            keyTools.copyOpposite()
+        elif action_identifier == "mirror":
+            keyTools.mirror()
+        elif action_identifier == "copy_animation":
+            keyTools.copy_animation()
+        elif action_identifier == "paste_animation":
+            keyTools.paste_animation()
+        elif action_identifier == "paste_insert_animation":
+            keyTools.paste_insert_animation()
+        elif action_identifier == "copy_pose":
+            keyTools.copy_pose()
+        elif action_identifier == "paste_pose":
+            keyTools.paste_pose()
+        elif action_identifier == "selectHierarchy":
+            bar.selectHierarchy()
+        elif action_identifier == "mod_link_objects":
+            keyTools.mod_link_objects()
+        elif action_identifier == "temp_pivot":
+            temp_pivot_action()
+        elif action_identifier == "copy_worldspace_single_frame":
+            bar.copy_worldspace_single_frame()
+        elif action_identifier == "paste_worldspace_single_frame":
+            bar.paste_worldspace_single_frame()
+        else:
+            pass
+
+    finally:
+        if chunk_opened:
+            cmds.undoInfo(closeChunk=True)
 
 
 def save_orbit_button_config():
