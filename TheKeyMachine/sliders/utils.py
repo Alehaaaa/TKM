@@ -26,6 +26,8 @@ _target_attr_plugs = None
 _target_source = None
 _target_time_range = None
 _target_has_graph_keys = False
+
+
 def start_dragging():
     """Starts a Maya undo chunk if not already dragging."""
     global is_dragging

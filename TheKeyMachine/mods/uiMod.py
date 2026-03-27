@@ -38,6 +38,7 @@ except ImportError:
     pass
 
 import ssl
+import re
 import os
 import platform
 import sys
@@ -73,25 +74,70 @@ def _auto_transparency_enabled():
 
 
 color_codes = {
-    "_01": "#878A90",  # gris
-    "_02": "#E6DC54",  # amarillo
-    "_03": "#96BEC7",  # azul claro
-    "_04": "#598693",  # azul oscuro
-    "_05": "#8190B8",  # purple
-    "_06": "#45C46B",  # verde
-    "_07": "#C9844B",  # naranja
-    "_08": "#AD4D4E",  # rojo oscuro
+    "_01": "#DDA6A1",
+    "_02": "#C96B68",
+    "_03": "#7E3D3C",
+    "_04": "#DDB78F",
+    "_05": "#C98E57",
+    "_06": "#7E5738",
+    "_07": "#DED595",
+    "_08": "#CFC06B",
+    "_09": "#80723E",
+    "_10": "#A8C4A3",
+    "_11": "#6E9D68",
+    "_12": "#3E5F3B",
+    "_13": "#9DBBD2",
+    "_14": "#668DAF",
+    "_15": "#3A536D",
+    "_16": "#9BC2BC",
+    "_17": "#5F9E94",
+    "_18": "#35635D",
+    "_19": "#BAA4C8",
+    "_20": "#8C6D9F",
+    "_21": "#533F61",
+    "_22": "#D5A6B7",
+    "_23": "#B8718D",
+    "_24": "#6F4155",
 }
 
 color_codes_hover = {
-    "_01": "#A0A5AF",  # gris
-    "_02": "#EEE3C2",  # amarillo
-    "_03": "#ABD9E3",  # azul claro
-    "_04": "#77ABBA",  # azul oscuro
-    "_05": "#A1AFD9",  # purple
-    "_06": "#83C4B3",  # verde
-    "_07": "#D99993",  # rojo claro
-    "_08": "#D46668",  # rojo oscuro
+    "_01": "#E4B4AF",
+    "_02": "#D57E7A",
+    "_03": "#8E4A49",
+    "_04": "#E3C39F",
+    "_05": "#D59C6B",
+    "_06": "#8F6644",
+    "_07": "#E4DCAA",
+    "_08": "#D8CA7E",
+    "_09": "#90824A",
+    "_10": "#B3CCAF",
+    "_11": "#7EAA79",
+    "_12": "#4A6C46",
+    "_13": "#AAC6DB",
+    "_14": "#7799B8",
+    "_15": "#476179",
+    "_16": "#ABCDC8",
+    "_17": "#70AAA1",
+    "_18": "#43706A",
+    "_19": "#C4B3D0",
+    "_20": "#9A7DAB",
+    "_21": "#644D73",
+    "_22": "#DCB6C4",
+    "_23": "#C3839B",
+    "_24": "#7D4E61",
+}
+
+selection_set_color_order = tuple(color_codes.keys())
+selection_set_color_index = {suffix: index for index, suffix in enumerate(selection_set_color_order)}
+selection_set_dark_text_map = {
+    "_03": color_codes["_01"],
+    "_06": color_codes["_04"],
+    "_09": color_codes["_07"],
+    "_12": color_codes["_10"],
+    "_15": color_codes["_13"],
+    "_18": color_codes["_16"],
+    "_21": color_codes["_19"],
+    "_24": color_codes["_22"],
 }
 
 
@@ -427,12 +473,46 @@ orbit_action_icons = {
     "bar.paste_worldspace_single_frame": media.worldspace_paste_frame_image,
 }
 
+DEFAULT_ORBIT_CONFIGURATION = {
+    "button1": "reset_objects_mods",
+    "button2": "deleteAnimation",
+    "button3": "selectOpposite",
+    "button4": "copyOpposite",
+    "button5": "mirror",
+    "button6": "selectHierarchy",
+    "button7": "isolate_master",
+}
+
 
 LEGACY_ACTION_ALIASES = {"accion_temp_pivot": "temp_pivot"}
 
 
 def normalize_action_identifier(action_identifier):
     return LEGACY_ACTION_ALIASES.get(action_identifier, action_identifier)
+
+
+def _orbit_button_sort_key(button_id):
+    suffix = str(button_id).replace("button", "")
+    return int(suffix) if suffix.isdigit() else 9999
+
+
+def sanitize_orbit_configuration(config):
+    valid_actions = set(orbit_actions.keys())
+    sanitized = {}
+    seen_actions = set()
+
+    for button_id in sorted(config.keys(), key=_orbit_button_sort_key):
+        if not str(button_id).startswith("button"):
+            continue
+        action_identifier = normalize_action_identifier(config.get(button_id, ""))
+        if action_identifier not in valid_actions:
+            continue
+        if action_identifier in seen_actions:
+            continue
+        sanitized[button_id] = action_identifier
+        seen_actions.add(action_identifier)
+
+    return sanitized
 
 
 def execute_action(action_identifier):
@@ -489,38 +569,21 @@ def execute_action(action_identifier):
 
 def save_orbit_button_config():
     config_path = USER_FOLDER_PATH + "/TheKeyMachine_user_data/tools/orbit/orbit.py"
+    config_dir = os.path.dirname(config_path)
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
 
-    with open(config_path, "r") as file:
-        lines = file.readlines()
+    sanitized = sanitize_orbit_configuration(orbit_configuration)
 
-    # Update the line that stores each button assignment
-    for button_id, action_name in orbit_configuration.items():
-        line_prefix = f"{button_id} = "
-        line_index = next((i for i, line_value in enumerate(lines) if line_value.startswith(line_prefix)), None)
-
-        if line_index is not None:
-            lines[line_index] = f"{button_id} = '{action_name}'\n"
-        else:
-            # If the button is missing from the file, append it at the end
-            lines.append(f"{button_id} = '{action_name}'\n")
-
-    # Rewrite the file with the updated assignments
     with open(config_path, "w") as file:
-        file.writelines(lines)
+        for button_id in sorted(sanitized.keys(), key=_orbit_button_sort_key):
+            file.write(f"{button_id} = '{sanitized[button_id]}'\n")
 
 
 def load_orbit_configuration():
     config_path = USER_FOLDER_PATH + "/TheKeyMachine_user_data/tools/orbit/orbit.py"
     config_dir = os.path.dirname(config_path)
-    orbit_configuration = {
-        "button1": "reset_objects_mods",
-        "button2": "deleteAnimation",
-        "button3": "selectOpposite",
-        "button4": "copyOpposite",
-        "button5": "mirror",
-        "button6": "selectHierarchy",
-        "button7": "isolate_master",
-    }
+    orbit_configuration = dict(DEFAULT_ORBIT_CONFIGURATION)
 
     # Ensure the directory exists
     if not os.path.exists(config_dir):
@@ -541,7 +604,7 @@ def load_orbit_configuration():
             for key, value in orbit_configuration.items():
                 file.write(f"{key} = '{value}'\n")
 
-    return {k: normalize_action_identifier(v) for k, v in orbit_configuration.items()}
+    return sanitize_orbit_configuration(orbit_configuration)
 
 
 orbit_configuration = load_orbit_configuration()
@@ -705,66 +768,7 @@ class OrbitWindowMixin:
 
     def _setup_orbit_ui(self):
         global orbit_configuration
-        use_shared_header = all(hasattr(self, name) for name in ("clear_header_right_widgets", "set_header_left_widget", "add_header_right_widget"))
-        if use_shared_header:
-            # Build header row using the shared close-button/header layout from QFlatCloseableFloatingWidget.
-            self.clear_header_right_widgets()
-
-            self.orbit_buttons = []
-            self.button_widgets = {}
-
-            self.button_flow_container = cw.QFlowContainer()
-            self.button_flow_layout = cw.QFlowLayout(
-                self.button_flow_container,
-                margin=0,
-                Hspacing=wutil.DPI(6),
-                Vspacing=wutil.DPI(6),
-                alignment=QtCore.Qt.AlignLeft,
-            )
-            self.button_flow_container.setLayout(self.button_flow_layout)
-            self.set_header_left_widget(self.button_flow_container, stretch=1)
-
-            orbit_configuration = load_orbit_configuration()
-
-            button_keys = sorted(
-                [k for k in orbit_configuration.keys() if k.startswith("button")],
-                key=lambda x: int(x.replace("button", "")) if x.replace("button", "").isdigit() else 99,
-            )
-
-            for button_id in button_keys:
-                action_name = orbit_configuration.get(button_id, "")
-                self._create_orbit_button(button_id, action_name)
-
-            self.add_button = cw.QFlatToolButton(
-                text="+", tooltip_template="Add Tool Option", description="Assign an extra tool to your Orbit window."
-            )
-            self.add_button.setFixedSize(wutil.DPI(20), wutil.DPI(20))
-
-            self.add_button.setStyleSheet(
-                self.add_button.styleSheet()
-                + " QToolButton { color: #888888; font-size: "
-                + str(wutil.DPI(18))
-                + "px; } QToolButton:hover { color: #ffffff; }"
-            )
-            self.add_button.clicked.connect(self._setup_add_button_menu)
-            # Right-click should also open the add menu.
-            self.add_button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-            self.add_button.customContextMenuRequested.connect(lambda *_: self._setup_add_button_menu())
-            self.add_header_right_widget(self.add_button, before_close=True)
-            return
-
-        # Fallback for older sessions where customDialogs wasn't reloaded yet.
-        if hasattr(self, "top_bar_layout") and self.top_bar_layout:
-            try:
-                self.top_bar_layout.setParent(None)
-                self.top_bar_layout.deleteLater()
-            except Exception:
-                pass
-
-        self.orbit_layout = QtWidgets.QHBoxLayout()
-        self.orbit_layout.setContentsMargins(0, 0, 0, 0)
-        self.orbit_layout.setSpacing(wutil.DPI(15))
-        self.mainLayout.addLayout(self.orbit_layout)
+        self.clear_header_right_widgets()
 
         self.orbit_buttons = []
         self.button_widgets = {}
@@ -778,8 +782,8 @@ class OrbitWindowMixin:
             alignment=QtCore.Qt.AlignLeft,
         )
         self.button_flow_container.setLayout(self.button_flow_layout)
-        self.orbit_layout.addWidget(self.button_flow_container, 1)
-        self.orbit_layout.addSpacing(wutil.DPI(8))
+        self.button_flow_container.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.set_header_left_widget(self.button_flow_container, stretch=1)
 
         orbit_configuration = load_orbit_configuration()
 
@@ -792,15 +796,9 @@ class OrbitWindowMixin:
             action_name = orbit_configuration.get(button_id, "")
             self._create_orbit_button(button_id, action_name)
 
-        self.separator = QtWidgets.QFrame()
-        self.separator.setFrameShape(QtWidgets.QFrame.VLine)
-        self.separator.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.separator.setFixedSize(2, wutil.DPI(20))
-        self.separator.setStyleSheet("QFrame { background-color: #3d3d3d; border: none; }")
-        self.orbit_layout.addWidget(self.separator)
-
         self.add_button = cw.QFlatToolButton(text="+", tooltip_template="Add Tool Option", description="Assign an extra tool to your Orbit window.")
         self.add_button.setFixedSize(wutil.DPI(20), wutil.DPI(20))
+
         self.add_button.setStyleSheet(
             self.add_button.styleSheet()
             + " QToolButton { color: #888888; font-size: "
@@ -808,14 +806,9 @@ class OrbitWindowMixin:
             + "px; } QToolButton:hover { color: #ffffff; }"
         )
         self.add_button.clicked.connect(self._setup_add_button_menu)
-        # Right-click should also open the add menu.
         self.add_button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.add_button.customContextMenuRequested.connect(lambda *_: self._setup_add_button_menu())
-        self.orbit_layout.addWidget(self.add_button)
-
-        self.close_button.setFixedSize(wutil.DPI(20), wutil.DPI(20))
-        self.close_button.setParent(None)
-        self.orbit_layout.addWidget(self.close_button)
+        self.add_header_right_widget(self.add_button, before_close=True)
 
     def _remove_from_flow_layout(self, widget):
         if not hasattr(self, "button_flow_layout"):
@@ -921,6 +914,13 @@ class OrbitWindowMixin:
             action.setChecked(checked)
             action.toggled.connect(partial(self._handle_add_action_toggle, action, action_ident))
 
+        menu.addSeparator()
+        pin_default_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin Default")
+        pin_default_action.triggered.connect(self._pin_default_tools)
+
+        pin_all_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin All")
+        pin_all_action.triggered.connect(self._pin_all_tools)
+
         menu.exec_(QtGui.QCursor.pos())
 
     def _handle_add_action_toggle(self, action, action_identifier, checked):
@@ -957,6 +957,24 @@ class OrbitWindowMixin:
         orbit_configuration[button_id] = action_identifier
         save_orbit_button_config()
         self._create_orbit_button(button_id, action_identifier)
+
+    def _reset_orbit_buttons(self, new_config):
+        for button_id in list(self.button_widgets.keys()):
+            self._remove_button(button_id)
+
+        orbit_configuration.clear()
+        orbit_configuration.update(sanitize_orbit_configuration(new_config))
+        save_orbit_button_config()
+
+        for button_id in sorted(orbit_configuration.keys(), key=_orbit_button_sort_key):
+            self._create_orbit_button(button_id, orbit_configuration[button_id])
+
+    def _pin_default_tools(self):
+        self._reset_orbit_buttons(dict(DEFAULT_ORBIT_CONFIGURATION))
+
+    def _pin_all_tools(self):
+        all_config = {f"button{index}": action_ident for index, (_, _, action_ident, _) in enumerate(self._get_menu_items(), start=1)}
+        self._reset_orbit_buttons(all_config)
 
     def _remove_button(self, button_id):
         btn = self.button_widgets.pop(button_id, None)
@@ -1184,7 +1202,34 @@ def selection_sets_window(*args, controller=None, reuse_existing=True):
     return win
 
 
-_selection_sets_open_fn = lambda: selection_sets_window(controller=None, reuse_existing=True)
+def _has_any_selection_sets(controller=None):
+    controller = _resolve_toolbar_controller(controller)
+    if controller is None:
+        return False
+    return bool(controller.get_selection_sets())
+
+
+def _open_selection_sets_from_toolbar(controller=None):
+    controller = _resolve_toolbar_controller(controller)
+    if not _has_any_selection_sets(controller):
+        if not cmds.ls(selection=True):
+            _emit_selection_sets_window_state(False)
+            wutil.make_inViewMessage("Select something first.")
+            return
+        open_selection_set_creation_dialog(
+            controller=controller,
+            on_created=lambda: selection_sets_window(controller=controller, reuse_existing=True),
+            on_rejected=lambda: _emit_selection_sets_window_state(False),
+        )
+        return
+    selection_sets_window(controller=controller, reuse_existing=True)
+
+
+def open_selection_sets_toolbar_action(controller=None):
+    _open_selection_sets_from_toolbar(controller=controller)
+
+
+_selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=None)
 _selection_sets_toolbar_toggle = ToolbarWindowToggle(
     is_selection_sets_window_open,
     lambda: _selection_sets_open_fn(),
@@ -1197,14 +1242,14 @@ def toggle_selection_sets_window(controller=None):
     global _selection_sets_open_fn
     controller = _resolve_toolbar_controller(controller)
     if controller is not None:
-        _selection_sets_open_fn = lambda: selection_sets_window(controller=controller, reuse_existing=True)
+        _selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=controller)
     if _selection_sets_toolbar_toggle:
         _selection_sets_toolbar_toggle.toggle()
     else:
         if is_selection_sets_window_open():
             close_selection_sets_window()
         else:
-            selection_sets_window(controller=controller, reuse_existing=True)
+            _open_selection_sets_from_toolbar(controller=controller)
 
 
 def refresh_selection_sets_window():
@@ -1216,116 +1261,265 @@ def refresh_selection_sets_window():
 _selection_set_creation_dialog = None
 
 
+class SelectionSetButton(cw.InlineRenameButton):
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self._match_state = "none"
+        self._match_radius = wutil.DPI(7)
+        self._subset_name = None
+        self._controller = None
+
+    def set_rename_target(self, controller, subset_name, display_name):
+        self._controller = controller
+        self._subset_name = subset_name
+        super().set_rename_target(subset_name, display_name, self._commit_inline_rename)
+
+    def _commit_inline_rename(self, subset_name, new_name):
+        if self._controller and subset_name:
+            self._controller.rename_set(subset_name, new_name)
+
+    def set_match_state(self, match_state):
+        self._match_state = match_state or "none"
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self._renaming_active:
+            return
+        if self._match_state not in ("exact", "partial"):
+            return
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        pen = QtGui.QPen(QtGui.QColor("#ffffff"))
+        pen.setWidth(2)
+        if self._match_state == "partial":
+            pen.setWidth(1)
+            pen.setStyle(QtCore.Qt.CustomDashLine)
+            pen.setDashPattern([wutil.DPI(4), wutil.DPI(3)])
+        painter.setPen(pen)
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.drawRoundedRect(rect, self._match_radius, self._match_radius)
+        painter.end()
+
+
 class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
-    def __init__(self, controller, parent=None):
+    def __init__(self, controller, parent=None, on_created=None, on_rejected=None):
         super().__init__(popup=False, parent=parent)
         self.controller = controller
+        self.on_created = on_created
+        self.on_rejected = on_rejected
+        self._opened = False
+        self._completed = False
+        self._selected_color_suffix = next(iter(color_codes.keys()), "_01")
+        self._color_buttons = {}
         self.setObjectName("selection_set_creation_dialog")
         self.setWindowTitle("Create Selection Set")
-        fixed_width = wutil.DPI(680)
-        self.setMinimumWidth(fixed_width)
-        self.setMaximumWidth(fixed_width)
-        self.setMinimumHeight(wutil.DPI(120))
-
-        self.flow_container = cw.QFlowContainer()
-        self.flow_layout = cw.QFlowLayout(
-            self.flow_container,
-            margin=wutil.DPI(6),
-            Hspacing=wutil.DPI(8),
-            alignment=QtCore.Qt.AlignLeft,
-        )
-        self.flow_container.setMinimumHeight(wutil.DPI(40))
-        self.flow_container.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        self._configure_top_row()
-        self._build_controls()
-
-    def _configure_top_row(self):
-        close_btn = self.close_button
+        self.setMinimumWidth(wutil.DPI(320))
+        self.top_bar_layout.setContentsMargins(0, 0, 0, 0)
+        self.top_bar_layout.setSpacing(0)
         while self.top_bar_layout.count():
             item = self.top_bar_layout.takeAt(0)
             widget = item.widget()
-            if widget and widget is not close_btn:
+            if widget:
                 widget.setParent(None)
-        self.top_bar_layout.addWidget(self.flow_container, 1)
-        self.top_bar_layout.addWidget(close_btn, 0, QtCore.Qt.AlignRight)
+        self._build_controls()
+        self._apply_default_name_from_selection()
 
     def _build_controls(self):
-        self.name_field = QtWidgets.QLineEdit()
-        self.name_field.setPlaceholderText("Set name and click a color")
-        self.name_field.setMinimumWidth(wutil.DPI(200))
+        self.top_row = QtWidgets.QWidget()
+        self.top_row.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        top_row_layout = QtWidgets.QHBoxLayout(self.top_row)
+        top_row_layout.setContentsMargins(0, 0, 0, 0)
+        top_row_layout.setSpacing(wutil.DPI(6))
+
+        self.entry_button = QtWidgets.QFrame()
+        self.entry_button.setObjectName("selection_set_creation_entry")
+        self.entry_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.entry_button.setFixedHeight(wutil.DPI(37))
+        self.entry_button.setStyleSheet(
+            """
+            QFrame#selection_set_creation_entry {
+                background-color: %s;
+                border-radius: 7px;
+            }
+            """
+            % color_codes["_02"]
+        )
+        entry_layout = QtWidgets.QHBoxLayout(self.entry_button)
+        entry_layout.setContentsMargins(wutil.DPI(10), 0, wutil.DPI(10), 0)
+        entry_layout.setSpacing(0)
+
+        self.name_field = cw.PersistentPlaceholderLineEdit()
+        self.name_field.setPlaceholderText("Selection Set")
+        self.name_field.setAlignment(QtCore.Qt.AlignCenter)
+        self.name_field.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.name_field.setFixedHeight(wutil.DPI(30))
         self.name_field.setStyleSheet(
             """
             QLineEdit {
-                background-color: #272727;
-                border: 1px solid #434343;
-                border-radius: 6px;
-                color: #e0e0e0;
-                padding: 4px 8px;
-            }
-            """
-        )
-        self.flow_layout.addWidget(self.name_field)
-
-        self.group_combo = QtWidgets.QComboBox()
-        self.group_combo.setFixedHeight(wutil.DPI(30))
-        self.group_combo.setMinimumWidth(wutil.DPI(150))
-        self.group_combo.setStyleSheet(
-            """
-            QComboBox {
-                background-color: #2f2f2f;
-                border-radius: 6px;
-                border: 1px solid #434343;
-                color: #d5d5d5;
-                padding-left: 8px;
-            }
-            QComboBox::drop-down {
+                background-color: transparent;
                 border: none;
+                color: #000000;
+                padding: 0px 6px;
+            }
+            QLineEdit::placeholder {
+                color: transparent;
             }
             """
         )
-        if hasattr(self.controller, "update_set_group_menu"):
-            self.controller.update_set_group_menu(self.group_combo)
-        self.flow_layout.addWidget(self.group_combo)
+        self.name_field.returnPressed.connect(self._create_set_from_selected_color)
+        entry_layout.addWidget(self.name_field, 1)
+        top_row_layout.addWidget(self.entry_button, 1)
 
-        self.create_group_button = cw.QFlatButton(text="New Group")
-        self.create_group_button.clicked.connect(self._create_group)
-        self.flow_layout.addWidget(self.create_group_button)
+        self.confirm_button = self._create_action_button("OK", self._create_set_from_selected_color, highlight=True)
+        top_row_layout.addWidget(self.confirm_button, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+
+        self.close_dialog_button = self._create_action_button("Close", self.close)
+        top_row_layout.addWidget(self.close_dialog_button, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+
+        self.mainLayout.addWidget(self.top_row)
+
+        self.color_row = QtWidgets.QWidget()
+        self.color_row.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.color_layout = QtWidgets.QHBoxLayout(self.color_row)
+        self.color_layout.setContentsMargins(0, 0, 0, 0)
+        self.color_layout.setSpacing(wutil.DPI(2))
 
         for suffix, color_hex in color_codes.items():
             btn = self._create_color_button(suffix, color_hex)
-            self.flow_layout.addWidget(btn)
+            self.color_layout.addWidget(btn)
 
-    def _create_group(self):
-        if self.controller:
-            self.controller.create_new_set_group(self.name_field, self.group_combo)
+        self.color_layout.addStretch(1)
+        self.mainLayout.addWidget(self.color_row)
+
+    def _create_action_button(self, text, callback, highlight=False):
+        button = cw.QFlatButton(text=text, highlight=highlight)
+        button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        button.clicked.connect(callback)
+        return button
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._opened = True
+        QtCore.QTimer.singleShot(0, self._focus_name_field)
+
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.ActivationChange:
+            if self._opened and not self.isActiveWindow():
+                self.close()
+                return
+        super().changeEvent(event)
+
+    def closeEvent(self, event):
+        if not self._completed and callable(self.on_rejected):
+            self.on_rejected()
+        super().closeEvent(event)
+
+    def _focus_name_field(self):
+        if not wutil.is_valid_widget(self) or not self.isVisible():
+            return
+        self.raise_()
+        self.activateWindow()
+        self.name_field.setFocus(QtCore.Qt.ActiveWindowFocusReason)
+        self.name_field.selectAll()
+
+    def _sanitize_selection_name(self, name):
+        short_name = name.rsplit("|", 1)[-1].rsplit(":", 1)[-1]
+        parts = [part for part in re.split(r"[^A-Za-z0-9]+", short_name) if part]
+        sanitized = "_".join(parts)
+        sanitized = re.sub(r"^[^A-Za-z_]+", "", sanitized)
+        return sanitized
+
+    def _build_default_name_from_selection(self):
+        selection = cmds.ls(selection=True) or []
+        if not selection:
+            return ""
+
+        sanitized_names = [self._sanitize_selection_name(item) for item in selection]
+        sanitized_names = [name for name in sanitized_names if name]
+        if not sanitized_names:
+            return ""
+        if len(sanitized_names) == 1:
+            return sanitized_names[0]
+
+        token_lists = [name.split("_") for name in sanitized_names]
+        common_tokens = []
+        first_tokens = token_lists[0]
+        for token in first_tokens:
+            if all(token in tokens for tokens in token_lists[1:]) and token not in common_tokens:
+                common_tokens.append(token)
+
+        if common_tokens:
+            return "_".join(common_tokens)
+
+        prefix = sanitized_names[0]
+        for name in sanitized_names[1:]:
+            max_len = min(len(prefix), len(name))
+            match_len = 0
+            while match_len < max_len and prefix[match_len].lower() == name[match_len].lower():
+                match_len += 1
+            prefix = prefix[:match_len]
+            if not prefix:
+                break
+        prefix = re.sub(r"[^A-Za-z0-9]+$", "", prefix).strip("_")
+        return prefix
+
+    def _apply_default_name_from_selection(self):
+        default_name = self._build_default_name_from_selection()
+        if default_name:
+            self.name_field.setText(default_name)
+
+    def _create_set_from_selected_color(self):
+        self._create_set(self._selected_color_suffix)
 
     def _create_set(self, suffix):
         if self.controller:
-            self.controller.create_new_set_and_update_buttons(suffix, self.name_field, self.group_combo)
+            set_name = self.name_field.text().strip()
+            if not set_name:
+                self.name_field.setFocus(QtCore.Qt.ActiveWindowFocusReason)
+                return
+            created = self.controller.create_new_set_and_update_buttons(suffix, self.name_field, None)
+            if created:
+                self._completed = True
+                self.close()
+                if callable(self.on_created):
+                    self.on_created()
 
     def _create_color_button(self, suffix, color_hex):
-        icon = self._build_color_icon(color_hex)
+        icon = media.selection_set_color_images.get(suffix)
         label = ""
         if hasattr(self.controller, "color_names"):
             label = self.controller.color_names.get(suffix, "")
         tooltip = f"Create {label or suffix.replace('_', '').title()} Set"
+        button_size = max(1, int(round(wutil.DPI(20) * 0.7)))
+        icon_size = max(1, int(round(wutil.DPI(18) * 0.7)))
         btn = cw.QFlatToolButton(icon=icon, tooltip_template=tooltip)
-        btn.clicked.connect(lambda _, s=suffix: self._create_set(s))
+        btn.setFixedSize(button_size, button_size)
+        btn.setIconSize(QtCore.QSize(icon_size, icon_size))
+        btn.setCheckable(True)
+        btn.clicked.connect(lambda *_, s=suffix: self._create_set_from_color_click(s))
+        self._color_buttons[suffix] = btn
+        btn.setStyleSheet(btn.styleSheet() + " QToolButton:checked { background-color: #4a4a4a; color: #ffffff; }")
+        if suffix == self._selected_color_suffix:
+            btn.setChecked(True)
         return btn
 
-    def _build_color_icon(self, color_hex):
-        size = wutil.DPI(24)
-        pixmap = QtGui.QPixmap(size, size)
-        pixmap.fill(QtGui.QColor(color_hex))
-        painter = QtGui.QPainter(pixmap)
-        painter.setPen(QtGui.QPen(QtGui.QColor("#111111"), 2))
-        painter.drawRoundedRect(1, 1, size - 2, size - 2, 6, 6)
-        painter.end()
-        return QtGui.QIcon(pixmap)
+    def _set_selected_color(self, suffix):
+        self._selected_color_suffix = suffix
+        for key, button in self._color_buttons.items():
+            block = button.blockSignals(True)
+            button.setChecked(key == suffix)
+            button.blockSignals(block)
+
+    def _create_set_from_color_click(self, suffix):
+        self._set_selected_color(suffix)
+        self._create_set(suffix)
 
 
-def open_selection_set_creation_dialog(controller=None, parent=None):
+def open_selection_set_creation_dialog(controller=None, parent=None, on_created=None, on_rejected=None):
     global _selection_set_creation_dialog
     controller = _resolve_toolbar_controller(controller)
     if controller is None:
@@ -1336,7 +1530,7 @@ def open_selection_set_creation_dialog(controller=None, parent=None):
     if _selection_set_creation_dialog and wutil.is_valid_widget(_selection_set_creation_dialog):
         _selection_set_creation_dialog.close()
 
-    dialog = SelectionSetCreationDialog(controller=controller, parent=parent)
+    dialog = SelectionSetCreationDialog(controller=controller, parent=parent, on_created=on_created, on_rejected=on_rejected)
 
     def _clear_reference(*_):
         global _selection_set_creation_dialog
@@ -1344,6 +1538,9 @@ def open_selection_set_creation_dialog(controller=None, parent=None):
 
     dialog.destroyed.connect(_clear_reference)
     dialog.show()
+    dialog.raise_()
+    dialog.activateWindow()
+    QtCore.QTimer.singleShot(0, dialog._focus_name_field)
     _selection_set_creation_dialog = dialog
     return dialog
 
@@ -1398,12 +1595,15 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         super().__init__(popup=False, parent=parent)
         self.controller = controller or _resolve_toolbar_controller(controller)
         self._creation_dialog = None
+        self._set_buttons = {}
+        self._selection_match_timer = QtCore.QTimer(self)
+        self._selection_match_timer.setSingleShot(True)
+        self._selection_match_timer.timeout.connect(self._update_button_match_states)
         self.setObjectName("selection_sets_window")
         self.setWindowTitle("Selection Sets")
-        self.setMinimumWidth(wutil.DPI(360))
-        self.setMinimumHeight(wutil.DPI(260))
+        self.setMinimumHeight(wutil.DPI(76))
         margins = self.mainLayout.contentsMargins()
-        self.mainLayout.setContentsMargins(0, margins.top(), 0, margins.bottom())
+        self.mainLayout.setContentsMargins(0, wutil.DPI(4), 0, wutil.DPI(4))
         self._section_menu_targets = []
         self._build_ui()
         self._hovered = False
@@ -1414,127 +1614,24 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         self.settings_timer = QtCore.QTimer(self)
         self.settings_timer.timeout.connect(self._check_settings)
         self.settings_timer.start(500)
+        self._connect_selection_callback()
         self.adjustSize()
         self._restore_geometry()
         self.update_transparency_state(False)
         self.refresh()
 
     def _build_ui(self):
-        use_shared_header = all(hasattr(self, name) for name in ("clear_header_right_widgets", "set_header_left_widget", "add_header_right_widget"))
-        if use_shared_header:
-            # Use the shared header layout from QFlatCloseableFloatingWidget:
-            # left content (scroll) | separator | pinned tools section + close.
-            self.clear_header_right_widgets()
-            self.close_button.setToolTip("Close Select Sets")
-            # Match Orbit: leave a small breathing room between the close button and the window edge.
-            if hasattr(self, "header_right_layout") and self.header_right_layout:
-                self.header_right_layout.setContentsMargins(0, 0, wutil.DPI(6), 0)
-
-            self.scroll_area = QtWidgets.QScrollArea()
-            self.scroll_area.setWidgetResizable(True)
-            self.scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
-            # Let the window shrink; don't let scroll contents force a tall minimum.
-            self.scroll_area.setMinimumHeight(0)
-            self.scroll_area.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-            self.set_header_left_widget(self.scroll_area, stretch=1)
-
-            self.scroll_widget = QtWidgets.QWidget()
-            self.scroll_widget.setMinimumSize(0, 0)
-            self.scroll_layout = QtWidgets.QVBoxLayout(self.scroll_widget)
-            self.scroll_layout.setContentsMargins(0, 0, 0, 0)
-            self.scroll_layout.setSpacing(wutil.DPI(10))
-            self.scroll_layout.addStretch()
-            self.scroll_area.setWidget(self.scroll_widget)
-
-            self.header_section = cw.QFlatSectionWidget(spacing=wutil.DPI(2), hiddeable=True)
-            self.header_section.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed)
-            section_layout = self.header_section.layout()
-            if section_layout:
-                section_layout.setContentsMargins(0, 0, 0, 0)
-                section_layout.setSpacing(0)
-            self.header_section.setContentsMargins(0, 0, 0, 0)
-            self.add_header_right_widget(self.header_section, before_close=True)
-
-            self.add_button = self._create_header_button(
-                media.add_selection_set_image,
-                "Create Selection Set",
-                self._open_set_creation_window,
-                key="selection_sets_add_btn",
-                default_visible=True,
-            )
-            self.refresh_button = self._create_header_button(
-                media.reload_image,
-                "Reload Selection Sets",
-                self.refresh,
-                key="selection_sets_refresh_btn",
-                default_visible=False,
-            )
-            self.export_button = self._create_header_button(
-                media.move_selection_set_image,
-                "Export Selection Sets",
-                self._export_sets,
-                key="selection_sets_export_btn",
-                default_visible=False,
-            )
-            self.import_button = self._create_header_button(
-                media.selector_selection_set_image,
-                "Import Selection Sets",
-                self._import_sets,
-                key="selection_sets_import_btn",
-                default_visible=False,
-            )
-            self._install_header_context_menu()
-            for btn in (self.add_button, self.refresh_button, self.export_button, self.import_button):
-                self._register_section_menu_target(btn)
-            return
-
-        # Fallback for older sessions where customDialogs wasn't reloaded yet.
-        self.top_bar_layout.setContentsMargins(0, 0, 0, 0)
-        self.top_bar_layout.setSpacing(0)
-
-        close_btn = self.close_button
-        while self.top_bar_layout.count():
-            item = self.top_bar_layout.takeAt(0)
+        self.clear_header_right_widgets()
+        self.close_button.setToolTip("Close Select Sets")
+        while self.header_left_layout.count():
+            item = self.header_left_layout.takeAt(0)
             widget = item.widget()
-            if widget and widget is not close_btn:
+            if widget:
                 widget.setParent(None)
-
-        self.scroll_area = QtWidgets.QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.scroll_area.setMinimumHeight(0)
-        self.scroll_area.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        self.top_bar_layout.addWidget(self.scroll_area)
-
-        self.scroll_widget = QtWidgets.QWidget()
-        self.scroll_widget.setMinimumSize(0, 0)
-        self.scroll_layout = QtWidgets.QVBoxLayout(self.scroll_widget)
-        self.scroll_layout.setContentsMargins(0, 0, 0, 0)
-        self.scroll_layout.setSpacing(wutil.DPI(10))
-        self.scroll_layout.addStretch()
-        self.scroll_area.setWidget(self.scroll_widget)
-
-        self.header_spacer = QtWidgets.QWidget()
-        self.header_spacer.setMinimumWidth(wutil.DPI(90))
-        spacer_layout = QtWidgets.QHBoxLayout(self.header_spacer)
-        spacer_layout.setContentsMargins(0, 0, 0, 0)
-        spacer_layout.setSpacing(0)
-        spacer_layout.addStretch(1)
-        self.top_bar_layout.addWidget(self.header_spacer, 1)
-
-        self.header_separator = QtWidgets.QFrame()
-        self.header_separator.setFrameShape(QtWidgets.QFrame.VLine)
-        self.header_separator.setFrameShadow(QtWidgets.QFrame.Plain)
-        self.header_separator.setStyleSheet("background-color: #1f1f1f;")
-        self.header_separator.setFixedWidth(max(1, wutil.DPI(1)))
-        self.top_bar_layout.addWidget(self.header_separator)
-
-        self.header_controls_container = QtWidgets.QWidget()
-        self.header_controls_container.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        controls_layout = QtWidgets.QHBoxLayout(self.header_controls_container)
-        controls_layout.setContentsMargins(0, 0, wutil.DPI(6), 0)
-        controls_layout.setSpacing(max(1, wutil.DPI(2)))
-        controls_layout.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        if hasattr(self, "_set_header_divider_visible"):
+            self._set_header_divider_visible(False)
+        if hasattr(self, "header_right_layout") and self.header_right_layout:
+            self.header_right_layout.setContentsMargins(0, 0, wutil.DPI(6), 0)
 
         self.header_section = cw.QFlatSectionWidget(spacing=wutil.DPI(2), hiddeable=True)
         self.header_section.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed)
@@ -1543,10 +1640,7 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
             section_layout.setContentsMargins(0, 0, 0, 0)
             section_layout.setSpacing(0)
         self.header_section.setContentsMargins(0, 0, 0, 0)
-        controls_layout.addWidget(self.header_section, 0, QtCore.Qt.AlignRight)
-        close_btn.setToolTip("Close Select Sets")
-        controls_layout.addWidget(close_btn, 0, QtCore.Qt.AlignRight)
-        self.top_bar_layout.addWidget(self.header_controls_container, 0)
+        self.add_header_right_widget(self.header_section, before_close=True)
 
         self.add_button = self._create_header_button(
             media.add_selection_set_image,
@@ -1579,6 +1673,30 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         self._install_header_context_menu()
         for btn in (self.add_button, self.refresh_button, self.export_button, self.import_button):
             self._register_section_menu_target(btn)
+
+        self._build_sets_header_holder()
+
+    def _build_sets_header_holder(self):
+        self.header_sets_host = QtWidgets.QWidget(self.header_left_container)
+        self.header_sets_host.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.header_sets_layout = QtWidgets.QVBoxLayout(self.header_sets_host)
+        self.header_sets_layout.setContentsMargins(wutil.DPI(4), wutil.DPI(2), 0, wutil.DPI(2))
+        self.header_sets_layout.setSpacing(0)
+
+        self.flow_container = cw.QFlowContainer()
+        self.flow_container.setMinimumHeight(0)
+        self.flow_container.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        self.flow_layout = cw.QFillFlowLayout(
+            self.flow_container,
+            margin=0,
+            Hspacing=wutil.DPI(1),
+            Vspacing=wutil.DPI(1),
+            alignment=QtCore.Qt.AlignLeft,
+        )
+        self.flow_container.setLayout(self.flow_layout)
+        self.header_sets_layout.addWidget(self.flow_container, 0, QtCore.Qt.AlignTop)
+        self.header_sets_layout.addStretch(1)
+        self.set_header_left_widget(self.header_sets_host, stretch=1)
 
     def _create_header_button(self, icon, tooltip, callback, key, default_visible):
         btn = cw.QFlatToolButton(icon=icon, tooltip_template=tooltip)
@@ -1652,12 +1770,9 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         controller = controller or self.controller or _resolve_toolbar_controller()
         if controller is None:
             return False
-        set_groups = controller.get_set_groups()
-        for set_group in set_groups:
-            sub_sets = cmds.sets(set_group, q=True) or []
-            for subset in sub_sets:
-                if cmds.objExists(subset):
-                    return True
+        for subset in controller.get_selection_sets():
+            if cmds.objExists(subset):
+                return True
         wutil.make_inViewMessage("No sets to export")
         return False
 
@@ -1722,6 +1837,7 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         super().hideEvent(event)
 
     def closeEvent(self, event):
+        self._disconnect_selection_callback()
         _emit_selection_sets_window_state(False)
         super().closeEvent(event)
 
@@ -1732,22 +1848,30 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
             self._add_empty_state("Toolbar not available.")
             return
 
-        sel_root = "TheKeyMachine_SelectionSet"
-        set_groups = controller.get_set_groups()
-        if not set_groups:
+        visible_sets = []
+        for subset in controller.get_selection_sets():
+            if not cmds.objExists(subset):
+                continue
+            if cmds.attributeQuery("hidden", node=subset, exists=True) and cmds.getAttr(f"{subset}.hidden"):
+                continue
+            visible_sets.append(subset)
+
+        if not visible_sets:
             self._add_empty_state("Create your first selection set from the toolbar button.")
             return
 
-        set_groups.sort(key=lambda g: (g != "main_setgroup", g))
+        visible_sets.sort(key=self._selection_set_sort_key)
 
-        for set_group in set_groups:
-            group_widget = self._build_group_section(controller, set_group, set_groups, sel_root)
-            if group_widget:
-                self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, group_widget)
+        for subset in visible_sets:
+            button = self._create_set_button(controller, subset)
+            if button:
+                self.flow_layout.addWidget(button)
+        self._update_button_match_states()
 
     def _clear_scroll(self):
-        while self.scroll_layout.count() > 1:
-            item = self.scroll_layout.takeAt(0)
+        self._set_buttons = {}
+        while self.flow_layout.count():
+            item = self.flow_layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.setParent(None)
@@ -1757,131 +1881,143 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         # Intentionally no placeholder widget: keep the layout clean when empty.
         return
 
-    def _build_group_section(self, controller, set_group, all_groups, sel_root):
-        sub_sets = cmds.sets(set_group, q=True) or []
-        group_widget = QtWidgets.QFrame()
-        group_layout = QtWidgets.QVBoxLayout(group_widget)
-        group_layout.setContentsMargins(0, 0, 0, 0)
-        group_layout.setSpacing(wutil.DPI(6))
-
-        header_button = QtWidgets.QPushButton(set_group.replace("_setgroup", ""))
-        header_button.setCursor(QtCore.Qt.PointingHandCursor)
-        header_button.clicked.connect(lambda _, sg=set_group: controller.toggle_setgroup_visibility(sg))
-        header_button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        header_button.customContextMenuRequested.connect(lambda *_: self._show_group_menu(controller, set_group))
-
-        hidden = True
-        for subset in sub_sets:
-            if cmds.objExists(subset) and not cmds.getAttr(f"{subset}.hidden"):
-                hidden = False
-                break
-
-        text_color = "#636363" if hidden else "#66949d"
-        bg_color = "#393939" if hidden else "#292929"
-        header_button.setStyleSheet(
-            "QPushButton {color: %s; background-color: %s; border-radius: 6px; border: 1px solid #1f1f1f; font-weight: bold;}"
-            % (text_color, bg_color)
-        )
-        group_layout.addWidget(header_button)
-
-        flow_container = QtWidgets.QWidget()
-        flow_layout = cw.QFlowLayout(flow_container, margin=0, Hspacing=wutil.DPI(6), Vspacing=wutil.DPI(6), alignment=QtCore.Qt.AlignLeft)
-
-        for subset in sorted(sub_sets, key=lambda s: (s.split("_")[-1], s)):
-            if not cmds.objExists(subset):
-                continue
-            if cmds.getAttr(f"{subset}.hidden"):
-                continue
-            button = self._create_set_button(controller, subset, all_groups, sel_root)
-            if button:
-                flow_layout.addWidget(button)
-
-        if flow_layout.count() == 0:
-            placeholder = QtWidgets.QLabel("No visible sets")
-            placeholder.setStyleSheet("color: #777777;")
-            flow_layout.addWidget(placeholder)
-
-        group_layout.addWidget(flow_container)
-        return group_widget
-
-    def _create_set_button(self, controller, subset, all_groups, sel_root):
+    def _selection_set_sort_key(self, subset):
         split_name = subset.split("_")
-        if len(split_name) < 3:
+        color_suffix = split_name[-1] if len(split_name) >= 2 else ""
+        set_name = "_".join(split_name[:-1]) if len(split_name) >= 2 else subset
+        color_key = selection_set_color_index.get(f"_{color_suffix}", 999)
+        return color_key, set_name.lower(), subset.lower()
+
+    def _create_set_button(self, controller, subset):
+        split_name = subset.split("_")
+        if len(split_name) < 2:
             return None
         color_suffix = split_name[-1]
-        set_name = "_".join(split_name[:-2])
+        set_name = "_".join(split_name[:-1])
 
-        button = QtWidgets.QPushButton(set_name)
+        button = SelectionSetButton(set_name)
         button.setCursor(QtCore.Qt.PointingHandCursor)
-        button.clicked.connect(lambda _, s=subset: controller.handle_set_selection(s, False, False))
+        button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        button.setFixedHeight(wutil.DPI(38))
+        button.set_rename_target(controller, subset, set_name)
+        button.clicked.connect(lambda *_, s=subset: controller.handle_set_selection(s, False, False))
         button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        button.customContextMenuRequested.connect(lambda *_: self._show_set_menu(controller, subset, all_groups, sel_root))
+        button.customContextMenuRequested.connect(lambda *_: self._show_set_menu(controller, subset))
 
         color = color_codes.get(f"_{color_suffix}", "#333333")
         hover = color_codes_hover.get(f"_{color_suffix}", "#454545")
+        suffix_key = f"_{color_suffix}"
+        text_color = selection_set_dark_text_map.get(suffix_key, "#1a1a1a")
+        button.setProperty("tkm_base_color", color)
+        button.setProperty("tkm_hover_color", hover)
+        button.setProperty("tkm_text_color", text_color)
+        self._apply_set_button_style(button, match_state="none")
+        self._set_buttons[subset] = button
+        return button
+
+    def _apply_set_button_style(self, button, match_state="none"):
+        color = button.property("tkm_base_color") or "#333333"
+        hover = button.property("tkm_hover_color") or "#454545"
+        text_color = button.property("tkm_text_color") or "#1a1a1a"
         button.setStyleSheet(
             """
             QPushButton {
-                color: #1a1a1a;
+                color: %s;
                 background-color: %s;
-                border-radius: 6px;
-                border: 1px solid #1f1f1f;
-                padding: %dpx;
-                font-weight: bold;
+                border-radius: %dpx;
+                border: none;
+                padding: 0px %dpx;
+                font-weight: normal;
             }
             QPushButton:hover {
                 background-color: %s;
             }
             """
-            % (color, wutil.DPI(6), hover)
+            % (text_color, color, wutil.DPI(7), wutil.DPI(12), hover)
         )
-        return button
+        if hasattr(button, "set_match_state"):
+            button.set_match_state(match_state)
 
-    def _show_group_menu(self, controller, set_group):
-        menu = cw.OpenMenuWidget()
-        if set_group != "main_setgroup":
-            rename_action = menu.addAction("Rename Group")
-            rename_action.triggered.connect(lambda: controller.change_setgroup_name_window(set_group))
-            menu.addSeparator()
+    def _connect_selection_callback(self):
+        try:
+            import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
 
-        export_action = menu.addAction("Export Group")
-        export_action.triggered.connect(lambda: controller.export_single_subgroup(set_group))
-        delete_action = menu.addAction("Delete Group")
-        delete_action.triggered.connect(lambda: controller.remove_set_group_and_update_buttons(set_group))
-        menu.exec_(QtGui.QCursor.pos())
+            self._callback_manager = callbacks.get_callback_manager()
+            self._callback_manager.selection_changed.connect(self._schedule_selection_match_refresh)
+        except Exception:
+            self._callback_manager = None
 
-    def _show_set_menu(self, controller, subset, all_groups, sel_root):
-        menu = cw.OpenMenuWidget()
+    def _disconnect_selection_callback(self):
+        callback_manager = getattr(self, "_callback_manager", None)
+        if not callback_manager:
+            return
+        try:
+            callback_manager.selection_changed.disconnect(self._schedule_selection_match_refresh)
+        except Exception:
+            pass
+        self._callback_manager = None
+
+    def _schedule_selection_match_refresh(self):
+        if not self._selection_match_timer.isActive():
+            self._selection_match_timer.start(0)
+
+    def _normalize_scene_objects(self, items):
+        if not items:
+            return set()
+        normalized = cmds.ls(items, long=True) or []
+        return set(normalized or items)
+
+    def _update_button_match_states(self):
+        current_selection = self._normalize_scene_objects(cmds.ls(selection=True, long=True) or [])
+        for subset, button in list(self._set_buttons.items()):
+            if not wutil.is_valid_widget(button):
+                self._set_buttons.pop(subset, None)
+                continue
+            if not cmds.objExists(subset):
+                self._apply_set_button_style(button, match_state="none")
+                continue
+            set_members = self._normalize_scene_objects(cmds.sets(subset, q=True) or [])
+            if current_selection == set_members:
+                match_state = "exact"
+            elif current_selection and set_members and current_selection.intersection(set_members):
+                match_state = "partial"
+            else:
+                match_state = "none"
+            self._apply_set_button_style(button, match_state=match_state)
+
+    def _show_set_menu(self, controller, subset):
+        menu = cw.MenuWidget()
         menu.addAction(QtGui.QIcon(media.add_to_selection_set_image), "Add Selection").triggered.connect(
             lambda: controller.add_selection_to_set(subset)
         )
         menu.addAction(QtGui.QIcon(media.remove_from_selection_set_image), "Remove Selection").triggered.connect(
             lambda: controller.remove_selection_from_set(subset)
         )
+        menu.addAction(QtGui.QIcon(media.reload_image), "Update Selection").triggered.connect(lambda: controller.update_selection_to_set(subset))
         menu.addSeparator()
 
-        color_menu = cw.OpenMenuWidget("Change Color")
-        color_menu_action = menu.addMenu(color_menu)
+        color_menu = cw.MenuWidget("Change Color")
+        menu.addMenu(color_menu)
         for suffix, label in controller.color_names.items():
-            action = color_menu.addAction(label)
-            action.triggered.connect(lambda _, s=subset, suf=suffix: controller.set_set_color(s, suf))
+            action = color_menu.addAction(QtGui.QIcon(media.selection_set_color_images.get(suffix, "")), label)
+            action.triggered.connect(lambda *_, s=subset, suf=suffix: controller.set_set_color(s, suf))
 
-        menu.addSeparator()
-        menu.addAction(QtGui.QIcon(media.rename_selection_set_image), "Rename Set").triggered.connect(
-            lambda: controller.change_set_name_window(subset, subset.rsplit("_", 1)[0])
+        menu.addAction(QtGui.QIcon(media.rename_selection_set_image), "Rename").triggered.connect(
+            lambda: (
+                self._set_buttons.get(subset).start_inline_rename()
+                if self._set_buttons.get(subset)
+                else controller.change_set_name_window(subset, subset.rsplit("_", 1)[0])
+            )
         )
-        menu.addAction(QtGui.QIcon(media.remove_selection_set_image), "Delete Set").triggered.connect(
-            lambda: controller.remove_set_and_update_buttons(subset, subset.rsplit("_", 2)[-2] + "_setgroup")
+        menu.addAction(QtGui.QIcon(media.remove_selection_set_image), "Delete").triggered.connect(
+            lambda: controller.remove_set_and_update_buttons(subset)
         )
-        menu.addSeparator()
-        menu.addAction(QtGui.QIcon(media.selector_selection_set_image), "Selector").triggered.connect(lambda: open_selection_set_members(subset))
-
-        move_menu = cw.OpenMenuWidget("Move To ...")
-        menu.addMenu(move_menu)
-        for group in all_groups:
-            action = move_menu.addAction(group.replace("_setgroup", ""))
-            action.setEnabled(group != subset.rsplit("_", 2)[-2] + "_setgroup")
-            action.triggered.connect(lambda _, s=subset, g=group: controller.move_set_to_setgroup(s, g))
+        current_color_suffix = f"_{subset.rsplit('_', 1)[-1]}"
+        current_color_label = controller.color_names.get(current_color_suffix, current_color_suffix.strip("_"))
+        menu.addAction(
+            QtGui.QIcon(media.remove_selection_set_image),
+            f"Delete All {current_color_label}",
+        ).triggered.connect(lambda: controller.delete_sets_by_color_suffix(current_color_suffix))
 
         menu.exec_(QtGui.QCursor.pos())
 
@@ -1890,7 +2026,7 @@ def bind_selection_sets_toolbar_button(button, controller=None):
     global _selection_sets_open_fn
     controller = _resolve_toolbar_controller(controller)
     if controller is not None:
-        _selection_sets_open_fn = lambda: selection_sets_window(controller=controller, reuse_existing=True)
+        _selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=controller)
     if button:
         _selection_sets_toolbar_toggle.attach_button(button)
 

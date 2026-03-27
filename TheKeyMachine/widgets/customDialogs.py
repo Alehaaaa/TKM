@@ -84,6 +84,7 @@ class QFlatDialog(QtWidgets.QDialog):
         if sys.platform != "win32":
             self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool)
 
+        self.setProperty("tkm_floating_widget", True)
         self.root_layout = QtWidgets.QVBoxLayout(self)
         self.root_layout.setSizeConstraint(QtWidgets.QLayout.SetMinAndMaxSize)
         self.root_layout.setContentsMargins(0, 0, 0, 0)

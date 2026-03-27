@@ -142,6 +142,33 @@ remove_from_selection_set_image = getImage("remove_from_selection_set.svg")
 rename_selection_set_image = getImage("rename_selection_set.svg")
 change_selection_set_color_image = getImage("change_selection_set_color.svg")
 remove_selection_set_image = getImage("remove_selection_set.svg")
+selection_set_color_icon_names = {
+    "_01": "_redLight_set.svg",
+    "_02": "_red_set.svg",
+    "_03": "_redDark_set.svg",
+    "_04": "_orangeLight_set.svg",
+    "_05": "_orange_set.svg",
+    "_06": "_orangeDark_set.svg",
+    "_07": "_yellowLight_set.svg",
+    "_08": "_yellow_set.svg",
+    "_09": "_yellowDark_set.svg",
+    "_10": "_greenLight_set.svg",
+    "_11": "_green_set.svg",
+    "_12": "_greenDark_set.svg",
+    "_13": "_blueLight_set.svg",
+    "_14": "_blue_set.svg",
+    "_15": "_blueDark_set.svg",
+    "_16": "_tealLight_set.svg",
+    "_17": "_teal_set.svg",
+    "_18": "_tealDark_set.svg",
+    "_19": "_purpleLight_set.svg",
+    "_20": "_purple_set.svg",
+    "_21": "_purpleDark_set.svg",
+    "_22": "_pinkLight_set.svg",
+    "_23": "_pink_set.svg",
+    "_24": "_pinkDark_set.svg",
+}
+selection_set_color_images = {suffix: getImage(filename) for suffix, filename in selection_set_color_icon_names.items()}
 
 # ________________ Menus Images __________________________________________#
 

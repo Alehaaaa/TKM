@@ -40,6 +40,22 @@ def reload():
     except Exception:
         pass
 
+    try:
+        try:
+            from PySide6 import QtWidgets
+        except ImportError:
+            from PySide2 import QtWidgets
+
+        for widget in QtWidgets.QApplication.topLevelWidgets():
+            if widget.property("tkm_floating_widget"):
+                widget.close()
+                try:
+                    widget.deleteLater()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     modules_to_delete = [m for m in list(sys.modules.keys()) if m.startswith("TheKeyMachine")]
 
     for mod_name in modules_to_delete:

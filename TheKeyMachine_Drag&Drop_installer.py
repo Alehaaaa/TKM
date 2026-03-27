@@ -36,8 +36,6 @@ __stage__ = "beta"
 __build__ = "311"
 __codename__ = "Iced Coffee"
 
-TKM_VERSION = f"{__version__} {__stage__} {__build__} {__codename__}"
-
 
 def get_screen_resolution():
     app = QtWidgets.QApplication.instance()
@@ -156,13 +154,12 @@ def TheKeyMachine_installer():
     screen_width = screen_width
 
     os_platform = platform.system()
-    python_version = f"{sys.version_info.major}{sys.version_info.minor}"
     supported_os = ["Windows", "Linux", "Darwin"]
-    supported_python_versions = ["37", "39", "310", "311"]
+
+    python_version = sys.version_info.major
+    supported_python_versions = [3]
 
     if os_platform in supported_os and python_version in supported_python_versions:
-        global TKM_VERSION
-
         try:
             cmds.deleteUI("TheKeyMachineInstaller", window=True)
         except RuntimeError:
@@ -194,7 +191,7 @@ def TheKeyMachine_installer():
         label_below_image = QtWidgets.QLabel("Animation toolset for Maya Animators", window)
         label_below_image.setGeometry(175, 152, 250, 20)
 
-        tkm_version = QtWidgets.QLabel(TKM_VERSION, window)
+        tkm_version = QtWidgets.QLabel(f"{__version__} {__stage__} {__build__} {__codename__}", window)
         tkm_version.setGeometry(220, 190, 250, 20)
 
         text_label = QtWidgets.QLabel(window)

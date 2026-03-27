@@ -786,6 +786,144 @@ class QFlowLayout(QtWidgets.QLayout):
         return y + line_height - rect.y() + margins.bottom()
 
 
+class QFillFlowLayout(QtWidgets.QLayout):
+    def __init__(self, parent=None, margin=0, Hspacing=-1, Vspacing=-1, alignment=None):
+        super().__init__(parent)
+        self._item_list = []
+        self._Hspacing = Hspacing
+        self._Vspacing = Vspacing
+        self.setContentsMargins(margin, margin, margin, margin)
+        if alignment is not None:
+            self.setAlignment(alignment)
+
+    def __del__(self):
+        item = self.takeAt(0)
+        while item:
+            item = self.takeAt(0)
+
+    def addItem(self, item):
+        self._item_list.append(item)
+
+    def count(self):
+        return len(self._item_list)
+
+    def itemAt(self, index):
+        if 0 <= index < len(self._item_list):
+            return self._item_list[index]
+        return None
+
+    def takeAt(self, index):
+        if 0 <= index < len(self._item_list):
+            return self._item_list.pop(index)
+        return None
+
+    def expandingDirections(self):
+        return QtCore.Qt.Orientations(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        return self._do_layout(QtCore.QRect(0, 0, width, 0), True)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self._do_layout(rect, False)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        size = QtCore.QSize()
+        for item in self._item_list:
+            size = size.expandedTo(item.minimumSize())
+        margins = self.contentsMargins()
+        size += QtCore.QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
+        return size
+
+    def _visible_items(self):
+        visible_items = []
+        for item in self._item_list:
+            widget = item.widget()
+            if widget is not None and widget.isHidden():
+                continue
+            visible_items.append(item)
+        return visible_items
+
+    def _build_rows(self, items, available_width, spacing_x):
+        rows = []
+        current_row = []
+        current_width = 0
+        current_height = 0
+
+        for item in items:
+            item_size = item.sizeHint()
+            item_width = item_size.width()
+            projected_width = item_width if not current_row else current_width + spacing_x + item_width
+
+            if current_row and projected_width > available_width:
+                rows.append((current_row, current_width, current_height))
+                current_row = [item]
+                current_width = item_width
+                current_height = item_size.height()
+                continue
+
+            current_row.append(item)
+            current_width = projected_width
+            current_height = max(current_height, item_size.height())
+
+        if current_row:
+            rows.append((current_row, current_width, current_height))
+        return rows
+
+    def _do_layout(self, rect, test_only):
+        margins = self.contentsMargins()
+        effective_rect = rect.adjusted(+margins.left(), +margins.top(), -margins.right(), -margins.bottom())
+        available_width = max(0, effective_rect.width())
+        if available_width <= 0:
+            return margins.top() + margins.bottom()
+
+        spacing_x = self._Hspacing if self._Hspacing >= 0 else 5
+        spacing_y = self._Vspacing if self._Vspacing >= 0 else 5
+        visible_items = self._visible_items()
+        if not visible_items:
+            return margins.top() + margins.bottom()
+
+        rows = self._build_rows(visible_items, available_width, spacing_x)
+        current_y = effective_rect.y()
+
+        if not test_only:
+            for row_items, row_width, row_height in rows:
+                count = len(row_items)
+                total_spacing = spacing_x * max(0, count - 1)
+                base_width = row_width - total_spacing
+                extra_width = max(0, available_width - row_width)
+                extra_each, extra_remainder = divmod(extra_width, count)
+                current_x = effective_rect.x()
+
+                for index, item in enumerate(row_items):
+                    item_size = item.sizeHint()
+                    item_width = item_size.width() + extra_each + (1 if index < extra_remainder else 0)
+                    item_height = item_size.height()
+                    dy = max(0, (row_height - item_height) // 2)
+                    item.setGeometry(
+                        QtCore.QRect(
+                            QtCore.QPoint(int(current_x), int(current_y + dy)),
+                            QtCore.QSize(int(item_width), int(item_height)),
+                        )
+                    )
+                    current_x += item_width + spacing_x
+
+                current_y += row_height + spacing_y
+        else:
+            for _, _, row_height in rows:
+                current_y += row_height + spacing_y
+
+        if rows:
+            current_y -= spacing_y
+        return current_y - rect.y() + margins.bottom()
+
+
 class QFlowContainer(QtWidgets.QWidget):
     """A QWidget that automatically sizes its height to its QFlowLayout.
 
@@ -813,6 +951,135 @@ class QFlowContainer(QtWidgets.QWidget):
             new_h = lay.heightForWidth(self.width())
             if new_h > 0 and self.height() != new_h:
                 self.setFixedHeight(new_h)
+
+
+class PersistentPlaceholderLineEdit(QtWidgets.QLineEdit):
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.text():
+            return
+        placeholder = self.placeholderText()
+        if not placeholder:
+            return
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.TextAntialiasing)
+        color = self.palette().color(QtGui.QPalette.PlaceholderText)
+        if not color.isValid():
+            color = QtGui.QColor("#7b7b7b")
+        painter.setPen(color)
+        rect = self.rect().adjusted(DPI(6), 0, -DPI(6), 0)
+        painter.drawText(rect, QtCore.Qt.AlignCenter, placeholder)
+        painter.end()
+
+
+class InlineRenameLineEdit(QtWidgets.QLineEdit):
+    def keyPressEvent(self, event):
+        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            self.returnPressed.emit()
+            return
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.clearFocus()
+            return
+        super().keyPressEvent(event)
+
+
+class CompressibleScrollArea(QtWidgets.QScrollArea):
+    def minimumSizeHint(self):
+        return QtCore.QSize(0, 0)
+
+    def sizeHint(self):
+        return QtCore.QSize(0, 0)
+
+    def viewportSizeHint(self):
+        return QtCore.QSize(0, 0)
+
+
+class InlineRenameButton(QtWidgets.QPushButton):
+    def __init__(self, text="", parent=None, line_edit_class=None):
+        super().__init__(text, parent)
+        self._renaming_active = False
+        self._original_text = text
+        self._rename_locked_width = None
+        self._rename_payload = None
+        self._rename_commit_callback = None
+        editor_class = line_edit_class or InlineRenameLineEdit
+        self.inline_rename_field = editor_class(self)
+        self.inline_rename_field.hide()
+        self.inline_rename_field.returnPressed.connect(self._finish_inline_rename)
+        self.inline_rename_field.editingFinished.connect(self._finish_inline_rename)
+
+    def set_rename_target(self, rename_payload, display_name, commit_callback):
+        self._rename_payload = rename_payload
+        self._rename_commit_callback = commit_callback
+        self._original_text = display_name
+        self.setText(display_name)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.start_inline_rename()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._renaming_active:
+            self._position_inline_rename()
+
+    def start_inline_rename(self):
+        if not self._rename_commit_callback or self._rename_payload is None:
+            return
+        self._renaming_active = True
+        self._rename_locked_width = self.width()
+        if self._rename_locked_width > 0:
+            self.setFixedWidth(self._rename_locked_width)
+        self._position_inline_rename()
+        self._sync_inline_rename_style()
+        self.inline_rename_field.setText(self._original_text)
+        self.setText("")
+        self.inline_rename_field.show()
+        self.inline_rename_field.setFocus(QtCore.Qt.ActiveWindowFocusReason)
+        self.inline_rename_field.selectAll()
+        self.update()
+
+    def _position_inline_rename(self):
+        rect = self.rect().adjusted(DPI(6), DPI(5), -DPI(6), -DPI(5))
+        self.inline_rename_field.setGeometry(rect)
+
+    def _finish_inline_rename(self):
+        if not self._renaming_active:
+            return
+        self._renaming_active = False
+        new_name = self.inline_rename_field.text().strip()
+        self.inline_rename_field.hide()
+        self.setMinimumWidth(0)
+        self.setMaximumWidth(16777215)
+        self.setText(self._original_text)
+        self.update()
+        if (
+            new_name
+            and new_name != self._original_text
+            and self._rename_commit_callback
+            and self._rename_payload is not None
+        ):
+            self._rename_commit_callback(self._rename_payload, new_name)
+
+    def _sync_inline_rename_style(self):
+        bg_color = self.property("tkm_base_color") or "#333333"
+        text_color = self.property("tkm_text_color") or "#1a1a1a"
+        self.inline_rename_field.setStyleSheet(
+            """
+            QLineEdit {
+                background-color: %s;
+                border: none;
+                color: %s;
+                padding: 0px 6px;
+                border-radius: 5px;
+            }
+            """
+            % (bg_color, text_color)
+        )
 
 
 # QPainter for the shelf tabBar

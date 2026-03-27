@@ -81,12 +81,13 @@ import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
+from TheKeyMachine.widgets import customDialogs as customDialogs  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 
 from TheKeyMachine.tooltips import QFlatTooltipManager
 
-mods = [general, ui, keyTools, helper, media, bar, hotkeys, settings, cg, updater, style, sw, cw, wutil, sliders, toolbox]
+mods = [general, ui, keyTools, helper, media, bar, hotkeys, settings, cg, updater, style, sw, cw, customDialogs, wutil, sliders, toolbox]
 
 for m in mods:
     if m:
@@ -255,8 +256,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Stop micro move thread
         self.micro_move_run_timer = False
-        if hasattr(self, "micro_move_thread") and self.micro_move_thread and self.micro_move_thread.is_alive():
-            self.micro_move_thread.join(timeout=0.5)
+        if hasattr(self, "micro_move_thread_obj") and self.micro_move_thread_obj and self.micro_move_thread_obj.is_alive():
+            self.micro_move_thread_obj.join(timeout=0.5)
 
         # Stop link objects image toggle thread
         self.link_obj_image_timer = False
@@ -674,6 +675,17 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         except Exception:
             pass
 
+        try:
+            for widget in QtWidgets.QApplication.topLevelWidgets():
+                if widget.property("tkm_floating_widget"):
+                    widget.close()
+                    try:
+                        widget.deleteLater()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         # Importa el módulo y recarga
         toolbar_module = import_module(toolbar_module_name)
         customGraph_module = import_module(customGraph_module_name)
@@ -708,6 +720,17 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         try:
             callbacks.shutdown_callback_manager()
+        except Exception:
+            pass
+
+        try:
+            for widget in QtWidgets.QApplication.topLevelWidgets():
+                if widget.property("tkm_floating_widget"):
+                    widget.close()
+                    try:
+                        widget.deleteLater()
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -975,7 +998,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Check that the new name does not already exist in the scene
         current_color_suffix = old_set_name.rsplit("_", 1)[-1]
-        new_set_name_with_color = f"{new_set_name}_{set_group}_{current_color_suffix}"
+        new_set_name_with_color = f"{new_set_name}_{current_color_suffix}"
 
         if cmds.objExists(new_set_name_with_color):
             cmds.warning(f"A set named '{new_set_name_with_color}' already exists. Please choose a different name")
@@ -1215,66 +1238,84 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         else:
             return []
 
-    def create_new_set_and_update_buttons(self, color_suffix, set_name_field, set_group_combo, *args):
+    def get_selection_sets(self):
+        sel_set_name = "TheKeyMachine_SelectionSet"
+        if not cmds.objExists(sel_set_name):
+            return []
+        self._migrate_legacy_selection_set_groups(sel_set_name)
+        selection_sets = []
+        for node in cmds.sets(sel_set_name, q=True) or []:
+            if not cmds.objExists(node):
+                continue
+            if str(node).endswith("_setgroup"):
+                continue
+            selection_sets.append(node)
+        return selection_sets
+
+    def _ensure_selection_sets_root(self):
+        sel_set_name = "TheKeyMachine_SelectionSet"
+
+        if not cmds.objExists(sel_set_name):
+            cmds.sets(name=sel_set_name, empty=True)
+
+        self._migrate_legacy_selection_set_groups(sel_set_name)
+        return sel_set_name
+
+    def _migrate_legacy_selection_set_groups(self, sel_set_name):
+        legacy_groups = [node for node in (cmds.sets(sel_set_name, q=True) or []) if str(node).endswith("_setgroup")]
+        for legacy_group in legacy_groups:
+            for subset in cmds.sets(legacy_group, q=True) or []:
+                if not cmds.objExists(subset):
+                    continue
+                try:
+                    cmds.sets(subset, add=sel_set_name)
+                except Exception:
+                    pass
+                try:
+                    cmds.sets(subset, remove=legacy_group)
+                except Exception:
+                    pass
+            if cmds.objExists(legacy_group):
+                members_left = cmds.sets(legacy_group, q=True) or []
+                if not members_left:
+                    try:
+                        cmds.delete(legacy_group)
+                    except Exception:
+                        pass
+
+    def create_new_set_and_update_buttons(self, color_suffix, set_name_field, set_group_combo=None, *args):
         selection = cmds.ls(selection=True)
+        if not selection:
+            wutil.make_inViewMessage("No selection to create set")
+            return False
 
-        if selection:
-            new_set_name = set_name_field.text()
-            set_group_name = set_group_combo.currentText()
+        new_set_name = set_name_field.text()
+        sel_set_name = self._ensure_selection_sets_root()
 
-            sel_set_name = "TheKeyMachine_SelectionSet"
-            main_setgroup_name = "main_setgroup"
+        new_set_name = new_set_name.replace(" ", "_")
 
-            if not cmds.objExists(sel_set_name):
-                # Crea el conjunto de selección si no existe
-                cmds.sets(name=sel_set_name, empty=True)
+        if not re.match("^[a-zA-Z_][a-zA-Z0-9_]*$", new_set_name):
+            cmds.warning("Invalid set name. Name can't start with a number or contain invalid characters")
+            return False
 
-            if not cmds.objExists(main_setgroup_name):
-                # Crea el conjunto de selección genérico si no existe
-                cmds.sets(name=main_setgroup_name, empty=True)
+        new_set_name += f"{color_suffix}"
 
-                # Añade el conjunto genérico al conjunto principal "TheKeyMachine_SelectionSet"
-                cmds.sets(main_setgroup_name, add=sel_set_name)
+        if not cmds.objExists(new_set_name):
+            new_set = cmds.sets(name=new_set_name, empty=True)
+            cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
 
-            # Reemplaza los espacios por guiones bajos
-            new_set_name = new_set_name.replace(" ", "_")
+            if cmds.ls(selection=True):
+                cmds.sets(cmds.ls(selection=True), add=new_set)
 
-            # Verificar que el nombre del set es válido
-            if not re.match("^[a-zA-Z_][a-zA-Z0-9_]*$", new_set_name):
-                cmds.warning("Invalid set name. Name can't start with a number or contain invalid characters")
-                return
+            cmds.sets(new_set, add=sel_set_name)
 
-            # Añadir el sufijo del color y el nombre del setgroup al nombre del set
-            new_set_name += f"_{set_group_name}{color_suffix}"
+            self.create_buttons_for_sel_sets()
+            set_name_field.clear()
+            return True
 
-            set_group_with_suffix = f"{set_group_name}_setgroup"
-
-            if not cmds.objExists(set_group_with_suffix):
-                new_set_group = cmds.sets(name=set_group_with_suffix, empty=True)
-                cmds.sets(new_set_group, add=sel_set_name)
-
-            # Crear el nuevo set como hijo del set group seleccionado
-            if not cmds.objExists(new_set_name):
-                # Crear el conjunto de selección y establecer el atributo "hidden" en 0
-                new_set = cmds.sets(name=new_set_name, empty=True)
-                cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
-
-                # Asegúrate de que se selecciona algo en la escena
-                if cmds.ls(selection=True):
-                    # Añade la selección actual al nuevo conjunto de selección
-                    cmds.sets(cmds.ls(selection=True), add=new_set)
-
-                # Añade el nuevo conjunto al conjunto del grupo seleccionado (con el sufijo "_setgroup")
-                set_group_with_suffix = set_group_name + "_setgroup"
-                if cmds.objExists(set_group_with_suffix):
-                    cmds.sets(new_set, add=set_group_with_suffix)
-
-                # Actualizar los botones
-                self.create_buttons_for_sel_sets()
-                set_name_field.clear()
-
-            else:
-                cmds.warning(f"{new_set_name} already exists")
+        else:
+            cmds.warning(f"{new_set_name} already exists")
+            return False
 
     def move_set_to_setgroup(self, set_name, target_setgroup):
         # Verificar si el conjunto de selección y el setgroup de destino existen
@@ -1316,58 +1357,89 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 cmds.select(set_name)
 
     def add_selection_to_set(self, set_name, *args):
-        if not cmds.ls(selection=True):
-            return
+        selection = cmds.ls(selection=True)
+        if not selection:
+            return wutil.make_inViewMessage("No selection to add")
         elif not cmds.objExists(set_name):
             return cmds.warning(f"Set {set_name} does not exist")
 
-        # Añade la selección al conjunto de selección
-        cmds.sets(cmds.ls(selection=True), add=set_name)
+        cmds.sets(selection, add=set_name)
 
     def remove_selection_from_set(self, set_name, *args):
-        if not cmds.ls(selection=True):
-            return
+        selection = cmds.ls(selection=True)
+        if not selection:
+            return wutil.make_inViewMessage("No selection to remove")
         elif not cmds.objExists(set_name):
             return cmds.warning(f"Set {set_name} does not exist")
 
-        # Elimina la selección del conjunto de selección
-        cmds.sets(cmds.ls(selection=True), remove=set_name)
+        cmds.sets(selection, remove=set_name)
+
+    def update_selection_to_set(self, set_name, *args):
+        selection = cmds.ls(selection=True)
+        if not selection:
+            return wutil.make_inViewMessage("No selection to update")
+        elif not cmds.objExists(set_name):
+            return cmds.warning(f"Set {set_name} does not exist")
+
+        current_members = cmds.sets(set_name, q=True) or []
+        if current_members:
+            cmds.sets(current_members, remove=set_name)
+        cmds.sets(selection, add=set_name)
+
+    def delete_sets_by_color_suffix(self, color_suffix, *args):
+        target_suffix = color_suffix if str(color_suffix).startswith("_") else f"_{color_suffix}"
+        removed_any = False
+
+        for subset in list(self.get_selection_sets()):
+            if not cmds.objExists(subset):
+                continue
+            if not subset.endswith(target_suffix):
+                continue
+            if cmds.objExists("TheKeyMachine_SelectionSet"):
+                try:
+                    cmds.sets(subset, remove="TheKeyMachine_SelectionSet")
+                except Exception:
+                    pass
+            cmds.delete(subset)
+            removed_any = True
+
+        if removed_any:
+            cmds.evalDeferred(self.create_buttons_for_sel_sets)
 
     color_names = {
-        "_01": "Gray",
-        "_02": "Beige",
-        "_03": "Aqua",
-        "_04": "Blue",
-        "_05": "Purple",
-        "_06": "Green",
-        "_07": "Mute red",
-        "_08": "Red",
+        "_01": "Red Light",
+        "_02": "Red",
+        "_03": "Red Dark",
+        "_04": "Orange Light",
+        "_05": "Orange",
+        "_06": "Orange Dark",
+        "_07": "Yellow Light",
+        "_08": "Yellow",
+        "_09": "Yellow Dark",
+        "_10": "Green Light",
+        "_11": "Green",
+        "_12": "Green Dark",
+        "_13": "Blue Light",
+        "_14": "Blue",
+        "_15": "Blue Dark",
+        "_16": "Teal Light",
+        "_17": "Teal",
+        "_18": "Teal Dark",
+        "_19": "Purple Light",
+        "_20": "Purple",
+        "_21": "Purple Dark",
+        "_22": "Pink Light",
+        "_23": "Pink",
+        "_24": "Pink Dark",
     }
 
     def create_color_submenu(self, set_name, parent_menu):
-        # Los botones de color
-        color_buttons = [
-            ([0.51, 0.55, 0.56], "_01"),
-            ([0.90, 0.84, 0.68], "_02"),
-            ([0.64, 0.80, 0.75], "_03"),
-            ([0.45, 0.71, 0.63], "_04"),
-            ([0.76, 0.58, 0.57], "_05"),
-            ([0.66, 0.39, 0.40], "_06"),
-            ([0.50, 0.50, 0.63], "_07"),
-            ([0.50, 0.50, 0.63], "_08"),
-        ]
-
-        for color_value, color_suffix in color_buttons:
+        for color_suffix, image_path in media.selection_set_color_images.items():
             color_name = self.color_names.get(color_suffix, "Default")
-
-            # Aquí, asumimos que las imágenes se llaman "_01.png", "_02.png", etc.
-            # Por lo que simplemente añadimos ".png" al sufijo.
-            image_name = color_suffix + ".svg"
-            image_path = self.getImage(image_name)
 
             cmds.menuItem(
                 label=color_name,
-                image=image_path,  # Agregando la imagen al menuItem
+                image=image_path,
                 parent=parent_menu,
                 command=partial(self.set_set_color, set_name, color_suffix),
             )
@@ -1376,10 +1448,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         ui.refresh_selection_sets_window()
 
     def selection_sets_empty_setup(self, *args):
-        ui.refresh_selection_sets_window()
+        ui.close_selection_sets_window()
 
     def selection_sets_setup(self, *args):
-        ui.selection_sets_window(controller=self, reuse_existing=True)
+        ui.open_selection_sets_toolbar_action(controller=self)
 
     def create_buttons_for_sel_sets(self, *args):
         ui.refresh_selection_sets_window()
@@ -1417,11 +1489,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Seleccionar los objetos en la escena
         cmds.select(selected_items, replace=True)
 
-    def remove_set_and_update_buttons(self, set_name, set_group, *args):
+    def remove_set_and_update_buttons(self, set_name, set_group=None, *args):
         if cmds.objExists(set_name):
-            # Si el set existe, quitarlo del setgroup
-            if cmds.objExists(set_name) and cmds.objExists(set_group):
-                cmds.sets(set_name, remove=set_group)
+            if cmds.objExists("TheKeyMachine_SelectionSet"):
+                try:
+                    cmds.sets(set_name, remove="TheKeyMachine_SelectionSet")
+                except Exception:
+                    pass
             cmds.delete(set_name)
 
             # Retrasar la actualización de los botones
@@ -1761,12 +1835,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         print("_________________________________________________________")
 
     def start_selection_sets_UI(self):
-        ui.selection_sets_window(controller=self, reuse_existing=True)
+        ui.open_selection_sets_toolbar_action(controller=self)
 
     # Crea el selection sets workspace ----------------------------------------------------------------------------
 
     def create_selection_sets_workspace(self):
-        ui.selection_sets_window(controller=self, reuse_existing=True)
+        ui.open_selection_sets_toolbar_action(controller=self)
 
     def toggle_selection_sets_workspace(self, *args):
         ui.toggle_selection_sets_window(controller=self)
