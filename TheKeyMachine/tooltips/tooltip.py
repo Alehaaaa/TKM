@@ -154,9 +154,9 @@ class QFlatTooltip(QWidget):
             else:
                 tooltip_template = ""
                 if icon:
-                    tooltip_template += f"<img src='{icon}'>"
+                    tooltip_template += "<img src='{}'>".format(icon)
                 if text:
-                    tooltip_template += f"<b>{text.strip()}</b>"
+                    tooltip_template += "<b>{}</b>".format(text.strip())
 
         # 2. Add description if missing from template body
         if description:
@@ -164,7 +164,7 @@ class QFlatTooltip(QWidget):
             has_body = tooltip_template and ("<br" in tooltip_template.lower() or "\n" in tooltip_template)
             if not has_body:
                 prefix = "<br><br>" if tooltip_template else ""
-                tooltip_template = f"{tooltip_template}{prefix}{description.strip()}"
+                tooltip_template = "{}{}{}".format(tooltip_template, prefix, description.strip())
 
         self.tooltip_template = tooltip_template or ""
 
@@ -342,7 +342,9 @@ class QFlatTooltip(QWidget):
             raw_lbl.setOpenExternalLinks(True)
             raw_lbl.setTextFormat(Qt.RichText)
             raw_lbl.setMaximumWidth(wutil.DPI(self.MAX_WIDTH))
-            raw_lbl.setStyleSheet("color: {}; background: transparent;".format(self.TEXT_COLOR))
+            raw_lbl.setStyleSheet(
+                "color: {}; background: transparent; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5))
+            )
             content_layout.addWidget(raw_lbl)
             self.bg_layout.addLayout(content_layout)
             self.bg_layout.addSpacing(wutil.DPI(4))
@@ -441,7 +443,7 @@ class QFlatTooltip(QWidget):
         return lbl
 
     def _icon_target_size(self, dim):
-        px_dim = max(1, int(wutil.DPR(wutil.DPI(dim))))
+        px_dim = max(1, int(wutil.DPI(dim * 2)))
         return QSize(px_dim, px_dim)
 
     def _load_icon_pixmap(self, path, target_size):

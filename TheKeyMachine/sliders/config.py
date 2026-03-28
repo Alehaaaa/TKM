@@ -130,6 +130,7 @@ TWEEN_MODES = [
         "label": "Blend to Frame",
         "key": "blend_to_frame",
         "icon": "BF",
+        "frameButtons": True,
         "shortcut": [CTRL],
         "description": "Blends the current pose toward the values at a specific frame (user-defined).",
     },
@@ -137,6 +138,7 @@ TWEEN_MODES = [
         "label": "Blend to Frame World Space",
         "key": "blend_to_frame_ws",
         "icon": "BF",
+        "frameButtons": True,
         "shortcut": [CTRL, MID],
         "description": "Blends toward a specific frame value using World Space coordinates.",
         "worldSpace": True,
@@ -264,6 +266,7 @@ BLEND_MODES = [
         "key": "scale_frame",
         "icon": "SF",
         "shortcut": [CTRL],
+        "frameButtons": True,
         "description": "Scales the curve relative to the value at the current frame.",
     },
     {

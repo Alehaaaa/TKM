@@ -86,6 +86,7 @@ from TheKeyMachine.tools.attribute_switcher.common import (
     GimbalAnalyzer,
     ATTRIBUTE_SWITCHER_GEOMETRY_KEY,
     ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
+    ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
     ATTRIBUTE_SWITCHER_GLOBE_IMAGE,
     UI_COLOR,
 )
@@ -1043,6 +1044,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
     def __init__(self, popup=False, parent=None):
         parent = parent or util.get_maya_qt()
         FloatingWidget.__init__(self, popup=popup, parent=parent)
+        self._init_floating_window_behavior()
 
         self._active_popup = None
         self._popup_pending_item = None
@@ -1068,6 +1070,18 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         saved_geom = settings.get_setting(ATTRIBUTE_SWITCHER_GEOMETRY_KEY, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
         if saved_geom and len(saved_geom) == 4:
             self.setGeometry(saved_geom[0], saved_geom[1], saved_geom[2], saved_geom[3])
+
+    def _auto_transparency_setting_enabled(self):
+        return False
+
+    def _stays_on_top_setting_enabled(self):
+        return settings.get_setting(ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY, False, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
+
+    def _geometry_settings_key(self):
+        return ATTRIBUTE_SWITCHER_GEOMETRY_KEY
+
+    def _geometry_settings_namespace(self):
+        return ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE
 
     def closeEvent(self, e):
         self._disconnect_runtime_manager()

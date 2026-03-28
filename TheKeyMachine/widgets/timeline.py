@@ -137,6 +137,8 @@ class TimelineTint(QtWidgets.QWidget):
         self.center_line = bool(center_line)
         self.icon_path = icon_path
         self._icon = QtGui.QPixmap(icon_path) if icon_path else QtGui.QPixmap()
+        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
 
         self.setGeometry(parent_widget.rect())
         self.show()

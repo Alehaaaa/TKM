@@ -94,6 +94,26 @@ import TheKeyMachine_user_data.connect.scripts.scripts as cbScripts  # type: ign
 
 from TheKeyMachine.tooltips import QFlatTooltipManager
 
+
+class LinkObjectImageThread(QtCore.QThread):
+    tick = QtCore.Signal()
+
+    def __init__(self, interval_seconds=0.3, parent=None):
+        super().__init__(parent)
+        self._interval_ms = max(1, int(float(interval_seconds) * 1000))
+        self._running = False
+
+    def run(self):
+        self._running = True
+        while self._running:
+            self.msleep(self._interval_ms)
+            if not self._running:
+                break
+            self.tick.emit()
+
+    def stop(self):
+        self._running = False
+
 mods = [
     general,
     ui,
@@ -289,8 +309,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         # Stop link objects image toggle thread
         self.link_obj_image_timer = False
-        if hasattr(self, "link_obj_thread") and self.link_obj_thread and self.link_obj_thread.is_alive():
-            self.link_obj_thread.join(timeout=0.5)
+        if hasattr(self, "link_obj_thread") and self.link_obj_thread:
+            try:
+                self.link_obj_thread.stop()
+                self.link_obj_thread.wait(500)
+            except Exception:
+                pass
+            self.link_obj_thread = None
 
         # Cleanup painter
         if self.shelf_painter and isValid(self.shelf_painter):
@@ -1724,7 +1749,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ],
         )
 
-
         clear_btn = cw.QFlatToolButton(text="x")
         clear_btn.clicked.connect(keyTools.clear_selected_keys)
         sec.addWidget(
@@ -1807,29 +1831,23 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.button(button_name, edit=True, label=str(int(current_frame)))
 
         # _____________________ Sliders Sections ____________________________ #
-        blend_to_key_left_b_qt = cw.QFlatToolButton()
-        blend_to_key_left_b_qt.setText("1")
-        blend_to_key_left_b_qt.setFixedSize(25, 16)
-        blend_to_key_left_b_qt.hide()
-        blend_to_key_left_b_qt.clicked.connect(lambda: blend_to_key_left_b_qt.setText(str(int(cmds.currentTime(q=True)))))
+        # Temporary disable: frame capture buttons for Blend to Frame sliders.
+        # blend_to_key_left_b_qt = cw.QFlatToolButton()
+        # blend_to_key_left_b_qt.setText("1")
+        # blend_to_key_left_b_qt.setFixedSize(25, 16)
+        # blend_to_key_left_b_qt.hide()
+        # blend_to_key_left_b_qt.clicked.connect(lambda: blend_to_key_left_b_qt.setText(str(int(cmds.currentTime(q=True)))))
 
-        blend_to_key_right_b_qt = cw.QFlatToolButton()
-        blend_to_key_right_b_qt.setText("1")
-        blend_to_key_right_b_qt.setFixedSize(25, 16)
-        blend_to_key_right_b_qt.hide()
-        blend_to_key_right_b_qt.clicked.connect(lambda: blend_to_key_right_b_qt.setText(str(int(cmds.currentTime(q=True)))))
+        # blend_to_key_right_b_qt = cw.QFlatToolButton()
+        # blend_to_key_right_b_qt.setText("1")
+        # blend_to_key_right_b_qt.setFixedSize(25, 16)
+        # blend_to_key_right_b_qt.hide()
+        # blend_to_key_right_b_qt.clicked.connect(lambda: blend_to_key_right_b_qt.setText(str(int(cmds.currentTime(q=True)))))
 
         def blend_to_frame_with_button_values(percentage):
-            left_frame_label = blend_to_key_left_b_qt.text()
-            right_frame_label = blend_to_key_right_b_qt.text()
-            try:
-                left_frame = int(left_frame_label)
-            except ValueError:
-                left_frame = None
-            try:
-                right_frame = int(right_frame_label)
-            except ValueError:
-                right_frame = None
+            # Temporary disable: frame buttons are commented out, so defer to tool defaults.
+            left_frame = None
+            right_frame = None
             keyTools.blend_to_frame(percentage, left_frame, right_frame)
 
         def add_mode_sliders(modes_list, prefix, color, change_func, drop_func, default_modes=None):
@@ -1891,12 +1909,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
                         # Handle specialized frames visibility
                         if new_mode == "blend_to_frame":
-                            blend_to_key_left_b_qt.show()
-                            blend_to_key_right_b_qt.show()
+                            # Temporary disable: frame capture buttons for Blend to Frame sliders.
+                            # blend_to_key_left_b_qt.show()
+                            # blend_to_key_right_b_qt.show()
                             slider_instance.setDragCommand(blend_to_frame_with_button_values)
                         else:
-                            blend_to_key_left_b_qt.hide()
-                            blend_to_key_right_b_qt.hide()
+                            # Temporary disable: frame capture buttons for Blend to Frame sliders.
+                            # blend_to_key_left_b_qt.hide()
+                            # blend_to_key_right_b_qt.hide()
                             slider_instance.setDragCommand(lambda v, nk=new_mode: change_func(nk, v))
 
                         if not temporary:
@@ -1944,6 +1964,31 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.select_rig_controls_image,
                     "callback": bar.select_rig_controls,
                     "tooltip_template": helper.select_rig_controls_tooltip_text,
+                    "description": "Select all rig controls. Ctrl+Click selects only animated rig controls.",
+                    "shortcuts": [
+                        {"icon": media.select_rig_controls_image, "label": "Select Rig Controls", "keys": "Click"},
+                        {
+                            "icon": media.select_rig_controls_animated_image,
+                            "label": "Select Animated Rig Controls",
+                            "keys": [QtCore.Qt.Key_Control],
+                        },
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 4,
+                            "icon_path": media.select_rig_controls_animated_image,
+                            "tooltip_template": helper.select_rig_controls_animated_tooltip_text,
+                            "description": "Select only animated rig controls.",
+                            "callback": bar.select_rig_controls_animated,
+                            "shortcuts": [
+                                {
+                                    "icon": media.select_rig_controls_animated_image,
+                                    "label": "Select Animated Rig Controls",
+                                    "keys": "Click",
+                                }
+                            ],
+                        }
+                    ],
                     "default": True,
                 },
                 {
@@ -2381,12 +2426,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ],
         )
 
-
         # Select hierarchy -----------------------------------------------------------------------
         select_hierarchy_button_widget = cw.QFlatToolButton(icon=media.select_hierarchy_image, tooltip_template=helper.select_hierarchy_tooltip_text)
         select_hierarchy_button_widget.clicked.connect(bar.selectHierarchy)
         sec.addWidget(select_hierarchy_button_widget, "Select Hierarchy", "select_hierarchy", tooltip_template=helper.select_hierarchy_tooltip_text)
-
 
         sec = new_section()
 
@@ -2522,7 +2565,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.animation_offset_button_widget = animation_offset_button_widget
         sec.addWidget(animation_offset_button_widget, "Anim Offset", "anim_offset", tooltip_template=helper.animation_offset_tooltip_text)
 
-
         sec = new_section()
 
         # Temp Pivot ----------------------------------------------------------------------------
@@ -2567,7 +2609,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         micro_move_button_widget.setChecked(self.micro_move_controller.is_enabled())
         micro_move_button_widget.clicked.connect(self.toggle_micro_move_button)
         sec.addWidget(micro_move_button_widget, "Micro Move", "micro_move", tooltip_template=helper.micro_move_tooltip_text)
-
 
         sec.addWidgetGroup(
             [
@@ -2628,7 +2669,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ],
         )
 
-
         sec = new_section()
 
         # Copy Link -----------------------------------------------------------------------
@@ -2649,18 +2689,27 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             new_image = media.link_objects_on_image if self.link_obj_toggle_state else media.link_objects_image
             link_objects_button_widget.setIcon(QtGui.QIcon(new_image))
 
-        def change_link_obj_image(interval):
-            while self.link_obj_image_timer and isValid(self):
-                time.sleep(interval)
-                utils.executeDeferred(toggle_link_obj_button_image)
-
         def start_link_obj_toggle_image_thread():
             self.link_obj_image_timer = True
-            self.link_obj_thread = threading.Thread(target=change_link_obj_image, args=(0.3,))
+            if self.link_obj_thread:
+                try:
+                    self.link_obj_thread.stop()
+                    self.link_obj_thread.wait(500)
+                except Exception:
+                    pass
+            self.link_obj_thread = LinkObjectImageThread(interval_seconds=0.3, parent=self)
+            self.link_obj_thread.tick.connect(toggle_link_obj_button_image)
             self.link_obj_thread.start()
 
         def stop_link_obj_toggle_image_thread():
             self.link_obj_image_timer = False
+            if self.link_obj_thread:
+                try:
+                    self.link_obj_thread.stop()
+                    self.link_obj_thread.wait(500)
+                except Exception:
+                    pass
+                self.link_obj_thread = None
 
         # Añade el auto-link callback
         def add_link_objects_callback(*args):

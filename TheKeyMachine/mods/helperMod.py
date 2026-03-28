@@ -37,8 +37,8 @@ def getImage(image):
 
 
 # style ------------------------------------
-font_size_enun = "{}px".format(int(round(wutil.DPR(20))))
-font_size = "{}px".format(int(round(wutil.DPR(6))))
+font_size_enun = "{}px".format(wutil.DPI(35))
+font_size = "{}px".format(wutil.DPI(10.5))
 
 
 # ----------------------------------------------  TOOLTIPS  --------------------------------------------------------

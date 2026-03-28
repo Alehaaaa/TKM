@@ -149,16 +149,26 @@ class FloatingToolWindowMixin:
         raise NotImplementedError
 
     def _save_geometry_setting(self):
+        try:
+            key = self._geometry_settings_key()
+            namespace = self._geometry_settings_namespace()
+        except NotImplementedError:
+            return
         settings.set_setting(
-            self._geometry_settings_key(),
+            key,
             [self.pos().x(), self.pos().y(), self.width(), self.height()],
-            namespace=self._geometry_settings_namespace(),
+            namespace=namespace,
         )
 
     def _restore_saved_geometry(self):
+        try:
+            key = self._geometry_settings_key()
+            namespace = self._geometry_settings_namespace()
+        except NotImplementedError:
+            return False
         saved_geom = settings.get_setting(
-            self._geometry_settings_key(),
-            namespace=self._geometry_settings_namespace(),
+            key,
+            namespace=namespace,
         )
         if not saved_geom:
             return False
@@ -190,9 +200,12 @@ class FloatingToolWindowMixin:
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.update_transparency_state(self.rect().contains(self.mapFromGlobal(QtGui.QCursor.pos())))
+        if hasattr(self, "fade_timer"):
+            self.update_transparency_state(self.rect().contains(self.mapFromGlobal(QtGui.QCursor.pos())))
 
     def update_transparency_state(self, hovered):
+        if not hasattr(self, "fade_timer"):
+            return
         self._hovered = hovered
         self.fade_timer.stop()
         if not self._auto_transparency:

@@ -47,12 +47,13 @@ globalSignals = _GlobalSignals()
 class SliderMode:
     """Professional object representation of a slider mode."""
 
-    def __init__(self, key, label=None, icon=None, description="", worldSpace=False, shortcut=None):
+    def __init__(self, key, label=None, icon=None, description="", worldSpace=False, frameButtons=False, shortcut=None):
         self.key = key
         self.label = label or key.replace("_", " ").title()
         self.icon = icon  # Short text for the handle
         self.description = description
         self.worldSpace = worldSpace
+        self.frameButtons = frameButtons
         self.shortcut = list(shortcut or [])
 
     def __repr__(self):
@@ -103,11 +104,12 @@ def _shortcut_requires_mid_click(shortcut) -> bool:
 class SliderButton(cw.TooltipMixin, QPushButton):
     """Flat square-indicator button that emits its signed percent on click."""
 
-    def __init__(self, parent: QWidget, *, percent: int, color: str, worldSpace: bool = False):
+    def __init__(self, parent: QWidget, *, percent: int, color: str, worldSpace: bool = False, frameButton: bool = False):
         super().__init__(parent)
         self._percent = percent
         self._color = color
-        self._box_sz = util.DPI(7) if abs(percent) == 100 else util.DPI(3)
+        self._frameButton = bool(frameButton)
+        self._box_sz = util.DPI(7) if (self._frameButton or abs(percent) == 100) else util.DPI(3)
         self.setFixedHeight(parent.height())
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -123,9 +125,14 @@ class SliderButton(cw.TooltipMixin, QPushButton):
         # Initial tooltip
         self._update_tooltip()
 
+    def setColor(self, color: str):
+        self._color = color
+        self.update()
+
     def _update_tooltip(self):
         title = self._tooltip_title or "Value"
-        self.setToolTipData(text=f"{title}: {self._percent}%", description=self._tooltip_description)
+        value_label = "Set Frame" if self._frameButton else f"{self._percent}%"
+        self.setToolTipData(text=f"{title}: {value_label}", description=self._tooltip_description)
 
     def setTooltipInfo(self, title: str, description: str = ""):
         self._tooltip_title = title
@@ -261,7 +268,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._value_font = QFont()
         self._value_font.setPointSize(util.DPI(14))
         self._text_font = QFont()
-        self._text_font.setPixelSize(int(util.DPR(5)))
+        self._text_font.setPixelSize(int(util.DPI(11)))
 
         # size
         self.setFixedWidth(util.DPI(200))
@@ -582,16 +589,18 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         tooltipTitle: str = "",
         tooltipDescription: str = "",
         p: Optional[QLayout] = None,
-        worldSpace: bool = False,
     ):
         super().__init__(None)
         self.setObjectName(name)
 
         self._scale = 1000  # internal units per 1%
         self._color = color
-        self._worldSpace = worldSpace
+
+        self._worldSpace = False
+        self._frameButtons = False
         self._tooltipTitle = tooltipTitle
         self._tooltipDescription = tooltipDescription
+
         self._section_parent = None
         self._section_prefix = ""
         self._internal_key = ""
@@ -635,32 +644,57 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         values = [150, 125, 105, 100, 50, 15, 5]
 
-        # left side buttons (near handle => AlignRight)
         self._leftButtons = []
+        self._rightButtons = []
+        self._leftFrameButton = None
+        self._rightFrameButton = None
+
+        def _add_button(layout, parent_widget, percent, button_color, world_space, aggregate_list, frame_button=False):
+            btn = SliderButton(parent_widget, percent=percent, color=button_color, worldSpace=world_space, frameButton=frame_button)
+            btn.clicked.connect(lambda _c=False, b=btn: self._on_button_clicked(b))
+            layout.addWidget(btn, 1)
+            aggregate_list.append(btn)
+            btn.installEventFilter(self)
+            return btn
+
+        self._leftFrameButton = _add_button(
+            self._leftLayout,
+            self._leftOverlay,
+            0,
+            "#d7d7d7",
+            False,
+            self._leftButtons,
+            frame_button=True,
+        )
+        self._leftFrameButton.hide()
+
+        # left side buttons
         for v in values:
             if self._worldSpace:
                 _worldSpace = self._worldSpace if v == 100 else False
             else:
                 _worldSpace = False
-            b = SliderButton(self._leftOverlay, percent=-abs(v), color=color, worldSpace=_worldSpace)
-            b.clicked.connect(lambda _c=False, btn=b: self._on_button_clicked(btn))
-            self._leftLayout.addWidget(b, 1)
-            self._leftButtons.append(b)
-            b.installEventFilter(self)
+            _add_button(self._leftLayout, self._leftOverlay, -abs(v), color, _worldSpace, self._leftButtons)
 
-        # right side buttons (AlignLeft)
-        self._rightButtons = []
         for v in reversed(values):
             if self._worldSpace:
                 _worldSpace = self._worldSpace if v == 100 else False
             else:
                 _worldSpace = False
 
-            b = SliderButton(self._rightOverlay, percent=v, color=color, worldSpace=_worldSpace)
-            b.clicked.connect(lambda _c=False, btn=b: self._on_button_clicked(btn))
-            self._rightLayout.addWidget(b, 1)
-            self._rightButtons.append(b)
-            b.installEventFilter(self)
+            _add_button(self._rightLayout, self._rightOverlay, v, color, _worldSpace, self._rightButtons)
+
+        # right side buttons
+        self._rightFrameButton = _add_button(
+            self._rightLayout,
+            self._rightOverlay,
+            0,
+            "#d7d7d7",
+            False,
+            self._rightButtons,
+            frame_button=True,
+        )
+        self._rightFrameButton.hide()
 
         # bridge slider signals
         self._slider.started.connect(self._on_drag_started)
@@ -683,6 +717,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         # Connect to global signal and initialize
         self.setOvershoot(settings.get_setting("sliders_overshoot", False))
+        self.setFrameButtons(False)
         globalSignals.overshootChanged.connect(self.setOvershoot)
 
         # add to provided layout, if any
@@ -776,8 +811,13 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._slider.update()
 
     def setColor(self, color: str):
+        self._color = color
         self._slider._color = color
         self._slider._apply_stylesheet(thick=False)
+        for btn in self._leftButtons + self._rightButtons:
+            if btn in (self._leftFrameButton, self._rightFrameButton):
+                continue
+            btn.setColor(color)
         self._slider.update()
 
     def setTooltipInfo(self, title: str, description: str = ""):
@@ -790,9 +830,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         # Update inner components
         self._slider.setTooltipInfo(title, description)
-        for b in self._leftButtons:
-            b.setTooltipInfo(title, description)
-        for b in self._rightButtons:
+        for b in self._leftButtons + self._rightButtons:
             b.setTooltipInfo(title, description)
 
     def setWorldSpace(self, enabled: bool):
@@ -801,6 +839,13 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             if abs(int(btn.percent)) == 100:
                 # Call SliderButton.setWorldSpace directly
                 btn.setWorldSpace(enabled)
+
+    def setFrameButtons(self, enabled: bool):
+        self._frameButtons = bool(enabled)
+        if self._leftFrameButton:
+            self._leftFrameButton.show() if self._frameButtons else self._leftFrameButton.hide()
+        if self._rightFrameButton:
+            self._rightFrameButton.show() if self._frameButtons else self._rightFrameButton.hide()
 
     def setDragCommand(self, dragCommand):
         try:
@@ -841,16 +886,20 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         right_max = 100
 
         for b in self._leftButtons:
+            if b is self._leftFrameButton:
+                continue
             p = int(b.percent)
             if abs(p) > 100:
-                b.setVisible(visible)
                 left_max = max(left_max, abs(p))
+                b.setVisible(visible)
 
         for b in self._rightButtons:
+            if b is self._rightFrameButton:
+                continue
             p = int(b.percent)
             if abs(p) > 100:
-                b.setVisible(visible)
                 right_max = max(right_max, abs(p))
+                b.setVisible(visible)
 
         if visible:
             self._slider.set_range(-left_max, right_max)
@@ -874,7 +923,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             if isinstance(m, dict):
                 self._modes.append(SliderMode(**m))
             else:
-                self._modes.append(m)  # Likely "separator"
+                self._modes.append(m)  # Likely a separator
 
     def _apply_mode_visuals(self, mode: SliderMode):
         if mode.icon:
@@ -882,6 +931,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         self.setTooltipInfo(mode.label, mode.description)
         self.setWorldSpace(mode.worldSpace)
+        self.setFrameButtons(mode.frameButtons)
         self._refresh_help_feedback()
 
     def _get_hover_help_target(self):
