@@ -1,13 +1,10 @@
 import re
 
 import maya.cmds as cmds
-import maya.OpenMayaUI as mui
 
 try:
-    from shiboken2 import wrapInstance
     from PySide2 import QtCore, QtGui, QtWidgets
 except ImportError:
-    from shiboken6 import wrapInstance
     from PySide6 import QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.mods.mediaMod as media
@@ -549,22 +546,22 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
 
     def _connect_selection_callback(self):
         try:
-            import TheKeyMachine.core.callback_manager as callbacks
+            import TheKeyMachine.core.runtime_manager as runtime
 
-            self._callback_manager = callbacks.get_callback_manager()
-            self._callback_manager.selection_changed.connect(self._schedule_selection_match_refresh)
+            self._runtime_manager = runtime.get_runtime_manager()
+            self._runtime_manager.selection_changed.connect(self._schedule_selection_match_refresh)
         except Exception:
-            self._callback_manager = None
+            self._runtime_manager = None
 
     def _disconnect_selection_callback(self):
-        callback_manager = getattr(self, "_callback_manager", None)
-        if not callback_manager:
+        runtime_manager = getattr(self, "_runtime_manager", None)
+        if not runtime_manager:
             return
         try:
-            callback_manager.selection_changed.disconnect(self._schedule_selection_match_refresh)
+            runtime_manager.selection_changed.disconnect(self._schedule_selection_match_refresh)
         except Exception:
             pass
-        self._callback_manager = None
+        self._runtime_manager = None
 
     def _schedule_selection_match_refresh(self):
         if not self._selection_match_timer.isActive():
@@ -631,7 +628,7 @@ def make_selection_set_creation_dialog(controller, parent=None, on_created=None,
 
 
 def make_selection_set_members_dialog(set_name):
-    parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
+    parent = wutil.get_maya_qt(qt=QtWidgets.QWidget)
     dlg = SelectionSetMembersDialog(set_name=set_name, parent=parent)
     dlg.show()
     return dlg

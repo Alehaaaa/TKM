@@ -950,9 +950,9 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
 
         # Auto-refresh with Maya selection changes (no manual reload button).
         try:
-            import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
+            import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
 
-            callbacks.get_callback_manager().selection_changed.connect(self._schedule_reload)
+            runtime.get_runtime_manager().selection_changed.connect(self._schedule_reload)
         except Exception:
             pass
 

@@ -20,8 +20,8 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
             (media.tracer_image, "Tracer", "mod_tracer", getattr(helper, "tracer_tooltip_text", "Tracer")),
             (media.reset_animation_image, "Reset Values", "reset_objects_mods", getattr(helper, "reset_values_tooltip_text", "Reset Values")),
             (media.delete_animation_image, "Delete Animation", "deleteAnimation", getattr(helper, "delete_animation_tooltip_text", "Delete Animation")),
-            (media.select_opposite_image, "Select Opposite", "selectOpposite", getattr(helper, "select_opposite_tooltip_text", "Select Opposite")),
-            (media.copy_opposite_image, "Copy Opposite", "copyOpposite", getattr(helper, "copy_opposite_tooltip_text", "Copy Opposite")),
+            (media.opposite_select_image, "Select Opposite", "selectOpposite", getattr(helper, "opposite_select_tooltip_text", "Select Opposite")),
+            (media.opposite_copy_image, "Copy Opposite", "copyOpposite", getattr(helper, "opposite_copy_tooltip_text", "Copy Opposite")),
             (media.mirror_image, "Mirror", "mirror", getattr(helper, "mirror_tooltip_text", "Mirror")),
             (media.copy_animation_image, "Copy Animation", "copy_animation", getattr(helper, "copy_animation_tooltip_text", "Copy Animation")),
             (media.paste_animation_image, "Paste Animation", "paste_animation", getattr(helper, "paste_animation_tooltip_text", "Paste Animation")),
@@ -83,14 +83,12 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
         for button_id in button_keys:
             self._create_orbit_button(button_id, orbitApi.orbit_configuration.get(button_id, ""))
 
-        self.add_button = cw.QFlatToolButton(text="+", tooltip_template="Add Tool Option", description="Assign an extra tool to your Orbit window.")
-        self.add_button.setFixedSize(wutil.DPI(20), wutil.DPI(20))
-        self.add_button.setStyleSheet(
-            self.add_button.styleSheet()
-            + " QToolButton { color: #888888; font-size: "
-            + str(wutil.DPI(18))
-            + "px; } QToolButton:hover { color: #ffffff; }"
+        self.add_button = cw.QFlatToolButton(
+            icon=media.add_image,
+            tooltip_template="Add Orbit Tool",
+            description="Add another action button to the floating Orbit tool palette.",
         )
+        self.add_button.setFixedSize(wutil.DPI(20), wutil.DPI(20))
         self.add_button.clicked.connect(self._setup_add_button_menu)
         self.add_button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.add_button.customContextMenuRequested.connect(lambda *_: self._setup_add_button_menu())

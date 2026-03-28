@@ -6,7 +6,6 @@ from TheKeyMachine.mods.generalMod import USER_FOLDER_PATH
 
 _PREFERENCES_ROOT = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data", "preferences")
 _DEFAULT_FILENAME = "user_preferences.json"
-_LEGACY_FILENAME = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data", "user_preferences.json")
 
 
 def _preferences_dir() -> str:
@@ -33,16 +32,7 @@ def get_preferences_file(namespace: Optional[str] = None) -> str:
 
 
 def _candidate_files(namespace: Optional[str]) -> Iterable[str]:
-    """Ordered list of files to inspect when reading."""
-    primary = get_preferences_file(namespace)
-    yield primary
-
-    # When working inside a namespace, fall back to the shared file (old behavior) and legacy path.
-    if namespace:
-        yield os.path.join(_preferences_dir(), _DEFAULT_FILENAME)
-        yield _LEGACY_FILENAME
-    else:
-        yield _LEGACY_FILENAME
+    yield get_preferences_file(namespace)
 
 
 def _load_file(config_file: str) -> Optional[Dict]:

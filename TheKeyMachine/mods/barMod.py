@@ -36,7 +36,7 @@ import sys
 import math
 import importlib
 
-import TheKeyMachine.core.callback_manager as callbacks
+import TheKeyMachine.core.runtime_manager as runtime
 
 
 # ----------------------------------------------------------------------
@@ -45,6 +45,7 @@ import TheKeyMachine.core.callback_manager as callbacks
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.widgets.customDialogs as customDialogs
+import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as util
 
 
@@ -112,25 +113,7 @@ def openCustomGraph():
 
 
 def mod_delete_animation(*args):
-    # Get the current state of the modifiers
-    mods = callbacks.get_modifier_mask()
-    shift_pressed = bool(mods & 1)
-
-    if shift_pressed:
-        delete_time_slider_animation()
-    else:
-        delete_animation()
-
-
-def delete_time_slider_animation():
-    # Obtener selección actual
-    selection = cmds.ls(selection=True)
-
-    # Verificar si hay algo seleccionado
-    if not selection:
-        return
-
-    mel.eval("timeSliderClearKey;")
+    delete_animation()
 
 
 def delete_animation():
@@ -143,16 +126,30 @@ def delete_animation():
     # Verificar si hay algo seleccionado
     if not selection:
         return
+    time_context = keyTools.get_working_time_context(default_mode="all_animation")
+    tint_session = timelineWidgets.begin_timeline_context(
+        default_mode="all_animation",
+        key="delete_animation_range",
+        min_duration_ms=200,
+    )
 
-    # Si hay canales seleccionados, solo borra esos canales
-    if selected_channels:
+    try:
+        if time_context.mode == "graph_editor_keys":
+            selected_keyframes = keyTools.get_graph_editor_selected_keyframes()
+            for curve, frame in selected_keyframes:
+                cmds.cutKey(curve, time=(frame, frame), clear=True)
+            return
+
+        cut_kwargs = {}
+        if selected_channels:
+            cut_kwargs["attribute"] = selected_channels
+        if time_context.mode == "time_slider_range":
+            cut_kwargs["time"] = (time_context.start_frame, time_context.end_frame)
+
         for obj in selection:
-            for channel in selected_channels:
-                cmds.cutKey(obj, attribute=channel, clear=True)
-    # Si no hay canales seleccionados, borra todos los canales
-    else:
-        for obj in selection:
-            cmds.cutKey(obj, clear=True)
+            cmds.cutKey(obj, clear=True, **cut_kwargs)
+    finally:
+        tint_session.finish()
 
 
 def createLocator():
@@ -238,9 +235,11 @@ def get_graph_editor_selected_keyframes():
     if not anim_curves:
         return []
 
+    selected_frames = set(timelineWidgets.get_graph_editor_selected_frames())
     keyframes = []
     for curve in anim_curves:
-        keyframes += [(curve, frame) for frame in cmds.keyframe(curve, q=True, selected=True)]
+        curve_frames = cmds.keyframe(curve, q=True, selected=True) or []
+        keyframes.extend((curve, frame) for frame in curve_frames if int(frame) in selected_frames)
 
     return keyframes
 
@@ -779,16 +778,16 @@ def create_temp_pivot(use_saved_position=False, *args):
             cmds.undoInfo(closeChunk=True)
             cmds.undoInfo(closeChunk=True)
 
-    import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
+    import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
 
-    cb_id = callbacks.get_callback_manager().add_maya_event_callback(
+    cb_id = runtime.get_runtime_manager().add_maya_event_callback(
         "SelectionChanged",
         temp_pivot_scriptJob_SelectionChanged,
         key="temp_pivot_selection_changed",
         one_shot=True,
     )
     if cb_id is None:
-        raise RuntimeError("TKM CallbackManager failed to register temp pivot SelectionChanged callback")
+        raise RuntimeError("TKM RuntimeManager failed to register temp pivot SelectionChanged callback")
 
 
 # ---------------------------------------------------  COPY/PASTE WORLDSPACE ANIMATION  ------------------------------------------------------#
@@ -796,7 +795,7 @@ def create_temp_pivot(use_saved_position=False, *args):
 
 def mod_worldspace_copy_animation(*args):
     # Get the current state of the modifiers
-    mods = callbacks.get_modifier_mask()
+    mods = runtime.get_modifier_mask()
     shift_pressed = bool(mods & 1)
 
     if shift_pressed:
@@ -848,6 +847,12 @@ def worldspace_copy_animation(*args):
 
     try:
         all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, query=True))))
+        if all_keyframes:
+            tint_session = timelineWidgets.begin_timeline_tint(
+                timerange=(int(all_keyframes[0]), int(all_keyframes[-1])),
+                key="worldspace_copy_all",
+                min_duration_ms=200,
+            )
         for frame in all_keyframes:
             # Verificar si el proceso fue interrumpido por el usuario
             if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
@@ -885,6 +890,8 @@ def worldspace_copy_animation(*args):
             json.dump(payload, json_file)
 
     finally:
+        if tint_session:
+            tint_session.finish()
         # Restaurar la actualización de la vista y cerrar la barra de progreso
         cmds.refresh(suspend=False)
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
@@ -905,9 +912,12 @@ def copy_range_worldspace_animation(*args):
     if not cmds.keyframe(selected_objects, query=True):
         return
 
-    time_range = keyTools.get_selected_time_range()
+    time_context = keyTools.get_working_time_context(default_mode="all_animation")
+    time_range = time_context.timerange if time_context.mode != "current_frame" else None
 
     animation_data = {}
+    tint_session = None
+    tint_session = None
 
     # Guardar el tiempo actual antes de realizar cambios
     original_time = cmds.currentTime(query=True)
@@ -935,6 +945,13 @@ def copy_range_worldspace_animation(*args):
     )
 
     try:
+        if all_keyframes:
+            tint_session = timelineWidgets.begin_timeline_tint(
+                timerange=(int(all_keyframes[0]), int(all_keyframes[-1])),
+                key="worldspace_copy_range",
+                min_duration_ms=200,
+            )
+
         for frame in all_keyframes:
             # Verificar si el proceso fue interrumpido por el usuario
             if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
@@ -971,6 +988,8 @@ def copy_range_worldspace_animation(*args):
             json.dump(payload, json_file)
 
     finally:
+        if tint_session:
+            tint_session.finish()
         # Restaurar la actualización de la vista y cerrar la barra de progreso
         cmds.refresh(suspend=False)
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
@@ -992,32 +1011,41 @@ def copy_worldspace_single_frame(*args):
 
     # Obtener el tiempo actual
     current_time = cmds.currentTime(query=True)
+    tint_session = timelineWidgets.begin_timeline_tint(
+        timerange=(int(current_time), int(current_time)),
+        key="worldspace_copy_single_frame",
+        min_duration_ms=200,
+    )
 
-    for source_obj in selected_objects:
-        worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
-            source_obj, query=True, rotation=True, worldSpace=True
-        )
-        animation_data[source_obj] = {int(current_time): worldspace_values}
+    try:
+        for source_obj in selected_objects:
+            worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
+                source_obj, query=True, rotation=True, worldSpace=True
+            )
+            animation_data[source_obj] = {int(current_time): worldspace_values}
 
-    # Save to JSON
-    worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
-    worldspace_anim_data_folder = general.get_copy_worldspace_single_frame_data_folder()
+        # Save to JSON
+        worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
+        worldspace_anim_data_folder = general.get_copy_worldspace_single_frame_data_folder()
 
-    if not os.path.exists(worldspace_anim_data_folder):
-        os.makedirs(worldspace_anim_data_folder)
+        if not os.path.exists(worldspace_anim_data_folder):
+            os.makedirs(worldspace_anim_data_folder)
 
-    payload = {
-        "meta": {"ordered_objects": selected_objects},
-        "data": animation_data,
-    }
-    with open(worldspace_anim_data_file, "w") as json_file:
-        json.dump(payload, json_file)
+        payload = {
+            "meta": {"ordered_objects": selected_objects},
+            "data": animation_data,
+        }
+        with open(worldspace_anim_data_file, "w") as json_file:
+            json.dump(payload, json_file)
 
-    util.make_inViewMessage("World Space values for current frame copied")
+        util.make_inViewMessage("World Space values for current frame copied")
+    finally:
+        tint_session.finish()
 
 
 def paste_worldspace_single_frame(*args):
     chunk_opened = False
+    tint_session = None
     try:
         cmds.undoInfo(openChunk=True, chunkName="TKM:paste_worldspace_single_frame")
         chunk_opened = True
@@ -1047,6 +1075,17 @@ def paste_worldspace_single_frame(*args):
         ordered_sources = [obj for obj in ordered_sources if obj in animation_data]
         if not ordered_sources:
             return util.make_inViewMessage("No World Space data found")
+
+        frame_range = timelineWidgets.get_animation_data_timerange(
+            {obj_name: {"frames": list((animation_data.get(obj_name) or {}).keys())} for obj_name in ordered_sources},
+            frame_key="frames",
+        )
+        if frame_range:
+            tint_session = timelineWidgets.begin_timeline_tint(
+                timerange=frame_range,
+                key="worldspace_paste_single_frame",
+                min_duration_ms=200,
+            )
 
         target_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
 
@@ -1095,6 +1134,8 @@ def paste_worldspace_single_frame(*args):
         return
 
     finally:
+        if tint_session:
+            tint_session.finish()
         if chunk_opened:
             try:
                 cmds.undoInfo(closeChunk=True)
@@ -1171,6 +1212,7 @@ def paste_worldspace_single_frame(*args):
 # Override: selection-aware World Space animation paste
 def worldspace_paste_animation(*args):
     chunk_opened = False
+    tint_session = None
     try:
         cmds.undoInfo(openChunk=True, chunkName="TKM:paste_worldspace_animation")
         chunk_opened = True
@@ -1228,19 +1270,29 @@ def worldspace_paste_animation(*args):
                 cmds.cutKey(target_obj, attribute=["tx", "ty", "tz", "rx", "ry", "rz"])
 
         # Frames to paste (union of used sources)
+        mapped_animation_data = {}
         frame_set = set()
         for source_obj, _ in mapping:
             obj_data = animation_data.get(source_obj) or {}
             if isinstance(obj_data, dict):
+                mapped_animation_data[source_obj] = {"frames": list(obj_data.keys())}
                 for frame_key in obj_data.keys():
                     try:
                         frame_set.add(int(frame_key))
                     except Exception:
                         continue
 
-        all_frames = sorted(frame_set)
-        if not all_frames:
+        paste_range = timelineWidgets.get_animation_data_timerange(mapped_animation_data, frame_key="frames")
+        if not paste_range:
             return util.make_inViewMessage("No World Space animation data found")
+
+        tint_session = timelineWidgets.begin_timeline_tint(
+            timerange=paste_range,
+            key="worldspace_paste_range",
+            min_duration_ms=200,
+        )
+
+        all_frames = sorted(frame_set)
 
         cmds.refresh(suspend=True)
 
@@ -1285,6 +1337,8 @@ def worldspace_paste_animation(*args):
             pass
 
     finally:
+        if tint_session:
+            tint_session.finish()
         if chunk_opened:
             try:
                 cmds.undoInfo(closeChunk=True)
@@ -1297,7 +1351,7 @@ def worldspace_paste_animation(*args):
 
 def mod_tracer(*args):
     # Get the current state of the modifiers
-    mods = callbacks.get_modifier_mask()
+    mods = runtime.get_modifier_mask()
 
     shift_pressed = bool(mods & 1)
     ctrl_pressed = bool(mods & 4)
@@ -1624,7 +1678,7 @@ def select_rig_controls(*args):
 # ______________ SELECT ANIMATED RIG CONTROLS
 
 
-def select_animated_rig_controls(*args):
+def select_rig_controls_animated(*args):
     cache = {}
 
     def find_controls(node):
@@ -2096,7 +2150,7 @@ def gimbal_fixer_build():
     def mouseReleaseEvent(event):
         drag["active"] = False
 
-    parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
+    parent = util.get_maya_qt(qt=QtWidgets.QWidget)
     window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
 
     window.resize(win_h, win_w)

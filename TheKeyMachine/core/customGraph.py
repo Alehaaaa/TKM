@@ -48,7 +48,7 @@ from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
-import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
+import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 
 mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolbox]
 
@@ -61,134 +61,13 @@ COLOR = ui.Color()
 _GRAPH_LAYOUT = "customGraph_columnLayout"
 
 
-class CustomGraphBus(QtCore.QObject):
-    graph_toolbar_enabled_changed = QtCore.Signal(bool)
-
-
-custom_graph_bus = CustomGraphBus()
-
-
-def get_graph_toolbar_checkbox_state() -> bool:
-    return bool(settings.get_setting("graph_toolbar_enabled", True))
-
-
-def is_graph_toolbar_visible() -> bool:
-    return bool(cmds.columnLayout(_GRAPH_LAYOUT, exists=True))
-
-
-def emit_graph_toolbar_state() -> None:
-    try:
-        custom_graph_bus.graph_toolbar_enabled_changed.emit(get_graph_toolbar_checkbox_state())
-    except Exception:
-        pass
-
-
-def sync_graph_toolbar_watch() -> None:
-    try:
-        callbacks.get_callback_manager().set_graph_editor_watch_enabled(get_graph_toolbar_checkbox_state())
-    except Exception:
-        pass
-
-
-def _set_checked_safely(widget, checked: bool) -> bool:
-    signal_blocker = getattr(widget, "blockSignals", None)
-    blocked = False
-    if callable(signal_blocker):
-        try:
-            blocked = widget.blockSignals(True)
-        except Exception:
-            blocked = False
-
-    try:
-        widget.setChecked(bool(checked))
-        return True
-    except Exception:
-        return False
-    finally:
-        if callable(signal_blocker):
-            try:
-                widget.blockSignals(blocked)
-            except Exception:
-                pass
-
-
-def bind_graph_toolbar_toggle(widget) -> None:
-    """Keep a checkable Qt widget synced with the graph toolbar setting bus."""
-    if not widget:
-        return
-
-    def _sync(enabled):
-        try:
-            if not wutil.is_valid_widget(widget):
-                try:
-                    custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync)
-                except Exception:
-                    pass
-                return
-        except Exception:
-            pass
-
-        if not _set_checked_safely(widget, bool(enabled)):
-            try:
-                custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync)
-            except Exception:
-                pass
-        return
-
-    try:
-        _set_checked_safely(widget, get_graph_toolbar_checkbox_state())
-    except Exception:
-        pass
-
-    try:
-        custom_graph_bus.graph_toolbar_enabled_changed.connect(_sync)
-    except Exception:
-        pass
-
-    def _disconnect(*_args):
-        try:
-            custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync)
-        except Exception:
-            pass
-
-    destroyed_signal = getattr(widget, "destroyed", None)
-    if destroyed_signal:
-        try:
-            destroyed_signal.connect(_disconnect)
-        except Exception:
-            pass
-
-
-def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
-    settings.set_setting("graph_toolbar_enabled", bool(enabled))
-    sync_graph_toolbar_watch()
-    emit_graph_toolbar_state()
-    if not apply:
-        return
-
-    if enabled and is_graph_toolbar_visible():
-        return
-
-    # Defer UI changes to avoid deleting UI while menus/actions are mid-execution.
-    try:
-        if enabled:
-            QtCore.QTimer.singleShot(0, createCustomGraph)
-        else:
-            QtCore.QTimer.singleShot(0, removeCustomGraph)
-    except Exception:
-        if enabled:
-            createCustomGraph()
-        else:
-            removeCustomGraph()
-
-
 def removeCustomGraph() -> None:
     if cmds.columnLayout(_GRAPH_LAYOUT, exists=True):
         try:
             cmds.deleteUI(_GRAPH_LAYOUT)
         except Exception:
             pass
-    emit_graph_toolbar_state()
+    graphToolbarApi.emit_graph_toolbar_state()
 
 
 def _show_graph_editor() -> None:
@@ -268,10 +147,10 @@ def create_settings_menu(parent_button):
     graph_toolbar_action.setCheckable(True)
 
     def _on_graph_toolbar_toggled(state):
-        set_graph_toolbar_enabled(bool(state))
+        graphToolbarApi.set_graph_toolbar_enabled(bool(state))
 
     graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
-    bind_graph_toolbar_toggle(graph_toolbar_action)
+    graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
 
     settings_menu.addSection("Toolbar's icons alignment")
     align_group = QActionGroup(settings_menu)

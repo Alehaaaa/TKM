@@ -77,6 +77,14 @@ TOOL_DEFINITIONS = {
         "callback": lambda: ui.orbit_window(0, 0),
         "tooltip_template": helper.orbit_tooltip_text,
     },
+    "attribute_switcher": {
+        "key": "attribute_switcher",
+        "label": "Attribute Switcher",
+        "text": "SSw",
+        "icon_path": media.attribute_switcher_image,
+        "callback": lambda: ui.toggle_attribute_switcher_window(),
+        "tooltip_template": helper.attribute_switcher_tooltip_text,
+    },
     "gimbal": {
         "key": "gimbal",
         "label": "Gimbal Fixer",

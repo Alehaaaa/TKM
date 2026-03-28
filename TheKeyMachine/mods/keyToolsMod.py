@@ -31,7 +31,6 @@ try:
     from PySide6.QtCore import QRegularExpression
 except ImportError:
     from PySide2.QtWidgets import QApplication
-    from PySide2.QtWidgets import QDesktopWidget
 
     from PySide2.QtGui import QRegExpValidator
     from PySide2.QtCore import QRegExp
@@ -47,10 +46,11 @@ import math
 import re
 from collections import Counter
 
-import TheKeyMachine.core.callback_manager as callbacks
+import TheKeyMachine.core.runtime_manager as runtime
 
 
 import TheKeyMachine.widgets.util as util
+import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.mods.generalMod as general
 
 
@@ -86,15 +86,10 @@ def get_time_range_selected():
 
 # Esta es una version nueva que evalua correctamente si es un rango o no. Dejo la otra porque se usa en algunos sitios. Hay que limpiar.
 def get_selected_time_range():
-    aTimeSlider = mel.eval("$tmpVar=$gPlayBackSlider")
-    timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
-    current_time = cmds.currentTime(query=True)
-
-    # Verificar si el rango de tiempo seleccionado es más que un solo frame
-    if (timeRange[1] - timeRange[0]) > 1 or (timeRange[0] != current_time and timeRange[1] != current_time + 1):
-        return timeRange
-    else:
+    time_range = timelineWidgets.get_selected_time_slider_range()
+    if not time_range:
         return None
+    return [time_range[0], time_range[1]]
 
 
 def get_graph_editor_selected_keyframes():
@@ -102,11 +97,42 @@ def get_graph_editor_selected_keyframes():
     if not anim_curves:
         return []
 
+    selected_frames = set(timelineWidgets.get_graph_editor_selected_frames())
     keyframes = []
     for curve in anim_curves:
-        keyframes += [(curve, frame) for frame in cmds.keyframe(curve, q=True, selected=True)]
+        curve_frames = cmds.keyframe(curve, q=True, selected=True) or []
+        keyframes.extend((curve, frame) for frame in curve_frames if int(frame) in selected_frames)
 
     return keyframes
+
+
+def get_working_time_context(default_mode="all_animation"):
+    return timelineWidgets.resolve_time_context(default_mode=default_mode)
+
+
+def _begin_timeline_context_tint(default_mode, key, owner=None):
+    return timelineWidgets.begin_timeline_context(
+        default_mode=default_mode,
+        owner=owner,
+        key=key,
+        min_duration_ms=200,
+    )
+
+
+def _get_reset_value_for_attribute(obj, attr, data):
+    short_name = obj.split("|")[-1]
+    parts = short_name.split(":")
+    namespace = parts[0] if len(parts) > 1 else "default"
+    short_object_name = parts[-1]
+    attr_full = "{}.{}".format(short_object_name, attr)
+
+    if namespace in data and attr_full in data[namespace]:
+        return data[namespace][attr_full]
+
+    default_value = cmds.attributeQuery(attr, node=obj, listDefault=True)
+    if default_value:
+        return default_value[0]
+    return None
 
 
 def getSelectedCurves():
@@ -198,7 +224,7 @@ def find_all_roots_in_selection():
 
 def mod_link_objects(*args):
     # Get the current state of the modifiers
-    mods = callbacks.get_modifier_mask()
+    mods = runtime.get_modifier_mask()
     shift_pressed = bool(mods & 1)
 
     if shift_pressed:
@@ -579,6 +605,7 @@ def reblock_insert(*args):
 
 def bake_animation(bake_interval=1, window=None):
     cmds.undoInfo(openChunk=True)
+    tint_session = None
 
     try:
         # Obtener los objetos seleccionados.
@@ -588,9 +615,14 @@ def bake_animation(bake_interval=1, window=None):
         if not selected_objects:
             return util.make_inViewMessage("Select at least one object for baking")
 
-        # Definir el rango de tiempo de la animación.
-        start_frame = cmds.playbackOptions(query=True, minTime=True)
-        end_frame = cmds.playbackOptions(query=True, maxTime=True)
+        time_context = get_working_time_context(default_mode="all_animation")
+        start_frame, end_frame = time_context.timerange
+        tint_session = timelineWidgets.begin_timeline_tint(
+            timerange=time_context.timerange,
+            owner=window,
+            key="bake_animation_range",
+            min_duration_ms=200,
+        )
 
         # Hacer bake a las curvas de animación de los objetos seleccionados.
         cmds.bakeResults(
@@ -617,6 +649,8 @@ def bake_animation(bake_interval=1, window=None):
         cmds.warning("An error occurred: {}".format(e))
 
     finally:
+        if tint_session:
+            tint_session.finish()
         # Cerrar el chunk de undo
         cmds.undoInfo(closeChunk=True)
 
@@ -1580,7 +1614,7 @@ def flipFromKeyframe():
 
 def mod_overlap_animation(*args):
     # Get the current state of the modifiers
-    mods = callbacks.get_modifier_mask()
+    mods = runtime.get_modifier_mask()
     shift_pressed = bool(mods & 1)
 
     if shift_pressed:
@@ -1731,7 +1765,7 @@ def toggleLock():
 
 def reset_objects_mods(*args):
     # Get the current state of the modifiers
-    mods = callbacks.get_modifier_mask()
+    mods = runtime.get_modifier_mask()
     shift_pressed = bool(mods & 1)
     ctrl_pressed = bool(mods & 4)
 
@@ -1840,6 +1874,7 @@ def remove_default_values_for_selected_object(*args):
 
 def reset_object_values(reset_translations=False, reset_rotations=False):
     cmds.undoInfo(openChunk=True)
+    tint_session = None
 
     try:
         json_file_path = general.get_set_default_data_file()
@@ -1851,58 +1886,81 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
         else:
             data = {}
 
+        time_context = get_working_time_context(default_mode="current_frame")
+        tint_session = _begin_timeline_context_tint("current_frame", "reset_defaults_range")
+
         selected_objects = cmds.ls(selection=True, long=True)
         selected_channels = get_selected_channels()
 
-        for obj in selected_objects:
-            # Extraer el namespace y el nombre corto del objeto
-            partes = obj.split(":")
-            namespace = partes[0] if len(partes) > 1 else "default"
-            nombre_corto = partes[-1]
+        if time_context.mode == "graph_editor_keys":
+            selected_keyframes = get_graph_editor_selected_keyframes()
+            for curve, frame in selected_keyframes:
+                target_plugs = cmds.listConnections(curve + ".output", plugs=True, source=False, destination=True) or []
+                if not target_plugs:
+                    continue
+                obj, attr = target_plugs[0].split(".", 1)
+                if reset_translations and not attr.startswith("translate"):
+                    continue
+                if reset_rotations and not attr.startswith("rotate"):
+                    continue
+                reset_value = _get_reset_value_for_attribute(obj, attr, data)
+                if reset_value is None:
+                    continue
+                try:
+                    cmds.keyframe(curve, edit=True, valueChange=reset_value, time=(frame, frame))
+                except Exception as e:
+                    print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
+            return
 
+        for obj in selected_objects:
             attrs = selected_channels if selected_channels else cmds.listAttr(obj, keyable=True)
 
             if not attrs:
                 continue
 
             for attr in attrs:
-                attr_full = f"{nombre_corto}.{attr}"
+                if reset_translations and not attr.startswith("translate"):
+                    continue
+                if reset_rotations and not attr.startswith("rotate"):
+                    continue
 
-                # Comprobar si hay datos guardados para el atributo
-                if namespace in data and attr_full in data[namespace]:
-                    # Restaurar valores desde el JSON
-                    try:
-                        cmds.setAttr(obj + "." + attr, data[namespace][attr_full])
-                    except Exception as e:
-                        print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
-                else:
-                    # Restablecer a los valores por defecto
-                    if reset_translations and not attr.startswith("translate"):
-                        continue
-                    if reset_rotations and not attr.startswith("rotate"):
+                try:
+                    attr_plug = obj + "." + attr
+                    is_locked = cmds.getAttr(attr_plug, lock=True)
+                    if is_locked:
                         continue
 
-                    try:
-                        is_locked = cmds.getAttr(obj + "." + attr, lock=True)
-                        if is_locked:
-                            continue
+                    connections = cmds.listConnections(attr_plug, source=True, destination=False, plugs=True)
+                    if connections:
+                        node_type = cmds.nodeType(connections[0].split(".")[0])
+                        if node_type not in ["animCurveTL", "animCurveTA", "animCurveTT", "animCurveTU"]:
+                            cmds.disconnectAttr(connections[0], attr_plug)
 
-                        connections = cmds.listConnections(obj + "." + attr, source=True, destination=False, plugs=True)
-                        if connections:
-                            node_type = cmds.nodeType(connections[0].split(".")[0])
-                            if node_type not in ["animCurveTL", "animCurveTA", "animCurveTT", "animCurveTU"]:
-                                cmds.disconnectAttr(connections[0], obj + "." + attr)
-
-                        default_value = cmds.attributeQuery(attr, node=obj, listDefault=True)
-                        if default_value:
-                            cmds.setAttr(obj + "." + attr, default_value[0])
-                    except Exception as e:
-                        print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
+                    reset_value = _get_reset_value_for_attribute(obj, attr, data)
+                    if reset_value is None:
                         continue
+
+                    if time_context.mode == "current_frame":
+                        cmds.setAttr(attr_plug, reset_value)
+                        continue
+
+                    keyframes = cmds.keyframe(
+                        obj,
+                        attribute=attr,
+                        query=True,
+                        time=(time_context.start_frame, time_context.end_frame),
+                    ) or []
+                    for frame in sorted(set(int(k) for k in keyframes)):
+                        cmds.setKeyframe(obj, attribute=attr, time=(frame,), value=reset_value)
+                except Exception as e:
+                    print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
+                    continue
 
     except Exception as e:
         cmds.warning("Error during reset: {}".format(str(e)))
     finally:
+        if tint_session:
+            tint_session.finish()
         cmds.undoInfo(closeChunk=True)
 
 
@@ -2036,7 +2094,7 @@ def find_opposite_name(name):
 
 
 def selectOppositeHandler(*args):
-    mods = callbacks.get_modifier_mask()
+    mods = runtime.get_modifier_mask()
     shift_pressed = bool(mods & 1)
 
     if shift_pressed:
@@ -2568,8 +2626,9 @@ def copy_animation(*args):
     if not selected_objects:
         return
 
-    time_range = get_selected_time_range()
+    time_context = get_working_time_context(default_mode="all_animation")
     animation_data = {}
+    tint_session = None
 
     try:
         # Procesar cada objeto seleccionado
@@ -2580,9 +2639,23 @@ def copy_animation(*args):
             # Obtener la animación de los canales animados
             animation_data[control_name] = {}
             for channel in animated_channels:
-                if time_range:
-                    keyframes = cmds.keyframe(f"{control}.{channel}", query=True, time=(time_range[0], time_range[1]))
-                    values = cmds.keyframe(f"{control}.{channel}", query=True, vc=True, time=(time_range[0], time_range[1]))
+                if time_context.mode == "graph_editor_keys":
+                    selected_frames = set(time_context.frames)
+                    keyframes = cmds.keyframe(f"{control}.{channel}", query=True) or []
+                    keyframes = [frame for frame in keyframes if int(frame) in selected_frames]
+                    values = [cmds.keyframe(f"{control}.{channel}", query=True, vc=True, time=(frame, frame))[0] for frame in keyframes]
+                elif time_context.mode == "time_slider_range":
+                    keyframes = cmds.keyframe(
+                        f"{control}.{channel}",
+                        query=True,
+                        time=(time_context.start_frame, time_context.end_frame),
+                    )
+                    values = cmds.keyframe(
+                        f"{control}.{channel}",
+                        query=True,
+                        vc=True,
+                        time=(time_context.start_frame, time_context.end_frame),
+                    )
                 else:
                     keyframes = cmds.keyframe(f"{control}.{channel}", query=True)
                     values = cmds.keyframe(f"{control}.{channel}", query=True, vc=True)
@@ -2592,12 +2665,28 @@ def copy_animation(*args):
 
         save_animation_to_json(json_file_path, animation_data)
 
-        if time_range:
+        tint_range = None
+        if time_context.mode == "time_slider_range":
+            tint_range = time_context.timerange
             clear_timeslider_selection()
+        elif time_context.mode == "all_animation":
+            tint_range = timelineWidgets.get_playback_range()
+        else:
+            tint_range = timelineWidgets.get_animation_data_timerange(animation_data)
+
+        if tint_range:
+            tint_session = timelineWidgets.begin_timeline_tint(
+                timerange=tint_range,
+                key="copy_animation_range",
+                min_duration_ms=200,
+            )
 
         util.make_inViewMessage("Animation saved")
     except Exception as e:
         cmds.warning(f"Error saving animation: {e}")
+    finally:
+        if tint_session:
+            tint_session.finish()
 
 
 # PASTE ANIMATION ___________________________________________________________________________
@@ -2621,6 +2710,7 @@ def paste_animation(*args):
                     # Aplicar nueva animación
                     for frame, value in zip(anim_data["keyframes"], anim_data["values"]):
                         cmds.setKeyframe(control, time=frame, attribute=channel, value=value)
+        return timelineWidgets.get_animation_data_timerange(animation_data)
 
     # Obtener los objetos seleccionados
     selected_objects = cmds.ls(selection=True)
@@ -2631,7 +2721,18 @@ def paste_animation(*args):
     json_file_path = general.get_copy_animation_file()
 
     # Aplicar animación a los objetos seleccionados
-    apply_animation_from_json(json_file_path, selected_objects)
+    tint_session = None
+    try:
+        paste_range = apply_animation_from_json(json_file_path, selected_objects)
+        if paste_range:
+            tint_session = timelineWidgets.begin_timeline_tint(
+                timerange=paste_range,
+                key="paste_animation_range",
+                min_duration_ms=200,
+            )
+    finally:
+        if tint_session:
+            tint_session.finish()
 
     util.make_inViewMessage("Animation restored")
 
@@ -2877,30 +2978,38 @@ def copy_pose(*args):
         return
 
     pose_data = {}
+    tint_session = timelineWidgets.begin_timeline_context(
+        default_mode="current_frame",
+        key="copy_pose_frame",
+        min_duration_ms=200,
+    )
 
-    # Procesar cada objeto seleccionado
-    for control in selected_objects:
-        control_name = control.rsplit(":", 1)[-1]  # Eliminar namespace
-        attributes = cmds.listAttr(control, keyable=True)
+    try:
+        # Procesar cada objeto seleccionado
+        for control in selected_objects:
+            control_name = control.rsplit(":", 1)[-1]  # Eliminar namespace
+            attributes = cmds.listAttr(control, keyable=True)
 
-        if attributes is None:
-            continue  # Si no hay atributos keyable, continuar con el siguiente objeto
+            if attributes is None:
+                continue  # Si no hay atributos keyable, continuar con el siguiente objeto
 
-        pose_data[control_name] = {}
-        for attr in attributes:
-            if not cmds.getAttr(f"{control}.{attr}", lock=True) and cmds.getAttr(f"{control}.{attr}", keyable=True):
-                try:
-                    values = cmds.getAttr(f"{control}.{attr}")
-                    pose_data[control_name][attr] = values
-                except Exception as e:
-                    print(f"Error getting attribute {attr} from {control}: {e}")
-                    pass  # Ignorar atributos que no pueden ser leídos
+            pose_data[control_name] = {}
+            for attr in attributes:
+                if not cmds.getAttr(f"{control}.{attr}", lock=True) and cmds.getAttr(f"{control}.{attr}", keyable=True):
+                    try:
+                        values = cmds.getAttr(f"{control}.{attr}")
+                        pose_data[control_name][attr] = values
+                    except Exception as e:
+                        print(f"Error getting attribute {attr} from {control}: {e}")
+                        pass  # Ignorar atributos que no pueden ser leídos
 
-    json_file_path = general.get_copy_paste_pose_file()
+        json_file_path = general.get_copy_paste_pose_file()
 
-    save_pose_to_json(json_file_path, pose_data)
+        save_pose_to_json(json_file_path, pose_data)
 
-    cmds.warning("Pose saved")
+        cmds.warning("Pose saved")
+    finally:
+        tint_session.finish()
 
 
 # PASTE POSE _____________________________________________________________
@@ -2952,11 +3061,19 @@ def paste_pose(*args):
         return
 
     json_file_path = general.get_copy_paste_pose_file()
+    tint_session = timelineWidgets.begin_timeline_context(
+        default_mode="current_frame",
+        key="paste_pose_frame",
+        min_duration_ms=200,
+    )
 
-    # Aplicar pose a los objetos seleccionados
-    apply_pose_from_json(json_file_path, selected_objects)
+    try:
+        # Aplicar pose a los objetos seleccionados
+        apply_pose_from_json(json_file_path, selected_objects)
 
-    cmds.warning("Pose restored")
+        cmds.warning("Pose restored")
+    finally:
+        tint_session.finish()
 
 
 # ______________________________________________ TANGENTS

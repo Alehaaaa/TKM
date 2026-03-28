@@ -46,7 +46,7 @@ def create_TheKeyMachine_hotkeys(*args):
 
     select_rig_controls = "import TheKeyMachine.mods.barMod as bar; bar.select_rig_controls()"
 
-    select_animated_rig_controls = "import TheKeyMachine.mods.barMod as bar; bar.select_animated_rig_controls()"
+    select_rig_controls_animated = "import TheKeyMachine.mods.barMod as bar; bar.select_rig_controls_animated()"
 
     depth_mover = "import TheKeyMachine.mods.barMod as bar; bar.depth_mover()"
 
@@ -65,8 +65,6 @@ def create_TheKeyMachine_hotkeys(*args):
     reset_object_values_rotate = "import TheKeyMachine.mods.keyToolsMod as key; key.reset_object_values(reset_rotations=True)"
 
     delete_animation = "import TheKeyMachine.mods.barMod as bar; bar.delete_animation()"
-
-    delete_time_slider_animation = "import TheKeyMachine.mods.barMod as bar; bar.delete_time_slider_animation()"
 
     selectOpposite = "import TheKeyMachine.mods.keyToolsMod as key; key.selectOpposite()"
 
@@ -138,7 +136,7 @@ def create_TheKeyMachine_hotkeys(*args):
         ("orbitWindow", "Open Orbit Window", open_orbit_window),
         ("isolate", "Isolate tool", isolate_master),
         ("selectRigControls", "Select Rig Controls", select_rig_controls),
-        ("selectAnimatedRigControls", "Select Animated Rig Controls", select_animated_rig_controls),
+        ("selectAnimatedRigControls", "Select Animated Rig Controls", select_rig_controls_animated),
         ("depthMover", "Adjust object depth in camera", depth_mover),
         ("createLocator", "Create temp locator on the spot in the selected object ", createLocator),
         ("align_selected_objects", "Align Selected objects ", align_selected_objects),
@@ -148,7 +146,6 @@ def create_TheKeyMachine_hotkeys(*args):
         ("reset_object_values_translate", "Reset Translate Object Values", reset_object_values_translate),
         ("reset_object_values_rotate", "Reset Rotation Object Values", reset_object_values_rotate),
         ("delete_animation", "Delete Objects Animation", delete_animation),
-        ("delete_time_slider_animation", "Delete Selected Time Slider Animation", delete_animation),
         ("selectOpposite", "Select Opposite", selectOpposite),
         ("addSelectOpposite", "Add Select Opposite", addSelectOpposite),
         ("copyOpposite", "Copy Opposite", copyOpposite),

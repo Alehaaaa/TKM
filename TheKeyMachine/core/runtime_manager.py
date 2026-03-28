@@ -1,8 +1,9 @@
 """
-Centralized Maya callback manager for TheKeyMachine.
+Centralized Maya runtime manager for TheKeyMachine.
 
 - Owns Maya callbacks (OpenMaya + scriptJobs) and guarantees cleanup on unload/reload.
-- Emits Qt signals when callbacks fire so UI can subscribe without creating its own jobs.
+- Emits Qt signals when runtime events fire so UI can subscribe without creating its own jobs.
+- Tracks managed Qt widgets that should be cleaned up with their owner or on shutdown.
 """
 
 from __future__ import annotations
@@ -23,8 +24,8 @@ except Exception:  # pragma: no cover
     om = None
 
 
-_OPTIONVAR_NAME = "TKM_CallbackManager"
-_MANAGER: Optional["CallbackManager"] = None
+_OPTIONVAR_NAME = "TKM_RuntimeManager"
+_MANAGER: Optional["RuntimeManager"] = None
 
 
 def _load_state() -> Dict[str, Any]:
@@ -120,7 +121,7 @@ def get_modifier_state() -> Dict[str, bool]:
     }
 
 
-class CallbackManager(QtCore.QObject):
+class RuntimeManager(QtCore.QObject):
     callback_fired = QtCore.Signal(str)
 
     # Common / high-value signals
@@ -128,6 +129,8 @@ class CallbackManager(QtCore.QObject):
     scene_new = QtCore.Signal()
 
     selection_changed = QtCore.Signal()
+    time_changed = QtCore.Signal()
+    undo_performed = QtCore.Signal()
     graph_editor_opened = QtCore.Signal()
 
     modifiers_changed = QtCore.Signal(bool, bool, bool)
@@ -137,6 +140,7 @@ class CallbackManager(QtCore.QObject):
         self._started = False
         self._om_callbacks: Dict[str, List[int]] = {}
         self._scriptjobs: Dict[str, List[int]] = {}
+        self._managed_widgets: Dict[str, QtWidgets.QWidget] = {}
 
         self._graph_editor_visible = False
         self._graph_editor_watch_enabled = False
@@ -164,6 +168,8 @@ class CallbackManager(QtCore.QObject):
         # Built-in, long-lived callbacks while the tool is loaded.
         self._install_scene_callbacks()
         self._install_selection_callback()
+        self._install_time_changed_callback()
+        self._install_undo_callback()
         self._refresh_event_filter_state()
 
         self._started = True
@@ -171,6 +177,7 @@ class CallbackManager(QtCore.QObject):
 
     def shutdown(self) -> None:
         self._remove_event_filter()
+        self._clear_managed_widgets()
         self._remove_all()
         self._started = False
         _clear_state()
@@ -238,6 +245,39 @@ class CallbackManager(QtCore.QObject):
         self._track_scriptjob(key, int(job_id))
         return int(job_id)
 
+    def register_managed_widget(self, widget, key: Optional[str] = None, owner=None):
+        if widget is None:
+            return None
+
+        if key:
+            existing = self._managed_widgets.get(key)
+            if existing is not None and existing is not widget:
+                self._safe_delete_widget(existing)
+            self._managed_widgets[key] = widget
+
+        def _cleanup(*_args):
+            if not key:
+                return
+            if self._managed_widgets.get(key) is widget:
+                self._managed_widgets.pop(key, None)
+
+        try:
+            widget.destroyed.connect(_cleanup)
+        except Exception:
+            pass
+
+        if owner is not None and hasattr(owner, "destroyed"):
+            try:
+                owner.destroyed.connect(lambda *_: self._safe_delete_widget(widget))
+            except Exception:
+                pass
+
+        return widget
+
+    def clear_managed_widget(self, key: str) -> None:
+        widget = self._managed_widgets.pop(key, None)
+        self._safe_delete_widget(widget)
+
     # ----------------------------
     # Internal installs
     # ----------------------------
@@ -254,6 +294,34 @@ class CallbackManager(QtCore.QObject):
 
         cb_id = om.MEventMessage.addEventCallback("SelectionChanged", _on_selection_changed)
         self._track_om("selection_changed", int(cb_id))
+
+    def _install_time_changed_callback(self) -> None:
+        if not om:
+            return
+
+        def _on_time_changed(*_args):
+            self._emit("time_changed")
+            try:
+                self.time_changed.emit()
+            except Exception:
+                pass
+
+        cb_id = om.MEventMessage.addEventCallback("timeChanged", _on_time_changed)
+        self._track_om("time_changed", int(cb_id))
+
+    def _install_undo_callback(self) -> None:
+        if not om:
+            return
+
+        def _on_undo(*_args):
+            self._emit("undo_performed")
+            try:
+                self.undo_performed.emit()
+            except Exception:
+                pass
+
+        cb_id = om.MEventMessage.addEventCallback("Undo", _on_undo)
+        self._track_om("undo_performed", int(cb_id))
 
     def _install_scene_callbacks(self) -> None:
         if not om:
@@ -512,17 +580,38 @@ class CallbackManager(QtCore.QObject):
 
         self._persist_state()
 
+    def _safe_delete_widget(self, widget) -> None:
+        if widget is None:
+            return
+        try:
+            widget.hide()
+        except Exception:
+            pass
+        try:
+            widget.setParent(None)
+        except Exception:
+            pass
+        try:
+            widget.deleteLater()
+        except Exception:
+            pass
 
-def get_callback_manager(start: bool = True) -> CallbackManager:
+    def _clear_managed_widgets(self) -> None:
+        for key, widget in list(self._managed_widgets.items()):
+            self._safe_delete_widget(widget)
+        self._managed_widgets.clear()
+
+
+def get_runtime_manager(start: bool = True) -> RuntimeManager:
     global _MANAGER
     if _MANAGER is None:
-        _MANAGER = CallbackManager()
+        _MANAGER = RuntimeManager()
     if start:
         _MANAGER.start()
     return _MANAGER
 
 
-def shutdown_callback_manager() -> None:
+def shutdown_runtime_manager() -> None:
     global _MANAGER
     if _MANAGER is not None:
         try:
@@ -534,5 +623,3 @@ def shutdown_callback_manager() -> None:
         except Exception:
             pass
         _MANAGER = None
-    else:
-        cleanup_orphaned_callbacks()

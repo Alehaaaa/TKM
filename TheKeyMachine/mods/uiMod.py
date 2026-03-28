@@ -39,7 +39,7 @@ except ImportError:
 
 import ssl
 
-import TheKeyMachine.core.callback_manager as callbacks
+import TheKeyMachine.core.runtime_manager as runtime
 import re
 import os
 import platform
@@ -56,17 +56,19 @@ import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.tools.colors as toolColors
 import TheKeyMachine.tools.orbit.api as orbitApi
+import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 from TheKeyMachine.mods import settingsMod as settings
 
-mods = [general, keyTools, media, bar, customDialogs, cw, wutil, updater, settings, toolColors, orbitApi, selectionSetsApi]
+mods = [general, keyTools, media, bar, customDialogs, cw, wutil, updater, settings, toolColors, orbitApi, attributeSwitcherApi, selectionSetsApi]
 
 for m in mods:
     reload(m)
 
 ORBIT_SETTINGS_NAMESPACE = orbitApi.ORBIT_SETTINGS_NAMESPACE
+ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE = attributeSwitcherApi.ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE
 SELECTION_SETS_SETTINGS_NAMESPACE = selectionSetsApi.SELECTION_SETS_SETTINGS_NAMESPACE
 
 INSTALL_PATH = general.config["INSTALL_PATH"]
@@ -83,6 +85,22 @@ def close_orbit_window(*args, **kwargs):
 
 def bind_orbit_toolbar_button(*args, **kwargs):
     return orbitApi.bind_orbit_toolbar_button(*args, **kwargs)
+
+
+def attribute_switcher_window(*args, **kwargs):
+    return attributeSwitcherApi.attribute_switcher_window(*args, **kwargs)
+
+
+def close_attribute_switcher_window(*args, **kwargs):
+    return attributeSwitcherApi.close_attribute_switcher_window(*args, **kwargs)
+
+
+def bind_attribute_switcher_toolbar_button(*args, **kwargs):
+    return attributeSwitcherApi.bind_attribute_switcher_toolbar_button(*args, **kwargs)
+
+
+def toggle_attribute_switcher_window(*args, **kwargs):
+    return attributeSwitcherApi.toggle_attribute_switcher_window(*args, **kwargs)
 
 
 def open_selection_set_creation_dialog(*args, **kwargs):
@@ -179,7 +197,7 @@ def filterMode_sync_off():
 
 def customGraph_filter_mods(*args):
     # Get the current state of the modifiers
-    mods = callbacks.get_modifier_mask()
+    mods = runtime.get_modifier_mask()
     shift_pressed = bool(mods & 1)
 
     if shift_pressed:

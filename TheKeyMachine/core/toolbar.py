@@ -43,7 +43,6 @@ import time
 import json
 import shutil
 import platform
-import threading
 
 from functools import partial
 
@@ -77,7 +76,11 @@ import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.core.customGraph as cg  # type: ignore
 import TheKeyMachine.mods.updater as updater  # type: ignore
 import TheKeyMachine.core.toolbox as toolbox  # type: ignore
-import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
+import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
+import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
+import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
+import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
+import TheKeyMachine.tools.ibookmarks.api as iBookmarksApi  # type: ignore
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
@@ -109,6 +112,10 @@ mods = [
     wutil,
     sliders,
     toolbox,
+    animationOffsetApi,
+    graphToolbarApi,
+    microMoveApi,
+    iBookmarksApi,
     connectToolBox,
     cbScripts,
 ]
@@ -212,18 +219,17 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.setObjectName(WorkspaceName)
         self.setContextMenuPolicy(QtCore.Qt.PreventContextMenu)
 
-        self._callback_manager = callbacks.get_callback_manager()
-        cg.sync_graph_toolbar_watch()
-        self._callback_manager.scene_opened.connect(self._on_scene_opened)
-        self._callback_manager.scene_new.connect(self._on_scene_opened)
-        self._callback_manager.graph_editor_opened.connect(self._on_graph_editor_opened)
+        self._runtime_manager = runtime.get_runtime_manager()
+        graphToolbarApi.sync_graph_toolbar_watch()
+        self._runtime_manager.scene_opened.connect(self._on_scene_opened)
+        self._runtime_manager.scene_new.connect(self._on_scene_opened)
+        self._runtime_manager.graph_editor_opened.connect(self._on_graph_editor_opened)
 
         self.shelf_painter = None
         self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
 
         # Initial state variables from settingsMod
-        self.toggleAnimOffsetButtonState = settings.get_setting("toggleAnimOffsetButtonState", False)
-        self.micro_move_button_state = settings.get_setting("micro_move_button_state", False)
+        self.toggleAnimOffsetButtonState = False
         self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
         self.orbit_button_widget = None
 
@@ -242,9 +248,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             "Shelf": "Shelf",
         }
 
-        self.anim_offset_run_timer = True
-        self.micro_move_run_timer = True
-        self.animation_offset_original_values = {}
+        self.animation_offset_controller = animationOffsetApi.AnimationOffsetController(self)
+        self.micro_move_controller = microMoveApi.MicroMoveController(self)
+        self.animation_offset_button_widget = None
         self.setgroup_states = {}
         self.setgroup_buttons = {}
 
@@ -267,19 +273,19 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         _toolbar_instance = None
 
         try:
-            callbacks.shutdown_callback_manager()
+            runtime.shutdown_runtime_manager()
         except Exception:
             pass
 
-        # Stop animation offset thread
-        self.anim_offset_run_timer = False
-        if hasattr(self, "anim_offset_thread") and self.anim_offset_thread and self.anim_offset_thread.is_alive():
-            self.anim_offset_thread.join(timeout=0.5)
+        was_anim_offset_active = self.toggleAnimOffsetButtonState
+        self.animation_offset_controller.deactivate()
+        if was_anim_offset_active:
+            try:
+                cmds.undoInfo(closeChunk=True)
+            except Exception:
+                pass
 
-        # Stop micro move thread
-        self.micro_move_run_timer = False
-        if hasattr(self, "micro_move_thread_obj") and self.micro_move_thread_obj and self.micro_move_thread_obj.is_alive():
-            self.micro_move_thread_obj.join(timeout=0.5)
+        self.micro_move_controller.deactivate()
 
         # Stop link objects image toggle thread
         self.link_obj_image_timer = False
@@ -300,8 +306,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def _on_scene_opened(self, *_args):
         if not isValid(self):
             return
-        self.update_selectionSets_on_new_scene()
-        self.update_popup_menu()
+        self.update_selectionSets()
+        self.update_iBookmarks_menu()
 
     def _on_graph_editor_opened(self, *_args):
         if not isValid(self):
@@ -553,10 +559,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         return self.dock_menu
 
-    # For use with toggle functionality on Shelf or Launcher
-    def toggle(self, *args):
-        self.showWindow()
-
     def create_shelf_icon(self, *args):
         button_name = "TheKeyMachine"
         command = "import TheKeyMachine;TheKeyMachine.toggle()"
@@ -566,113 +568,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         cmds.shelfButton(parent=current_shelf_tab, image=icon_path, command=command, label=button_name)
 
     # Update the iBookmarks menu when scene changes
-    def update_popup_menu(self, *args):
+    def update_iBookmarks_menu(self, *args):
         if not isValid(self):
             return
+        iBookmarksApi.update_isolate_popup_menu()
 
-        if not cmds.objExists("iBookmarks"):
-            if cmds.popupMenu("isolate_button_popupMenu", exists=True):
-                # Limpia el menú popup actual
-                cmds.popupMenu("isolate_button_popupMenu", e=True, deleteAllItems=True)
-
-                # Agrega un ítem para abrir la ventana de bookmarks
-                cmds.menuItem(
-                    l="Bookmarks",
-                    c=lambda x: self.create_ibookmarks_window(),
-                    annotation="Open isolate bookmarks window",
-                    image=media.ibookmarks_menu_image,
-                    parent="isolate_button_popupMenu",
-                )  # type: ignore
-                cmds.menuItem(divider=True, parent="isolate_button_popupMenu")
-                cmds.menuItem(
-                    "down_level_checkbox",
-                    l="Down one level",
-                    annotation="",
-                    checkBox=False,
-                    c=lambda x: bar.toggle_down_one_level(x),
-                    parent="isolate_button_popupMenu",
-                )
-            return
-
-        # Obtén todos los nombres de los bookmarks existentes
-        bookmarks = cmds.listRelatives("iBookmarks", children=True) or []
-
-        if cmds.popupMenu("isolate_button_popupMenu", exists=True):
-            # Limpia el menú popup actual
-            cmds.popupMenu("isolate_button_popupMenu", e=True, deleteAllItems=True)
-
-            # Agrega un ítem por cada bookmark existente
-            for bookmark in bookmarks:
-                text = bookmark.replace("_ibookmark", "")
-                cmds.menuItem(
-                    l=text,
-                    parent="isolate_button_popupMenu",
-                    image=media.grey_got_image,
-                    c=lambda x, text=text: self.isolate_bookmark(bookmark_name=text),
-                )
-
-            cmds.menuItem(divider=True, parent="isolate_button_popupMenu")
-
-            # Agrega un ítem para abrir la ventana de bookmarks
-            cmds.menuItem(
-                l="Bookmarks",
-                c=lambda x: self.create_ibookmarks_window(),
-                annotation="Open isolate bookmarks window",
-                image=media.ibookmarks_menu_image,
-                parent="isolate_button_popupMenu",
-            )
-            cmds.menuItem(divider=True, parent="isolate_button_popupMenu")
-            cmds.menuItem(
-                "down_level_checkbox",
-                l="Down one level",
-                annotation="",
-                checkBox=False,
-                c=lambda x: bar.toggle_down_one_level(x),
-                parent="isolate_button_popupMenu",
-            )
-
-        else:
-            # Obtén todos los nombres de los bookmarks existentes
-            bookmarks = cmds.listRelatives("iBookmarks", children=True) or []
-
-            # Limpia el menú popup actual
-            cmds.popupMenu("isolate_button_popupMenu", e=True, deleteAllItems=True)
-
-            # Agrega un ítem por cada bookmark existente
-            for bookmark in bookmarks:
-                text = bookmark.replace("_ibookmark", "")
-                cmds.menuItem(
-                    l=text,
-                    parent="isolate_button_popupMenu",
-                    image=media.grey_got_image,
-                    c=lambda x, text=text: self.isolate_bookmark(bookmark_name=text),
-                )  # type: ignore
-
-            cmds.menuItem(divider=True, parent="isolate_button_popupMenu")
-
-            # Agrega un ítem para abrir la ventana de bookmarks
-            cmds.menuItem(
-                l="Bookmarks",
-                c=lambda x: self.create_ibookmarks_window(),
-                annotation="Open isolate bookmarks window",
-                image=media.ibookmarks_menu_image,
-                parent="isolate_button_popupMenu",
-            )  # type: ignore
-            cmds.menuItem(divider=True, parent="isolate_button_popupMenu")
-            cmds.menuItem(
-                "down_level_checkbox",
-                l="Down one level",
-                annotation="",
-                checkBox=False,
-                c=lambda x: bar.toggle_down_one_level(x),
-                parent="isolate_button_popupMenu",
-            )
-
-    def update_selectionSets_on_new_scene(self):
+    def update_selectionSets(self):
         if not isValid(self):
             return
-        if cmds.window("SetCreationWindow", exists=True):
-            cmds.deleteUI("SetCreationWindow")
 
         # First verification to check if the SelectionSets workspace exists.
         # If it doesn't exist and trying to assign `vis_state` results in an error.
@@ -684,14 +587,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 else:
                     self.selection_sets_empty_setup()
 
-            # The selection set workspace is hidden; nothing needs to be done
+    # For use with toggle functionality on Shelf or Launcher
+    def toggle(self, *args):
+        self.showWindow()
 
     def reload(self, *args):
         toolbar_module_name = "TheKeyMachine.core.toolbar"
         customGraph_module_name = "TheKeyMachine.core.customGraph"
 
         try:
-            callbacks.shutdown_callback_manager()
+            runtime.shutdown_runtime_manager()
         except Exception:
             pass
 
@@ -739,7 +644,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         _toolbar_instance = None
 
         try:
-            callbacks.shutdown_callback_manager()
+            runtime.shutdown_runtime_manager()
         except Exception:
             pass
 
@@ -1272,7 +1177,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sel_set_name = "TheKeyMachine_SelectionSet"
         if not cmds.objExists(sel_set_name):
             return []
-        self._migrate_legacy_selection_set_groups(sel_set_name)
         selection_sets = []
         for node in cmds.sets(sel_set_name, q=True) or []:
             if not cmds.objExists(node):
@@ -1288,30 +1192,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if not cmds.objExists(sel_set_name):
             cmds.sets(name=sel_set_name, empty=True)
 
-        self._migrate_legacy_selection_set_groups(sel_set_name)
         return sel_set_name
-
-    def _migrate_legacy_selection_set_groups(self, sel_set_name):
-        legacy_groups = [node for node in (cmds.sets(sel_set_name, q=True) or []) if str(node).endswith("_setgroup")]
-        for legacy_group in legacy_groups:
-            for subset in cmds.sets(legacy_group, q=True) or []:
-                if not cmds.objExists(subset):
-                    continue
-                try:
-                    cmds.sets(subset, add=sel_set_name)
-                except Exception:
-                    pass
-                try:
-                    cmds.sets(subset, remove=legacy_group)
-                except Exception:
-                    pass
-            if cmds.objExists(legacy_group):
-                members_left = cmds.sets(legacy_group, q=True) or []
-                if not members_left:
-                    try:
-                        cmds.delete(legacy_group)
-                    except Exception:
-                        pass
 
     def create_new_set_and_update_buttons(self, color_suffix, set_name_field, set_group_combo=None, *args):
         selection = cmds.ls(selection=True)
@@ -1370,7 +1251,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.warning("Invalid set or setgroup names")
 
     def handle_set_selection(self, set_name, shift_pressed, ctrl_pressed):
-        mods = callbacks.get_modifier_mask()
+        mods = runtime.get_modifier_mask()
         shift_pressed = bool(mods & 1)
         ctrl_pressed = bool(mods & 4)
 
@@ -1607,203 +1488,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     # ---------------------------------------- ANIMATION OFFSET ------------------------------------------------------#
 
-    # Variable global para almacenar los valores originales de los keyframes
-    animation_offset_original_values = {}
-
-    def store_keyframes(self):
-        global animation_offset_original_values
-
-        # Obtener el rango de tiempo seleccionado en el Range Slider
-        aTimeSlider = mel.eval("$tmpVar=$gPlayBackSlider")
-        timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
-
-        # Si no se selecciona un rango, utilizar todo el rango de la línea de tiempo
-        if timeRange[1] - timeRange[0] == 1:
-            timeRange = [cmds.playbackOptions(q=True, minTime=True), cmds.playbackOptions(q=True, maxTime=True)]
-
-        selected_objects = cmds.ls(selection=True)
-
-        for obj in selected_objects:
-            attrs = cmds.listAttr(obj, keyable=True)
-            if attrs:
-                self.animation_offset_original_values[obj] = {}
-                for attr in attrs:
-                    attr_full_name = obj + "." + attr
-                    if cmds.getAttr(attr_full_name, settable=True):
-                        keyframes = cmds.keyframe(obj, attribute=attr, query=True)
-                        if keyframes:
-                            self.animation_offset_original_values[obj][attr] = {
-                                frame: cmds.getAttr(attr_full_name, time=frame) for frame in keyframes if timeRange[0] <= frame <= timeRange[1]
-                            }
-
-        # borra selected range slider
-        cmds.ls(selection=True)
-        cmds.select(clear=True)
-        cmds.select(obj)
-
-    def adjust_keyframes(self):
-        def _as_scalar(value):
-            v = value
-            while isinstance(v, (list, tuple)) and len(v) == 1:
-                v = v[0]
-            if isinstance(v, (list, tuple)):
-                return None, False
-            return v, True
-
-        global animation_offset_original_values
-
-        # Range del Time Slider
-        aTimeSlider = mel.eval("$tmpVar=$gPlayBackSlider")
-        timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
-        if timeRange[1] - timeRange[0] == 1:
-            timeRange = [
-                cmds.playbackOptions(q=True, minTime=True),
-                cmds.playbackOptions(q=True, maxTime=True),
-            ]
-
-        selected_objects = cmds.ls(selection=True)
-
-        for obj in selected_objects:
-            # SOLO escalares para evitar double3
-            attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
-            for attr in attrs:
-                attr_full_name = obj + "." + attr
-
-                # salta bloqueados/no seteables y tipos no numéricos
-                if not cmds.getAttr(attr_full_name, settable=True) or cmds.getAttr(attr_full_name, lock=True):
-                    continue
-                a_type = cmds.getAttr(attr_full_name, type=True)
-                if a_type in ("enum", "string", "message"):
-                    continue
-
-                keyframes = cmds.keyframe(obj, attribute=attr, query=True)
-                if not keyframes:
-                    continue
-
-                for frame in keyframes:
-                    if not (timeRange[0] <= frame <= timeRange[1]):
-                        continue
-
-                    # valores actual y original
-                    cur_raw = cmds.getAttr(attr_full_name, time=frame)
-                    current_value, ok_cur = _as_scalar(cur_raw)
-
-                    original_value = self.animation_offset_original_values.get(obj, {}).get(attr, {}).get(frame)
-
-                    if original_value is not None:
-                        original_value, ok_org = _as_scalar(original_value)
-                    else:
-                        ok_org = False
-
-                    if not (ok_cur and ok_org):
-                        # si alguno no es escalar, ignora este par (evita restar listas)
-                        continue
-
-                    diff = current_value - original_value
-                    if diff == 0:
-                        continue
-
-                    # aplica offset a todas las keys del rango (UNA sola vez por atributo)
-                    for frame_to_update in keyframes:
-                        if not (timeRange[0] <= frame_to_update <= timeRange[1]):
-                            continue
-
-                        orig_update = self.animation_offset_original_values.get(obj, {}).get(attr, {}).get(frame_to_update)
-                        if orig_update is None:
-                            continue
-
-                        orig_update, ok_upd = _as_scalar(orig_update)
-                        if not ok_upd:
-                            continue
-
-                        new_val = orig_update + diff
-                        cmds.setKeyframe(obj, attribute=attr, time=frame_to_update, value=new_val)
-
-                    for fr in keyframes:
-                        if timeRange[0] <= fr <= timeRange[1]:
-                            self.animation_offset_original_values.setdefault(obj, {}).setdefault(attr, {})[fr] = cmds.getAttr(attr_full_name, time=fr)
-
-                    break  # salimos del bucle de frames (ya aplicamos el offset para este attr)
-
-    def offset_animation_deferred(self, interval):
-        def adjust_offset_animation():
-            if not isValid(self):
-                return
-            self.adjust_keyframes()
-
-        while self.anim_offset_run_timer and isValid(self):
-            time.sleep(interval)
-            utils.executeDeferred(adjust_offset_animation)
-
-    def toggleAnimOffsetButton(self, *args):
-        selection = cmds.ls(selection=True)
-
-        if selection:
-            # Toggle button state
-            self.toggleAnimOffsetButtonState = not self.toggleAnimOffsetButtonState
-            settings.set_setting("toggleAnimOffsetButtonState", self.toggleAnimOffsetButtonState)
-
-            if self.toggleAnimOffsetButtonState:
-                cmds.undoInfo(openChunk=True)
-                cmds.iconTextButton("anim_offset_button", e=True, bgc=(0.3, 0.3, 0.3))
-                self.anim_offset_run_timer = True
-
-                # Initialize thread variable if not already
-                self.anim_offset_thread = threading.Thread(target=self.offset_animation_deferred, args=(0.3,))
-                self.anim_offset_thread.start()
-                self.store_keyframes()
-
-            else:
-                cmds.undoInfo(closeChunk=True)
-                cmds.iconTextButton("anim_offset_button", e=True, bgc=(0.2, 0.2, 0.2))
-                self.anim_offset_run_timer = False
-                if self.anim_offset_thread and self.anim_offset_thread.is_alive():
-                    self.anim_offset_thread.join()  # Wait for the thread to finish
-                pass
+    def toggleAnimOffsetButton(self, checked=None):
+        self.animation_offset_controller.toggle(checked, button_widget=self.animation_offset_button_widget)
+        self.toggleAnimOffsetButtonState = self.animation_offset_controller.is_enabled()
 
     # ---------------------------------------------------------------
 
     def toggle_micro_move_button(self, checked=None):
-        if checked is not None:
-            self.micro_move_button_state = checked
-        else:
-            self.micro_move_button_state = not self.micro_move_button_state
-
-        settings.set_setting("micro_move_button_state", self.micro_move_button_state)
-
-        if self.micro_move_button_state:
-            cmds.undoInfo(openChunk=True)
-            # cmds.iconTextButton("micro_move_button", e=True, bgc=(0.3, 0.3, 0.3))
-            self.micro_move_run_timer = True
-            bar.activate_micro_move()
-
-            # Initialize thread variable if not already
-            self.micro_move_thread_obj = threading.Thread(target=self.micro_move_thread, args=(0.5,))
-            self.micro_move_thread_obj.start()
-
-        else:
-            self.micro_move_run_timer = False
-            cmds.undoInfo(closeChunk=True)
-            # current_context = cmds.currentCtx()
-            # microMoveContext = "microMoveCtx"
-            # microRotateContext = "microRotateCtx"
-            # cmds.iconTextButton("micro_move_button", e=True, bgc=(0.2, 0.2, 0.2))
-
-            # El thread tarda en pararse así que necesitamos crear esto y así salirnos en barMod de la ejecución
-            cmds.manipMoveContext("dummyCtx")
-            cmds.setToolTo("dummyCtx")
-            if hasattr(self, "micro_move_thread_obj") and self.micro_move_thread_obj and self.micro_move_thread_obj.is_alive():
-                self.micro_move_thread_obj.join()  # Wait for the thread to finish
-
-    def micro_move_thread(self, interval):
-        def micro_move_run():
-            if not isValid(self):
-                return
-            bar.activate_micro_move()
-
-        while self.micro_move_run_timer and isValid(self):
-            time.sleep(interval)
-            utils.executeDeferred(micro_move_run)
+        self.micro_move_controller.toggle(checked)
 
     def _setup_orbit_toolbar_button(self, button_widget):
         self.orbit_button_widget = button_widget
@@ -1888,185 +1580,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def maya_main_window(self, *args):
         main_window_ptr = mui.MQtUtil.mainWindow()
         return wrapInstance(int(main_window_ptr), QtWidgets.QWidget)
-
-    # ___________________________________________ iBookmarks _____________________________________________________________ #
-
-    def create_ibookmark_node(self, *args):
-        if not cmds.objExists("TheKeyMachine"):
-            general.create_TheKeyMachine_node()
-        if not cmds.objExists("iBookmarks"):
-            general.create_ibookmarks_node()
-
-    def create_bookmark(self, list_widget, *args):
-        current_selection = cmds.ls(selection=True)
-        if not current_selection:
-            return
-
-        text = cmds.promptDialog(
-            title="Create Bookmark",
-            message="Enter bookmark name:",
-            button=["Create", "Cancel"],
-            defaultButton="Create",
-            cancelButton="Cancel",
-            dismissString="Cancel",
-        )
-
-        if text == "Create":
-            bookmark_name = cmds.promptDialog(query=True, text=True)
-            if not bookmark_name:  # Validar si el campo de texto está vacío
-                cmds.warning("Bookmark name cannot be empty")
-                return
-
-            # Validar el nombre del bookmark usando una expresión regular
-            if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", bookmark_name):
-                cmds.warning("Invalid bookmark name. It should start with a letter or underscore and contain only letters, numbers, and underscores")
-                return
-
-            self.create_ibookmark_node()
-            bookmark_node = cmds.group(em=True, name=f"{bookmark_name}_ibookmark")
-            cmds.parent(bookmark_node, "iBookmarks")
-
-            new_groups = []  # Lista para almacenar los nuevos grupos
-
-            for obj in current_selection:
-                # Obtener el nombre del objeto sin la ruta (si existe)
-                obj_name = obj.split("|")[-1]
-
-                # Si el nombre del objeto contiene "->", eliminar la parte anterior a esos caracteres
-                if "->" in obj_name:
-                    obj_name = obj_name.split("->")[-1]
-
-                # Eliminar cualquier punto en el nombre del objeto (para imagePlanes)
-                obj_name = obj_name.replace(".", "_")
-                new_group = cmds.group(em=True, name=f"{obj_name}_{bookmark_name}_ibook")
-                cmds.parent(new_group, bookmark_node)
-                new_groups.append(new_group)  # Agregar el nuevo grupo a la lista
-
-            # Desemparentar los objetos después de crear todos los grupos
-            for new_group in new_groups:
-                cmds.select(new_group, add=True)
-
-            self.update_bookmark_list(list_widget)
-        cmds.select(clear=True)
-        self.update_popup_menu()
-
-    def remove_bookmark(self, list_widget, *args):
-        item = cmds.textScrollList(list_widget, query=True, selectItem=True)
-        if item:
-            text = item[0]
-            bookmark_node = f"{text}_ibookmark"
-            cmds.delete(bookmark_node)  # Eliminar el nodo del bookmark
-            self.update_bookmark_list(list_widget)
-            self.update_popup_menu()
-
-    def isolate_bookmark(self, list_widget=None, bookmark_name=None, *args):
-        current_selection = cmds.ls(selection=True, long=True)  # Obtén los nombres completos de los objetos seleccionados
-
-        # Si bookmark_name no es proporcionado, obténlo del list_widget
-        if not bookmark_name and list_widget:
-            item = cmds.textScrollList(list_widget, query=True, selectItem=True)
-            if item:
-                bookmark_name = item[0]
-
-        if bookmark_name:
-            # Remover '_ibookmark' del final del nombre para obtener el nombre del bookmark
-            bookmark_name = bookmark_name.replace("_ibookmark", "")
-            # Encontrar el nodo del bookmark
-            bookmark_node = f"{bookmark_name}_ibookmark"
-            if cmds.objExists(bookmark_node):
-                # Obtener todos los objetos dentro del nodo de bookmark
-                objects = cmds.listRelatives(bookmark_node, allDescendents=True, fullPath=True)  # Usa fullPath=True aquí
-                if objects:
-                    selected_objects = []
-                    for obj in objects:
-                        # Remover "_ibook" del final del nombre del objeto
-                        obj_name = obj.rsplit("|", 1)[-1].replace("_ibook", "")
-                        # Remover el sufijo que coincide con el texto de la lista de bookmarks
-                        obj_name = obj_name.replace(f"_{bookmark_name}", "")
-
-                        # Asegúrate de que el objeto exista antes de agregarlo a la lista de objetos seleccionados
-                        if cmds.objExists(obj_name):
-                            selected_objects.append(obj_name)
-
-                    # Obtener el estado actual del aislamiento
-                    currentPanel = cmds.getPanel(wf=True)
-                    if cmds.getPanel(typeOf=currentPanel) != "modelPanel":
-                        currentPanel = cmds.playblast(activeEditor=True)
-                    if cmds.getPanel(typeOf=currentPanel) != "modelPanel":
-                        return wutil.inViewMessage("Focus on a camera or viewport")
-
-                    currentState = cmds.isolateSelect(currentPanel, query=True, state=True)
-                    cmds.select(selected_objects)
-                    # If the isolation is not active, we activate it and add the selection
-                    if currentState == 0:
-                        cmds.isolateSelect(currentPanel, state=1)
-                        cmds.isolateSelect(currentPanel, addSelected=True)
-                    else:
-                        # Si el aislamiento está activo, vaciamos la selección actual y añadimos la nueva selección
-                        cmds.isolateSelect(currentPanel, state=0)
-                        cmds.isolateSelect(currentPanel, state=1)
-                        cmds.isolateSelect(currentPanel, addSelected=True)
-
-                else:
-                    cmds.warning(f"No objects in bookmark '{bookmark_name}'")
-            else:
-                cmds.warning(f"Bookmark '{bookmark_name}' not found")
-        else:
-            cmds.warning("No bookmark selected")
-
-        # Restaurar la selección original al final de la función
-        cmds.select(clear=True)
-        if current_selection:
-            cmds.select(current_selection, replace=True)
-
-    def update_bookmark_list(self, list_widget, *args):
-        bookmarks = cmds.listRelatives("iBookmarks", children=True) or []
-        cmds.textScrollList(list_widget, edit=True, removeAll=True)  # Limpiar la lista
-        for bookmark in bookmarks:
-            text = bookmark.replace("_ibookmark", "")
-            cmds.textScrollList(list_widget, edit=True, append=text)
-
-    def create_ibookmarks_window(self, *args):
-        original_selection = cmds.ls(selection=True)
-
-        if cmds.window("iBookmarksWindow", exists=True):
-            cmds.deleteUI("iBookmarksWindow")
-
-        window = cmds.window(
-            "iBookmarksWindow", title="Isolate Bookmarks", widthHeight=(265, 140), sizeable=False
-        )  # Hacer la ventana no redimensionable
-        main_layout = cmds.columnLayout(adjustableColumn=True, rowSpacing=10, columnAlign="center")
-
-        # Crear un formLayout para controlar la disposición de los elementos
-        form_layout = cmds.formLayout()
-
-        # Columna de la izquierda con la lista
-        list_widget = cmds.textScrollList(allowMultiSelection=False, h=130)
-
-        # Columna de la derecha con los botones
-        button_layout = cmds.columnLayout(adjustableColumn=True, columnAlign="center")
-        cmds.button(label="Create", command=lambda x: self.create_bookmark(list_widget), width=90)  # Ajustar el ancho del botón
-        cmds.button(label="Remove", command=lambda x: self.remove_bookmark(list_widget), width=90)  # Ajustar el ancho del botón
-        cmds.button(label="Isolate", command=lambda x: self.isolate_bookmark(list_widget), width=90)  # Ajustar el ancho del botón
-
-        # Establecer las restricciones de disposición en el formLayout
-        cmds.formLayout(
-            form_layout,
-            edit=True,
-            attachForm=[(list_widget, "left", 5), (list_widget, "top", 5), (button_layout, "top", 5), (button_layout, "right", 5)],
-            attachControl=[(list_widget, "right", 5, button_layout)],
-        )
-
-        cmds.setParent(main_layout)  # Regresar al layout principal
-        cmds.showWindow(window)
-        self.create_ibookmark_node()
-        self.update_bookmark_list(list_widget)
-
-        # Restaurar la selección original
-        if original_selection:
-            cmds.select(original_selection, replace=True)
-        else:
-            cmds.select(clear=True)
 
     def buildUI(self):
         ### ______________________________________________________ TOOLBAR ICON SIZE  ___________________________________________________
@@ -2177,6 +1690,40 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.move_keyframes_intField = cw.QFlatSpinBox()
         self.move_keyframes_intField.setFixedWidth(50)
         sec.addWidget(self.move_keyframes_intField, "Nudge Value", "nudge_val")
+        sec.addWidgetGroup(
+            [
+                toolbox.get_tool(
+                    "share_keys",
+                    shortcuts=[
+                        {"icon": media.share_keys_image, "label": "Share Keys", "keys": "Click"},
+                        {"icon": media.reblock_keys_image, "label": "reBlock", "keys": [QtCore.Qt.Key_Shift]},
+                        # {"icon": media.reblock_keys_image, "label": "Gimbal Fixer", "keys": [QtCore.Qt.Key_Control]},
+                    ],
+                    shortcut_variants=[
+                        {
+                            "mask": 1,
+                            "text": "rB",
+                            "icon_path": media.reblock_keys_image,
+                            "tooltip_template": helper.reblock_move_tooltip_text,
+                            "description": "Reblock the selected animation.",
+                            "callback": keyTools.reblock_move,
+                        },
+                        # {
+                        #     "mask": 4,
+                        #     "text": "Gm",
+                        #     "icon_path": media.reblock_keys_image,
+                        #     "tooltip_template": helper.gimbal_fixer_tooltip_text,
+                        #     "description": "Open the Gimbal Fixer for the current selection.",
+                        #     "callback": bar.gimbal_fixer_window,
+                        # },
+                    ],
+                    default=True,
+                ),
+                toolbox.get_tool("reblock", key="bk_reblock"),
+                # toolbox.get_tool("gimbal", key="bk_gimbal"),
+            ],
+        )
+
 
         clear_btn = cw.QFlatToolButton(text="x")
         clear_btn.clicked.connect(keyTools.clear_selected_keys)
@@ -2402,8 +1949,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 {
                     "key": "pointer_sel_anim_rig",
                     "label": "Select Animated Rig Controls",
-                    "icon_path": media.select_animated_rig_controls_image,
-                    "callback": bar.select_animated_rig_controls,
+                    "icon_path": media.select_rig_controls_animated_image,
+                    "callback": bar.select_rig_controls_animated,
                 },
                 "separator",
                 {"key": "pointer_depth_mover", "label": "Depth Mover", "icon_path": media.depth_mover_image, "callback": bar.depth_mover},
@@ -2426,7 +1973,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "key": "isolate_bookmarks",
                     "label": "Bookmarks",
                     "icon_path": media.ibookmarks_menu_image,
-                    "callback": self.create_ibookmarks_window,
+                    "callback": iBookmarksApi.create_ibookmarks_window,
                 },
                 "separator",
                 {
@@ -2448,7 +1995,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ],
         )
 
-        self.update_selectionSets_on_new_scene()
+        self.update_selectionSets()
 
         # Create Locators  ----------------------------------------------------------------
         sec.addWidgetGroup(
@@ -2721,17 +2268,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         delete_anim_btn = cw.QFlatToolButton(
             icon=media.delete_animation_image,
             tooltip_template=helper.delete_animation_tooltip_text,
-            shortcuts=[{"icon": media.delete_animation_image, "label": "Remove Time Slider Keyframes", "keys": [QtCore.Qt.Key_Shift]}],
-            shortcut_variants=[
-                {
-                    "mask": 1,
-                    "text": "DT",
-                    "icon_path": media.delete_animation_image,
-                    "tooltip_template": "Delete Time Slider Keyframes",
-                    "description": "Remove keyframes from the selected Time Slider range.",
-                    "callback": bar.delete_time_slider_animation,
-                }
-            ],
         )
         delete_anim_btn.clicked.connect(lambda *_args, w=delete_anim_btn: w.triggerToolCallback(bar.delete_animation))
         sec.addWidget(delete_anim_btn, "Delete Anim", "delete_anim", tooltip_template=helper.delete_animation_tooltip_text)
@@ -2748,7 +2284,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             selector_button_widget.setCount(num_selected)
 
         try:
-            self._callback_manager.selection_changed.connect(update_selector_button_text)
+            self._runtime_manager.selection_changed.connect(update_selector_button_text)
         except Exception:
             pass
         update_selector_button_text()
@@ -2759,29 +2295,29 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(
             [
                 {
-                    "key": "select_opposite",
+                    "key": "opposite_select",
                     "label": "Select Opposite",
-                    "icon_path": media.select_opposite_image,
+                    "icon_path": media.opposite_select_image,
                     "callback": keyTools.selectOpposite,
-                    "tooltip_template": helper.select_opposite_tooltip_text,
+                    "tooltip_template": helper.opposite_select_tooltip_text,
                     "shortcuts": [
-                        {"icon": media.select_opposite_image, "label": "Add Opposite", "keys": [QtCore.Qt.Key_Shift]},
-                        {"icon": media.copy_opposite_image, "label": "Copy Opposite", "keys": [QtCore.Qt.Key_Alt]},
+                        {"icon": media.opposite_add_image, "label": "Add Opposite", "keys": [QtCore.Qt.Key_Shift]},
+                        {"icon": media.opposite_copy_image, "label": "Copy Opposite", "keys": [QtCore.Qt.Key_Alt]},
                     ],
                     "shortcut_variants": [
                         {
                             "mask": 1,
                             "text": "AOp",
-                            "icon_path": media.select_opposite_image,
-                            "tooltip_template": helper.add_opposite_tooltip_text,
+                            "icon_path": media.opposite_add_image,
+                            "tooltip_template": helper.opposite_add_tooltip_text,
                             "description": "Add the opposite control to the current selection.",
                             "callback": keyTools.addSelectOpposite,
                         },
                         {
                             "mask": 8,
                             "text": "COp",
-                            "icon_path": media.copy_opposite_image,
-                            "tooltip_template": helper.copy_opposite_tooltip_text,
+                            "icon_path": media.opposite_copy_image,
+                            "tooltip_template": helper.opposite_copy_tooltip_text,
                             "description": "Copy the opposite-name mapping for the current selection.",
                             "callback": keyTools.copyOpposite,
                         },
@@ -2789,18 +2325,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "default": True,
                 },
                 {
-                    "key": "add_opposite",
+                    "key": "opposite_add",
                     "label": "Add Opposite",
-                    "icon_path": media.select_opposite_image,
+                    "icon_path": media.opposite_add_image,
                     "callback": keyTools.addSelectOpposite,
-                    "tooltip_template": helper.add_opposite_tooltip_text,
+                    "tooltip_template": helper.opposite_add_tooltip_text,
                 },
                 {
-                    "key": "copy_opposite",
+                    "key": "opposite_copy",
                     "label": "Copy Opposite",
-                    "icon_path": media.copy_opposite_image,
+                    "icon_path": media.opposite_copy_image,
                     "callback": keyTools.copyOpposite,
-                    "tooltip_template": helper.copy_opposite_tooltip_text,
+                    "tooltip_template": helper.opposite_copy_tooltip_text,
                 },
             ]
         )
@@ -2844,6 +2380,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 },
             ],
         )
+
+
+        # Select hierarchy -----------------------------------------------------------------------
+        select_hierarchy_button_widget = cw.QFlatToolButton(icon=media.select_hierarchy_image, tooltip_template=helper.select_hierarchy_tooltip_text)
+        select_hierarchy_button_widget.clicked.connect(bar.selectHierarchy)
+        sec.addWidget(select_hierarchy_button_widget, "Select Hierarchy", "select_hierarchy", tooltip_template=helper.select_hierarchy_tooltip_text)
+
+
+        sec = new_section()
 
         # Copy Paste Pose -----------------------------------------------------------------------
         sec.addWidgetGroup(
@@ -2968,16 +2513,61 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         sec = new_section()
 
-        # Select hierarchy -----------------------------------------------------------------------
-        select_hierarchy_button_widget = cw.QFlatToolButton(icon=media.select_hierarchy_image, tooltip_template=helper.select_hierarchy_tooltip_text)
-        select_hierarchy_button_widget.clicked.connect(bar.selectHierarchy)
-        sec.addWidget(select_hierarchy_button_widget, "Select Hierarchy", "select_hierarchy", tooltip_template=helper.select_hierarchy_tooltip_text)
-
-        # Animation offset -----------------------------------------------------------------------
+        # Animation Offset -----------------------------------------------------------------------
         animation_offset_button_widget = cw.QFlatToolButton(icon=media.animation_offset_image, tooltip_template=helper.animation_offset_tooltip_text)
         animation_offset_button_widget.setObjectName("anim_offset_button")
+        animation_offset_button_widget.setCheckable(True)
+        animation_offset_button_widget.setChecked(bool(self.toggleAnimOffsetButtonState))
         animation_offset_button_widget.clicked.connect(self.toggleAnimOffsetButton)
+        self.animation_offset_button_widget = animation_offset_button_widget
         sec.addWidget(animation_offset_button_widget, "Anim Offset", "anim_offset", tooltip_template=helper.animation_offset_tooltip_text)
+
+
+        sec = new_section()
+
+        # Temp Pivot ----------------------------------------------------------------------------
+        sec.addWidgetGroup(
+            [
+                toolbox.get_tool(
+                    "temp_pivot",
+                    shortcuts=[
+                        {"icon": media.temp_pivot_image, "label": "Create Temp Pivot", "keys": "Click"},
+                        {"icon": media.temp_pivot_image, "label": "Reuse Last Pivot", "keys": [QtCore.Qt.Key_Shift]},
+                    ],
+                    shortcut_variants=[
+                        {
+                            "mask": 1,
+                            "text": "TP+",
+                            "icon_path": media.temp_pivot_image,
+                            "tooltip_template": "Last Pivot Used",
+                            "description": "Recreate the most recently used Temp Pivot setup.",
+                            "callback": lambda: bar.create_temp_pivot(True),
+                        }
+                    ],
+                    default=True,
+                ),
+                toolbox.get_tool(
+                    "tp_last_used", label="Last pivot used", icon_path=media.temp_pivot_image, callback=lambda: bar.create_temp_pivot(True)
+                ),
+                "separator",
+                {
+                    "key": "tp_help",
+                    "label": "Help",
+                    "icon_path": media.help_menu_image,
+                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/temp-pivots"),
+                    "pinnable": False,
+                },
+            ],
+        )
+
+        # Micro Move ----------------------------------------------------------------------------
+        micro_move_button_widget = cw.QFlatToolButton(icon=media.ruler_image, tooltip_template=helper.micro_move_tooltip_text)
+        micro_move_button_widget.setObjectName("micro_move_button")
+        micro_move_button_widget.setCheckable(True)
+        micro_move_button_widget.setChecked(self.micro_move_controller.is_enabled())
+        micro_move_button_widget.clicked.connect(self.toggle_micro_move_button)
+        sec.addWidget(micro_move_button_widget, "Micro Move", "micro_move", tooltip_template=helper.micro_move_tooltip_text)
+
 
         sec.addWidgetGroup(
             [
@@ -3037,6 +2627,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 {"key": "fcam_remove", "label": "Remove followCam", "icon_path": media.remove_image, "callback": bar.remove_followCam},
             ],
         )
+
+
+        sec = new_section()
 
         # Copy Link -----------------------------------------------------------------------
 
@@ -3248,48 +2841,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ],
         )
 
-        # Temp Pivot ----------------------------------------------------------------------------
-        sec.addWidgetGroup(
+        attribute_switcher_button_widget = sec.addWidgetGroup(
             [
-                toolbox.get_tool(
-                    "temp_pivot",
-                    shortcuts=[
-                        {"icon": media.temp_pivot_image, "label": "Create Temp Pivot", "keys": "Click"},
-                        {"icon": media.temp_pivot_image, "label": "Reuse Last Pivot", "keys": [QtCore.Qt.Key_Shift]},
-                    ],
-                    shortcut_variants=[
-                        {
-                            "mask": 1,
-                            "text": "TP+",
-                            "icon_path": media.temp_pivot_image,
-                            "tooltip_template": "Last Pivot Used",
-                            "description": "Recreate the most recently used Temp Pivot setup.",
-                            "callback": lambda: bar.create_temp_pivot(True),
-                        }
-                    ],
-                    default=True,
-                ),
-                toolbox.get_tool(
-                    "tp_last_used", label="Last pivot used", icon_path=media.temp_pivot_image, callback=lambda: bar.create_temp_pivot(True)
-                ),
-                "separator",
-                {
-                    "key": "tp_help",
-                    "label": "Help",
-                    "icon_path": media.help_menu_image,
-                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/temp-pivots"),
-                    "pinnable": False,
-                },
+                toolbox.get_tool("attribute_switcher", callback=None, default=True),
             ],
         )
-
-        # Micro Move ----------------------------------------------------------------------------
-        micro_move_button_widget = cw.QFlatToolButton(icon=media.ruler_image, tooltip_template=helper.micro_move_tooltip_text)
-        micro_move_button_widget.setObjectName("micro_move_button")
-        micro_move_button_widget.setCheckable(True)
-        micro_move_button_widget.setChecked(self.micro_move_button_state)
-        micro_move_button_widget.clicked.connect(self.toggle_micro_move_button)
-        sec.addWidget(micro_move_button_widget, "Micro Move", "micro_move", tooltip_template=helper.micro_move_tooltip_text)
+        if attribute_switcher_button_widget:
+            attribute_switcher_button_widget.setObjectName("toggle_attribute_switcher_window_b")
+            ui.bind_attribute_switcher_toolbar_button(attribute_switcher_button_widget)
 
         # Key Menu -------------------------------------------------------------------------------
         sec.addWidgetGroup(
@@ -3344,39 +2903,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 toolbox.get_tool("bake_animation_3", key="bk_bake_anim_3"),
                 toolbox.get_tool("bake_animation_4", key="bk_bake_anim_4"),
                 toolbox.get_tool("bake_animation_custom", key="bk_bake_anim_custom"),
-            ],
-        )
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool(
-                    "share_keys",
-                    shortcuts=[
-                        {"icon": media.share_keys_image, "label": "Share Keys", "keys": "Click"},
-                        {"icon": media.reblock_keys_image, "label": "reBlock", "keys": [QtCore.Qt.Key_Shift]},
-                        {"icon": media.reblock_keys_image, "label": "Gimbal Fixer", "keys": [QtCore.Qt.Key_Control]},
-                    ],
-                    shortcut_variants=[
-                        {
-                            "mask": 1,
-                            "text": "rB",
-                            "icon_path": media.reblock_keys_image,
-                            "tooltip_template": helper.reblock_move_tooltip_text,
-                            "description": "Reblock the selected animation.",
-                            "callback": keyTools.reblock_move,
-                        },
-                        {
-                            "mask": 4,
-                            "text": "Gm",
-                            "icon_path": media.reblock_keys_image,
-                            "tooltip_template": helper.gimbal_fixer_tooltip_text,
-                            "description": "Open the Gimbal Fixer for the current selection.",
-                            "callback": bar.gimbal_fixer_window,
-                        },
-                    ],
-                    default=True,
-                ),
-                toolbox.get_tool("reblock", key="bk_reblock"),
-                toolbox.get_tool("gimbal", key="bk_gimbal"),
             ],
         )
 
@@ -3442,14 +2968,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "custom_graph",
                     checkable=True,
                     set_checked=lambda: settings.get_setting("graph_toolbar_enabled", True),
-                    callback=lambda state: cg.set_graph_toolbar_enabled(bool(state), apply=True),
+                    callback=lambda state: graphToolbarApi.set_graph_toolbar_enabled(bool(state), apply=True),
                     default_visible=False,
                 )
             ]
         )
         if graph_toolbar_button:
             graph_toolbar_button.setObjectName("toggle_graph_toolbar_button")
-            cg.bind_graph_toolbar_toggle(graph_toolbar_button)
+            graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_button)
 
         invalidate_caches()
 
@@ -3696,10 +3222,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         graph_toolbar_action.setCheckable(True)
 
         def _on_graph_toolbar_toggled(state):
-            cg.set_graph_toolbar_enabled(bool(state))
+            graphToolbarApi.set_graph_toolbar_enabled(bool(state))
 
         graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
-        cg.bind_graph_toolbar_toggle(graph_toolbar_action)
+        graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
 
         settings_menu.addSection("Toolbar's icons alignment")
         align_group = QActionGroup(settings_menu)
@@ -3764,7 +3290,7 @@ def show():
     global _toolbar_instance
 
     try:
-        callbacks.shutdown_callback_manager()
+        runtime.shutdown_runtime_manager()
     except Exception:
         pass
 

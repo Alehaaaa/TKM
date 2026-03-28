@@ -276,7 +276,7 @@ def get_latest_version():
 
 
 class UpdateCheckWorker(QThread):
-    finished = Signal(bool, object)
+    result_ready = Signal(bool, object)
 
     def __init__(self, installed_version, force=False, delay=0, parent=None):
         QThread.__init__(self, parent)
@@ -290,19 +290,19 @@ class UpdateCheckWorker(QThread):
 
         success, latest_version = get_latest_version()
         if not success:
-            self.finished.emit(False, latest_version)
+            self.result_ready.emit(False, latest_version)
             return
 
         comp = compare_versions(latest_version, self.installed_version)
         if comp <= 0 and not self.force:
-            self.finished.emit(True, None)
+            self.result_ready.emit(True, None)
             return
         elif comp <= 0 and self.force:
             # We still want to let them know they are up to date instead of prompting a false update.
-            self.finished.emit(True, None)
+            self.result_ready.emit(True, None)
             return
 
-        self.finished.emit(True, latest_version)
+        self.result_ready.emit(True, latest_version)
 
 
 updater_worker = None
@@ -315,10 +315,17 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
 
     installed_version = get_thekeymachine_version()
 
-    def handle_result(success, latest_version):
+    def cleanup_worker():
         global updater_worker
+        worker = updater_worker
         updater_worker = None
+        if worker is not None:
+            try:
+                worker.deleteLater()
+            except Exception:
+                pass
 
+    def handle_result(success, latest_version):
         if not success:
             if warning:
                 util.make_inViewMessage(latest_version)  # latest_version contains error msg here
@@ -399,5 +406,6 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
 
     delay = 0 if warning or force else 1000
     updater_worker = UpdateCheckWorker(installed_version, force=force, delay=delay)
-    updater_worker.finished.connect(handle_result)
+    updater_worker.result_ready.connect(handle_result)
+    updater_worker.finished.connect(cleanup_worker)
     updater_worker.start()

@@ -27,7 +27,7 @@ import TheKeyMachine.widgets.util as util
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.sliders import utils as slider_utils
-import TheKeyMachine.core.callback_manager as callbacks
+import TheKeyMachine.core.runtime_manager as runtime
 
 from TheKeyMachine.tooltips import QFlatTooltipManager, format_tooltip_shortcut
 
@@ -261,7 +261,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._value_font = QFont()
         self._value_font.setPointSize(util.DPI(14))
         self._text_font = QFont()
-        self._text_font.setPointSize(util.DPI(8.5))
+        self._text_font.setPixelSize(int(util.DPR(5)))
 
         # size
         self.setFixedWidth(util.DPI(200))
@@ -705,6 +705,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def _is_pointer_over_widget(self) -> bool:
         try:
+            if not self.isVisible():
+                return False
             return self.rect().contains(self.mapFromGlobal(QCursor.pos()))
         except Exception:
             return False
@@ -713,7 +715,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if self._modifier_watch_connected:
             return
         try:
-            callbacks.get_callback_manager().modifiers_changed.connect(self._on_modifiers_changed)
+            runtime.get_runtime_manager().modifiers_changed.connect(self._on_modifiers_changed)
             self._modifier_watch_connected = True
         except Exception:
             self._modifier_watch_connected = False
@@ -722,7 +724,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if not self._modifier_watch_connected:
             return
         try:
-            callbacks.get_callback_manager().modifiers_changed.disconnect(self._on_modifiers_changed)
+            runtime.get_runtime_manager().modifiers_changed.disconnect(self._on_modifiers_changed)
         except Exception:
             pass
         self._modifier_watch_connected = False
@@ -766,7 +768,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             return
         if not self._is_pointer_over_widget():
             return
-        self._apply_shortcut_mode(callbacks.get_modifier_mask(), requires_mid_click=False)
+        self._apply_shortcut_mode(runtime.get_modifier_mask(), requires_mid_click=False)
 
     # --- public API -------------------------------------------------------------
     def setText(self, text: str):
@@ -884,7 +886,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def _get_hover_help_target(self):
         for widget in [self._slider] + self._leftButtons + self._rightButtons + [self]:
-            if widget is not None and widget.underMouse():
+            if widget is not None and widget.isVisible() and widget.underMouse():
                 return widget
         return self if self._is_pointer_over_widget() else None
 
@@ -1008,7 +1010,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             return QWidget.eventFilter(self, obj, event)
 
         if event_type == QEvent.MouseButtonPress and getattr(event, "button", lambda: None)() == Qt.MiddleButton:
-            if self._apply_shortcut_mode(callbacks.get_modifier_mask(), requires_mid_click=True):
+            if self._apply_shortcut_mode(runtime.get_modifier_mask(), requires_mid_click=True):
                 event.accept()
                 return True
 
@@ -1116,5 +1118,5 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     def enterEvent(self, e):
         self._connect_modifier_watch()
         if self._is_idle():
-            self._apply_shortcut_mode(callbacks.get_modifier_mask(), requires_mid_click=False)
+            self._apply_shortcut_mode(runtime.get_modifier_mask(), requires_mid_click=False)
         super().enterEvent(e)

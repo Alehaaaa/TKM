@@ -34,9 +34,9 @@ def reload():
         pass
 
     try:
-        import TheKeyMachine.core.callback_manager as callbacks
+        import TheKeyMachine.core.runtime_manager as runtime
 
-        callbacks.shutdown_callback_manager()
+        runtime.shutdown_runtime_manager()
     except Exception:
         pass
 

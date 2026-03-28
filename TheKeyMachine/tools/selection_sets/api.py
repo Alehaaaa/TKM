@@ -1,13 +1,10 @@
 import os
 
 import maya.cmds as cmds
-import maya.OpenMayaUI as mui
 
 try:
-    from shiboken2 import wrapInstance
     from PySide2 import QtCore, QtGui, QtWidgets
 except ImportError:
-    from shiboken6 import wrapInstance
     from PySide6 import QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.mods.generalMod as general
@@ -51,7 +48,7 @@ def _members_dialog_class():
 
 
 def _parent_widget():
-    return wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
+    return wutil.get_maya_qt(qt=QtWidgets.QWidget)
 
 
 def _emit_selection_sets_window_state(is_open):
@@ -257,7 +254,7 @@ def build_selection_sets_context_menu(parent=None, controller=None):
     auto_transparency_action = menu.addAction(
         QtGui.QIcon(media.selection_sets_image),
         "Auto Transparency",
-        description="Make the floating Selection Sets window translucent when not hovered.",
+        description="Make the floating Selection Sets palette translucent when the cursor is not over it.",
     )
     auto_transparency_action.setCheckable(True)
     auto_transparency_action.setChecked(_selection_sets_auto_transparency_enabled())
@@ -301,7 +298,7 @@ def build_selection_sets_context_menu(parent=None, controller=None):
     stays_on_top_action = menu.addAction(
         QtGui.QIcon(media.settings_image),
         "Stay on Top",
-        description="Keep the floating Selection Sets window above other Maya windows.",
+        description="Keep the floating Selection Sets palette above other Maya windows.",
     )
     stays_on_top_action.setCheckable(True)
     stays_on_top_action.setChecked(_selection_sets_stays_on_top())
@@ -310,7 +307,7 @@ def build_selection_sets_context_menu(parent=None, controller=None):
     menu.addAction(
         QtGui.QIcon(media.selection_sets_reload_image),
         "Restore Position",
-        description="Reset the floating window position to the default placement above the cursor.",
+        description="Reset the floating Selection Sets palette to its default position above the Selection Sets toolbar button.",
     ).triggered.connect(lambda *_: restore_selection_sets_default_position(controller=controller))
 
     return menu

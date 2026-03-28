@@ -219,9 +219,16 @@ share_keys_tooltip_text = (
 orbit_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Orbit</b></font><img src='{media.orbit_ui_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "This tool allows you to orbit the entire rig by selecting just a single control.<br><br>"
-    "You can utilize this tool to orbit multiple rigs simultaneously or select both<br>"
-    "objects and rigs. In either scenario, the tool will orbit the top node in every hierarchy.<br><br>"
+    "A small floating shortcut panel for the tools you keep reaching for while animating.<br><br>"
+    "Pick the actions you want in it, keep it near the toolbar, and use it as a quick-access strip for things like isolate, reset, mirror, copy/paste pose, link, temp pivot, and world-space tools.<br><br>"
+    "</font>"
+)
+
+attribute_switcher_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Attribute Switcher</b></font><img src='{media.attribute_switcher_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size};'>"
+    "Open the floating Attribute Switcher window for the current selection.<br><br>"
+    "It lists compatible switch attributes, supports current-frame or all-keys switching, and helps inspect rotate order choices.<br><br>"
     "</font>"
 )
 
@@ -236,8 +243,8 @@ select_rig_controls_tooltip_text = (
     "</font>"
 )
 
-select_animated_rig_controls_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Animated Rig Controls</b></font><img src='{media.select_animated_rig_controls_image}' width='30'><br><br>"
+select_rig_controls_animated_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select Animated Rig Controls</b></font><img src='{media.select_rig_controls_animated_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool selects all animated rig controls. Selected controls will be only nurbs curves."
     "</font>"
@@ -311,27 +318,26 @@ delete_animation_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Delete animation in all animation channels.<br><br>"
     "Select channels in the ChannelBox to remove animation only in the selected channels.<br><br>"
-    "Use 'Shift' key to remove keyframes from TimeSlider.<br><br>"
     "</font>"
 )
 
 
-select_opposite_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select opposite</b></font><img src='{media.select_opposite_image}' width='30'><br><br>"
+opposite_select_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select opposite</b></font><img src='{media.opposite_select_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Select the opposite control of a rig. You can select more than one object at a time.<br><br>"
     "</font>"
 )
 
-add_opposite_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Add opposite</b></font><img src='{media.select_opposite_image}' width='30'><br><br>"
+opposite_add_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Add opposite</b></font><img src='{media.opposite_select_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Add the opposite control of the selected object to the current selection.<br><br>"
     "</font>"
 )
 
-copy_opposite_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy opposite</b></font><img src='{media.copy_opposite_image}' width='30'><br><br>"
+opposite_copy_tooltip_text = (
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Copy opposite</b></font><img src='{media.opposite_copy_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Copy the current values from the selected objects to their opposite.<br><br>"
     "Keep in mind that this tool works in conjunction with the Mirror tool. Any exception added in Mirror will affect this tool.<br><br>"
@@ -401,9 +407,9 @@ select_hierarchy_tooltip_text = (
 )
 
 animation_offset_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Animation offset</b></font><img src='{media.animation_offset_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Animation Offset</b></font><img src='{media.animation_offset_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Animation offset allows you to move the position of an animated object without affecting the existing animation.<br>"
+    "Animation Offset allows you to move the position of an animated object without affecting the existing animation.<br>"
     "The position change made propagates throughout the entire existing animation.<br><br>"
     "For this tool to work properly, it should be executed when on a keyframe. Currently, it only works with one object at a time.<br><br>"
     "</font>"
@@ -448,7 +454,7 @@ copy_worldspace_range_tooltip_text = (
 )
 
 paste_worldspace_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Paste World Space</b></font><img src='{media.worldspace_paste_animation_image}' width='28'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Paste World Space</b></font><img src='{media.worldspace_paste_frame_image}' width='28'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Paste saved World Space position for the current frame.<br><br>"
     "There is not need of selecting any control.<br><br>"
@@ -487,12 +493,9 @@ micro_move_tooltip_text = (
 selection_sets_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Selection Sets</b></font><img src='{media.selection_sets_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Create sets of selections.<br><br>"
-    "Use the 'main' group to add selection sets that are not related to each other, or create 'Groups' to group all sets under the same category.<br><br>"
-    "Groups are useful for creating selections sets for characters. "
-    "Groups can be hidden or unhidden.<br><br>"
-    "Import and export sets and groups between scenes."
-    "<br>"
+    "Save useful selections so you can get back to them in one click.<br><br>"
+    "Create color-coded sets from the current selection, keep character picks or shot-specific picks organized, and recall them quickly from the floating panel.<br><br>"
+    "You can also import, export, or quick-share sets when moving between scenes.<br>"
     "</font>"
 )
 

@@ -1,13 +1,10 @@
 import os
 
 import maya.cmds as cmds
-import maya.OpenMayaUI as mui
 
 try:
-    from shiboken2 import wrapInstance
     from PySide2 import QtCore, QtGui, QtWidgets
 except ImportError:
-    from shiboken6 import wrapInstance
     from PySide6 import QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.mods.barMod as bar
@@ -28,7 +25,7 @@ def _window_class():
 
 
 def _parent_widget():
-    return wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
+    return wutil.get_maya_qt(qt=QtWidgets.QWidget)
 
 
 def _emit_orbit_window_state(is_open):
@@ -92,8 +89,8 @@ orbit_action_icons = {
     "bar.mod_tracer": media.tracer_image,
     "keyTools.reset_objects_mods": media.reset_animation_image,
     "bar.deleteAnimation": media.delete_animation_image,
-    "keyTools.selectOpposite": media.select_opposite_image,
-    "keyTools.copyOpposite": media.copy_opposite_image,
+    "keyTools.selectOpposite": media.opposite_select_image,
+    "keyTools.copyOpposite": media.opposite_copy_image,
     "keyTools.mirror": media.mirror_image,
     "keyTools.copy_animation": media.copy_animation_image,
     "keyTools.paste_animation": media.paste_animation_image,
@@ -341,7 +338,7 @@ def build_orbit_context_menu(parent=None):
     auto_transparency_action = menu.addAction(
         QtGui.QIcon(media.orbit_ui_image),
         "Auto Transparency",
-        description="Make the floating Orbit window translucent when not hovered.",
+        description="Make the floating Orbit tool palette translucent when the cursor is not over it.",
     )
     auto_transparency_action.setCheckable(True)
     auto_transparency_action.setChecked(_orbit_auto_transparency_enabled())
@@ -352,7 +349,7 @@ def build_orbit_context_menu(parent=None):
     stays_on_top_action = menu.addAction(
         QtGui.QIcon(media.settings_image),
         "Stay on Top",
-        description="Keep the floating Orbit window above other Maya windows.",
+        description="Keep the floating Orbit tool palette above other Maya windows.",
     )
     stays_on_top_action.setCheckable(True)
     stays_on_top_action.setChecked(_orbit_stays_on_top())
@@ -361,7 +358,7 @@ def build_orbit_context_menu(parent=None):
     restore_position_action = menu.addAction(
         QtGui.QIcon(media.orbit_ui_image),
         "Restore Position",
-        description="Reset the floating Orbit window position to the default placement above the cursor.",
+        description="Reset the floating Orbit tool palette to its default position above the Orbit toolbar button.",
     )
     restore_position_action.triggered.connect(lambda *_: restore_orbit_default_position())
 

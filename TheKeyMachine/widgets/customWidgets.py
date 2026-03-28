@@ -5,7 +5,7 @@ from functools import partial
 
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
-import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
+import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
 
 try:
     import TheKeyMachine_user_data.preferences.user_preferences as user_preferences  # type: ignore
@@ -697,7 +697,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
     def _get_active_shortcut_variant(self):
         if not self._shortcut_variants:
             return None
-        current_mask = callbacks.get_modifier_mask()
+        current_mask = runtime.get_modifier_mask()
         best = None
         best_bits = -1
         for variant in self._shortcut_variants:
@@ -768,7 +768,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         if not self._shortcut_variants or self._modifier_watch_connected:
             return
         try:
-            callbacks.get_callback_manager().modifiers_changed.connect(self._on_modifier_state_changed)
+            runtime.get_runtime_manager().modifiers_changed.connect(self._on_modifier_state_changed)
             self._modifier_watch_connected = True
         except Exception:
             self._modifier_watch_connected = False
@@ -777,7 +777,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         if not self._modifier_watch_connected:
             return
         try:
-            callbacks.get_callback_manager().modifiers_changed.disconnect(self._on_modifier_state_changed)
+            runtime.get_runtime_manager().modifiers_changed.disconnect(self._on_modifier_state_changed)
         except Exception:
             pass
         self._modifier_watch_connected = False
@@ -794,7 +794,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
 
     def enterEvent(self, event: QtCore.QEvent):
         self._connect_modifier_variant_watch()
-        if self._shortcut_variants and callbacks.get_modifier_mask():
+        if self._shortcut_variants and runtime.get_modifier_mask():
             self._refresh_modifier_variant_state()
         TooltipMixin.enterEvent(self, event)
 
