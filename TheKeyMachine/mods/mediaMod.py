@@ -32,10 +32,15 @@ def getImage(image):
 # __________________ Install _________________________________ #
 
 tool_icon = getImage("TheKeyMachine_icon.png")
+stripe_image = getImage("stripe.png")
+TheKeyMachine_logo_250_image = getImage("TheKeyMachine_logo_250.png")
 
 # __________________ Nodes _________________________________ #
 
 tkm_node_image = getImage("tkm_node.png")
+
+install_image = getImage("install.png")
+skip_image = getImage("skip.png")
 
 # __________________ Toolbar Images _________________________________ #
 
@@ -53,10 +58,9 @@ select_animated_rig_controls_image = getImage("select_animated_rig_controls.svg"
 isolate_image = getImage("isolate.svg")
 create_locator_image = getImage("cube.svg")
 align_menu_image = getImage("magnet.svg")
-tracer_menu_image = getImage("tracer.svg")
+tracer_image = getImage("tracer.svg")
 reset_animation_image = getImage("eraser.svg")
 delete_animation_image = getImage("trash.svg")
-
 match_image = getImage("magnet.svg")
 
 select_opposite_image = getImage("select_opposite.svg")
@@ -76,7 +80,6 @@ bake_animation_custom_image = getImage("bake_animation_custom.svg")
 bake_animation_1_image = getImage("bake_animation_1.svg")
 bake_animation_2_image = getImage("bake_animation_2.svg")
 bake_animation_3_image = getImage("bake_animation_3.svg")
-bake_animation_image = getImage("bake_animation.svg")
 
 selector_image = getImage("selector.svg")
 select_hierarchy_image = getImage("select_hierarchy.svg")
@@ -104,8 +107,13 @@ match_curve_cycle_image = getImage("match_curve_cycle.svg")
 bouncy_curve_image = getImage("bouncy_curve.svg")
 
 playblast_image = getImage("playblast.svg")
+
 selection_sets_image = getImage("selection_sets.svg")
-add_selection_set_image = getImage("add_selection_set.svg")
+selection_sets_add_image = getImage("selection_sets_add.svg")
+selection_sets_reload_image = getImage("selection_sets_reload.svg")
+selection_sets_import_image = getImage("selection_sets_import.svg")
+selection_sets_export_image = getImage("selection_sets_export.svg")
+
 customGraph_image = getImage("customGraph.svg")
 
 orbit_ui_image = getImage("orbit_ui.svg")
@@ -116,9 +124,13 @@ settings_image = getImage("settings.svg")
 settings_update_image = getImage("settings_update.svg")
 
 
-close_image = getImage("close.png")
-apply_image = getImage("apply.png")
-cancel_image = getImage("cancel.png")
+close_image = getImage("close.svg")
+apply_image = getImage("apply.svg")
+cancel_image = getImage("cancel.svg")
+add_image = getImage("add.svg")
+subtract_image = getImage("subtract.svg")
+rename_image = getImage("rename.svg")
+# remove_selection_set_image = getImage("close.svg")
 
 # ________________ dot colors __________________________________________#
 
@@ -135,13 +147,6 @@ default_dot_image = getImage("round_dot.png")
 
 # ________________ Selection Sets ________________________________________#
 
-move_selection_set_image = getImage("move_selection_set.svg")
-selector_selection_set_image = getImage("selector_selection_set.svg")
-add_to_selection_set_image = getImage("add_to_selection_set.svg")
-remove_from_selection_set_image = getImage("remove_from_selection_set.svg")
-rename_selection_set_image = getImage("rename_selection_set.svg")
-change_selection_set_color_image = getImage("change_selection_set_color.svg")
-remove_selection_set_image = getImage("remove_selection_set.svg")
 selection_set_color_icon_names = {
     "_01": "_redLight_set.svg",
     "_02": "_red_set.svg",
@@ -173,12 +178,14 @@ selection_set_color_images = {suffix: getImage(filename) for suffix, filename in
 # ________________ Menus Images __________________________________________#
 
 reload_image = getImage("reload.png")
-remove_image = getImage("remove.svg")
+remove_image = getImage("remove_red.svg")
 dock_image = getImage("dock.png")
 check_updates_image = getImage("check_updates.svg")
 check_updates_image_available = getImage("check_updates_available.svg")
 report_a_bug_image = getImage("bug.svg")
 about_image = getImage("about.png")
+
+refresh_image = getImage("refresh.svg")
 
 # ___________________Help / Tooltips Images ______________________________#
 
@@ -191,7 +198,6 @@ youtube_image = getImage("youtube.svg")
 # ___________________ Tracer ______________________________#
 
 tracer_show_hide_image = getImage("tracer_show_hide.svg")
-tracer_refresh_image = getImage("tracer_refresh.svg")
 tracer_select_offset_image = getImage("tracer_select_offset.svg")
 tracer_set_color_image = getImage("tracer_set_color.svg")
 tracer_red_image = getImage("tracer_red.svg")

@@ -40,16 +40,6 @@ def getImage(image):
     return fullImgDir
 
 
-# images -------------------------------------
-
-isolate_image = getImage("isolate.svg")
-create_locator_image = getImage("cube.svg")
-match_image = getImage("magnet.svg")
-tracer_image = getImage("tracer.svg")
-reset_animation_image = getImage("eraser.svg")
-delete_animation_image = getImage("trash.svg")
-
-
 # style ------------------------------------
 
 
@@ -303,7 +293,7 @@ depth_mover_tooltip_text = (
 
 
 isolate_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Isolate </b></font><img src='{isolate_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Isolate </b></font><img src='{media.isolate_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "This tool allows you to isolate the entire rig by selecting just a single control.<br><br>"
     "You can utilize this tool to isolate multiple rigs simultaneously or select both<br>"
@@ -319,7 +309,7 @@ isolate_tooltip_text = (
 
 
 createLocator_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Temp locator  </b></font><img src='{create_locator_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Temp locator  </b></font><img src='{media.create_locator_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Create temp locators on the spot in the selected object or objects.<br><br><br>"
     "Right-click for options.<br>"
@@ -327,7 +317,7 @@ createLocator_tooltip_text = (
 )
 
 align_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Match / Align </b></font><img src='{match_image}' width='30'><br><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Match / Align </b></font><img src='{media.match_image}' width='30'><br><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Aling one object to another.<br><br>"
     "First select the child object, then the parent object.<br><br>"
@@ -338,40 +328,28 @@ align_tooltip_text = (
 )
 
 tracer_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tracer </b></font><img src='{tracer_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Tracer </b></font><img src='{media.tracer_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Create a motion trail on the selected object<br><br>"
     "This is a modified Maya's motion trail. You can activate or desactivate it so that it will not refresh eveytime you move the tracked object<br><br>"
     "Use 'refresh' to refresh the trail without activating it.<br><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'><b>Keys Shortcuts:</b></font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Shift &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Refresh</font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Ctrl &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Show/Hide</font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Ctrl + Alt &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Remove</font><br>"
     "</font>"
 )
 
 reset_values_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Reset to default </b></font><img src='{reset_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Reset to default </b></font><img src='{media.reset_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Reset objects to their default values. Handy to reset a pose, or attributes in an object.<br><br>"
     "Select channels in the ChannelBox to reset only the selected channels.<br><br>"
     "</font>"
-    f"<font style='color: #869fac; font-size:{font_size};'><b>Shortcuts:</b></font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Shift &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Reset Translations</font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Ctrl &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Reset Rotations</font><br>"
-    "</font>"
 )
 
 delete_animation_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Delete Animation</b></font><img src='{delete_animation_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Delete Animation</b></font><img src='{media.delete_animation_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Delete animation in all animation channels.<br><br>"
     "Select channels in the ChannelBox to remove animation only in the selected channels.<br><br>"
     "Use 'Shift' key to remove keyframes from TimeSlider.<br><br>"
-    "</font>"
-    f"<font style='color: #869fac; font-size:{font_size};'><b>Shortcuts:</b></font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Shift + Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Remove Time Slider keyframes</font><br>"
-    "</font>"
     "</font>"
 )
 
@@ -380,9 +358,6 @@ select_opposite_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Select opposite</b></font><img src='{media.select_opposite_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Select the opposite control of a rig. You can select more than one object at a time.<br><br>"
-    "</font>"
-    f"<font style='color: #869fac; font-size:{font_size};'><b>Shortcuts:</b></font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Shift + Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Add opposite</font><br>"
     "</font>"
 )
 
@@ -481,10 +456,7 @@ link_objects_tooltip_text = (
     "To retrieve the object relationship, execute 'Paste Link Position'. At least one object must be selected.<br><br>"
     "The relationship between objects is saved to a file on disk, so this tool can be used across different Maya sessions.<br><br>"
     "Use the 'Auto Link' option to update the object relationship in real-time.<br><br>"
-    "Right-click for options.<br><br><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'><b>Shortcuts:</b></font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Copy Link Position</font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Shift + Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Paste Link Position</font>"
+    "Right-click for options.<br><br>"
     "</font>"
 )
 
@@ -503,9 +475,6 @@ copy_worldspace_tooltip_text = (
     "Copy the World Space positions of selected objects in current frame. Useful for reseting, for example, the master control in a walking cycle.<br><br>"
     "To 'Copy' select a group of controls and click 'Copy World Space'.<br><br>"
     "To 'Paste' just click 'Paste World Space' there is not need of selecting any control.<br><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'><b>Shortcuts:</b></font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Copy World Space</font><br>"
-    f"<font style='color: #869fac; font-size:{font_size};'>Shift + Click &nbsp;&nbsp;&nbsp; Paste World Space</font>"
     "</font>"
 )
 
@@ -566,10 +535,11 @@ selection_sets_tooltip_text = (
 )
 
 customGraph_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>customGraph</b></font><img src='{media.customGraph_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Graph Editor Toolbar</b></font><img src='{media.customGraph_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Open GraphEditor with the customGraph add-on.<br><br>"
-    "customGraph is a specific set of tools for the GraphEditor. Manipulate animation curves, lock or mute channels, or create specific selection sets.<br><br>"
+    "Toggle the automatic TKM toolbar for Maya's Graph Editor.<br><br>"
+    "This button only manages the saved setting. It does not open the Graph Editor.<br><br>"
+    "When enabled, TKM attaches the custom Graph Editor toolbar automatically when a Graph Editor is opened.<br><br>"
     "</font>"
 )
 

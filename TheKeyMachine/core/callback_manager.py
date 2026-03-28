@@ -13,9 +13,9 @@ from typing import Any, Callable, Dict, List, Optional
 from maya import cmds
 
 try:
-    from PySide6 import QtCore  # type: ignore
+    from PySide6 import QtCore, QtWidgets  # type: ignore
 except Exception:  # pragma: no cover
-    from PySide2 import QtCore  # type: ignore
+    from PySide2 import QtCore, QtWidgets  # type: ignore
 
 try:
     from maya.api import OpenMaya as om  # type: ignore
@@ -78,19 +78,79 @@ def cleanup_orphaned_callbacks() -> None:
     _clear_state()
 
 
+def _qt_modifiers_to_mask(modifiers) -> int:
+    mask = 0
+    try:
+        if modifiers & QtCore.Qt.ShiftModifier:
+            mask |= 1
+        if modifiers & QtCore.Qt.ControlModifier:
+            mask |= 4
+        if modifiers & QtCore.Qt.AltModifier:
+            mask |= 8
+    except Exception:
+        pass
+    return mask
+
+
+def get_modifier_mask() -> int:
+    manager = _MANAGER
+    if manager is not None:
+        state = manager.get_modifier_state()
+        return (1 if state["shift"] else 0) | (4 if state["ctrl"] else 0) | (8 if state["alt"] else 0)
+
+    try:
+        app = QtWidgets.QApplication.instance()
+        if app:
+            return _qt_modifiers_to_mask(app.keyboardModifiers())
+    except Exception:
+        pass
+
+    try:
+        return int(cmds.getModifiers())
+    except Exception:
+        return 0
+
+
+def get_modifier_state() -> Dict[str, bool]:
+    mask = get_modifier_mask()
+    return {
+        "ctrl": bool(mask & 4),
+        "shift": bool(mask & 1),
+        "alt": bool(mask & 8),
+    }
+
+
 class CallbackManager(QtCore.QObject):
     callback_fired = QtCore.Signal(str)
 
     # Common / high-value signals
-    selection_changed = QtCore.Signal()
     scene_opened = QtCore.Signal()
     scene_new = QtCore.Signal()
+
+    selection_changed = QtCore.Signal()
+    graph_editor_opened = QtCore.Signal()
+
+    modifiers_changed = QtCore.Signal(bool, bool, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self._started = False
         self._om_callbacks: Dict[str, List[int]] = {}
         self._scriptjobs: Dict[str, List[int]] = {}
+
+        self._graph_editor_visible = False
+        self._graph_editor_watch_enabled = False
+
+        self._ui_watch_timer = QtCore.QTimer(self)
+        self._ui_watch_timer.setSingleShot(True)
+        self._ui_watch_timer.timeout.connect(self._check_graph_editor_state)
+
+        self._modifier_watch_enabled = True
+        self._ctrl_pressed = False
+        self._shift_pressed = False
+        self._alt_pressed = False
+
+        self._event_filter_installed = False
 
     # ----------------------------
     # Lifecycle
@@ -104,11 +164,13 @@ class CallbackManager(QtCore.QObject):
         # Built-in, long-lived callbacks while the tool is loaded.
         self._install_scene_callbacks()
         self._install_selection_callback()
+        self._refresh_event_filter_state()
 
         self._started = True
         self._persist_state()
 
     def shutdown(self) -> None:
+        self._remove_event_filter()
         self._remove_all()
         self._started = False
         _clear_state()
@@ -156,7 +218,6 @@ class CallbackManager(QtCore.QObject):
     ) -> Optional[int]:
         """
         Adds a Maya scriptJob and tracks it for cleanup.
-
         Prefer add_maya_event_callback() when possible; scriptJobs exist for edge cases.
         """
 
@@ -216,6 +277,180 @@ class CallbackManager(QtCore.QObject):
         cb_new = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterNew, _after_new)
         self._track_om("scene_opened", int(cb_open))
         self._track_om("scene_new", int(cb_new))
+
+    def _install_event_filter(self) -> None:
+        if self._event_filter_installed:
+            return
+        try:
+            app = QtWidgets.QApplication.instance()
+            if app:
+                app.installEventFilter(self)
+                self._event_filter_installed = True
+        except Exception:
+            pass
+        self._sync_enabled_ui_watchers()
+
+    def _remove_event_filter(self) -> None:
+        if not self._event_filter_installed:
+            return
+        try:
+            app = QtWidgets.QApplication.instance()
+            if app:
+                app.removeEventFilter(self)
+        except Exception:
+            pass
+        self._event_filter_installed = False
+        self._reset_graph_editor_watch()
+        self._reset_modifier_state()
+
+    def set_graph_editor_watch_enabled(self, enabled: bool) -> None:
+        self._graph_editor_watch_enabled = bool(enabled)
+        self._refresh_event_filter_state()
+        if self._graph_editor_watch_enabled:
+            self._schedule_graph_editor_check()
+        else:
+            self._reset_graph_editor_watch()
+
+    def set_modifier_watch_enabled(self, enabled: bool) -> None:
+        self._modifier_watch_enabled = bool(enabled)
+        self._refresh_event_filter_state()
+        if self._modifier_watch_enabled:
+            self._sync_modifier_state()
+        else:
+            self._reset_modifier_state()
+
+    def _refresh_event_filter_state(self) -> None:
+        if self._should_install_event_filter():
+            self._install_event_filter()
+        else:
+            self._remove_event_filter()
+
+    def _should_install_event_filter(self) -> bool:
+        return bool(self._graph_editor_watch_enabled or self._modifier_watch_enabled)
+
+    def _sync_enabled_ui_watchers(self) -> None:
+        if self._graph_editor_watch_enabled:
+            self._schedule_graph_editor_check()
+        if self._modifier_watch_enabled:
+            self._sync_modifier_state()
+
+    def _reset_graph_editor_watch(self) -> None:
+        self._graph_editor_visible = False
+        try:
+            self._ui_watch_timer.stop()
+        except Exception:
+            pass
+
+    def _reset_modifier_state(self) -> None:
+        self._set_modifier_state(False, False, False)
+
+    def _set_modifier_state(self, ctrl: bool, shift: bool, alt: bool) -> None:
+        ctrl = bool(ctrl)
+        shift = bool(shift)
+        alt = bool(alt)
+        if (ctrl, shift, alt) == (self._ctrl_pressed, self._shift_pressed, self._alt_pressed):
+            return
+        self._ctrl_pressed = ctrl
+        self._shift_pressed = shift
+        self._alt_pressed = alt
+        self._emit("modifiers_changed")
+        try:
+            self.modifiers_changed.emit(ctrl, shift, alt)
+        except Exception:
+            pass
+
+    def _sync_modifier_state(self, modifiers=None) -> None:
+        if not self._modifier_watch_enabled:
+            return
+        try:
+            if modifiers is None:
+                app = QtWidgets.QApplication.instance()
+                modifiers = app.keyboardModifiers() if app else QtCore.Qt.NoModifier
+        except Exception:
+            modifiers = QtCore.Qt.NoModifier
+
+        self._set_modifier_state(
+            bool(modifiers & QtCore.Qt.ControlModifier),
+            bool(modifiers & QtCore.Qt.ShiftModifier),
+            bool(modifiers & QtCore.Qt.AltModifier),
+        )
+
+    def get_modifier_state(self) -> Dict[str, bool]:
+        return {
+            "ctrl": self._ctrl_pressed,
+            "shift": self._shift_pressed,
+            "alt": self._alt_pressed,
+        }
+
+    def _schedule_graph_editor_check(self) -> None:
+        if not self._ui_watch_timer.isActive():
+            self._ui_watch_timer.start(0)
+
+    def _check_graph_editor_state(self) -> None:
+        try:
+            graph_vis = cmds.getPanel(vis=True) or []
+            visible = "graphEditor1" in graph_vis
+        except Exception:
+            visible = False
+
+        if visible == self._graph_editor_visible:
+            return
+
+        self._graph_editor_visible = visible
+        try:
+            if visible:
+                self._emit("graph_editor_opened")
+                self.graph_editor_opened.emit()
+        except Exception:
+            pass
+
+    def eventFilter(self, obj, event):
+        try:
+            event_type = event.type()
+        except Exception:
+            return False
+        self._handle_modifier_event(event_type, event)
+        self._handle_graph_editor_event(obj, event_type)
+        return False
+
+    def _handle_modifier_event(self, event_type, event) -> None:
+        if not self._modifier_watch_enabled:
+            return
+        if event_type in {QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease, QtCore.QEvent.ShortcutOverride}:
+            try:
+                self._sync_modifier_state(event.modifiers())
+            except Exception:
+                self._sync_modifier_state()
+            return
+        if event_type in {QtCore.QEvent.ApplicationDeactivate, QtCore.QEvent.WindowDeactivate, QtCore.QEvent.FocusOut}:
+            self._reset_modifier_state()
+
+    def _handle_graph_editor_event(self, obj, event_type) -> None:
+        if not self._graph_editor_watch_enabled:
+            return
+        if event_type not in {
+            QtCore.QEvent.Show,
+            QtCore.QEvent.Hide,
+            QtCore.QEvent.Close,
+            QtCore.QEvent.Destroy,
+            QtCore.QEvent.WindowActivate,
+        }:
+            return
+        if self._looks_like_graph_editor(obj):
+            self._schedule_graph_editor_check()
+
+    def _looks_like_graph_editor(self, obj) -> bool:
+        try:
+            object_name = obj.objectName() or ""
+        except Exception:
+            object_name = ""
+
+        try:
+            window_title = obj.windowTitle() or ""
+        except Exception:
+            window_title = ""
+
+        return "graphEditor1" in object_name or "Graph Editor" in window_title
 
     # ----------------------------
     # Emit + tracking

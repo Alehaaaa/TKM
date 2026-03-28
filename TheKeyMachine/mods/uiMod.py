@@ -38,6 +38,8 @@ except ImportError:
     pass
 
 import ssl
+
+import TheKeyMachine.core.callback_manager as callbacks
 import re
 import os
 import platform
@@ -66,11 +68,43 @@ USER_FOLDER_PATH = general.config["USER_FOLDER_PATH"]
 
 ORBIT_SETTINGS_NAMESPACE = "orbit_window"
 SELECTION_SETS_SETTINGS_NAMESPACE = "selection_sets_window"
-AUTO_TRANSPARENCY_KEY = "orbit_auto_transparency"
+ORBIT_AUTO_TRANSPARENCY_KEY = "orbit_auto_transparency"
+SELECTION_SETS_AUTO_TRANSPARENCY_KEY = "selection_sets_auto_transparency"
 
 
-def _auto_transparency_enabled():
-    return settings.get_setting(AUTO_TRANSPARENCY_KEY, True, namespace=ORBIT_SETTINGS_NAMESPACE)
+def _orbit_auto_transparency_enabled():
+    return settings.get_setting(ORBIT_AUTO_TRANSPARENCY_KEY, True, namespace=ORBIT_SETTINGS_NAMESPACE)
+
+
+def _selection_sets_auto_transparency_enabled():
+    return settings.get_setting(SELECTION_SETS_AUTO_TRANSPARENCY_KEY, True, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
+
+
+def _set_orbit_auto_transparency_enabled(enabled):
+    settings.set_setting(ORBIT_AUTO_TRANSPARENCY_KEY, bool(enabled), namespace=ORBIT_SETTINGS_NAMESPACE)
+    win = get_orbit_window()
+    if win and wutil.is_valid_widget(win):
+        win._auto_transparency = bool(enabled)
+        win.update_transparency_state(win._hovered)
+
+
+def _set_selection_sets_auto_transparency_enabled(enabled):
+    settings.set_setting(SELECTION_SETS_AUTO_TRANSPARENCY_KEY, bool(enabled), namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
+    win = get_selection_sets_window()
+    if win and wutil.is_valid_widget(win):
+        win._auto_transparency = bool(enabled)
+        win.update_transparency_state(win._hovered)
+
+
+def _orbit_stays_on_top():
+    return settings.get_setting("stays_on_top", False, namespace=ORBIT_SETTINGS_NAMESPACE)
+
+
+def _set_orbit_stays_on_top(enabled):
+    settings.set_setting("stays_on_top", bool(enabled), namespace=ORBIT_SETTINGS_NAMESPACE)
+    win = get_orbit_window()
+    if win and wutil.is_valid_widget(win):
+        win.apply_stay_on_top_setting()
 
 
 color_codes = {
@@ -276,8 +310,8 @@ def filterMode_sync_off():
 
 def customGraph_filter_mods(*args):
     # Get the current state of the modifiers
-    mods = mel.eval("getModifiers")
-    shift_pressed = bool(mods % 2)  # Check if Shift is pressed
+    mods = callbacks.get_modifier_mask()
+    shift_pressed = bool(mods & 1)
 
     if shift_pressed:
         filterMode_sync_off()
@@ -455,7 +489,7 @@ orbit_actions = {
 orbit_action_icons = {
     "bar.isolate_master": media.isolate_image,
     "bar.align_selected_objects": media.align_menu_image,
-    "bar.mod_tracer": media.tracer_menu_image,
+    "bar.mod_tracer": media.tracer_image,
     "keyTools.reset_objects_mods": media.reset_animation_image,
     "bar.deleteAnimation": media.delete_animation_image,
     "keyTools.selectOpposite": media.select_opposite_image,
@@ -723,7 +757,7 @@ class OrbitWindowMixin:
         return [
             (media.isolate_image, "Isolate", "isolate_master", getattr(helper, "isolate_tooltip_text", "Isolate")),
             (media.align_menu_image, "Align", "align_selected_objects", getattr(helper, "align_tooltip_text", "Align")),
-            (media.tracer_menu_image, "Tracer", "mod_tracer", getattr(helper, "tracer_tooltip_text", "Tracer")),
+            (media.tracer_image, "Tracer", "mod_tracer", getattr(helper, "tracer_tooltip_text", "Tracer")),
             (media.reset_animation_image, "Reset Values", "reset_objects_mods", getattr(helper, "reset_values_tooltip_text", "Reset Values")),
             (
                 media.delete_animation_image,
@@ -997,7 +1031,7 @@ class OrbitWindow(customDialogs.QFlatCloseableFloatingWidget, OrbitWindowMixin):
 
         self._setup_orbit_ui()
         self._hovered = False
-        self._auto_transparency = _auto_transparency_enabled()
+        self._auto_transparency = _orbit_auto_transparency_enabled()
 
         self.fade_timer = QtCore.QTimer(self)
         self.fade_timer.setSingleShot(True)
@@ -1029,10 +1063,11 @@ class OrbitWindow(customDialogs.QFlatCloseableFloatingWidget, OrbitWindowMixin):
             else:
                 self.place_near_cursor()
 
+        self.apply_stay_on_top_setting()
         self.update_transparency_state(False)
 
     def _check_settings(self):
-        new_state = _auto_transparency_enabled()
+        new_state = _orbit_auto_transparency_enabled()
         if new_state != self._auto_transparency:
             self._auto_transparency = new_state
             self.update_transparency_state(self._hovered)
@@ -1084,12 +1119,23 @@ class OrbitWindow(customDialogs.QFlatCloseableFloatingWidget, OrbitWindowMixin):
         _emit_orbit_window_state(False)
         super().closeEvent(event)
 
+    def apply_stay_on_top_setting(self):
+        was_visible = self.isVisible()
+        geometry = self.geometry()
+        self.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, _orbit_stays_on_top())
+        self.setGeometry(geometry)
+        if was_visible:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+
 
 def orbit_window(*args, offset_x=0, offset_y=0, rebuild=False, reuse_existing=False):
     existing_win = get_orbit_window()
     if reuse_existing and not rebuild and offset_x == 0 and offset_y == 0 and existing_win:
         if not existing_win.isVisible():
             existing_win.show()
+        existing_win.apply_stay_on_top_setting()
         existing_win.raise_()
         existing_win.activateWindow()
         _emit_orbit_window_state(True)
@@ -1120,6 +1166,13 @@ orbit_toolbar_toggle = ToolbarWindowToggle(
 
 def bind_orbit_toolbar_button(button):
     orbit_toolbar_toggle.attach_button(button)
+    if button:
+        try:
+            button.customContextMenuRequested.disconnect()
+        except Exception:
+            pass
+        button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        button.customContextMenuRequested.connect(lambda pos, b=button: build_orbit_context_menu(parent=b).exec_(b.mapToGlobal(pos)))
 
 
 def toggle_orbit_window():
@@ -1130,6 +1183,46 @@ def toggle_orbit_window():
             close_orbit_window()
         else:
             orbit_window(reuse_existing=True)
+
+
+def restore_orbit_default_position():
+    settings.set_setting("orbit_geometry", None, namespace=ORBIT_SETTINGS_NAMESPACE)
+    win = get_orbit_window()
+    if win and wutil.is_valid_widget(win):
+        win.place_near_cursor()
+
+
+def build_orbit_context_menu(parent=None):
+    menu = cw.OpenMenuWidget(parent)
+
+    auto_transparency_action = menu.addAction(
+        QtGui.QIcon(media.orbit_ui_image),
+        "Auto Transparency",
+        description="Make the floating Orbit window translucent when not hovered.",
+    )
+    auto_transparency_action.setCheckable(True)
+    auto_transparency_action.setChecked(_orbit_auto_transparency_enabled())
+    auto_transparency_action.triggered.connect(_set_orbit_auto_transparency_enabled)
+
+    menu.addSeparator()
+
+    stays_on_top_action = menu.addAction(
+        QtGui.QIcon(media.settings_image),
+        "Stay on Top",
+        description="Keep the floating Orbit window above other Maya windows.",
+    )
+    stays_on_top_action.setCheckable(True)
+    stays_on_top_action.setChecked(_orbit_stays_on_top())
+    stays_on_top_action.triggered.connect(_set_orbit_stays_on_top)
+
+    restore_position_action = menu.addAction(
+        QtGui.QIcon(media.orbit_ui_image),
+        "Restore Position",
+        description="Reset the floating Orbit window position to the default placement above the cursor.",
+    )
+    restore_position_action.triggered.connect(lambda *_: restore_orbit_default_position())
+
+    return menu
 
 
 # ________________________________________________ Selection Sets Floating Window  ______________________________________ #
@@ -1185,6 +1278,7 @@ def selection_sets_window(*args, controller=None, reuse_existing=True):
     if reuse_existing and win and wutil.is_valid_widget(win):
         if not win.isVisible():
             win.show()
+        win.apply_stay_on_top_setting()
         win.raise_()
         win.activateWindow()
         _emit_selection_sets_window_state(True)
@@ -1198,6 +1292,8 @@ def selection_sets_window(*args, controller=None, reuse_existing=True):
 
     win.destroyed.connect(_on_destroyed)
     win.show()
+    if not getattr(win, "_restored_geometry", False):
+        _place_selection_sets_window_default(win)
     _emit_selection_sets_window_state(True)
     return win
 
@@ -1209,12 +1305,19 @@ def _has_any_selection_sets(controller=None):
     return bool(controller.get_selection_sets())
 
 
+def _can_open_selection_set_creation(show_message=True):
+    if cmds.ls(selection=True):
+        return True
+    if show_message:
+        wutil.make_inViewMessage("Select something first")
+    return False
+
+
 def _open_selection_sets_from_toolbar(controller=None):
     controller = _resolve_toolbar_controller(controller)
     if not _has_any_selection_sets(controller):
-        if not cmds.ls(selection=True):
+        if not _can_open_selection_set_creation(show_message=True):
             _emit_selection_sets_window_state(False)
-            wutil.make_inViewMessage("Select something first.")
             return
         open_selection_set_creation_dialog(
             controller=controller,
@@ -1258,6 +1361,163 @@ def refresh_selection_sets_window():
         win.refresh()
 
 
+def _get_selection_sets_toolbar_button():
+    button = getattr(_selection_sets_toolbar_toggle, "_button", None)
+    if button and wutil.is_valid_widget(button) and button.isVisible():
+        return button
+    return None
+
+
+def _place_selection_sets_window_default(win):
+    if not win or not wutil.is_valid_widget(win):
+        return
+
+    button = _get_selection_sets_toolbar_button()
+    if not button:
+        win.place_near_cursor()
+        return
+
+    win.adjustSize()
+    width = win.width()
+    height = win.height()
+
+    top_left = button.mapToGlobal(QtCore.QPoint(0, 0))
+    button_rect = QtCore.QRect(top_left, button.size())
+    anchor_point = button_rect.center()
+
+    screen = QtGui.QGuiApplication.screenAt(anchor_point) or QtGui.QGuiApplication.primaryScreen()
+    geo = screen.availableGeometry()
+    gap = wutil.DPI(18)
+
+    x = anchor_point.x() - width // 2
+    y = button_rect.top() - height - gap
+
+    if y < geo.top():
+        y = button_rect.bottom() + gap
+
+    x = max(geo.left(), min(x, geo.right() - width))
+    y = max(geo.top(), min(y, geo.bottom() - height))
+
+    win.move(x, y)
+    win.show()
+    win.raise_()
+    win.activateWindow()
+
+
+def _selection_sets_quick_file():
+    quick_dir = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data", "selection_sets")
+    os.makedirs(quick_dir, exist_ok=True)
+    return os.path.join(quick_dir, "quick_selection_sets.json")
+
+
+def _selection_sets_stays_on_top():
+    return settings.get_setting("stays_on_top", False, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
+
+
+def _set_selection_sets_stays_on_top(enabled):
+    settings.set_setting("stays_on_top", bool(enabled), namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
+    win = get_selection_sets_window()
+    if win and wutil.is_valid_widget(win):
+        win.apply_stay_on_top_setting()
+
+
+def restore_selection_sets_default_position(controller=None):
+    settings.set_setting("selection_sets_geometry", None, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
+    win = get_selection_sets_window()
+    if win and wutil.is_valid_widget(win):
+        _place_selection_sets_window_default(win)
+
+
+def _confirm_clear_selection_sets(controller=None, parent=None):
+    controller = _resolve_toolbar_controller(controller)
+    if controller is None:
+        return
+    clicked = customDialogs.QFlatConfirmDialog.question(
+        parent=parent,
+        window="Selection Sets",
+        title="Clear all selection sets?",
+        message="This will delete every selection set in the current scene.",
+        buttons=[customDialogs.QFlatConfirmDialog.Yes, customDialogs.QFlatConfirmDialog.Cancel],
+        highlight="Yes",
+        closeButton=False,
+    )
+    if clicked and clicked.get("name") == "Yes":
+        controller.clear_selection_sets()
+
+
+def build_selection_sets_context_menu(parent=None, controller=None):
+    controller = _resolve_toolbar_controller(controller)
+    menu = cw.OpenMenuWidget(parent)
+
+    auto_transparency_action = menu.addAction(
+        QtGui.QIcon(media.selection_sets_image),
+        "Auto Transparency",
+        description="Make the floating Selection Sets window translucent when not hovered.",
+    )
+    auto_transparency_action.setCheckable(True)
+    auto_transparency_action.setChecked(_selection_sets_auto_transparency_enabled())
+    auto_transparency_action.triggered.connect(_set_selection_sets_auto_transparency_enabled)
+
+    quick_import_action = menu.addAction(
+        QtGui.QIcon(media.selection_sets_import_image),
+        "Quick Import",
+        description="Import selection sets from the shared quick file.",
+    )
+    quick_import_action.triggered.connect(lambda *_: controller and controller.import_sets(_selection_sets_quick_file()))
+
+    quick_export_action = menu.addAction(
+        QtGui.QIcon(media.selection_sets_export_image),
+        "Quick Export",
+        description="Export selection sets to the shared quick file, overwriting it.",
+    )
+    quick_export_action.triggered.connect(lambda *_: controller and controller.export_sets(_selection_sets_quick_file()))
+
+    menu.addSeparator()
+
+    import_action = menu.addAction(
+        QtGui.QIcon(media.selection_sets_import_image),
+        "Import",
+        description="Import selection sets from a chosen file.",
+    )
+    import_action.triggered.connect(lambda *_: controller and controller.import_sets())
+
+    export_action = menu.addAction(
+        QtGui.QIcon(media.selection_sets_export_image),
+        "Export",
+        description="Export selection sets to a chosen file.",
+    )
+    export_action.triggered.connect(lambda *_: controller and controller.export_sets())
+
+    menu.addSeparator()
+
+    clear_action = menu.addAction(
+        QtGui.QIcon(media.remove_image),
+        "Clear All Select Sets",
+        description="Delete every selection set in the current scene.",
+    )
+    clear_action.triggered.connect(lambda *_: _confirm_clear_selection_sets(controller=controller, parent=parent))
+
+    menu.addSeparator()
+
+    stays_on_top_action = menu.addAction(
+        QtGui.QIcon(media.settings_image),
+        "Stay on Top",
+        description="Keep the floating Selection Sets window above other Maya windows.",
+    )
+    stays_on_top_action.setCheckable(True)
+    stays_on_top_action.setChecked(_selection_sets_stays_on_top())
+    stays_on_top_action.triggered.connect(_set_selection_sets_stays_on_top)
+
+    restore_position_action = menu.addAction(
+        QtGui.QIcon(media.selection_sets_reload_image),
+        "Restore Position",
+        description="Reset the floating window position to the default placement above the cursor.",
+    )
+    restore_position_action.triggered.connect(lambda *_: restore_selection_sets_default_position(controller=controller))
+
+    return menu
+
+
 _selection_set_creation_dialog = None
 
 
@@ -1294,9 +1554,12 @@ class SelectionSetButton(cw.InlineRenameButton):
 
         rect = self.rect().adjusted(1, 1, -1, -1)
         pen = QtGui.QPen(QtGui.QColor("#ffffff"))
-        pen.setWidth(2)
+        pen.setWidth(wutil.DPI(2))
         if self._match_state == "partial":
-            pen.setWidth(1)
+            color = pen.color()
+            color.setAlphaF(0.7)
+            pen.setColor(color)
+            pen.setWidth(wutil.DPI(0.5))
             pen.setStyle(QtCore.Qt.CustomDashLine)
             pen.setDashPattern([wutil.DPI(4), wutil.DPI(3)])
         painter.setPen(pen)
@@ -1313,7 +1576,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.on_rejected = on_rejected
         self._opened = False
         self._completed = False
-        self._selected_color_suffix = next(iter(color_codes.keys()), "_01")
+        self._selected_color_suffix = "_02" if "_02" in color_codes else next(iter(color_codes.keys()), "_01")
         self._color_buttons = {}
         self.setObjectName("selection_set_creation_dialog")
         self.setWindowTitle("Create Selection Set")
@@ -1346,7 +1609,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
                 border-radius: 7px;
             }
             """
-            % color_codes["_02"]
+            % color_codes.get(self._selected_color_suffix, color_codes.get("_02", "#333333"))
         )
         entry_layout = QtWidgets.QHBoxLayout(self.entry_button)
         entry_layout.setContentsMargins(wutil.DPI(10), 0, wutil.DPI(10), 0)
@@ -1374,10 +1637,20 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         entry_layout.addWidget(self.name_field, 1)
         top_row_layout.addWidget(self.entry_button, 1)
 
-        self.confirm_button = self._create_action_button("OK", self._create_set_from_selected_color, highlight=True)
+        self.confirm_button = self._create_action_button(
+            "OK",
+            self._create_set_from_selected_color,
+            highlight=True,
+            icon=media.apply_image,
+        )
         top_row_layout.addWidget(self.confirm_button, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
-        self.close_dialog_button = self._create_action_button("Close", self.close)
+        self.close_dialog_button = self._create_action_button(
+            "",
+            self.close,
+            icon=media.close_image,
+            fixed_width=wutil.DPI(34),
+        )
         top_row_layout.addWidget(self.close_dialog_button, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
         self.mainLayout.addWidget(self.top_row)
@@ -1386,7 +1659,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.color_row.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.color_layout = QtWidgets.QHBoxLayout(self.color_row)
         self.color_layout.setContentsMargins(0, 0, 0, 0)
-        self.color_layout.setSpacing(wutil.DPI(2))
+        self.color_layout.setSpacing(wutil.DPI(1))
 
         for suffix, color_hex in color_codes.items():
             btn = self._create_color_button(suffix, color_hex)
@@ -1395,9 +1668,13 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.color_layout.addStretch(1)
         self.mainLayout.addWidget(self.color_row)
 
-    def _create_action_button(self, text, callback, highlight=False):
-        button = cw.QFlatButton(text=text, highlight=highlight)
+        self.mainLayout.setSpacing(wutil.DPI(5))
+
+    def _create_action_button(self, text, callback, highlight=False, icon=None, fixed_width=None):
+        button = cw.QFlatButton(text=text, icon_path=icon, highlight=highlight)
         button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        if fixed_width is not None:
+            button.setFixedWidth(fixed_width)
         button.clicked.connect(callback)
         return button
 
@@ -1494,8 +1771,8 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         if hasattr(self.controller, "color_names"):
             label = self.controller.color_names.get(suffix, "")
         tooltip = f"Create {label or suffix.replace('_', '').title()} Set"
-        button_size = max(1, int(round(wutil.DPI(20) * 0.7)))
-        icon_size = max(1, int(round(wutil.DPI(18) * 0.7)))
+        button_size = max(1, int(round(wutil.DPI(30) * 0.7)))
+        icon_size = max(1, int(round(wutil.DPI(28) * 0.7)))
         btn = cw.QFlatToolButton(icon=icon, tooltip_template=tooltip)
         btn.setFixedSize(button_size, button_size)
         btn.setIconSize(QtCore.QSize(icon_size, icon_size))
@@ -1523,6 +1800,10 @@ def open_selection_set_creation_dialog(controller=None, parent=None, on_created=
     global _selection_set_creation_dialog
     controller = _resolve_toolbar_controller(controller)
     if controller is None:
+        return None
+    if not _can_open_selection_set_creation(show_message=True):
+        if callable(on_rejected):
+            on_rejected()
         return None
     if parent is None or not wutil.is_valid_widget(parent):
         parent = wrapInstance(int(mui.MQtUtil.mainWindow()), QtWidgets.QWidget)
@@ -1607,7 +1888,7 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         self._section_menu_targets = []
         self._build_ui()
         self._hovered = False
-        self._auto_transparency = _auto_transparency_enabled()
+        self._auto_transparency = _selection_sets_auto_transparency_enabled()
         self.fade_timer = QtCore.QTimer(self)
         self.fade_timer.setSingleShot(True)
         self.fade_timer.timeout.connect(self._apply_transparency)
@@ -1616,7 +1897,8 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         self.settings_timer.start(500)
         self._connect_selection_callback()
         self.adjustSize()
-        self._restore_geometry()
+        self._restored_geometry = self._restore_geometry()
+        self.apply_stay_on_top_setting()
         self.update_transparency_state(False)
         self.refresh()
 
@@ -1643,32 +1925,36 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         self.add_header_right_widget(self.header_section, before_close=True)
 
         self.add_button = self._create_header_button(
-            media.add_selection_set_image,
+            media.selection_sets_add_image,
             "Create Selection Set",
             self._open_set_creation_window,
             key="selection_sets_add_btn",
             default_visible=True,
+            description="Create a new selection set from the current selection.",
         )
         self.refresh_button = self._create_header_button(
-            media.reload_image,
+            media.selection_sets_reload_image,
             "Reload Selection Sets",
             self.refresh,
             key="selection_sets_refresh_btn",
             default_visible=False,
+            description="Reload the selection set list from the current scene data.",
         )
         self.export_button = self._create_header_button(
-            media.move_selection_set_image,
+            media.selection_sets_export_image,
             "Export Selection Sets",
             self._export_sets,
             key="selection_sets_export_btn",
             default_visible=False,
+            description="Export selection sets to a file for reuse in another scene.",
         )
         self.import_button = self._create_header_button(
-            media.selector_selection_set_image,
+            media.selection_sets_import_image,
             "Import Selection Sets",
             self._import_sets,
             key="selection_sets_import_btn",
             default_visible=False,
+            description="Import selection sets from a previously exported file.",
         )
         self._install_header_context_menu()
         for btn in (self.add_button, self.refresh_button, self.export_button, self.import_button):
@@ -1698,8 +1984,8 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         self.header_sets_layout.addStretch(1)
         self.set_header_left_widget(self.header_sets_host, stretch=1)
 
-    def _create_header_button(self, icon, tooltip, callback, key, default_visible):
-        btn = cw.QFlatToolButton(icon=icon, tooltip_template=tooltip)
+    def _create_header_button(self, icon, tooltip, callback, key, default_visible, description=None):
+        btn = cw.QFlatToolButton(icon=icon, tooltip_template=tooltip, description=description)
         btn.setFixedSize(wutil.DPI(26), wutil.DPI(26))
         btn.setIconSize(QtCore.QSize(wutil.DPI(20), wutil.DPI(20)))
         btn.clicked.connect(callback)
@@ -1709,7 +1995,7 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
                 label=tooltip,
                 key=key,
                 default_visible=default_visible,
-                description=tooltip,
+                description=description or tooltip,
                 tooltip_template=tooltip,
             )
         return btn
@@ -1749,11 +2035,7 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
             open_selection_set_creation_dialog(controller=controller, parent=self)
 
     def _open_menu(self):
-        menu = cw.OpenMenuWidget()
-        export_action = menu.addAction("Export Sets")
-        export_action.triggered.connect(self._export_sets)
-        import_action = menu.addAction("Import Sets")
-        import_action.triggered.connect(self._import_sets)
+        menu = build_selection_sets_context_menu(parent=self, controller=self.controller)
         menu.exec_(QtGui.QCursor.pos())
 
     def _export_sets(self):
@@ -1777,7 +2059,7 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
         return False
 
     def _check_settings(self):
-        new_state = _auto_transparency_enabled()
+        new_state = _selection_sets_auto_transparency_enabled()
         if new_state != self._auto_transparency:
             self._auto_transparency = new_state
             self.update_transparency_state(self._hovered)
@@ -1821,12 +2103,23 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
             namespace=SELECTION_SETS_SETTINGS_NAMESPACE,
         )
         if not saved_geom:
-            return
+            return False
         if len(saved_geom) == 4:
             x, y, w, h = saved_geom
             self.setGeometry(x, y, w, h)
         elif len(saved_geom) >= 2:
             self.move(saved_geom[0], saved_geom[1])
+        return True
+
+    def apply_stay_on_top_setting(self):
+        was_visible = self.isVisible()
+        geometry = self.geometry()
+        self.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, _selection_sets_stays_on_top())
+        self.setGeometry(geometry)
+        if was_visible:
+            self.show()
+            self.raise_()
+            self.activateWindow()
 
     def hideEvent(self, event):
         settings.set_setting(
@@ -1986,36 +2279,30 @@ class SelectionSetsWindow(customDialogs.QFlatCloseableFloatingWidget):
             self._apply_set_button_style(button, match_state=match_state)
 
     def _show_set_menu(self, controller, subset):
-        menu = cw.MenuWidget()
-        menu.addAction(QtGui.QIcon(media.add_to_selection_set_image), "Add Selection").triggered.connect(
-            lambda: controller.add_selection_to_set(subset)
-        )
-        menu.addAction(QtGui.QIcon(media.remove_from_selection_set_image), "Remove Selection").triggered.connect(
-            lambda: controller.remove_selection_from_set(subset)
-        )
+        menu = QtWidgets.QMenu()
+        menu.addAction(QtGui.QIcon(media.add_image), "Add Selection").triggered.connect(lambda: controller.add_selection_to_set(subset))
+        menu.addAction(QtGui.QIcon(media.subtract_image), "Remove Selection").triggered.connect(lambda: controller.remove_selection_from_set(subset))
         menu.addAction(QtGui.QIcon(media.reload_image), "Update Selection").triggered.connect(lambda: controller.update_selection_to_set(subset))
         menu.addSeparator()
 
-        color_menu = cw.MenuWidget("Change Color")
+        color_menu = QtWidgets.QMenu("Change Color")
         menu.addMenu(color_menu)
         for suffix, label in controller.color_names.items():
             action = color_menu.addAction(QtGui.QIcon(media.selection_set_color_images.get(suffix, "")), label)
             action.triggered.connect(lambda *_, s=subset, suf=suffix: controller.set_set_color(s, suf))
 
-        menu.addAction(QtGui.QIcon(media.rename_selection_set_image), "Rename").triggered.connect(
+        menu.addAction(QtGui.QIcon(media.rename_image), "Rename").triggered.connect(
             lambda: (
                 self._set_buttons.get(subset).start_inline_rename()
                 if self._set_buttons.get(subset)
                 else controller.change_set_name_window(subset, subset.rsplit("_", 1)[0])
             )
         )
-        menu.addAction(QtGui.QIcon(media.remove_selection_set_image), "Delete").triggered.connect(
-            lambda: controller.remove_set_and_update_buttons(subset)
-        )
+        menu.addAction(QtGui.QIcon(media.remove_image), "Delete").triggered.connect(lambda: controller.remove_set_and_update_buttons(subset))
         current_color_suffix = f"_{subset.rsplit('_', 1)[-1]}"
         current_color_label = controller.color_names.get(current_color_suffix, current_color_suffix.strip("_"))
         menu.addAction(
-            QtGui.QIcon(media.remove_selection_set_image),
+            QtGui.QIcon(media.remove_image),
             f"Delete All {current_color_label}",
         ).triggered.connect(lambda: controller.delete_sets_by_color_suffix(current_color_suffix))
 
@@ -2029,6 +2316,14 @@ def bind_selection_sets_toolbar_button(button, controller=None):
         _selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=controller)
     if button:
         _selection_sets_toolbar_toggle.attach_button(button)
+        try:
+            button.customContextMenuRequested.disconnect()
+        except Exception:
+            pass
+        button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        button.customContextMenuRequested.connect(
+            lambda pos, b=button, c=controller: build_selection_sets_context_menu(parent=b, controller=c).exec_(b.mapToGlobal(pos))
+        )
 
 
 # ________________________________________________ Donate window  ______________________________________________________ #
@@ -2061,7 +2356,7 @@ def donate_window():
         window="Donate",
         title="",
         message=msg,
-        icon=media.getImage("stripe.png"),
+        icon=media.stripe_image,
         closeButton=True,
     )
     dlg.message_label.setOpenExternalLinks(True)

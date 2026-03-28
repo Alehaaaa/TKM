@@ -148,10 +148,9 @@ def resolve_target_attribute_plugs():
     2) Channel Box selected channels (on selected objects)
     3) All keyable scalar channels (on selected objects)
 
-    The returned list is also filtered based on whether keys exist at current time:
-    - If Graph Editor keys are selected, always return those plugs.
-    - Otherwise, if any plugs already have keys at current time, only those plugs are returned.
-    - Otherwise, returns all candidate plugs (and the caller should create keys at current time).
+    The returned list preserves the full selected target set.
+    Animated plugs can be keyed later by the slider op, but unanimated plugs
+    should remain available for direct attribute edits.
     """
     global _target_attr_plugs, _target_source, _target_time_range, _target_has_graph_keys
 
@@ -188,16 +187,6 @@ def resolve_target_attribute_plugs():
     # Filter to existing plugs
     candidates = [p for p in candidates if p and cmds.objExists(p)]
 
-    current_time = cmds.currentTime(query=True)
-    keyed_at_current = []
-    for plug in candidates:
-        try:
-            times = cmds.keyframe(plug, q=True, time=(current_time, current_time), timeChange=True) or []
-        except Exception:
-            times = []
-        if times:
-            keyed_at_current.append(plug)
-
     _target_has_graph_keys = False
-    _target_attr_plugs = keyed_at_current if keyed_at_current else candidates
+    _target_attr_plugs = candidates
     return _target_attr_plugs, _target_source, _target_time_range, _target_has_graph_keys

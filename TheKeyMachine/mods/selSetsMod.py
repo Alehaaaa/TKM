@@ -38,6 +38,7 @@ import base64
 import TheKeyMachine
 
 import TheKeyMachine.core.customGraph as cg
+import TheKeyMachine.core.callback_manager as callbacks
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.keyToolsMod as keyTools
@@ -120,7 +121,7 @@ def add_button_selection(button_name):
             cmds.warning("SelectionSet is locked. Unlock before modifying")
             return
         # Si la tecla Ctrl está presionada, realizar suma de selecciones
-        if cmds.getModifiers() & 4:  # 4 representa la tecla Ctrl
+        if callbacks.get_modifier_mask() & 4:  # 4 representa la tecla Ctrl
             button_selections[button_name]["selection"] += selection
         # Si la tecla Ctrl no está presionada, agregar objetos seleccionados sin duplicados
         else:
@@ -146,7 +147,7 @@ def remove_button_selection(button_name):
             cmds.warning("SelectionSet is locked. Unlock before modifying")
             return
         # Si la tecla Shift está presionada, realizar resta de selecciones
-        if cmds.getModifiers() & 1:  # 1 representa la tecla Shift
+        if callbacks.get_modifier_mask() & 1:  # 1 representa la tecla Shift
             button_selections[button_name]["selection"] = [obj for obj in button_selections[button_name]["selection"] if obj not in selection]
         # Si la tecla Shift no está presionada, eliminar solo los objetos seleccionados
         else:
@@ -161,7 +162,7 @@ def remove_button_selection(button_name):
 
 
 def handle_button_selection(button_name):
-    modifiers = cmds.getModifiers()
+    modifiers = callbacks.get_modifier_mask()
     # Verificar si la tecla Shift está presionada
     if modifiers & 1:  # 1 representa la tecla Shift
         load_button_selection(button_name)

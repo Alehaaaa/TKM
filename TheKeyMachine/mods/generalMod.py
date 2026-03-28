@@ -108,6 +108,10 @@ def get_thekeymachine_codename():
 # ----- RUTAS ----------------------------------------------------------------------
 
 
+def get_tkm_node_image():
+    return os.path.join(INSTALL_PATH, "TheKeyMachine", "data", "img", "tkm_node.png")
+
+
 # MIRROR EXCEPTIONS ___________________
 def get_mirror_exceptions_file():
     cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/mirror")
@@ -196,13 +200,6 @@ def get_copy_worldspace_single_frame_data_folder():
 # ------------------------------------------------------------------------
 
 
-def getImage(image):
-    img_dir = os.path.join(INSTALL_PATH, "TheKeyMachine/data/img/")
-
-    fullImgDir = os.path.join(img_dir, image)
-    return fullImgDir
-
-
 def create_TheKeyMachine_node():
     # Guardar la selección inicial
     initial_selection = cmds.ls(selection=True)
@@ -218,7 +215,7 @@ def create_TheKeyMachine_node():
         node = cmds.container(type="dagContainer", name="TheKeyMachine")
 
         # Establecer el icono del assetNode
-        icon_path = getImage("tkm_node.png")  # Usar la función para obtener la ruta del icono
+        icon_path = get_tkm_node_image()
         cmds.setAttr(node + ".iconName", icon_path, type="string")
 
         # Bloquear y ocultar todos los atributos de transformación

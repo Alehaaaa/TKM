@@ -1,4 +1,4 @@
-from .tooltip import QFlatTooltip, QFlatTooltipManager, parse_tt
+from .tooltip import QFlatTooltip, QFlatTooltipManager, format_tooltip_shortcut, parse_tt
 
 
-__all__ = ["QFlatTooltip", "QFlatTooltipManager", "parse_tt"]
+__all__ = ["QFlatTooltip", "QFlatTooltipManager", "format_tooltip_shortcut", "parse_tt"]

@@ -30,11 +30,63 @@ def _ensure_keys_at_current_time(attr_plugs):
         try:
             if not cmds.objExists(attr_full):
                 continue
+            existing_keys = cmds.keyframe(attr_full, query=True) or []
+            if not existing_keys:
+                continue
             if cmds.getAttr(attr_full, lock=True) or not cmds.getAttr(attr_full, settable=True):
                 continue
             if cmds.getAttr(attr_full, type=True) in ("enum", "string", "message"):
                 continue
             cmds.setKeyframe(attr_full, time=current_time)
+        except Exception:
+            pass
+
+
+def _has_keyframes(attr_full):
+    try:
+        return bool(cmds.keyframe(attr_full, query=True) or [])
+    except Exception:
+        return False
+
+
+def _clamp_numeric_attr_value(attr_full, value):
+    try:
+        obj, attr = attr_full.split(".", 1)
+    except ValueError:
+        return value
+    try:
+        if cmds.attributeQuery(attr, node=obj, minExists=True):
+            value = max(value, cmds.attributeQuery(attr, node=obj, minimum=True)[0])
+        if cmds.attributeQuery(attr, node=obj, maxExists=True):
+            value = min(value, cmds.attributeQuery(attr, node=obj, maximum=True)[0])
+    except Exception:
+        pass
+    return value
+
+
+def _set_attr_value(attr_full, value):
+    value = _clamp_numeric_attr_value(attr_full, value)
+    try:
+        cmds.setAttr(attr_full, float(value))
+        return
+    except Exception:
+        pass
+    try:
+        cmds.setAttr(attr_full, int(round(value)))
+    except Exception:
+        pass
+
+
+def _apply_cached_value(attr_full, value, current_time, use_direct_attr=False):
+    value = _clamp_numeric_attr_value(attr_full, value)
+    if use_direct_attr:
+        _set_attr_value(attr_full, value)
+        return
+    try:
+        cmds.keyframe(attr_full, edit=True, time=(current_time, current_time), valueChange=float(value))
+    except Exception:
+        try:
+            cmds.setKeyframe(attr_full, time=current_time, value=float(value))
         except Exception:
             pass
 
@@ -60,11 +112,8 @@ def _resolve_affected_attribute_plugs():
         if missing:
             _ensure_keys_at_current_time(missing)
     else:
-        if keyed_at_current:
-            affected = keyed_at_current
-        else:
-            affected = plugs
-            _ensure_keys_at_current_time(affected)
+        affected = plugs
+        _ensure_keys_at_current_time(affected)
 
     return affected, time_range
 
@@ -117,6 +166,7 @@ def prepare_tween_data(objs=None, attrs=None, attr_plugs=None, time_range=None):
 
         keyframes = cmds.keyframe(attr_full, query=True) or []
         if not keyframes:
+            utils.tween_frame_data_cache[attr_full] = {"needsCalculation": False, "use_direct_attr": True}
             continue
 
         prev_keys = [f for f in keyframes if f < current_time]
@@ -136,6 +186,7 @@ def prepare_tween_data(objs=None, attrs=None, attr_plugs=None, time_range=None):
             "nextValue": next_v,
             "currentValue": current_v,
             "needsCalculation": (prev_v != next_v) or (current_v != prev_v),
+            "use_direct_attr": False,
         }
     return utils.tween_frame_data_cache
 
@@ -182,16 +233,7 @@ def execute_tween(value, world_space=False):
             new_v = cur_v
 
         # Handle limits
-        obj, attr = attr_full.split(".")
-        if cmds.attributeQuery(attr, node=obj, minExists=True):
-            new_v = max(new_v, cmds.attributeQuery(attr, node=obj, minimum=True)[0])
-        if cmds.attributeQuery(attr, node=obj, maxExists=True):
-            new_v = min(new_v, cmds.attributeQuery(attr, node=obj, maximum=True)[0])
-
-        try:
-            cmds.keyframe(attr_full, edit=True, time=(current_time, current_time), valueChange=float(new_v))
-        except Exception:
-            pass
+        _apply_cached_value(attr_full, new_v, current_time, use_direct_attr=cache.get("use_direct_attr", False))
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -254,6 +296,7 @@ def cache_keyframe_data(attr_plugs, time_range=None):
             "previousValue": previous_value,
             "nextValue": next_value,
             "prevTanType": prev_tan_type,
+            "use_direct_attr": not _has_keyframes(attr_full),
         }
 
     return utils.frame_data_cache
@@ -297,10 +340,7 @@ def execute_blend_to_neighbors(percentage, world_space=False):
         else:
             continue
 
-        try:
-            cmds.keyframe(attr_full, edit=True, time=(current_time, current_time), valueChange=float(new_v))
-        except Exception:
-            pass
+        _apply_cached_value(attr_full, new_v, current_time, use_direct_attr=cache.get("use_direct_attr", False))
 
 
 def execute_blend_to_default(percentage, world_space=False):
@@ -338,7 +378,11 @@ def execute_blend_to_default(percentage, world_space=False):
                 if not isinstance(original_value, (int, float)) or not isinstance(default_value, (int, float)):
                     continue
 
-                utils.frame_data_cache[attr_full] = {"original_value": float(original_value), "defaultValue": float(default_value)}
+                utils.frame_data_cache[attr_full] = {
+                    "original_value": float(original_value),
+                    "defaultValue": float(default_value),
+                    "use_direct_attr": not _has_keyframes(attr_full),
+                }
             except Exception:
                 pass
         utils.is_cached = True
@@ -365,10 +409,7 @@ def execute_blend_to_default(percentage, world_space=False):
             new_value = orig + (mirrored - orig) * u
         else:
             new_value = orig
-        try:
-            cmds.keyframe(attr_full, edit=True, time=(current_time, current_time), valueChange=float(new_value))
-        except Exception:
-            pass
+        _apply_cached_value(attr_full, new_value, current_time, use_direct_attr=cache.get("use_direct_attr", False))
 
 
 def execute_blend_to_key(percentage, objs=None):

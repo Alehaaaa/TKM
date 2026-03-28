@@ -1245,7 +1245,7 @@ class TKMAboutDialog(QFlatDialog):
         # Logo
         logo_label = QtWidgets.QLabel()
         logo_label.setAlignment(QtCore.Qt.AlignCenter)
-        logo_pixmap = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_250.png"))
+        logo_pixmap = QtGui.QPixmap(media.TheKeyMachine_logo_250_image)
         logo_label.setPixmap(logo_pixmap)
         content_layout.addWidget(logo_label)
 
@@ -1278,7 +1278,7 @@ class TKMAboutDialog(QFlatDialog):
                 """
 
             def _check_updates():
-                import TheKeyMachine.core.updater as updater
+                import TheKeyMachine.mods.updater as updater
 
                 try:
                     from importlib import reload

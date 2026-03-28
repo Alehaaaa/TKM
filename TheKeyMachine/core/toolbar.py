@@ -85,9 +85,33 @@ from TheKeyMachine.widgets import customDialogs as customDialogs  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 
+import TheKeyMachine_user_data.connect.tools.tools as connectToolBox  # type: ignore
+import TheKeyMachine_user_data.connect.scripts.scripts as cbScripts  # type: ignore
+
+
 from TheKeyMachine.tooltips import QFlatTooltipManager
 
-mods = [general, ui, keyTools, helper, media, bar, hotkeys, settings, cg, updater, style, sw, cw, customDialogs, wutil, sliders, toolbox]
+mods = [
+    general,
+    ui,
+    keyTools,
+    helper,
+    media,
+    bar,
+    hotkeys,
+    settings,
+    cg,
+    updater,
+    style,
+    sw,
+    cw,
+    customDialogs,
+    wutil,
+    sliders,
+    toolbox,
+    connectToolBox,
+    cbScripts,
+]
 
 for m in mods:
     if m:
@@ -189,8 +213,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.setContextMenuPolicy(QtCore.Qt.PreventContextMenu)
 
         self._callback_manager = callbacks.get_callback_manager()
+        cg.sync_graph_toolbar_watch()
         self._callback_manager.scene_opened.connect(self._on_scene_opened)
         self._callback_manager.scene_new.connect(self._on_scene_opened)
+        self._callback_manager.graph_editor_opened.connect(self._on_graph_editor_opened)
 
         self.shelf_painter = None
         self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
@@ -280,6 +306,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             return
         self.update_selectionSets_on_new_scene()
         self.update_popup_menu()
+
+    def _on_graph_editor_opened(self, *_args):
+        if not isValid(self):
+            return
+        if not settings.get_setting("graph_toolbar_enabled", True):
+            return
+        QTimer.singleShot(0, cg.createCustomGraph)
 
     def showWindow(self):
         # Build up kwargs for the visibleChangeCommand
@@ -751,8 +784,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     # _______________________________________________________ SELECTION SET ________________________________________________________
 
-    def export_sets(self, *args):
-        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Export Sets", "", "JSON Files (*.json);;All Files (*)")
+    def export_sets(self, file_path=None, *args):
+        if not file_path:
+            file_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Export Sets", "", "JSON Files (*.json);;All Files (*)")
 
         if not file_path:
             return
@@ -770,6 +804,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     set_name = "_".join(split_name[:-1])
                     set_group_data["sets"].append({"name": set_name, "color_suffix": color_suffix, "objects": cmds.sets(sub_sel_set, q=True)})
             set_data["set_groups"].append(set_group_data)
+
+        export_dir = os.path.dirname(file_path)
+        if export_dir:
+            os.makedirs(export_dir, exist_ok=True)
 
         with open(file_path, "w") as file:
             json.dump(set_data, file, indent=4)
@@ -796,10 +834,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         with open(file_path, "w") as file:
             json.dump(set_data, file, indent=4)
 
-    def import_sets(self, *args):
-        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(None, "Import Sets", "", "JSON Files (*.json);;All Files (*)")
+    def import_sets(self, file_path=None, *args):
+        if not file_path:
+            file_path, _ = QtWidgets.QFileDialog.getOpenFileName(None, "Import Sets", "", "JSON Files (*.json);;All Files (*)")
 
         if not file_path:
+            return
+
+        if not os.path.isfile(file_path):
+            wutil.make_inViewMessage("Selection sets file not found")
             return
 
         with open(file_path, "r") as file:
@@ -1286,7 +1329,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def create_new_set_and_update_buttons(self, color_suffix, set_name_field, set_group_combo=None, *args):
         selection = cmds.ls(selection=True)
         if not selection:
-            wutil.make_inViewMessage("No selection to create set")
+            wutil.make_inViewMessage("Select something first")
             return False
 
         new_set_name = set_name_field.text()
@@ -1340,9 +1383,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.warning("Invalid set or setgroup names")
 
     def handle_set_selection(self, set_name, shift_pressed, ctrl_pressed):
-        mods = cmds.getModifiers()
-        shift_pressed = bool(mods % 2)  # Shift
-        ctrl_pressed = bool(mods % 3)  # Control
+        mods = callbacks.get_modifier_mask()
+        shift_pressed = bool(mods & 1)
+        ctrl_pressed = bool(mods & 4)
 
         # Verificar si el conjunto de selección es válido
         if cmds.objExists(set_name):
@@ -1445,7 +1488,37 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             )
 
     def clear_selection_sets(self, *args):
-        ui.refresh_selection_sets_window()
+        removed_any = False
+        sel_set_name = "TheKeyMachine_SelectionSet"
+
+        for subset in list(self.get_selection_sets()):
+            if not cmds.objExists(subset):
+                continue
+            try:
+                if cmds.objExists(sel_set_name):
+                    cmds.sets(subset, remove=sel_set_name)
+            except Exception:
+                pass
+            try:
+                cmds.delete(subset)
+                removed_any = True
+            except Exception:
+                pass
+
+        if cmds.objExists(sel_set_name):
+            try:
+                members = cmds.sets(sel_set_name, q=True) or []
+            except Exception:
+                members = []
+            if not members:
+                try:
+                    cmds.delete(sel_set_name)
+                except Exception:
+                    pass
+
+        if removed_any:
+            ui.refresh_selection_sets_window()
+            wutil.make_inViewMessage("All selection sets cleared")
 
     def selection_sets_empty_setup(self, *args):
         ui.close_selection_sets_window()
@@ -2081,6 +2154,20 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.nudge_left_image,
                     "callback": lambda: keyTools.move_keyframes_in_range(-self.move_keyframes_intField.value()),
                     "description": "Nudge selected keys to the left.",
+                    "shortcuts": [
+                        {"icon": media.nudge_left_image, "label": "Nudge Left", "keys": "Click"},
+                        {"icon": media.remove_inbetween_image, "label": "Remove Inbetween", "keys": [QtCore.Qt.Key_Shift]},
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 1,
+                            "text": "-IB",
+                            "icon_path": media.remove_inbetween_image,
+                            "tooltip_template": "Remove Inbetween",
+                            "description": "Remove inbetweens using the current nudge step value.",
+                            "callback": lambda: keyTools.remove_inbetween(self.move_keyframes_intField.value()),
+                        }
+                    ],
                     "default": True,
                 },
                 {
@@ -2100,6 +2187,20 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.nudge_right_image,
                     "callback": lambda: keyTools.move_keyframes_in_range(self.move_keyframes_intField.value()),
                     "description": "Nudge selected keys to the right.",
+                    "shortcuts": [
+                        {"icon": media.nudge_right_image, "label": "Nudge Right", "keys": "Click"},
+                        {"icon": media.insert_inbetween_image, "label": "Insert Inbetween", "keys": [QtCore.Qt.Key_Shift]},
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 1,
+                            "text": "+IB",
+                            "icon_path": media.insert_inbetween_image,
+                            "tooltip_template": "Insert Inbetween",
+                            "description": "Insert inbetweens using the current nudge step value.",
+                            "callback": lambda: keyTools.insert_inbetween(self.move_keyframes_intField.value()),
+                        }
+                    ],
                     "default": True,
                 },
                 {
@@ -2272,9 +2373,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
                 # Setup mode switching
                 def make_mode_setter(slider_instance, prefix_val, show_f):
-                    def setter(new_mode):
+                    def setter(new_mode, temporary=False):
                         # Switch to solo mode logic: simply update instance and metadata
-                        slider_instance.setCurrentMode(new_mode)
+                        slider_instance.setCurrentMode(new_mode, temporary=temporary)
                         m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
                         if m_info:
                             slider_instance.setTooltipInfo(m_info["label"], m_info.get("description", ""))
@@ -2289,11 +2390,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                             blend_to_key_right_b_qt.hide()
                             slider_instance.setDragCommand(lambda v, nk=new_mode: change_func(nk, v))
 
-                        slider_instance.startFlash()
+                        if not temporary:
+                            slider_instance.startFlash()
 
                     return setter
 
-                s.modeSelected.connect(make_mode_setter(s, prefix, show_frames))
+                s.modeRequested.connect(make_mode_setter(s, prefix, show_frames))
 
                 # Add to section with registration
                 sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
@@ -2369,7 +2471,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "key": "isolate_down_level",
                     "label": "Down one level",
                     "checkable": True,
-                    "is_checked_fn": lambda: bar.down_one_level,  # Assuming bar.down_one_level tracks state
+                    "set_checked_fn": lambda: bar.down_one_level,  # Assuming bar.down_one_level tracks state
                     "callback": bar.toggle_down_one_level,
                     "pinnable": False,
                 },
@@ -2422,6 +2524,38 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.match_image,
                     "callback": bar.align_selected_objects,
                     "tooltip_template": helper.align_tooltip_text,
+                    "shortcuts": [
+                        {"icon": media.match_image, "label": "Align All", "keys": "Click"},
+                        {"icon": media.align_menu_image, "label": "Align Translation", "keys": [QtCore.Qt.Key_Shift]},
+                        {"icon": media.align_menu_image, "label": "Align Rotation", "keys": [QtCore.Qt.Key_Control]},
+                        {"icon": media.align_menu_image, "label": "Align Scale", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 1,
+                            "text": "AT",
+                            "icon_path": media.align_menu_image,
+                            "tooltip_template": "Align Translation",
+                            "description": "Match only translation values from the driver object.",
+                            "callback": partial(bar.align_selected_objects, pos=True, rot=False, scl=False),
+                        },
+                        {
+                            "mask": 4,
+                            "text": "AR",
+                            "icon_path": media.align_menu_image,
+                            "tooltip_template": "Align Rotation",
+                            "description": "Match only rotation values from the driver object.",
+                            "callback": partial(bar.align_selected_objects, pos=False, rot=True, scl=False),
+                        },
+                        {
+                            "mask": 5,
+                            "text": "AS",
+                            "icon_path": media.align_menu_image,
+                            "tooltip_template": "Align Scale",
+                            "description": "Match only scale values from the driver object.",
+                            "callback": partial(bar.align_selected_objects, pos=False, rot=False, scl=True),
+                        },
+                    ],
                     "default": True,
                 },
                 {
@@ -2461,16 +2595,52 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 {
                     "key": "tracer",
                     "label": "Tracer",
-                    "icon_path": media.tracer_menu_image,
-                    "callback": bar.mod_tracer,
+                    "icon_path": media.tracer_image,
+                    "callback": bar.create_tracer,
                     "tooltip_template": helper.tracer_tooltip_text,
+                    "shortcuts": [
+                        {"icon": media.refresh_image, "label": "Refresh Tracer", "keys": [QtCore.Qt.Key_Control]},
+                        {"icon": media.tracer_show_hide_image, "label": "Toggle Tracer", "keys": [QtCore.Qt.Key_Shift]},
+                        {"icon": media.tracer_select_offset_image, "label": "Select Offset Object", "keys": [QtCore.Qt.Key_Alt]},
+                        {
+                            "icon": media.remove_image,
+                            "label": "Remove Tracer",
+                            "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift, QtCore.Qt.Key_Alt],
+                        },
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 1,
+                            "text": "TR+",
+                            "icon_path": media.refresh_image,
+                            "tooltip_template": "Refresh Tracer",
+                            "description": "Refresh the existing tracer without re-creating it.",
+                            "callback": bar.tracer_refresh,
+                        },
+                        {
+                            "mask": 4,
+                            "text": "TRo",
+                            "icon_path": media.tracer_show_hide_image,
+                            "tooltip_template": "Toggle Tracer",
+                            "description": "Show or hide the existing tracer.",
+                            "callback": bar.tracer_show_hide,
+                        },
+                        {
+                            "mask": 12,
+                            "text": "TRx",
+                            "icon_path": media.remove_image,
+                            "tooltip_template": "Remove Tracer",
+                            "description": "Remove the existing tracer node.",
+                            "callback": bar.remove_tracer_node,
+                        },
+                    ],
                     "default": True,
                 },
                 {
                     "key": "tracer_connected",
                     "label": "Connected",
                     "checkable": True,
-                    "is_checked_fn": lambda: getattr(bar, "is_tracer_connected", lambda: False)(),  # Assuming a state check exists
+                    "set_checked_fn": lambda: getattr(bar, "is_tracer_connected", lambda: False)(),  # Assuming a state check exists
                     "callback": lambda x: bar.tracer_connected(connected=x, update_cb=bar.tracer_update_checkbox),
                     "pinnable": False,
                 },
@@ -2478,7 +2648,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 {
                     "key": "tracer_refresh",
                     "label": "Refresh Tracer",
-                    "icon_path": media.tracer_refresh_image,
+                    "icon_path": media.refresh_image,
                     "callback": bar.tracer_refresh,
                 },
                 {
@@ -2489,7 +2659,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 },
                 {
                     "key": "tracer_offset_node",
-                    "label": "Select offset node",
+                    "label": "Select Offset Object",
                     "icon_path": media.tracer_select_offset_image,
                     "callback": bar.select_tracer_offset_node,
                 },
@@ -2529,8 +2699,30 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "key": "reset_values",
                     "label": "Reset Values",
                     "icon_path": media.reset_animation_image,
-                    "callback": keyTools.reset_objects_mods,
+                    "callback": keyTools.reset_object_values,
                     "tooltip_template": helper.reset_values_tooltip_text,
+                    "shortcuts": [
+                        {"icon": media.reset_animation_image, "label": "Reset Translations", "keys": [QtCore.Qt.Key_Shift]},
+                        {"icon": media.reset_animation_image, "label": "Reset Rotations", "keys": [QtCore.Qt.Key_Control]},
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 1,
+                            "text": "RT",
+                            "icon_path": media.reset_animation_image,
+                            "tooltip_template": "Reset Translations",
+                            "description": "Reset only translation values for the selected objects.",
+                            "callback": lambda: keyTools.reset_object_values(reset_translations=True),
+                        },
+                        {
+                            "mask": 4,
+                            "text": "RR",
+                            "icon_path": media.reset_animation_image,
+                            "tooltip_template": "Reset Rotations",
+                            "description": "Reset only rotation values for the selected objects.",
+                            "callback": lambda: keyTools.reset_object_values(reset_rotations=True),
+                        },
+                    ],
                     "default": True,
                 },
                 {
@@ -2564,12 +2756,25 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         )
 
         # Delete anim -------------------------------------------------------------------------
-        delete_anim_btn = cw.QFlatToolButton(icon=media.delete_animation_image, tooltip_template=helper.delete_animation_tooltip_text)
-        delete_anim_btn.clicked.connect(bar.mod_delete_animation)
+        delete_anim_btn = cw.QFlatToolButton(
+            icon=media.delete_animation_image,
+            tooltip_template=helper.delete_animation_tooltip_text,
+            shortcuts=[{"icon": media.delete_animation_image, "label": "Remove Time Slider Keyframes", "keys": [QtCore.Qt.Key_Shift]}],
+            shortcut_variants=[
+                {
+                    "mask": 1,
+                    "text": "DT",
+                    "icon_path": media.delete_animation_image,
+                    "tooltip_template": "Delete Time Slider Keyframes",
+                    "description": "Remove keyframes from the selected Time Slider range.",
+                    "callback": bar.delete_time_slider_animation,
+                }
+            ],
+        )
+        delete_anim_btn.clicked.connect(lambda *_args, w=delete_anim_btn: w.triggerToolCallback(bar.delete_animation))
         sec.addWidget(delete_anim_btn, "Delete Anim", "delete_anim", tooltip_template=helper.delete_animation_tooltip_text)
 
-        selector_button_widget = cw.QFlatToolButton(tooltip_template=helper.selector_tooltip_text)
-        selector_button_widget.setText("0")
+        selector_button_widget = cw.QFlatSelectorButton(icon=media.selector_image, tooltip_template=helper.selector_tooltip_text)
         selector_button_widget.clicked.connect(bar.selector_window)
         sec.addWidget(selector_button_widget, "Selector", "selector", tooltip_template=helper.selector_tooltip_text)
 
@@ -2578,7 +2783,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 return
             selected_objects = cmds.ls(selection=True)
             num_selected = len(selected_objects)
-            selector_button_widget.setText(str(num_selected))
+            selector_button_widget.setCount(num_selected)
 
         try:
             self._callback_manager.selection_changed.connect(update_selector_button_text)
@@ -2597,6 +2802,28 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.select_opposite_image,
                     "callback": keyTools.selectOpposite,
                     "tooltip_template": helper.select_opposite_tooltip_text,
+                    "shortcuts": [
+                        {"icon": media.select_opposite_image, "label": "Add Opposite", "keys": [QtCore.Qt.Key_Shift]},
+                        {"icon": media.copy_opposite_image, "label": "Copy Opposite", "keys": [QtCore.Qt.Key_Alt]},
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 1,
+                            "text": "AOp",
+                            "icon_path": media.select_opposite_image,
+                            "tooltip_template": helper.add_opposite_tooltip_text,
+                            "description": "Add the opposite control to the current selection.",
+                            "callback": keyTools.addSelectOpposite,
+                        },
+                        {
+                            "mask": 8,
+                            "text": "COp",
+                            "icon_path": media.copy_opposite_image,
+                            "tooltip_template": helper.copy_opposite_tooltip_text,
+                            "description": "Copy the opposite-name mapping for the current selection.",
+                            "callback": keyTools.copyOpposite,
+                        },
+                    ],
                     "default": True,
                 },
                 {
@@ -2612,7 +2839,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.copy_opposite_image,
                     "callback": keyTools.copyOpposite,
                     "tooltip_template": helper.copy_opposite_tooltip_text,
-                    "default": True,
                 },
             ]
         )
@@ -2666,6 +2892,20 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.copy_pose_image,
                     "callback": keyTools.copy_pose,
                     "tooltip_template": helper.copy_pose_tooltip_text,
+                    "shortcuts": [
+                        {"icon": media.copy_pose_image, "label": "Copy Pose", "keys": "Click"},
+                        {"icon": media.paste_pose_image, "label": "Paste Pose", "keys": [QtCore.Qt.Key_Control]},
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 4,
+                            "text": "PP",
+                            "icon_path": media.paste_pose_image,
+                            "tooltip_template": "Paste Pose",
+                            "description": "Paste the saved pose onto the current selection.",
+                            "callback": keyTools.paste_pose,
+                        }
+                    ],
                     "default": True,
                 },
                 {"key": "cp_paste_pose", "label": "Paste Pose", "icon_path": media.paste_pose_image, "callback": keyTools.paste_pose},
@@ -2691,6 +2931,42 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.copy_animation_image,
                     "callback": keyTools.copy_animation,
                     "tooltip_template": helper.copy_animation_tooltip_text,
+                    "shortcuts": [
+                        {"icon": media.copy_animation_image, "label": "Copy Animation", "keys": "Click"},
+                        {"icon": media.paste_animation_image, "label": "Paste Animation", "keys": [QtCore.Qt.Key_Control]},
+                        {"icon": media.paste_insert_animation_image, "label": "Paste Insert", "keys": [QtCore.Qt.Key_Shift]},
+                        {
+                            "icon": media.paste_opposite_animation_image,
+                            "label": "Paste Opposite",
+                            "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift],
+                        },
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 4,
+                            "text": "PA",
+                            "icon_path": media.paste_animation_image,
+                            "tooltip_template": helper.paste_animation_tooltip_text,
+                            "description": "Paste the saved animation onto the current selection.",
+                            "callback": keyTools.paste_animation,
+                        },
+                        {
+                            "mask": 1,
+                            "text": "PI",
+                            "icon_path": media.paste_insert_animation_image,
+                            "tooltip_template": helper.paste_insert_animation_tooltip_text,
+                            "description": "Insert the saved animation while preserving surrounding timing.",
+                            "callback": keyTools.paste_insert_animation,
+                        },
+                        {
+                            "mask": 5,
+                            "text": "PO",
+                            "icon_path": media.paste_opposite_animation_image,
+                            "tooltip_template": "Paste Opposite Animation",
+                            "description": "Paste the saved animation onto the opposite side controls.",
+                            "callback": keyTools.paste_opposite_animation,
+                        },
+                    ],
                     "default": True,
                 },
                 {
@@ -2749,6 +3025,38 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.follow_cam_image,
                     "callback": lambda *args: bar.create_follow_cam(translation=True, rotation=True),
                     "tooltip_template": helper.follow_cam_tooltip_text,
+                    "shortcuts": [
+                        {"icon": media.follow_cam_image, "label": "Follow Translation + Rotation", "keys": "Click"},
+                        {"icon": media.follow_cam_image, "label": "Follow Translation Only", "keys": [QtCore.Qt.Key_Shift]},
+                        {"icon": media.follow_cam_image, "label": "Follow Rotation Only", "keys": [QtCore.Qt.Key_Control]},
+                        {"icon": media.remove_image, "label": "Remove Follow Cam", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt]},
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 1,
+                            "text": "FT",
+                            "icon_path": media.follow_cam_image,
+                            "tooltip_template": "Follow Translation Only",
+                            "description": "Create a Follow Cam that inherits only translation.",
+                            "callback": lambda: bar.create_follow_cam(translation=True, rotation=False),
+                        },
+                        {
+                            "mask": 4,
+                            "text": "FR",
+                            "icon_path": media.follow_cam_image,
+                            "tooltip_template": "Follow Rotation Only",
+                            "description": "Create a Follow Cam that inherits only rotation.",
+                            "callback": lambda: bar.create_follow_cam(translation=False, rotation=True),
+                        },
+                        {
+                            "mask": 12,
+                            "text": "FX",
+                            "icon_path": media.remove_image,
+                            "tooltip_template": "Remove Follow Cam",
+                            "description": "Remove the current Follow Cam setup.",
+                            "callback": bar.remove_followCam,
+                        },
+                    ],
                     "default": True,
                 },
                 {
@@ -2843,8 +3151,22 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "key": "link_objects",
                     "label": "Link Objects",
                     "icon_path": media.link_objects_image,
-                    "callback": keyTools.mod_link_objects,
+                    "callback": keyTools.copy_link,
                     "tooltip_template": helper.link_objects_tooltip_text,
+                    "shortcuts": [
+                        {"icon": media.link_objects_copy_image, "label": "Copy Link Position", "keys": "Click"},
+                        {"icon": media.link_objects_paste_image, "label": "Paste Link Position", "keys": [QtCore.Qt.Key_Shift]},
+                    ],
+                    "shortcut_variants": [
+                        {
+                            "mask": 1,
+                            "text": "LP",
+                            "icon_path": media.link_objects_paste_image,
+                            "tooltip_template": "Paste Link Position",
+                            "description": "Apply the saved link relationship to the current selection.",
+                            "callback": keyTools.paste_link,
+                        }
+                    ],
                     "default": True,
                 },
                 {
@@ -2866,7 +3188,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "icon_path": media.link_objects_image,
                     "callback": toggle_auto_link_callback,
                     "checkable": True,
-                    "is_checked_fn": lambda: self.link_checkbox_state,
+                    "set_checked_fn": lambda: self.link_checkbox_state,
                     "pinnable": False,
                 },
                 "separator",
@@ -2890,6 +3212,42 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     icon_path=media.worldspace_copy_frame_image,
                     callback=bar.copy_worldspace_single_frame,
                     tooltip_template=helper.copy_worldspace_tooltip_text,
+                    shortcuts=[
+                        {"icon": media.worldspace_copy_frame_image, "label": "Copy World Space", "keys": "Click"},
+                        {"icon": media.worldspace_paste_frame_image, "label": "Paste World Space", "keys": [QtCore.Qt.Key_Control]},
+                        {"icon": media.worldspace_copy_animation_image, "label": "Copy World Space - Selected Range", "keys": [QtCore.Qt.Key_Shift]},
+                        {
+                            "icon": media.worldspace_paste_animation_image,
+                            "label": "Paste World Space - All Animation",
+                            "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift],
+                        },
+                    ],
+                    shortcut_variants=[
+                        {
+                            "mask": 4,
+                            "text": "WSP",
+                            "icon_path": media.worldspace_paste_frame_image,
+                            "tooltip_template": helper.paste_worldspace_tooltip_text,
+                            "description": "Paste the saved World Space position for the current frame.",
+                            "callback": bar.paste_worldspace_single_frame,
+                        },
+                        {
+                            "mask": 1,
+                            "text": "WSR",
+                            "icon_path": media.worldspace_copy_animation_image,
+                            "tooltip_template": helper.copy_worldspace_range_tooltip_text,
+                            "description": "Copy World Space positions for the selected range or full animation.",
+                            "callback": bar.copy_range_worldspace_animation,
+                        },
+                        {
+                            "mask": 5,
+                            "text": "WSA",
+                            "icon_path": media.worldspace_paste_animation_image,
+                            "tooltip_template": helper.paste_worldspace_animation_tooltip_text,
+                            "description": "Paste saved World Space positions for the selected range or all animation.",
+                            "callback": bar.color_worldspace_paste_animation,
+                        },
+                    ],
                     default=True,
                 ),
                 toolbox.get_tool(
@@ -2931,7 +3289,24 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Temp Pivot ----------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                toolbox.get_tool("temp_pivot", default=True),
+                toolbox.get_tool(
+                    "temp_pivot",
+                    shortcuts=[
+                        {"icon": media.temp_pivot_image, "label": "Create Temp Pivot", "keys": "Click"},
+                        {"icon": media.temp_pivot_image, "label": "Reuse Last Pivot", "keys": [QtCore.Qt.Key_Shift]},
+                    ],
+                    shortcut_variants=[
+                        {
+                            "mask": 1,
+                            "text": "TP+",
+                            "icon_path": media.temp_pivot_image,
+                            "tooltip_template": "Last Pivot Used",
+                            "description": "Recreate the most recently used Temp Pivot setup.",
+                            "callback": lambda: bar.create_temp_pivot(True),
+                        }
+                    ],
+                    default=True,
+                ),
                 toolbox.get_tool(
                     "tp_last_used", label="Last pivot used", icon_path=media.temp_pivot_image, callback=lambda: bar.create_temp_pivot(True)
                 ),
@@ -2957,15 +3332,87 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Key Menu -------------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                toolbox.get_tool("bake_animation_1", key="bk_bake_anim_1", default=True),
+                toolbox.get_tool(
+                    "bake_animation_1",
+                    key="bk_bake_anim_1",
+                    shortcuts=[
+                        {"icon": media.bake_animation_1_image, "label": "Bake on Ones", "keys": "Click"},
+                        {"icon": media.bake_animation_2_image, "label": "Bake on Twos", "keys": [QtCore.Qt.Key_Control]},
+                        {"icon": media.bake_animation_3_image, "label": "Bake on Threes", "keys": [QtCore.Qt.Key_Shift]},
+                        {"icon": media.bake_animation_3_image, "label": "Bake on Fours", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+                        {"icon": media.bake_animation_custom_image, "label": "Bake Custom Interval", "keys": [QtCore.Qt.Key_Alt]},
+                    ],
+                    shortcut_variants=[
+                        {
+                            "mask": 4,
+                            "text": "B2",
+                            "icon_path": media.bake_animation_2_image,
+                            "tooltip_template": helper.bake_animation_2_tooltip_text,
+                            "description": "Bake the animation using 2-frame steps.",
+                            "callback": keyTools.bake_animation_2,
+                        },
+                        {
+                            "mask": 1,
+                            "text": "B3",
+                            "icon_path": media.bake_animation_3_image,
+                            "tooltip_template": helper.bake_animation_3_tooltip_text,
+                            "description": "Bake the animation using 3-frame steps.",
+                            "callback": keyTools.bake_animation_3,
+                        },
+                        {
+                            "mask": 8,
+                            "text": "BC",
+                            "icon_path": media.bake_animation_custom_image,
+                            "tooltip_template": helper.bake_animation_custom_tooltip_text,
+                            "description": "Open the custom bake interval dialog.",
+                            "callback": bar.bake_animation_custom_window,
+                        },
+                        {
+                            "mask": 5,
+                            "text": "B4",
+                            "icon_path": media.bake_animation_3_image,
+                            "tooltip_template": "Bake on Fours",
+                            "description": "Bake the animation using 4-frame steps.",
+                            "callback": keyTools.bake_animation_4,
+                        },
+                    ],
+                    default=True,
+                ),
                 toolbox.get_tool("bake_animation_2", key="bk_bake_anim_2"),
                 toolbox.get_tool("bake_animation_3", key="bk_bake_anim_3"),
+                toolbox.get_tool("bake_animation_4", key="bk_bake_anim_4"),
                 toolbox.get_tool("bake_animation_custom", key="bk_bake_anim_custom"),
             ],
         )
         sec.addWidgetGroup(
             [
-                toolbox.get_tool("share_keys", default=True),
+                toolbox.get_tool(
+                    "share_keys",
+                    shortcuts=[
+                        {"icon": media.share_keys_image, "label": "Share Keys", "keys": "Click"},
+                        {"icon": media.reblock_keys_image, "label": "reBlock", "keys": [QtCore.Qt.Key_Shift]},
+                        {"icon": media.reblock_keys_image, "label": "Gimbal Fixer", "keys": [QtCore.Qt.Key_Control]},
+                    ],
+                    shortcut_variants=[
+                        {
+                            "mask": 1,
+                            "text": "rB",
+                            "icon_path": media.reblock_keys_image,
+                            "tooltip_template": helper.reblock_move_tooltip_text,
+                            "description": "Reblock the selected animation.",
+                            "callback": keyTools.reblock_move,
+                        },
+                        {
+                            "mask": 4,
+                            "text": "Gm",
+                            "icon_path": media.reblock_keys_image,
+                            "tooltip_template": helper.gimbal_fixer_tooltip_text,
+                            "description": "Open the Gimbal Fixer for the current selection.",
+                            "callback": bar.gimbal_fixer_window,
+                        },
+                    ],
+                    default=True,
+                ),
                 toolbox.get_tool("reblock", key="bk_reblock"),
                 toolbox.get_tool("gimbal", key="bk_gimbal"),
             ],
@@ -2982,7 +3429,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Auto Transparency",
                     "description": "Make floating windows translucent when not hovered.",
                     "checkable": True,
-                    "is_checked_fn": lambda: settings.get_setting(
+                    "set_checked_fn": lambda: settings.get_setting(
                         "orbit_auto_transparency",
                         True,
                         namespace=ui.ORBIT_SETTINGS_NAMESPACE,
@@ -3000,16 +3447,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             selection_sets_button_widget.setObjectName("toggle_selection_sets_workspace_b")
             ui.bind_selection_sets_toolbar_button(selection_sets_button_widget, controller=self)
 
-        # customGraph ----------------------------------------------------------------------------
-        def open_customGraph():
-            import TheKeyMachine.core.customGraph as cg  # type: ignore
-
-            cg.createCustomGraph(force=True)
-
-        sec.addWidgetGroup([toolbox.get_tool("custom_graph", callback=open_customGraph, default=True)])
-
         # custom tools ----------------------------------------------------------------------------
-        sec = new_section()
         orbit_button_widget = sec.addWidgetGroup(
             [
                 toolbox.get_tool("orbit", callback=None, default=True),
@@ -3018,7 +3456,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "label": "Auto Transparency",
                     "description": "Make the Orbit window translucent when not hovered.",
                     "checkable": True,
-                    "is_checked_fn": lambda: settings.get_setting(
+                    "set_checked_fn": lambda: settings.get_setting(
                         "orbit_auto_transparency",
                         True,
                         namespace=ui.ORBIT_SETTINGS_NAMESPACE,
@@ -3035,8 +3473,23 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if orbit_button_widget:
             self._setup_orbit_toolbar_button(orbit_button_widget)
 
+        # customGraph ----------------------------------------------------------------------------
+        graph_toolbar_button = sec.addWidgetGroup(
+            [
+                toolbox.get_tool(
+                    "custom_graph",
+                    checkable=True,
+                    set_checked=lambda: settings.get_setting("graph_toolbar_enabled", True),
+                    callback=lambda state: cg.set_graph_toolbar_enabled(bool(state), apply=True),
+                    default_visible=False,
+                )
+            ]
+        )
+        if graph_toolbar_button:
+            graph_toolbar_button.setObjectName("toggle_graph_toolbar_button")
+            cg.bind_graph_toolbar_toggle(graph_toolbar_button)
+
         invalidate_caches()
-        import TheKeyMachine_user_data.connect.tools.tools as connectToolBox  # type: ignore
 
         def initialize_tool_menu():
             reload(connectToolBox)
@@ -3097,20 +3550,17 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 "Open config file",
                 lambda: general.open_file("TheKeyMachine_user_data/connect/tools", "tools.py"),
             )
-            toolBox_menu.addAction(QtGui.QIcon(media.reload_image), "Reload menu", initialize_tool_menu)
 
         toolBox_button_widget = cw.QFlatToolButton(icon=media.custom_tools_image)
         toolBox_button_widget.setVisible(bool(CUSTOM_TOOLS_MENU))
-        sec.addWidget(toolBox_button_widget, "Custom Tools", "custom_tools", tooltip_template=helper.custom_tools_tooltip_text)
+        sec.addWidget(toolBox_button_widget, "Custom Tools", "custom_tools", tooltip_template=helper.custom_tools_tooltip_text, default_visible=False)
         toolBox_menu = QtWidgets.QMenu(toolBox_button_widget)
+        toolBox_menu.aboutToShow.connect(initialize_tool_menu)
         toolBox_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         toolBox_button_widget.customContextMenuRequested.connect(lambda pos: toolBox_menu.exec_(toolBox_button_widget.mapToGlobal(pos)))
         toolBox_button_widget.clicked.connect(lambda: toolBox_menu.exec_(QtGui.QCursor.pos()))
 
-        initialize_tool_menu()
-
         # custom scripts ----------------------------------------------------------------------------
-        import TheKeyMachine_user_data.connect.scripts.scripts as cbScripts  # type: ignore
 
         def initialize_scripts_menu():
             reload(cbScripts)
@@ -3171,20 +3621,26 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 "Open scripts file",
                 lambda: general.open_file("TheKeyMachine_user_data/connect/scripts", "scripts.py"),
             )
-            customScripts_menu.addAction(QtGui.QIcon(media.reload_image), "Reload menu", initialize_scripts_menu)
 
         customScripts_button_widget = cw.QFlatToolButton(icon=media.custom_scripts_image, tooltip_template=helper.custom_scripts_tooltip_text)
         customScripts_button_widget.setVisible(bool(CUSTOM_SCRIPTS_MENU))
-        sec.addWidget(customScripts_button_widget, "Custom Scripts", "custom_scripts", tooltip_template=helper.custom_scripts_tooltip_text)
+        sec.addWidget(
+            customScripts_button_widget,
+            "Custom Scripts",
+            "custom_scripts",
+            tooltip_template=helper.custom_scripts_tooltip_text,
+            default_visible=False,
+        )
 
         customScripts_menu = QtWidgets.QMenu(customScripts_button_widget)
         customScripts_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         customScripts_button_widget.customContextMenuRequested.connect(
             lambda pos: customScripts_menu.exec_(customScripts_button_widget.mapToGlobal(pos))
         )
+        customScripts_menu.aboutToShow.connect(initialize_scripts_menu)
         customScripts_button_widget.clicked.connect(lambda: customScripts_menu.exec_(QtGui.QCursor.pos()))
 
-        initialize_scripts_menu()
+        # initialize_scripts_menu()
 
         # _____________________ Workspaces Section ____________________________ #
         sec = new_section(hiddeable=False)
@@ -3270,7 +3726,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         overshoot_action.setChecked(overshootSliders)
         overshoot_action.toggled.connect(_setOvershoot)
 
-        graph_toolbar_enabled = settings.get_setting("graph_toolbar_enabled", True)
         graph_toolbar_action = settings_menu.addAction(
             QtGui.QIcon(media.customGraph_image),
             "Graph Editor Toolbar",
@@ -3281,56 +3736,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         def _on_graph_toolbar_toggled(state):
             cg.set_graph_toolbar_enabled(bool(state))
 
-        try:
-            graph_toolbar_action.blockSignals(True)
-            graph_toolbar_action.setChecked(graph_toolbar_enabled)
-        finally:
-            graph_toolbar_action.blockSignals(False)
-
         graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
-
-        def _sync_graph_toolbar_action(enabled):
-            try:
-                graph_toolbar_action.blockSignals(True)
-            except RuntimeError:
-                try:
-                    cg.custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
-                except Exception:
-                    pass
-                return
-
-            try:
-                graph_toolbar_action.setChecked(bool(enabled))
-            except RuntimeError:
-                try:
-                    cg.custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
-                except Exception:
-                    pass
-                return
-            finally:
-                try:
-                    graph_toolbar_action.blockSignals(False)
-                except RuntimeError:
-                    try:
-                        cg.custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
-                    except Exception:
-                        pass
-
-        try:
-            cg.custom_graph_bus.graph_toolbar_enabled_changed.connect(_sync_graph_toolbar_action)
-        except Exception:
-            pass
-
-        def _disconnect_graph_toolbar_action(*_args):
-            try:
-                cg.custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
-            except Exception:
-                pass
-
-        try:
-            graph_toolbar_action.destroyed.connect(_disconnect_graph_toolbar_action)
-        except Exception:
-            pass
+        cg.bind_graph_toolbar_toggle(graph_toolbar_action)
 
         settings_menu.addSection("Toolbar's icons alignment")
         align_group = QActionGroup(settings_menu)

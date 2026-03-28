@@ -4,12 +4,12 @@ from typing import Optional
 import importlib
 
 try:
-    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint
-    from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup
+    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent
+    from PySide6.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup
     from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout
 except ImportError:
-    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint
-    from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath
+    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent
+    from PySide2.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath
     from PySide2.QtWidgets import (
         QWidget,
         QHBoxLayout,
@@ -27,8 +27,9 @@ import TheKeyMachine.widgets.util as util
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.sliders import utils as slider_utils
+import TheKeyMachine.core.callback_manager as callbacks
 
-from TheKeyMachine.tooltips import QFlatTooltipManager
+from TheKeyMachine.tooltips import QFlatTooltipManager, format_tooltip_shortcut
 
 importlib.reload(ui)
 importlib.reload(util)
@@ -46,12 +47,13 @@ globalSignals = _GlobalSignals()
 class SliderMode:
     """Professional object representation of a slider mode."""
 
-    def __init__(self, key, label=None, icon=None, description="", worldSpace=False):
+    def __init__(self, key, label=None, icon=None, description="", worldSpace=False, shortcut=None):
         self.key = key
         self.label = label or key.replace("_", " ").title()
         self.icon = icon  # Short text for the handle
         self.description = description
         self.worldSpace = worldSpace
+        self.shortcut = list(shortcut or [])
 
     def __repr__(self):
         return f"<SliderMode {self.key}>"
@@ -75,6 +77,26 @@ PySide6 or PySide2 (Maya 2017+). No external COLOR import.
 
 
 COLOR = ui.Color()
+
+
+def _format_shortcut(shortcut) -> str:
+    return format_tooltip_shortcut(shortcut)
+
+
+def _shortcut_to_mask(shortcut) -> int:
+    shortcut = shortcut or []
+    mask = 0
+    if Qt.Key_Shift in shortcut:
+        mask |= 1
+    if Qt.Key_Control in shortcut:
+        mask |= 4
+    if Qt.Key_Alt in shortcut:
+        mask |= 8
+    return mask
+
+
+def _shortcut_requires_mid_click(shortcut) -> bool:
+    return Qt.MiddleButton in (shortcut or [])
 
 
 # --- tiny button with centered square ------------------------------------------
@@ -546,6 +568,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     dragStarted = Signal()
     dragFinished = Signal()
     modeSelected = Signal(str)
+    modeRequested = Signal(str, bool)
 
     def __init__(
         self,
@@ -572,9 +595,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._section_parent = None
         self._section_prefix = ""
         self._internal_key = ""
+        self._modifier_watch_connected = False
 
         self._modes: list[SliderMode | str] = []
         self._current_mode: Optional[SliderMode] = None
+        self._temporary_mode: Optional[SliderMode] = None
         self._menu = None
 
         self.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -582,13 +607,14 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         # base layout: only the slider; buttons live in overlay containers
         base = QHBoxLayout(self)
-        base.setContentsMargins(0, 0, 0, 0)
+        base.setContentsMargins(1, 0, 1, 0)
         base.setSpacing(0)
 
         self._slider = SliderHandle(self, text=text, color=color)
         self._slider.setRange(int(min * self._scale), int(max * self._scale))
         self._slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         base.addWidget(self._slider)
+        self._slider.installEventFilter(self)
 
         # overlay containers (left/right "stems"), on top of the slider
         self._leftOverlay = QWidget(self)
@@ -598,6 +624,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             ov.setMouseTracking(True)
             ov.setVisible(True)
             ov.setFixedHeight(self._slider._handle)
+            ov.installEventFilter(self)
 
         # layouts inside overlays
         self._leftLayout = QHBoxLayout(self._leftOverlay)
@@ -619,6 +646,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             b.clicked.connect(lambda _c=False, btn=b: self._on_button_clicked(btn))
             self._leftLayout.addWidget(b, 1)
             self._leftButtons.append(b)
+            b.installEventFilter(self)
 
         # right side buttons (AlignLeft)
         self._rightButtons = []
@@ -632,6 +660,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             b.clicked.connect(lambda _c=False, btn=b: self._on_button_clicked(btn))
             self._rightLayout.addWidget(b, 1)
             self._rightButtons.append(b)
+            b.installEventFilter(self)
 
         # bridge slider signals
         self._slider.started.connect(self._on_drag_started)
@@ -670,6 +699,74 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         # Accept wheel focus from anywhere in the widget
         self.setFocusPolicy(Qt.StrongFocus)
+
+    def _is_idle(self) -> bool:
+        return not self._slider._is_active()
+
+    def _is_pointer_over_widget(self) -> bool:
+        try:
+            return self.rect().contains(self.mapFromGlobal(QCursor.pos()))
+        except Exception:
+            return False
+
+    def _connect_modifier_watch(self):
+        if self._modifier_watch_connected:
+            return
+        try:
+            callbacks.get_callback_manager().modifiers_changed.connect(self._on_modifiers_changed)
+            self._modifier_watch_connected = True
+        except Exception:
+            self._modifier_watch_connected = False
+
+    def _disconnect_modifier_watch(self):
+        if not self._modifier_watch_connected:
+            return
+        try:
+            callbacks.get_callback_manager().modifiers_changed.disconnect(self._on_modifiers_changed)
+        except Exception:
+            pass
+        self._modifier_watch_connected = False
+
+    def _find_shortcut_mode(self, mask: int, requires_mid_click: bool) -> Optional[SliderMode]:
+        for mode in self._modes:
+            if not isinstance(mode, SliderMode):
+                continue
+            if _shortcut_requires_mid_click(mode.shortcut) != bool(requires_mid_click):
+                continue
+            if _shortcut_to_mask(mode.shortcut) != int(mask):
+                continue
+            return mode
+        return None
+
+    def _request_temporary_mode(self, mode_key: Optional[str]) -> bool:
+        if mode_key is None:
+            if not self._temporary_mode or not self._current_mode:
+                return False
+            self.modeRequested.emit(self._current_mode.key, True)
+            return True
+
+        active_preview_key = self._temporary_mode.key if self._temporary_mode else None
+        if active_preview_key == mode_key:
+            return False
+        if not self._temporary_mode and self._current_mode and self._current_mode.key == mode_key:
+            return False
+        self.modeRequested.emit(mode_key, True)
+        return True
+
+    def _apply_shortcut_mode(self, mask: int, requires_mid_click: bool = False) -> bool:
+        if not self._is_idle() or not self._is_pointer_over_widget():
+            return False
+        mode = self._find_shortcut_mode(mask, requires_mid_click)
+        if not mode:
+            return self._request_temporary_mode(None)
+        return self._request_temporary_mode(mode.key)
+
+    def _on_modifiers_changed(self, *_args):
+        if not self._is_idle():
+            return
+        if not self._is_pointer_over_widget():
+            return
+        self._apply_shortcut_mode(callbacks.get_modifier_mask(), requires_mid_click=False)
 
     # --- public API -------------------------------------------------------------
     def setText(self, text: str):
@@ -777,7 +874,36 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             else:
                 self._modes.append(m)  # Likely "separator"
 
-    def setCurrentMode(self, identifier: str):
+    def _apply_mode_visuals(self, mode: SliderMode):
+        if mode.icon:
+            self.setText(mode.icon)
+
+        self.setTooltipInfo(mode.label, mode.description)
+        self.setWorldSpace(mode.worldSpace)
+        self._refresh_help_feedback()
+
+    def _get_hover_help_target(self):
+        for widget in [self._slider] + self._leftButtons + self._rightButtons + [self]:
+            if widget is not None and widget.underMouse():
+                return widget
+        return self if self._is_pointer_over_widget() else None
+
+    def _refresh_help_feedback(self):
+        target = self._get_hover_help_target()
+        if not target:
+            return
+        data = getattr(target, "_help_data", None)
+        if not data:
+            return
+
+        # Keep Maya status/help channels and the floating tooltip in sync.
+        cw.HelpSystem.push(target, data.get("tooltip_template") or data.get("text", ""), data.get("description", ""))
+        if not self._is_pointer_over_widget():
+            return
+        QFlatTooltipManager.hide()
+        QFlatTooltipManager.delayed_show(anchor_widget=target, **data)
+
+    def setCurrentMode(self, identifier: str, temporary: bool = False):
         """Updates the current mode and adjusts UI accordingly."""
         found = None
         for m in self._modes:
@@ -786,22 +912,27 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                 break
 
         if found:
-            # Notify the section BEFORE changing _current_mode so it can unregister the old key
-            section = getattr(self, "_section_parent", None)
-            if section and hasattr(section, "notify_mode_changed"):
-                old_key = self._current_mode.key if self._current_mode else None
-                section.notify_mode_changed(self, old_key, found.key)
+            if temporary:
+                if self._current_mode and found.key == self._current_mode.key:
+                    self._temporary_mode = None
+                    self._apply_mode_visuals(self._current_mode)
+                else:
+                    self._temporary_mode = found
+                    self._apply_mode_visuals(found)
+            else:
+                # Notify the section BEFORE changing _current_mode so it can unregister the old key
+                section = getattr(self, "_section_parent", None)
+                if section and hasattr(section, "notify_mode_changed"):
+                    old_key = self._current_mode.key if self._current_mode else None
+                    section.notify_mode_changed(self, old_key, found.key)
 
-            self._current_mode = found
-            if found.icon:
-                self.setText(found.icon)
-
-            # Update Tooltips/StatusTip
-            self.setTooltipInfo(found.label, found.description)
-            self.setWorldSpace(found.worldSpace)
+                self._current_mode = found
+                self._temporary_mode = None
+                self._apply_mode_visuals(found)
         else:
             # Fallback for initialization or unknown keys
             self._current_mode = None
+            self._temporary_mode = None
 
     def on_added_to_section(self, section, key: str):
         """Called automatically by QFlatSectionWidget to establish a stable reference."""
@@ -817,6 +948,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     def _get_active_mode(self) -> Optional[SliderMode]:
         """Returns the current mode object, or the first available one as fallback."""
         if self._current_mode:
+            if self._temporary_mode:
+                return self._temporary_mode
             return self._current_mode
         for m in self._modes:
             if isinstance(m, SliderMode):
@@ -826,11 +959,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     def _show_context_menu(self, pos: QPoint):
         if not self._modes:
             return
-
         # Use the stable reference established during section registration
         section = self._section_parent
 
         menu = cw.MenuWidget(parent=self)
+        menu.setTearOffEnabled(False)
         group = QActionGroup(menu)
         active = self._get_active_mode()
 
@@ -839,7 +972,12 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                 menu.addSeparator()
                 continue
 
-            act = menu.addAction(mode.label, description=mode.description)
+            label = mode.label
+            shortcut_text = _format_shortcut(getattr(mode, "shortcut", None))
+            if shortcut_text:
+                label = "{}\t{}".format(mode.label, shortcut_text)
+
+            act = menu.addAction(label, description=mode.description)
             act.setCheckable(True)
             act.setActionGroup(group)
 
@@ -858,9 +996,23 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                 act.setEnabled(False)
 
             act.triggered.connect(lambda *args, m=mode: self.modeSelected.emit(m.key))
+            act.triggered.connect(lambda *args, m=mode: self.modeRequested.emit(m.key, False))
 
         menu.exec_(self.mapToGlobal(pos))
         menu.deleteLater()
+
+    def eventFilter(self, obj, event):
+        try:
+            event_type = event.type()
+        except Exception:
+            return QWidget.eventFilter(self, obj, event)
+
+        if event_type == QEvent.MouseButtonPress and getattr(event, "button", lambda: None)() == Qt.MiddleButton:
+            if self._apply_shortcut_mode(callbacks.get_modifier_mask(), requires_mid_click=True):
+                event.accept()
+                return True
+
+        return QWidget.eventFilter(self, obj, event)
 
     # --- geometry mgmt for overlays --------------------------------------------
     def resizeEvent(self, e):
@@ -954,7 +1106,15 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                 pass
 
     def leaveEvent(self, e):
+        self._disconnect_modifier_watch()
+        self._request_temporary_mode(None)
         # Finalize the interaction if we were wheeling when the mouse leaves the widget
         if self._slider and self._slider._pressOffset is not None and not self._slider.isSliderDown():
             self._slider._reset_without_emit()
         super().leaveEvent(e)
+
+    def enterEvent(self, e):
+        self._connect_modifier_watch()
+        if self._is_idle():
+            self._apply_shortcut_mode(callbacks.get_modifier_mask(), requires_mid_click=False)
+        super().enterEvent(e)

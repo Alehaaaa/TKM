@@ -47,6 +47,8 @@ import math
 import re
 from collections import Counter
 
+import TheKeyMachine.core.callback_manager as callbacks
+
 
 import TheKeyMachine.widgets.util as util
 import TheKeyMachine.mods.generalMod as general
@@ -216,8 +218,8 @@ def find_all_roots_in_selection():
 
 def mod_link_objects(*args):
     # Get the current state of the modifiers
-    mods = mel.eval("getModifiers")
-    shift_pressed = bool(mods % 2)  # Check if Shift is pressed
+    mods = callbacks.get_modifier_mask()
+    shift_pressed = bool(mods & 1)
 
     if shift_pressed:
         paste_link()
@@ -652,6 +654,10 @@ def bake_animation_2(*args):
 
 def bake_animation_3(*args):
     bake_animation(bake_interval=3)
+
+
+def bake_animation_4(*args):
+    bake_animation(bake_interval=4)
 
 
 # ____________________________________________________ ShiftKeys Box _____________________________________________________________#
@@ -1594,8 +1600,8 @@ def flipFromKeyframe():
 
 def mod_overlap_animation(*args):
     # Get the current state of the modifiers
-    mods = mel.eval("getModifiers")
-    shift_pressed = bool(mods % 2)  # Check if Shift is pressed
+    mods = callbacks.get_modifier_mask()
+    shift_pressed = bool(mods & 1)
 
     if shift_pressed:
         overlap_backward()
@@ -1745,9 +1751,9 @@ def toggleLock():
 
 def reset_objects_mods(*args):
     # Get the current state of the modifiers
-    mods = mel.eval("getModifiers")
-    shift_pressed = bool(mods % 2)  # Check if Shift is pressed
-    ctrl_pressed = bool(mods & 4)  # Check if Ctrl is pressed
+    mods = callbacks.get_modifier_mask()
+    shift_pressed = bool(mods & 1)
+    ctrl_pressed = bool(mods & 4)
 
     if shift_pressed:
         reset_object_values(reset_translations=True)
@@ -2050,8 +2056,8 @@ def find_opposite_name(name):
 
 
 def selectOppositeHandler(*args):
-    mods = mel.eval("getModifiers")
-    shift_pressed = bool(mods % 2)  # Shift
+    mods = callbacks.get_modifier_mask()
+    shift_pressed = bool(mods & 1)
 
     if shift_pressed:
         addSelectOpposite(args)

@@ -5,6 +5,7 @@ from functools import partial
 
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
+import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
 
 try:
     import TheKeyMachine_user_data.preferences.user_preferences as user_preferences  # type: ignore
@@ -216,7 +217,7 @@ class LogoAction(QtWidgets.QWidgetAction):
         layout.setContentsMargins(0, 10, 0, 10)
         layout.setSpacing(0)
 
-        logo_pix = QtGui.QPixmap(media.getImage("TheKeyMachine_logo_250.png"))
+        logo_pix = QtGui.QPixmap(media.TheKeyMachine_logo_250_image)
         if not logo_pix.isNull():
             self.logo_label = QtWidgets.QLabel()
             self.logo_label.setPixmap(logo_pix.scaledToHeight(DPI(60), QtCore.Qt.SmoothTransformation))
@@ -582,12 +583,17 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         tooltip_template=None,
         description=None,
         shortcuts=None,
+        shortcut_variants=None,
         highlight=False,
         pressed_color=None,
     ):
         super().__init__(parent)
         self.setAutoRaise(True)
         self.pressed_color = pressed_color or "#666666"
+        self._modifier_watch_connected = False
+        self._shortcut_variants = []
+        self._variant_state_lock = False
+        self._active_variant_mask = None
 
         if text:
             self.setText(text)
@@ -633,20 +639,197 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
 
         self._icon_path = icon
         self._highlight = highlight
+        self._base_state = {
+            "text": text,
+            "description": description,
+            "shortcuts": shortcuts or [],
+            "tooltip_template": tooltip_template,
+            "icon": icon,
+        }
         if icon:
-            self.setIcon(icon)
-        self.setToolTipData(text=tooltip_template or text, description=description, shortcuts=shortcuts, tooltip_template=tooltip_template, icon=icon)
+            self._apply_icon_visual(icon)
+        self.setToolTipData(
+            text=tooltip_template or text,
+            description=description,
+            shortcuts=shortcuts,
+            tooltip_template=tooltip_template,
+            icon=icon,
+        )
+        self.setShortcutVariants(shortcut_variants or [])
 
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
         if isinstance(icon, (str, bytes)):
             self._icon_path = str(icon)
-            QFlatHoverableIcon.apply(self, self._icon_path, highlight=self._highlight)
-            # Update tooltip icon as well
+            self._apply_icon_visual(self._icon_path)
             data = getattr(self, "_help_data", {})
             self.setToolTipData(icon=self._icon_path, **data)
         elif icon:
             super().setIcon(icon)
+
+    def setToolTipData(self, **kwargs):
+        super().setToolTipData(**kwargs)
+        if not self._variant_state_lock:
+            self._base_state["text"] = kwargs.get("text", self._base_state.get("text"))
+            self._base_state["description"] = kwargs.get("description", self._base_state.get("description"))
+            self._base_state["shortcuts"] = kwargs.get("shortcuts", self._base_state.get("shortcuts", []))
+            self._base_state["tooltip_template"] = kwargs.get("tooltip_template", self._base_state.get("tooltip_template"))
+            self._base_state["icon"] = kwargs.get("icon", self._base_state.get("icon"))
+
+    def setShortcutVariants(self, variants):
+        self._shortcut_variants = list(variants or [])
+        self._active_variant_mask = None
+
+    def triggerToolCallback(self, base_callback):
+        variant = self._get_active_shortcut_variant()
+        callback = variant.get("callback") if variant else None
+        if callback:
+            return callback()
+        if base_callback:
+            return base_callback()
+
+    def _apply_icon_visual(self, icon):
+        if isinstance(icon, (str, bytes)):
+            QFlatHoverableIcon.apply(self, str(icon), highlight=self._highlight)
+        elif icon:
+            super().setIcon(icon)
+
+    def _get_active_shortcut_variant(self):
+        if not self._shortcut_variants:
+            return None
+        current_mask = callbacks.get_modifier_mask()
+        best = None
+        best_bits = -1
+        for variant in self._shortcut_variants:
+            mask = int(variant.get("mask", 0))
+            if current_mask != mask:
+                continue
+            bits = bin(mask).count("1")
+            if bits > best_bits:
+                best = variant
+                best_bits = bits
+        return best
+
+    def _apply_display_state(self, state):
+        self._variant_state_lock = True
+        try:
+            text = state.get("text")
+            tooltip_template = state.get("tooltip_template", text)
+            description = state.get("description", "")
+            shortcuts = state.get("shortcuts", [])
+            icon = state.get("icon")
+            self.setText(text or "")
+            self._apply_icon_visual(icon)
+            TooltipMixin.setToolTipData(
+                self,
+                text=tooltip_template or text,
+                description=description,
+                shortcuts=shortcuts,
+                tooltip_template=tooltip_template,
+                icon=icon,
+            )
+            HelpSystem.push(self, tooltip_template or text or "", description or "")
+        finally:
+            self._variant_state_lock = False
+
+    def _variant_to_state(self, variant):
+        if not variant:
+            return {
+                "text": self._base_state.get("text"),
+                "description": self._base_state.get("description"),
+                "shortcuts": self._base_state.get("shortcuts", []),
+                "tooltip_template": self._base_state.get("tooltip_template"),
+                "icon": self._base_state.get("icon"),
+            }
+        return {
+            "text": variant.get("text", self._base_state.get("text")),
+            "description": variant.get("description", ""),
+            "shortcuts": variant.get("shortcuts", []),
+            "tooltip_template": variant.get("tooltip_template", variant.get("text", self._base_state.get("text"))),
+            "icon": variant.get("icon_path", self._base_state.get("icon")),
+        }
+
+    def _refresh_modifier_variant_state(self):
+        variant = self._get_active_shortcut_variant()
+        target_mask = int(variant.get("mask", 0)) if variant else None
+        if target_mask == self._active_variant_mask:
+            return False
+        self._active_variant_mask = target_mask
+        self._apply_display_state(self._variant_to_state(variant))
+        return True
+
+    def _restore_base_state(self):
+        if self._active_variant_mask is None:
+            return
+        self._active_variant_mask = None
+        self._apply_display_state(self._variant_to_state(None))
+
+    def _connect_modifier_variant_watch(self):
+        if not self._shortcut_variants or self._modifier_watch_connected:
+            return
+        try:
+            callbacks.get_callback_manager().modifiers_changed.connect(self._on_modifier_state_changed)
+            self._modifier_watch_connected = True
+        except Exception:
+            self._modifier_watch_connected = False
+
+    def _disconnect_modifier_variant_watch(self):
+        if not self._modifier_watch_connected:
+            return
+        try:
+            callbacks.get_callback_manager().modifiers_changed.disconnect(self._on_modifier_state_changed)
+        except Exception:
+            pass
+        self._modifier_watch_connected = False
+
+    def _on_modifier_state_changed(self, *_args):
+        if not self.underMouse() or not self._shortcut_variants:
+            return
+        if not self._refresh_modifier_variant_state():
+            return
+        QFlatTooltipManager.hide()
+        data = getattr(self, "_help_data", {})
+        if data.get("text") or data.get("description") or data.get("tooltip_template"):
+            QFlatTooltipManager.delayed_show(anchor_widget=self, **data)
+
+    def enterEvent(self, event: QtCore.QEvent):
+        self._connect_modifier_variant_watch()
+        if self._shortcut_variants and callbacks.get_modifier_mask():
+            self._refresh_modifier_variant_state()
+        TooltipMixin.enterEvent(self, event)
+
+    def leaveEvent(self, event: QtCore.QEvent):
+        self._disconnect_modifier_variant_watch()
+        if self._shortcut_variants:
+            self._restore_base_state()
+        TooltipMixin.leaveEvent(self, event)
+
+
+class QFlatSelectorButton(QFlatToolButton):
+    def __init__(self, parent=None, icon=None, tooltip_template=None, description=None):
+        super().__init__(parent=parent, icon=icon, tooltip_template=tooltip_template, description=description)
+        self._count_text = "0"
+        self.setText("")
+        self.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly)
+
+    def setCount(self, value):
+        self._count_text = str(value)
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.TextAntialiasing)
+
+        font = painter.font()
+        font.setBold(False)
+        font.setPixelSize(DPI(11))
+        painter.setFont(font)
+
+        color = QtGui.QColor("#ffffff" if self.underMouse() or self.isDown() or self.isChecked() else "#bfbfbf")
+        painter.setPen(color)
+        rect = self.rect().translated(0, -DPI(3))
+        painter.drawText(rect, QtCore.Qt.AlignCenter, self._count_text)
 
 
 class QFlowLayout(QtWidgets.QLayout):
@@ -896,7 +1079,6 @@ class QFillFlowLayout(QtWidgets.QLayout):
             for row_items, row_width, row_height in rows:
                 count = len(row_items)
                 total_spacing = spacing_x * max(0, count - 1)
-                base_width = row_width - total_spacing
                 extra_width = max(0, available_width - row_width)
                 extra_each, extra_remainder = divmod(extra_width, count)
                 current_x = effective_rect.x()
@@ -1000,11 +1182,13 @@ class InlineRenameButton(QtWidgets.QPushButton):
         super().__init__(text, parent)
         self._renaming_active = False
         self._original_text = text
-        self._rename_locked_width = None
+        self._rename_hidden_text_stylesheet = None
         self._rename_payload = None
         self._rename_commit_callback = None
         editor_class = line_edit_class or InlineRenameLineEdit
         self.inline_rename_field = editor_class(self)
+        self.inline_rename_field.setFrame(False)
+        self.inline_rename_field.setAlignment(QtCore.Qt.AlignCenter)
         self.inline_rename_field.hide()
         self.inline_rename_field.returnPressed.connect(self._finish_inline_rename)
         self.inline_rename_field.editingFinished.connect(self._finish_inline_rename)
@@ -1031,14 +1215,12 @@ class InlineRenameButton(QtWidgets.QPushButton):
         if not self._rename_commit_callback or self._rename_payload is None:
             return
         self._renaming_active = True
-        self._rename_locked_width = self.width()
-        if self._rename_locked_width > 0:
-            self.setFixedWidth(self._rename_locked_width)
         self._position_inline_rename()
         self._sync_inline_rename_style()
         self.inline_rename_field.setText(self._original_text)
-        self.setText("")
+        self._apply_hidden_text_style(True)
         self.inline_rename_field.show()
+        self.inline_rename_field.raise_()
         self.inline_rename_field.setFocus(QtCore.Qt.ActiveWindowFocusReason)
         self.inline_rename_field.selectAll()
         self.update()
@@ -1053,32 +1235,42 @@ class InlineRenameButton(QtWidgets.QPushButton):
         self._renaming_active = False
         new_name = self.inline_rename_field.text().strip()
         self.inline_rename_field.hide()
-        self.setMinimumWidth(0)
-        self.setMaximumWidth(16777215)
-        self.setText(self._original_text)
+        self._apply_hidden_text_style(False)
         self.update()
-        if (
-            new_name
-            and new_name != self._original_text
-            and self._rename_commit_callback
-            and self._rename_payload is not None
-        ):
+        if new_name and new_name != self._original_text and self._rename_commit_callback and self._rename_payload is not None:
             self._rename_commit_callback(self._rename_payload, new_name)
 
+    def _apply_hidden_text_style(self, enabled):
+        if enabled:
+            if self._rename_hidden_text_stylesheet is None:
+                self._rename_hidden_text_stylesheet = self.styleSheet()
+            self.setStyleSheet(
+                self._rename_hidden_text_stylesheet
+                + """
+                QPushButton {
+                    color: transparent;
+                }
+                QPushButton:hover {
+                    color: transparent;
+                }
+                """
+            )
+        elif self._rename_hidden_text_stylesheet is not None:
+            self.setStyleSheet(self._rename_hidden_text_stylesheet)
+            self._rename_hidden_text_stylesheet = None
+
     def _sync_inline_rename_style(self):
-        bg_color = self.property("tkm_base_color") or "#333333"
         text_color = self.property("tkm_text_color") or "#1a1a1a"
         self.inline_rename_field.setStyleSheet(
             """
             QLineEdit {
-                background-color: %s;
+                background-color: transparent;
                 border: none;
                 color: %s;
                 padding: 0px 6px;
-                border-radius: 5px;
             }
             """
-            % (bg_color, text_color)
+            % text_color
         )
 
 
@@ -1186,12 +1378,18 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             # If no description/template provided to addWidget, try to preserve widget's own data
             d = description
             tt = tooltip_template
+            existing = getattr(widget, "_help_data", {}) if hasattr(widget, "_help_data") else {}
             if not d and not tt and hasattr(widget, "_help_data"):
-                existing = widget._help_data
                 d = existing.get("description")
                 tt = existing.get("tooltip_template")
 
-            widget.setToolTipData(text=label, description=d or "", tooltip_template=tt)
+            widget.setToolTipData(
+                text=label,
+                description=d or "",
+                shortcuts=existing.get("shortcuts", []),
+                tooltip_template=tt,
+                icon=existing.get("icon"),
+            )
         else:
             HelpSystem.push(widget, tooltip_template or label, description or "")
 
@@ -1214,7 +1412,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             List of action descriptors or the string ``"separator"``.
             Each descriptor dict may contain:
               key, label, icon_path, callback,
-              checkable (bool), is_checked_fn (callable), tooltip, description.
+             checkable (bool), set_checked_fn (callable), tooltip, description.
         default_visible : bool
         description : str
         """
@@ -1229,19 +1427,45 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 text=default_item.get("text"),
                 tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or default_item.get("label"),
                 description=default_item.get("description") or "",
+                shortcuts=default_item.get("shortcuts"),
+                shortcut_variants=default_item.get("shortcut_variants"),
             )
             label = default_item.get("label", "Unknown")
             key = default_item.get("key", "unknown")
+            checkable = default_item.get("checkable", False)
+            set_checked_fn = default_item.get("set_checked_fn")
+            item_default_visible = default_item.get("default_visible", default_visible)
+
+            widget.setCheckable(checkable)
+            if checkable and set_checked_fn:
+                try:
+                    widget.setChecked(set_checked_fn())
+                except Exception:
+                    pass
 
             if "callback" in default_item:
-                widget.clicked.connect(default_item["callback"])
+                callback = default_item["callback"]
+                if checkable:
+
+                    def _checked_cb(*args, cb=callback, b=widget, fn=set_checked_fn):
+                        checked = bool(args[0]) if args else b.isChecked()
+                        cb(checked)
+                        if fn and isValid(b):
+                            try:
+                                b.setChecked(fn())
+                            except Exception:
+                                pass
+
+                    widget.clicked.connect(_checked_cb)
+                else:
+                    widget.clicked.connect(lambda *_args, cb=callback, w=widget: w.triggerToolCallback(cb))
 
             # 1. Register the main widget in the section
             self.addWidget(
                 widget,
                 label,
                 key,
-                default_visible=default_visible,
+                default_visible=item_default_visible,
                 description=default_item.get("description"),
                 tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or label,
             )
@@ -1265,7 +1489,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         "icon_path": item.get("icon_path"),
                         "callback": item.get("callback"),
                         "checkable": item.get("checkable", False),
-                        "is_checked_fn": item.get("is_checked_fn"),
+                        "set_checked_fn": item.get("set_checked_fn"),
                         "tooltip_template": item.get("tooltip_template") or item.get("tooltip"),
                         "description": item.get("description"),
                     }
@@ -1294,7 +1518,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 act_icon_p = item.get("icon_path") or ""
                 cb = item.get("callback")
                 checkable = item.get("checkable", False)
-                is_checked_f = item.get("is_checked_fn")
+                is_checked_f = item.get("set_checked_fn")
 
                 # Use raw label for display, but full tooltip for documentation
                 display_label = item.get("label", "")
@@ -1360,8 +1584,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 label       - display label
                 icon_path   - path to icon (or None)
                 callback    - callable to invoke on click
-                checkable   - bool (optional, default False)
-                is_checked_fn - callable() -> bool (optional, for checkable items)
+                set_checked bool (optional, default False)
+                set_checked_fn - callable() -> bool (optional, for checkable items)
                 tooltip     - str (optional)
                 description - str (optional)
         menu_factory : callable() -> QMenu (optional)
@@ -1424,20 +1648,20 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         description = act_info.get("description", "")
         callback = act_info.get("callback")
         checkable = act_info.get("checkable", False)
-        is_checked_fn = act_info.get("is_checked_fn")
+        set_checked_fn = act_info.get("set_checked_fn")
 
         btn = QFlatToolButton(icon=icon_path or None, tooltip_template=tooltip_template, description=description)
         btn.setCheckable(checkable)
-        if checkable and is_checked_fn:
+        if checkable and set_checked_fn:
             try:
-                btn.setChecked(is_checked_fn())
+                btn.setChecked(set_checked_fn())
             except Exception:
                 pass
 
         if callback:
             if checkable:
 
-                def _checked_cb(checked, cb=callback, b=btn, fn=is_checked_fn):
+                def _checked_cb(checked, cb=callback, b=btn, fn=set_checked_fn):
                     cb(checked)
                     if fn and isValid(b):
                         try:

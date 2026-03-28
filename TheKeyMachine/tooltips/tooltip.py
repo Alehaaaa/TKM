@@ -10,6 +10,7 @@ try:
         QFrame,
         QMenu,
         QApplication,
+        QSizePolicy,
     )
     from PySide6.QtGui import (  # type: ignore
         QColor,
@@ -39,6 +40,7 @@ except ImportError:
         QFrame,
         QMenu,
         QApplication,
+        QSizePolicy,
     )
     from PySide2.QtGui import (
         QColor,
@@ -71,6 +73,44 @@ RE_IMG_EXTRACT = re.compile(r"<img[^>]*src=['\"](.*?)['\"]", re.IGNORECASE)
 RE_TAG_STRIP = re.compile(r"<[^>]*>")
 RE_LEADING_BR = re.compile(r"^\s*<br\s*/?>", re.IGNORECASE)
 
+IS_MAC = sys.platform == "darwin"
+SHORTCUT_KEY_MAP = {
+    Qt.Key_Alt: "⌥" if IS_MAC else "Alt",
+    Qt.Key_Shift: "⇧" if IS_MAC else "Shift",
+    Qt.Key_Control: "⌘" if IS_MAC else "Ctrl",
+    Qt.MiddleButton: "Click" if IS_MAC else "MidClick",
+}
+SHORTCUT_KEY_ORDER = [Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift, Qt.MiddleButton]
+
+
+def format_tooltip_shortcut(keys_list, include_click_suffix=False):
+    keys_list = list(keys_list or [])
+    if not keys_list:
+        return ""
+
+    keys_set = set(keys_list)
+    parts = [SHORTCUT_KEY_MAP[key] for key in SHORTCUT_KEY_ORDER if key in keys_set]
+    seen_labels = set(parts)
+
+    if len(parts) < len(keys_set):
+        for key in keys_list:
+            if key in SHORTCUT_KEY_MAP:
+                continue
+            label = str(key)
+            if label in seen_labels:
+                continue
+            parts.append(label)
+            seen_labels.add(label)
+
+    if not parts:
+        return ""
+
+    separator = "" if IS_MAC else "+"
+    result = separator.join(parts)
+    if include_click_suffix:
+        return result + "+Click"
+    return result
+
 
 class QFlatTooltip(QWidget):
     """A floating tooltip with an arrow pointing to its source."""
@@ -87,14 +127,6 @@ class QFlatTooltip(QWidget):
     MAX_WIDTH = 320
     MIN_WIDTH = 220
 
-    IS_MAC = sys.platform == "darwin"
-    KEY_MAP = {
-        Qt.Key_Alt: "⌥" if IS_MAC else "Alt",
-        Qt.Key_Shift: "⇧" if IS_MAC else "Shift",
-        Qt.Key_Control: "⌘" if IS_MAC else "Ctrl",
-    }
-    KEY_ORDER = [Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift]
-
     def __init__(self, text="", anchor_widget=None, icon=None, shortcuts=None, description=None, tooltip_template=None, icon_obj=None):
         QWidget.__init__(self, wutil.get_maya_qt())
         self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -107,6 +139,7 @@ class QFlatTooltip(QWidget):
         self.text = text
         self.description = description
         self.icon_path = icon  # Store for reference
+        self._shortcut_min_width = 0
 
         # 1. Build base template if not provided
         if not tooltip_template:
@@ -187,15 +220,7 @@ class QFlatTooltip(QWidget):
         self.close()
 
     def _format_keys(self, keys_list):
-        keys_set = set(keys_list)
-        parts = [self.KEY_MAP[k] for k in self.KEY_ORDER if k in keys_set]
-
-        if len(parts) < len(keys_list):
-            for k in keys_list:
-                if k not in self.KEY_MAP:
-                    parts.append(str(k))
-
-        return ("" if self.IS_MAC else "+").join(parts) + "+Click"
+        return format_tooltip_shortcut(keys_list, include_click_suffix=True)
 
     def _setup_ui(self):
         self.main_layout = QVBoxLayout(self)
@@ -342,6 +367,11 @@ class QFlatTooltip(QWidget):
         self.bg_layout.addWidget(frame)
         self.bg_layout.addSpacing(wutil.DPI(12))
 
+        max_row_width = 0
+        shortcut_font = self.font()
+        shortcut_font.setPixelSize(wutil.DPI(9.5))
+        shortcut_metrics = QFontMetrics(shortcut_font)
+
         for sh in self.shortcuts:
             row = QHBoxLayout()
             row.setContentsMargins(wutil.DPI(12), 0, wutil.DPI(12), 0)
@@ -349,10 +379,14 @@ class QFlatTooltip(QWidget):
 
             icon_path = sh.get("icon", "default")
             pix = QPixmap(icon_path)
-            row.addWidget(self._create_icon_label(pix))
+            row.addWidget(self._create_icon_label(pix, dim=24))
 
-            name = QLabel(sh.get("label", ""))
-            name.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5)))
+            label_text = sh.get("label", "")
+            name = QLabel(label_text)
+            name.setWordWrap(False)
+            name.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+            name.setMinimumWidth(shortcut_metrics.horizontalAdvance(label_text))
+            name.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(9.5)))
             row.addWidget(name)
             row.addStretch()
 
@@ -360,12 +394,29 @@ class QFlatTooltip(QWidget):
             if isinstance(command, list):
                 command = self._format_keys(command)
             keys = QLabel(command)
-            keys.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5)))
+            keys.setWordWrap(False)
+            keys.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+            keys.setMinimumWidth(shortcut_metrics.horizontalAdvance(command))
+            keys.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(9.5)))
             row.addWidget(keys)
             self.bg_layout.addLayout(row)
             self.bg_layout.addSpacing(wutil.DPI(4))
 
+            row_width = (
+                wutil.DPI(24)
+                + wutil.DPI(20)
+                + shortcut_metrics.horizontalAdvance(label_text)
+                + wutil.DPI(20)
+                + shortcut_metrics.horizontalAdvance(command)
+                + wutil.DPI(24)
+            )
+            max_row_width = max(max_row_width, row_width)
+
         self.bg_layout.addSpacing(wutil.DPI(16))
+        if max_row_width:
+            self._shortcut_min_width = min(max_row_width, wutil.DPI(460))
+            self.bg_frame.setMinimumWidth(max(self.bg_frame.minimumWidth(), self._shortcut_min_width))
+            self.bg_frame.setMaximumWidth(max(wutil.DPI(self.MAX_WIDTH), self._shortcut_min_width))
 
     def _create_icon_label(self, source, dim=32):
         lbl = QLabel()

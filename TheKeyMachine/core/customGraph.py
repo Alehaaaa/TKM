@@ -48,6 +48,7 @@ from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
+import TheKeyMachine.core.callback_manager as callbacks  # type: ignore
 
 mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolbox]
 
@@ -67,14 +68,107 @@ class CustomGraphBus(QtCore.QObject):
 custom_graph_bus = CustomGraphBus()
 
 
-def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
-    settings.set_setting("graph_toolbar_enabled", bool(enabled))
+def get_graph_toolbar_checkbox_state() -> bool:
+    return bool(settings.get_setting("graph_toolbar_enabled", True))
+
+
+def is_graph_toolbar_visible() -> bool:
+    return bool(cmds.columnLayout(_GRAPH_LAYOUT, exists=True))
+
+
+def emit_graph_toolbar_state() -> None:
     try:
-        custom_graph_bus.graph_toolbar_enabled_changed.emit(bool(enabled))
+        custom_graph_bus.graph_toolbar_enabled_changed.emit(get_graph_toolbar_checkbox_state())
     except Exception:
         pass
+
+
+def sync_graph_toolbar_watch() -> None:
+    try:
+        callbacks.get_callback_manager().set_graph_editor_watch_enabled(get_graph_toolbar_checkbox_state())
+    except Exception:
+        pass
+
+
+def _set_checked_safely(widget, checked: bool) -> bool:
+    signal_blocker = getattr(widget, "blockSignals", None)
+    blocked = False
+    if callable(signal_blocker):
+        try:
+            blocked = widget.blockSignals(True)
+        except Exception:
+            blocked = False
+
+    try:
+        widget.setChecked(bool(checked))
+        return True
+    except Exception:
+        return False
+    finally:
+        if callable(signal_blocker):
+            try:
+                widget.blockSignals(blocked)
+            except Exception:
+                pass
+
+
+def bind_graph_toolbar_toggle(widget) -> None:
+    """Keep a checkable Qt widget synced with the graph toolbar setting bus."""
+    if not widget:
+        return
+
+    def _sync(enabled):
+        try:
+            if not wutil.is_valid_widget(widget):
+                try:
+                    custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync)
+                except Exception:
+                    pass
+                return
+        except Exception:
+            pass
+
+        if not _set_checked_safely(widget, bool(enabled)):
+            try:
+                custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync)
+            except Exception:
+                pass
+        return
+
+    try:
+        _set_checked_safely(widget, get_graph_toolbar_checkbox_state())
+    except Exception:
+        pass
+
+    try:
+        custom_graph_bus.graph_toolbar_enabled_changed.connect(_sync)
+    except Exception:
+        pass
+
+    def _disconnect(*_args):
+        try:
+            custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync)
+        except Exception:
+            pass
+
+    destroyed_signal = getattr(widget, "destroyed", None)
+    if destroyed_signal:
+        try:
+            destroyed_signal.connect(_disconnect)
+        except Exception:
+            pass
+
+
+def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
+    settings.set_setting("graph_toolbar_enabled", bool(enabled))
+    sync_graph_toolbar_watch()
+    emit_graph_toolbar_state()
     if not apply:
         return
+
+    if enabled and is_graph_toolbar_visible():
+        return
+
     # Defer UI changes to avoid deleting UI while menus/actions are mid-execution.
     try:
         if enabled:
@@ -94,6 +188,32 @@ def removeCustomGraph() -> None:
             cmds.deleteUI(_GRAPH_LAYOUT)
         except Exception:
             pass
+    emit_graph_toolbar_state()
+
+
+def _show_graph_editor() -> None:
+    """Open and raise Maya's Graph Editor window for explicit toolbar launches."""
+    try:
+        cmds.GraphEditor()
+    except Exception:
+        pass
+
+    try:
+        if cmds.window("graphEditor1Window", exists=True):
+            cmds.showWindow("graphEditor1Window")
+    except Exception:
+        pass
+
+    try:
+        ptr = mui.MQtUtil.findWindow("graphEditor1Window")
+        graph_window = wutil.get_maya_qt(ptr, QtWidgets.QWidget) if ptr else None
+        if graph_window:
+            if hasattr(graph_window, "showNormal"):
+                graph_window.showNormal()
+            graph_window.raise_()
+            graph_window.activateWindow()
+    except Exception:
+        pass
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -150,53 +270,8 @@ def create_settings_menu(parent_button):
     def _on_graph_toolbar_toggled(state):
         set_graph_toolbar_enabled(bool(state))
 
-    try:
-        graph_toolbar_action.blockSignals(True)
-        graph_toolbar_action.setChecked(settings.get_setting("graph_toolbar_enabled", True))
-    finally:
-        graph_toolbar_action.blockSignals(False)
-
     graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
-
-    def _sync_graph_toolbar_action(enabled):
-        try:
-            graph_toolbar_action.blockSignals(True)
-        except RuntimeError:
-            try:
-                custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
-            except Exception:
-                pass
-            return
-
-        try:
-            graph_toolbar_action.setChecked(bool(enabled))
-        except RuntimeError:
-            try:
-                custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
-            except Exception:
-                pass
-            return
-        finally:
-            try:
-                graph_toolbar_action.blockSignals(False)
-            except RuntimeError:
-                try:
-                    custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
-                except Exception:
-                    pass
-
-    custom_graph_bus.graph_toolbar_enabled_changed.connect(_sync_graph_toolbar_action)
-
-    def _disconnect_graph_toolbar_action(*_args):
-        try:
-            custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync_graph_toolbar_action)
-        except Exception:
-            pass
-
-    try:
-        graph_toolbar_action.destroyed.connect(_disconnect_graph_toolbar_action)
-    except Exception:
-        pass
+    bind_graph_toolbar_toggle(graph_toolbar_action)
 
     settings_menu.addSection("Toolbar's icons alignment")
     align_group = QActionGroup(settings_menu)
@@ -224,7 +299,12 @@ def create_settings_menu(parent_button):
     settings_menu.addAction("Add TKM Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys.")
 
     settings_menu.addSection("General")
-    settings_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", createCustomGraph, description="Refresh the TKM interface.")
+    settings_menu.addAction(
+        QtGui.QIcon(media.close_image),
+        "Close",
+        lambda: QtCore.QTimer.singleShot(0, removeCustomGraph),
+        description="Close only the TKM Graph Editor toolbar.",
+    )
 
     menu.addSeparator()
     menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
@@ -243,7 +323,7 @@ def create_tool_button(icon=None, text="", tooltip_template="", description="", 
     return btn
 
 
-def createCustomGraph(*_args, force: bool = False, **_kwargs):
+def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs):
     if not force and not settings.get_setting("graph_toolbar_enabled", True):
         removeCustomGraph()
         return
@@ -256,15 +336,22 @@ def createCustomGraph(*_args, force: bool = False, **_kwargs):
     graph_vis = cmds.getPanel(vis=True)
     layout = _GRAPH_LAYOUT
 
+    if "graphEditor1" not in graph_vis:
+        if not force:
+            return
+        _show_graph_editor()
+        graph_vis = cmds.getPanel(vis=True) or []
+        if "graphEditor1" not in graph_vis:
+            if _attempt < 5:
+                QtCore.QTimer.singleShot(100, lambda: createCustomGraph(force=True, _attempt=_attempt + 1))
+            return
+
     if "graphEditor1" in graph_vis:
         if cmds.columnLayout(layout, exists=True):
             cmds.deleteUI(layout)
             cmds.columnLayout(layout, adj=1, p="graphEditor1")
         else:
             cmds.columnLayout(layout, adj=1, p="graphEditor1")
-    else:
-        cmds.GraphEditor()
-        cmds.columnLayout(layout, adj=1, p="graphEditor1")
 
     flow_qw = cw.QFlowContainer()
     flow_qw.setObjectName("tkm_customGraph_flowToolbar")
@@ -366,20 +453,22 @@ def createCustomGraph(*_args, force: bool = False, **_kwargs):
 
             # Setup mode switching for this specific slider instance
             def make_mode_setter(slider_instance, prefix_val):
-                def setter(new_mode):
+                def setter(new_mode, temporary=False):
                     # For compatibility, if they change mode via the slider's OWN menu,
                     # we update the global setting and the slider's state.
-                    settings.set_setting(f"graph_{prefix_val}_mode", new_mode)
-                    slider_instance.setCurrentMode(new_mode)
+                    if not temporary:
+                        settings.set_setting(f"graph_{prefix_val}_mode", new_mode)
+                    slider_instance.setCurrentMode(new_mode, temporary=temporary)
                     # Find info for new mode to update tooltip
                     m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
                     if m_info:
                         slider_instance.setTooltipInfo(m_info["label"], m_info.get("description", ""))
-                    slider_instance.startFlash()
+                    if not temporary:
+                        slider_instance.startFlash()
 
                 return setter
 
-            s.modeSelected.connect(make_mode_setter(s, prefix))
+            s.modeRequested.connect(make_mode_setter(s, prefix))
 
             sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
 

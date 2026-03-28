@@ -36,6 +36,8 @@ import sys
 import math
 import importlib
 
+import TheKeyMachine.core.callback_manager as callbacks
+
 
 # ----------------------------------------------------------------------
 
@@ -133,8 +135,8 @@ def openCustomGraph():
 
 def mod_delete_animation(*args):
     # Get the current state of the modifiers
-    mods = mel.eval("getModifiers")
-    shift_pressed = bool(mods % 2)  # Check if Shift is pressed
+    mods = callbacks.get_modifier_mask()
+    shift_pressed = bool(mods & 1)
 
     if shift_pressed:
         delete_time_slider_animation()
@@ -566,10 +568,6 @@ def selectHierarchy():
 
 
 def create_temp_pivot(use_saved_position=False, *args):
-    attribute_callback_id = None
-    time_callback_id = None
-    process_callback = True
-
     seleccion = cmds.ls(selection=True)
 
     if not seleccion:
@@ -578,9 +576,6 @@ def create_temp_pivot(use_saved_position=False, *args):
     if cmds.objExists("tkm_temp_pivot"):
         cmds.warning("Temp pivot already exists. Please unselect the current object to remove it")
         return
-
-    # Variables globales
-    temp_pivot_relative_data = {}
 
     def get_temp_pivot_relation():
         cmds.undoInfo(openChunk=True)
@@ -823,8 +818,8 @@ def create_temp_pivot(use_saved_position=False, *args):
 
 def mod_worldspace_copy_animation(*args):
     # Get the current state of the modifiers
-    mods = mel.eval("getModifiers")
-    shift_pressed = bool(mods % 2)  # Check if Shift is pressed
+    mods = callbacks.get_modifier_mask()
+    shift_pressed = bool(mods & 1)
 
     if shift_pressed:
         color_worldspace_paste_animation()
@@ -1129,70 +1124,70 @@ def paste_worldspace_single_frame(*args):
                 pass
 
 
-def worldspace_paste_animation(*args):
-    original_time = cmds.currentTime(query=True)
+# def worldspace_paste_animation(*args):
+#     original_time = cmds.currentTime(query=True)
 
-    # Rutas
-    worldspace_anim_data_file = general.get_copy_worldspace_data_file()
+#     # Rutas
+#     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
 
-    if not os.path.exists(worldspace_anim_data_file):
-        return util.make_inViewMessage("No World Space animation data found")
+#     if not os.path.exists(worldspace_anim_data_file):
+#         return util.make_inViewMessage("No World Space animation data found")
 
-    with open(worldspace_anim_data_file, "r") as json_file:
-        payload = json.load(json_file)
+#     with open(worldspace_anim_data_file, "r") as json_file:
+#         payload = json.load(json_file)
 
-    # Filtrar solo objetos existentes en la escena
-    if isinstance(payload, dict) and "data" in payload:
-        animation_data = payload.get("data") or {}
-    else:
-        animation_data = payload or {}
-    existing_objects = {obj: data for obj, data in animation_data.items() if cmds.objExists(obj)}
+#     # Filtrar solo objetos existentes en la escena
+#     if isinstance(payload, dict) and "data" in payload:
+#         animation_data = payload.get("data") or {}
+#     else:
+#         animation_data = payload or {}
+#     existing_objects = {obj: data for obj, data in animation_data.items() if cmds.objExists(obj)}
 
-    if not existing_objects:
-        cmds.warning("Objects not found in the scene. Animation paste aborted")
-        return
+#     if not existing_objects:
+#         cmds.warning("Objects not found in the scene. Animation paste aborted")
+#         return
 
-    # Eliminar animación previa de los objetos existentes
-    for obj in existing_objects.keys():
-        cmds.cutKey(obj, attribute=["tx", "ty", "tz", "rx", "ry", "rz"])
+#     # Eliminar animación previa de los objetos existentes
+#     for obj in existing_objects.keys():
+#         cmds.cutKey(obj, attribute=["tx", "ty", "tz", "rx", "ry", "rz"])
 
-    # Obtener todos los frames únicos donde hay animación
-    all_frames = sorted(set(frame for obj_data in existing_objects.values() for frame in obj_data.keys()), key=int)
+#     # Obtener todos los frames únicos donde hay animación
+#     all_frames = sorted(set(frame for obj_data in existing_objects.values() for frame in obj_data.keys()), key=int)
 
-    # Suspender la actualización de la vista
-    cmds.refresh(suspend=True)
+#     # Suspender la actualización de la vista
+#     cmds.refresh(suspend=True)
 
-    # Crear barra de progreso
-    gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
-    cmds.progressBar(
-        gMainProgressBar,
-        edit=True,
-        beginProgress=True,
-        isInterruptable=True,
-        status="Pasting World Space animation...",
-        maxValue=len(all_frames),
-    )
+#     # Crear barra de progreso
+#     gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
+#     cmds.progressBar(
+#         gMainProgressBar,
+#         edit=True,
+#         beginProgress=True,
+#         isInterruptable=True,
+#         status="Pasting World Space animation...",
+#         maxValue=len(all_frames),
+#     )
 
-    try:
-        for frame in all_frames:
-            cmds.progressBar(gMainProgressBar, edit=True, step=1)
-            if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
-                break
+#     try:
+#         for frame in all_frames:
+#             cmds.progressBar(gMainProgressBar, edit=True, step=1)
+#             if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
+#                 break
 
-            cmds.currentTime(frame)
-            for obj, obj_data in existing_objects.items():
-                if frame in obj_data:
-                    values = obj_data[frame]
-                    cmds.xform(obj, translation=values[:3], worldSpace=True)
-                    cmds.xform(obj, rotation=values[3:], worldSpace=True)
-                    cmds.setKeyframe(obj)
+#             cmds.currentTime(frame)
+#             for obj, obj_data in existing_objects.items():
+#                 if frame in obj_data:
+#                     values = obj_data[frame]
+#                     cmds.xform(obj, translation=values[:3], worldSpace=True)
+#                     cmds.xform(obj, rotation=values[3:], worldSpace=True)
+#                     cmds.setKeyframe(obj)
 
-    finally:
-        cmds.filterCurve(list(existing_objects.keys()))  # Filtrar solo los objetos válidos
-        cmds.refresh(suspend=False)
-        cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
-        cmds.currentTime(original_time)
-        pass
+#     finally:
+#         cmds.filterCurve(list(existing_objects.keys()))  # Filtrar solo los objetos válidos
+#         cmds.refresh(suspend=False)
+#         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
+#         cmds.currentTime(original_time)
+#         pass
 
 
 # Override: selection-aware World Space animation paste
@@ -1324,11 +1319,11 @@ def worldspace_paste_animation(*args):
 
 def mod_tracer(*args):
     # Get the current state of the modifiers
-    mods = mel.eval("getModifiers")
+    mods = callbacks.get_modifier_mask()
 
-    shift_pressed = bool(mods & 1)  # Check if Shift is pressed
-    ctrl_pressed = bool(mods & 4)  # Check if Ctrl is pressed
-    alt_pressed = bool(mods & 8)  # Check if Alt is pressed
+    shift_pressed = bool(mods & 1)
+    ctrl_pressed = bool(mods & 4)
+    alt_pressed = bool(mods & 8)
 
     if shift_pressed:
         tracer_refresh()
@@ -1536,7 +1531,7 @@ def remove_followCam(*args):
     global followCam_original_camera
     # Obtén el panel con el foco actualmente
     panel = cmds.playblast(activeEditor=True)
-    current_camera = cmds.modelEditor(panel, query=True, camera=True)
+    # current_camera = cmds.modelEditor(panel, query=True, camera=True)
 
     if cmds.objExists("tkm_followCam"):
         cmds.delete("tkm_followCam")
@@ -1922,7 +1917,7 @@ def update_rotation_order(window):
         if button:
             button.setText(order)
 
-    quality_names = ["Best", "Good", "Moderate", "Average", "Poor", "Inadequate"]
+    # quality_names = ["Best", "Good", "Moderate", "Average", "Poor", "Inadequate"]
 
     for quality_name, (tolerance, order) in zip(["Best", "Good", "Moderate", "Average", "Poor", "Inadequate"], sorted_tolerances):
         line_edit = window.findChild(QtWidgets.QLineEdit, f"{quality_name.lower()}_edit")
@@ -2519,7 +2514,7 @@ def micro_move_post_drag():
         if cmds.objExists(driver_name):
             cmds.delete(driver_name)
 
-        current_frame = cmds.currentTime(query=True)
+        # current_frame = cmds.currentTime(query=True)
         micro_move_paste_animation(selected)
 
         for attr, value in translate_values.items():
@@ -2677,7 +2672,7 @@ def micro_rotate_post_deferred():
         if cmds.objExists(driver_name):
             cmds.delete(driver_name)
 
-        current_frame = cmds.currentTime(query=True)
+        # current_frame = cmds.currentTime(query=True)
         micro_rotate_paste_animation(selected)
 
         for attr, value in rotate_values.items():

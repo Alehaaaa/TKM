@@ -61,6 +61,14 @@ TOOL_DEFINITIONS = {
         "callback": keyTools.bake_animation_3,
         "tooltip_template": helper.bake_animation_3_tooltip_text,
     },
+    "bake_animation_4": {
+        "key": "bake_animation_4",
+        "label": "Bake on Fours",
+        "text": "BA",
+        "icon_path": media.bake_animation_3_image,
+        "callback": keyTools.bake_animation_4,
+        "tooltip_template": "Bake on Fours",
+    },
     "orbit": {
         "key": "orbit",
         "label": "ToolBox Orbit",
@@ -145,8 +153,8 @@ TOOL_DEFINITIONS = {
     },
     "custom_graph": {
         "key": "custom_graph",
-        "label": "Custom Graph",
-        "text": "CG",
+        "label": "Graph Editor Toolbar",
+        "text": "GE",
         "icon_path": media.customGraph_image,
         "tooltip_template": helper.customGraph_tooltip_text,
     },
