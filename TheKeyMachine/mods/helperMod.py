@@ -19,12 +19,8 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 import os
 
-try:
-    from PySide6.QtWidgets import QApplication
-except ImportError:
-    from PySide2.QtWidgets import QApplication, QDesktopWidget
-
 import TheKeyMachine.mods.mediaMod as media
+import TheKeyMachine.widgets.util as wutil
 from TheKeyMachine.mods.generalMod import config
 
 INSTALL_PATH = config["INSTALL_PATH"]
@@ -41,42 +37,8 @@ def getImage(image):
 
 
 # style ------------------------------------
-
-
-def get_screen_resolution():
-    app = QApplication.instance()
-    if not app:
-        app = QApplication([])
-
-    try:
-        # PySide6
-        screen = app.primaryScreen()
-        screen_rect = screen.geometry()
-    except Exception:
-        # PySide2
-        desktop = QDesktopWidget()
-        screen_rect = desktop.screenGeometry()
-
-    screen_width = screen_rect.width()
-    screen_height = screen_rect.height()
-
-    return screen_width, screen_height
-
-
-def get_font_sizes():
-    screen_width, screen_height = get_screen_resolution()
-
-    if screen_width >= 4000:
-        font_size_enun = "25px"
-        font_size = "18px"
-    else:
-        font_size_enun = "20px"
-        font_size = "12px"
-
-    return font_size_enun, font_size
-
-
-font_size_enun, font_size = get_font_sizes()
+font_size_enun = "{}px".format(int(round(wutil.DPR(20))))
+font_size = "{}px".format(int(round(wutil.DPR(6))))
 
 
 # ----------------------------------------------  TOOLTIPS  --------------------------------------------------------

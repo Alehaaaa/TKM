@@ -188,7 +188,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
                 if not is_glow:
                     # Black linework on top
-                    pen = QPen(QColor(COLOR.color.darkGray))
+                    pen = QPen(QColor(COLOR.color.darkGray.hex))
                     pen.setWidthF(0.85)
                     p.setPen(pen)
                     p.setBrush(Qt.NoBrush)
@@ -363,12 +363,12 @@ class SliderHandle(cw.TooltipMixin, QSlider):
             handle_bg = self._color
             handle_border = "none"
         else:
-            handle_bg = COLOR.color.gray
-            handle_border = f"{util.DPI(1)}px solid {COLOR.color.darkerGray}"
+            handle_bg = COLOR.color.gray.hex
+            handle_border = f"{util.DPI(1)}px solid {COLOR.color.darkerGray.hex}"
         self.setStyleSheet(
             f"""
 QSlider::groove:horizontal {{
-    background: {COLOR.color.darkGray};
+    background: {COLOR.color.darkGray.hex};
     height: {gh}px;
     border-radius: {self._handle_radius}px;
     margin: 0;
@@ -501,7 +501,7 @@ QSlider::handle:horizontal {{
         path.addText(tx, ty, self._text_font, self._text)
 
         # Draw thin outline (drawn first so it sits BEHIND the fill, growing only outwards)
-        p.setPen(QPen(QColor(COLOR.color.darkGray), util.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        p.setPen(QPen(QColor(COLOR.color.darkGray.hex), util.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         p.setBrush(Qt.NoBrush)
         p.drawPath(path)
 
@@ -548,7 +548,7 @@ QSlider::handle:horizontal {{
             align = Qt.AlignVCenter | Qt.AlignLeft
 
         p.setFont(self._value_font)
-        p.setPen(QColor(COLOR.color.lightGray))
+        p.setPen(QColor(COLOR.color.lightGray.hex))
         p.drawText(text_rect, align, f"{self.value() / 1000.0:.2f}")
         p.end()
 

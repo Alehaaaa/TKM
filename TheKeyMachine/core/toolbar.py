@@ -253,14 +253,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.link_obj_toggle_state = False
         self.link_obj_thread = None
 
-        # Utility for determining screen resolution
-        screen_width, screen_height = wutil.get_screen_resolution()
-        self.screen_width = screen_width
-
         self.buildUI()
 
-        # Attempt to load customGraph
-        QTimer.singleShot(6000, self.load_customGraph_try_01)
+        # Reconcile Graph Editor state at startup; ongoing tracking uses the event filter.
+        QTimer.singleShot(0, self._sync_graph_editor_on_startup)
 
     def closeEvent(self, event):
         """
@@ -313,6 +309,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if not settings.get_setting("graph_toolbar_enabled", True):
             return
         QTimer.singleShot(0, cg.createCustomGraph)
+
+    def _sync_graph_editor_on_startup(self):
+        if not isValid(self):
+            return
+        if not settings.get_setting("graph_toolbar_enabled", True):
+            return
+
+        graph_vis = cmds.getPanel(vis=True) or []
+        if "graphEditor1" in graph_vis:
+            QTimer.singleShot(0, cg.createCustomGraph)
 
     def showWindow(self):
         # Build up kwargs for the visibleChangeCommand
@@ -546,25 +552,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.dock_menu.aboutToShow.connect(self.update_dock_menu)
 
         return self.dock_menu
-
-    # These two functions attempt to check if the Graph Editor is open and load customGraph in that case; they are made with two attempts
-    def load_customGraph_try_01(self):
-        if not isValid(self):
-            return
-        graph_vis = cmds.getPanel(vis=True)
-        if graph_vis and "graphEditor1" in graph_vis:
-            cg.createCustomGraph()
-        else:
-            QTimer.singleShot(8000, self.load_customGraph_try_02)
-
-    def load_customGraph_try_02(self):
-        if not isValid(self):
-            return
-        graph_vis = cmds.getPanel(vis=True)
-        if graph_vis and "graphEditor1" in graph_vis:
-            cg.createCustomGraph()
-        else:
-            pass
 
     # For use with toggle functionality on Shelf or Launcher
     def toggle(self, *args):
@@ -1449,32 +1436,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if removed_any:
             cmds.evalDeferred(self.create_buttons_for_sel_sets)
 
-    color_names = {
-        "_01": "Red Light",
-        "_02": "Red",
-        "_03": "Red Dark",
-        "_04": "Orange Light",
-        "_05": "Orange",
-        "_06": "Orange Dark",
-        "_07": "Yellow Light",
-        "_08": "Yellow",
-        "_09": "Yellow Dark",
-        "_10": "Green Light",
-        "_11": "Green",
-        "_12": "Green Dark",
-        "_13": "Blue Light",
-        "_14": "Blue",
-        "_15": "Blue Dark",
-        "_16": "Teal Light",
-        "_17": "Teal",
-        "_18": "Teal Dark",
-        "_19": "Purple Light",
-        "_20": "Purple",
-        "_21": "Purple Dark",
-        "_22": "Pink Light",
-        "_23": "Pink",
-        "_24": "Pink Dark",
-    }
+    color_names = dict(ui.selectionSetsApi.selection_set_color_names)
 
     def create_color_submenu(self, set_name, parent_menu):
         for color_suffix, image_path in media.selection_set_color_images.items():
@@ -2407,7 +2369,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         add_mode_sliders(
             sliders.BLEND_MODES,
             "blend",
-            COLOR.color.green,
+            COLOR.color.green.hex,
             sliders.execute_curve_modifier,
             sliders.stop_dragging,
             default_modes=["connect_neighbors"],
@@ -2415,7 +2377,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         add_mode_sliders(
             sliders.TWEEN_MODES,
             "tween",
-            COLOR.color.yellow,
+            COLOR.color.yellow.hex,
             sliders.execute_tween,
             sliders.stop_dragging,
             default_modes=["tweener"],

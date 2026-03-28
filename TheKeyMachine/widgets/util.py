@@ -12,6 +12,7 @@ except ImportError:
     from PySide2.QtCore import QSignalBlocker
     from PySide2.QtWidgets import QSlider, QMainWindow
 
+from TheKeyMachine.mods import mediaMod as media
 
 def DPI(val):
     return omui.MQtUtil.dpiScale(val)
@@ -91,7 +92,6 @@ class ResetWithoutEmit:
 
 
 def make_inViewMessage(message, icon=None):
-    from TheKeyMachine.mods import mediaMod as media
 
     if not icon:
         icon = media.tool_icon
@@ -101,7 +101,7 @@ def make_inViewMessage(message, icon=None):
         icon = ""
 
     cmds.inViewMessage(
-        amg='<div style="text-align:center"><img src=' + icon + ">\n" + message + "\n",
+        amg='<div style="text-align:center"><img src="' + icon + '">\n\n' + message + "\n\n\n",
         pos="midCenter",
         a=0.9,
         fade=True,

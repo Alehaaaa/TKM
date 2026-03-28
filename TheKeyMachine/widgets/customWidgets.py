@@ -1326,7 +1326,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 }
             """)
 
-            self._overlay_btn.clicked.connect(self._show_menu)
+            self._overlay_btn.pressed.connect(lambda: self.open_menu(QtGui.QCursor.pos()))
 
     def addWidget(self, widget, label, key, default_visible=True, description=None, tooltip_template=None):
         """Add a widget to the section with a toggle key."""
@@ -1888,13 +1888,20 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 break
             parent = parent.parent()
 
-    def _show_menu(self):
-        if not self._hiddeable:
-            return
+    def _add_checkable_menu_action(self, menu, key, label, checked, handler, description="", title=None, icon=None):
+        if icon and not icon.isNull():
+            action = menu.addAction(icon, label, description=description)
+        else:
+            action = menu.addAction(label, description=description)
+        action.setCheckable(True)
+        action.setChecked(bool(checked))
+        action.triggered.connect(handler)
+        HelpSystem.push(action, title or label, description or "")
+        menu._tkm_actions[key] = action
+        return action
 
-        menu = OpenMenuWidget(self)
+    def _populate_menu(self, menu):
         menu._tkm_actions = {}
-        self._active_menu = menu
 
         if self._all_modes:
             # Mode-driven sections (sliders): build from the full mode list.
@@ -1907,11 +1914,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 slot_key = self._mode_to_slot.get(mode.key)
                 widget = self._widgets.get(slot_key) if slot_key else None
                 is_visible = widget is not None and isValid(widget) and widget.isVisible()
-
-                action = menu.addAction(mode.label, description=mode.description)
-                action.setCheckable(True)
-                action.setChecked(is_visible)
-                menu._tkm_actions[mode.key] = action
 
                 def make_mode_toggle(mk):
                     def handler(checked):
@@ -1929,7 +1931,15 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                     return handler
 
-                action.triggered.connect(make_mode_toggle(mode.key))
+                self._add_checkable_menu_action(
+                    menu,
+                    mode.key,
+                    mode.label,
+                    is_visible,
+                    make_mode_toggle(mode.key),
+                    description=mode.description,
+                    title=mode.label,
+                )
 
         else:
             # Non-slider sections (toolbar buttons): build from registration metadata
@@ -1941,16 +1951,15 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     widget = self._widgets.get(key)
                     if not widget or not isValid(widget):
                         continue
-                    action = menu.addAction(item["label"], description=item["description"])
-                    HelpSystem.push(
-                        action,
-                        title=item.get("tooltip_template") or item.get("tooltip") or item["label"],
+                    self._add_checkable_menu_action(
+                        menu,
+                        key,
+                        item["label"],
+                        widget.isVisible(),
+                        self._make_toggle_handler(key),
                         description=item.get("description") or "",
+                        title=item.get("tooltip_template") or item.get("tooltip") or item["label"],
                     )
-                    action.setCheckable(True)
-                    action.setChecked(widget.isVisible())
-                    action.triggered.connect(self._make_toggle_handler(key))
-                    menu._tkm_actions[key] = action
 
                     # If this widget has a registered action group, show its pinnable
                     # sub-actions inline (separated) so the user can pin them as buttons.
@@ -1968,15 +1977,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                             existing_btn = self._pinned_action_buttons.get(act_key)
                             is_pinned = bool(existing_btn and isValid(existing_btn))
 
-                            sub_action = menu.addAction(QtGui.QIcon(act_icon_path or ""), act_label)
-                            HelpSystem.push(
-                                sub_action,
-                                title=act_info.get("tooltip_template") or act_info.get("tooltip") or act_label,
-                                description=act_info.get("description") or "",
-                            )
-                            sub_action.setCheckable(True)
-                            sub_action.setChecked(is_pinned)
-
                             def _make_pin_handler(gk, ai, ak):
                                 def handler(checked):
                                     if checked:
@@ -1988,7 +1988,17 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                                 return handler
 
-                            sub_action.triggered.connect(_make_pin_handler(key, act_info, act_key))
+                            icon = QtGui.QIcon(act_icon_path or "") if act_icon_path else QtGui.QIcon()
+                            self._add_checkable_menu_action(
+                                menu,
+                                act_key,
+                                act_label,
+                                is_pinned,
+                                _make_pin_handler(key, act_info, act_key),
+                                description=act_info.get("description") or "",
+                                title=act_info.get("tooltip_template") or act_info.get("tooltip") or act_label,
+                                icon=icon,
+                            )
 
                         menu.addSeparator()
 
@@ -2004,8 +2014,28 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         else:
             pin_all_action.triggered.connect(self.pin_widget_all)
 
-        menu.exec_(QtGui.QCursor.pos())
+    def _build_menu(self):
+        if not self._hiddeable:
+            return None
+
+        menu = OpenMenuWidget(self)
+        self._populate_menu(menu)
+
+        return menu
+
+    def open_menu(self, global_pos=None):
+        if global_pos is None:
+            global_pos = QtGui.QCursor.pos()
+
+        menu = self._build_menu()
+        if not menu:
+            return
+        self._active_menu = menu
+        menu.exec_(global_pos)
         self._active_menu = None
+
+    def _show_menu(self):
+        self.open_menu(QtGui.QCursor.pos())
 
     def enterEvent(self, event):
         if self._hiddeable:

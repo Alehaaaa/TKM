@@ -60,26 +60,6 @@ python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 # _____________________________________________________ General _______________________________________________________________#
 
 
-def get_screen_resolution():
-    app = QApplication.instance()
-    if not app:
-        app = QApplication([])
-
-    try:
-        # PySide6
-        screen = app.primaryScreen()
-        screen_rect = screen.geometry()
-    except Exception:
-        # PySide2
-        desktop = QDesktopWidget()
-        screen_rect = desktop.screenGeometry()
-
-    screen_width = screen_rect.width()
-    screen_height = screen_rect.height()
-
-    return screen_width, screen_height
-
-
 def clear_timeslider_selection():
     # fix temporal para limpiar el timeslider
     selection = cmds.ls(selection=True)

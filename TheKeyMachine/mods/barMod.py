@@ -60,28 +60,6 @@ down_one_level_var = False
 original_bg_color = None
 original_fg_color = None
 original_key_color = None
-
-
-def get_screen_resolution():
-    app = QtWidgets.QApplication.instance()
-    if not app:
-        app = QtWidgets.QApplication([])
-
-    try:
-        # PySide6
-        screen = app.primaryScreen()
-        screen_rect = screen.geometry()
-    except Exception:
-        # PySide2
-        desktop = QtWidgets.QDesktopWidget()
-        screen_rect = desktop.screenGeometry()
-
-    screen_width = screen_rect.width()
-    screen_height = screen_rect.height()
-
-    return screen_width, screen_height
-
-
 def set_temp_timeslider_colors():
     global python_version, original_bg_color, original_fg_color, original_key_color
 
@@ -2063,7 +2041,7 @@ def convert_rotation_order(rot_order="zxy"):
 
 
 def gimbal_fixer_build():
-    screen_width, screen_height = get_screen_resolution()
+    screen_width, screen_height = util.get_screen_resolution()
     screen_width = screen_width
 
     # 4K fix

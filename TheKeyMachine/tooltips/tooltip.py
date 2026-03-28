@@ -31,6 +31,10 @@ try:
         QTimer,
         QRect,
     )
+    try:
+        from PySide6.QtSvg import QSvgRenderer  # type: ignore
+    except ImportError:
+        QSvgRenderer = None  # type: ignore
 except ImportError:
     from PySide2.QtWidgets import (
         QWidget,
@@ -61,13 +65,16 @@ except ImportError:
         QTimer,
         QRect,
     )
+    try:
+        from PySide2.QtSvg import QSvgRenderer  # type: ignore
+    except ImportError:
+        QSvgRenderer = None  # type: ignore
 
 from TheKeyMachine.widgets import util as wutil
 
 
 # Pre-compiled regular expressions for high-performance tooltip parsing
 RE_BR_SPLIT = re.compile(r"<br\s*/?>", re.IGNORECASE)
-RE_DBL_BR_SPLIT = re.compile(r"<br\s*/?>\s*<br\s*/?>", re.IGNORECASE)
 RE_TITLE_EXTRACT = re.compile(r"<(b|title)>(.*?)</\1>", re.IGNORECASE)
 RE_IMG_EXTRACT = re.compile(r"<img[^>]*src=['\"](.*?)['\"]", re.IGNORECASE)
 RE_TAG_STRIP = re.compile(r"<[^>]*>")
@@ -118,8 +125,6 @@ class QFlatTooltip(QWidget):
     BG_COLOR = "#333333"
     HEADER_COLOR = "#282828"
     TEXT_COLOR = "#bbbbbb"
-    ACCENT_COLOR = "#e0e0e0"
-
     ARROW_W = 12
     ARROW_H = 8
     BORDER_RADIUS = 8
@@ -281,7 +286,7 @@ class QFlatTooltip(QWidget):
         if header_title or header_pixmap:
             header_frame, header_layout = self._create_section_frame("")
             if header_pixmap:
-                lbl = self._create_icon_label(header_pixmap, dim=45)
+                lbl = self._create_icon_label(header_pixmap, dim=22.5)
                 header_layout.addWidget(lbl)
             if header_title:
                 title_lbl = self._create_text_label(header_title, size=18, bold=True, elide=True)
@@ -369,8 +374,9 @@ class QFlatTooltip(QWidget):
 
         max_row_width = 0
         shortcut_font = self.font()
-        shortcut_font.setPixelSize(wutil.DPI(9.5))
+        shortcut_font.setPixelSize(wutil.DPI(10.5))
         shortcut_metrics = QFontMetrics(shortcut_font)
+        shortcut_icon_dim = 11.25
 
         for sh in self.shortcuts:
             row = QHBoxLayout()
@@ -378,15 +384,14 @@ class QFlatTooltip(QWidget):
             row.setSpacing(wutil.DPI(20))
 
             icon_path = sh.get("icon", "default")
-            pix = QPixmap(icon_path)
-            row.addWidget(self._create_icon_label(pix, dim=24))
+            row.addWidget(self._create_icon_label(icon_path, dim=shortcut_icon_dim))
 
             label_text = sh.get("label", "")
             name = QLabel(label_text)
             name.setWordWrap(False)
             name.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
             name.setMinimumWidth(shortcut_metrics.horizontalAdvance(label_text))
-            name.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(9.5)))
+            name.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5)))
             row.addWidget(name)
             row.addStretch()
 
@@ -397,18 +402,18 @@ class QFlatTooltip(QWidget):
             keys.setWordWrap(False)
             keys.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
             keys.setMinimumWidth(shortcut_metrics.horizontalAdvance(command))
-            keys.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(9.5)))
+            keys.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5)))
             row.addWidget(keys)
             self.bg_layout.addLayout(row)
             self.bg_layout.addSpacing(wutil.DPI(4))
 
             row_width = (
-                wutil.DPI(24)
+                wutil.DPI(shortcut_icon_dim)
                 + wutil.DPI(20)
                 + shortcut_metrics.horizontalAdvance(label_text)
                 + wutil.DPI(20)
                 + shortcut_metrics.horizontalAdvance(command)
-                + wutil.DPI(24)
+                + wutil.DPI(shortcut_icon_dim)
             )
             max_row_width = max(max_row_width, row_width)
 
@@ -420,17 +425,43 @@ class QFlatTooltip(QWidget):
 
     def _create_icon_label(self, source, dim=32):
         lbl = QLabel()
-        px_dim = wutil.DPR(wutil.DPI(dim))
+        target_size = self._icon_target_size(dim)
         if hasattr(source, "pixmap"):
-            pix = source.pixmap(px_dim, px_dim)
+            pix = source.pixmap(target_size)
+        elif isinstance(source, (str, bytes)):
+            icon_path = source.decode() if isinstance(source, bytes) else source
+            pix = self._load_icon_pixmap(icon_path, target_size)
         elif isinstance(source, QPixmap):
-            pix = source
+            pix = source.scaled(target_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         else:
             pix = QPixmap()
 
         if not pix.isNull():
-            lbl.setPixmap(pix.scaled(px_dim, px_dim, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            lbl.setPixmap(pix)
         return lbl
+
+    def _icon_target_size(self, dim):
+        px_dim = max(1, int(wutil.DPR(wutil.DPI(dim))))
+        return QSize(px_dim, px_dim)
+
+    def _load_icon_pixmap(self, path, target_size):
+        if not path:
+            return QPixmap()
+
+        if path.lower().endswith(".svg") and QSvgRenderer:
+            renderer = QSvgRenderer(path)
+            if renderer.isValid():
+                pixmap = QPixmap(target_size)
+                pixmap.fill(Qt.transparent)
+                painter = QPainter(pixmap)
+                renderer.render(painter)
+                painter.end()
+                return pixmap
+
+        pixmap = QPixmap(path)
+        if pixmap.isNull():
+            return pixmap
+        return pixmap.scaled(target_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
     def _create_text_label(self, text, size=11, bold=False, elide=False, align=None):
         lbl = QLabel(text)

@@ -18,6 +18,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 """
 
 import os
+import TheKeyMachine.tools.colors as toolColors
 
 from TheKeyMachine.mods.generalMod import config
 
@@ -27,6 +28,10 @@ INSTALL_PATH = config["INSTALL_PATH"]
 def getImage(image):
     img_dir = os.path.join(INSTALL_PATH, "TheKeyMachine", "data", "img")
     return os.path.join(img_dir, image)
+
+
+def getSelectionSetsImage(image):
+    return getImage(os.path.join("selection_sets", image))
 
 
 # __________________ Install _________________________________ #
@@ -60,7 +65,7 @@ create_locator_image = getImage("cube.svg")
 align_menu_image = getImage("magnet.svg")
 tracer_image = getImage("tracer.svg")
 reset_animation_image = getImage("eraser.svg")
-delete_animation_image = getImage("trash.svg")
+delete_animation_image = getImage("remove.svg")
 match_image = getImage("magnet.svg")
 
 select_opposite_image = getImage("select_opposite.svg")
@@ -130,6 +135,9 @@ cancel_image = getImage("cancel.svg")
 add_image = getImage("add.svg")
 subtract_image = getImage("subtract.svg")
 rename_image = getImage("rename.svg")
+
+trash_image = getImage("trash.svg")
+
 # remove_selection_set_image = getImage("close.svg")
 
 # ________________ dot colors __________________________________________#
@@ -147,33 +155,27 @@ default_dot_image = getImage("round_dot.png")
 
 # ________________ Selection Sets ________________________________________#
 
-selection_set_color_icon_names = {
-    "_01": "_redLight_set.svg",
-    "_02": "_red_set.svg",
-    "_03": "_redDark_set.svg",
-    "_04": "_orangeLight_set.svg",
-    "_05": "_orange_set.svg",
-    "_06": "_orangeDark_set.svg",
-    "_07": "_yellowLight_set.svg",
-    "_08": "_yellow_set.svg",
-    "_09": "_yellowDark_set.svg",
-    "_10": "_greenLight_set.svg",
-    "_11": "_green_set.svg",
-    "_12": "_greenDark_set.svg",
-    "_13": "_blueLight_set.svg",
-    "_14": "_blue_set.svg",
-    "_15": "_blueDark_set.svg",
-    "_16": "_tealLight_set.svg",
-    "_17": "_teal_set.svg",
-    "_18": "_tealDark_set.svg",
-    "_19": "_purpleLight_set.svg",
-    "_20": "_purple_set.svg",
-    "_21": "_purpleDark_set.svg",
-    "_22": "_pinkLight_set.svg",
-    "_23": "_pink_set.svg",
-    "_24": "_pinkDark_set.svg",
+_selection_set_icon_shade_names = {
+    "light": "Light",
+    "base": "",
+    "dark": "Dark",
 }
-selection_set_color_images = {suffix: getImage(filename) for suffix, filename in selection_set_color_icon_names.items()}
+
+
+def _selection_set_icon_filename(color):
+    shade = _selection_set_icon_shade_names.get(color.shade, "")
+    return f"_{color.family}{shade}_set.svg"
+
+
+selection_set_color_icon_names = {
+    color.suffix: _selection_set_icon_filename(color) for color in toolColors.SELECTION_SET_COLORS
+}
+selection_set_color_images = {suffix: getSelectionSetsImage(filename) for suffix, filename in selection_set_color_icon_names.items()}
+selection_set_color_trash_images = {
+    suffix: getSelectionSetsImage(filename.replace(".svg", "_trash.svg")) for suffix, filename in selection_set_color_icon_names.items()
+}
+
+color_image = getImage("color.svg")
 
 # ________________ Menus Images __________________________________________#
 
