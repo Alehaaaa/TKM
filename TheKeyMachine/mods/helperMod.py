@@ -411,7 +411,7 @@ animation_offset_tooltip_text = (
     f"<font style='color: #cccccc; font-size:{font_size};'>"
     "Animation Offset allows you to move the position of an animated object without affecting the existing animation.<br>"
     "The position change made propagates throughout the entire existing animation.<br><br>"
-    "For this tool to work properly, it should be executed when on a keyframe. Currently, it only works with one object at a time.<br><br>"
+    "You can select more than one object at a time.<br><br>"
     "</font>"
 )
 
