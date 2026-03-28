@@ -292,6 +292,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     def add_mode_sliders(modes_list, default_key_setting, prefix, color, change_func, drop_func, default_modes=None, ws_support=False):
         # Create a new section for each slider color/type
         sec = new_section()
+        sec.set_settings_namespace("graph_toolbar_sliders")
 
         current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
 
@@ -314,7 +315,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
             icon = m.get("icon", "SL")
 
             # Determine initial visibility: pinned setting takes priority, fallback to default_modes membership
-            is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys)
+            is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys, namespace="graph_toolbar_sliders")
 
             s = sw.QFlatSliderWidget(
                 f"graph_{prefix}_{key}",

@@ -1283,12 +1283,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     for toggling the visibility of its child widgets.
     """
 
-    def __init__(self, parent=None, spacing=0, hiddeable=True):
+    def __init__(self, parent=None, spacing=0, hiddeable=True, settings_namespace=None):
         super().__init__(parent)
         self.setLayout(QtWidgets.QHBoxLayout())
         self.layout().setContentsMargins(0, 3, 0, 3)
         self.layout().setSpacing(spacing)
         self._hiddeable = hiddeable
+        self._settings_namespace = settings_namespace
 
         self._widgets = {}  # slot_key -> widget mapping
         self._menu_metadata = []  # for non-slider sections (toolbar buttons etc.)
@@ -1328,6 +1329,15 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
             self._overlay_btn.pressed.connect(lambda: self.open_menu(QtGui.QCursor.pos()))
 
+    def set_settings_namespace(self, namespace):
+        self._settings_namespace = namespace
+
+    def _get_setting(self, key, default_value=None):
+        return settings.get_setting(key, default_value, namespace=self._settings_namespace)
+
+    def _set_setting(self, key, value):
+        settings.set_setting(key, value, namespace=self._settings_namespace)
+
     def addWidget(self, widget, label, key, default_visible=True, description=None, tooltip_template=None):
         """Add a widget to the section with a toggle key."""
         # Auto-extract help metadata from widget if not provided
@@ -1349,7 +1359,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if is_valid_widget(widget) and hasattr(widget, "_current_mode"):
             cm = getattr(widget, "_current_mode", None)
             if cm:
-                saved_mode_key = settings.get_setting(f"slider_mode_{key}", cm.key)
+                saved_mode_key = self._get_setting(f"slider_mode_{key}", cm.key)
                 if saved_mode_key != cm.key and hasattr(widget, "setCurrentMode"):
                     widget.setCurrentMode(saved_mode_key)
                 # Register current mode in the section's live map
@@ -1370,7 +1380,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             )
 
             # Load stored visibility or use default
-            visible = settings.get_setting(f"pin_{key}", default_visible)
+            visible = self._get_setting(f"pin_{key}", default_visible)
             widget.setVisible(visible)
 
         # Push documentation to the widget (syncs Maya Status Bar and TKM tooltips)
@@ -1630,7 +1640,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             group_key = keys_list[0]
             for act_info in pinnable_actions:
                 act_key = act_info["key"]
-                if settings.get_setting(f"pin_action_{act_key}", False):
+                if self._get_setting(f"pin_action_{act_key}", False):
                     self._create_pinned_action_button(group_key, act_info)
 
     def _create_pinned_action_button(self, group_key, act_info):
@@ -1732,7 +1742,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             widget.setVisible(visible)
 
         if save_setting:
-            settings.set_setting(f"pin_{key}", visible)
+            self._set_setting(f"pin_{key}", visible)
 
         # Update action in active menu (keyed by mode_key for mode-driven sections)
         if self._active_menu and isValid(self._active_menu):
@@ -1769,7 +1779,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._mode_to_slot.pop(old_key, None)
         if new_key:
             self._mode_to_slot[new_key] = slot_key
-            settings.set_setting(f"slider_mode_{slot_key}", new_key)
+            self._set_setting(f"slider_mode_{slot_key}", new_key)
 
     def _set_visible_modes(self, desired_mode_keys):
         """
@@ -1805,7 +1815,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for slot, widget in pool.items():
             visible = slot in active_slots
             widget.setVisible(visible)
-            settings.set_setting(f"pin_{slot}", visible)
+            self._set_setting(f"pin_{slot}", visible)
 
         # sync check states in the active menu (keyed by mode key)
         if self._active_menu and isValid(self._active_menu):

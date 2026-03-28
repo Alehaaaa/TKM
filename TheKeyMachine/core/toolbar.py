@@ -1853,6 +1853,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         def add_mode_sliders(modes_list, prefix, color, change_func, drop_func, default_modes=None):
             # Create a new section for each slider color/type
             sec = new_section()
+            sec.set_settings_namespace("main_toolbar_sliders")
 
             # Static default list for "Pin Defaults" — uses provided list or falls back to first mode
             if default_modes:
@@ -1882,7 +1883,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     show_frames = True
 
                 # Determine initial visibility: pinned setting takes priority, fallback to default_modes membership
-                is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys)
+                is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys, namespace="main_toolbar_sliders")
 
                 s = sw.QFlatSliderWidget(
                     f"bar_{prefix}_{key}",

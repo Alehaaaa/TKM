@@ -123,6 +123,7 @@ class TimelineTint(QtWidgets.QWidget):
         self._full_width = bool(full_width)
         parent_widget = parent or self.get_timeline_widget(full_width=self._full_width)
         super().__init__(parent_widget)
+        self._parent_widget = parent_widget
 
         if not parent_widget:
             self.timerange = None
@@ -139,8 +140,9 @@ class TimelineTint(QtWidgets.QWidget):
         self._icon = QtGui.QPixmap(icon_path) if icon_path else QtGui.QPixmap()
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
+        parent_widget.installEventFilter(self)
 
-        self.setGeometry(parent_widget.rect())
+        self._sync_geometry()
         self.show()
 
         if not self._persistent:
@@ -166,19 +168,9 @@ class TimelineTint(QtWidgets.QWidget):
             return
 
         painter = QtGui.QPainter(self)
-
-        if self._full_width:
-            rect = QtCore.QRectF(self.rect())
-        else:
-            start = cmds.playbackOptions(q=True, minTime=True)
-            end = cmds.playbackOptions(q=True, maxTime=True)
-            total_width = self.width()
-            step = (total_width - (total_width * 0.01)) / (end - start + 1)
-
-            start_frame, end_frame = self.timerange
-            rect_start = (start_frame - start) * step + (total_width * 0.005)
-            rect_end = (end_frame + 1 - start) * step + (total_width * 0.005)
-            rect = QtCore.QRectF(QtCore.QPointF(rect_start, 0), QtCore.QPointF(rect_end, self.height()))
+        rect = self._current_tint_rect()
+        if rect.isEmpty():
+            return
 
         pen = QtGui.QPen(self.color)
         pen.setWidth(max(1, int(rect.height())))
@@ -205,10 +197,51 @@ class TimelineTint(QtWidgets.QWidget):
 
     def delete_tint(self):
         try:
+            if self._parent_widget and util.is_valid_widget(self._parent_widget):
+                self._parent_widget.removeEventFilter(self)
+        except Exception:
+            pass
+        try:
             self.setParent(None)
             self.deleteLater()
         except RuntimeError:
             pass
+
+    def eventFilter(self, watched, event):
+        if watched is self._parent_widget and event.type() in (
+            QtCore.QEvent.Resize,
+            QtCore.QEvent.Move,
+            QtCore.QEvent.Show,
+            QtCore.QEvent.LayoutRequest,
+        ):
+            self._sync_geometry()
+        return super().eventFilter(watched, event)
+
+    def _sync_geometry(self):
+        if not self._parent_widget or not util.is_valid_widget(self._parent_widget):
+            return
+        new_geometry = self._parent_widget.rect()
+        if self.geometry() != new_geometry:
+            self.setGeometry(new_geometry)
+        self.update()
+
+    def _current_tint_rect(self):
+        if self._full_width:
+            return QtCore.QRectF(self.rect())
+
+        start = cmds.playbackOptions(q=True, minTime=True)
+        end = cmds.playbackOptions(q=True, maxTime=True)
+        span = float(end - start + 1)
+        if span <= 0:
+            return QtCore.QRectF()
+
+        total_width = float(self.width())
+        step = (total_width - (total_width * 0.01)) / span
+
+        start_frame, end_frame = self.timerange
+        rect_start = (start_frame - start) * step + (total_width * 0.005)
+        rect_end = (end_frame + 1 - start) * step + (total_width * 0.005)
+        return QtCore.QRectF(QtCore.QPointF(rect_start, 0), QtCore.QPointF(rect_end, self.height()))
 
 
 class TimelineTintSession(QtCore.QObject):
