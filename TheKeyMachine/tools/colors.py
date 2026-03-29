@@ -20,6 +20,13 @@ class SelectionSetColor:
 
 
 @dataclass(frozen=True)
+class ColorFamily:
+    light: SelectionSetColor
+    base: SelectionSetColor
+    dark: SelectionSetColor
+
+
+@dataclass(frozen=True)
 class UiPalette:
     gray: ColorValue
     dark_gray: ColorValue
@@ -101,6 +108,10 @@ SELECTION_SET_COLORS = (
 
 SELECTION_SET_COLOR_BY_SUFFIX = {color.suffix: color for color in SELECTION_SET_COLORS}
 SELECTION_SET_DEFAULT_COLOR = SELECTION_SET_COLOR_BY_SUFFIX["_02"]
+SELECTION_SET_COLORS_BY_FAMILY = {}
+
+for selection_color in SELECTION_SET_COLORS:
+    SELECTION_SET_COLORS_BY_FAMILY.setdefault(selection_color.family, {})[selection_color.shade] = selection_color
 
 gray_light = SELECTION_SET_COLOR_BY_SUFFIX["_25"]
 gray = SELECTION_SET_COLOR_BY_SUFFIX["_26"]
@@ -133,3 +144,27 @@ pink_dark = SELECTION_SET_COLOR_BY_SUFFIX["_24"]
 
 def get_selection_set_color(suffix, fallback=None):
     return SELECTION_SET_COLOR_BY_SUFFIX.get(suffix, fallback or SELECTION_SET_DEFAULT_COLOR)
+
+
+def get_selection_set_variant(color, shade, fallback=None):
+    family = getattr(color, "family", None)
+    if not family:
+        return fallback
+    return SELECTION_SET_COLORS_BY_FAMILY.get(family, {}).get(shade, fallback)
+
+
+class _ColorNamespace:
+    pass
+
+
+color = _ColorNamespace()
+for family_name, variants in SELECTION_SET_COLORS_BY_FAMILY.items():
+    setattr(
+        color,
+        family_name,
+        ColorFamily(
+            light=variants["light"],
+            base=variants["base"],
+            dark=variants["dark"],
+        ),
+    )

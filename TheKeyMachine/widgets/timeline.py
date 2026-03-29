@@ -178,7 +178,7 @@ class TimelineTint(QtWidgets.QWidget):
         painter.fillRect(rect, QtGui.QBrush(self.color))
 
         if self.center_line:
-            line_color = QtGui.QColor(255, 244, 196, 235)
+            line_color = _light_tint_line_color(self.color)
             line_pen = QtGui.QPen(line_color)
             line_pen.setWidth(max(2, int(util.DPI(2))))
             painter.setPen(line_pen)
@@ -378,3 +378,44 @@ def _normalize_tint_color(color):
     if qcolor.alpha() == 255:
         qcolor.setAlpha(52)
     return qcolor
+
+
+def _light_tint_line_color(color):
+    variant_hex = _resolve_tint_variant_hex(color, preferred_shades=("light", "base", "dark"))
+    if variant_hex is not None:
+        qcolor = QtGui.QColor(variant_hex)
+        qcolor.setAlpha(235)
+        return qcolor
+
+    qcolor = QtGui.QColor(color)
+    if not qcolor.isValid():
+        return QtGui.QColor(255, 244, 196, 235)
+
+    line_color = qcolor.lighter(185)
+    line_color.setAlpha(235)
+    return line_color
+
+
+def _resolve_tint_variant_hex(color, preferred_shades=("base",)):
+    if color is None:
+        return None
+
+    family_name = getattr(color, "family", None)
+    family_colors = getattr(toolColors.color, family_name, None) if family_name else None
+    for shade in preferred_shades:
+        variant = getattr(family_colors, shade, None) if family_colors else None
+        variant_hex = _color_hex(variant)
+        if variant_hex is not None:
+            return variant_hex
+
+    return _color_hex(color)
+
+
+def _color_hex(color):
+    if color is None:
+        return None
+    if hasattr(color, "base") and hasattr(color.base, "hex"):
+        return color.base.hex
+    if hasattr(color, "hex"):
+        return color.hex
+    return None

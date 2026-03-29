@@ -642,11 +642,16 @@ def bake_animation(bake_interval=1, window=None):
 
         # Cambiar las tangentes de las claves a stepped.
         for obj in selected_objects:
-            anim_curves = cmds.listConnections(obj, type="animCurve")
+            anim_curves = list(set(cmds.listConnections(obj, type="animCurve") or []))
             if anim_curves:
                 for curve in anim_curves:
-                    cmds.selectKey(curve, add=True, keyframe=True)
-                    cmds.keyTangent(inTangentType="stepnext", outTangentType="step")
+                    cmds.keyTangent(
+                        curve,
+                        edit=True,
+                        time=(start_frame, end_frame),
+                        inTangentType="stepnext",
+                        outTangentType="step",
+                    )
 
     except Exception as e:
         cmds.warning("An error occurred: {}".format(e))
