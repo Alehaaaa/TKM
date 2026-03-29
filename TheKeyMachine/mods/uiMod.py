@@ -43,9 +43,6 @@ import TheKeyMachine.core.runtime_manager as runtime
 import re
 import os
 import platform
-import sys
-import urllib.request
-import urllib.parse
 import shutil
 from functools import partial
 
@@ -53,6 +50,7 @@ import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.barMod as bar
+import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.tools.colors as toolColors
 import TheKeyMachine.tools.orbit.api as orbitApi
@@ -62,7 +60,7 @@ import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 from TheKeyMachine.mods import settingsMod as settings
 
-mods = [general, keyTools, media, bar, customDialogs, cw, wutil, updater, settings, toolColors, orbitApi, attributeSwitcherApi, selectionSetsApi]
+mods = [general, keyTools, media, bar, customDialogs, cw, wutil, updater, settings, report, toolColors, orbitApi, attributeSwitcherApi, selectionSetsApi]
 
 for m in mods:
     reload(m)
@@ -386,47 +384,9 @@ def about_window():
     dlg.exec_()
 
 
-def send_bug_report(name, email, explanation, script_error):
-    url = ""
-
-    # Obtener version de Python, OS y Maya
-    python_version = sys.version
-    os_version = platform.system()
-    maya_version = cmds.about(version=True)
-    tkm_version = general.get_thekeymachine_version()
-
-    data = {
-        "name": name,
-        "email": email,
-        "explanation": explanation,
-        "script_error": script_error,
-        "python_version": python_version,
-        "os_version": os_version,
-        "maya_version": maya_version,
-        "tkm_version": tkm_version,
-    }
-    data = urllib.parse.urlencode(data).encode("utf-8")
-
-    # Ruta al archivo .pem y creación del contexto SSL
-
-    install_dir = os.path.join(INSTALL_PATH, "TheKeyMachine")
-    cert_file_path = os.path.join(install_dir, "data/cert/thekeymachine.pem")
-    context = ssl.create_default_context(cafile=cert_file_path)
-
-    with urllib.request.urlopen(url, data, context=context) as response:
-        response_data = response.read().decode("utf-8")
-        if "success" in response_data:
-            return True
-        else:
-            return False
-
-
-def bug_report_window(*args):
-    for widget in QtWidgets.QApplication.topLevelWidgets():
-        if isinstance(widget, customDialogs.QFlatBugReportDialog):
-            widget.close()
-            widget.deleteLater()
-
-    dlg = customDialogs.QFlatBugReportDialog(submit_callback=send_bug_report)
-    dlg.show_centered()
-    return dlg
+send_bug_report = report.send_bug_report
+report_detected_exception = report.report_detected_exception
+safe_execute = report.safe_execute
+wrap_callback = report.wrap_callback
+install_bug_exception_handler = report.install_bug_exception_handler
+bug_report_window = report.bug_report_window

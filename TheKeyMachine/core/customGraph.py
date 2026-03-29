@@ -244,8 +244,8 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
 
     flowtoolbar_layout = cw.QFlowLayout(flow_qw, margin=2, Wspacing=18, Hspacing=6, alignment=align_val)
 
-    def new_section(hiddeable=True):
-        sec = cw.QFlatSectionWidget(hiddeable=hiddeable)
+    def new_section(hiddeable=True, color=None):
+        sec = cw.QFlatSectionWidget(hiddeable=hiddeable, color=color)
         flowtoolbar_layout.addWidget(sec)
         return sec
 

@@ -27,6 +27,8 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.setObjectName("selection_set_creation_dialog")
         self.setWindowTitle("Create Selection Set")
         self.setMinimumWidth(wutil.DPI(320))
+        self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.grip.hide()
         self.top_bar_layout.setContentsMargins(0, 0, 0, 0)
         self.top_bar_layout.setSpacing(0)
         while self.top_bar_layout.count():
@@ -86,7 +88,28 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.confirm_button = self._create_action_button("OK", self._create_set_from_selected_color, highlight=True, icon=media.apply_image)
         top_row_layout.addWidget(self.confirm_button, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
-        self.close_dialog_button = self._create_action_button("", self.close, icon=media.close_image, fixed_width=wutil.DPI(34))
+        self.close_dialog_button = QtWidgets.QToolButton()
+        self.close_dialog_button.setAutoRaise(True)
+        self.close_dialog_button.setCursor(QtCore.Qt.PointingHandCursor)
+        self.close_dialog_button.setIcon(QtGui.QIcon(media.close_image))
+        self.close_dialog_button.setIconSize(QtCore.QSize(wutil.DPI(18), wutil.DPI(18)))
+        self.close_dialog_button.setFixedSize(wutil.DPI(20), wutil.DPI(20))
+        self.close_dialog_button.setStyleSheet(
+            """
+            QToolButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 0px;
+            }
+            QToolButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+            }
+            QToolButton:pressed {
+                background-color: rgba(0, 0, 0, 0.45);
+            }
+            """
+        )
+        self.close_dialog_button.clicked.connect(self.close)
         top_row_layout.addWidget(self.close_dialog_button, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
         self.mainLayout.addWidget(self.top_row)
@@ -115,7 +138,18 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._opened = True
+        self._compress_to_contents()
+        self.place_near_cursor()
         QtCore.QTimer.singleShot(0, self._focus_name_field)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.grip.hide()
+
+    def _compress_to_contents(self):
+        self.adjustSize()
+        target_size = self.sizeHint().expandedTo(QtCore.QSize(self.minimumWidth(), 0))
+        self.setFixedSize(target_size)
 
     def changeEvent(self, event):
         if event.type() == QtCore.QEvent.ActivationChange and self._opened and not self.isActiveWindow():
@@ -144,7 +178,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         return sanitized
 
     def _build_default_name_from_selection(self):
-        selection = cmds.ls(selection=True) or []
+        selection = wutil.get_selected_objects()
         if not selection:
             return ""
 
@@ -295,7 +329,11 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         if hasattr(self, "header_right_layout") and self.header_right_layout:
             self.header_right_layout.setContentsMargins(0, 0, wutil.DPI(6), 0)
 
-        self.header_section = cw.QFlatSectionWidget(spacing=wutil.DPI(2), hiddeable=True)
+        self.header_section = cw.QFlatSectionWidget(
+            spacing=wutil.DPI(2),
+            hiddeable=True,
+            settings_namespace=selectionSetsApi.SELECTION_SETS_SETTINGS_NAMESPACE,
+        )
         self.header_section.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed)
         section_layout = self.header_section.layout()
         if section_layout:
@@ -574,7 +612,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         return set(normalized or items)
 
     def _update_button_match_states(self):
-        current_selection = self._normalize_scene_objects(cmds.ls(selection=True, long=True) or [])
+        current_selection = self._normalize_scene_objects(wutil.get_selected_objects(long=True))
         for subset, button in list(self._set_buttons.items()):
             if not wutil.is_valid_widget(button):
                 self._set_buttons.pop(subset, None)

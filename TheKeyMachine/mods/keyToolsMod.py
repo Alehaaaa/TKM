@@ -62,7 +62,7 @@ python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 
 def clear_timeslider_selection():
     # fix temporal para limpiar el timeslider
-    selection = cmds.ls(selection=True)
+    selection = util.get_selected_objects()
 
     # Crear y eliminar un nodo temporal
     empty_node = cmds.createNode("transform", name="tempNode")
@@ -111,11 +111,24 @@ def get_working_time_context(default_mode="all_animation"):
 
 
 def _begin_timeline_context_tint(default_mode, key, owner=None):
+    import TheKeyMachine.widgets.customWidgets as cw
+
     return timelineWidgets.begin_timeline_context(
         default_mode=default_mode,
+        color=cw.get_active_tool_tint_color(),
         owner=owner,
         key=key,
-        min_duration_ms=200,
+    )
+
+
+def _begin_timeline_tint(timerange, key, owner=None):
+    import TheKeyMachine.widgets.customWidgets as cw
+
+    return timelineWidgets.begin_timeline_tint(
+        timerange=timerange,
+        color=cw.get_active_tool_tint_color(),
+        owner=owner,
+        key=key,
     )
 
 
@@ -198,7 +211,7 @@ def find_all_roots_in_selection():
     """
     Identifica todos los nodos raíces en la selección.
     """
-    selection = cmds.ls(selection=True)
+    selection = util.get_selected_objects()
     root_nodes = []
 
     while selection:
@@ -255,7 +268,7 @@ def load_relative_data():
 def copy_link(*args):
     matrix_file_path = general.get_copy_link_data_file()
 
-    seleccion = cmds.ls(selection=True)
+    seleccion = util.get_selected_objects()
     if len(seleccion) < 2:
         return util.make_inViewMessage("Select at least 2 objects")
 
@@ -427,52 +440,43 @@ def remove_link_obj_callbacks(*args):
             time_callback_id = None
 
     except Exception as e:
-        print(f"Error removing callback: {e}")
+        import TheKeyMachine.mods.reportMod as report
+
+        report.report_detected_exception(e, context="relative matrix callback cleanup")
 
 
 # ---------------------------------------------------------- SHARE KEYS ---------------------------------------------------------
 
 
 def share_keys(*args):
-    objetos = cmds.ls(selection=True)
+    objetos = util.get_selected_objects()
 
     if len(objetos) < 2:
         return util.make_inViewMessage("Select at least 2 objects")
 
-    objeto_principal = objetos[0]
-    objetos_secundarios = objetos[1:]
-
     time_range = get_time_range_selected()
+    all_frames = set()
+    object_frames = {}
 
-    # Eliminamos la verificación de canales seleccionados
-    frames_claves = []
-    if not time_range or (time_range[1] - time_range[0] == 1):
-        frames_claves = cmds.keyframe(objeto_principal, query=True)
-    else:
-        frames_claves = cmds.keyframe(objeto_principal, query=True, time=(time_range[0], time_range[1]))
-
-    if not frames_claves:
-        cmds.warning(f"There is no keys in {objeto_principal}")
-        return
-
-    for objeto_secundario in objetos_secundarios:
+    for objeto in objetos:
         if time_range:
-            frames_secundario = cmds.keyframe(objeto_secundario, query=True, time=(time_range[0], time_range[1])) or []
+            frames = cmds.keyframe(objeto, query=True, time=(time_range[0], time_range[1])) or []
         else:
-            frames_secundario = cmds.keyframe(objeto_secundario, query=True) or []
+            frames = cmds.keyframe(objeto, query=True) or []
+        normalized_frames = sorted({int(frame) if int(frame) == frame else frame for frame in frames})
+        object_frames[objeto] = set(normalized_frames)
+        all_frames.update(normalized_frames)
 
-        if not frames_secundario:
-            for frame in frames_claves:
-                cmds.setKeyframe(objeto_secundario, time=frame)
-            continue
+    if not all_frames:
+        return util.make_inViewMessage("No keys found in selection")
 
-        for frame in frames_claves:
-            if frame not in frames_secundario:
-                cmds.setKeyframe(objeto_secundario, time=frame, insert=True)
+    shared_frames = sorted(all_frames)
 
-        for frame in frames_secundario:
-            if frame not in frames_claves:
-                cmds.cutKey(objeto_secundario, time=(frame, frame))
+    for objeto in objetos:
+        existing_frames = object_frames.get(objeto, set())
+        for frame in shared_frames:
+            if frame not in existing_frames:
+                cmds.setKeyframe(objeto, time=frame, insert=True)
 
 
 # ______________________________________ ReBlock Move
@@ -480,7 +484,7 @@ def share_keys(*args):
 
 def reblock_move(*args):
     # Obtener la lista de objetos seleccionados
-    objetos = cmds.ls(selection=True, long=True)  # Usar nombres largos para mayor precisión
+    objetos = util.get_selected_objects(long=True)  # Usar nombres largos para mayor precisión
 
     # Verificar que haya al menos un objeto seleccionado
     if len(objetos) < 1:
@@ -569,7 +573,7 @@ def reblock_move(*args):
 
 def reblock_insert(*args):
     # Obtener la lista de objetos actualmente seleccionados en la escena
-    objetos = cmds.ls(selection=True)
+    objetos = util.get_selected_objects()
 
     # Verificar que haya al menos dos objetos seleccionados
     if len(objetos) < 2:
@@ -609,7 +613,7 @@ def bake_animation(bake_interval=1, window=None):
 
     try:
         # Obtener los objetos seleccionados.
-        selected_objects = cmds.ls(selection=True)
+        selected_objects = util.get_selected_objects()
 
         # Verificar si no hay objetos seleccionados.
         if not selected_objects:
@@ -617,11 +621,10 @@ def bake_animation(bake_interval=1, window=None):
 
         time_context = get_working_time_context(default_mode="all_animation")
         start_frame, end_frame = time_context.timerange
-        tint_session = timelineWidgets.begin_timeline_tint(
+        tint_session = _begin_timeline_tint(
             timerange=time_context.timerange,
-            owner=window,
             key="bake_animation_range",
-            min_duration_ms=200,
+            owner=window,
         )
 
         # Hacer bake a las curvas de animación de los objetos seleccionados.
@@ -679,7 +682,7 @@ def bake_animation_4(*args):
 
 def delete_keyframes_before_current_time():
     # Obtén los objetos seleccionados
-    selected = cmds.ls(selection=True)
+    selected = util.get_selected_objects()
 
     if not selected:
         return util.make_inViewMessage("Select at least one object")
@@ -702,7 +705,7 @@ def delete_keyframes_before_current_time():
 
 def delete_keyframes_after_current_time():
     # Obtén los objetos seleccionados
-    selected = cmds.ls(selection=True)
+    selected = util.get_selected_objects()
 
     if not selected:
         return util.make_inViewMessage("Select at least one object")
@@ -813,7 +816,7 @@ def move_keyframes_in_range(*args):
     end_frame = int(time_range[1] - 1)
     has_range = abs(end_frame - start_frame) > 1
 
-    selection = cmds.ls(selection=True, long=True) or []
+    selection = util.get_selected_objects(long=True)
 
     cmds.undoInfo(openChunk=True)
     try:
@@ -931,7 +934,7 @@ def blend_pull_and_push(value, objs=None, selection=True):
         raise ValueError("No objects given to blend_pull_and_push")
 
     if not objs:
-        objs = cmds.ls(selection=True)
+        objs = util.get_selected_objects()
 
     if not is_dragging:
         cmds.undoInfo(openChunk=True)
@@ -1077,7 +1080,7 @@ def blend_to_key(percentage, objs=None, selection=True):
         is_dragging = True
 
     if objs is None and selection:
-        objs = cmds.ls(selection=True)
+        objs = util.get_selected_objects()
 
     if not objs:
         if is_dragging:
@@ -1188,7 +1191,7 @@ def blend_to_frame(percentage, left_frame=None, right_frame=None, objs=None, sel
         raise ValueError("No objects given to blend_to_frame")
 
     if not objs:
-        objs = cmds.ls(selection=True)
+        objs = util.get_selected_objects()
 
     if not is_dragging:
         cmds.undoInfo(openChunk=True)
@@ -1268,7 +1271,7 @@ def prepare_tween_data(objs=None, attrs=None):
     tween_frame_data_cache = {}
     currentTime = cmds.currentTime(query=True)
 
-    for obj in objs or cmds.ls(selection=True):
+    for obj in objs or util.get_selected_objects():
         if not cmds.objExists(obj):
             continue
 
@@ -1418,7 +1421,7 @@ def tweenSliderReset(slider):
 
 def deleteStaticCurves():
     # Obtener los objetos seleccionados con sus nombres completos una sola vez
-    selected_objects = cmds.ls(selection=True, long=True)
+    selected_objects = util.get_selected_objects(long=True)
 
     # También incluir las formas de los objetos seleccionados
     selected_shapes = []
@@ -1447,7 +1450,7 @@ def deleteStaticCurves():
 
 def snapKeyframes():
     # Obtén la selección actual
-    selected_objects = cmds.ls(sl=True)
+    selected_objects = util.get_selected_objects()
 
     for obj in selected_objects:
         if not cmds.attributeQuery("translateX", node=obj, exists=True):
@@ -1627,7 +1630,7 @@ def get_selected_objects():
     """
     Devuelve una lista de objetos seleccionados en el orden en que se seleccionaron.
     """
-    return cmds.ls(orderedSelection=True, long=True)
+    return util.get_selected_objects(orderedSelection=True, long=True)
 
 
 def overlap_forward(*args):
@@ -1779,7 +1782,7 @@ def reset_objects_mods(*args):
 
 def save_default_values(*args):
     # Obtener objetos seleccionados
-    objetos_seleccionados = cmds.ls(selection=True, long=True)
+    objetos_seleccionados = util.get_selected_objects(long=True)
 
     json_file_path = general.get_set_default_data_file()
 
@@ -1845,7 +1848,7 @@ def remove_default_values_for_selected_object(*args):
         return util.make_inViewMessage("No default values found to remove")
 
     # Obtener objetos seleccionados
-    objetos_seleccionados = cmds.ls(selection=True, long=True)
+    objetos_seleccionados = util.get_selected_objects(long=True)
 
     for obj in objetos_seleccionados:
         # Extraer el namespace y el nombre corto del objeto
@@ -1875,6 +1878,7 @@ def remove_default_values_for_selected_object(*args):
 def reset_object_values(reset_translations=False, reset_rotations=False):
     cmds.undoInfo(openChunk=True)
     tint_session = None
+    selected_objects = []
 
     try:
         json_file_path = general.get_set_default_data_file()
@@ -1889,7 +1893,7 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
         time_context = get_working_time_context(default_mode="current_frame")
         tint_session = _begin_timeline_context_tint("current_frame", "reset_defaults_range")
 
-        selected_objects = cmds.ls(selection=True, long=True)
+        selected_objects = util.get_selected_objects(long=True)
         selected_channels = get_selected_channels()
 
         if time_context.mode == "graph_editor_keys":
@@ -1961,6 +1965,10 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
     finally:
         if tint_session:
             tint_session.finish()
+        if selected_objects:
+            cmds.select(selected_objects, replace=True)
+        else:
+            cmds.select(clear=True)
         cmds.undoInfo(closeChunk=True)
 
 
@@ -2004,7 +2012,7 @@ def get_default_value_main():
 
 def get_namespace_from_selection(*args):
     # Obtener el namespace del objeto seleccionado (si existe)
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
     if selected_objects:
         object_name = selected_objects[0]
         if ":" in object_name:
@@ -2106,7 +2114,7 @@ def selectOppositeHandler(*args):
 def selectOpposite(*args):
     global MIRROR_PATTERNS
 
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
     opposite_controls = []
 
     for obj in selected_objects:
@@ -2121,7 +2129,7 @@ def selectOpposite(*args):
 def addSelectOpposite(*args):
     global MIRROR_PATTERNS
 
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
     opposite_controls = []
 
     for obj in selected_objects:
@@ -2166,7 +2174,7 @@ def copyOpposite(*args):
                     return attr.replace(from_pattern, to_pattern)
             return attr
 
-        selected_objects = cmds.ls(selection=True)
+        selected_objects = util.get_selected_objects()
 
         for obj in selected_objects:
             opposite_obj = find_opposite_name(obj)
@@ -2187,7 +2195,9 @@ def copyOpposite(*args):
                             current_value = apply_exception(obj, attr, current_value)
                             cmds.setAttr(f"{opposite_obj}.{opposite_attr}", current_value)
                         except Exception as e:
-                            print("Error compiling attribute:, {}".format(str(e)))
+                            import TheKeyMachine.mods.reportMod as report
+
+                            report.report_detected_exception(e, context="copy opposite attribute compile")
 
     except Exception as e:
         cmds.warning("Error during copy: {}".format(str(e)))
@@ -2304,7 +2314,7 @@ def mirror(*args):
                     cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
 
         def mirror_controls():
-            selected_controls = cmds.ls(selection=True)
+            selected_controls = util.get_selected_objects()
 
             if not selected_controls:
                 return util.make_inViewMessage("Select at least one object")
@@ -2425,7 +2435,7 @@ def mirror_to_opposite(*args):
                 cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
 
     def mirror_controls():
-        selected_controls = cmds.ls(selection=True)
+        selected_controls = util.get_selected_objects()
 
         if not selected_controls:
             return util.make_inViewMessage("Select at least one object")
@@ -2490,7 +2500,7 @@ def add_mirror_invert_exception(*args):
 
     def create_mirror_exception():
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = cmds.ls(selection=True)
+        selected_controls = util.get_selected_objects()
         selected_channels = get_selected_channels()
 
         if selected_controls and selected_channels:
@@ -2538,7 +2548,7 @@ def add_mirror_keep_exception(*args):
 
     def create_mirror_exception():
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = cmds.ls(selection=True)
+        selected_controls = util.get_selected_objects()
         selected_channels = get_selected_channels()
 
         if selected_controls and selected_channels:
@@ -2587,7 +2597,7 @@ def remove_mirror_invert_exception(*args):
 
     def remove_mirror_exceptions():
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = cmds.ls(selection=True)
+        selected_controls = util.get_selected_objects()
         selected_channels = get_selected_channels()
 
         if selected_controls and selected_channels:
@@ -2621,7 +2631,7 @@ def copy_animation(*args):
         with open(json_file_path, "w") as json_file:
             json.dump(animation_data, json_file, indent=4)
 
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
 
     if not selected_objects:
         return
@@ -2675,10 +2685,9 @@ def copy_animation(*args):
             tint_range = timelineWidgets.get_animation_data_timerange(animation_data)
 
         if tint_range:
-            tint_session = timelineWidgets.begin_timeline_tint(
+            tint_session = _begin_timeline_tint(
                 timerange=tint_range,
                 key="copy_animation_range",
-                min_duration_ms=200,
             )
 
         util.make_inViewMessage("Animation saved")
@@ -2713,7 +2722,7 @@ def paste_animation(*args):
         return timelineWidgets.get_animation_data_timerange(animation_data)
 
     # Obtener los objetos seleccionados
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
 
     if not selected_objects:
         return
@@ -2725,10 +2734,9 @@ def paste_animation(*args):
     try:
         paste_range = apply_animation_from_json(json_file_path, selected_objects)
         if paste_range:
-            tint_session = timelineWidgets.begin_timeline_tint(
+            tint_session = _begin_timeline_tint(
                 timerange=paste_range,
                 key="paste_animation_range",
-                min_duration_ms=200,
             )
     finally:
         if tint_session:
@@ -2762,7 +2770,7 @@ def paste_insert_animation(*args):
                             cmds.setKeyframe(control, time=adjusted_frame, attribute=channel, value=value)
 
     # Obtener los objetos seleccionados y el tiempo actual
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
     current_time = cmds.currentTime(query=True)
 
     if not selected_objects:
@@ -2854,7 +2862,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             return json.load(f)
 
     # Destinos: selección actual
-    targets = cmds.ls(selection=True) or []
+    targets = util.get_selected_objects()
     if not targets:
         return util.make_inViewMessage("Select at least one destination control")
 
@@ -2951,7 +2959,9 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
                     total_keys_set += 1
                 except Exception as e:
                     # Si un key falla, seguimos con los demás canales
-                    print("Failed to set key on {}.{} at {}: {}".format(dst, channel, t, e))
+                    import TheKeyMachine.mods.reportMod as report
+
+                    report.report_detected_exception(e, context="paste animation set key")
 
     if total_keys_set == 0:
         cmds.warning("No keys were pasted. Check that destination controls have the needed attributes and that the source has keyframes.")
@@ -2972,17 +2982,13 @@ def copy_pose(*args):
         with open(json_file_path, "w") as json_file:
             json.dump(pose_data, json_file, indent=4)
 
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
 
     if not selected_objects:
         return
 
     pose_data = {}
-    tint_session = timelineWidgets.begin_timeline_context(
-        default_mode="current_frame",
-        key="copy_pose_frame",
-        min_duration_ms=200,
-    )
+    tint_session = _begin_timeline_context_tint("current_frame", "copy_pose_frame")
 
     try:
         # Procesar cada objeto seleccionado
@@ -3000,14 +3006,16 @@ def copy_pose(*args):
                         values = cmds.getAttr(f"{control}.{attr}")
                         pose_data[control_name][attr] = values
                     except Exception as e:
-                        print(f"Error getting attribute {attr} from {control}: {e}")
+                        import TheKeyMachine.mods.reportMod as report
+
+                        report.report_detected_exception(e, context="copy pose attribute read")
                         pass  # Ignorar atributos que no pueden ser leídos
 
         json_file_path = general.get_copy_paste_pose_file()
 
         save_pose_to_json(json_file_path, pose_data)
 
-        cmds.warning("Pose saved")
+        util.make_inViewMessage("Pose saved")
     finally:
         tint_session.finish()
 
@@ -3052,26 +3060,24 @@ def paste_pose(*args):
                             else:
                                 cmds.setAttr(f"{control}.{attr}", value)
                         except RuntimeError as e:
-                            print(f"Error setting attribute {attr} on {control}: {e}")
+                            import TheKeyMachine.mods.reportMod as report
+
+                            report.report_detected_exception(e, context="paste pose attribute set")
 
     # Obtener los objetos seleccionados
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
 
     if not selected_objects:
         return
 
     json_file_path = general.get_copy_paste_pose_file()
-    tint_session = timelineWidgets.begin_timeline_context(
-        default_mode="current_frame",
-        key="paste_pose_frame",
-        min_duration_ms=200,
-    )
+    tint_session = _begin_timeline_context_tint("current_frame", "paste_pose_frame")
 
     try:
         # Aplicar pose a los objetos seleccionados
         apply_pose_from_json(json_file_path, selected_objects)
 
-        cmds.warning("Pose restored")
+        util.make_inViewMessage("Pose pasted")
     finally:
         tint_session.finish()
 

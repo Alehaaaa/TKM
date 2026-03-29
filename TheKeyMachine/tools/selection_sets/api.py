@@ -150,7 +150,7 @@ def _has_any_selection_sets(controller=None):
 
 
 def _can_open_selection_set_creation(show_message=True):
-    if cmds.ls(selection=True):
+    if wutil.get_selected_objects():
         return True
     if show_message:
         wutil.make_inViewMessage("Select something first")
@@ -322,13 +322,32 @@ def open_selection_set_creation_dialog(controller=None, parent=None, on_created=
         if callable(on_rejected):
             on_rejected()
         return None
+
+    find_matching = getattr(controller, "find_matching_selection_set", None)
+    if callable(find_matching):
+        matching_set = find_matching()
+        if matching_set:
+            show_matching_message = getattr(controller, "show_matching_selection_set_message", None)
+            if callable(show_matching_message):
+                show_matching_message(matching_set)
+            else:
+                wutil.make_inViewMessage(f"Selection already matches set: {matching_set}")
+            if callable(on_rejected):
+                on_rejected()
+            return None
+
     if parent is None or not wutil.is_valid_widget(parent):
         parent = _parent_widget()
 
     if _selection_set_creation_dialog and wutil.is_valid_widget(_selection_set_creation_dialog):
         _selection_set_creation_dialog.close()
 
-    dialog = _creation_dialog_class()(controller=controller, parent=parent, on_created=on_created, on_rejected=on_rejected)
+    dialog = _creation_dialog_class()(
+        controller=controller,
+        parent=parent,
+        on_created=on_created,
+        on_rejected=on_rejected,
+    )
 
     def _clear_reference(*_):
         global _selection_set_creation_dialog

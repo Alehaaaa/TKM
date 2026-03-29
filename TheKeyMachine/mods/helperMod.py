@@ -470,11 +470,11 @@ paste_worldspace_animation_tooltip_text = (
 )
 
 temp_pivot_tooltip_text = (
-    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Temp pivot</b></font><img src='{media.temp_pivot_image}' width='30'><br><br>"
+    f"<font style='color: #cccccc; font-size:{font_size_enun};'><b>Temp Pivot</b></font><img src='{media.temp_pivot_image}' width='30'><br><br>"
     f"<font style='color: #cccccc; font-size:{font_size};'>"
-    "Temp pivot allows you to create temporary pivots.<br><br>"
+    "Temp Pivot allows you to create temporary pivots.<br><br>"
     "These pivots are created without affecting object's animation or pivot and without using any kind of constraint.<br><br>"
-    "Temp pivots can be applied to multiple objects at once. The temp pivots are destroyed when selection is changed."
+    "Temp Pivots can be applied to multiple objects at once. The temp pivots are destroyed when selection is changed."
     "Right-click for options.<br>"
     "</font>"
 )

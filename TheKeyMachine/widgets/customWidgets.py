@@ -6,6 +6,7 @@ from functools import partial
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
 import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
+from TheKeyMachine.tools import colors as toolColors  # type: ignore
 
 try:
     import TheKeyMachine_user_data.preferences.user_preferences as user_preferences  # type: ignore
@@ -40,6 +41,62 @@ RE_BR_SPLIT = re.compile(r"<br\s*/?>", re.IGNORECASE)
 RE_NEWLINE_SPLIT = re.compile(r"<br\s*/?>|\r?\n", re.IGNORECASE)
 RE_TKM_TT_SPLIT = re.compile(r"(?:<br\s*/?>\s*){2,}", re.IGNORECASE)
 RE_HELP_SPLIT = re.compile(r"(\.[\s\r\n]|<br\s*/?>|\r?\n)", re.IGNORECASE)
+_ACTIVE_TOOL_WIDGET = None
+
+
+def get_widget_tint_color(widget, default=None):
+    if not widget:
+        return default
+    try:
+        if hasattr(widget, "get_tint_color"):
+            color = widget.get_tint_color()
+            if color is not None:
+                return color
+    except Exception:
+        pass
+    try:
+        color = widget.property("tkm_tint_color")
+        if color is not None:
+            return color
+    except Exception:
+        pass
+    return default
+
+
+def get_active_tool_widget():
+    global _ACTIVE_TOOL_WIDGET
+    if _ACTIVE_TOOL_WIDGET and isValid(_ACTIVE_TOOL_WIDGET):
+        return _ACTIVE_TOOL_WIDGET
+    return None
+
+
+def get_active_tool_tint_color(default=None):
+    return get_widget_tint_color(get_active_tool_widget(), default=default)
+
+
+def _default_pressed_color_hex():
+    return toolColors.gray.base.hex
+
+
+def _color_to_hex(color, default=None):
+    if default is None:
+        default = _default_pressed_color_hex()
+    if color is None:
+        return default
+    try:
+        if hasattr(color, "base") and hasattr(color.base, "hex"):
+            return str(color.base.hex)
+        if hasattr(color, "hex"):
+            return str(color.hex)
+    except Exception:
+        pass
+    try:
+        qcolor = QtGui.QColor(color)
+        if qcolor.isValid():
+            return qcolor.name()
+    except Exception:
+        pass
+    return str(color) if isinstance(color, str) else default
 
 
 class HelpSystem:
@@ -589,11 +646,13 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
     ):
         super().__init__(parent)
         self.setAutoRaise(True)
-        self.pressed_color = pressed_color or "#666666"
+        self.pressed_color = pressed_color
         self._modifier_watch_connected = False
         self._shortcut_variants = []
         self._variant_state_lock = False
         self._active_variant_mask = None
+        self._section = None
+        self._section_key = None
 
         if text:
             self.setText(text)
@@ -601,30 +660,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         else:
             self.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly)
 
-        pressed_bg = self.pressed_color
-        # Enforce styling: squared corners, no border on hover, consistent pressed/checked colors
-        self.setStyleSheet(
-            f"""
-            QToolButton {{
-                border: none;
-                border-radius: 0px;
-                background-color: transparent;
-                color: #bfbfbf;
-                font-size: 11px;
-                font-weight: bold;
-            }}
-            QToolButton:hover {{
-                border: none;
-                background-color: transparent;
-                color: #ffffff;
-            }}
-            QToolButton:pressed,
-            QToolButton:checked {{
-                background-color: {pressed_bg};
-                color: #ffffff;
-            }}
-            """
-        )
+        self._refresh_button_stylesheet()
 
         # Centralized size
         w = 28
@@ -680,13 +716,67 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self._shortcut_variants = list(variants or [])
         self._active_variant_mask = None
 
-    def triggerToolCallback(self, base_callback):
+    def on_added_to_section(self, section, key):
+        self._section = section
+        self._section_key = key
+        self._refresh_button_stylesheet()
+
+    def set_tint_color(self, color):
+        self.setProperty("tkm_tint_color", color)
+        self._refresh_button_stylesheet()
+
+    def get_tint_color(self):
+        color = self.property("tkm_tint_color")
+        if color is not None:
+            return color
+        section = getattr(self, "_section", None)
+        if section and hasattr(section, "get_tint_color"):
+            return section.get_tint_color()
+        return None
+
+    def _resolve_pressed_color(self):
+        if self.pressed_color:
+            return self.pressed_color
+        return _color_to_hex(self.get_tint_color())
+
+    def _refresh_button_stylesheet(self):
+        pressed_bg = _color_to_hex(self._resolve_pressed_color())
+        self.setStyleSheet(
+            f"""
+            QToolButton {{
+                border: none;
+                border-radius: 0px;
+                background-color: transparent;
+                color: #bfbfbf;
+                font-size: 11px;
+                font-weight: bold;
+            }}
+            QToolButton:hover {{
+                border: none;
+                background-color: transparent;
+                color: #ffffff;
+            }}
+            QToolButton:pressed,
+            QToolButton:checked {{
+                background-color: {pressed_bg};
+                color: #ffffff;
+            }}
+            """
+        )
+
+    def triggerToolCallback(self, base_callback, *args, **kwargs):
+        global _ACTIVE_TOOL_WIDGET
+        previous_widget = _ACTIVE_TOOL_WIDGET
+        _ACTIVE_TOOL_WIDGET = self
         variant = self._get_active_shortcut_variant()
         callback = variant.get("callback") if variant else None
-        if callback:
-            return callback()
-        if base_callback:
-            return base_callback()
+        try:
+            if callback:
+                return callback(*args, **kwargs)
+            if base_callback:
+                return base_callback(*args, **kwargs)
+        finally:
+            _ACTIVE_TOOL_WIDGET = previous_widget
 
     def _apply_icon_visual(self, icon):
         if isinstance(icon, (str, bytes)):
@@ -812,8 +902,20 @@ class QFlatSelectorButton(QFlatToolButton):
         self.setText("")
         self.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly)
 
+    def _format_count_text(self, value):
+        try:
+            count = int(value)
+        except Exception:
+            return str(value)
+
+        if count >= 1000000:
+            return "{}m".format(int(count / 1000000))
+        if count >= 1000:
+            return "{}k".format(int(count / 1000))
+        return str(count)
+
     def setCount(self, value):
-        self._count_text = str(value)
+        self._count_text = self._format_count_text(value)
         self.update()
 
     def paintEvent(self, event):
@@ -1283,18 +1385,18 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     for toggling the visibility of its child widgets.
     """
 
-    def __init__(self, parent=None, spacing=0, hiddeable=True, settings_namespace=None):
+    def __init__(self, parent=None, spacing=0, hiddeable=True, settings_namespace=None, color=None):
         super().__init__(parent)
         self.setLayout(QtWidgets.QHBoxLayout())
         self.layout().setContentsMargins(0, 3, 0, 3)
         self.layout().setSpacing(spacing)
         self._hiddeable = hiddeable
         self._settings_namespace = settings_namespace
+        self._tint_color = color
 
         self._widgets = {}  # slot_key -> widget mapping
         self._menu_metadata = []  # for non-slider sections (toolbar buttons etc.)
         self._default_keys = []
-        self._active_menu = None
         self._all_modes = []  # Full ordered mode list (SliderMode objects + "separator")
         self._mode_to_slot = {}  # mode_key -> slot_key (live, authoritative mapping)
 
@@ -1331,6 +1433,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
     def set_settings_namespace(self, namespace):
         self._settings_namespace = namespace
+
+    def set_tint_color(self, color):
+        self._tint_color = color
+
+    def get_tint_color(self):
+        return self._tint_color
 
     def _get_setting(self, key, default_value=None):
         return settings.get_setting(key, default_value, namespace=self._settings_namespace)
@@ -1459,7 +1567,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                     def _checked_cb(*args, cb=callback, b=widget, fn=set_checked_fn):
                         checked = bool(args[0]) if args else b.isChecked()
-                        cb(checked)
+                        b.triggerToolCallback(cb, checked)
                         if fn and isValid(b):
                             try:
                                 b.setChecked(fn())
@@ -1502,11 +1610,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         "set_checked_fn": item.get("set_checked_fn"),
                         "tooltip_template": item.get("tooltip_template") or item.get("tooltip"),
                         "description": item.get("description"),
+                        "default": bool(item.get("default", False)),
                     }
                 )
 
         # 3. Build QMenu from the descriptor list (factory will manage visibility)
-        def menu_factory(section=self, source_widget=None, widgets=widgets_list, group_pin_actions=pinnable_actions):
+        def menu_factory(section=self, source_widget=None, widgets=widgets_list):
             menu = MenuWidget(source_widget)
             menu.setTearOffEnabled(True)
 
@@ -1672,7 +1781,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if checkable:
 
                 def _checked_cb(checked, cb=callback, b=btn, fn=set_checked_fn):
-                    cb(checked)
+                    b.triggerToolCallback(cb, checked)
                     if fn and isValid(b):
                         try:
                             b.setChecked(fn())
@@ -1681,7 +1790,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                 btn.clicked.connect(_checked_cb)
             else:
-                btn.clicked.connect(lambda *_: callback())
+                btn.clicked.connect(lambda *_args, cb=callback, b=btn: b.triggerToolCallback(cb))
 
         # Right-click: show the group's shared context menu
         menu_factory = group_info.get("menu_factory")
@@ -1735,7 +1844,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             btn.deleteLater()
         self._refresh_layout()
 
-    def toggle_widget(self, key, visible, save_setting=True):
+    def toggle_widget(self, key, visible, save_setting=True, menu=None):
         """Toggle widget visibility and update menu/settings if needed."""
         widget = self._widgets.get(key)
         if widget and isValid(widget):
@@ -1744,13 +1853,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if save_setting:
             self._set_setting(f"pin_{key}", visible)
 
-        # Update action in active menu (keyed by mode_key for mode-driven sections)
-        if self._active_menu and isValid(self._active_menu):
+        # Update the currently open menu action, keyed by mode key for mode-driven sections.
+        if menu and isValid(menu):
             # Try to look up by slot key or by current mode key of that widget
             widget = self._widgets.get(key)
             current_cm = getattr(widget, "_current_mode", None) if widget else None
             action_key = current_cm.key if current_cm else key
-            action = getattr(self._active_menu, "_tkm_actions", {}).get(action_key)
+            action = getattr(menu, "_tkm_actions", {}).get(action_key)
             if action and isValid(action):
                 action.blockSignals(True)
                 action.setChecked(visible)
@@ -1781,7 +1890,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._mode_to_slot[new_key] = slot_key
             self._set_setting(f"slider_mode_{slot_key}", new_key)
 
-    def _set_visible_modes(self, desired_mode_keys):
+    def _set_visible_modes(self, desired_mode_keys, menu=None):
         """
         Show exactly the given modes, reassigning sliders from the pool as needed.
         This is the single source of truth for all pin operations.
@@ -1817,9 +1926,9 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             widget.setVisible(visible)
             self._set_setting(f"pin_{slot}", visible)
 
-        # sync check states in the active menu (keyed by mode key)
-        if self._active_menu and isValid(self._active_menu):
-            actions = getattr(self._active_menu, "_tkm_actions", {})
+        # Sync check states in the currently open menu, keyed by mode key.
+        if menu and isValid(menu):
+            actions = getattr(menu, "_tkm_actions", {})
 
             # Recalculate which modes actively have a visible slider representative
             actual_visible_modes = {
@@ -1833,12 +1942,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     action.blockSignals(False)
 
             # Force the menu to repaint so the visual check marks reflect the new state immediately
-            self._active_menu.update()
-            self._active_menu.repaint()
+            menu.update()
+            menu.repaint()
 
         self._refresh_layout()
 
-    def pin_defaults(self, default_keys):
+    def pin_defaults(self, default_keys, menu=None):
         """Show only the default modes, reassigning sliders as needed."""
         all_mode_keys = {m.key for m in self._all_modes if hasattr(m, "key")}
         default_mode_keys = set()
@@ -1848,43 +1957,101 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 if dk == mk or dk.endswith(f"_{mk}"):
                     default_mode_keys.add(mk)
                     break
-        self._set_visible_modes(default_mode_keys)
+        self._set_visible_modes(default_mode_keys, menu=menu)
 
-    def pin_all(self):
+    def pin_all(self, menu=None):
         """Show ALL modes, reassigning sliders to cover every mode in the list."""
         all_mode_keys = {m.key for m in self._all_modes if hasattr(m, "key")}
-        self._set_visible_modes(all_mode_keys)
+        self._set_visible_modes(all_mode_keys, menu=menu)
 
-    def pin_widget_defaults(self):
-        """Non-slider sections: restore widget visibility to their registered defaults."""
+    def pin_widget_defaults(self, menu=None):
+        """Non-slider sections: restore widget visibility and sub-action pins to defaults."""
         for item in self._menu_metadata:
             if item.get("type") != "widget":
                 continue
             key = item.get("key")
             if not key:
                 continue
-            self.toggle_widget(key, bool(item.get("default", True)), save_setting=True)
+            self.toggle_widget(key, bool(item.get("default", True)), save_setting=True, menu=menu)
+
+        for group_key, group_info in self._tool_groups.items():
+            for act_info in group_info.get("actions", []):
+                act_key = act_info.get("key")
+                if not act_key or act_key == group_key:
+                    continue
+                should_pin = bool(act_info.get("default", False))
+                settings.set_setting(f"pin_action_{act_key}", should_pin)
+                if should_pin:
+                    self._create_pinned_action_button(group_key, act_info)
+                else:
+                    self._remove_pinned_action_button(act_key)
+
+        self._sync_widget_menu_actions(menu)
         self._refresh_layout()
 
-    def pin_widget_all(self):
-        """Non-slider sections: show all registered widgets."""
+    def pin_widget_all(self, menu=None):
+        """Non-slider sections: show all widgets and pin all group sub-actions."""
         for item in self._menu_metadata:
             if item.get("type") != "widget":
                 continue
             key = item.get("key")
             if not key:
                 continue
-            self.toggle_widget(key, True, save_setting=True)
+            self.toggle_widget(key, True, save_setting=True, menu=menu)
+
+        for group_key, group_info in self._tool_groups.items():
+            for act_info in group_info.get("actions", []):
+                act_key = act_info.get("key")
+                if not act_key or act_key == group_key:
+                    continue
+                settings.set_setting(f"pin_action_{act_key}", True)
+                self._create_pinned_action_button(group_key, act_info)
+
+        self._sync_widget_menu_actions(menu)
         self._refresh_layout()
 
-    def _make_toggle_handler(self, key):
+    def _make_toggle_handler(self, key, menu=None):
         """Creates a handler function that captures 'key'."""
 
         def handler(checked):
-            self.toggle_widget(key, checked)
+            self.toggle_widget(key, checked, menu=menu)
             self._refresh_layout()
 
         return handler
+
+    def _sync_widget_menu_actions(self, menu):
+        if not menu or not isValid(menu):
+            return
+
+        actions = getattr(menu, "_tkm_actions", {})
+        for item in self._menu_metadata:
+            if item.get("type") != "widget":
+                continue
+            key = item.get("key")
+            action = actions.get(key)
+            widget = self._widgets.get(key)
+            if not key or not action or not isValid(action) or not widget or not isValid(widget):
+                continue
+            action.blockSignals(True)
+            action.setChecked(widget.isVisible())
+            action.blockSignals(False)
+
+        for group_key, group_info in self._tool_groups.items():
+            for act_info in group_info.get("actions", []):
+                act_key = act_info.get("key")
+                if not act_key or act_key == group_key:
+                    continue
+                action = actions.get(act_key)
+                existing_btn = self._pinned_action_buttons.get(act_key)
+                is_pinned = bool(existing_btn and isValid(existing_btn))
+                if not action or not isValid(action):
+                    continue
+                action.blockSignals(True)
+                action.setChecked(is_pinned)
+                action.blockSignals(False)
+
+        menu.update()
+        menu.repaint()
 
     def _refresh_layout(self):
         """Trigger a height recalculation."""
@@ -1937,7 +2104,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                             current.add(mk)
                         else:
                             current.discard(mk)
-                        self._set_visible_modes(current)
+                        self._set_visible_modes(current, menu=menu)
 
                     return handler
 
@@ -1966,7 +2133,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         key,
                         item["label"],
                         widget.isVisible(),
-                        self._make_toggle_handler(key),
+                        self._make_toggle_handler(key, menu=menu),
                         description=item.get("description") or "",
                         title=item.get("tooltip_template") or item.get("tooltip") or item["label"],
                     )
@@ -2015,14 +2182,14 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         menu.addSeparator()
         pin_def_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin Defaults")
         if self._all_modes:
-            pin_def_action.triggered.connect(lambda: self.pin_defaults(self._default_keys))
+            pin_def_action.triggered.connect(lambda: self.pin_defaults(self._default_keys, menu=menu))
         else:
-            pin_def_action.triggered.connect(self.pin_widget_defaults)
+            pin_def_action.triggered.connect(lambda: self.pin_widget_defaults(menu=menu))
         pin_all_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin All")
         if self._all_modes:
-            pin_all_action.triggered.connect(self.pin_all)
+            pin_all_action.triggered.connect(lambda: self.pin_all(menu=menu))
         else:
-            pin_all_action.triggered.connect(self.pin_widget_all)
+            pin_all_action.triggered.connect(lambda: self.pin_widget_all(menu=menu))
 
     def _build_menu(self):
         if not self._hiddeable:
@@ -2040,9 +2207,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         menu = self._build_menu()
         if not menu:
             return
-        self._active_menu = menu
         menu.exec_(global_pos)
-        self._active_menu = None
 
     def _show_menu(self):
         self.open_menu(QtGui.QCursor.pos())

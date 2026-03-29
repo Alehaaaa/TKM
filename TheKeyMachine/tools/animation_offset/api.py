@@ -9,7 +9,9 @@ except Exception:
 
 import TheKeyMachine.core.runtime_manager as runtime
 import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.tools import colors as toolColors
 import TheKeyMachine.widgets.timeline as timelineWidgets
+from TheKeyMachine.widgets import util as wutil
 
 
 SUPPORTED_ATTR_TYPES = {
@@ -51,6 +53,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._baseline = {}
         self._last_values = {}
         self._pending_manip_plugs = set()
+        self._tint_color = toolColors.purple
 
         self._poll_timer = QtCore.QTimer(self)
         self._poll_timer.setInterval(70)
@@ -60,7 +63,7 @@ class AnimationOffsetController(QtCore.QObject):
         return self._enabled
 
     def _selection(self):
-        return cmds.ls(selection=True, long=True) or []
+        return wutil.get_selected_objects(long=True)
 
     def _selection_signature_value(self, selection=None):
         if selection is None:
@@ -75,6 +78,9 @@ class AnimationOffsetController(QtCore.QObject):
         if selected_range:
             return selected_range
         return timelineWidgets.get_playback_range()
+
+    def _resolve_tint_color(self):
+        return self._tint_color
 
     def _is_in_locked_range(self):
         if not self._time_range:
@@ -465,12 +471,12 @@ class AnimationOffsetController(QtCore.QObject):
 
     def activate(self):
         self._enabled = True
-        cmds.select(cmds.ls(sl=True))
+        cmds.select(wutil.get_selected_objects())
         self._connect_runtime_manager()
         self._resnapshot(update_range=True)
         timelineWidgets.show_timeline_tint(
             timerange=self._time_range,
-            hue=19,
+            color=self._resolve_tint_color(),
             duration_ms=None,
             owner=self._owner,
             key=self._tint_key,
@@ -497,6 +503,14 @@ class AnimationOffsetController(QtCore.QObject):
 
         checked = bool(checked)
         self._enabled = checked
+
+        if button_widget and isValid(button_widget) and hasattr(button_widget, "get_tint_color"):
+            try:
+                tint_color = button_widget.get_tint_color()
+            except Exception:
+                tint_color = None
+            if tint_color is not None:
+                self._tint_color = tint_color
 
         if button_widget and isValid(button_widget):
             button_widget.blockSignals(True)

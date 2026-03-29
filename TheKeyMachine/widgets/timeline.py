@@ -119,7 +119,7 @@ def resolve_time_context(default_mode="all_animation"):
 
 
 class TimelineTint(QtWidgets.QWidget):
-    def __init__(self, timerange, hue=(200, 120, 200), duration_ms=200, parent=None, center_line=False, icon_path=None, full_width=False):
+    def __init__(self, timerange, color=(200, 120, 200), duration_ms=200, parent=None, center_line=False, icon_path=None, full_width=False):
         self._full_width = bool(full_width)
         parent_widget = parent or self.get_timeline_widget(full_width=self._full_width)
         super().__init__(parent_widget)
@@ -134,7 +134,7 @@ class TimelineTint(QtWidgets.QWidget):
         self.timerange = (int(start_frame), int(end_frame))
         self._persistent = duration_ms is None
 
-        self.color = _normalize_tint_color(hue)
+        self.color = _normalize_tint_color(color)
         self.center_line = bool(center_line)
         self.icon_path = icon_path
         self._icon = QtGui.QPixmap(icon_path) if icon_path else QtGui.QPixmap()
@@ -146,7 +146,7 @@ class TimelineTint(QtWidgets.QWidget):
         self.show()
 
         if not self._persistent:
-            lifetime_ms = max(200, int(duration_ms or 0))
+            lifetime_ms = max(300, int(duration_ms or 0))
             self._timer = QtCore.QTimer(self)
             self._timer.setSingleShot(True)
             self._timer.timeout.connect(self.delete_tint)
@@ -245,12 +245,12 @@ class TimelineTint(QtWidgets.QWidget):
 
 
 class TimelineTintSession(QtCore.QObject):
-    def __init__(self, widget, key=None, min_duration_ms=200, parent=None):
+    def __init__(self, widget, key=None, min_duration=300, parent=None):
         session_parent = parent or runtime.get_runtime_manager()
         super().__init__(session_parent)
         self._widget = widget
         self._key = key
-        self._min_duration_ms = max(200, int(min_duration_ms or 0))
+        self._min_duration = max(300, int(min_duration or 0))
         self._finished = False
         self._elapsed = QtCore.QElapsedTimer()
         self._elapsed.start()
@@ -262,7 +262,7 @@ class TimelineTintSession(QtCore.QObject):
         if self._finished:
             return
         self._finished = True
-        remaining = max(0, self._min_duration_ms - self._elapsed.elapsed())
+        remaining = max(0, self._min_duration - self._elapsed.elapsed())
         if remaining:
             self._finish_timer.start(remaining)
         else:
@@ -287,13 +287,13 @@ class TimelineTintSession(QtCore.QObject):
             pass
 
 
-def show_timeline_tint(timerange=None, hue=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None):
-    hue = hue or _default_tint_color()
+def show_timeline_tint(timerange=None, color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None):
+    color = color or _default_tint_color()
     context = timerange or resolve_time_context(default_mode="all_animation").timerange
     full_width = _is_full_playback_timerange(context)
     widget = TimelineTint(
         timerange=context,
-        hue=hue,
+        color=color,
         duration_ms=duration_ms,
         center_line=center_line,
         icon_path=icon_path,
@@ -302,11 +302,11 @@ def show_timeline_tint(timerange=None, hue=None, duration_ms=200, owner=None, ke
     return runtime.get_runtime_manager().register_managed_widget(widget, key=key, owner=owner)
 
 
-def show_timeline_context(default_mode="all_animation", hue=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None):
+def show_timeline_context(default_mode="all_animation", color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None):
     context = resolve_time_context(default_mode=default_mode)
     return show_timeline_tint(
         timerange=context.timerange,
-        hue=hue,
+        color=color,
         duration_ms=duration_ms,
         owner=owner,
         key=key,
@@ -319,35 +319,34 @@ def clear_timeline_tint(key):
     runtime.get_runtime_manager().clear_managed_widget(key)
 
 
-def begin_timeline_tint(timerange=None, hue=None, owner=None, key=None, min_duration_ms=200, center_line=False, icon_path=None):
+def begin_timeline_tint(timerange=None, color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None):
     widget = show_timeline_tint(
         timerange=timerange,
-        hue=hue,
+        color=color,
         duration_ms=None,
         owner=owner,
         key=key,
         center_line=center_line,
         icon_path=icon_path,
     )
-    return TimelineTintSession(widget, key=key, min_duration_ms=min_duration_ms, parent=owner)
+    return TimelineTintSession(widget, key=key, min_duration=min_duration, parent=owner)
 
 
-def begin_timeline_context(default_mode="all_animation", hue=None, owner=None, key=None, min_duration_ms=200, center_line=False, icon_path=None):
+def begin_timeline_context(default_mode="all_animation", color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None):
     context = resolve_time_context(default_mode=default_mode)
     return begin_timeline_tint(
         timerange=context.timerange,
-        hue=hue,
+        color=color,
         owner=owner,
         key=key,
-        min_duration_ms=min_duration_ms,
+        min_duration=min_duration,
         center_line=center_line,
         icon_path=icon_path,
     )
 
 
 def _default_tint_color():
-    color = toolColors.get_selection_set_color("_20")
-    return QtGui.QColor(color.base.hex).getRgb()[:3]
+    return toolColors.gray
 
 
 def _is_full_playback_timerange(timerange):
@@ -364,6 +363,10 @@ def _is_full_playback_timerange(timerange):
 def _normalize_tint_color(color):
     if isinstance(color, QtGui.QColor):
         qcolor = QtGui.QColor(color)
+    elif hasattr(color, "base") and hasattr(color.base, "hex"):
+        qcolor = QtGui.QColor(color.base.hex)
+    elif hasattr(color, "hex"):
+        qcolor = QtGui.QColor(color.hex)
     elif isinstance(color, (int, float)):
         hue = int(color) % 360
         qcolor = QtGui.QColor.fromHsv(hue, 75, 242, 52)

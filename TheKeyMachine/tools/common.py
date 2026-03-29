@@ -36,13 +36,34 @@ class ToolbarWindowToggle(QtCore.QObject):
         self._button.toggled.connect(self._on_button_toggled)
         self._button.destroyed.connect(self._on_button_destroyed)
 
+    def _set_button_checked(self, checked):
+        if not self._button:
+            return
+        self._syncing = True
+        try:
+            self._button.setChecked(bool(checked))
+        finally:
+            self._syncing = False
+
+    def _reconcile_button_state(self):
+        if not self._button:
+            return
+        try:
+            is_open = bool(self._is_open_fn())
+        except Exception:
+            return
+        self._set_button_checked(is_open)
+
     def _on_button_toggled(self, checked):
         if self._syncing:
             return
+        import TheKeyMachine.mods.reportMod as report
+
         if checked:
-            self._open_fn()
+            report.safe_execute(self._open_fn, context="toolbar window toggle open")
         else:
-            self._close_fn()
+            report.safe_execute(self._close_fn, context="toolbar window toggle close")
+        self._reconcile_button_state()
 
     def _on_button_destroyed(self, *_):
         if not self._button:
@@ -63,18 +84,30 @@ class ToolbarWindowToggle(QtCore.QObject):
             pass
 
     def open(self):
+        import TheKeyMachine.mods.reportMod as report
+
         if not self._is_open_fn():
-            self._open_fn()
+            result = report.safe_execute(self._open_fn, context="toolbar window toggle open")
+            self._reconcile_button_state()
+            return result
 
     def close(self):
+        import TheKeyMachine.mods.reportMod as report
+
         if self._is_open_fn():
-            self._close_fn()
+            result = report.safe_execute(self._close_fn, context="toolbar window toggle close")
+            self._reconcile_button_state()
+            return result
 
     def toggle(self):
+        import TheKeyMachine.mods.reportMod as report
+
         if self._is_open_fn():
-            self._close_fn()
+            result = report.safe_execute(self._close_fn, context="toolbar window toggle close")
         else:
-            self._open_fn()
+            result = report.safe_execute(self._open_fn, context="toolbar window toggle open")
+        self._reconcile_button_state()
+        return result
 
     def _on_window_state_changed(self, is_open):
         if not self._button:

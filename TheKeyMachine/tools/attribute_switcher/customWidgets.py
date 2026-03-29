@@ -919,7 +919,7 @@ class SetupTargetsDialog(FloatingWidget):
         )
 
     def _add_target(self):
-        for obj in cmds.ls(selection=True):
+        for obj in util.get_selected_objects():
             self.targets_list.add_target(obj)
 
     def _create_layouts(self):
@@ -1249,7 +1249,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
     def _get_selected_nodes(self, long=False):
         """Returns the current Maya selection."""
-        return cmds.ls(selection=True, long=long)
+        return util.get_selected_objects(long=long)
 
     def _fetch_attribute_data(self):
         """Analyzes active selection for compatible space-switch attributes and returns structured data."""
@@ -1577,7 +1577,6 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
                 timerange=(list(keyframes.keys())[0], list(keyframes.keys())[-1]),
                 owner=self,
                 key="attribute_switcher_range",
-                min_duration_ms=200,
             )
 
             # Start Progress Bar

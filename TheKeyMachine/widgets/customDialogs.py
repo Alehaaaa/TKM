@@ -30,7 +30,7 @@ except ImportError:
     QRegularExpression = QRegExp
     QRegularExpressionValidator = QRegExpValidator
 
-from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
+from TheKeyMachine.widgets.util import DPI, get_maya_qt, get_selected_objects, is_valid_widget
 from TheKeyMachine.tooltips.tooltip import QFlatTooltipManager
 
 import TheKeyMachine.mods.mediaMod as media
@@ -939,12 +939,17 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
         self._refresh_timer.setSingleShot(True)
         self._refresh_timer.timeout.connect(self.reload_objects)
         self._suppress_next_refresh = False
+        self._pending_objects = []
+        self._refreshing = False
 
         # List
-        self.list_widget = QtWidgets.QListWidget()
+        self._list_model = QtCore.QStringListModel(self)
+        self.list_widget = QtWidgets.QListView()
+        self.list_widget.setModel(self._list_model)
         self.list_widget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.list_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        self.list_widget.itemSelectionChanged.connect(self._on_list_selection_changed)
+        self.list_widget.setUniformItemSizes(True)
+        self.list_widget.selectionModel().selectionChanged.connect(self._on_list_selection_changed)
 
         self.mainLayout.addWidget(self.list_widget, 1)
 
@@ -965,33 +970,45 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
         if not self._refresh_timer.isActive():
             self._refresh_timer.start(0)
 
+    def _sort_selected_objects_for_display(self, objects):
+        return sorted(objects or [], key=lambda obj: (obj.rsplit("|", 1)[-1].lower(), obj.lower()))
+
+    def _select_all_rows(self):
+        selection_model = self.list_widget.selectionModel()
+        if not selection_model or not self._pending_objects:
+            return
+        top_left = self._list_model.index(0, 0)
+        bottom_right = self._list_model.index(len(self._pending_objects) - 1, 0)
+        selection_model.select(
+            QtCore.QItemSelection(top_left, bottom_right),
+            QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows,
+        )
+
     def reload_objects(self):
         """Fills the list with current selection names and preserves active selection in the UI."""
-        import maya.cmds as cmds
-
+        self._refreshing = True
         self.list_widget.blockSignals(True)
-        self.list_widget.clear()
-
-        selected = cmds.ls(selection=True, long=True) or []
-
-        for obj in sorted(selected):
-            label = obj.rsplit("|", 1)[-1]
-            item = QtWidgets.QListWidgetItem(label)
-            item.setData(QtCore.Qt.UserRole, obj)
-            self.list_widget.addItem(item)
-            item.setSelected(True)
-
+        selected = self._sort_selected_objects_for_display(get_selected_objects(long=True))
+        self._pending_objects = selected
+        item_labels = [obj.rsplit("|", 1)[-1] for obj in selected]
         self.title_label.setText(str(len(selected)))
+        self._list_model.setStringList(item_labels)
+        self._select_all_rows()
+        self._refreshing = False
         self.list_widget.blockSignals(False)
 
     def _on_list_selection_changed(self):
         """Syncs the dialog selection back to the Maya scene."""
         import maya.cmds as cmds
 
+        if self._refreshing:
+            return
+
         names = []
-        for item in self.list_widget.selectedItems():
-            full_path = item.data(QtCore.Qt.UserRole)
-            names.append(full_path or item.text())
+        for index in self.list_widget.selectionModel().selectedIndexes():
+            row = index.row()
+            if 0 <= row < len(self._pending_objects):
+                names.append(self._pending_objects[row])
 
         valid_names = [n for n in names if n and cmds.objExists(n)]
 
@@ -1014,16 +1031,17 @@ class QFlatBugReportDialog(QFlatDialog):
 
     MAX_TEXT_CHARS = 1200
 
-    def __init__(self, parent=None, submit_callback=None):
+    def __init__(self, parent=None, submit_callback=None, dialog_title="Sorry, you found a bug!", prefill_name="", prefill_explanation="", prefill_script_error=""):
         self._submit_callback = submit_callback
         self._send_button = None
         QFlatDialog.__init__(self, parent)
-        self.setWindowTitle("Report a Bug")
+        self.setWindowTitle(dialog_title)
         # More horizontal / less tall default footprint.
         self.setMinimumSize(DPI(600), DPI(450))
 
         self._info_color = "#9bbbca"
         self._error_color = "#CA6161"
+        self._status_placeholder = " "
 
         content_widget = QtWidgets.QWidget()
         content_layout = QtWidgets.QVBoxLayout(content_widget)
@@ -1045,10 +1063,10 @@ class QFlatBugReportDialog(QFlatDialog):
         text_layout = QtWidgets.QVBoxLayout()
         text_layout.setSpacing(DPI(4))
 
-        title = QtWidgets.QLabel("<b>Report a Bug</b>")
-        title.setAlignment(QtCore.Qt.AlignLeft)
-        title.setStyleSheet("color: #CA6161; font-size: %spx;" % DPI(18))
-        text_layout.addWidget(title)
+        self.title_label = QtWidgets.QLabel("<b>{}</b>".format(dialog_title))
+        self.title_label.setAlignment(QtCore.Qt.AlignLeft)
+        self.title_label.setStyleSheet("color: #CA6161; font-size: %spx;" % DPI(18))
+        text_layout.addWidget(self.title_label)
 
         subtitle = QtWidgets.QLabel("Have you found a bug? Please fill the report and I will do my best to fix it in the next update.")
         subtitle.setAlignment(QtCore.Qt.AlignLeft)
@@ -1059,39 +1077,43 @@ class QFlatBugReportDialog(QFlatDialog):
         header_layout.addLayout(text_layout, stretch=1)
         content_layout.addLayout(header_layout)
 
-        self.status_label = QtWidgets.QLabel("")
+        self.status_label = QtWidgets.QLabel(self._status_placeholder)
         self.status_label.setAlignment(QtCore.Qt.AlignCenter)
         self.status_label.setWordWrap(True)
+        self.status_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.status_label.setMinimumHeight(self._status_row_height())
         self.status_label.setStyleSheet("color: %s;" % self._info_color)
-        content_layout.addWidget(self.status_label)
 
         self.name_input = QtWidgets.QLineEdit()
-        self.name_input.setPlaceholderText("Your name (required)")
+        self.name_input.setPlaceholderText("* Your name")
         self.name_input.setMaxLength(50)
-
-        self.email_input = QtWidgets.QLineEdit()
-        self.email_input.setPlaceholderText("Your email")
-        self.email_input.setMaxLength(50)
+        if prefill_name:
+            self.name_input.setText(prefill_name)
 
         self.explanation_textbox = QtWidgets.QTextEdit()
         self.explanation_textbox.setPlaceholderText(
-            "Please describe the problem or error you're experiencing. Include the steps and tool used so the issue can be reproduced."
+            "* Describe what happened, what you expected, and the steps to reproduce it."
         )
         self.explanation_textbox.setAcceptRichText(False)
         self.explanation_textbox.setMinimumHeight(DPI(110))
         self.explanation_textbox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.explanation_textbox.textChanged.connect(lambda: self._enforce_text_limit(self.explanation_textbox))
+        if prefill_explanation:
+            self.explanation_textbox.setPlainText(prefill_explanation)
 
         self.script_error_textbox = QtWidgets.QTextEdit()
-        self.script_error_textbox.setPlaceholderText("If you see any errors in the Script Editor, copy and paste the last 3 or 4 lines here.")
+        self.script_error_textbox.setPlaceholderText(
+            "Paste the last Script Editor lines here. Include the traceback or exact error if you have it."
+        )
         self.script_error_textbox.setAcceptRichText(False)
         self.script_error_textbox.setMinimumHeight(DPI(80))
         self.script_error_textbox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.script_error_textbox.textChanged.connect(lambda: self._enforce_text_limit(self.script_error_textbox))
+        if prefill_script_error:
+            self.script_error_textbox.setPlainText(prefill_script_error)
 
-        for widget in (self.name_input, self.email_input):
-            widget.setStyleSheet(self._input_style())
-            widget.textChanged.connect(self._clear_status_message)
+        self.name_input.setStyleSheet(self._input_style())
+        self.name_input.textChanged.connect(self._clear_status_message)
 
         for widget in (self.explanation_textbox, self.script_error_textbox):
             widget.setStyleSheet(self._textedit_style())
@@ -1099,10 +1121,16 @@ class QFlatBugReportDialog(QFlatDialog):
 
         # Keep fields in a single vertical column for faster scanning/filling.
         content_layout.addWidget(self.name_input)
-        content_layout.addWidget(self.email_input)
-        # Stretch with a modest ratio; keep the fields from becoming huge by default.
-        content_layout.addWidget(self.explanation_textbox, 2)
-        content_layout.addWidget(self.script_error_textbox, 1)
+        self.details_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        self.details_splitter.setChildrenCollapsible(False)
+        self.details_splitter.setOpaqueResize(True)
+        self.details_splitter.setHandleWidth(DPI(6))
+        self.details_splitter.addWidget(self.explanation_textbox)
+        self.details_splitter.addWidget(self.script_error_textbox)
+        self.details_splitter.setStretchFactor(0, 2)
+        self.details_splitter.setStretchFactor(1, 1)
+        content_layout.addWidget(self.details_splitter, 1)
+        content_layout.addWidget(self.status_label)
 
         self.root_layout.addWidget(content_widget, 1)
 
@@ -1113,6 +1141,7 @@ class QFlatBugReportDialog(QFlatDialog):
 
         # Keep a horizontal rectangle feel even with vertical fields.
         self.resize(DPI(680), DPI(500))
+        QtCore.QTimer.singleShot(0, self._init_splitter_sizes)
 
     def _input_style(self):
         return (
@@ -1158,15 +1187,63 @@ class QFlatBugReportDialog(QFlatDialog):
                 return btn
         return None
 
+    def apply_prefill(self, dialog_title=None, name="", explanation="", script_error=""):
+        if dialog_title:
+            self.setWindowTitle(dialog_title)
+            self.title_label.setText("<b>{}</b>".format(dialog_title))
+        self.name_input.setText(name or "")
+        self.explanation_textbox.setPlainText(explanation or "")
+        self.script_error_textbox.setPlainText(script_error or "")
+        self._set_send_enabled(True)
+        self._clear_status_message()
+
+    def _status_row_height(self):
+        metrics = self.status_label.fontMetrics() if hasattr(self, "status_label") else self.fontMetrics()
+        return max(DPI(10), metrics.lineSpacing() + DPI(1))
+
+    def _init_splitter_sizes(self):
+        if not hasattr(self, "details_splitter"):
+            return
+        total = max(DPI(240), self.details_splitter.size().height())
+        upper = max(DPI(130), int(total * 0.68))
+        lower = max(DPI(90), total - upper)
+        self.details_splitter.setSizes([upper, lower])
+
+    def _set_send_enabled(self, enabled):
+        if self._send_button:
+            self._send_button.setEnabled(bool(enabled))
+
+    def _required_values(self):
+        return (
+            self.name_input.text().strip(),
+            self.explanation_textbox.toPlainText().strip(),
+        )
+
+    def _optional_values(self):
+        return {
+            "script_error": self.script_error_textbox.toPlainText().strip(),
+        }
+
+    def _validate(self):
+        name, explanation = self._required_values()
+        if not name or not explanation:
+            self._set_status("Please fill in the required fields.", error=True)
+            return None
+        return {
+            "name": name,
+            "explanation": explanation,
+            **self._optional_values(),
+        }
+
     def _set_status(self, message, error=False):
         color = self._error_color if error else self._info_color
         self.status_label.setStyleSheet("color: %s;" % color)
-        self.status_label.setText(message)
+        self.status_label.setText(message or self._status_placeholder)
 
     def _clear_status_message(self):
         if self._send_button and not self._send_button.isEnabled():
             return
-        self.status_label.clear()
+        self.status_label.setText(self._status_placeholder)
 
     def _enforce_text_limit(self, widget):
         text = widget.toPlainText()
@@ -1181,27 +1258,20 @@ class QFlatBugReportDialog(QFlatDialog):
         widget.blockSignals(False)
 
     def _on_send_clicked(self):
-        name = self.name_input.text().strip()
-        explanation = self.explanation_textbox.toPlainText().strip()
-
-        if not name or not explanation:
-            self._set_status("Please fill in the required fields.", error=True)
+        payload = self._validate()
+        if not payload:
             return
 
         if not self._submit_callback:
             self._set_status("Bug reporting is unavailable right now.", error=True)
             return
 
-        email = self.email_input.text().strip()
-        script_error = self.script_error_textbox.toPlainText().strip()
-
         self._set_status("Sending bug report...", error=False)
-        if self._send_button:
-            self._send_button.setEnabled(False)
+        self._set_send_enabled(False)
 
         success = False
         try:
-            success = bool(self._submit_callback(name, email, explanation, script_error))
+            success = bool(self._submit_callback(**payload))
         except Exception as exc:
             print("[TheKeyMachine] Bug report submission failed:", exc)
 
@@ -1210,8 +1280,7 @@ class QFlatBugReportDialog(QFlatDialog):
             QtCore.QTimer.singleShot(3100, self.close)
         else:
             self._set_status("Failed to send the report. Try again later.", error=True)
-            if self._send_button:
-                self._send_button.setEnabled(True)
+            self._set_send_enabled(True)
 
     def show_centered(self):
         # Avoid adjustSize() here: it tends to make this dialog overly tall based on content hints.

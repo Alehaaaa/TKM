@@ -6,6 +6,7 @@ Tweening and blending operations translated from keyToolsMod.
 
 import maya.cmds as cmds
 from . import utils
+from TheKeyMachine.widgets import util as wutil
 
 # ---------------------------------------------------------------------------------------------------------------------
 #                                                     Tween Logic                                                     #
@@ -128,7 +129,7 @@ def prepare_tween_data(objs=None, attrs=None, attr_plugs=None, time_range=None):
     if attr_plugs is not None:
         plugs = list(attr_plugs)
     else:
-        nodes = objs if objs else cmds.ls(selection=True)
+        nodes = objs if objs else wutil.get_selected_objects()
         plugs = []
         for obj in nodes:
             if not cmds.objExists(obj):
@@ -420,7 +421,7 @@ def execute_blend_to_key(percentage, objs=None):
 def execute_blend_to_frame(percentage, left_frame=None, right_frame=None, objs=None):
     """Blends current value toward values at specific frames."""
     utils.start_dragging()
-    nodes = objs if objs else cmds.ls(selection=True)
+    nodes = objs if objs else wutil.get_selected_objects()
     if not nodes:
         return
 

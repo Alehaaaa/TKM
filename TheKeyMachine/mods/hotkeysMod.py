@@ -19,6 +19,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 import maya.cmds as cmds
 import maya.mel as mel
+from TheKeyMachine.widgets import util as wutil
 
 
 def create_TheKeyMachine_hotkeys(*args):
@@ -193,7 +194,7 @@ def set_smart_key():
     import maya.cmds as cmds
 
     # Obtén una lista de todos los objetos seleccionados
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = wutil.get_selected_objects()
 
     if not selected_objects:
         return

@@ -202,7 +202,9 @@ def get_copy_worldspace_single_frame_data_folder():
 
 def create_TheKeyMachine_node():
     # Guardar la selección inicial
-    initial_selection = cmds.ls(selection=True)
+    from TheKeyMachine.widgets import util as wutil
+
+    initial_selection = wutil.get_selected_objects()
 
     tkm_version = get_thekeymachine_version()
     tkm_stage = get_thekeymachine_stage_version()
@@ -235,7 +237,9 @@ def create_TheKeyMachine_node():
 
 def create_ibookmarks_node():
     # Guardar la selección inicial
-    initial_selection = cmds.ls(selection=True)
+    from TheKeyMachine.widgets import util as wutil
+
+    initial_selection = wutil.get_selected_objects()
 
     if not cmds.objExists("iBookmarks"):
         node = cmds.createNode("transform", name="iBookmarks")
@@ -295,7 +299,13 @@ def open_file(sub_directory, file_name):
 
     # Comprueba si el archivo existe
     if not os.path.isfile(file_path):
-        print(f"Error: file '{file_path}' does not exist")
+        import TheKeyMachine.mods.reportMod as report
+
+        report.report_detected_exception(
+            context="open file",
+            source_file=os.path.basename(__file__),
+            traceback_text="File does not exist: {}".format(file_path),
+        )
         return
 
     # Abrir el archivo con la aplicación predeterminada
@@ -303,7 +313,9 @@ def open_file(sub_directory, file_name):
         try:
             os.startfile(file_path)
         except Exception as e:
-            print(f"Error opening the file: {e}")
+            import TheKeyMachine.mods.reportMod as report
+
+            report.report_detected_exception(e, context="open file")
 
     elif sys.platform == "darwin":
         subprocess.call(["open", file_path])
@@ -313,8 +325,9 @@ def open_file(sub_directory, file_name):
             subprocess.run(["xdg-open", file_path], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
             # Si xdg-open produce un error, intenta cambiar temporalmente LD_LIBRARY_PATH y volver a intentar
-            print(f"Error opening the file with xdg-open: {e}")
-            print("Attempting to open the file with modified LD_LIBRARY_PATH..")
+            import TheKeyMachine.mods.reportMod as report
+
+            report.report_detected_exception(e, context="open file with xdg-open")
 
             original_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
             os.environ["LD_LIBRARY_PATH"] = "/usr/lib:/lib:/usr/local/lib"
@@ -322,7 +335,7 @@ def open_file(sub_directory, file_name):
             try:
                 subprocess.run(["xdg-open", file_path], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except subprocess.CalledProcessError as e:
-                print(f"Error opening the file with modified LD_LIBRARY_PATH: {e}")
+                report.report_detected_exception(e, context="open file with modified LD_LIBRARY_PATH")
             finally:
                 # Restaurar el valor original de LD_LIBRARY_PATH
                 os.environ["LD_LIBRARY_PATH"] = original_ld_path

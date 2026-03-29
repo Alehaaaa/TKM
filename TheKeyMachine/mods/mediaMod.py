@@ -103,6 +103,7 @@ worldspace_copy_frame_image = getImage("worldspace_copy_frame.svg")
 worldspace_paste_frame_image = getImage("worldspace_paste_frame.svg")
 
 temp_pivot_image = getImage("temp_pivot.svg")
+temp_pivot_use_last_image = getImage("temp_pivot_use_last.svg")
 ruler_image = getImage("ruler.svg")
 
 auto_tangent_image = getImage("auto_tangent.svg")

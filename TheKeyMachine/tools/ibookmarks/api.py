@@ -32,7 +32,7 @@ def update_bookmark_list(list_widget, *_args):
 
 
 def create_bookmark(list_widget, *_args):
-    current_selection = cmds.ls(selection=True)
+    current_selection = wutil.get_selected_objects()
     if not current_selection:
         return
 
@@ -90,7 +90,7 @@ def remove_bookmark(list_widget, *_args):
 
 
 def isolate_bookmark(list_widget=None, bookmark_name=None, *_args):
-    current_selection = cmds.ls(selection=True, long=True)
+    current_selection = wutil.get_selected_objects(long=True)
 
     if not bookmark_name and list_widget:
         item = cmds.textScrollList(list_widget, query=True, selectItem=True)
@@ -176,7 +176,7 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
 
 
 def create_ibookmarks_window(*_args):
-    original_selection = cmds.ls(selection=True)
+    original_selection = wutil.get_selected_objects()
 
     if cmds.window(WINDOW_NAME, exists=True):
         cmds.deleteUI(WINDOW_NAME)

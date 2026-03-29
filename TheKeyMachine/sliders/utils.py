@@ -6,6 +6,7 @@ Internal state management and shared helper functions for sliders.
 
 import maya.cmds as cmds
 import maya.mel as mel
+from TheKeyMachine.widgets import util as wutil
 
 
 # Persistent session state for slider operations
@@ -166,7 +167,7 @@ def resolve_target_attribute_plugs():
         _target_has_graph_keys = True
         return _target_attr_plugs, _target_source, _target_time_range, _target_has_graph_keys
 
-    nodes = cmds.ls(selection=True) or []
+    nodes = wutil.get_selected_objects()
     if not nodes:
         _target_attr_plugs = []
         _target_source = "none"

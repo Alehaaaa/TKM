@@ -45,6 +45,7 @@ import TheKeyMachine.core.runtime_manager as runtime
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.widgets.customDialogs as customDialogs
+import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as util
 
@@ -61,6 +62,12 @@ down_one_level_var = False
 original_bg_color = None
 original_fg_color = None
 original_key_color = None
+
+
+def _active_tint_color():
+    return cw.get_active_tool_tint_color()
+
+
 def set_temp_timeslider_colors():
     global python_version, original_bg_color, original_fg_color, original_key_color
 
@@ -121,7 +128,7 @@ def delete_animation():
     selected_channels = keyTools.get_selected_channels()
 
     # Obtener selección actual
-    selection = cmds.ls(selection=True)
+    selection = util.get_selected_objects()
 
     # Verificar si hay algo seleccionado
     if not selection:
@@ -129,8 +136,8 @@ def delete_animation():
     time_context = keyTools.get_working_time_context(default_mode="all_animation")
     tint_session = timelineWidgets.begin_timeline_context(
         default_mode="all_animation",
+        color=_active_tint_color(),
         key="delete_animation_range",
-        min_duration_ms=200,
     )
 
     try:
@@ -153,7 +160,7 @@ def delete_animation():
 
 
 def createLocator():
-    selection = cmds.ls(selection=True)
+    selection = util.get_selected_objects()
     if selection:
         # Verificar si el grupo 'TheKeyMachine' existe, si no, crearlo
         if not cmds.objExists("TheKeyMachine"):
@@ -258,7 +265,7 @@ def setTangent(tangent_type):
 
 def align_selected_objects(*args, pos=True, rot=True, scl=False):
     # Obtener los objetos seleccionados
-    sel = cmds.ls(selection=True)
+    sel = util.get_selected_objects()
 
     # Asegurarse de que hay al menos dos objetos seleccionados
     if len(sel) < 2:
@@ -356,10 +363,10 @@ def isolate_master():
     down_one_level = down_one_level_var
 
     # Guardar la selección actual
-    current_selection = cmds.ls(selection=True)
+    current_selection = util.get_selected_objects()
 
     # Obtener los objetos actualmente seleccionados
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
     currentPanel = cmds.getPanel(wf=True)
     currentState = cmds.isolateSelect(currentPanel, query=True, state=True)
 
@@ -528,13 +535,15 @@ def select_curves_with_ctrl(obj):
                     cmds.select(transform, add=True)
             except Exception as e:
                 # Manejar cualquier excepción y continuar con el siguiente descendiente
-                print(f"Error selecting: {e}")
+                import TheKeyMachine.mods.reportMod as report
+
+                report.report_detected_exception(e, context="select hierarchy curves")
                 continue
 
 
 def selectHierarchy():
     # Obtener la selección actual
-    selection = cmds.ls(selection=True)
+    selection = util.get_selected_objects()
 
     if selection:
         for obj in selection:
@@ -545,13 +554,13 @@ def selectHierarchy():
 
 
 def create_temp_pivot(use_saved_position=False, *args):
-    seleccion = cmds.ls(selection=True)
+    seleccion = util.get_selected_objects()
 
     if not seleccion:
         return
 
     if cmds.objExists("tkm_temp_pivot"):
-        cmds.warning("Temp pivot already exists. Please unselect the current object to remove it")
+        cmds.warning("Temp Pivot already exists. Please unselect the current object to remove it")
         return
 
     def get_temp_pivot_relation():
@@ -559,7 +568,7 @@ def create_temp_pivot(use_saved_position=False, *args):
 
         matrix_file_path = general.get_temp_pivot_data_file()
 
-        seleccion = cmds.ls(selection=True)
+        seleccion = util.get_selected_objects()
 
         if not seleccion:
             return util.make_inViewMessage("Select at least one object")
@@ -657,7 +666,7 @@ def create_temp_pivot(use_saved_position=False, *args):
         temp_pivot_obj = temp_pivot_relative_data.get("temp_pivot_obj")
         follow_temp_pivot_objs = temp_pivot_relative_data.get("follow_temp_pivot_objs", {})
 
-        seleccion = cmds.ls(selection=True)
+        seleccion = util.get_selected_objects()
         if not seleccion:
             return util.make_inViewMessage("Select at least one object")
 
@@ -716,7 +725,9 @@ def create_temp_pivot(use_saved_position=False, *args):
                 om.MMessage.removeCallback(time_callback_id)
                 time_callback_id = None
         except Exception as e:
-            print(f"Error removing callback: {e}")
+            import TheKeyMachine.mods.reportMod as report
+
+            report.report_detected_exception(e, context="temp pivot callback cleanup")
 
     def attribute_callback_function(msg, plug, otherPlug, clientData):
         global process_callback
@@ -817,7 +828,7 @@ def color_worldspace_paste_animation(*args):
 
 
 def worldspace_copy_animation(*args):
-    selected_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
+    selected_objects = util.get_selected_objects(orderedSelection=True)
     if not selected_objects:
         return
 
@@ -850,8 +861,8 @@ def worldspace_copy_animation(*args):
         if all_keyframes:
             tint_session = timelineWidgets.begin_timeline_tint(
                 timerange=(int(all_keyframes[0]), int(all_keyframes[-1])),
+                color=_active_tint_color(),
                 key="worldspace_copy_all",
-                min_duration_ms=200,
             )
         for frame in all_keyframes:
             # Verificar si el proceso fue interrumpido por el usuario
@@ -904,7 +915,7 @@ def worldspace_copy_animation(*args):
 
 
 def copy_range_worldspace_animation(*args):
-    selected_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
+    selected_objects = util.get_selected_objects(orderedSelection=True)
     if not selected_objects:
         return
 
@@ -948,8 +959,8 @@ def copy_range_worldspace_animation(*args):
         if all_keyframes:
             tint_session = timelineWidgets.begin_timeline_tint(
                 timerange=(int(all_keyframes[0]), int(all_keyframes[-1])),
+                color=_active_tint_color(),
                 key="worldspace_copy_range",
-                min_duration_ms=200,
             )
 
         for frame in all_keyframes:
@@ -1003,7 +1014,7 @@ def copy_range_worldspace_animation(*args):
 
 
 def copy_worldspace_single_frame(*args):
-    selected_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
+    selected_objects = util.get_selected_objects(orderedSelection=True)
     if not selected_objects:
         return
 
@@ -1013,8 +1024,8 @@ def copy_worldspace_single_frame(*args):
     current_time = cmds.currentTime(query=True)
     tint_session = timelineWidgets.begin_timeline_tint(
         timerange=(int(current_time), int(current_time)),
+        color=_active_tint_color(),
         key="worldspace_copy_single_frame",
-        min_duration_ms=200,
     )
 
     try:
@@ -1083,11 +1094,11 @@ def paste_worldspace_single_frame(*args):
         if frame_range:
             tint_session = timelineWidgets.begin_timeline_tint(
                 timerange=frame_range,
+                color=_active_tint_color(),
                 key="worldspace_paste_single_frame",
-                min_duration_ms=200,
             )
 
-        target_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
+        target_objects = util.get_selected_objects(orderedSelection=True)
 
         # No selection: paste back to the originally copied objects (if they still exist)
         if not target_objects:
@@ -1242,7 +1253,7 @@ def worldspace_paste_animation(*args):
         if not ordered_sources:
             return util.make_inViewMessage("No World Space animation data found")
 
-        target_objects = cmds.ls(orderedSelection=True) or cmds.ls(selection=True) or []
+        target_objects = util.get_selected_objects(orderedSelection=True)
 
         # No selection: paste back to the originally copied objects (if they still exist)
         if not target_objects:
@@ -1288,8 +1299,8 @@ def worldspace_paste_animation(*args):
 
         tint_session = timelineWidgets.begin_timeline_tint(
             timerange=paste_range,
+            color=_active_tint_color(),
             key="worldspace_paste_range",
-            min_duration_ms=200,
         )
 
         all_frames = sorted(frame_set)
@@ -1368,7 +1379,7 @@ def mod_tracer(*args):
 
 
 def create_tracer(*args):
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
 
     # Verificar si hay exactamente un objeto seleccionado.
     if len(selected_objects) != 1:
@@ -1382,7 +1393,7 @@ def create_tracer(*args):
     if cmds.objExists("TKM_Tracer"):
         cmds.delete("TKM_Tracer")
 
-    selected_objects_start = cmds.ls(selection=True)
+    selected_objects_start = util.get_selected_objects()
     cmds.createNode("transform", name="TKM_Tracer")
     cmds.parent("TKM_Tracer", "TheKeyMachine")
 
@@ -1392,7 +1403,7 @@ def create_tracer(*args):
 
     cmds.select(selected_objects_start)
 
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
 
     if not selected_objects:
         return util.make_inViewMessage("Select an object to trace")
@@ -1497,7 +1508,7 @@ def create_follow_cam(translation=True, rotation=True, *args):
     global followCam_original_camera
 
     # Obtén el objeto seleccionado en la escena
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
 
     # Verifica si existe el grupo "TheKeyMachine"
     if not cmds.objExists("TheKeyMachine"):
@@ -1580,7 +1591,7 @@ def remove_followCam(*args):
 
 def selector_window(*args):
     # Check if anything is selected first
-    if not cmds.ls(selection=True):
+    if not util.get_selected_objects():
         return
 
     # Search for an existing instance of the selector window
@@ -1603,7 +1614,7 @@ def select_objects_from_list(list_name, *args):
 
 
 def reload_selected_objects(list_name, *args):
-    selected_objects = cmds.ls(selection=True)
+    selected_objects = util.get_selected_objects()
     sorted_objects = sorted(selected_objects)
 
     # Borrar los elementos actuales en la lista
@@ -1630,7 +1641,7 @@ def select_rig_controls(*args):
                 curves += find_curves(child)
         return curves
 
-    selected = cmds.ls(selection=True, long=True)
+    selected = util.get_selected_objects(long=True)
 
     if not selected:
         return
@@ -1729,7 +1740,7 @@ def select_rig_controls_animated(*args):
         cache[node] = False
         return False
 
-    selected = cmds.ls(selection=True, long=True)
+    selected = util.get_selected_objects(long=True)
 
     if not selected:
         return
@@ -1864,7 +1875,7 @@ class DepthControlDragger(MouseDragger):
             om.MGlobal.displayWarning("No camera found.")
             return
 
-        sel = cmds.ls(sl=True)
+        sel = util.get_selected_objects()
         if not sel:
             om.MGlobal.displayWarning("Please select an object.")
             return
@@ -1923,14 +1934,14 @@ def gimbal_fixer_window(*args):
 
     main_window = gimbal_fixer_build()
 
-    if cmds.ls(sl=True):  # Verifica si hay una selección
+    if util.get_selected_objects():  # Verifica si hay una selección
         update_rotation_order(main_window)  # Ejecuta el botón "Reload"
     else:
         util.make_inViewMessage("Select a control and reload")
 
 
 def update_rotation_order(window):
-    sel = cmds.ls(sl=True)
+    sel = util.get_selected_objects()
     if not sel:
         return util.make_inViewMessage("Select a control")
 
@@ -2039,7 +2050,7 @@ def convert_rotation_order(rot_order="zxy"):
         om.MGlobal.displayWarning("Wrong rotation order " + str(rot_order))
         return
 
-    sel = cmds.ls(sl=True)
+    sel = util.get_selected_objects()
 
     if not sel:
         om.MGlobal.displayWarning("Please select a control.")
@@ -2488,7 +2499,7 @@ def micro_move_pre_drag(*args):
 
     cmds.undoInfo(openChunk=True)
 
-    micro_move_selected_objects = cmds.ls(selection=True)
+    micro_move_selected_objects = util.get_selected_objects()
     if not micro_move_selected_objects:
         raise Exception("Please select an object")
 
@@ -2636,7 +2647,7 @@ def micro_rotate_pack_funtion():
             om.MMessage.removeCallback(id)
         micro_rotate_callback_ids = []  # Limpiar la lista después de eliminar los callbacks
 
-    micro_rotate_selected_objects = cmds.ls(selection=True)
+    micro_rotate_selected_objects = util.get_selected_objects()
 
     transform_attrs = ["rotateX", "rotateY", "rotateZ"]
     for selected in micro_rotate_selected_objects:
