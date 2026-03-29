@@ -44,10 +44,12 @@ import TheKeyMachine.core.runtime_manager as runtime
 
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.generalMod as general
+import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.widgets.customDialogs as customDialogs
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as util
+from TheKeyMachine.tools import common as toolCommon
 
 
 python_version = f"{sys.version_info.major}{sys.version_info.minor}"
@@ -125,15 +127,15 @@ def mod_delete_animation(*args):
 
 def delete_animation():
     # Obtener canales seleccionados
-    selected_channels = keyTools.get_selected_channels()
+    target_info = keyTools.resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
+    selection = target_info["target_objects"]
+    target_plugs = target_info["target_plugs"]
+    selected_channels = target_info["selected_channels"]
 
     # Obtener selección actual
-    selection = util.get_selected_objects()
-
-    # Verificar si hay algo seleccionado
-    if not selection:
+    if not selection and not target_plugs:
         return
-    time_context = keyTools.get_working_time_context(default_mode="all_animation")
+    time_context = target_info["time_context"]
     tint_session = timelineWidgets.begin_timeline_context(
         default_mode="all_animation",
         color=_active_tint_color(),
@@ -141,20 +143,27 @@ def delete_animation():
     )
 
     try:
-        if time_context.mode == "graph_editor_keys":
-            selected_keyframes = keyTools.get_graph_editor_selected_keyframes()
-            for curve, frame in selected_keyframes:
+        if target_info["has_graph_keys"]:
+            for curve, frame in target_info["selected_keyframes"]:
                 cmds.cutKey(curve, time=(frame, frame), clear=True)
             return
 
-        cut_kwargs = {}
+        if target_plugs:
+            cut_kwargs = {"clear": True}
+            if time_context.mode == "time_slider_range":
+                cut_kwargs["time"] = (time_context.start_frame, time_context.end_frame)
+            for plug in target_plugs:
+                cmds.cutKey(plug, **cut_kwargs)
+            return
+
+        cut_kwargs = {"clear": True}
         if selected_channels:
             cut_kwargs["attribute"] = selected_channels
         if time_context.mode == "time_slider_range":
             cut_kwargs["time"] = (time_context.start_frame, time_context.end_frame)
 
         for obj in selection:
-            cmds.cutKey(obj, clear=True, **cut_kwargs)
+            cmds.cutKey(obj, **cut_kwargs)
     finally:
         tint_session.finish()
 
@@ -564,7 +573,8 @@ def create_temp_pivot(use_saved_position=False, *args):
         return
 
     def get_temp_pivot_relation():
-        cmds.undoInfo(openChunk=True)
+        temp_pivot_tooltip = helper.temp_pivot_last_tooltip_text if use_saved_position else helper.temp_pivot_tooltip_text
+        toolCommon.open_undo_chunk(tool_id="temp_pivot", tooltip_template=temp_pivot_tooltip)
 
         matrix_file_path = general.get_temp_pivot_data_file()
 
@@ -576,7 +586,7 @@ def create_temp_pivot(use_saved_position=False, *args):
         general.create_TheKeyMachine_node()
 
         # 1. Crear el nodo transform
-        cmds.undoInfo(openChunk=True)
+        toolCommon.open_undo_chunk(tool_id="temp_pivot", tooltip_template=temp_pivot_tooltip)
         temp_pivot_obj = cmds.createNode("transform", name="tkm_temp_pivot")
         cmds.parent("tkm_temp_pivot", "TheKeyMachine")
 
@@ -786,8 +796,8 @@ def create_temp_pivot(use_saved_position=False, *args):
             cmds.delete("tkm_temp_pivot")
             cmds.delete(locator)
 
-            cmds.undoInfo(closeChunk=True)
-            cmds.undoInfo(closeChunk=True)
+            toolCommon.close_undo_chunk()
+            toolCommon.close_undo_chunk()
 
     import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
 
@@ -828,7 +838,8 @@ def color_worldspace_paste_animation(*args):
 
 
 def worldspace_copy_animation(*args):
-    selected_objects = util.get_selected_objects(orderedSelection=True)
+    target_info = keyTools.resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=False)
+    selected_objects = target_info["target_objects"]
     if not selected_objects:
         return
 
@@ -846,7 +857,11 @@ def worldspace_copy_animation(*args):
 
     # Crear una barra de progreso
     gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
-    total_frames = len(set(cmds.keyframe(selected_objects, query=True)))
+    time_context = target_info["time_context"]
+    keyframe_query = {"query": True}
+    if time_context.mode != "all_animation":
+        keyframe_query["time"] = time_context.timerange
+    total_frames = len(set(cmds.keyframe(selected_objects, **keyframe_query) or []))
     cmds.progressBar(
         gMainProgressBar,
         edit=True,
@@ -856,8 +871,10 @@ def worldspace_copy_animation(*args):
         maxValue=total_frames,
     )
 
+    tint_session = None
+
     try:
-        all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, query=True))))
+        all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, **keyframe_query) or [])))
         if all_keyframes:
             tint_session = timelineWidgets.begin_timeline_tint(
                 timerange=(int(all_keyframes[0]), int(all_keyframes[-1])),
@@ -915,7 +932,8 @@ def worldspace_copy_animation(*args):
 
 
 def copy_range_worldspace_animation(*args):
-    selected_objects = util.get_selected_objects(orderedSelection=True)
+    target_info = keyTools.resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=False)
+    selected_objects = target_info["target_objects"]
     if not selected_objects:
         return
 
@@ -923,7 +941,7 @@ def copy_range_worldspace_animation(*args):
     if not cmds.keyframe(selected_objects, query=True):
         return
 
-    time_context = keyTools.get_working_time_context(default_mode="all_animation")
+    time_context = target_info["time_context"]
     time_range = time_context.timerange if time_context.mode != "current_frame" else None
 
     animation_data = {}
@@ -1058,7 +1076,7 @@ def paste_worldspace_single_frame(*args):
     chunk_opened = False
     tint_session = None
     try:
-        cmds.undoInfo(openChunk=True, chunkName="TKM:paste_worldspace_single_frame")
+        toolCommon.open_undo_chunk(tool_id="paste_worldspace_single_frame")
         chunk_opened = True
     except Exception:
         pass
@@ -1149,7 +1167,7 @@ def paste_worldspace_single_frame(*args):
             tint_session.finish()
         if chunk_opened:
             try:
-                cmds.undoInfo(closeChunk=True)
+                toolCommon.close_undo_chunk()
             except Exception:
                 pass
 
@@ -1225,7 +1243,7 @@ def worldspace_paste_animation(*args):
     chunk_opened = False
     tint_session = None
     try:
-        cmds.undoInfo(openChunk=True, chunkName="TKM:paste_worldspace_animation")
+        toolCommon.open_undo_chunk(title="Paste World Space Animation", tooltip_template=helper.paste_worldspace_animation_tooltip_text)
         chunk_opened = True
     except Exception:
         pass
@@ -1352,7 +1370,7 @@ def worldspace_paste_animation(*args):
             tint_session.finish()
         if chunk_opened:
             try:
-                cmds.undoInfo(closeChunk=True)
+                toolCommon.close_undo_chunk()
             except Exception:
                 pass
 
@@ -1846,7 +1864,7 @@ class MouseDragger(object):
 
     def onPress(self):
         self.anchorPoint = cmds.draggerContext(self.draggerContext, query=True, anchorPoint=True)
-        cmds.undoInfo(openChunk=True)
+        toolCommon.open_undo_chunk(title="Depth Mover", tooltip_template=helper.depth_mover_tooltip_text)
 
     def onDrag(self):
         dragPoint = cmds.draggerContext(self.draggerContext, query=True, dragPoint=True)
@@ -1856,7 +1874,7 @@ class MouseDragger(object):
         cmds.refresh()
 
     def onRelease(self):
-        cmds.undoInfo(closeChunk=True)
+        toolCommon.close_undo_chunk()
         cmds.setToolTo("selectSuperContext")
 
     def performDrag(self):
@@ -1911,10 +1929,10 @@ ROTATE_ORDERS = ["xyz", "yzx", "zxy", "xzy", "yxz", "zyx"]
 
 class UndoSetup:
     def __enter__(self):
-        cmds.undoInfo(openChunk=True)
+        toolCommon.open_undo_chunk(title="Gimbal Fixer", tooltip_template=helper.gimbal_fixer_tooltip_text)
 
     def __exit__(self, *args):
-        cmds.undoInfo(closeChunk=True)
+        toolCommon.close_undo_chunk()
 
 
 class StopRefresh:
@@ -2497,7 +2515,7 @@ def add_micro_move_callback(object_name):
 def micro_move_pre_drag(*args):
     global micro_move_selected_objects, micro_move_drivers
 
-    cmds.undoInfo(openChunk=True)
+    toolCommon.open_undo_chunk(tool_id="micro_move")
 
     micro_move_selected_objects = util.get_selected_objects()
     if not micro_move_selected_objects:
@@ -2569,7 +2587,7 @@ def micro_move_post_drag():
     micro_move_animation_data.clear()
     cmds.select(micro_move_selected_objects)
 
-    cmds.undoInfo(closeChunk=True)
+    toolCommon.close_undo_chunk()
 
 
 def remove_micro_move_callbacks():
@@ -2688,7 +2706,7 @@ def micro_rotate_pack_funtion():
 
 
 def micro_rotate_pre_drag(*args):
-    cmds.undoInfo(openChunk=True)
+    toolCommon.open_undo_chunk(title="Micro Rotate", tooltip_template=helper.micro_move_tooltip_text)
     micro_rotate_pack_funtion()
 
 
@@ -2725,7 +2743,7 @@ def micro_rotate_post_deferred():
 
     remove_micro_rotate_callbacks()
     micro_rotate_animation_data.clear()
-    cmds.undoInfo(closeChunk=True)
+    toolCommon.close_undo_chunk()
     cmds.select(micro_rotate_selected_objects)
 
 

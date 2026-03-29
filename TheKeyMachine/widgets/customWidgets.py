@@ -2,11 +2,13 @@ from TheKeyMachine.tooltips import QFlatTooltipManager
 from .util import DPI
 import re
 from functools import partial
+import maya.cmds as cmds
 
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
 import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
 from TheKeyMachine.tools import colors as toolColors  # type: ignore
+from TheKeyMachine.tools import common as toolCommon  # type: ignore
 
 try:
     import TheKeyMachine_user_data.preferences.user_preferences as user_preferences  # type: ignore
@@ -44,6 +46,21 @@ RE_HELP_SPLIT = re.compile(r"(\.[\s\r\n]|<br\s*/?>|\r?\n)", re.IGNORECASE)
 _ACTIVE_TOOL_WIDGET = None
 
 
+def _tool_chunk_name(widget, variant=None):
+    title = None
+    description = None
+    if variant:
+        title = variant.get("status_title") or variant.get("text")
+        description = variant.get("status_description")
+    if not title:
+        base = getattr(widget, "_base_state", {}) or {}
+        title = base.get("status_title") or base.get("text")
+        description = description or base.get("status_description")
+    if not title:
+        title = getattr(widget, "_section_key", None) or widget.objectName() or "tool"
+    return toolCommon.make_undo_chunk_name(title=title, description=description)
+
+
 def get_widget_tint_color(widget, default=None):
     if not widget:
         return default
@@ -75,7 +92,7 @@ def get_active_tool_tint_color(default=None):
 
 
 def _default_pressed_color_hex():
-    return toolColors.gray.base.hex
+    return toolColors.UI_COLORS.gray.hex
 
 
 def _color_to_hex(color, default=None):
@@ -413,7 +430,7 @@ class OpenMenuWidget(MenuWidget):
 
 
 class TooltipMixin:
-    def setData(self, text="", description="", shortcuts=None, icon=None, tooltip_template=None):
+    def setData(self, text="", description="", shortcuts=None, icon=None, tooltip_template=None, status_title=None, status_description=None):
         # Automatically pick up the widget's icon if not provided
         if not icon and hasattr(self, "_icon_path"):
             icon = self._icon_path
@@ -424,8 +441,10 @@ class TooltipMixin:
             "shortcuts": shortcuts or [],
             "icon": icon,
             "tooltip_template": tooltip_template,
+            "status_title": status_title,
+            "status_description": status_description,
         }
-        HelpSystem.push(self, tooltip_template or text, description)
+        HelpSystem.push(self, status_title or tooltip_template or text, status_description if status_description is not None else description)
 
     def get_help_data(self):
         return getattr(self, "_help_data", {})
@@ -440,7 +459,11 @@ class TooltipMixin:
     def enterEvent(self, event: QtCore.QEvent):
         # Refresh description and trigger Maya event
         data = getattr(self, "_help_data", {})
-        HelpSystem.push(self, data.get("tooltip_template") or data.get("text", ""), data.get("description", ""))
+        HelpSystem.push(
+            self,
+            data.get("status_title") or data.get("tooltip_template") or data.get("text", ""),
+            data.get("status_description") if data.get("status_description") is not None else data.get("description", ""),
+        )
 
         try:
             super().enterEvent(event)
@@ -681,6 +704,8 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             "shortcuts": shortcuts or [],
             "tooltip_template": tooltip_template,
             "icon": icon,
+            "status_title": None,
+            "status_description": None,
         }
         if icon:
             self._apply_icon_visual(icon)
@@ -711,6 +736,8 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             self._base_state["shortcuts"] = kwargs.get("shortcuts", self._base_state.get("shortcuts", []))
             self._base_state["tooltip_template"] = kwargs.get("tooltip_template", self._base_state.get("tooltip_template"))
             self._base_state["icon"] = kwargs.get("icon", self._base_state.get("icon"))
+            self._base_state["status_title"] = kwargs.get("status_title", self._base_state.get("status_title"))
+            self._base_state["status_description"] = kwargs.get("status_description", self._base_state.get("status_description"))
 
     def setShortcutVariants(self, variants):
         self._shortcut_variants = list(variants or [])
@@ -770,12 +797,20 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         _ACTIVE_TOOL_WIDGET = self
         variant = self._get_active_shortcut_variant()
         callback = variant.get("callback") if variant else None
+        chunk_opened = False
         try:
+            toolCommon.open_named_undo_chunk(_tool_chunk_name(self, variant))
+            chunk_opened = True
             if callback:
                 return callback(*args, **kwargs)
             if base_callback:
                 return base_callback(*args, **kwargs)
         finally:
+            if chunk_opened:
+                try:
+                    toolCommon.close_undo_chunk()
+                except Exception:
+                    pass
             _ACTIVE_TOOL_WIDGET = previous_widget
 
     def _apply_icon_visual(self, icon):
@@ -808,6 +843,8 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             description = state.get("description", "")
             shortcuts = state.get("shortcuts", [])
             icon = state.get("icon")
+            status_title = state.get("status_title")
+            status_description = state.get("status_description")
             self.setText(text or "")
             self._apply_icon_visual(icon)
             TooltipMixin.setToolTipData(
@@ -817,8 +854,14 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 shortcuts=shortcuts,
                 tooltip_template=tooltip_template,
                 icon=icon,
+                status_title=status_title,
+                status_description=status_description,
             )
-            HelpSystem.push(self, tooltip_template or text or "", description or "")
+            HelpSystem.push(
+                self,
+                status_title or tooltip_template or text or "",
+                status_description if status_description is not None else description or "",
+            )
         finally:
             self._variant_state_lock = False
 
@@ -830,6 +873,8 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 "shortcuts": self._base_state.get("shortcuts", []),
                 "tooltip_template": self._base_state.get("tooltip_template"),
                 "icon": self._base_state.get("icon"),
+                "status_title": self._base_state.get("status_title"),
+                "status_description": self._base_state.get("status_description"),
             }
         return {
             "text": variant.get("text", self._base_state.get("text")),
@@ -837,6 +882,8 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             "shortcuts": variant.get("shortcuts", []),
             "tooltip_template": variant.get("tooltip_template", variant.get("text", self._base_state.get("text"))),
             "icon": variant.get("icon_path", self._base_state.get("icon")),
+            "status_title": variant.get("status_title"),
+            "status_description": variant.get("status_description"),
         }
 
     def _refresh_modifier_variant_state(self):
@@ -932,6 +979,35 @@ class QFlatSelectorButton(QFlatToolButton):
         painter.setPen(color)
         rect = self.rect().translated(0, -DPI(3))
         painter.drawText(rect, QtCore.Qt.AlignCenter, self._count_text)
+
+
+def create_tool_button_from_data(tool_data, parent=None, **overrides):
+    data = dict(tool_data or {})
+    data.update(overrides)
+
+    btn = QFlatToolButton(
+        parent=parent,
+        icon=data.get("icon_path"),
+        text=data.get("text"),
+        tooltip_template=data.get("tooltip_template"),
+        description=data.get("description"),
+        shortcuts=data.get("shortcuts"),
+        shortcut_variants=data.get("shortcut_variants"),
+    )
+    btn.setToolTipData(
+        text=data.get("tooltip_template") or data.get("text"),
+        description=data.get("description"),
+        shortcuts=data.get("shortcuts"),
+        tooltip_template=data.get("tooltip_template"),
+        icon=data.get("icon_path"),
+        status_title=data.get("status_title"),
+        status_description=data.get("status_description"),
+    )
+
+    callback = data.get("callback")
+    if callback:
+        btn.clicked.connect(lambda *_args, w=btn, cb=callback: w.triggerToolCallback(cb))
+    return btn
 
 
 class QFlowLayout(QtWidgets.QLayout):
@@ -1593,6 +1669,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         first_item = default_items[0] if default_items else {}
         group_label = first_item.get("label", "Group")
         group_icon_p = first_item.get("icon_path") or ""
+        menu_setup_fn = first_item.get("menu_setup_fn")
 
         # 3. Build QMenu + pinnable_actions from the descriptor list
         pinnable_actions = []
@@ -1615,7 +1692,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 )
 
         # 3. Build QMenu from the descriptor list (factory will manage visibility)
-        def menu_factory(section=self, source_widget=None, widgets=widgets_list):
+        def menu_factory(section=self, source_widget=None, widgets=widgets_list, setup_fn=menu_setup_fn):
             menu = MenuWidget(source_widget)
             menu.setTearOffEnabled(True)
 
@@ -1627,6 +1704,11 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         break
 
             checkable_sync_pairs = []
+            if callable(setup_fn):
+                try:
+                    setup_fn(menu, source_widget=source_widget)
+                except TypeError:
+                    setup_fn(menu)
             for item in widgets:
                 if item == "separator":
                     menu.addSeparator()

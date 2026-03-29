@@ -28,6 +28,7 @@ import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.sliders import utils as slider_utils
 import TheKeyMachine.core.runtime_manager as runtime
+from TheKeyMachine.tools import colors as toolColors
 
 from TheKeyMachine.tooltips import QFlatTooltipManager, format_tooltip_shortcut
 
@@ -77,7 +78,9 @@ PySide6 or PySide2 (Maya 2017+). No external COLOR import.
 """
 
 
-COLOR = ui.Color()
+UI_COLORS = toolColors.UI_COLORS
+SLIDER_HANDLE_NEUTRAL_HEX = "#444444"
+SLIDER_VALUE_TEXT_HEX = "#747474"
 
 
 def _format_shortcut(shortcut) -> str:
@@ -195,7 +198,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
                 if not is_glow:
                     # Black linework on top
-                    pen = QPen(QColor(COLOR.color.darkGray.hex))
+                    pen = QPen(QColor(UI_COLORS.dark_gray.hex))
                     pen.setWidthF(0.85)
                     p.setPen(pen)
                     p.setBrush(Qt.NoBrush)
@@ -370,12 +373,12 @@ class SliderHandle(cw.TooltipMixin, QSlider):
             handle_bg = self._color
             handle_border = "none"
         else:
-            handle_bg = COLOR.color.gray.hex
-            handle_border = f"{util.DPI(1)}px solid {COLOR.color.darkerGray.hex}"
+            handle_bg = SLIDER_HANDLE_NEUTRAL_HEX
+            handle_border = f"{util.DPI(1)}px solid {UI_COLORS.darker_gray.hex}"
         self.setStyleSheet(
             f"""
 QSlider::groove:horizontal {{
-    background: {COLOR.color.darkGray.hex};
+    background: {UI_COLORS.dark_gray.hex};
     height: {gh}px;
     border-radius: {self._handle_radius}px;
     margin: 0;
@@ -467,6 +470,7 @@ QSlider::handle:horizontal {{
         if e.button() == Qt.LeftButton and self.isSliderDown():
             self.setSliderDown(False)
             self._apply_stylesheet(thick=False)
+            self.moved.emit(self.percent())
             self.finished.emit(self.percent())
             self._reset_without_emit()
             self._pressOffset = None
@@ -508,12 +512,12 @@ QSlider::handle:horizontal {{
         path.addText(tx, ty, self._text_font, self._text)
 
         # Draw thin outline (drawn first so it sits BEHIND the fill, growing only outwards)
-        p.setPen(QPen(QColor(COLOR.color.darkGray.hex), util.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        p.setPen(QPen(QColor(UI_COLORS.dark_gray.hex), util.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         p.setBrush(Qt.NoBrush)
         p.drawPath(path)
 
         base_color = QColor(self._color)
-        if getattr(self, "_handle_hover", False):
+        if getattr(self, "_handle_hover", False) or bool(self._pressOffset):
             main_color = QColor(
                 min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
             )
@@ -555,7 +559,7 @@ QSlider::handle:horizontal {{
             align = Qt.AlignVCenter | Qt.AlignLeft
 
         p.setFont(self._value_font)
-        p.setPen(QColor(COLOR.color.lightGray.hex))
+        p.setPen(QColor(SLIDER_VALUE_TEXT_HEX))
         p.drawText(text_rect, align, f"{self.value() / 1000.0:.2f}")
         p.end()
 
@@ -1119,11 +1123,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     def _on_drag_started(self):
         QFlatTooltipManager.hide()
 
-        try:
-            slider_utils.start_dragging()
-        except Exception:
-            pass
-
         self.dragStarted.emit()
         self._leftOverlay.hide()
         self._rightOverlay.hide()
@@ -1144,11 +1143,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._rightOverlay.show()
 
     def _on_button_clicked(self, btn: SliderButton):
-        try:
-            slider_utils.start_dragging()
-        except Exception:
-            pass
-
         try:
             self.valueChanged.emit(float(btn.percent))
         finally:

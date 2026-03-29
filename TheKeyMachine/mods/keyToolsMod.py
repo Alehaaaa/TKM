@@ -26,14 +26,13 @@ except ImportError:
     import maya.api.OpenMaya as om
 
 try:
-    from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QRegularExpressionValidator
     from PySide6.QtCore import QRegularExpression
+    from PySide6 import QtGui
 except ImportError:
-    from PySide2.QtWidgets import QApplication
-
     from PySide2.QtGui import QRegExpValidator
     from PySide2.QtCore import QRegExp
+    from PySide2 import QtGui
 
     QRegularExpression = QRegExp
     QRegularExpressionValidator = QRegExpValidator
@@ -52,9 +51,23 @@ import TheKeyMachine.core.runtime_manager as runtime
 import TheKeyMachine.widgets.util as util
 import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.mods.generalMod as general
+import TheKeyMachine.mods.helperMod as helper
+import TheKeyMachine.mods.settingsMod as settings
+from TheKeyMachine.tools import common as toolCommon
+from TheKeyMachine.core import selection_targets
 
 
 python_version = f"{sys.version_info.major}{sys.version_info.minor}"
+SHARE_KEYS_MODE_SETTING = "share_keys_mode"
+SHARE_KEYS_MODE_PRESERVE_TANGENT = "preserve_tangent_type"
+SHARE_KEYS_MODE_PRESERVE_SHAPE = "preserve_anim_curve_shape"
+
+BAKE_UNDO_HELP = {
+    1: ("Bake on Ones", helper.bake_animation_1_tooltip_text),
+    2: ("Bake on Twos", helper.bake_animation_2_tooltip_text),
+    3: ("Bake on Threes", helper.bake_animation_3_tooltip_text),
+    4: ("Bake on Fours", helper.bake_animation_4_tooltip_text),
+}
 
 
 # _____________________________________________________ General _______________________________________________________________#
@@ -175,11 +188,91 @@ def getSelectedCurves():
 def get_selected_channels():
     # Obtén el nombre del Channel Box principal
     main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
-
-    # Obtén los canales seleccionados
     selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
 
     return selected_channels
+
+
+def resolve_tool_targets(default_mode="all_animation", ordered_selection=False, long_names=True):
+    target_plugs, source, _time_range, has_graph_keys = selection_targets.resolve_target_attribute_plugs()
+    time_context = get_working_time_context(default_mode=default_mode)
+    selected_keyframes = get_graph_editor_selected_keyframes() if has_graph_keys else []
+
+    target_objects = []
+    seen_objects = set()
+    for plug in target_plugs:
+        if "." not in plug:
+            continue
+        obj = plug.split(".", 1)[0]
+        if obj in seen_objects:
+            continue
+        seen_objects.add(obj)
+        target_objects.append(obj)
+
+    if not target_objects:
+        target_objects = util.get_selected_objects(orderedSelection=ordered_selection, long=long_names)
+
+    selected_channels = []
+    seen_channels = set()
+    for plug in target_plugs:
+        if "." not in plug:
+            continue
+        attr = plug.split(".", 1)[1]
+        if attr in seen_channels:
+            continue
+        seen_channels.add(attr)
+        selected_channels.append(attr)
+
+    selected_curves = []
+    seen_curves = set()
+    for plug in target_plugs:
+        curves = cmds.listConnections(plug, source=True, destination=False, type="animCurve") or []
+        for curve in curves:
+            if curve in seen_curves:
+                continue
+            seen_curves.add(curve)
+            selected_curves.append(curve)
+
+    return {
+        "target_plugs": target_plugs,
+        "target_objects": target_objects,
+        "selected_channels": selected_channels,
+        "selected_curves": selected_curves,
+        "selected_keyframes": selected_keyframes,
+        "time_context": time_context,
+        "source": source,
+        "has_graph_keys": has_graph_keys,
+    }
+
+
+def get_share_keys_mode():
+    return settings.get_setting(SHARE_KEYS_MODE_SETTING, SHARE_KEYS_MODE_PRESERVE_TANGENT)
+
+
+def set_share_keys_mode(mode):
+    if mode not in (SHARE_KEYS_MODE_PRESERVE_TANGENT, SHARE_KEYS_MODE_PRESERVE_SHAPE):
+        mode = SHARE_KEYS_MODE_PRESERVE_TANGENT
+    settings.set_setting(SHARE_KEYS_MODE_SETTING, mode)
+
+
+def build_share_keys_menu(menu, source_widget=None):
+    _ = source_widget
+    action_group = QtGui.QActionGroup(menu)
+    action_group.setExclusive(True)
+
+    preserve_tangent_action = menu.addAction("Preserve Tangent Type")
+    preserve_tangent_action.setCheckable(True)
+    preserve_tangent_action.setChecked(get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_TANGENT)
+    preserve_tangent_action.triggered.connect(lambda checked=False: set_share_keys_mode(SHARE_KEYS_MODE_PRESERVE_TANGENT))
+    action_group.addAction(preserve_tangent_action)
+
+    preserve_shape_action = menu.addAction("Preserve Anim Curve Shape")
+    preserve_shape_action.setCheckable(True)
+    preserve_shape_action.setChecked(get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE)
+    preserve_shape_action.triggered.connect(lambda checked=False: set_share_keys_mode(SHARE_KEYS_MODE_PRESERVE_SHAPE))
+    action_group.addAction(preserve_shape_action)
+
+    menu.addSeparator()
 
 
 # Estas dos funciones la idea era usarlas para hacer overlap
@@ -449,34 +542,59 @@ def remove_link_obj_callbacks(*args):
 
 
 def share_keys(*args):
-    objetos = util.get_selected_objects()
+    chunk_opened = False
+    target_info = resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
+    objetos = target_info["target_objects"]
+    target_plugs = target_info["target_plugs"]
+    time_context = target_info["time_context"]
 
-    if len(objetos) < 2:
-        return util.make_inViewMessage("Select at least 2 objects")
+    if not objetos and not target_plugs:
+        return util.make_inViewMessage("Select at least one object")
 
-    time_range = get_time_range_selected()
     all_frames = set()
-    object_frames = {}
+    object_plug_frames = {obj: {} for obj in objetos}
 
-    for objeto in objetos:
-        if time_range:
-            frames = cmds.keyframe(objeto, query=True, time=(time_range[0], time_range[1])) or []
+    for plug in target_plugs:
+        if not cmds.objExists(plug) or "." not in plug:
+            continue
+        obj = plug.split(".", 1)[0]
+        if time_context.mode == "all_animation":
+            plug_frames = cmds.keyframe(plug, query=True, timeChange=True) or []
         else:
-            frames = cmds.keyframe(objeto, query=True) or []
-        normalized_frames = sorted({int(frame) if int(frame) == frame else frame for frame in frames})
-        object_frames[objeto] = set(normalized_frames)
+            plug_frames = cmds.keyframe(plug, query=True, time=time_context.timerange, timeChange=True) or []
+        normalized_frames = {int(frame) if int(frame) == frame else frame for frame in plug_frames}
+        if not normalized_frames:
+            continue
+        object_plug_frames.setdefault(obj, {})[plug] = normalized_frames
         all_frames.update(normalized_frames)
 
     if not all_frames:
         return util.make_inViewMessage("No keys found in selection")
 
     shared_frames = sorted(all_frames)
+    tint_session = _begin_timeline_tint((int(shared_frames[0]), int(shared_frames[-1])), "share_keys")
+    preserve_curve_shape = get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE
 
-    for objeto in objetos:
-        existing_frames = object_frames.get(objeto, set())
-        for frame in shared_frames:
-            if frame not in existing_frames:
-                cmds.setKeyframe(objeto, time=frame, insert=True)
+    try:
+        toolCommon.open_undo_chunk(tool_id="share_keys", tooltip_template=helper.share_keys_tooltip_text)
+        chunk_opened = True
+        for objeto in objetos:
+            for plug, existing_frames in object_plug_frames.get(objeto, {}).items():
+                node_name, attribute_name = plug.split(".", 1)
+                for frame in shared_frames:
+                    if frame not in existing_frames:
+                        set_keyframe_kwargs = {
+                            "attribute": attribute_name,
+                            "time": (frame,),
+                        }
+                        if preserve_curve_shape:
+                            set_keyframe_kwargs["insert"] = True
+                        cmds.setKeyframe(node_name, **set_keyframe_kwargs)
+    finally:
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
+        if tint_session:
+            tint_session.finish()
 
 
 # ______________________________________ ReBlock Move
@@ -608,18 +726,19 @@ def reblock_insert(*args):
 
 
 def bake_animation(bake_interval=1, window=None):
-    cmds.undoInfo(openChunk=True)
+    bake_title, bake_tooltip = BAKE_UNDO_HELP.get(bake_interval, ("Bake Animation", helper.bake_animation_custom_tooltip_text))
+    toolCommon.open_undo_chunk(title=bake_title, tooltip_template=bake_tooltip)
     tint_session = None
 
     try:
-        # Obtener los objetos seleccionados.
-        selected_objects = util.get_selected_objects()
+        target_info = resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
+        selected_objects = target_info["target_objects"]
+        selected_channels = target_info["selected_channels"]
 
-        # Verificar si no hay objetos seleccionados.
         if not selected_objects:
             return util.make_inViewMessage("Select at least one object for baking")
 
-        time_context = get_working_time_context(default_mode="all_animation")
+        time_context = target_info["time_context"]
         start_frame, end_frame = time_context.timerange
         tint_session = _begin_timeline_tint(
             timerange=time_context.timerange,
@@ -628,8 +747,7 @@ def bake_animation(bake_interval=1, window=None):
         )
 
         # Hacer bake a las curvas de animación de los objetos seleccionados.
-        cmds.bakeResults(
-            selected_objects,
+        bake_kwargs = dict(
             time=(start_frame, end_frame),
             sampleBy=bake_interval,
             preserveOutsideKeys=True,
@@ -639,19 +757,25 @@ def bake_animation(bake_interval=1, window=None):
             controlPoints=False,
             shape=True,
         )
+        if selected_channels:
+            bake_kwargs["attribute"] = selected_channels
+        cmds.bakeResults(selected_objects, **bake_kwargs)
 
         # Cambiar las tangentes de las claves a stepped.
-        for obj in selected_objects:
-            anim_curves = list(set(cmds.listConnections(obj, type="animCurve") or []))
-            if anim_curves:
-                for curve in anim_curves:
-                    cmds.keyTangent(
-                        curve,
-                        edit=True,
-                        time=(start_frame, end_frame),
-                        inTangentType="stepnext",
-                        outTangentType="step",
-                    )
+        curves_to_update = list(dict.fromkeys(target_info["selected_curves"]))
+        if not curves_to_update:
+            for obj in selected_objects:
+                anim_curves = list(set(cmds.listConnections(obj, type="animCurve") or []))
+                curves_to_update.extend(anim_curves)
+
+        for curve in curves_to_update:
+            cmds.keyTangent(
+                curve,
+                edit=True,
+                time=(start_frame, end_frame),
+                inTangentType="stepnext",
+                outTangentType="step",
+            )
 
     except Exception as e:
         cmds.warning("An error occurred: {}".format(e))
@@ -660,7 +784,7 @@ def bake_animation(bake_interval=1, window=None):
         if tint_session:
             tint_session.finish()
         # Cerrar el chunk de undo
-        cmds.undoInfo(closeChunk=True)
+        toolCommon.close_undo_chunk()
 
     if window:
         window.close()
@@ -813,25 +937,27 @@ def move_keyframes_in_range(*args):
         return
 
     current_time = cmds.currentTime(q=True)
+    target_info = resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
+    selection = target_info["target_objects"]
+    target_plugs = target_info["target_plugs"]
+    target_curves = target_info["selected_curves"]
+    time_context = target_info["time_context"]
+    has_range = time_context.mode == "time_slider_range"
+    start_frame, end_frame = time_context.timerange
 
-    time_slider = mel.eval("$tmpVar=$gPlayBackSlider")
-    time_range = cmds.timeControl(time_slider, q=True, rangeArray=True)
-
-    start_frame = int(time_range[0])
-    end_frame = int(time_range[1] - 1)
-    has_range = abs(end_frame - start_frame) > 1
-
-    selection = util.get_selected_objects(long=True)
-
-    cmds.undoInfo(openChunk=True)
+    toolCommon.open_undo_chunk(
+        title="Nudge Keys Right" if offset > 0 else "Nudge Keys Left",
+        tooltip_template=helper.nudge_keyright_b_widget_tooltip_text if offset > 0 else helper.nudge_keyleft_b_widget_tooltip_text,
+    )
     try:
-        if has_range:
-            if selection:
-                animation_curves = cmds.keyframe(selection, q=True, name=True) or []
-            else:
-                animation_curves = cmds.ls(type="animCurve") or []
+        if target_info["has_graph_keys"]:
+            cmds.keyframe(edit=True, animation="keys", relative=True, includeUpperBound=True, option="over", timeChange=offset)
+            return
 
-            animation_curves = list(set(animation_curves))
+        if has_range:
+            animation_curves = list(dict.fromkeys(target_curves))
+            if not animation_curves and selection:
+                animation_curves = cmds.keyframe(selection, q=True, name=True) or []
             if not animation_curves:
                 return
 
@@ -856,26 +982,21 @@ def move_keyframes_in_range(*args):
                 pass
             return
 
-        selected_keys = cmds.keyframe(query=True, selected=True, tc=True) or []
-        if selected_keys:
-            cmds.keyframe(edit=True, animation="keys", relative=True, includeUpperBound=True, option="over", timeChange=offset)
+        if not target_plugs:
             return
 
-        if not selection:
-            return
-
-        objects_with_key_at_current = []
+        plugs_with_key_at_current = []
         grouped_source_times = {}
 
-        for obj in selection:
-            key_times = cmds.keyframe(obj, query=True, tc=True) or []
+        for plug in target_plugs:
+            key_times = cmds.keyframe(plug, query=True, tc=True) or []
             if not key_times:
                 continue
 
             key_times = sorted(set(key_times))
 
             if current_time in key_times:
-                objects_with_key_at_current.append(obj)
+                plugs_with_key_at_current.append(plug)
                 continue
 
             if offset > 0:
@@ -886,17 +1007,17 @@ def move_keyframes_in_range(*args):
                 source_time = candidates[0] if candidates else None
 
             if source_time is not None:
-                grouped_source_times.setdefault(source_time, []).append(obj)
+                grouped_source_times.setdefault(source_time, []).append(plug)
 
-        if objects_with_key_at_current:
-            cmds.keyframe(objects_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset)
+        if plugs_with_key_at_current:
+            cmds.keyframe(plugs_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset)
             cmds.currentTime(current_time + offset)
             return
 
-        for source_time, objects in grouped_source_times.items():
-            cmds.keyframe(objects, edit=True, absolute=True, option="over", time=(source_time, source_time), timeChange=current_time)
+        for source_time, plugs in grouped_source_times.items():
+            cmds.keyframe(plugs, edit=True, absolute=True, option="over", time=(source_time, source_time), timeChange=current_time)
     finally:
-        cmds.undoInfo(closeChunk=True)
+        toolCommon.close_undo_chunk()
 
 
 # _____________________________________________________________________________________________________________________
@@ -942,7 +1063,7 @@ def blend_pull_and_push(value, objs=None, selection=True):
         objs = util.get_selected_objects()
 
     if not is_dragging:
-        cmds.undoInfo(openChunk=True)
+        toolCommon.open_undo_chunk(title="Pull Push", tooltip_template=helper.pull_push_tooltip_text)
         is_dragging = True
 
     selected_keyframes = get_graph_editor_selected_keyframes()
@@ -1081,7 +1202,7 @@ def blend_to_key(percentage, objs=None, selection=True):
     global is_dragging, frame_data_cache, is_cached, last_autokey_time, autokey_interval
 
     if not is_dragging:
-        cmds.undoInfo(openChunk=True)
+        toolCommon.open_undo_chunk(title="Blend to Neighbor", tooltip_template=helper.blend_tooltip_text)
         is_dragging = True
 
     if objs is None and selection:
@@ -1089,7 +1210,7 @@ def blend_to_key(percentage, objs=None, selection=True):
 
     if not objs:
         if is_dragging:
-            cmds.undoInfo(closeChunk=True)
+            toolCommon.close_undo_chunk()
             is_dragging = False
         return
 
@@ -1199,7 +1320,7 @@ def blend_to_frame(percentage, left_frame=None, right_frame=None, objs=None, sel
         objs = util.get_selected_objects()
 
     if not is_dragging:
-        cmds.undoInfo(openChunk=True)
+        toolCommon.open_undo_chunk(title="Blend to Frame", tooltip_template=helper.blend_to_frame_tooltip_text)
         is_dragging = True
 
     if not is_cached:
@@ -1262,7 +1383,7 @@ def blendSliderReset(slider):
     original_keyframe_values = {}
 
     if is_dragging:
-        cmds.undoInfo(closeChunk=True)
+        toolCommon.close_undo_chunk()
         is_dragging = False
 
     cmds.floatSlider(slider, edit=True, value=0)
@@ -1327,7 +1448,7 @@ def tween(percentage):
         tween_frame_data_cache = prepare_tween_data()
 
     if not is_dragging:
-        cmds.undoInfo(openChunk=True)
+        toolCommon.open_undo_chunk(title="Tweener", tooltip_template=helper.tweener_tooltip_text)
         is_dragging = True
 
     currentTime = cmds.currentTime(query=True)
@@ -1417,7 +1538,7 @@ def tweenSliderReset(slider):
     tween_frame_data_cache = {}
 
     if is_dragging:
-        cmds.undoInfo(closeChunk=True)
+        toolCommon.close_undo_chunk()
         is_dragging = False
 
 
@@ -1881,7 +2002,15 @@ def remove_default_values_for_selected_object(*args):
 
 
 def reset_object_values(reset_translations=False, reset_rotations=False):
-    cmds.undoInfo(openChunk=True)
+    toolCommon.open_undo_chunk(
+        tool_id="reset_objects_mods",
+        title="Reset Rotations" if reset_rotations else "Reset Translations" if reset_translations else None,
+        tooltip_template=helper.reset_rotations_tooltip_text
+        if reset_rotations
+        else helper.reset_translations_tooltip_text
+        if reset_translations
+        else helper.reset_values_tooltip_text,
+    )
     tint_session = None
     selected_objects = []
 
@@ -1895,15 +2024,15 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
         else:
             data = {}
 
-        time_context = get_working_time_context(default_mode="current_frame")
+        target_info = resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=True)
+        time_context = target_info["time_context"]
         tint_session = _begin_timeline_context_tint("current_frame", "reset_defaults_range")
 
-        selected_objects = util.get_selected_objects(long=True)
-        selected_channels = get_selected_channels()
+        selected_objects = target_info["target_objects"]
+        target_plugs = target_info["target_plugs"]
 
         if time_context.mode == "graph_editor_keys":
-            selected_keyframes = get_graph_editor_selected_keyframes()
-            for curve, frame in selected_keyframes:
+            for curve, frame in target_info["selected_keyframes"]:
                 target_plugs = cmds.listConnections(curve + ".output", plugs=True, source=False, destination=True) or []
                 if not target_plugs:
                     continue
@@ -1921,49 +2050,40 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
                     print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
             return
 
-        for obj in selected_objects:
-            attrs = selected_channels if selected_channels else cmds.listAttr(obj, keyable=True)
-
-            if not attrs:
+        for attr_plug in target_plugs:
+            if "." not in attr_plug:
+                continue
+            obj, attr = attr_plug.split(".", 1)
+            if reset_translations and not attr.startswith("translate"):
+                continue
+            if reset_rotations and not attr.startswith("rotate"):
                 continue
 
-            for attr in attrs:
-                if reset_translations and not attr.startswith("translate"):
+            try:
+                is_locked = cmds.getAttr(attr_plug, lock=True)
+                if is_locked:
                     continue
-                if reset_rotations and not attr.startswith("rotate"):
+
+                connections = cmds.listConnections(attr_plug, source=True, destination=False, plugs=True)
+                if connections:
+                    node_type = cmds.nodeType(connections[0].split(".")[0])
+                    if node_type not in ["animCurveTL", "animCurveTA", "animCurveTT", "animCurveTU"]:
+                        cmds.disconnectAttr(connections[0], attr_plug)
+
+                reset_value = _get_reset_value_for_attribute(obj, attr, data)
+                if reset_value is None:
                     continue
 
-                try:
-                    attr_plug = obj + "." + attr
-                    is_locked = cmds.getAttr(attr_plug, lock=True)
-                    if is_locked:
-                        continue
-
-                    connections = cmds.listConnections(attr_plug, source=True, destination=False, plugs=True)
-                    if connections:
-                        node_type = cmds.nodeType(connections[0].split(".")[0])
-                        if node_type not in ["animCurveTL", "animCurveTA", "animCurveTT", "animCurveTU"]:
-                            cmds.disconnectAttr(connections[0], attr_plug)
-
-                    reset_value = _get_reset_value_for_attribute(obj, attr, data)
-                    if reset_value is None:
-                        continue
-
-                    if time_context.mode == "current_frame":
-                        cmds.setAttr(attr_plug, reset_value)
-                        continue
-
-                    keyframes = cmds.keyframe(
-                        obj,
-                        attribute=attr,
-                        query=True,
-                        time=(time_context.start_frame, time_context.end_frame),
-                    ) or []
-                    for frame in sorted(set(int(k) for k in keyframes)):
-                        cmds.setKeyframe(obj, attribute=attr, time=(frame,), value=reset_value)
-                except Exception as e:
-                    print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
+                if time_context.mode == "current_frame":
+                    cmds.setAttr(attr_plug, reset_value)
                     continue
+
+                keyframes = cmds.keyframe(attr_plug, query=True, time=(time_context.start_frame, time_context.end_frame)) or []
+                for frame in sorted(set(int(k) for k in keyframes)):
+                    cmds.setKeyframe(obj, attribute=attr, time=(frame,), value=reset_value)
+            except Exception as e:
+                print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
+                continue
 
     except Exception as e:
         cmds.warning("Error during reset: {}".format(str(e)))
@@ -1974,7 +2094,7 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
             cmds.select(selected_objects, replace=True)
         else:
             cmds.select(clear=True)
-        cmds.undoInfo(closeChunk=True)
+        toolCommon.close_undo_chunk()
 
 
 def get_default_value(node):
@@ -2150,7 +2270,7 @@ def addSelectOpposite(*args):
 
 
 def copyOpposite(*args):
-    cmds.undoInfo(openChunk=True)
+    toolCommon.open_undo_chunk(tool_id="copyOpposite")
 
     try:
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
@@ -2207,7 +2327,7 @@ def copyOpposite(*args):
     except Exception as e:
         cmds.warning("Error during copy: {}".format(str(e)))
     finally:
-        cmds.undoInfo(closeChunk=True)
+        toolCommon.close_undo_chunk()
 
 
 # ________________________________________________________________ MIRROR _______________________________________________________________________ #
@@ -2223,7 +2343,7 @@ def load_exceptions():
 
 
 def mirror(*args):
-    cmds.undoInfo(openChunk=True)
+    toolCommon.open_undo_chunk(tool_id="mirror")
 
     try:
         global MIRROR_PATTERNS
@@ -2346,7 +2466,7 @@ def mirror(*args):
     except Exception as e:
         cmds.warning("Error during mirroring: {}".format(str(e)))
     finally:
-        cmds.undoInfo(closeChunk=True)
+        toolCommon.close_undo_chunk()
 
 
 # ------------------------------- mirror to opposite

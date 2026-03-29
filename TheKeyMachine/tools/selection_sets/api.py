@@ -1,6 +1,5 @@
 import os
 
-import maya.cmds as cmds
 
 try:
     from PySide2 import QtCore, QtGui, QtWidgets
@@ -25,6 +24,7 @@ selection_set_color_names = {color.suffix: color.label for color in SELECTION_SE
 
 def get_selection_set_color(suffix, fallback=None):
     return toolColors.get_selection_set_color(suffix, fallback=fallback)
+
 
 _selection_set_creation_dialog = None
 
@@ -223,6 +223,34 @@ def _selection_sets_quick_file():
     return os.path.join(quick_dir, "quick_selection_sets.json")
 
 
+def quick_import_selection_sets(controller=None):
+    controller = _resolve_toolbar_controller(controller)
+    if controller:
+        controller.import_sets(_selection_sets_quick_file())
+
+
+def quick_export_selection_sets(controller=None):
+    controller = _resolve_toolbar_controller(controller)
+    if controller:
+        controller.export_sets(_selection_sets_quick_file())
+
+
+def import_selection_sets(controller=None):
+    controller = _resolve_toolbar_controller(controller)
+    if controller:
+        controller.import_sets()
+
+
+def export_selection_sets(controller=None):
+    controller = _resolve_toolbar_controller(controller)
+    if controller:
+        controller.export_sets()
+
+
+def clear_all_selection_sets(controller=None, parent=None):
+    _confirm_clear_selection_sets(controller=controller, parent=parent)
+
+
 def restore_selection_sets_default_position(controller=None):
     settings.set_setting("selection_sets_geometry", None, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
     win = get_selection_sets_window()
@@ -375,6 +403,19 @@ def bind_selection_sets_toolbar_button(button, controller=None):
         _selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=controller)
     if button:
         _selection_sets_toolbar_toggle.attach_button(button)
+        if not hasattr(button, "_tkm_selection_sets_default_mouse_press"):
+            button._tkm_selection_sets_default_mouse_press = button.mousePressEvent
+
+        def _selection_sets_mouse_press(event, b=button, c=controller):
+            if event.button() == QtCore.Qt.LeftButton:
+                variant = getattr(b, "_get_active_shortcut_variant", lambda: None)()
+                if variant and int(variant.get("mask", 0)):
+                    b.triggerToolCallback(lambda: toggle_selection_sets_window(controller=c))
+                    event.accept()
+                    return
+            return b._tkm_selection_sets_default_mouse_press(event)
+
+        button.mousePressEvent = _selection_sets_mouse_press
         try:
             button.customContextMenuRequested.disconnect()
         except Exception:

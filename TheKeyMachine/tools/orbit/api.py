@@ -13,6 +13,7 @@ import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools.common import ToolbarWindowToggle
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import customWidgets as cw, util as wutil
 
 ORBIT_SETTINGS_NAMESPACE = "orbit_window"
@@ -145,10 +146,9 @@ def sanitize_orbit_configuration(config):
 
 def execute_action(action_identifier):
     action_identifier = normalize_action_identifier(action_identifier)
-
     chunk_opened = False
     try:
-        cmds.undoInfo(openChunk=True, chunkName=f"TKM:{action_identifier}")
+        toolCommon.open_undo_chunk(tool_id=action_identifier)
         chunk_opened = True
 
         if action_identifier == "isolate_master":
@@ -189,7 +189,7 @@ def execute_action(action_identifier):
             bar.paste_worldspace_single_frame()
     finally:
         if chunk_opened:
-            cmds.undoInfo(closeChunk=True)
+            toolCommon.close_undo_chunk()
 
 
 def _config_path():

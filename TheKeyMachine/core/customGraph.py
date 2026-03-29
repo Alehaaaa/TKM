@@ -41,6 +41,7 @@ import TheKeyMachine.mods.selSetsMod as selSets
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
 import TheKeyMachine.core.toolbox as toolbox
+from TheKeyMachine.tools import colors as toolColors
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
@@ -56,7 +57,7 @@ for m in mods:
     importlib.reload(m)
 
 
-COLOR = ui.Color()
+UI_COLORS = toolColors.UI_COLORS
 
 _GRAPH_LAYOUT = "customGraph_columnLayout"
 
@@ -191,15 +192,36 @@ def create_settings_menu(parent_button):
     return menu
 
 
-def create_tool_button(icon=None, text="", tooltip_template="", description="", command=None, p=None):
+def create_tool_button(icon=None, text="", tooltip_template="", description="", command=None, shortcuts=None, shortcut_variants=None, p=None):
     """Helper to create a QFlatToolButton with our tooltip system"""
-    # Initialize with all help context directly in the constructor
-    btn = cw.QFlatToolButton(icon=icon, text=text, tooltip_template=tooltip_template, description=description)
-    if command:
-        btn.clicked.connect(command)
+    btn = cw.create_tool_button_from_data(
+        {
+            "icon_path": icon,
+            "text": text,
+            "tooltip_template": tooltip_template,
+            "description": description,
+            "callback": command,
+            "shortcuts": shortcuts,
+            "shortcut_variants": shortcut_variants,
+        }
+    )
     if p:
         p.addWidget(btn)
     return btn
+
+
+def create_toolbox_button(tool_id, p=None, **overrides):
+    tool_data = toolbox.get_tool(tool_id, **overrides)
+    return create_tool_button(
+        icon=tool_data.get("icon_path"),
+        text=tool_data.get("text", ""),
+        tooltip_template=tool_data.get("tooltip_template", ""),
+        description=tool_data.get("description", ""),
+        command=tool_data.get("callback"),
+        shortcuts=tool_data.get("shortcuts"),
+        shortcut_variants=tool_data.get("shortcut_variants"),
+        p=p,
+    )
 
 
 def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs):
@@ -259,21 +281,12 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
 
     sec.addWidgetGroup(
         [
-            toolbox.get_tool(
-                "static",
-                text="S",
-                icon_path=media.delete_animation_image,
-                tooltip_template="Static",
-                description="Remove all statics curves",
-                callback=lambda: keyTools.deleteStaticCurves(),
-                default=True,
-            ),
+            toolbox.get_tool("static", default=True),
             toolbox.get_tool("share_keys", text="sK", default=True),
             toolbox.get_tool("match", text="M", default=True),
             toolbox.get_tool("flip", text="F", default=True),
             toolbox.get_tool("snap", text="Sn", default=True),
             toolbox.get_tool("overlap", text="O", default=True),
-            toolbox.get_tool("reblock", text="rB", default=True),
             toolbox.get_tool("extra_tools", text="E", default=True),
         ]
     )
@@ -359,7 +372,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         sliders.TWEEN_MODES,
         "graph_tween_mode",
         "tween",
-        COLOR.color.yellow.hex,
+        UI_COLORS.yellow.hex,
         sliders.execute_tween,
         sliders.stop_dragging,
         default_modes=["tweener"],
@@ -369,7 +382,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         sliders.BLEND_MODES,
         "graph_blend_mode",
         "blend",
-        COLOR.color.green.hex,
+        UI_COLORS.green.hex,
         sliders.execute_curve_modifier,
         sliders.stop_dragging,
         default_modes=["connect_neighbors"],
@@ -378,7 +391,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         sliders.TANGENT_MODES,
         "graph_tangent_mode",
         "tangent",
-        COLOR.color.orange.hex,
+        UI_COLORS.orange.hex,
         sliders.execute_tangent_blend,
         sliders.stop_dragging,
         default_modes=["blend_best_guess"],
@@ -386,91 +399,29 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
 
     # _________________  Iso / Mute / Lock  _________________#
     sec = new_section()
-    btn_iso = create_tool_button(
-        icon=media.isolate_image,
-        tooltip_template="Isolate Curves",
-        description="Isolate selected curves.",
-        command=lambda: keyTools.isolateCurve(),
-    )
+    btn_iso = create_toolbox_button("graph_isolate_curves")
     sec.addWidget(btn_iso, "Isolate", "iso")
 
-    btn_mute = create_tool_button(
-        text="Mt", tooltip_template="Mute", description="Toggle mute on selected curves.", command=lambda: keyTools.toggleMute()
-    )
+    btn_mute = create_toolbox_button("graph_toggle_mute")
     sec.addWidget(btn_mute, "Mute", "mute")
 
-    btn_lock = create_tool_button(
-        text="Lk", tooltip_template="Lock", description="Toggle lock on selected curves.", command=lambda: keyTools.toggleLock()
-    )
+    btn_lock = create_toolbox_button("graph_toggle_lock")
     sec.addWidget(btn_lock, "Lock", "lock")
 
-    btn_fi = create_tool_button(
-        text="Fi",
-        tooltip_template="Filter",
-        command=lambda: ui.customGraph_filter_mods(),
-        description="Filter selection in the GraphEditor. Shift+Click to deactivate.",
-    )
+    btn_fi = create_toolbox_button("graph_filter", callback=lambda: ui.customGraph_filter_mods())
     sec.addWidget(btn_fi, "Filter", "filter")
 
     # ____________________  Resets  _________________________#
     sec = new_section()
-    btn_reset = create_tool_button(
-        icon=media.reset_animation_image,
-        text="R",
-        tooltip_template="Reset",
-        description="Reset the selected curves to their default values.",
-        command=lambda: keyTools.get_default_value_main(),
-    )
+    btn_reset = create_toolbox_button("graph_reset")
     sec.addWidget(btn_reset, "Reset", "reset")
-
-    # ________________  SelSets Buttons  ____________________#
-    # sec = new_section()
-    # color_map = {
-    #     "1": "#CBC8AD",
-    #     "2": "#7BA399",
-    #     "3": "#93C2AD",
-    #     "4": "#C29591",
-    #     "5": "#A86465",
-    # }
-    # for i in range(1, 6):
-    #     s_id = str(i)
-    #     s_name = "button_" + s_id
-    #     btn = create_tool_button(text=s_id, tooltip="SelSet 0{}".format(s_id), description="Left-click to select, Right-click for options.", p=sec)
-    #     btn.setStyleSheet("QPushButton {{ background-color: {}; color: #333; }}".format(color_map.get(s_id, "#555")))
-
-    #     # Action menu
-    #     menu = cw.MenuWidget(parent=btn)
-    #     menu.addAction("Set", partial(selSets.set_button_value, s_name))
-    #     menu.addSeparator()
-    #     menu.addAction("Add", partial(selSets.add_button_selection, s_name))
-    #     menu.addAction("Remove", partial(selSets.remove_button_selection, s_name))
-    #     menu.addSeparator()
-    #     menu.addAction("Lock", partial(selSets.lock_button_selection, s_name))
-    #     menu.addAction("Unlock", partial(selSets.unlock_button_selection, s_name))
-
-    #     btn = create_tool_button(text=s_id, tooltip="SelSet 0{}".format(s_id), description="Left-click to select, Right-click for options.")
-    #     sec.addWidget(btn, "Set 0{}".format(s_id), "set_{}".format(s_id))
-    #     btn.setStyleSheet("QPushButton {{ background-color: {}; color: #333; }}".format(color_map.get(s_id, "#555")))
-
-    #     # Re-parent the menu to the button after it's created
-    #     menu.setParent(btn)
-    #     btn.clicked.connect(partial(selSets.handle_button_selection, s_name))
-    #     btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-    #     btn.customContextMenuRequested.connect(lambda pos, m=menu, b=btn: m.exec_(b.mapToGlobal(pos)))
 
     # ________________ Cycle / Bouncy ___________________#
     sec = new_section()
-    btn_cycle = create_tool_button(
-        icon=media.match_curve_cycle_image,
-        tooltip_template="Cycle Matcher",
-        description="Curve cycle matcher.",
-        command=keyTools.match_curve_cycle,
-    )
+    btn_cycle = create_toolbox_button("graph_cycle_matcher")
     sec.addWidget(btn_cycle, "Cycle Matcher", "cycle")
 
-    btn_bouncy = create_tool_button(
-        icon=media.bouncy_curve_image, tooltip_template="Bouncy", description="Set bouncy tangents.", command=keyTools.bouncy_tangets
-    )
+    btn_bouncy = create_toolbox_button("graph_bouncy")
     sec.addWidget(btn_bouncy, "Bouncy", "bouncy")
 
     # _________________  Opacity Slider  ____________________#

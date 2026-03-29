@@ -3,6 +3,7 @@ from __future__ import division
 
 from maya import cmds
 from maya import mel
+from TheKeyMachine.tools import common as toolCommon
 
 try:
     PYSIDE_VERSION = 6
@@ -1659,7 +1660,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         target_attrs = options_and_objects[enum_value]["attrs"]
         enum_index = options_and_objects[enum_value].get("index", enum_value)
 
-        cmds.undoInfo(openChunk=True)
+        toolCommon.open_undo_chunk(tool_id="attribute_switcher")
         cmds.refresh(suspend=True)
         self._disconnect_runtime_manager()
 
@@ -1712,7 +1713,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
             self._connect_runtime_manager()
             self.refresh(force=True)
-            cmds.undoInfo(closeChunk=True)
+            toolCommon.close_undo_chunk()
 
         cmds.showWindow("MayaWindow")
 

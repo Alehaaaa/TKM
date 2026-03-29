@@ -8,6 +8,37 @@ using a robust dispatcher pattern to avoid complex if-elif chains.
 from . import utils
 from . import curve_ops
 from . import keyframe_ops
+from TheKeyMachine.tools import common as toolCommon
+import TheKeyMachine.mods.helperMod as helper
+
+
+SLIDER_MODE_TOOLTIPS = {
+    "tweener": helper.tweener_tooltip_text,
+    "tweener_worldspace": helper.tweener_world_space_tooltip_text,
+    "blend_to_buffer": helper.blend_tooltip_text,
+    "blend_to_default": helper.blend_to_default_tooltip_text,
+    "blend_to_frame": helper.blend_to_frame_tooltip_text,
+    "blend_to_neighbors": helper.blend_tooltip_text,
+    "blend_to_neighbors_ws": helper.blend_tooltip_text,
+    "connect_neighbors": helper.blend_tooltip_text,
+    "ease_in_out": helper.blend_tooltip_text,
+    "noise_wave": helper.blend_tooltip_text,
+    "smooth_rough": helper.blend_tooltip_text,
+    "scale_average": helper.blend_tooltip_text,
+    "scale_selection": helper.blend_tooltip_text,
+    "blend_auto": helper.auto_tangent_tooltip_text,
+    "blend_spline": helper.spline_tangent_tooltip_text,
+    "blend_linear": helper.linear_tangent_tooltip_text,
+    "blend_flat": helper.step_tangent_tooltip_text,
+    "blend_flow": helper.auto_tangent_tooltip_text,
+}
+
+
+def _start_mode_drag(mode):
+    utils.start_dragging(
+        title=toolCommon.humanize_tool_name(mode),
+        tooltip_template=SLIDER_MODE_TOOLTIPS.get(mode),
+    )
 
 # ---------------------------------------------------------------------------------------------------------------------
 #                                              Standard Dispatcher Maps                                               #
@@ -50,6 +81,7 @@ TANGENT_BLEND_DISPATCH = {
 
 def execute_tween(mode, value, world_space=False):
     """Entry point for the Yellow slider modes."""
+    _start_mode_drag(mode)
     func = TWEEN_MODIFIER_DISPATCH.get(mode)
     if func:
         func(value, world_space)
@@ -60,7 +92,7 @@ def execute_tween(mode, value, world_space=False):
 
 def execute_curve_modifier(mode, value):
     """Dispatcher for the Green slider modes."""
-    utils.start_dragging()
+    _start_mode_drag(mode)
     func = CURVE_MODIFIER_DISPATCH.get(mode)
     if func:
         curves = utils.get_target_curves()
@@ -70,6 +102,7 @@ def execute_curve_modifier(mode, value):
 
 def execute_tangent_blend(mode, value):
     """Dispatcher for the Orange slider modes."""
+    _start_mode_drag(mode)
     func = TANGENT_BLEND_DISPATCH.get(mode)
     if func:
         curves = utils.get_target_curves()

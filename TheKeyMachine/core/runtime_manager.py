@@ -467,8 +467,16 @@ class RuntimeManager(QtCore.QObject):
         self._graph_editor_visible = visible
         try:
             if visible:
-                self._emit("graph_editor_opened")
-                self.graph_editor_opened.emit()
+                QtCore.QTimer.singleShot(0, self._emit_graph_editor_opened)
+        except Exception:
+            pass
+
+    def _emit_graph_editor_opened(self) -> None:
+        try:
+            if not self._graph_editor_visible:
+                return
+            self._emit("graph_editor_opened")
+            self.graph_editor_opened.emit()
         except Exception:
             pass
 

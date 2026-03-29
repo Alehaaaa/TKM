@@ -119,7 +119,7 @@ def resolve_time_context(default_mode="all_animation"):
 
 
 class TimelineTint(QtWidgets.QWidget):
-    def __init__(self, timerange, color=(200, 120, 200), duration_ms=200, parent=None, center_line=False, icon_path=None, full_width=False):
+    def __init__(self, timerange, color=(200, 120, 200), duration_ms=200, parent=None, center_line=False, icon_path=None, full_width=False, icon_scale=1.0):
         self._full_width = bool(full_width)
         parent_widget = parent or self.get_timeline_widget(full_width=self._full_width)
         super().__init__(parent_widget)
@@ -137,6 +137,7 @@ class TimelineTint(QtWidgets.QWidget):
         self.color = _normalize_tint_color(color)
         self.center_line = bool(center_line)
         self.icon_path = icon_path
+        self.icon_scale = max(0.5, float(icon_scale or 1.0))
         self._icon = QtGui.QPixmap(icon_path) if icon_path else QtGui.QPixmap()
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
@@ -186,7 +187,9 @@ class TimelineTint(QtWidgets.QWidget):
             painter.drawLine(QtCore.QPointF(rect.left(), line_y), QtCore.QPointF(rect.right(), line_y))
 
         if not self._icon.isNull():
-            icon_size = min(util.DPI(18), int(max(12, rect.width() - util.DPI(6))), max(12, self.height() - util.DPI(4)))
+            base_icon_size = min(util.DPI(18), int(max(12, rect.width() - util.DPI(6))), max(12, self.height() - util.DPI(4)))
+            icon_size = int(max(12, round(base_icon_size * self.icon_scale)))
+            icon_size = min(icon_size, int(max(12, rect.width() - util.DPI(2))), int(max(12, self.height() - util.DPI(2))))
             icon_rect = QtCore.QRectF(
                 rect.center().x() - (icon_size * 0.5),
                 (self.height() - icon_size) * 0.5,
@@ -287,7 +290,7 @@ class TimelineTintSession(QtCore.QObject):
             pass
 
 
-def show_timeline_tint(timerange=None, color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None):
+def show_timeline_tint(timerange=None, color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None, icon_scale=1.0):
     color = color or _default_tint_color()
     context = timerange or resolve_time_context(default_mode="all_animation").timerange
     full_width = _is_full_playback_timerange(context)
@@ -298,11 +301,12 @@ def show_timeline_tint(timerange=None, color=None, duration_ms=200, owner=None, 
         center_line=center_line,
         icon_path=icon_path,
         full_width=full_width,
+        icon_scale=icon_scale,
     )
     return runtime.get_runtime_manager().register_managed_widget(widget, key=key, owner=owner)
 
 
-def show_timeline_context(default_mode="all_animation", color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None):
+def show_timeline_context(default_mode="all_animation", color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None, icon_scale=1.0):
     context = resolve_time_context(default_mode=default_mode)
     return show_timeline_tint(
         timerange=context.timerange,
@@ -312,6 +316,7 @@ def show_timeline_context(default_mode="all_animation", color=None, duration_ms=
         key=key,
         center_line=center_line,
         icon_path=icon_path,
+        icon_scale=icon_scale,
     )
 
 
@@ -319,7 +324,7 @@ def clear_timeline_tint(key):
     runtime.get_runtime_manager().clear_managed_widget(key)
 
 
-def begin_timeline_tint(timerange=None, color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None):
+def begin_timeline_tint(timerange=None, color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None, icon_scale=1.0):
     widget = show_timeline_tint(
         timerange=timerange,
         color=color,
@@ -328,11 +333,12 @@ def begin_timeline_tint(timerange=None, color=None, owner=None, key=None, min_du
         key=key,
         center_line=center_line,
         icon_path=icon_path,
+        icon_scale=icon_scale,
     )
     return TimelineTintSession(widget, key=key, min_duration=min_duration, parent=owner)
 
 
-def begin_timeline_context(default_mode="all_animation", color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None):
+def begin_timeline_context(default_mode="all_animation", color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None, icon_scale=1.0):
     context = resolve_time_context(default_mode=default_mode)
     return begin_timeline_tint(
         timerange=context.timerange,
@@ -342,6 +348,7 @@ def begin_timeline_context(default_mode="all_animation", color=None, owner=None,
         min_duration=min_duration,
         center_line=center_line,
         icon_path=icon_path,
+        icon_scale=icon_scale,
     )
 
 

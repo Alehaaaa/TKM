@@ -10,6 +10,7 @@ except Exception:
 import TheKeyMachine.core.runtime_manager as runtime
 import TheKeyMachine.mods.mediaMod as media
 from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.timeline as timelineWidgets
 from TheKeyMachine.widgets import util as wutil
 
@@ -184,7 +185,7 @@ class AnimationOffsetController(QtCore.QObject):
             return
         self.deactivate()
         try:
-            cmds.undoInfo(closeChunk=True)
+            toolCommon.close_undo_chunk()
         except Exception:
             pass
 
@@ -482,6 +483,7 @@ class AnimationOffsetController(QtCore.QObject):
             key=self._tint_key,
             center_line=True,
             icon_path=media.animation_offset_image,
+            icon_scale=1.15,
         )
         self._poll_timer.start()
 
@@ -518,11 +520,11 @@ class AnimationOffsetController(QtCore.QObject):
             button_widget.blockSignals(False)
 
         if checked:
-            cmds.undoInfo(openChunk=True)
+            toolCommon.open_undo_chunk(tool_id="animation_offset")
             self.activate()
         else:
             self.deactivate()
             try:
-                cmds.undoInfo(closeChunk=True)
+                toolCommon.close_undo_chunk()
             except Exception:
                 pass

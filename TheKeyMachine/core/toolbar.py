@@ -232,7 +232,7 @@ WorkspaceName = "k"
 selection_sets_workspace = "s"
 
 
-COLOR = ui.Color()
+UI_COLORS = toolColors.UI_COLORS
 
 
 class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
@@ -1720,17 +1720,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         sec.addWidgetGroup(
             [
-                {
-                    "key": "move_left",
-                    "label": "Nudge Left",
-                    "icon_path": media.nudge_left_image,
-                    "callback": lambda: keyTools.move_keyframes_in_range(-self.move_keyframes_intField.value()),
-                    "description": "Nudge selected keys to the left.",
-                    "shortcuts": [
-                        {"icon": media.nudge_left_image, "label": "Nudge Left", "keys": "Click"},
-                        {"icon": media.remove_inbetween_image, "label": "Remove Inbetween", "keys": [QtCore.Qt.Key_Shift]},
-                    ],
-                    "shortcut_variants": [
+                toolbox.get_tool(
+                    "move_left",
+                    callback=lambda: keyTools.move_keyframes_in_range(-self.move_keyframes_intField.value()),
+                    shortcut_variants=[
                         {
                             "mask": 1,
                             "text": "-IB",
@@ -1740,8 +1733,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                             "callback": lambda: keyTools.remove_inbetween(self.move_keyframes_intField.value()),
                         }
                     ],
-                    "default": True,
-                },
+                    default=True,
+                ),
                 {
                     "key": "nudge_remove_inbetween",
                     "label": "Remove Inbetween",
@@ -1753,17 +1746,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         sec.addWidgetGroup(
             [
-                {
-                    "key": "move_right",
-                    "label": "Nudge Right",
-                    "icon_path": media.nudge_right_image,
-                    "callback": lambda: keyTools.move_keyframes_in_range(self.move_keyframes_intField.value()),
-                    "description": "Nudge selected keys to the right.",
-                    "shortcuts": [
-                        {"icon": media.nudge_right_image, "label": "Nudge Right", "keys": "Click"},
-                        {"icon": media.insert_inbetween_image, "label": "Insert Inbetween", "keys": [QtCore.Qt.Key_Shift]},
-                    ],
-                    "shortcut_variants": [
+                toolbox.get_tool(
+                    "move_right",
+                    callback=lambda: keyTools.move_keyframes_in_range(self.move_keyframes_intField.value()),
+                    shortcut_variants=[
                         {
                             "mask": 1,
                             "text": "+IB",
@@ -1773,8 +1759,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                             "callback": lambda: keyTools.insert_inbetween(self.move_keyframes_intField.value()),
                         }
                     ],
-                    "default": True,
-                },
+                    default=True,
+                ),
                 {
                     "key": "nudge_insert_inbetween",
                     "label": "Insert Inbetween",
@@ -1789,40 +1775,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidget(self.move_keyframes_intField, "Nudge Value", "nudge_val")
         sec.addWidgetGroup(
             [
-                toolbox.get_tool(
-                    "share_keys",
-                    shortcuts=[
-                        {"icon": media.share_keys_image, "label": "Share Keys", "keys": "Click"},
-                        {"icon": media.reblock_keys_image, "label": "reBlock", "keys": [QtCore.Qt.Key_Shift]},
-                        # {"icon": media.reblock_keys_image, "label": "Gimbal Fixer", "keys": [QtCore.Qt.Key_Control]},
-                    ],
-                    shortcut_variants=[
-                        {
-                            "mask": 1,
-                            "text": "rB",
-                            "icon_path": media.reblock_keys_image,
-                            "tooltip_template": helper.reblock_move_tooltip_text,
-                            "description": "Reblock the selected animation.",
-                            "callback": keyTools.reblock_move,
-                        },
-                        # {
-                        #     "mask": 4,
-                        #     "text": "Gm",
-                        #     "icon_path": media.reblock_keys_image,
-                        #     "tooltip_template": helper.gimbal_fixer_tooltip_text,
-                        #     "description": "Open the Gimbal Fixer for the current selection.",
-                        #     "callback": bar.gimbal_fixer_window,
-                        # },
-                    ],
-                    default=True,
-                ),
+                toolbox.get_tool("share_keys", default=True),
                 toolbox.get_tool("reblock", key="bk_reblock"),
                 # toolbox.get_tool("gimbal", key="bk_gimbal"),
             ],
         )
 
         clear_btn = cw.QFlatToolButton(text="x")
-        clear_btn.clicked.connect(keyTools.clear_selected_keys)
+        clear_btn.clicked.connect(lambda *_args, w=clear_btn: w.triggerToolCallback(keyTools.clear_selected_keys))
         sec.addWidget(
             clear_btn,
             "Clear Selection",
@@ -1831,7 +1791,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             tooltip_template=helper.clear_selected_keys_widget_tooltip_text,
         )
         select_scene_btn = cw.QFlatToolButton(text="s")
-        select_scene_btn.clicked.connect(keyTools.select_all_animation_curves)
+        select_scene_btn.clicked.connect(lambda *_args, w=select_scene_btn: w.triggerToolCallback(keyTools.select_all_animation_curves))
         sec.addWidget(
             select_scene_btn,
             "Select Scene Anim",
@@ -1844,52 +1804,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Key Menu -------------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                toolbox.get_tool(
-                    "bake_animation_1",
-                    key="bk_bake_anim_1",
-                    shortcuts=[
-                        {"icon": media.bake_animation_1_image, "label": "Bake on Ones", "keys": "Click"},
-                        {"icon": media.bake_animation_2_image, "label": "Bake on Twos", "keys": [QtCore.Qt.Key_Control]},
-                        {"icon": media.bake_animation_3_image, "label": "Bake on Threes", "keys": [QtCore.Qt.Key_Shift]},
-                        {"icon": media.bake_animation_3_image, "label": "Bake on Fours", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
-                        {"icon": media.bake_animation_custom_image, "label": "Bake Custom Interval", "keys": [QtCore.Qt.Key_Alt]},
-                    ],
-                    shortcut_variants=[
-                        {
-                            "mask": 4,
-                            "text": "B2",
-                            "icon_path": media.bake_animation_2_image,
-                            "tooltip_template": helper.bake_animation_2_tooltip_text,
-                            "description": "Bake the animation using 2-frame steps.",
-                            "callback": keyTools.bake_animation_2,
-                        },
-                        {
-                            "mask": 1,
-                            "text": "B3",
-                            "icon_path": media.bake_animation_3_image,
-                            "tooltip_template": helper.bake_animation_3_tooltip_text,
-                            "description": "Bake the animation using 3-frame steps.",
-                            "callback": keyTools.bake_animation_3,
-                        },
-                        {
-                            "mask": 8,
-                            "text": "BC",
-                            "icon_path": media.bake_animation_custom_image,
-                            "tooltip_template": helper.bake_animation_custom_tooltip_text,
-                            "description": "Open the custom bake interval dialog.",
-                            "callback": bar.bake_animation_custom_window,
-                        },
-                        {
-                            "mask": 5,
-                            "text": "B4",
-                            "icon_path": media.bake_animation_3_image,
-                            "tooltip_template": "Bake on Fours",
-                            "description": "Bake the animation using 4-frame steps.",
-                            "callback": keyTools.bake_animation_4,
-                        },
-                    ],
-                    default=True,
-                ),
+                toolbox.get_tool("bake_animation_1", key="bk_bake_anim_1", default=True),
                 toolbox.get_tool("bake_animation_2", key="bk_bake_anim_2"),
                 toolbox.get_tool("bake_animation_3", key="bk_bake_anim_3"),
                 toolbox.get_tool("bake_animation_4", key="bk_bake_anim_4"),
@@ -2067,7 +1982,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         add_mode_sliders(
             sliders.BLEND_MODES,
             "blend",
-            COLOR.color.green.hex,
+            UI_COLORS.green.hex,
             sliders.execute_curve_modifier,
             sliders.stop_dragging,
             default_modes=["connect_neighbors"],
@@ -2075,7 +1990,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         add_mode_sliders(
             sliders.TWEEN_MODES,
             "tween",
-            COLOR.color.yellow.hex,
+            UI_COLORS.yellow.hex,
             sliders.execute_tween,
             sliders.stop_dragging,
             default_modes=["tweener"],
@@ -2089,39 +2004,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         sec.addWidgetGroup(
             [
-                {
-                    "key": "select_rig_controls",
-                    "label": "Select Rig Controls",
-                    "icon_path": media.select_rig_controls_image,
-                    "callback": bar.select_rig_controls,
-                    "tooltip_template": helper.select_rig_controls_tooltip_text,
-                    "description": "Select all rig controls. Ctrl+Click selects only animated rig controls.",
-                    "shortcuts": [
-                        {"icon": media.select_rig_controls_image, "label": "Select Rig Controls", "keys": "Click"},
-                        {
-                            "icon": media.select_rig_controls_animated_image,
-                            "label": "Select Animated Rig Controls",
-                            "keys": [QtCore.Qt.Key_Control],
-                        },
-                    ],
-                    "shortcut_variants": [
-                        {
-                            "mask": 4,
-                            "icon_path": media.select_rig_controls_animated_image,
-                            "tooltip_template": helper.select_rig_controls_animated_tooltip_text,
-                            "description": "Select only animated rig controls.",
-                            "callback": bar.select_rig_controls_animated,
-                            "shortcuts": [
-                                {
-                                    "icon": media.select_rig_controls_animated_image,
-                                    "label": "Select Animated Rig Controls",
-                                    "keys": "Click",
-                                }
-                            ],
-                        }
-                    ],
-                    "default": True,
-                },
+                toolbox.get_tool("select_rig_controls", default=True),
                 {
                     "key": "pointer_sel_anim_rig",
                     "label": "Select Animated Rig Controls",
@@ -2138,11 +2021,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(
             [
                 {
+                    **toolbox.get_tool("isolate_master"),
                     "key": "isolate",
-                    "label": "Isolate",
-                    "icon_path": media.isolate_image,
-                    "callback": bar.isolate_master,
-                    "tooltip_template": helper.isolate_tooltip_text,
                     "default": True,
                 },
                 {
@@ -2177,25 +2057,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(
             [
                 {
+                    **toolbox.get_tool("create_locator"),
                     "key": "create_locator",
-                    "label": "Create Locator",
-                    "icon_path": media.create_locator_image,
-                    "callback": bar.createLocator,
-                    "tooltip_template": helper.createLocator_tooltip_text,
                     "default": True,
                 },
-                {
-                    "key": "locator_select_temp",
-                    "label": "Select temp locators",
-                    "icon_path": media.create_locator_image,
-                    "callback": bar.selectTempLocators,
-                },
-                {
-                    "key": "locator_remove_temp",
-                    "label": "Remove temp locators",
-                    "icon_path": media.create_locator_image,
-                    "callback": bar.deleteTempLocators,
-                },
+                toolbox.get_tool("locator_select_temp"),
+                toolbox.get_tool("locator_remove_temp"),
             ],
         )
 
@@ -2203,66 +2070,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         sec.addWidgetGroup(
             [
-                {
-                    "key": "align",
-                    "label": "Align",
-                    "icon_path": media.match_image,
-                    "callback": bar.align_selected_objects,
-                    "tooltip_template": helper.align_tooltip_text,
-                    "shortcuts": [
-                        {"icon": media.match_image, "label": "Align All", "keys": "Click"},
-                        {"icon": media.align_menu_image, "label": "Align Translation", "keys": [QtCore.Qt.Key_Shift]},
-                        {"icon": media.align_menu_image, "label": "Align Rotation", "keys": [QtCore.Qt.Key_Control]},
-                        {"icon": media.align_menu_image, "label": "Align Scale", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
-                    ],
-                    "shortcut_variants": [
-                        {
-                            "mask": 1,
-                            "text": "AT",
-                            "icon_path": media.align_menu_image,
-                            "tooltip_template": "Align Translation",
-                            "description": "Match only translation values from the driver object.",
-                            "callback": partial(bar.align_selected_objects, pos=True, rot=False, scl=False),
-                        },
-                        {
-                            "mask": 4,
-                            "text": "AR",
-                            "icon_path": media.align_menu_image,
-                            "tooltip_template": "Align Rotation",
-                            "description": "Match only rotation values from the driver object.",
-                            "callback": partial(bar.align_selected_objects, pos=False, rot=True, scl=False),
-                        },
-                        {
-                            "mask": 5,
-                            "text": "AS",
-                            "icon_path": media.align_menu_image,
-                            "tooltip_template": "Align Scale",
-                            "description": "Match only scale values from the driver object.",
-                            "callback": partial(bar.align_selected_objects, pos=False, rot=False, scl=True),
-                        },
-                    ],
-                    "default": True,
-                },
-                {
-                    "key": "align_translation",
-                    "label": "Translation",
-                    "icon_path": media.align_menu_image,
-                    "callback": partial(bar.align_selected_objects, pos=True, rot=False, scl=False),
-                },
-                {
-                    "key": "align_rotation",
-                    "label": "Rotation",
-                    "icon_path": media.align_menu_image,
-                    "callback": partial(bar.align_selected_objects, pos=False, rot=True, scl=False),
-                },
-                {
-                    "key": "align_scale",
-                    "label": "Scale",
-                    "icon_path": media.align_menu_image,
-                    "callback": partial(bar.align_selected_objects, pos=False, rot=False, scl=True),
-                },
+                toolbox.get_tool("align_selected_objects", key="align", default=True),
+                toolbox.get_tool("align_translation"),
+                toolbox.get_tool("align_rotation"),
+                toolbox.get_tool("align_scale"),
                 "separator",
-                {"key": "align_range", "label": "Match Range", "icon_path": media.match_image, "callback": bar.align_range},
+                toolbox.get_tool("align_range"),
                 "separator",
                 {
                     "key": "align_help",
@@ -2277,50 +2090,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Tracer -----------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                {
-                    "key": "tracer",
-                    "label": "Tracer",
-                    "icon_path": media.tracer_image,
-                    "callback": bar.create_tracer,
-                    "tooltip_template": helper.tracer_tooltip_text,
-                    "shortcuts": [
-                        {"icon": media.refresh_image, "label": "Refresh Tracer", "keys": [QtCore.Qt.Key_Control]},
-                        {"icon": media.tracer_show_hide_image, "label": "Toggle Tracer", "keys": [QtCore.Qt.Key_Shift]},
-                        {"icon": media.tracer_select_offset_image, "label": "Select Offset Object", "keys": [QtCore.Qt.Key_Alt]},
-                        {
-                            "icon": media.remove_image,
-                            "label": "Remove Tracer",
-                            "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift, QtCore.Qt.Key_Alt],
-                        },
-                    ],
-                    "shortcut_variants": [
-                        {
-                            "mask": 1,
-                            "text": "TR+",
-                            "icon_path": media.refresh_image,
-                            "tooltip_template": "Refresh Tracer",
-                            "description": "Refresh the existing tracer without re-creating it.",
-                            "callback": bar.tracer_refresh,
-                        },
-                        {
-                            "mask": 4,
-                            "text": "TRo",
-                            "icon_path": media.tracer_show_hide_image,
-                            "tooltip_template": "Toggle Tracer",
-                            "description": "Show or hide the existing tracer.",
-                            "callback": bar.tracer_show_hide,
-                        },
-                        {
-                            "mask": 12,
-                            "text": "TRx",
-                            "icon_path": media.remove_image,
-                            "tooltip_template": "Remove Tracer",
-                            "description": "Remove the existing tracer node.",
-                            "callback": bar.remove_tracer_node,
-                        },
-                    ],
-                    "default": True,
-                },
+                toolbox.get_tool("mod_tracer", key="tracer", callback=bar.create_tracer, default=True),
                 {
                     "key": "tracer_connected",
                     "label": "Connected",
@@ -2330,105 +2100,26 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "pinnable": False,
                 },
                 "separator",
-                {
-                    "key": "tracer_refresh",
-                    "label": "Refresh Tracer",
-                    "icon_path": media.refresh_image,
-                    "callback": bar.tracer_refresh,
-                },
-                {
-                    "key": "tracer_show_hide",
-                    "label": "Toggle Tracer",
-                    "icon_path": media.tracer_show_hide_image,
-                    "callback": bar.tracer_show_hide,
-                },
-                {
-                    "key": "tracer_offset_node",
-                    "label": "Select Offset Object",
-                    "icon_path": media.tracer_select_offset_image,
-                    "callback": bar.select_tracer_offset_node,
-                },
+                toolbox.get_tool("tracer_refresh"),
+                toolbox.get_tool("tracer_show_hide"),
+                toolbox.get_tool("tracer_offset_node"),
                 "separator",
-                {
-                    "key": "tracer_grey",
-                    "label": "Tracer Style: Grey",
-                    "icon_path": media.tracer_grey_image,
-                    "callback": bar.set_tracer_grey_color,
-                },
-                {
-                    "key": "tracer_red",
-                    "label": "Tracer Style: Red",
-                    "icon_path": media.tracer_red_image,
-                    "callback": bar.set_tracer_red_color,
-                },
-                {
-                    "key": "tracer_blue",
-                    "label": "Tracer Style: Blue",
-                    "icon_path": media.tracer_blue_image,
-                    "callback": bar.set_tracer_blue_color,
-                },
+                toolbox.get_tool("tracer_grey"),
+                toolbox.get_tool("tracer_red"),
+                toolbox.get_tool("tracer_blue"),
                 "separator",
-                {
-                    "key": "tracer_remove",
-                    "label": "Remove Tracer",
-                    "icon_path": media.remove_image,
-                    "callback": bar.remove_tracer_node,
-                },
+                toolbox.get_tool("tracer_remove"),
             ],
         )
 
         # Reset anim  -------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                {
-                    "key": "reset_values",
-                    "label": "Reset Values",
-                    "icon_path": media.reset_animation_image,
-                    "callback": keyTools.reset_object_values,
-                    "tooltip_template": helper.reset_values_tooltip_text,
-                    "shortcuts": [
-                        {"icon": media.reset_animation_image, "label": "Reset Translations", "keys": [QtCore.Qt.Key_Shift]},
-                        {"icon": media.reset_animation_image, "label": "Reset Rotations", "keys": [QtCore.Qt.Key_Control]},
-                    ],
-                    "shortcut_variants": [
-                        {
-                            "mask": 1,
-                            "text": "RT",
-                            "icon_path": media.reset_animation_image,
-                            "tooltip_template": "Reset Translations",
-                            "description": "Reset only translation values for the selected objects.",
-                            "callback": lambda: keyTools.reset_object_values(reset_translations=True),
-                        },
-                        {
-                            "mask": 4,
-                            "text": "RR",
-                            "icon_path": media.reset_animation_image,
-                            "tooltip_template": "Reset Rotations",
-                            "description": "Reset only rotation values for the selected objects.",
-                            "callback": lambda: keyTools.reset_object_values(reset_rotations=True),
-                        },
-                    ],
-                    "default": True,
-                },
-                {
-                    "key": "reset_set_defaults",
-                    "label": "Set Default Values For Selected",
-                    "icon_path": media.reset_animation_image,
-                    "callback": keyTools.save_default_values,
-                },
-                {
-                    "key": "reset_restore_defaults",
-                    "label": "Restore Default Values For Selected",
-                    "icon_path": media.reset_animation_image,
-                    "callback": keyTools.remove_default_values_for_selected_object,
-                },
+                toolbox.get_tool("reset_objects_mods", key="reset_values", callback=keyTools.reset_object_values, default=True),
+                toolbox.get_tool("reset_set_defaults"),
+                toolbox.get_tool("reset_restore_defaults"),
                 "separator",
-                {
-                    "key": "reset_clear_all",
-                    "label": "Clear All Saved Data",
-                    "icon_path": media.reset_animation_image,
-                    "callback": keyTools.restore_default_data,
-                },
+                toolbox.get_tool("reset_clear_all"),
                 "separator",
                 {
                     "key": "reset_help",
@@ -2441,18 +2132,30 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         )
 
         # Delete anim -------------------------------------------------------------------------
-        delete_anim_btn = cw.QFlatToolButton(
-            icon=media.delete_animation_image,
-            tooltip_template=helper.delete_animation_tooltip_text,
+        delete_anim_tool = toolbox.get_tool("deleteAnimation")
+        delete_anim_btn = cw.create_tool_button_from_data(delete_anim_tool)
+        sec.addWidget(
+            delete_anim_btn,
+            delete_anim_tool.get("label", "Delete Anim"),
+            "delete_anim",
+            tooltip_template=delete_anim_tool.get("tooltip_template"),
+            description=delete_anim_tool.get("description"),
         )
-        delete_anim_btn.clicked.connect(lambda *_args, w=delete_anim_btn: w.triggerToolCallback(bar.delete_animation))
-        sec.addWidget(delete_anim_btn, "Delete Anim", "delete_anim", tooltip_template=helper.delete_animation_tooltip_text)
 
         sec = new_section(color=toolColors.green)
 
-        selector_button_widget = cw.QFlatSelectorButton(icon=media.selector_image, tooltip_template=helper.selector_tooltip_text)
-        selector_button_widget.clicked.connect(bar.selector_window)
-        sec.addWidget(selector_button_widget, "Selector", "selector", tooltip_template=helper.selector_tooltip_text)
+        selector_tool = toolbox.get_tool("selector")
+        selector_button_widget = cw.QFlatSelectorButton(
+            icon=selector_tool.get("icon_path"),
+            tooltip_template=selector_tool.get("tooltip_template"),
+        )
+        selector_button_widget.clicked.connect(selector_tool.get("callback"))
+        sec.addWidget(
+            selector_button_widget,
+            selector_tool.get("label", "Selector"),
+            selector_tool.get("key", "selector"),
+            tooltip_template=selector_tool.get("tooltip_template"),
+        )
 
         def update_selector_button_text():
             if not wutil.is_valid_widget(selector_button_widget):
@@ -2469,50 +2172,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Select opposite ---------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                {
-                    "key": "opposite_select",
-                    "label": "Select Opposite",
-                    "icon_path": media.opposite_select_image,
-                    "callback": keyTools.selectOpposite,
-                    "tooltip_template": helper.opposite_select_tooltip_text,
-                    "shortcuts": [
-                        {"icon": media.opposite_add_image, "label": "Add Opposite", "keys": [QtCore.Qt.Key_Shift]},
-                        {"icon": media.opposite_copy_image, "label": "Copy Opposite", "keys": [QtCore.Qt.Key_Alt]},
-                    ],
-                    "shortcut_variants": [
-                        {
-                            "mask": 1,
-                            "text": "AOp",
-                            "icon_path": media.opposite_add_image,
-                            "tooltip_template": helper.opposite_add_tooltip_text,
-                            "description": "Add the opposite control to the current selection.",
-                            "callback": keyTools.addSelectOpposite,
-                        },
-                        {
-                            "mask": 8,
-                            "text": "COp",
-                            "icon_path": media.opposite_copy_image,
-                            "tooltip_template": helper.opposite_copy_tooltip_text,
-                            "description": "Copy the opposite-name mapping for the current selection.",
-                            "callback": keyTools.copyOpposite,
-                        },
-                    ],
-                    "default": True,
-                },
-                {
-                    "key": "opposite_add",
-                    "label": "Add Opposite",
-                    "icon_path": media.opposite_add_image,
-                    "callback": keyTools.addSelectOpposite,
-                    "tooltip_template": helper.opposite_add_tooltip_text,
-                },
-                {
-                    "key": "opposite_copy",
-                    "label": "Copy Opposite",
-                    "icon_path": media.opposite_copy_image,
-                    "callback": keyTools.copyOpposite,
-                    "tooltip_template": helper.opposite_copy_tooltip_text,
-                },
+                toolbox.get_tool("selectOpposite", key="opposite_select", default=True),
+                toolbox.get_tool("opposite_add"),
+                toolbox.get_tool("opposite_copy"),
             ]
         )
 
@@ -2520,31 +2182,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(
             [
                 {
+                    **toolbox.get_tool("mirror"),
                     "key": "mirror",
-                    "label": "Mirror",
-                    "icon_path": media.mirror_image,
-                    "callback": keyTools.mirror,
-                    "tooltip_template": helper.mirror_tooltip_text,
                     "default": True,
                 },
-                {
-                    "key": "mirror_add_invert",
-                    "label": "Add Exception Invert",
-                    "icon_path": media.mirror_image,
-                    "callback": keyTools.add_mirror_invert_exception,
-                },
-                {
-                    "key": "mirror_add_keep",
-                    "label": "Add Exception Keep",
-                    "icon_path": media.mirror_image,
-                    "callback": keyTools.add_mirror_keep_exception,
-                },
-                {
-                    "key": "mirror_remove_exc",
-                    "label": "Remove Exception",
-                    "icon_path": media.mirror_image,
-                    "callback": keyTools.remove_mirror_invert_exception,
-                },
+                toolbox.get_tool("mirror_add_invert"),
+                toolbox.get_tool("mirror_add_keep"),
+                toolbox.get_tool("mirror_remove_exc"),
                 "separator",
                 {
                     "key": "mirror_help",
@@ -2557,38 +2201,23 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         )
 
         # Select hierarchy -----------------------------------------------------------------------
-        select_hierarchy_button_widget = cw.QFlatToolButton(icon=media.select_hierarchy_image, tooltip_template=helper.select_hierarchy_tooltip_text)
-        select_hierarchy_button_widget.clicked.connect(bar.selectHierarchy)
-        sec.addWidget(select_hierarchy_button_widget, "Select Hierarchy", "select_hierarchy", tooltip_template=helper.select_hierarchy_tooltip_text)
+        select_hierarchy_tool = toolbox.get_tool("selectHierarchy")
+        select_hierarchy_button_widget = cw.create_tool_button_from_data(select_hierarchy_tool)
+        sec.addWidget(
+            select_hierarchy_button_widget,
+            select_hierarchy_tool.get("label", "Select Hierarchy"),
+            "select_hierarchy",
+            tooltip_template=select_hierarchy_tool.get("tooltip_template"),
+            description=select_hierarchy_tool.get("description"),
+        )
 
         sec = new_section(color=toolColors.green)
 
         # Copy Paste Pose -----------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                {
-                    "key": "copy_pose",
-                    "label": "Copy Pose",
-                    "icon_path": media.copy_pose_image,
-                    "callback": keyTools.copy_pose,
-                    "tooltip_template": helper.copy_pose_tooltip_text,
-                    "shortcuts": [
-                        {"icon": media.copy_pose_image, "label": "Copy Pose", "keys": "Click"},
-                        {"icon": media.paste_pose_image, "label": "Paste Pose", "keys": [QtCore.Qt.Key_Control]},
-                    ],
-                    "shortcut_variants": [
-                        {
-                            "mask": 4,
-                            "text": "PP",
-                            "icon_path": media.paste_pose_image,
-                            "tooltip_template": "Paste Pose",
-                            "description": "Paste the saved pose onto the current selection.",
-                            "callback": keyTools.paste_pose,
-                        }
-                    ],
-                    "default": True,
-                },
-                {"key": "cp_paste_pose", "label": "Paste Pose", "icon_path": media.paste_pose_image, "callback": keyTools.paste_pose},
+                toolbox.get_tool("copy_pose", default=True),
+                toolbox.get_tool("cp_paste_pose"),
                 "separator",
                 {
                     "key": "pose_help",
@@ -2605,74 +2234,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Copy Paste Animation -----------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                {
-                    "key": "cp_copy_anim",
-                    "label": "Copy Animation",
-                    "icon_path": media.copy_animation_image,
-                    "callback": keyTools.copy_animation,
-                    "tooltip_template": helper.copy_animation_tooltip_text,
-                    "shortcuts": [
-                        {"icon": media.copy_animation_image, "label": "Copy Animation", "keys": "Click"},
-                        {"icon": media.paste_animation_image, "label": "Paste Animation", "keys": [QtCore.Qt.Key_Control]},
-                        {"icon": media.paste_insert_animation_image, "label": "Paste Insert", "keys": [QtCore.Qt.Key_Shift]},
-                        {
-                            "icon": media.paste_opposite_animation_image,
-                            "label": "Paste Opposite",
-                            "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift],
-                        },
-                    ],
-                    "shortcut_variants": [
-                        {
-                            "mask": 4,
-                            "text": "PA",
-                            "icon_path": media.paste_animation_image,
-                            "tooltip_template": helper.paste_animation_tooltip_text,
-                            "description": "Paste the saved animation onto the current selection.",
-                            "callback": keyTools.paste_animation,
-                        },
-                        {
-                            "mask": 1,
-                            "text": "PI",
-                            "icon_path": media.paste_insert_animation_image,
-                            "tooltip_template": helper.paste_insert_animation_tooltip_text,
-                            "description": "Insert the saved animation while preserving surrounding timing.",
-                            "callback": keyTools.paste_insert_animation,
-                        },
-                        {
-                            "mask": 5,
-                            "text": "PO",
-                            "icon_path": media.paste_opposite_animation_image,
-                            "tooltip_template": "Paste Opposite Animation",
-                            "description": "Paste the saved animation onto the opposite side controls.",
-                            "callback": keyTools.paste_opposite_animation,
-                        },
-                    ],
-                    "default": True,
-                },
-                {
-                    "key": "cp_paste_anim",
-                    "label": "Paste Animation",
-                    "icon_path": media.paste_animation_image,
-                    "callback": keyTools.paste_animation,
-                },
-                {
-                    "key": "cp_paste_ins",
-                    "label": "Paste Insert",
-                    "icon_path": media.paste_insert_animation_image,
-                    "callback": keyTools.paste_insert_animation,
-                },
-                {
-                    "key": "cp_paste_opp",
-                    "label": "Paste Opposite",
-                    "icon_path": media.paste_opposite_animation_image,
-                    "callback": keyTools.paste_opposite_animation,
-                },
-                {
-                    "key": "cp_paste_to",
-                    "label": "Paste To",
-                    "icon_path": media.paste_animation_image,
-                    "callback": keyTools.paste_animation_to,
-                },
+                toolbox.get_tool("copy_animation", key="cp_copy_anim", default=True),
+                toolbox.get_tool("cp_paste_anim"),
+                toolbox.get_tool("cp_paste_ins"),
+                toolbox.get_tool("cp_paste_opp"),
+                toolbox.get_tool("cp_paste_to"),
                 "separator",
                 {
                     "key": "cp_help",
@@ -2687,40 +2253,27 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec = new_section(color=toolColors.purple)
 
         # Animation Offset -----------------------------------------------------------------------
-        animation_offset_button_widget = cw.QFlatToolButton(icon=media.animation_offset_image, tooltip_template=helper.animation_offset_tooltip_text)
+        animation_offset_tool = toolbox.get_tool("animation_offset")
+        animation_offset_button_widget = cw.create_tool_button_from_data(animation_offset_tool, callback=None)
         animation_offset_button_widget.setObjectName("anim_offset_button")
         animation_offset_button_widget.setCheckable(True)
         animation_offset_button_widget.setChecked(bool(self.toggleAnimOffsetButtonState))
         animation_offset_button_widget.clicked.connect(self.toggleAnimOffsetButton)
         self.animation_offset_button_widget = animation_offset_button_widget
-        sec.addWidget(animation_offset_button_widget, "Anim Offset", "anim_offset", tooltip_template=helper.animation_offset_tooltip_text)
+        sec.addWidget(
+            animation_offset_button_widget,
+            animation_offset_tool.get("label", "Anim Offset"),
+            animation_offset_tool.get("key", "animation_offset"),
+            tooltip_template=animation_offset_tool.get("tooltip_template"),
+        )
 
         sec = new_section(color=toolColors.purple)
 
         # Temp Pivot ----------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
-                toolbox.get_tool(
-                    "temp_pivot",
-                    shortcuts=[
-                        {"icon": media.temp_pivot_image, "label": "Create Temp Pivot", "keys": "Click"},
-                        {"icon": media.temp_pivot_use_last_image, "label": "Use Last Pivot", "keys": [QtCore.Qt.Key_Shift]},
-                    ],
-                    shortcut_variants=[
-                        {
-                            "mask": 1,
-                            "text": "TP+",
-                            "icon_path": media.temp_pivot_use_last_image,
-                            "tooltip_template": "Use Last Pivot",
-                            "description": "Recreate the most recently used Temp Pivot setup.",
-                            "callback": lambda: bar.create_temp_pivot(True),
-                        }
-                    ],
-                    default=True,
-                ),
-                toolbox.get_tool(
-                    "tp_last_used", label="Use Last Pivot", icon_path=media.temp_pivot_use_last_image, callback=lambda: bar.create_temp_pivot(True)
-                ),
+                toolbox.get_tool("temp_pivot", default=True),
+                toolbox.get_tool("tp_last_used"),
                 "separator",
                 {
                     "key": "tp_help",
@@ -2733,69 +2286,26 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         )
 
         # Micro Move ----------------------------------------------------------------------------
-        micro_move_button_widget = cw.QFlatToolButton(icon=media.ruler_image, tooltip_template=helper.micro_move_tooltip_text)
+        micro_move_tool = toolbox.get_tool("micro_move")
+        micro_move_button_widget = cw.create_tool_button_from_data(micro_move_tool, callback=None)
         micro_move_button_widget.setObjectName("micro_move_button")
         micro_move_button_widget.setCheckable(True)
         micro_move_button_widget.setChecked(self.micro_move_controller.is_enabled())
         micro_move_button_widget.clicked.connect(self.toggle_micro_move_button)
-        sec.addWidget(micro_move_button_widget, "Micro Move", "micro_move", tooltip_template=helper.micro_move_tooltip_text)
+        sec.addWidget(
+            micro_move_button_widget,
+            micro_move_tool.get("label", "Micro Move"),
+            micro_move_tool.get("key", "micro_move"),
+            tooltip_template=micro_move_tool.get("tooltip_template"),
+        )
 
         sec.addWidgetGroup(
             [
-                {
-                    "key": "follow_cam",
-                    "label": "Follow Cam",
-                    "icon_path": media.follow_cam_image,
-                    "callback": lambda *args: bar.create_follow_cam(translation=True, rotation=True),
-                    "tooltip_template": helper.follow_cam_tooltip_text,
-                    "shortcuts": [
-                        {"icon": media.follow_cam_image, "label": "Follow Translation + Rotation", "keys": "Click"},
-                        {"icon": media.follow_cam_image, "label": "Follow Translation Only", "keys": [QtCore.Qt.Key_Shift]},
-                        {"icon": media.follow_cam_image, "label": "Follow Rotation Only", "keys": [QtCore.Qt.Key_Control]},
-                        {"icon": media.remove_image, "label": "Remove Follow Cam", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt]},
-                    ],
-                    "shortcut_variants": [
-                        {
-                            "mask": 1,
-                            "text": "FT",
-                            "icon_path": media.follow_cam_image,
-                            "tooltip_template": "Follow Translation Only",
-                            "description": "Create a Follow Cam that inherits only translation.",
-                            "callback": lambda: bar.create_follow_cam(translation=True, rotation=False),
-                        },
-                        {
-                            "mask": 4,
-                            "text": "FR",
-                            "icon_path": media.follow_cam_image,
-                            "tooltip_template": "Follow Rotation Only",
-                            "description": "Create a Follow Cam that inherits only rotation.",
-                            "callback": lambda: bar.create_follow_cam(translation=False, rotation=True),
-                        },
-                        {
-                            "mask": 12,
-                            "text": "FX",
-                            "icon_path": media.remove_image,
-                            "tooltip_template": "Remove Follow Cam",
-                            "description": "Remove the current Follow Cam setup.",
-                            "callback": bar.remove_followCam,
-                        },
-                    ],
-                    "default": True,
-                },
-                {
-                    "key": "fcam_trans_only",
-                    "label": "Follow only Translation",
-                    "icon_path": media.follow_cam_image,
-                    "callback": lambda: bar.create_follow_cam(translation=True, rotation=False),
-                },
-                {
-                    "key": "fcam_rot_only",
-                    "label": "Follow only Rotation",
-                    "icon_path": media.follow_cam_image,
-                    "callback": lambda: bar.create_follow_cam(translation=False, rotation=True),
-                },
+                toolbox.get_tool("follow_cam", default=True),
+                toolbox.get_tool("fcam_trans_only"),
+                toolbox.get_tool("fcam_rot_only"),
                 "separator",
-                {"key": "fcam_remove", "label": "Remove followCam", "icon_path": media.remove_image, "callback": bar.remove_followCam},
+                toolbox.get_tool("fcam_remove"),
             ],
         )
 
@@ -2872,49 +2382,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             else:
                 remove_link_objects_callback()
 
-        link_objects_button_widget = cw.QFlatToolButton(icon=media.link_objects_image, tooltip_template=helper.link_objects_tooltip_text)
-        link_objects_button_widget.clicked.connect(keyTools.mod_link_objects)
-
         # Initialize on startup
         if self.link_checkbox_state:
             add_link_objects_callback()
 
         link_objects_button_widget = sec.addWidgetGroup(
             [
-                {
-                    "key": "link_objects",
-                    "label": "Link Objects",
-                    "icon_path": media.link_objects_image,
-                    "callback": keyTools.copy_link,
-                    "tooltip_template": helper.link_objects_tooltip_text,
-                    "shortcuts": [
-                        {"icon": media.link_objects_copy_image, "label": "Copy Link Position", "keys": "Click"},
-                        {"icon": media.link_objects_paste_image, "label": "Paste Link Position", "keys": [QtCore.Qt.Key_Shift]},
-                    ],
-                    "shortcut_variants": [
-                        {
-                            "mask": 1,
-                            "text": "LP",
-                            "icon_path": media.link_objects_paste_image,
-                            "tooltip_template": "Paste Link Position",
-                            "description": "Apply the saved link relationship to the current selection.",
-                            "callback": keyTools.paste_link,
-                        }
-                    ],
-                    "default": True,
-                },
-                {
-                    "key": "link_copy",
-                    "label": "Copy Link Position",
-                    "icon_path": media.link_objects_copy_image,
-                    "callback": keyTools.copy_link,
-                },
-                {
-                    "key": "link_paste",
-                    "label": "Paste Link Position",
-                    "icon_path": media.link_objects_paste_image,
-                    "callback": keyTools.paste_link,
-                },
+                toolbox.get_tool("mod_link_objects", key="link_objects", callback=keyTools.copy_link, default=True),
+                toolbox.get_tool("link_copy"),
+                toolbox.get_tool("link_paste"),
                 "separator",
                 {
                     "key": "link_autolink",
@@ -2940,72 +2416,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(
             [
                 # toolbox.get_tool("worldspace", default=True),
-                toolbox.get_tool(
-                    "ws_copy_frame",
-                    label="Copy World Space",
-                    icon_path=media.worldspace_copy_frame_image,
-                    callback=bar.copy_worldspace_single_frame,
-                    tooltip_template=helper.copy_worldspace_tooltip_text,
-                    shortcuts=[
-                        {"icon": media.worldspace_copy_frame_image, "label": "Copy World Space", "keys": "Click"},
-                        {"icon": media.worldspace_paste_frame_image, "label": "Paste World Space", "keys": [QtCore.Qt.Key_Control]},
-                        {"icon": media.worldspace_copy_animation_image, "label": "Copy World Space - Selected Range", "keys": [QtCore.Qt.Key_Shift]},
-                        {
-                            "icon": media.worldspace_paste_animation_image,
-                            "label": "Paste World Space - All Animation",
-                            "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift],
-                        },
-                    ],
-                    shortcut_variants=[
-                        {
-                            "mask": 4,
-                            "text": "WSP",
-                            "icon_path": media.worldspace_paste_frame_image,
-                            "tooltip_template": helper.paste_worldspace_tooltip_text,
-                            "description": "Paste the saved World Space position for the current frame.",
-                            "callback": bar.paste_worldspace_single_frame,
-                        },
-                        {
-                            "mask": 1,
-                            "text": "WSR",
-                            "icon_path": media.worldspace_copy_animation_image,
-                            "tooltip_template": helper.copy_worldspace_range_tooltip_text,
-                            "description": "Copy World Space positions for the selected range or full animation.",
-                            "callback": bar.copy_range_worldspace_animation,
-                        },
-                        {
-                            "mask": 5,
-                            "text": "WSA",
-                            "icon_path": media.worldspace_paste_animation_image,
-                            "tooltip_template": helper.paste_worldspace_animation_tooltip_text,
-                            "description": "Paste saved World Space positions for the selected range or all animation.",
-                            "callback": bar.color_worldspace_paste_animation,
-                        },
-                    ],
-                    default=True,
-                ),
-                toolbox.get_tool(
-                    "ws_copy_range",
-                    label="Copy World Space - Selected Range",
-                    icon_path=media.worldspace_copy_animation_image,
-                    callback=bar.copy_range_worldspace_animation,
-                    tooltip_template=helper.copy_worldspace_range_tooltip_text,
-                ),
+                toolbox.get_tool("copy_worldspace_single_frame", key="ws_copy_frame", label="Copy World Space", default=True),
+                toolbox.get_tool("ws_copy_range"),
                 "separator",
-                toolbox.get_tool(
-                    "ws_paste_frame",
-                    label="Paste World Space",
-                    icon_path=media.worldspace_paste_frame_image,
-                    callback=bar.paste_worldspace_single_frame,
-                    tooltip_template=helper.paste_worldspace_tooltip_text,
-                ),
-                toolbox.get_tool(
-                    "ws_paste",
-                    label="Paste World Space - All Animation",
-                    icon_path=media.worldspace_paste_animation_image,
-                    callback=bar.color_worldspace_paste_animation,
-                    tooltip_template=helper.paste_worldspace_animation_tooltip_text,
-                ),
+                toolbox.get_tool("ws_paste_frame"),
+                toolbox.get_tool("ws_paste"),
                 "separator",
                 {
                     "key": "ws_help",
@@ -3167,9 +2582,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 lambda: general.open_file("TheKeyMachine_user_data/connect/tools", "tools.py"),
             )
 
-        toolBox_button_widget = cw.QFlatToolButton(icon=media.custom_tools_image)
+        custom_tools_tool = toolbox.get_tool("custom_tools")
+        toolBox_button_widget = cw.create_tool_button_from_data(custom_tools_tool, callback=None)
         toolBox_button_widget.setVisible(bool(CUSTOM_TOOLS_MENU))
-        sec.addWidget(toolBox_button_widget, "Custom Tools", "custom_tools", tooltip_template=helper.custom_tools_tooltip_text, default_visible=False)
+        sec.addWidget(
+            toolBox_button_widget,
+            custom_tools_tool.get("label", "Custom Tools"),
+            custom_tools_tool.get("key", "custom_tools"),
+            tooltip_template=custom_tools_tool.get("tooltip_template"),
+            default_visible=False,
+        )
         toolBox_menu = QtWidgets.QMenu(toolBox_button_widget)
         toolBox_menu.aboutToShow.connect(initialize_tool_menu)
         toolBox_button_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -3238,13 +2660,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 lambda: general.open_file("TheKeyMachine_user_data/connect/scripts", "scripts.py"),
             )
 
-        customScripts_button_widget = cw.QFlatToolButton(icon=media.custom_scripts_image, tooltip_template=helper.custom_scripts_tooltip_text)
+        custom_scripts_tool = toolbox.get_tool("custom_scripts")
+        customScripts_button_widget = cw.create_tool_button_from_data(custom_scripts_tool, callback=None)
         customScripts_button_widget.setVisible(bool(CUSTOM_SCRIPTS_MENU))
         sec.addWidget(
             customScripts_button_widget,
-            "Custom Scripts",
-            "custom_scripts",
-            tooltip_template=helper.custom_scripts_tooltip_text,
+            custom_scripts_tool.get("label", "Custom Scripts"),
+            custom_scripts_tool.get("key", "custom_scripts"),
+            tooltip_template=custom_scripts_tool.get("tooltip_template"),
             default_visible=False,
         )
 
@@ -3267,13 +2690,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             settings.set_setting("sliders_overshoot", state)
             sw.globalSignals.overshootChanged.emit(state)
 
-        toolbar_config_button_widget = cw.QFlatToolButton(icon=media.settings_image)
+        settings_tool = toolbox.get_tool("settings")
+        toolbar_config_button_widget = cw.create_tool_button_from_data(settings_tool, callback=None)
         toolbar_config_button_widget.setObjectName("settings_toolbar_button")
         sec.addWidget(
             toolbar_config_button_widget,
-            "Settings",
-            "settings",
-            description="Access global preferences, check for updates, and view credits.",
+            settings_tool.get("label", "Settings"),
+            settings_tool.get("key", "settings"),
+            description=settings_tool.get("description"),
         )
 
         # Build your menu with your cw.MenuWidget; make sure the button is the PARENT

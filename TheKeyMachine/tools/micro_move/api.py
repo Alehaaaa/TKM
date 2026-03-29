@@ -9,6 +9,7 @@ except Exception:
 
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.settingsMod as settings
+from TheKeyMachine.tools import common as toolCommon
 
 
 class MicroMoveController(QtCore.QObject):
@@ -29,7 +30,7 @@ class MicroMoveController(QtCore.QObject):
         utils.executeDeferred(bar.activate_micro_move)
 
     def activate(self):
-        cmds.undoInfo(openChunk=True)
+        toolCommon.open_undo_chunk(tool_id="micro_move")
         self._enabled = True
         settings.set_setting("micro_move_button_state", True)
         bar.activate_micro_move()
@@ -45,7 +46,7 @@ class MicroMoveController(QtCore.QObject):
         except Exception:
             pass
         try:
-            cmds.undoInfo(closeChunk=True)
+            toolCommon.close_undo_chunk()
         except Exception:
             pass
 

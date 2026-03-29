@@ -1,3 +1,8 @@
+import re
+from functools import lru_cache
+
+import maya.cmds as cmds
+
 try:
     from PySide2 import QtCore, QtGui
 except ImportError:
@@ -5,6 +10,141 @@ except ImportError:
 
 from TheKeyMachine.widgets import util as wutil
 from TheKeyMachine.mods import settingsMod as settings
+
+
+RE_HTML_TAGS = re.compile(r"<[^>]*>")
+RE_WHITESPACE = re.compile(r"\s+")
+RE_LINE_SPLIT = re.compile(r"<br\s*/?>|\r?\n", re.IGNORECASE)
+RE_SENTENCE = re.compile(r"(.+?[.!?])(?:\s|$)")
+RE_CAMEL_BREAK = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+RE_TOOLTIP_TITLE = re.compile(r"<b>(.*?)</b>", re.IGNORECASE | re.DOTALL)
+
+UNDO_PREFIX = "TKM"
+
+
+def clean_tool_text(raw):
+    if not raw:
+        return ""
+    return RE_WHITESPACE.sub(" ", RE_HTML_TAGS.sub(" ", str(raw))).strip()
+
+
+def humanize_tool_name(raw):
+    if not raw:
+        return ""
+    value = RE_CAMEL_BREAK.sub(" ", str(raw).replace("_", " ").replace("-", " "))
+    return clean_tool_text(value).title()
+
+
+def get_tool_summary(raw):
+    if not raw:
+        return ""
+
+    parts = [clean_tool_text(part) for part in RE_LINE_SPLIT.split(str(raw))]
+    first_line = next((part for part in parts if part), "")
+    if not first_line:
+        return ""
+
+    sentence = RE_SENTENCE.match(first_line)
+    if sentence:
+        return clean_tool_text(sentence.group(1))
+    return first_line
+
+
+def get_tooltip_title(raw):
+    if not raw:
+        return ""
+    match = RE_TOOLTIP_TITLE.search(str(raw))
+    if match:
+        return clean_tool_text(match.group(1))
+    return ""
+
+
+def get_tooltip_summary(raw):
+    return get_tool_summary(raw)
+
+
+def format_tool_label(title, description="", prefix=UNDO_PREFIX):
+    clean_title = clean_tool_text(title) or "Tool"
+    clean_desc = get_tool_summary(description)
+    label = clean_title if not clean_desc else f"{clean_title} - {clean_desc}"
+    if prefix:
+        return f"{prefix}: {label}"
+    return label
+
+
+@lru_cache(maxsize=256)
+def _get_tool_definition(tool_id):
+    if not tool_id:
+        return None
+    try:
+        import TheKeyMachine.core.toolbox as toolbox
+
+        return toolbox.get_tool(tool_id)
+    except Exception:
+        return None
+
+
+def resolve_undo_metadata(tool_id=None, title=None, description="", tooltip_template=None):
+    resolved_title = title or ""
+    resolved_description = description or ""
+
+    tool = _get_tool_definition(tool_id)
+    if tool:
+        resolved_title = (
+            tool.get("status_title")
+            or tool.get("label")
+            or tool.get("text")
+            or resolved_title
+        )
+        resolved_description = (
+            tool.get("status_description")
+            or tool.get("description")
+            or resolved_description
+        )
+        tooltip_template = tool.get("tooltip_template") or tooltip_template
+
+    if tooltip_template:
+        resolved_title = resolved_title or get_tooltip_title(tooltip_template)
+        resolved_description = resolved_description or get_tooltip_summary(tooltip_template)
+
+    resolved_title = resolved_title or humanize_tool_name(tool_id or "tool")
+    return resolved_title, resolved_description
+
+
+def make_undo_chunk_name(tool_id=None, title=None, description="", tooltip_template=None):
+    resolved_title, resolved_description = resolve_undo_metadata(
+        tool_id=tool_id,
+        title=title,
+        description=description,
+        tooltip_template=tooltip_template,
+    )
+    return format_tool_label(resolved_title, resolved_description)
+
+
+def open_undo_chunk(tool_id=None, title=None, description="", tooltip_template=None):
+    open_named_undo_chunk(
+        make_undo_chunk_name(
+            tool_id=tool_id,
+            title=title,
+            description=description,
+            tooltip_template=tooltip_template,
+        )
+    )
+    return True
+
+
+def open_named_undo_chunk(chunk_name):
+    cmds.undoInfo(openChunk=True, chunkName=chunk_name)
+    return True
+
+
+def close_undo_chunk(chunk_opened=True):
+    if not chunk_opened:
+        return
+    try:
+        cmds.undoInfo(closeChunk=True)
+    except Exception:
+        pass
 
 
 class ToolbarWindowToggle(QtCore.QObject):

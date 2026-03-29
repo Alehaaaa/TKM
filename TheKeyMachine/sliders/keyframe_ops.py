@@ -143,7 +143,6 @@ def prepare_tween_data(objs=None, attrs=None, attr_plugs=None, time_range=None):
         if not cmds.objExists(attr_full):
             continue
 
-        # Cache the current value once per drag so 0 stays stable/neutral.
         try:
             current_v = cmds.getAttr(attr_full, time=current_time)
         except Exception:
@@ -161,7 +160,7 @@ def prepare_tween_data(objs=None, attrs=None, attr_plugs=None, time_range=None):
                 "previousValue": prev_v,
                 "nextValue": next_v,
                 "currentValue": current_v,
-                "needsCalculation": (prev_v != next_v) or (current_v != prev_v),
+                "needsCalculation": (prev_v != next_v),
             }
             continue
 
@@ -186,7 +185,7 @@ def prepare_tween_data(objs=None, attrs=None, attr_plugs=None, time_range=None):
             "previousValue": prev_v,
             "nextValue": next_v,
             "currentValue": current_v,
-            "needsCalculation": (prev_v != next_v) or (current_v != prev_v),
+            "needsCalculation": (prev_v != next_v),
             "use_direct_attr": False,
         }
     return utils.tween_frame_data_cache
@@ -217,21 +216,14 @@ def execute_tween(value, world_space=False):
 
         prev_v = cache.get("previousValue")
         next_v = cache.get("nextValue")
-        cur_v = cache.get("currentValue")
-        if prev_v is None or next_v is None or cur_v is None:
+        if prev_v is None or next_v is None:
             continue
         if isinstance(prev_v, (list, tuple)) or isinstance(next_v, (list, tuple)):
             continue
 
-        # Tweener-style: value in [-100..100] maps to t in [-1..1], with 0 being neutral (current value).
-        t = float(value) / 100.0
-        if t < 0.0:
-            tt = t + 1.0  # remap [-1..0] to [0..1]
-            new_v = prev_v + (cur_v - prev_v) * tt
-        elif t > 0.0:
-            new_v = cur_v + (next_v - cur_v) * t
-        else:
-            new_v = cur_v
+        # Tweener now ignores the current keyed value and blends strictly from previous to next.
+        t = (float(value) + 100.0) / 200.0
+        new_v = prev_v + (next_v - prev_v) * t
 
         # Handle limits
         _apply_cached_value(attr_full, new_v, current_time, use_direct_attr=cache.get("use_direct_attr", False))
@@ -438,19 +430,19 @@ def execute_blend_to_frame(percentage, left_frame=None, right_frame=None, objs=N
         for attr in attrs:
             attr_full = f"{obj}.{attr}"
             orig = cmds.getAttr(attr_full)
-            
+
             if percentage > 0:
                 target_v = cmds.getAttr(attr_full, time=right_frame)
             else:
                 target_v = cmds.getAttr(attr_full, time=left_frame)
-            
+
             if target_v is None:
                 continue
-                
+
             diff = target_v - orig
             weighted_diff = (diff * abs(percentage)) / 100.0
             new_v = orig + weighted_diff
-            
+
             try:
                 cmds.setAttr(attr_full, float(new_v))
             except Exception:
