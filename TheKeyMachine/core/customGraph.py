@@ -176,7 +176,7 @@ def create_settings_menu(parent_button):
         act.toggled.connect(set_align)
 
     settings_menu.addSection("Hotkeys")
-    settings_menu.addAction("Add TKM Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys.")
+    settings_menu.addAction("Hotkeys...", hotkeys.show_hotkeys_window, description="Manage trigger hotkeys.")
 
     settings_menu.addSection("General")
     settings_menu.addAction(
@@ -192,7 +192,18 @@ def create_settings_menu(parent_button):
     return menu
 
 
-def create_tool_button(icon=None, text="", tooltip_template="", description="", command=None, shortcuts=None, shortcut_variants=None, p=None):
+def create_tool_button(
+    icon=None,
+    text="",
+    tooltip_template="",
+    description="",
+    command=None,
+    shortcuts=None,
+    shortcut_variants=None,
+    status_title=None,
+    status_description=None,
+    p=None,
+):
     """Helper to create a QFlatToolButton with our tooltip system"""
     btn = cw.create_tool_button_from_data(
         {
@@ -203,6 +214,8 @@ def create_tool_button(icon=None, text="", tooltip_template="", description="", 
             "callback": command,
             "shortcuts": shortcuts,
             "shortcut_variants": shortcut_variants,
+            "status_title": status_title,
+            "status_description": status_description,
         }
     )
     if p:
@@ -220,6 +233,8 @@ def create_toolbox_button(tool_id, p=None, **overrides):
         command=tool_data.get("callback"),
         shortcuts=tool_data.get("shortcuts"),
         shortcut_variants=tool_data.get("shortcut_variants"),
+        status_title=tool_data.get("status_title"),
+        status_description=tool_data.get("status_description"),
         p=p,
     )
 
@@ -389,9 +404,9 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     )
     add_mode_sliders(
         sliders.TANGENT_MODES,
-        "graph_tangent_mode",
+        "tangent_mode",
         "tangent",
-        UI_COLORS.orange.hex,
+        "#ea7760",
         sliders.execute_tangent_blend,
         sliders.stop_dragging,
         default_modes=["blend_best_guess"],
@@ -416,13 +431,46 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     btn_reset = create_toolbox_button("graph_reset")
     sec.addWidget(btn_reset, "Reset", "reset")
 
-    # ________________ Cycle / Bouncy ___________________#
-    sec = new_section()
-    btn_cycle = create_toolbox_button("graph_cycle_matcher")
-    sec.addWidget(btn_cycle, "Cycle Matcher", "cycle")
+    btn_reset_translations = create_toolbox_button("graph_reset_translations")
+    sec.addWidget(btn_reset_translations, "Reset Translations", "reset_translations", default_visible=False)
 
-    btn_bouncy = create_toolbox_button("graph_bouncy")
-    sec.addWidget(btn_bouncy, "Bouncy", "bouncy")
+    btn_reset_rotations = create_toolbox_button("graph_reset_rotations")
+    sec.addWidget(btn_reset_rotations, "Reset Rotations", "reset_rotations", default_visible=False)
+
+    btn_reset_scales = create_toolbox_button("graph_reset_scales")
+    sec.addWidget(btn_reset_scales, "Reset Scales", "reset_scales", default_visible=False)
+
+    btn_reset_trs = create_toolbox_button("graph_reset_trs")
+    sec.addWidget(btn_reset_trs, "Reset Translation Rotation Scale", "reset_translation_rotation_scale", default_visible=False)
+
+    # _________________  Tangents  ____________________#
+    sec = new_section(color=11)
+    btn_cycle = create_toolbox_button("tangent_cycle_matcher")
+    sec.addWidget(btn_cycle, "Cycle Matcher", "cycle", default_visible=False)
+
+    btn_bouncy = create_toolbox_button("tangent_bouncy")
+    sec.addWidget(btn_bouncy, "Bouncy Tangent", "bouncy")
+
+    btn_tangent_auto = create_toolbox_button("tangent_auto")
+    sec.addWidget(btn_tangent_auto, "Auto Tangent", "tangent_auto")
+
+    btn_tangent_spline = create_toolbox_button("tangent_spline")
+    sec.addWidget(btn_tangent_spline, "Spline Tangent", "tangent_spline")
+
+    btn_tangent_clamped = create_toolbox_button("tangent_clamped")
+    sec.addWidget(btn_tangent_clamped, "Clamped Tangent", "tangent_clamped", default_visible=False)
+
+    btn_tangent_linear = create_toolbox_button("tangent_linear")
+    sec.addWidget(btn_tangent_linear, "Linear Tangent", "tangent_linear")
+
+    btn_tangent_flat = create_toolbox_button("tangent_flat")
+    sec.addWidget(btn_tangent_flat, "Flat Tangent", "tangent_flat", default_visible=False)
+
+    btn_tangent_step = create_toolbox_button("tangent_step")
+    sec.addWidget(btn_tangent_step, "Step Tangent", "tangent_step")
+
+    btn_tangent_plateau = create_toolbox_button("tangent_plateau")
+    sec.addWidget(btn_tangent_plateau, "Plateau Tangent", "tangent_plateau", default_visible=False)
 
     # _________________  Opacity Slider  ____________________#
 
@@ -447,7 +495,11 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     # ________________ System/Core Section ___________________#
     sec = new_section(hiddeable=False)
 
-    settings_btn = create_tool_button(icon=media.settings_image, description="Access Graph Editor toolbar preferences, and view credits.")
+    settings_btn = create_tool_button(
+        icon=media.settings_image,
+        description="Access Graph Editor toolbar preferences, and view credits.",
+        status_title="Settings",
+    )
     sec.addWidget(settings_btn, "Settings", "settings")
 
     settings_menu = create_settings_menu(settings_btn)

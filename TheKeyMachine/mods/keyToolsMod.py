@@ -328,17 +328,6 @@ def find_all_roots_in_selection():
 # --------------------------------------------------- LINK OBJECTS -----------------------------------------------------
 
 
-def mod_link_objects(*args):
-    # Get the current state of the modifiers
-    mods = runtime.get_modifier_mask()
-    shift_pressed = bool(mods & 1)
-
-    if shift_pressed:
-        paste_link()
-    else:
-        copy_link()
-
-
 # Variables globales
 relative_data = {}
 
@@ -471,15 +460,16 @@ def paste_link_callback():
             cmds.warning(f"Could not save relative matrix for {follow_obj}")
 
 
-attribute_callback_id = None
-time_callback_id = None
 process_callback = False
+LINK_OBJECTS_RUNTIME_KEY = "link_objects_auto_link"
 
 
 def add_link_obj_callbacks(*args):
-    global relative_data, attribute_callback_id, time_callback_id, eval_callback_id, process_callback
+    global relative_data, process_callback
 
     process_callback = True
+    manager = runtime.get_runtime_manager()
+    manager.disconnect_callbacks(LINK_OBJECTS_RUNTIME_KEY)
 
     # Obtén el nombre del objeto principal desde relative_data
     main_obj_name = relative_data.get("main_obj")
@@ -487,16 +477,12 @@ def add_link_obj_callbacks(*args):
         cmds.warning("Relative data object not found")
         return
 
-    # Obtén el MObject del objeto principal
-    selection_list = om.MSelectionList()
-    selection_list.add(main_obj_name)
-    main_obj_mobject = selection_list.getDependNode(0)
+    attribute_cb = manager.add_node_attribute_changed_callback(main_obj_name, attribute_callback_function, key=LINK_OBJECTS_RUNTIME_KEY)
+    time_cb = manager.connect_signal(manager.time_changed, time_callback_function, key=LINK_OBJECTS_RUNTIME_KEY, unique=False)
 
-    # Registra el callback de atributo
-    attribute_callback_id = om.MNodeMessage.addAttributeChangedCallback(main_obj_mobject, attribute_callback_function)
-
-    # Registra el callback de cambio de tiempo
-    time_callback_id = om.MEventMessage.addEventCallback("timeChanged", time_callback_function)
+    if attribute_cb is None or not time_cb:
+        manager.disconnect_callbacks(LINK_OBJECTS_RUNTIME_KEY)
+        cmds.warning("Could not register link object callbacks")
 
 
 def attribute_callback_function(msg, plug, otherPlug, clientData):
@@ -521,17 +507,8 @@ def time_callback_function(clientData):
 
 
 def remove_link_obj_callbacks(*args):
-    global attribute_callback_id, time_callback_id
-
     try:
-        if attribute_callback_id:
-            om.MMessage.removeCallback(attribute_callback_id)
-            attribute_callback_id = None
-
-        if time_callback_id:
-            om.MMessage.removeCallback(time_callback_id)
-            time_callback_id = None
-
+        runtime.get_runtime_manager().disconnect_callbacks(LINK_OBJECTS_RUNTIME_KEY)
     except Exception as e:
         import TheKeyMachine.mods.reportMod as report
 
@@ -2001,15 +1978,28 @@ def remove_default_values_for_selected_object(*args):
     util.make_inViewMessage("Default values removed")
 
 
-def reset_object_values(reset_translations=False, reset_rotations=False):
+def reset_object_values(reset_translations=False, reset_rotations=False, reset_scales=False):
+    reset_trs = reset_translations and reset_rotations and reset_scales
+    if reset_trs:
+        title = "Reset Translation Rotation Scale"
+        tooltip_template = helper.reset_trs_tooltip_text
+    elif reset_scales:
+        title = "Reset Scales"
+        tooltip_template = helper.reset_scales_tooltip_text
+    elif reset_rotations:
+        title = "Reset Rotations"
+        tooltip_template = helper.reset_rotations_tooltip_text
+    elif reset_translations:
+        title = "Reset Translations"
+        tooltip_template = helper.reset_translations_tooltip_text
+    else:
+        title = None
+        tooltip_template = helper.reset_values_tooltip_text
+
     toolCommon.open_undo_chunk(
         tool_id="reset_objects_mods",
-        title="Reset Rotations" if reset_rotations else "Reset Translations" if reset_translations else None,
-        tooltip_template=helper.reset_rotations_tooltip_text
-        if reset_rotations
-        else helper.reset_translations_tooltip_text
-        if reset_translations
-        else helper.reset_values_tooltip_text,
+        title=title,
+        tooltip_template=tooltip_template,
     )
     tint_session = None
     selected_objects = []
@@ -2041,6 +2031,16 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
                     continue
                 if reset_rotations and not attr.startswith("rotate"):
                     continue
+                if reset_scales and not attr.startswith("scale"):
+                    continue
+                if not any((reset_translations, reset_rotations, reset_scales)):
+                    pass
+                elif not (
+                    (reset_translations and attr.startswith("translate"))
+                    or (reset_rotations and attr.startswith("rotate"))
+                    or (reset_scales and attr.startswith("scale"))
+                ):
+                    continue
                 reset_value = _get_reset_value_for_attribute(obj, attr, data)
                 if reset_value is None:
                     continue
@@ -2057,6 +2057,14 @@ def reset_object_values(reset_translations=False, reset_rotations=False):
             if reset_translations and not attr.startswith("translate"):
                 continue
             if reset_rotations and not attr.startswith("rotate"):
+                continue
+            if reset_scales and not attr.startswith("scale"):
+                continue
+            if any((reset_translations, reset_rotations, reset_scales)) and not (
+                (reset_translations and attr.startswith("translate"))
+                or (reset_rotations and attr.startswith("rotate"))
+                or (reset_scales and attr.startswith("scale"))
+            ):
                 continue
 
             try:
@@ -3240,7 +3248,7 @@ def match_curve_cycle(*args):
         cmds.keyTangent(curve, time=(lastKeyTime,), edit=True, inAngle=firstInAngle, outAngle=firstOutAngle)
 
 
-# Bouncy tangets
+# Bouncy Tangent tangets
 
 
 def calculateTangentAngle(curve, time1, value1, time2, value2):
@@ -3252,34 +3260,129 @@ def calculateTangentAngle(curve, time1, value1, time2, value2):
     return angle_degrees
 
 
+def _collect_bouncy_target_curves(target_info):
+    curves = []
+    seen = set()
+
+    for curve in target_info.get("selected_curves") or []:
+        if curve and curve not in seen:
+            seen.add(curve)
+            curves.append(curve)
+
+    if curves:
+        return curves
+
+    for plug in target_info.get("target_plugs") or []:
+        plug_curves = cmds.listConnections(plug, source=True, destination=False, type="animCurve") or []
+        for curve in plug_curves:
+            if curve and curve not in seen:
+                seen.add(curve)
+                curves.append(curve)
+
+    if curves:
+        return curves
+
+    target_objects = target_info.get("target_objects") or []
+    selected_channels = target_info.get("selected_channels") or None
+    time_context = target_info.get("time_context")
+    query_kwargs = {"query": True, "name": True}
+    if selected_channels:
+        query_kwargs["attribute"] = selected_channels
+    if time_context and time_context.mode == "time_slider_range":
+        query_kwargs["time"] = time_context.timerange
+
+    for obj in target_objects:
+        obj_curves = cmds.keyframe(obj, **query_kwargs) or []
+        for curve in obj_curves:
+            if curve and curve not in seen:
+                seen.add(curve)
+                curves.append(curve)
+
+    return curves
+
+
+def _collect_bouncy_target_keyframes(target_info):
+    selected_keyframes = target_info.get("selected_keyframes") or []
+    if selected_keyframes:
+        return [(curve, float(frame)) for curve, frame in selected_keyframes]
+
+    time_context = target_info.get("time_context")
+    curves = _collect_bouncy_target_curves(target_info)
+    targets = []
+    seen = set()
+
+    if not time_context:
+        return targets
+
+    for curve in curves:
+        if time_context.mode == "time_slider_range":
+            key_times = cmds.keyframe(curve, query=True, time=time_context.timerange, timeChange=True) or []
+        else:
+            current_frame = time_context.timerange[0]
+            key_times = cmds.keyframe(curve, query=True, time=(current_frame, current_frame), timeChange=True) or []
+
+        for frame in key_times:
+            item = (curve, float(frame))
+            if item in seen:
+                continue
+            seen.add(item)
+            targets.append(item)
+
+    return targets
+
+
 def bouncy_tangets(*args, angle_adjustment_factor=1.3):  # Ajuste de ángulo
-    selectedKeyframes = get_graph_editor_selected_keyframes()
+    target_info = resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=False)
+    target_keyframes = _collect_bouncy_target_keyframes(target_info)
 
-    if not selectedKeyframes:
-        return util.make_inViewMessage("Select a keyframe in Graph Editor")
+    if not target_keyframes:
+        return util.make_inViewMessage("No animation keys available for bouncy tangents.")
 
-    for curve, time in selectedKeyframes:
-        # Obtener los tiempos y valores de los keyframes
-        keyTimes = cmds.keyframe(curve, query=True, timeChange=True)
-        keyValues = cmds.keyframe(curve, query=True, valueChange=True)
+    time_context = target_info.get("time_context")
+    if target_info.get("selected_keyframes"):
+        frames = sorted({int(frame) for _curve, frame in target_keyframes})
+        tint_range = (frames[0], frames[-1])
+    else:
+        tint_range = time_context.timerange if time_context else None
 
-        # Encontrar índice del keyframe actual
-        currentIndex = keyTimes.index(time)
+    tint_session = _begin_timeline_tint(tint_range, "bouncy_tangent_range") if tint_range else None
+    try:
+        for curve, time in target_keyframes:
+            keyTimes = cmds.keyframe(curve, query=True, timeChange=True) or []
+            keyValues = cmds.keyframe(curve, query=True, valueChange=True) or []
+            if not keyTimes or not keyValues:
+                continue
 
-        # Calcular ángulo para la tangente de entrada
-        if currentIndex > 0:
-            inAngle = calculateTangentAngle(curve, keyTimes[currentIndex - 1], keyValues[currentIndex - 1], time, keyValues[currentIndex])
-        else:
-            inAngle = 0  # No hay keyframe anterior
+            currentIndex = None
+            for index, key_time in enumerate(keyTimes):
+                if abs(float(key_time) - float(time)) < 1e-4:
+                    currentIndex = index
+                    break
+            if currentIndex is None:
+                continue
 
-        # Calcular ángulo para la tangente de salida
-        if currentIndex < len(keyTimes) - 1:
-            outAngle = calculateTangentAngle(curve, time, keyValues[currentIndex], keyTimes[currentIndex + 1], keyValues[currentIndex + 1])
-        else:
-            outAngle = 0  # No hay keyframe posterior
+            if currentIndex > 0:
+                inAngle = calculateTangentAngle(curve, keyTimes[currentIndex - 1], keyValues[currentIndex - 1], time, keyValues[currentIndex])
+            else:
+                inAngle = 0
 
-        adjusted_in_angle = max(-85, min(85, inAngle * angle_adjustment_factor))
-        adjusted_out_angle = max(-85, min(85, outAngle * angle_adjustment_factor))
+            if currentIndex < len(keyTimes) - 1:
+                outAngle = calculateTangentAngle(curve, time, keyValues[currentIndex], keyTimes[currentIndex + 1], keyValues[currentIndex + 1])
+            else:
+                outAngle = 0
 
-        # Ajustar las tangentes con el factor de ajuste de ángulo
-        cmds.keyTangent(curve, time=(time,), edit=True, lock=False, absolute=True, inAngle=adjusted_in_angle, outAngle=adjusted_out_angle)
+            adjusted_in_angle = max(-85, min(85, inAngle * angle_adjustment_factor))
+            adjusted_out_angle = max(-85, min(85, outAngle * angle_adjustment_factor))
+
+            cmds.keyTangent(
+                curve,
+                time=(time, time),
+                edit=True,
+                lock=False,
+                absolute=True,
+                inAngle=adjusted_in_angle,
+                outAngle=adjusted_out_angle,
+            )
+    finally:
+        if tint_session:
+            tint_session.finish()

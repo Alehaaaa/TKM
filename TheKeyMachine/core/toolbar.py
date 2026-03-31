@@ -78,6 +78,7 @@ import TheKeyMachine.core.customGraph as cg  # type: ignore
 import TheKeyMachine.mods.updater as updater  # type: ignore
 import TheKeyMachine.core.toolbox as toolbox  # type: ignore
 import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
+import TheKeyMachine.core.trigger as trigger  # type: ignore
 import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
@@ -591,7 +592,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def create_shelf_icon(self, *args):
         button_name = "TheKeyMachine"
         command = "import TheKeyMachine;TheKeyMachine.toggle()"
-        icon_path = media.tool_icon
+        icon_path = media.asset_path("tool_icon")
         icon_path = os.path.normpath(icon_path)
         current_shelf_tab = cmds.tabLayout("ShelfLayout", query=True, selectTab=True)
         cmds.shelfButton(parent=current_shelf_tab, image=icon_path, command=command, label=button_name)
@@ -1722,7 +1723,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             [
                 toolbox.get_tool(
                     "move_left",
-                    callback=lambda: keyTools.move_keyframes_in_range(-self.move_keyframes_intField.value()),
+                    callback=trigger.make_command_callback("nudge_left"),
                     shortcut_variants=[
                         {
                             "mask": 1,
@@ -1730,7 +1731,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                             "icon_path": media.remove_inbetween_image,
                             "tooltip_template": "Remove Inbetween",
                             "description": "Remove inbetweens using the current nudge step value.",
-                            "callback": lambda: keyTools.remove_inbetween(self.move_keyframes_intField.value()),
+                            "callback": trigger.make_command_callback("remove_inbetween"),
                         }
                     ],
                     default=True,
@@ -1739,7 +1740,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "key": "nudge_remove_inbetween",
                     "label": "Remove Inbetween",
                     "icon_path": media.remove_inbetween_image,
-                    "callback": lambda: keyTools.remove_inbetween(self.move_keyframes_intField.value()),
+                    "callback": trigger.make_command_callback("remove_inbetween"),
                 },
             ],
         )
@@ -1748,7 +1749,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             [
                 toolbox.get_tool(
                     "move_right",
-                    callback=lambda: keyTools.move_keyframes_in_range(self.move_keyframes_intField.value()),
+                    callback=trigger.make_command_callback("nudge_right"),
                     shortcut_variants=[
                         {
                             "mask": 1,
@@ -1756,7 +1757,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                             "icon_path": media.insert_inbetween_image,
                             "tooltip_template": "Insert Inbetween",
                             "description": "Insert inbetweens using the current nudge step value.",
-                            "callback": lambda: keyTools.insert_inbetween(self.move_keyframes_intField.value()),
+                            "callback": trigger.make_command_callback("insert_inbetween"),
                         }
                     ],
                     default=True,
@@ -1765,7 +1766,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "key": "nudge_insert_inbetween",
                     "label": "Insert Inbetween",
                     "icon_path": media.insert_inbetween_image,
-                    "callback": lambda: keyTools.insert_inbetween(self.move_keyframes_intField.value()),
+                    "callback": trigger.make_command_callback("insert_inbetween"),
                 },
             ],
         )
@@ -1782,7 +1783,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         )
 
         clear_btn = cw.QFlatToolButton(text="x")
-        clear_btn.clicked.connect(lambda *_args, w=clear_btn: w.triggerToolCallback(keyTools.clear_selected_keys))
+        clear_btn.clicked.connect(
+            lambda *_args, w=clear_btn: w.triggerToolCallback(
+                trigger.make_command_callback("clear_selected_keys", keyTools.clear_selected_keys)
+            )
+        )
         sec.addWidget(
             clear_btn,
             "Clear Selection",
@@ -1791,7 +1796,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             tooltip_template=helper.clear_selected_keys_widget_tooltip_text,
         )
         select_scene_btn = cw.QFlatToolButton(text="s")
-        select_scene_btn.clicked.connect(lambda *_args, w=select_scene_btn: w.triggerToolCallback(keyTools.select_all_animation_curves))
+        select_scene_btn.clicked.connect(
+            lambda *_args, w=select_scene_btn: w.triggerToolCallback(
+                trigger.make_command_callback("select_all_animation_curves", keyTools.select_all_animation_curves)
+            )
+        )
         sec.addWidget(
             select_scene_btn,
             "Select Scene Anim",
@@ -1890,10 +1899,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # blend_to_key_right_b_qt.clicked.connect(lambda: blend_to_key_right_b_qt.setText(str(int(cmds.currentTime(q=True)))))
 
         def blend_to_frame_with_button_values(percentage):
-            # Temporary disable: frame buttons are commented out, so defer to tool defaults.
-            left_frame = None
-            right_frame = None
-            keyTools.blend_to_frame(percentage, left_frame, right_frame)
+            trigger.execute_slider("tween", "blend_to_frame", percentage)
 
         def add_mode_sliders(modes_list, prefix, color, change_func, drop_func, default_modes=None):
             # Create a new section for each slider color/type
@@ -1936,7 +1942,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     max=100,
                     text=icon,
                     color=color,
-                    dragCommand=command or (lambda v, k=key: change_func(k, v)),
+                    dragCommand=command or (lambda v, k=key, p=prefix: trigger.execute_slider(p, k, v)),
                     dropCommand=drop_func,
                     tooltipTitle=label,
                     tooltipDescription=desc,
@@ -1963,7 +1969,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                             # Temporary disable: frame capture buttons for Blend to Frame sliders.
                             # blend_to_key_left_b_qt.hide()
                             # blend_to_key_right_b_qt.hide()
-                            slider_instance.setDragCommand(lambda v, nk=new_mode: change_func(nk, v))
+                            slider_instance.setDragCommand(lambda v, nk=new_mode, p=prefix: trigger.execute_slider(p, nk, v))
 
                         if not temporary:
                             slider_instance.startFlash()
@@ -2217,7 +2223,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(
             [
                 toolbox.get_tool("copy_pose", default=True),
-                toolbox.get_tool("cp_paste_pose"),
+                toolbox.get_tool("paste_pose_direct"),
                 "separator",
                 {
                     "key": "pose_help",
@@ -2235,10 +2241,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(
             [
                 toolbox.get_tool("copy_animation", key="cp_copy_anim", default=True),
-                toolbox.get_tool("cp_paste_anim"),
-                toolbox.get_tool("cp_paste_ins"),
-                toolbox.get_tool("cp_paste_opp"),
-                toolbox.get_tool("cp_paste_to"),
+                toolbox.get_tool("paste_animation_direct"),
+                toolbox.get_tool("paste_insert_animation_direct"),
+                toolbox.get_tool("paste_opposite_animation_direct"),
+                toolbox.get_tool("paste_animation_to"),
                 "separator",
                 {
                     "key": "cp_help",
@@ -2258,7 +2264,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         animation_offset_button_widget.setObjectName("anim_offset_button")
         animation_offset_button_widget.setCheckable(True)
         animation_offset_button_widget.setChecked(bool(self.toggleAnimOffsetButtonState))
-        animation_offset_button_widget.clicked.connect(self.toggleAnimOffsetButton)
+        animation_offset_button_widget.clicked.connect(lambda *_args: trigger.invoke("animation_offset_toggle"))
         self.animation_offset_button_widget = animation_offset_button_widget
         sec.addWidget(
             animation_offset_button_widget,
@@ -2291,7 +2297,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         micro_move_button_widget.setObjectName("micro_move_button")
         micro_move_button_widget.setCheckable(True)
         micro_move_button_widget.setChecked(self.micro_move_controller.is_enabled())
-        micro_move_button_widget.clicked.connect(self.toggle_micro_move_button)
+        micro_move_button_widget.clicked.connect(lambda *_args: trigger.invoke("micro_move_toggle"))
         sec.addWidget(
             micro_move_button_widget,
             micro_move_tool.get("label", "Micro Move"),
@@ -2506,12 +2512,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "custom_graph",
                     checkable=True,
                     set_checked=lambda: settings.get_setting("graph_toolbar_enabled", True),
-                    callback=lambda state: report.safe_execute(
-                        graphToolbarApi.set_graph_toolbar_enabled,
-                        bool(state),
-                        apply=True,
-                        context="graph toolbar toggle",
-                    ),
+                    callback=trigger.make_command_callback("custom_graph_toggle"),
                     default_visible=False,
                 )
             ]
@@ -2738,7 +2739,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         toolbar_menu.addMenu(settings_menu, description="Tool configuration, hotkeys and UI preferences.")
         settings_menu.addSection("Shelf icon")
         settings_menu.addAction(
-            QtGui.QIcon(media.tool_icon),
+            QtGui.QIcon(media.asset_path("tool_icon")),
             "Add Toggle Button To Shelf",
             self.create_shelf_icon,
             description="Creates a shelf button to show/hide this toolbar.",
@@ -2794,7 +2795,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             action.triggered.connect(lambda align_name=align_name, align_value=align_value: update_toolbar_icon_alignment(align_name, align_value))
 
         settings_menu.addSection("Hotkeys")
-        settings_menu.addAction("Add TheKeyMachine Hotkeys", hotkeys.create_TheKeyMachine_hotkeys, description="Setup Maya hotkeys for TKM tools.")
+        settings_menu.addAction("Hotkeys...", hotkeys.show_hotkeys_window, description="Manage trigger hotkeys for TKM tools.")
 
         settings_menu.addSection("General")
         settings_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")

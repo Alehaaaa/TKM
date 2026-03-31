@@ -140,6 +140,7 @@ class RuntimeManager(QtCore.QObject):
         self._started = False
         self._om_callbacks: Dict[str, List[int]] = {}
         self._scriptjobs: Dict[str, List[int]] = {}
+        self._signal_connections: Dict[str, List[tuple]] = {}
         self._managed_widgets: Dict[str, QtWidgets.QWidget] = {}
 
         self._graph_editor_visible = False
@@ -244,6 +245,72 @@ class RuntimeManager(QtCore.QObject):
 
         self._track_scriptjob(key, int(job_id))
         return int(job_id)
+
+    def add_node_attribute_changed_callback(
+        self,
+        node: Any,
+        handler: Callable[..., Any],
+        *,
+        key: str,
+        client_data: Any = None,
+    ) -> Optional[int]:
+        if not om:
+            return None
+
+        try:
+            if isinstance(node, om.MObject):
+                mobject = node
+            else:
+                selection_list = om.MSelectionList()
+                selection_list.add(str(node))
+                mobject = selection_list.getDependNode(0)
+        except Exception:
+            return None
+
+        def _wrapped(*args):
+            try:
+                handler(*args)
+            finally:
+                self._emit(key)
+
+        try:
+            cb_id = om.MNodeMessage.addAttributeChangedCallback(mobject, _wrapped, client_data)
+        except Exception:
+            return None
+
+        self._track_om(key, int(cb_id))
+        return int(cb_id)
+
+    def connect_signal(self, signal: Any, handler: Callable[..., Any], *, key: str, unique: bool = True) -> bool:
+        if signal is None or handler is None:
+            return False
+        if unique:
+            self.disconnect_callbacks(key)
+        try:
+            signal.connect(handler)
+        except Exception:
+            return False
+        self._signal_connections.setdefault(key, []).append((signal, handler))
+        return True
+
+    def disconnect_callbacks(self, key: str) -> None:
+        for cb_id in list(self._om_callbacks.get(key, []) or []):
+            self._remove_om_callback_id(cb_id)
+
+        for job_id in list(self._scriptjobs.get(key, []) or []):
+            try:
+                cmds.scriptJob(kill=int(job_id), force=True)
+            except Exception:
+                pass
+        self._scriptjobs.pop(key, None)
+
+        for signal, handler in self._signal_connections.pop(key, []) or []:
+            try:
+                signal.disconnect(handler)
+            except Exception:
+                pass
+
+        self._persist_state()
 
     def register_managed_widget(self, widget, key: Optional[str] = None, owner=None):
         if widget is None:
@@ -585,6 +652,14 @@ class RuntimeManager(QtCore.QObject):
             except Exception:
                 pass
         self._scriptjobs.clear()
+
+        for connections in self._signal_connections.values():
+            for signal, handler in connections:
+                try:
+                    signal.disconnect(handler)
+                except Exception:
+                    pass
+        self._signal_connections.clear()
 
         self._persist_state()
 

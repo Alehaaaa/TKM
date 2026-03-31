@@ -338,7 +338,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
 
         # Update the icon
         if anchor_widget and hasattr(anchor_widget, "setIcon"):
-            anchor_widget.setIcon(QtGui.QIcon(media.settings_update_image))
+            anchor_widget.setIcon(QtGui.QIcon(media.asset_path("settings_update_image")))
 
         # If we are skipping updates and this isn't a forced check, don't do anything else
         if not force and settings.get_setting("skip_updates", False):
@@ -354,10 +354,10 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 anchor_widget,
                 title="Update available",
                 template=template,
-                icon=media.update_image,
+                icon=media.asset_path("update_image"),
                 buttons=[
-                    QFlatTooltipConfirm.CustomButton("Install", positive=True, icon=media.install_image),
-                    QFlatTooltipConfirm.CustomButton("Skip", positive=True, icon=media.skip_image),
+                    QFlatTooltipConfirm.CustomButton("Install", positive=True, icon=media.asset_path("install_image")),
+                    QFlatTooltipConfirm.CustomButton("Skip", positive=True, icon=media.asset_path("skip_image")),
                     QFlatTooltipConfirm.No,
                 ],
                 highlight="Install",
@@ -368,10 +368,10 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 "Update available",
                 title=f"Version {latest_version.strip()} available",
                 message="A new version of TheKeyMachine is available to download and install.",
-                icon=media.update_image,
+                icon=media.asset_path("update_image"),
                 buttons=[
-                    QFlatConfirmDialog.CustomButton("Install", positive=True, icon=media.install_image),
-                    QFlatConfirmDialog.CustomButton("Skip", positive=True, icon=media.skip_image),
+                    QFlatConfirmDialog.CustomButton("Install", positive=True, icon=media.asset_path("install_image")),
+                    QFlatConfirmDialog.CustomButton("Skip", positive=True, icon=media.asset_path("skip_image")),
                     QFlatConfirmDialog.No,
                 ],
                 highlight="Install",
@@ -395,7 +395,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                         "Updated",
                         title=f"Installed TheKeyMachine {latest_version.strip()}",
                         message="You have successfully updated the tool!<br><br>\nPlease restart Maya if you experience any issues.",
-                        icon=media.getImage("success.svg"),
+                        icon=media.asset_path("success_image"),
                         closeButton=True,
                     )
 

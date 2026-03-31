@@ -168,16 +168,34 @@ spline_tangent_tooltip_text = _tool_tooltip(
     media.spline_tangent_image,
 )
 
+clamped_tangent_tooltip_text = _tool_tooltip(
+    "Clamped Tangent",
+    ["Set the tangents of the selected keyframes to Clamped."],
+    media.clamped_tangent_image,
+)
+
 linear_tangent_tooltip_text = _tool_tooltip(
     "Linear Tangent",
     ["Set the tangents of the selected keyframes to Linear."],
     media.linear_tangent_image,
 )
 
+flat_tangent_tooltip_text = _tool_tooltip(
+    "Flat Tangent",
+    ["Set the tangents of the selected keyframes to Flat."],
+    media.flat_tangent_image,
+)
+
 step_tangent_tooltip_text = _tool_tooltip(
     "Step Tangent",
     ["Set the tangents of the selected keyframes to Stepped."],
     media.step_tangent_image,
+)
+
+plateau_tangent_tooltip_text = _tool_tooltip(
+    "Plateau Tangent",
+    ["Set the tangents of the selected keyframes to Plateau."],
+    media.plateau_tangent_image,
 )
 
 
@@ -345,7 +363,7 @@ reset_values_tooltip_text = _tool_tooltip(
         "Reset objects or attributes to their default values.",
         "Select channels in the Channel Box to reset only specific attributes.",
     ],
-    media.reset_animation_image,
+    media.asset_path("reset_animation_image"),
 )
 
 delete_animation_tooltip_text = _tool_tooltip(
@@ -552,7 +570,7 @@ match_keys_tooltip_text = _tool_tooltip(
 flip_tooltip_text = _tool_tooltip(
     "Flip",
     ["Invert the selected curve values vertically."],
-    media.flip_curve_image if hasattr(media, "flip_curve_image") else None,
+    media.asset_path("flip_curve_image"),
 )
 
 snap_tooltip_text = _tool_tooltip(
@@ -604,13 +622,25 @@ tracer_remove_tooltip_text = _tool_tooltip(
 reset_translations_tooltip_text = _tool_tooltip(
     "Reset Translations",
     ["Reset only translation values on the current selection."],
-    media.reset_animation_image,
+    media.asset_path("reset_animation_image"),
 )
 
 reset_rotations_tooltip_text = _tool_tooltip(
     "Reset Rotations",
     ["Reset only rotation values on the current selection."],
-    media.reset_animation_image,
+    media.asset_path("reset_animation_image"),
+)
+
+reset_scales_tooltip_text = _tool_tooltip(
+    "Reset Scales",
+    ["Reset only scale values on the current selection."],
+    media.asset_path("reset_animation_image"),
+)
+
+reset_trs_tooltip_text = _tool_tooltip(
+    "Reset Translation Rotation Scale",
+    ["Reset translation, rotation, and scale values on the current selection."],
+    media.asset_path("reset_animation_image"),
 )
 
 quick_export_selection_sets_tooltip_text = _tool_tooltip(
@@ -711,19 +741,19 @@ graph_filter_tooltip_text = _tool_tooltip(
 graph_reset_tooltip_text = _tool_tooltip(
     "Reset Curves",
     ["Reset the selected curves to their default values."],
-    media.reset_animation_image,
+    media.asset_path("reset_animation_image"),
 )
 
-graph_cycle_matcher_tooltip_text = _tool_tooltip(
+tangent_cycle_matcher_tooltip_text = _tool_tooltip(
     "Cycle Matcher",
     ["Match the selected curve ends for cleaner cyclic animation."],
     media.match_curve_cycle_image,
 )
 
-graph_bouncy_tooltip_text = _tool_tooltip(
-    "Bouncy",
+tangent_bouncy_tooltip_text = _tool_tooltip(
+    "Bouncy Tangent",
     ["Set the selected curves to a bouncy tangent style."],
-    media.bouncy_curve_image,
+    media.bouncy_tangent_image,
 )
 
 

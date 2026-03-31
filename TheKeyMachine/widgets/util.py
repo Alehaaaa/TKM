@@ -138,9 +138,9 @@ class ResetWithoutEmit:
 def make_inViewMessage(message, icon=None):
 
     if not icon:
-        icon = media.tool_icon
+        icon = media.asset_path("tool_icon")
     else:
-        icon = media.getImage(icon)
+        icon = media.asset_path(icon, media.getImage(icon))
     if not icon:
         icon = ""
 

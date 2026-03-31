@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from typing import Optional
+import os
 import importlib
 
 try:
-    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent
-    from PySide6.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup
+    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSize
+    from PySide6.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup, QIcon
     from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout
 except ImportError:
-    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent
-    from PySide2.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath
+    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSize
+    from PySide2.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QIcon
     from PySide2.QtWidgets import (
         QWidget,
         QHBoxLayout,
@@ -257,6 +258,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._handle_hover = False
         self._tooltip_title = ""
         self._tooltip_description = ""
+        self._icon_path = text if self._looks_like_icon_path(text) else None
 
         self._wheel_count = 0
         self._prev_wheel_direction = 0
@@ -307,6 +309,12 @@ class SliderHandle(cw.TooltipMixin, QSlider):
     def _update_self_tooltip(self, _v=None):
         title = self._tooltip_title or self._text
         self.setToolTipData(text=title, description=self._tooltip_description)
+
+    @staticmethod
+    def _looks_like_icon_path(value: str) -> bool:
+        if not value or not isinstance(value, str):
+            return False
+        return os.path.isabs(value) or os.path.splitext(value)[1].lower() in {".svg", ".png", ".jpg", ".jpeg", ".bmp", ".ico"}
 
     # --- public helpers ---------------------------------------------------------
     def handle_size(self) -> int:
@@ -500,41 +508,47 @@ QSlider::handle:horizontal {{
         hrect = self._handle_rect()
         p.setRenderHint(QPainter.Antialiasing)
 
-        # label text with thin outline
-        p.setFont(self._text_font)
-        fm = p.fontMetrics()
-        tw = fm.horizontalAdvance(self._text)
-        # Calculate baseline position to center text in hrect
-        tx = hrect.x() + (hrect.width() - tw) / 2.0
-        ty = hrect.y() + (hrect.height() + fm.capHeight()) / 2.0
-
-        path = QPainterPath()
-        path.addText(tx, ty, self._text_font, self._text)
-
-        # Draw thin outline (drawn first so it sits BEHIND the fill, growing only outwards)
-        p.setPen(QPen(QColor(UI_COLORS.dark_gray.hex), util.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        p.setBrush(Qt.NoBrush)
-        p.drawPath(path)
-
         base_color = QColor(self._color)
         if getattr(self, "_handle_hover", False) or bool(self._pressOffset):
             main_color = QColor(
                 min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
             )
-            glow_color = QColor(255, 255, 255, 40)
-            # draw silhouette glow by shifting path
-            p.setBrush(glow_color)
-            p.setPen(Qt.NoPen)
-            for dx, dy in [(-1, -1), (1, 1), (-1, 1), (1, -1), (0, -1), (0, 1), (-1, 0), (1, 0)]:
-                glow_path = path.translated(dx, dy)
-                p.drawPath(glow_path)
         else:
             main_color = base_color
 
-        # Draw fill (drawn ON TOP of the outline, covering the inner half of the stroke)
-        p.setPen(Qt.NoPen)
-        p.setBrush(main_color)
-        p.drawPath(path)
+        if self._icon_path:
+            icon_size = int(min(hrect.width(), hrect.height()) * 0.68)
+            qicon = QIcon(self._icon_path)
+            if not qicon.isNull():
+                pix = qicon.pixmap(QSize(icon_size, icon_size))
+                px = hrect.x() + (hrect.width() - pix.width()) // 2
+                py = hrect.y() + (hrect.height() - pix.height()) // 2
+                p.drawPixmap(px, py, pix)
+        else:
+            p.setFont(self._text_font)
+            fm = p.fontMetrics()
+            tw = fm.horizontalAdvance(self._text)
+            tx = hrect.x() + (hrect.width() - tw) / 2.0
+            ty = hrect.y() + (hrect.height() + fm.capHeight()) / 2.0
+
+            path = QPainterPath()
+            path.addText(tx, ty, self._text_font, self._text)
+
+            p.setPen(QPen(QColor(UI_COLORS.dark_gray.hex), util.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            p.setBrush(Qt.NoBrush)
+            p.drawPath(path)
+
+            if getattr(self, "_handle_hover", False) or bool(self._pressOffset):
+                glow_color = QColor(255, 255, 255, 40)
+                p.setBrush(glow_color)
+                p.setPen(Qt.NoPen)
+                for dx, dy in [(-1, -1), (1, 1), (-1, 1), (1, -1), (0, -1), (0, 1), (-1, 0), (1, 0)]:
+                    glow_path = path.translated(dx, dy)
+                    p.drawPath(glow_path)
+
+            p.setPen(Qt.NoPen)
+            p.setBrush(main_color)
+            p.drawPath(path)
 
         if not self._pressOffset:
             p.end()
@@ -812,6 +826,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     # --- public API -------------------------------------------------------------
     def setText(self, text: str):
         self._slider._text = text
+        self._slider._icon_path = text if self._slider._looks_like_icon_path(text) else None
         self._slider.update()
 
     def setColor(self, color: str):

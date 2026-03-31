@@ -76,7 +76,7 @@ orbit_actions = {
     "paste_animation": "keyTools.paste_animation",
     "paste_insert_animation": "keyTools.paste_insert_animation",
     "selectHierarchy": "bar.selectHierarchy",
-    "mod_link_objects": "keyTools.mod_link_objects",
+    "mod_link_objects": "keyTools.copy_link",
     "temp_pivot": "temp_pivot_action",
     "copy_pose": "keyTools.copy_pose",
     "paste_pose": "keyTools.paste_pose",
@@ -88,7 +88,7 @@ orbit_action_icons = {
     "bar.isolate_master": media.isolate_image,
     "bar.align_selected_objects": media.align_menu_image,
     "bar.mod_tracer": media.tracer_image,
-    "keyTools.reset_objects_mods": media.reset_animation_image,
+    "keyTools.reset_objects_mods": media.asset_path("reset_animation_image"),
     "bar.deleteAnimation": media.delete_animation_image,
     "keyTools.selectOpposite": media.opposite_select_image,
     "keyTools.copyOpposite": media.opposite_copy_image,
@@ -97,7 +97,7 @@ orbit_action_icons = {
     "keyTools.paste_animation": media.paste_animation_image,
     "keyTools.paste_insert_animation": media.paste_insert_animation_image,
     "bar.selectHierarchy": media.select_hierarchy_image,
-    "keyTools.mod_link_objects": media.link_objects_image,
+    "keyTools.copy_link": media.link_objects_image,
     "temp_pivot_action": media.temp_pivot_image,
     "keyTools.copy_pose": media.copy_pose_image,
     "keyTools.paste_pose": media.paste_pose_image,
@@ -180,7 +180,7 @@ def execute_action(action_identifier):
         elif action_identifier == "selectHierarchy":
             bar.selectHierarchy()
         elif action_identifier == "mod_link_objects":
-            keyTools.mod_link_objects()
+            keyTools.copy_link()
         elif action_identifier == "temp_pivot":
             temp_pivot_action()
         elif action_identifier == "copy_worldspace_single_frame":

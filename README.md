@@ -98,6 +98,14 @@ This keeps major tool logic separated from the main toolbar assembly.
 
 ## Version
 
-Current version: `0.1.82`
+Current version: `0.1.83`
+
+### 0.1.83 Highlights
+
+- Added a centralized `TheKeyMachine.core.trigger` command layer for hotkeys, runtime commands, and scripted access.
+- Added a dedicated hotkeys manager UI grouped by tool sections, with trigger-backed command assignment and Maya hotkey conflict detection.
+- Expanded slider triggers to cover all button values, including `0%`.
+- Unified tangent tools and graph-toolbar reset tools, including reset translations, rotations, scales, and full translation/rotation/scale reset.
+- Improved timeline tint feedback for tangent and reset workflows.
 
 <img width="200px" src="./TheKeyMachine/data/img/install_example.png" />

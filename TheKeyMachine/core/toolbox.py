@@ -1,4 +1,5 @@
 from functools import partial
+import re
 
 try:
     from PySide6 import QtCore
@@ -10,6 +11,7 @@ import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.uiMod as ui
+import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 
 """
@@ -363,39 +365,76 @@ TOOL_DEFINITIONS = {
     "reset_objects_mods": {
         "key": "reset_objects_mods",
         "label": "Reset Values",
-        "icon_path": media.reset_animation_image,
+        "command": "reset_values",
+        "icon_path": media.asset_path("reset_animation_image"),
         "callback": keyTools.reset_objects_mods,
         "tooltip_template": helper.reset_values_tooltip_text,
         "shortcuts": [
-            {"icon": media.reset_animation_image, "label": "Reset Values", "keys": "Click"},
-            {"icon": media.reset_animation_image, "label": "Reset Translations", "keys": [QtCore.Qt.Key_Shift]},
-            {"icon": media.reset_animation_image, "label": "Reset Rotations", "keys": [QtCore.Qt.Key_Control]},
+            {"icon": media.asset_path("reset_animation_image"), "label": "Reset Values", "keys": "Click"},
+            {"icon": media.asset_path("reset_animation_image"), "label": "Reset Translations", "keys": [QtCore.Qt.Key_Shift]},
+            {"icon": media.asset_path("reset_animation_image"), "label": "Reset Rotations", "keys": [QtCore.Qt.Key_Control]},
+            {"icon": media.asset_path("reset_animation_image"), "label": "Reset Scales", "keys": [QtCore.Qt.Key_Alt]},
+            {"icon": media.asset_path("reset_animation_image"), "label": "Reset Translation Rotation Scale", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
         ],
         "shortcut_variants": [
             {
                 "mask": 1,
+                "command": "reset_translations",
                 "text": "RT",
-                "icon_path": media.reset_animation_image,
+                "icon_path": media.asset_path("reset_animation_image"),
                 "tooltip_template": helper.reset_translations_tooltip_text,
                 "description": "Reset only translation values for the selected objects.",
                 "callback": lambda: keyTools.reset_object_values(reset_translations=True),
             },
             {
                 "mask": 4,
+                "command": "reset_rotations",
                 "text": "RR",
-                "icon_path": media.reset_animation_image,
+                "icon_path": media.asset_path("reset_animation_image"),
                 "tooltip_template": helper.reset_rotations_tooltip_text,
                 "description": "Reset only rotation values for the selected objects.",
                 "callback": lambda: keyTools.reset_object_values(reset_rotations=True),
+            },
+            {
+                "mask": 8,
+                "command": "reset_scales",
+                "text": "RS",
+                "icon_path": media.asset_path("reset_animation_image"),
+                "tooltip_template": helper.reset_scales_tooltip_text,
+                "description": "Reset only scale values for the selected objects.",
+                "callback": lambda: keyTools.reset_object_values(reset_scales=True),
+            },
+            {
+                "mask": 5,
+                "command": "reset_trs",
+                "text": "RTRS",
+                "icon_path": media.asset_path("reset_animation_image"),
+                "tooltip_template": helper.reset_trs_tooltip_text,
+                "description": "Reset translation, rotation, and scale values for the selected objects.",
+                "callback": lambda: keyTools.reset_object_values(
+                    reset_translations=True,
+                    reset_rotations=True,
+                    reset_scales=True,
+                ),
             },
         ],
     },
     "deleteAnimation": {
         "key": "deleteAnimation",
         "label": "Delete Animation",
+        "command": "delete_animation",
         "icon_path": media.delete_animation_image,
         "callback": bar.mod_delete_animation,
         "tooltip_template": helper.delete_animation_tooltip_text,
+    },
+    "delete_all_animation": {
+        "key": "delete_all_animation",
+        "label": "Delete All Animation",
+        "command": "delete_all_animation",
+        "icon_path": media.delete_animation_image,
+        "callback": bar.mod_delete_animation,
+        "tooltip_template": helper.delete_animation_tooltip_text,
+        "description": "Delete animation across the full animation context.",
     },
     "select_rig_controls": {
         "key": "select_rig_controls",
@@ -703,7 +742,7 @@ TOOL_DEFINITIONS = {
         "key": "mod_link_objects",
         "label": "Copy/Paste Link",
         "icon_path": media.link_objects_image,
-        "callback": keyTools.mod_link_objects,
+        "callback": keyTools.copy_link,
         "tooltip_template": helper.link_objects_tooltip_text,
         "shortcuts": [
             {"icon": media.link_objects_copy_image, "label": "Copy Link Position", "keys": "Click"},
@@ -839,19 +878,19 @@ TOOL_DEFINITIONS = {
     "reset_set_defaults": {
         "key": "reset_set_defaults",
         "label": "Set Default Values For Selected",
-        "icon_path": media.reset_animation_image,
+        "icon_path": media.asset_path("reset_animation_image"),
         "callback": keyTools.save_default_values,
     },
     "reset_restore_defaults": {
         "key": "reset_restore_defaults",
         "label": "Restore Default Values For Selected",
-        "icon_path": media.reset_animation_image,
+        "icon_path": media.asset_path("reset_animation_image"),
         "callback": keyTools.remove_default_values_for_selected_object,
     },
     "reset_clear_all": {
         "key": "reset_clear_all",
         "label": "Clear All Saved Data",
-        "icon_path": media.reset_animation_image,
+        "icon_path": media.asset_path("reset_animation_image"),
         "callback": keyTools.restore_default_data,
     },
     "mirror": {
@@ -893,32 +932,32 @@ TOOL_DEFINITIONS = {
         "callback": keyTools.copyOpposite,
         "tooltip_template": helper.opposite_copy_tooltip_text,
     },
-    "cp_paste_pose": {
-        "key": "cp_paste_pose",
+    "paste_pose_direct": {
+        "key": "paste_pose_direct",
         "label": "Paste Pose",
         "icon_path": media.paste_pose_image,
         "callback": keyTools.paste_pose,
     },
-    "cp_paste_anim": {
-        "key": "cp_paste_anim",
+    "paste_animation_direct": {
+        "key": "paste_animation_direct",
         "label": "Paste Animation",
         "icon_path": media.paste_animation_image,
         "callback": keyTools.paste_animation,
     },
-    "cp_paste_ins": {
-        "key": "cp_paste_ins",
+    "paste_insert_animation_direct": {
+        "key": "paste_insert_animation_direct",
         "label": "Paste Insert",
         "icon_path": media.paste_insert_animation_image,
         "callback": keyTools.paste_insert_animation,
     },
-    "cp_paste_opp": {
-        "key": "cp_paste_opp",
+    "paste_opposite_animation_direct": {
+        "key": "paste_opposite_animation_direct",
         "label": "Paste Opposite",
         "icon_path": media.paste_opposite_animation_image,
         "callback": keyTools.paste_opposite_animation,
     },
-    "cp_paste_to": {
-        "key": "cp_paste_to",
+    "paste_animation_to": {
+        "key": "paste_animation_to",
         "label": "Paste To",
         "icon_path": media.paste_animation_image,
         "callback": keyTools.paste_animation_to,
@@ -1033,28 +1072,170 @@ TOOL_DEFINITIONS = {
         "key": "graph_reset",
         "label": "Reset",
         "text": "R",
-        "icon_path": media.reset_animation_image,
-        "callback": keyTools.get_default_value_main,
+        "command": "reset_values",
+        "icon_path": media.asset_path("reset_animation_image"),
+        "callback": keyTools.reset_object_values,
         "tooltip_template": helper.graph_reset_tooltip_text,
         "description": "Reset the selected curves to their default values.",
     },
-    "graph_cycle_matcher": {
-        "key": "graph_cycle_matcher",
+    "graph_reset_translations": {
+        "key": "graph_reset_translations",
+        "label": "Reset Translations",
+        "text": "RT",
+        "command": "reset_translations",
+        "icon_path": media.asset_path("reset_animation_image"),
+        "callback": lambda: keyTools.reset_object_values(reset_translations=True),
+        "tooltip_template": helper.reset_translations_tooltip_text,
+        "description": "Reset only translation values on the selected graph targets.",
+    },
+    "graph_reset_rotations": {
+        "key": "graph_reset_rotations",
+        "label": "Reset Rotations",
+        "text": "RR",
+        "command": "reset_rotations",
+        "icon_path": media.asset_path("reset_animation_image"),
+        "callback": lambda: keyTools.reset_object_values(reset_rotations=True),
+        "tooltip_template": helper.reset_rotations_tooltip_text,
+        "description": "Reset only rotation values on the selected graph targets.",
+    },
+    "graph_reset_scales": {
+        "key": "graph_reset_scales",
+        "label": "Reset Scales",
+        "text": "RS",
+        "command": "reset_scales",
+        "icon_path": media.asset_path("reset_animation_image"),
+        "callback": lambda: keyTools.reset_object_values(reset_scales=True),
+        "tooltip_template": helper.reset_scales_tooltip_text,
+        "description": "Reset only scale values on the selected graph targets.",
+    },
+    "graph_reset_trs": {
+        "key": "graph_reset_trs",
+        "label": "Reset Translation Rotation Scale",
+        "text": "RTRS",
+        "command": "reset_trs",
+        "icon_path": media.asset_path("reset_animation_image"),
+        "callback": lambda: keyTools.reset_object_values(
+            reset_translations=True,
+            reset_rotations=True,
+            reset_scales=True,
+        ),
+        "tooltip_template": helper.reset_trs_tooltip_text,
+        "description": "Reset translation, rotation, and scale values on the selected graph targets.",
+    },
+    "tangent_cycle_matcher": {
+        "key": "tangent_cycle_matcher",
         "label": "Cycle Matcher",
-        "icon_path": media.match_curve_cycle_image,
+        "text": "CM",
+        "icon_path": media.asset_path("match_curve_cycle_image"),
         "callback": keyTools.match_curve_cycle,
-        "tooltip_template": helper.graph_cycle_matcher_tooltip_text,
+        "tooltip_template": helper.tangent_cycle_matcher_tooltip_text,
         "description": "Curve cycle matcher.",
     },
-    "graph_bouncy": {
-        "key": "graph_bouncy",
-        "label": "Bouncy",
-        "icon_path": media.bouncy_curve_image,
+    "tangent_bouncy": {
+        "key": "tangent_bouncy",
+        "label": "Bouncy Tangent",
+        "text": "BO",
+        "icon_path": media.bouncy_tangent_image,
         "callback": keyTools.bouncy_tangets,
-        "tooltip_template": helper.graph_bouncy_tooltip_text,
+        "tooltip_template": helper.tangent_bouncy_tooltip_text,
         "description": "Set bouncy tangents.",
     },
+    "tangent_auto": {
+        "key": "tangent_auto",
+        "label": "Auto Tangent",
+        "text": "AU",
+        "icon_path": media.auto_tangent_image,
+        "callback": lambda: bar.setTangent("auto"),
+        "tooltip_template": helper.auto_tangent_tooltip_text,
+        "description": "Set selected keys to Auto tangents.",
+    },
+    "tangent_spline": {
+        "key": "tangent_spline",
+        "label": "Spline Tangent",
+        "text": "SP",
+        "icon_path": media.spline_tangent_image,
+        "callback": lambda: bar.setTangent("spline"),
+        "tooltip_template": helper.spline_tangent_tooltip_text,
+        "description": "Set selected keys to Spline tangents.",
+    },
+    "tangent_clamped": {
+        "key": "tangent_clamped",
+        "label": "Clamped Tangent",
+        "text": "CL",
+        "icon_path": media.clamped_tangent_image,
+        "callback": lambda: bar.setTangent("clamped"),
+        "tooltip_template": helper.clamped_tangent_tooltip_text,
+        "description": "Set selected keys to Clamped tangents.",
+    },
+    "tangent_linear": {
+        "key": "tangent_linear",
+        "label": "Linear Tangent",
+        "text": "LI",
+        "icon_path": media.linear_tangent_image,
+        "callback": lambda: bar.setTangent("linear"),
+        "tooltip_template": helper.linear_tangent_tooltip_text,
+        "description": "Set selected keys to Linear tangents.",
+    },
+    "tangent_flat": {
+        "key": "tangent_flat",
+        "label": "Flat Tangent",
+        "text": "FT",
+        "icon_path": media.flat_tangent_image,
+        "callback": lambda: bar.setTangent("flat"),
+        "tooltip_template": helper.flat_tangent_tooltip_text,
+        "description": "Set selected keys to Flat tangents.",
+    },
+    "tangent_step": {
+        "key": "tangent_step",
+        "label": "Step Tangent",
+        "text": "ST",
+        "icon_path": media.step_tangent_image,
+        "callback": lambda: bar.setTangent("step"),
+        "tooltip_template": helper.step_tangent_tooltip_text,
+        "description": "Set selected keys to Stepped tangents.",
+    },
+    "tangent_plateau": {
+        "key": "tangent_plateau",
+        "label": "Plateau Tangent",
+        "text": "PT",
+        "icon_path": media.plateau_tangent_image,
+        "callback": lambda: bar.setTangent("plateau"),
+        "tooltip_template": helper.plateau_tangent_tooltip_text,
+        "description": "Set selected keys to Plateau tangents.",
+    },
 }
+
+
+def _variant_command_name(tool_key, variant, index):
+    variant_key = variant.get("key")
+    if variant_key:
+        return variant_key
+    label = variant.get("label") or variant.get("text") or variant.get("description") or ""
+    slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+    if slug:
+        return "{}_{}".format(tool_key, slug)
+    return "{}_option_{}".format(tool_key, index)
+
+
+def _bind_trigger_commands():
+    for tool_key, tool_data in TOOL_DEFINITIONS.items():
+        callback = tool_data.get("callback")
+        if callback:
+            command_name = tool_data.get("command") or tool_key
+            aliases = tool_data.get("command_aliases")
+            tool_data["command"] = command_name
+            tool_data["callback"] = trigger.make_command_callback(command_name, callback, aliases=aliases)
+
+        for index, variant in enumerate(tool_data.get("shortcut_variants", []), start=1):
+            variant_callback = variant.get("callback")
+            if not variant_callback:
+                continue
+            command_name = variant.get("command") or _variant_command_name(tool_key, variant, index)
+            variant["command"] = command_name
+            variant["callback"] = trigger.make_command_callback(command_name, variant_callback, aliases=variant.get("command_aliases"))
+
+
+_bind_trigger_commands()
 
 
 def _normalize_tool_state(state, fallback=None):

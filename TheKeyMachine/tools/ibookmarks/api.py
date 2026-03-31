@@ -152,7 +152,7 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
             cmds.menuItem(
                 l=text,
                 parent=popup_menu,
-                image=media.grey_got_image,
+                image=media.asset_path("grey_dot_image"),
                 c=lambda x, text=text: isolate_bookmark(bookmark_name=text),
             )
         cmds.menuItem(divider=True, parent=popup_menu)
@@ -161,7 +161,7 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
         l="Bookmarks",
         c=lambda x: create_ibookmarks_window(),
         annotation="Open isolate bookmarks window",
-        image=media.ibookmarks_menu_image,
+        image=media.asset_path("ibookmarks_menu_image"),
         parent=popup_menu,
     )
     cmds.menuItem(divider=True, parent=popup_menu)

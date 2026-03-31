@@ -18,15 +18,12 @@ Modified by: Alehaaaa / alehaaaa.github.io
 """
 
 import maya.cmds as cmds
-from maya import OpenMaya as om
-import maya.OpenMayaUI as mui
 import maya.mel as mel
+from maya import OpenMaya as om
 
 try:
     from PySide2 import QtCore, QtWidgets
-    from shiboken2 import wrapInstance
 except ImportError:
-    from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore
 
 
@@ -59,59 +56,11 @@ python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 
 global down_one_level
 down_one_level_var = False
-
-
-original_bg_color = None
-original_fg_color = None
-original_key_color = None
+TEMP_PIVOT_RUNTIME_KEY = "temp_pivot_auto_link"
 
 
 def _active_tint_color():
     return cw.get_active_tool_tint_color()
-
-
-def set_temp_timeslider_colors():
-    global python_version, original_bg_color, original_fg_color, original_key_color
-
-    # fix para maya 2024
-    if python_version == "310":
-        # Store the original colors
-        original_bg_color = cmds.displayRGBColor("timeControlBackground", query=True)
-        original_key_color = cmds.displayRGBColor("timeControlKey", query=True)
-
-        # Set temporary colors
-        cmds.displayRGBColor("timeControlBackground", 0.20530900359153748, 0.2126081883907318, 0.22100000083446503)
-        cmds.displayRGBColor("timeControlKey", 0.31883829832077026, 0.3369826376438141, 0.3578431308269501)
-        cmds.refresh(f=True)
-    else:
-        # Store the original colors
-        original_bg_color = cmds.displayRGBColor("timeSliderBackground", query=True)
-        original_fg_color = cmds.displayRGBColor("timeSliderForeground", query=True)
-        original_key_color = cmds.displayRGBColor("timeSliderKey", query=True)
-
-        # Set temporary colors
-        cmds.displayRGBColor("timeSliderBackground", 0.20530900359153748, 0.2126081883907318, 0.22100000083446503)
-        cmds.displayRGBColor("timeSliderForeground", 0.13725490868091583, 0.13725490868091583, 0.13725490868091583)
-        cmds.displayRGBColor("timeSliderKey", 0.31883829832077026, 0.3369826376438141, 0.3578431308269501)
-        cmds.refresh(f=True)
-
-
-def restore_timeslider_colors():
-    global python_version, original_bg_color, original_fg_color, original_key_color
-
-    # fix para maya 2024
-    if python_version == "310":
-        if original_bg_color:
-            # Restore original colors
-            cmds.displayRGBColor("timeControlBackground", original_bg_color[0], original_bg_color[1], original_bg_color[2])
-            cmds.displayRGBColor("timeControlKey", original_key_color[0], original_key_color[1], original_key_color[2])
-
-    else:
-        if original_bg_color and original_fg_color:
-            # Restore original colors
-            cmds.displayRGBColor("timeSliderBackground", original_bg_color[0], original_bg_color[1], original_bg_color[2])
-            cmds.displayRGBColor("timeSliderForeground", original_fg_color[0], original_fg_color[1], original_fg_color[2])
-            cmds.displayRGBColor("timeSliderKey", original_key_color[0], original_key_color[1], original_key_color[2])
 
 
 def openCustomGraph():
@@ -260,16 +209,86 @@ def get_graph_editor_selected_keyframes():
     return keyframes
 
 
-def setTangent(tangent_type):
-    selectedKeyframes = get_graph_editor_selected_keyframes()
+def _set_tangent_on_target(target, tangent_type, time_range):
+    kwargs = {"time": time_range, "ott": tangent_type}
+    if tangent_type != "step":
+        kwargs["itt"] = tangent_type
+    cmds.keyTangent(target, **kwargs)
 
-    if selectedKeyframes:
-        for curve, frame in selectedKeyframes:
-            cmds.keyTangent(curve, time=(frame,), itt=tangent_type, ott=tangent_type)
-    else:
-        # Si no hay curvas seleccionadas, ejecutar el comando MEL
-        mel_command = "timeSliderSetTangent {}".format(tangent_type)
-        mel.eval(mel_command)
+
+def _collect_target_curves(target_info):
+    curves = []
+    seen = set()
+
+    for curve in target_info.get("selected_curves") or []:
+        if curve and curve not in seen:
+            seen.add(curve)
+            curves.append(curve)
+
+    target_plugs = target_info.get("target_plugs") or []
+    if target_plugs:
+        for plug in target_plugs:
+            plug_curves = cmds.listConnections(plug, source=True, destination=False, type="animCurve") or []
+            for curve in plug_curves:
+                if curve and curve not in seen:
+                    seen.add(curve)
+                    curves.append(curve)
+        return curves
+
+    target_objects = target_info.get("target_objects") or []
+    selected_channels = target_info.get("selected_channels") or None
+    time_context = target_info.get("time_context")
+    query_kwargs = {"query": True, "name": True}
+    if selected_channels:
+        query_kwargs["attribute"] = selected_channels
+    if time_context and time_context.mode == "time_slider_range":
+        query_kwargs["time"] = time_context.timerange
+
+    for obj in target_objects:
+        obj_curves = cmds.keyframe(obj, **query_kwargs) or []
+        for curve in obj_curves:
+            if curve and curve not in seen:
+                seen.add(curve)
+                curves.append(curve)
+
+    return curves
+
+
+def setTangent(tangent_type):
+    selected_keyframes = get_graph_editor_selected_keyframes()
+
+    if selected_keyframes:
+        frames = sorted({int(frame) for _curve, frame in selected_keyframes})
+        timerange = (frames[0], frames[-1])
+        tint_session = timelineWidgets.begin_timeline_tint(
+            timerange=timerange,
+            color=_active_tint_color(),
+            key="set_tangent_range",
+        )
+        try:
+            for curve, frame in selected_keyframes:
+                _set_tangent_on_target(curve, tangent_type, (frame, frame))
+        finally:
+            tint_session.finish()
+        return
+
+    target_info = keyTools.resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=False)
+    time_context = target_info["time_context"]
+    curves = _collect_target_curves(target_info)
+    if not curves:
+        return util.make_inViewMessage("No animation curves available to set tangents.")
+
+    timerange = time_context.timerange
+    tint_session = timelineWidgets.begin_timeline_tint(
+        timerange=timerange,
+        color=_active_tint_color(),
+        key="set_tangent_range",
+    )
+    try:
+        for curve in curves:
+            _set_tangent_on_target(curve, tangent_type, timerange)
+    finally:
+        tint_session.finish()
 
 
 def align_selected_objects(*args, pos=True, rot=True, scl=False):
@@ -707,33 +726,22 @@ def create_temp_pivot(use_saved_position=False, *args):
     get_temp_pivot_relation()
 
     def add_callbacks_link():
-        global attribute_callback_id, time_callback_id, process_callback
+        global process_callback
 
         process_callback = True
+        manager = runtime.get_runtime_manager()
+        manager.disconnect_callbacks(TEMP_PIVOT_RUNTIME_KEY)
 
         temp_pivot_obj_name = "tkm_temp_pivot"
-
-        # Obtén el MObject del objeto principal
-        selection_list = om.MSelectionList()
-        selection_list.add(temp_pivot_obj_name)
-        temp_pivot_obj_mobject = om.MObject()
-        selection_list.getDependNode(0, temp_pivot_obj_mobject)
-
-        # Registra el callback de atributo
-        attribute_callback_id = om.MNodeMessage.addAttributeChangedCallback(temp_pivot_obj_mobject, attribute_callback_function)
-
-        # Registra el callback de cambio de tiempo
-        time_callback_id = om.MEventMessage.addEventCallback("timeChanged", time_callback_function)
+        attribute_cb = manager.add_node_attribute_changed_callback(temp_pivot_obj_name, attribute_callback_function, key=TEMP_PIVOT_RUNTIME_KEY)
+        time_cb = manager.connect_signal(manager.time_changed, time_callback_function, key=TEMP_PIVOT_RUNTIME_KEY, unique=False)
+        if attribute_cb is None or not time_cb:
+            manager.disconnect_callbacks(TEMP_PIVOT_RUNTIME_KEY)
+            raise RuntimeError("Could not register temp pivot callbacks")
 
     def remove_callbacks_link():
-        global attribute_callback_id, time_callback_id
         try:
-            if attribute_callback_id:
-                om.MMessage.removeCallback(attribute_callback_id)
-                attribute_callback_id = None
-            if time_callback_id:
-                om.MMessage.removeCallback(time_callback_id)
-                time_callback_id = None
+            runtime.get_runtime_manager().disconnect_callbacks(TEMP_PIVOT_RUNTIME_KEY)
         except Exception as e:
             import TheKeyMachine.mods.reportMod as report
 
@@ -826,15 +834,11 @@ def mod_worldspace_copy_animation(*args):
 
 
 def color_worldspace_copy_animation(*args):
-    # set_temp_timeslider_colors()
     cmds.evalDeferred(worldspace_copy_animation)
-    # cmds.evalDeferred(restore_timeslider_colors)
 
 
 def color_worldspace_paste_animation(*args):
-    # set_temp_timeslider_colors()
     cmds.evalDeferred(worldspace_paste_animation)
-    # cmds.evalDeferred(restore_timeslider_colors)
 
 
 def worldspace_copy_animation(*args):
