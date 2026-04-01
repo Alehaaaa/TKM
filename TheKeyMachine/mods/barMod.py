@@ -396,6 +396,11 @@ def isolate_master():
     # Obtener los objetos actualmente seleccionados
     selected_objects = util.get_selected_objects()
     currentPanel = cmds.getPanel(wf=True)
+    if not currentPanel or cmds.getPanel(typeOf=currentPanel) != "modelPanel":
+        visible_model_panels = cmds.getPanel(visiblePanels=True) or []
+        currentPanel = next((panel for panel in visible_model_panels if cmds.getPanel(typeOf=panel) == "modelPanel"), None)
+    if not currentPanel or cmds.getPanel(typeOf=currentPanel) != "modelPanel":
+        return
     currentState = cmds.isolateSelect(currentPanel, query=True, state=True)
 
     # Si no hay objetos seleccionados y el estado de aislamiento es 0, salimos de la función.

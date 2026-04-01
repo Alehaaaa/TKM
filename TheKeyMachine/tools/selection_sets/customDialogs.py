@@ -583,6 +583,12 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             button.set_match_state(match_state)
 
     def _connect_selection_callback(self):
+        runtime_manager = getattr(self, "_runtime_manager", None)
+        if runtime_manager:
+            try:
+                runtime_manager.selection_changed.disconnect(self._schedule_selection_match_refresh)
+            except Exception:
+                pass
         try:
             import TheKeyMachine.core.runtime_manager as runtime
 
@@ -604,6 +610,11 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
     def _schedule_selection_match_refresh(self):
         if not self._selection_match_timer.isActive():
             self._selection_match_timer.start(0)
+
+    def showEvent(self, event):
+        self._connect_selection_callback()
+        self._schedule_selection_match_refresh()
+        super().showEvent(event)
 
     def _normalize_scene_objects(self, items):
         if not items:

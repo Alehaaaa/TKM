@@ -176,7 +176,12 @@ def create_settings_menu(parent_button):
         act.toggled.connect(set_align)
 
     settings_menu.addSection("Hotkeys")
-    settings_menu.addAction("Hotkeys...", hotkeys.show_hotkeys_window, description="Manage trigger hotkeys.")
+    settings_menu.addAction(
+        QtGui.QIcon(media.hotkeys_image),
+        "Hotkeys...",
+        hotkeys.show_hotkeys_window,
+        description="Manage trigger hotkeys.",
+    )
 
     settings_menu.addSection("General")
     settings_menu.addAction(
@@ -431,10 +436,10 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     btn_reset = create_toolbox_button("graph_reset")
     sec.addWidget(btn_reset, "Reset", "reset")
 
-    btn_reset_translations = create_toolbox_button("graph_reset_translations")
+    btn_reset_translations = create_toolbox_button("graph_reset_translation")
     sec.addWidget(btn_reset_translations, "Reset Translations", "reset_translations", default_visible=False)
 
-    btn_reset_rotations = create_toolbox_button("graph_reset_rotations")
+    btn_reset_rotations = create_toolbox_button("graph_reset_rotation")
     sec.addWidget(btn_reset_rotations, "Reset Rotations", "reset_rotations", default_visible=False)
 
     btn_reset_scales = create_toolbox_button("graph_reset_scales")

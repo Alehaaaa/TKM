@@ -237,7 +237,7 @@ TOOL_DEFINITIONS = {
     },
     "static": {
         "key": "static",
-        "label": "Static",
+        "label": "Delete Static Keys",
         "text": "S",
         "icon_path": media.delete_animation_image,
         "tooltip_template": helper.static_tooltip_text,
@@ -374,7 +374,11 @@ TOOL_DEFINITIONS = {
             {"icon": media.asset_path("reset_animation_image"), "label": "Reset Translations", "keys": [QtCore.Qt.Key_Shift]},
             {"icon": media.asset_path("reset_animation_image"), "label": "Reset Rotations", "keys": [QtCore.Qt.Key_Control]},
             {"icon": media.asset_path("reset_animation_image"), "label": "Reset Scales", "keys": [QtCore.Qt.Key_Alt]},
-            {"icon": media.asset_path("reset_animation_image"), "label": "Reset Translation Rotation Scale", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+            {
+                "icon": media.asset_path("reset_animation_image"),
+                "label": "Reset Translation Rotation Scale",
+                "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift],
+            },
         ],
         "shortcut_variants": [
             {
@@ -700,9 +704,9 @@ TOOL_DEFINITIONS = {
         "callback": lambda *args: bar.create_follow_cam(translation=True, rotation=True),
         "tooltip_template": helper.follow_cam_tooltip_text,
         "shortcuts": [
-            {"icon": media.follow_cam_image, "label": "Follow Translation + Rotation", "keys": "Click"},
-            {"icon": media.follow_cam_image, "label": "Follow Translation Only", "keys": [QtCore.Qt.Key_Shift]},
-            {"icon": media.follow_cam_image, "label": "Follow Rotation Only", "keys": [QtCore.Qt.Key_Control]},
+            {"icon": media.follow_cam_image, "label": "Follow Translation Rotation", "keys": "Click"},
+            {"icon": media.follow_cam_image, "label": "Follow Translation", "keys": [QtCore.Qt.Key_Shift]},
+            {"icon": media.follow_cam_image, "label": "Follow Rotation", "keys": [QtCore.Qt.Key_Control]},
             {"icon": media.remove_image, "label": "Remove Follow Cam", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt]},
         ],
         "shortcut_variants": [
@@ -899,6 +903,38 @@ TOOL_DEFINITIONS = {
         "icon_path": media.mirror_image,
         "callback": keyTools.mirror,
         "tooltip_template": helper.mirror_tooltip_text,
+        "shortcuts": [
+            {"icon": media.mirror_image, "label": "Mirror", "keys": "Click"},
+            {"icon": media.mirror_image, "label": "Add Exception Invert", "keys": [QtCore.Qt.Key_Shift]},
+            {"icon": media.mirror_image, "label": "Add Exception Keep", "keys": [QtCore.Qt.Key_Control]},
+            {"icon": media.mirror_image, "label": "Remove Exception", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+        ],
+        "shortcut_variants": [
+            {
+                "mask": 1,
+                "text": "MI",
+                "icon_path": media.mirror_image,
+                "tooltip_template": helper.mirror_tooltip_text,
+                "description": "Add an invert mirror exception for the current selection.",
+                "callback": keyTools.add_mirror_invert_exception,
+            },
+            {
+                "mask": 4,
+                "text": "MK",
+                "icon_path": media.mirror_image,
+                "tooltip_template": helper.mirror_tooltip_text,
+                "description": "Add a keep mirror exception for the current selection.",
+                "callback": keyTools.add_mirror_keep_exception,
+            },
+            {
+                "mask": 5,
+                "text": "MR",
+                "icon_path": media.mirror_image,
+                "tooltip_template": helper.mirror_tooltip_text,
+                "description": "Remove the mirror exception for the current selection.",
+                "callback": keyTools.remove_mirror_invert_exception,
+            },
+        ],
     },
     "mirror_add_invert": {
         "key": "mirror_add_invert",
@@ -1074,29 +1110,29 @@ TOOL_DEFINITIONS = {
         "text": "R",
         "command": "reset_values",
         "icon_path": media.asset_path("reset_animation_image"),
-        "callback": keyTools.reset_object_values,
-        "tooltip_template": helper.graph_reset_tooltip_text,
-        "description": "Reset the selected curves to their default values.",
+        "callback": keyTools.reset_objects_mods,
+        "tooltip_template": helper.reset_values_tooltip_text,
+        "description": "Reset the selected objects or graph targets to their default values.",
     },
-    "graph_reset_translations": {
-        "key": "graph_reset_translations",
+    "graph_reset_translation": {
+        "key": "graph_reset_translation",
         "label": "Reset Translations",
         "text": "RT",
         "command": "reset_translations",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": lambda: keyTools.reset_object_values(reset_translations=True),
         "tooltip_template": helper.reset_translations_tooltip_text,
-        "description": "Reset only translation values on the selected graph targets.",
+        "description": "Reset only translation values for the selected objects or graph targets.",
     },
-    "graph_reset_rotations": {
-        "key": "graph_reset_rotations",
+    "graph_reset_rotation": {
+        "key": "graph_reset_rotation",
         "label": "Reset Rotations",
         "text": "RR",
         "command": "reset_rotations",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": lambda: keyTools.reset_object_values(reset_rotations=True),
         "tooltip_template": helper.reset_rotations_tooltip_text,
-        "description": "Reset only rotation values on the selected graph targets.",
+        "description": "Reset only rotation values for the selected objects or graph targets.",
     },
     "graph_reset_scales": {
         "key": "graph_reset_scales",
@@ -1106,7 +1142,7 @@ TOOL_DEFINITIONS = {
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": lambda: keyTools.reset_object_values(reset_scales=True),
         "tooltip_template": helper.reset_scales_tooltip_text,
-        "description": "Reset only scale values on the selected graph targets.",
+        "description": "Reset only scale values for the selected objects or graph targets.",
     },
     "graph_reset_trs": {
         "key": "graph_reset_trs",
@@ -1120,7 +1156,7 @@ TOOL_DEFINITIONS = {
             reset_scales=True,
         ),
         "tooltip_template": helper.reset_trs_tooltip_text,
-        "description": "Reset translation, rotation, and scale values on the selected graph targets.",
+        "description": "Reset translation, rotation, and scale values for the selected objects or graph targets.",
     },
     "tangent_cycle_matcher": {
         "key": "tangent_cycle_matcher",
@@ -1221,6 +1257,7 @@ def _bind_trigger_commands():
     for tool_key, tool_data in TOOL_DEFINITIONS.items():
         callback = tool_data.get("callback")
         if callback:
+            tool_data["raw_callback"] = callback
             command_name = tool_data.get("command") or tool_key
             aliases = tool_data.get("command_aliases")
             tool_data["command"] = command_name
@@ -1230,6 +1267,7 @@ def _bind_trigger_commands():
             variant_callback = variant.get("callback")
             if not variant_callback:
                 continue
+            variant["raw_callback"] = variant_callback
             command_name = variant.get("command") or _variant_command_name(tool_key, variant, index)
             variant["command"] = command_name
             variant["callback"] = trigger.make_command_callback(command_name, variant_callback, aliases=variant.get("command_aliases"))

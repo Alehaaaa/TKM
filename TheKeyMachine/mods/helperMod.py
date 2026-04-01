@@ -620,13 +620,13 @@ tracer_remove_tooltip_text = _tool_tooltip(
 )
 
 reset_translations_tooltip_text = _tool_tooltip(
-    "Reset Translations",
+    "Reset Translation",
     ["Reset only translation values on the current selection."],
     media.asset_path("reset_animation_image"),
 )
 
 reset_rotations_tooltip_text = _tool_tooltip(
-    "Reset Rotations",
+    "Reset Rotation",
     ["Reset only rotation values on the current selection."],
     media.asset_path("reset_animation_image"),
 )
@@ -691,13 +691,13 @@ paste_opposite_animation_tooltip_text = _tool_tooltip(
 )
 
 follow_translation_tooltip_text = _tool_tooltip(
-    "Follow Translation Only",
+    "Follow Translation",
     ["Create a Follow Cam that inherits only translation from the selected object."],
     media.follow_cam_image,
 )
 
 follow_rotation_tooltip_text = _tool_tooltip(
-    "Follow Rotation Only",
+    "Follow Rotation",
     ["Create a Follow Cam that inherits only rotation from the selected object."],
     media.follow_cam_image,
 )

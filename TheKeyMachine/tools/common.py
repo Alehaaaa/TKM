@@ -260,6 +260,34 @@ class ToolbarWindowToggle(QtCore.QObject):
 
 
 class FloatingToolWindowMixin:
+    def _current_screen_geometry(self):
+        if not wutil.is_valid_widget(self):
+            return None
+        frame_geo = self.frameGeometry()
+        anchor = frame_geo.center() if frame_geo.isValid() else QtGui.QCursor.pos()
+        screen = QtGui.QGuiApplication.screenAt(anchor) or QtGui.QGuiApplication.primaryScreen()
+        if not screen:
+            return None
+        return screen.availableGeometry()
+
+    def clamp_to_current_screen(self):
+        if not wutil.is_valid_widget(self):
+            return False
+        geo = self._current_screen_geometry()
+        if geo is None:
+            return False
+
+        width = min(self.width(), geo.width())
+        height = min(self.height(), geo.height())
+        x = max(geo.left(), min(self.x(), geo.right() - width))
+        y = max(geo.top(), min(self.y(), geo.bottom() - height))
+
+        if width != self.width() or height != self.height():
+            self.setGeometry(x, y, width, height)
+        else:
+            self.move(x, y)
+        return True
+
     def place_above_toolbar_button(self, button=None, gap=None):
         if not wutil.is_valid_widget(self):
             return False
@@ -290,6 +318,7 @@ class FloatingToolWindowMixin:
         y = max(geo.top(), min(y, geo.bottom() - height))
 
         self.move(x, y)
+        self.clamp_to_current_screen()
         self.show()
         self.raise_()
         self.activateWindow()
@@ -350,6 +379,7 @@ class FloatingToolWindowMixin:
             self.setGeometry(x, y, width, height)
         elif len(saved_geom) >= 2:
             self.move(saved_geom[0], saved_geom[1])
+        self.clamp_to_current_screen()
         return True
 
     def _check_settings(self):
@@ -373,6 +403,7 @@ class FloatingToolWindowMixin:
 
     def showEvent(self, event):
         super().showEvent(event)
+        self.clamp_to_current_screen()
         if hasattr(self, "fade_timer"):
             self.update_transparency_state(self.rect().contains(self.mapFromGlobal(QtGui.QCursor.pos())))
 

@@ -1987,10 +1987,10 @@ def reset_object_values(reset_translations=False, reset_rotations=False, reset_s
         title = "Reset Scales"
         tooltip_template = helper.reset_scales_tooltip_text
     elif reset_rotations:
-        title = "Reset Rotations"
+        title = "Reset Rotation"
         tooltip_template = helper.reset_rotations_tooltip_text
     elif reset_translations:
-        title = "Reset Translations"
+        title = "Reset Translation"
         tooltip_template = helper.reset_translations_tooltip_text
     else:
         title = None

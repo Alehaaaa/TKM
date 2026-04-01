@@ -4,10 +4,9 @@ Managed hotkey UI and hotkey helpers for TheKeyMachine trigger commands.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 import json
 import os
-from collections import OrderedDict
-from functools import partial
 
 import maya.cmds as cmds
 import maya.mel as mel
@@ -22,7 +21,6 @@ import TheKeyMachine.core.toolbox as toolbox
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.mediaMod as media
-from TheKeyMachine.sliders import BLEND_MODES, TANGENT_MODES, TWEEN_MODES
 from TheKeyMachine.widgets import customDialogs as cd
 from TheKeyMachine.widgets import customWidgets as cw
 from TheKeyMachine.widgets import util as wutil
@@ -31,14 +29,17 @@ from TheKeyMachine.widgets import util as wutil
 HOTKEYS_WINDOW_KEY = "tkm_hotkeys_window"
 HOTKEYS_EXPORT_DIR = os.path.join(general.USER_FOLDER_PATH, "TheKeyMachine_user_data", "tools", "hotkeys")
 
-_SECTION_ICONS = {
+
+HOTKEY_SECTION_ICONS = {
     "windows": media.tool_icon,
     "manipulators": media.depth_mover_image,
     "selection": media.select_rig_controls_image,
+    "selection_sets": media.selection_sets_image,
     "delete": media.delete_animation_image,
     "curve_tools": media.share_keys_image,
+    "reset": media.asset_path("reset_animation_image"),
     "graph_editor": media.customGraph_image,
-    "nudge": media.nudge_right_image,
+    "tempo_controls": media.nudge_right_image,
     "copy_paste": media.copy_animation_image,
     "worldspace": media.worldspace_copy_frame_image,
     "tangents": media.auto_tangent_image,
@@ -52,18 +53,18 @@ _SECTION_ICONS = {
     "follow_cam": media.follow_cam_image,
     "opposite": media.opposite_select_image,
     "temp_pivot": media.temp_pivot_image,
-    "tempo_controls": media.nudge_right_image,
     "link_objects": media.link_objects_image,
-    "misc": media.settings_image,
 }
 
-_SECTION_SPECS = OrderedDict(
+
+HOTKEY_SECTION_SPECS = OrderedDict(
     [
         (
             "windows",
             {
                 "title": "Windows",
-                "icon_path": _SECTION_ICONS["windows"],
+                "icon_path": HOTKEY_SECTION_ICONS["windows"],
+                "tools": ["gimbal"],
                 "commands": [
                     "toolbar_toggle",
                     "toolbar_add_shelf_button",
@@ -80,14 +81,13 @@ _SECTION_SPECS = OrderedDict(
                     "donate_window",
                     "bug_report_window",
                 ],
-                "tools": ["gimbal"],
             },
         ),
         (
             "manipulators",
             {
                 "title": "Manipulators",
-                "icon_path": _SECTION_ICONS["manipulators"],
+                "icon_path": HOTKEY_SECTION_ICONS["manipulators"],
                 "commands": ["smart_rotation", "smart_rotation_release", "smart_translation", "smart_translation_release", "depth_mover"],
             },
         ),
@@ -95,12 +95,11 @@ _SECTION_SPECS = OrderedDict(
             "selection",
             {
                 "title": "Selection",
-                "icon_path": _SECTION_ICONS["selection"],
-                "tools": ["attribute_switcher", "selection_sets", "selector"],
+                "icon_path": HOTKEY_SECTION_ICONS["selection"],
+                "tools": ["attribute_switcher", "selector"],
                 "commands": [
                     "create_locator",
                     "isolate_master",
-                    "selection_sets_toggle",
                     "attribute_switcher",
                     "selector",
                     "select_rig_controls",
@@ -112,46 +111,55 @@ _SECTION_SPECS = OrderedDict(
             },
         ),
         (
+            "selection_sets",
+            {
+                "title": "Selection Sets",
+                "icon_path": HOTKEY_SECTION_ICONS["selection_sets"],
+                "tools": ["selection_sets"],
+                "commands": ["selection_sets_toggle"],
+            },
+        ),
+        (
             "curve_tools",
             {
                 "title": "Key Tools",
-                "icon_path": _SECTION_ICONS["curve_tools"],
-                "tools": ["share_keys", "reblock", "reset_objects_mods", "extra_tools", "flip", "snap", "overlap"],
-                "commands": [],
+                "icon_path": HOTKEY_SECTION_ICONS["curve_tools"],
+                "tools": ["share_keys", "reblock", "extra_tools", "flip", "snap", "overlap"],
+            },
+        ),
+        (
+            "reset",
+            {
+                "title": "Reset",
+                "icon_path": HOTKEY_SECTION_ICONS["reset"],
+                "tools": ["reset_objects_mods"],
             },
         ),
         (
             "graph_editor",
             {
                 "title": "Graph Editor",
-                "icon_path": _SECTION_ICONS["graph_editor"],
+                "icon_path": HOTKEY_SECTION_ICONS["graph_editor"],
                 "tools": [
                     "graph_isolate_curves",
                     "graph_toggle_mute",
                     "graph_toggle_lock",
-                    "graph_reset",
-                    "graph_reset_translations",
-                    "graph_reset_rotations",
-                    "graph_reset_scales",
-                    "graph_reset_trs",
                 ],
-                "commands": [],
             },
         ),
         (
             "delete",
             {
                 "title": "Delete",
-                "icon_path": _SECTION_ICONS["delete"],
+                "icon_path": HOTKEY_SECTION_ICONS["delete"],
                 "tools": ["delete_all_animation", "static"],
-                "commands": ["delete_animation", "delete_all_animation", "static"],
             },
         ),
         (
             "copy_paste",
             {
                 "title": "Copy Paste",
-                "icon_path": _SECTION_ICONS["copy_paste"],
+                "icon_path": HOTKEY_SECTION_ICONS["copy_paste"],
                 "commands": [
                     "copy_pose",
                     "paste_pose",
@@ -166,16 +174,15 @@ _SECTION_SPECS = OrderedDict(
             "bake",
             {
                 "title": "Bake",
-                "icon_path": _SECTION_ICONS["bake"],
-                "tools": ["bake_animation_2", "bake_animation_3", "bake_animation_4", "bake_animation_custom"],
-                "commands": ["bake_animation_1"],
+                "icon_path": HOTKEY_SECTION_ICONS["bake"],
+                "tools": ["bake_animation_1"],
             },
         ),
         (
             "tempo_controls",
             {
-                "title": "Tempo Controls",
-                "icon_path": _SECTION_ICONS["tempo_controls"],
+                "title": "Nudge",
+                "icon_path": HOTKEY_SECTION_ICONS["tempo_controls"],
                 "tools": ["move_left", "move_right"],
                 "commands": ["insert_inbetween", "remove_inbetween", "nudge_left", "nudge_right"],
             },
@@ -184,7 +191,7 @@ _SECTION_SPECS = OrderedDict(
             "match",
             {
                 "title": "Match",
-                "icon_path": _SECTION_ICONS["match"],
+                "icon_path": HOTKEY_SECTION_ICONS["match"],
                 "tools": ["match", "align_selected_objects"],
                 "commands": ["align_selected_objects"],
                 "command_prefixes": ["align_selected_objects_", "match_"],
@@ -194,7 +201,7 @@ _SECTION_SPECS = OrderedDict(
             "tangents",
             {
                 "title": "Tangents",
-                "icon_path": _SECTION_ICONS["tangents"],
+                "icon_path": HOTKEY_SECTION_ICONS["tangents"],
                 "tools": [
                     "tangent_auto",
                     "tangent_spline",
@@ -206,22 +213,13 @@ _SECTION_SPECS = OrderedDict(
                     "tangent_cycle_matcher",
                     "tangent_bouncy",
                 ],
-                "commands": [
-                    "set_auto_tangent",
-                    "set_spline_tangent",
-                    "set_clamped_tangent",
-                    "set_linear_tangent",
-                    "set_flat_tangent",
-                    "set_step_tangent",
-                    "set_plateau_tangent",
-                ],
             },
         ),
         (
             "tracer",
             {
                 "title": "Tracer",
-                "icon_path": _SECTION_ICONS["tracer"],
+                "icon_path": HOTKEY_SECTION_ICONS["tracer"],
                 "tools": ["tracer_refresh", "tracer_show_hide", "tracer_offset_node", "tracer_grey", "tracer_red", "tracer_blue", "tracer_remove"],
                 "commands": ["create_tracer"],
             },
@@ -230,25 +228,23 @@ _SECTION_SPECS = OrderedDict(
             "mirror",
             {
                 "title": "Mirror",
-                "icon_path": _SECTION_ICONS["mirror"],
-                "tools": ["mirror", "mirror_add_invert", "mirror_add_keep", "mirror_remove_exc"],
-                "commands": ["mirror"],
+                "icon_path": HOTKEY_SECTION_ICONS["mirror"],
+                "tools": ["mirror"],
             },
         ),
         (
             "opposite",
             {
                 "title": "Opposite",
-                "icon_path": _SECTION_ICONS["opposite"],
-                "tools": ["selectOpposite", "opposite_add", "opposite_copy", "paste_opposite_animation_direct"],
-                "commands": ["select_opposite", "add_opposite", "copy_opposite", "paste_opposite_animation"],
+                "icon_path": HOTKEY_SECTION_ICONS["opposite"],
+                "tools": ["selectOpposite", "paste_opposite_animation_direct"],
             },
         ),
         (
             "follow_cam",
             {
                 "title": "Follow Cam",
-                "icon_path": _SECTION_ICONS["follow_cam"],
+                "icon_path": HOTKEY_SECTION_ICONS["follow_cam"],
                 "tools": ["fcam_trans_only", "fcam_rot_only", "fcam_remove"],
                 "commands": ["create_follow_cam"],
             },
@@ -257,21 +253,15 @@ _SECTION_SPECS = OrderedDict(
             "worldspace",
             {
                 "title": "World Space",
-                "icon_path": _SECTION_ICONS["worldspace"],
-                "tools": ["paste_worldspace_single_frame", "ws_copy_range", "ws_paste"],
-                "commands": [
-                    "copy_worldspace_single_frame",
-                    "copy_range_worldspace_animation",
-                    "worldspace_paste_animation",
-                    "worldspace_copy_animation",
-                ],
+                "icon_path": HOTKEY_SECTION_ICONS["worldspace"],
+                "tools": ["copy_worldspace_single_frame"],
             },
         ),
         (
             "temp_pivot",
             {
                 "title": "Temp Controls",
-                "icon_path": _SECTION_ICONS["temp_pivot"],
+                "icon_path": HOTKEY_SECTION_ICONS["temp_pivot"],
                 "tools": ["tp_last_used"],
                 "commands": ["create_temp_pivot", "create_temp_pivot_last"],
             },
@@ -280,7 +270,7 @@ _SECTION_SPECS = OrderedDict(
             "link_objects",
             {
                 "title": "Link Objects",
-                "icon_path": _SECTION_ICONS["link_objects"],
+                "icon_path": HOTKEY_SECTION_ICONS["link_objects"],
                 "tools": ["link_paste"],
                 "commands": ["copy_link", "paste_link"],
             },
@@ -288,74 +278,74 @@ _SECTION_SPECS = OrderedDict(
     ]
 )
 
-_MANUAL_COMMANDS = {
-    "open_custom_graph": ("windows", "Custom Graph", media.customGraph_image),
-    "toolbar_toggle": ("windows", "Main Toolbar", media.tool_icon),
-    "toolbar_add_shelf_button": ("windows", "Add Toggle Button To Shelf", media.asset_path("tool_icon")),
-    "toolbar_reload": ("windows", "Reload", media.reload_image),
-    "toolbar_unload": ("windows", "Unload", media.close_image),
-    "check_for_updates": ("windows", "Check for Updates", media.check_updates_image),
-    "orbit_window": ("windows", "Orbit Window", media.orbit_ui_image),
-    "selection_sets_toggle": ("windows", "Selection Sets", media.selection_sets_image),
-    "animation_offset_toggle": ("windows", "Animation Offset", media.animation_offset_image),
-    "micro_move_toggle": ("windows", "Micro Move", media.ruler_image),
-    "custom_graph_toggle": ("windows", "Graph Toolbar Toggle", media.customGraph_image),
-    "hotkeys_window": ("windows", "Hotkeys", media.selection_sets_image),
-    "about_window": ("windows", "About", media.about_image),
-    "donate_window": ("windows", "Donate", media.stripe_image),
-    "bug_report_window": ("windows", "Bug Report", media.report_a_bug_image),
-    "smart_rotation": ("manipulators", "Smart Rotation", media.auto_tangent_image),
-    "smart_rotation_release": ("manipulators", "Smart Rotation Release", media.auto_tangent_image),
-    "smart_translation": ("manipulators", "Smart Translation", media.create_locator_image),
-    "smart_translation_release": ("manipulators", "Smart Translation Release", media.create_locator_image),
-    "depth_mover": ("manipulators", "Depth Mover", media.depth_mover_image),
-    "create_locator": ("selection", "Create Locator", media.create_locator_image),
-    "isolate_master": ("selection", "Isolate", media.isolate_image),
-    "select_rig_controls": ("selection", "Select Rig Controls", media.select_rig_controls_image),
-    "select_rig_controls_animated": ("selection", "Select Animated Rig Controls", media.select_rig_controls_animated_image),
-    "select_hierarchy": ("selection", "Select Hierarchy", media.select_hierarchy_image),
-    "align_selected_objects": ("selection", "Align Selected Objects", media.align_menu_image),
-    "create_tracer": ("tracer", "Create Tracer", media.tracer_image),
-    "refresh_tracer": ("tracer", "Refresh Tracer", media.refresh_image),
-    "delete_animation": ("delete", "Delete Animation", media.delete_animation_image),
-    "delete_all_animation": ("delete", "Delete All Animation", media.delete_animation_image),
-    "insert_inbetween": ("nudge", "Insert Inbetween", media.insert_inbetween_image),
-    "remove_inbetween": ("nudge", "Remove Inbetween", media.remove_inbetween_image),
-    "nudge_left": ("nudge", "Nudge Left", media.nudge_left_image),
-    "nudge_right": ("nudge", "Nudge Right", media.nudge_right_image),
-    "reset_values": ("curve_tools", "Reset Values", media.asset_path("reset_animation_image")),
-    "reset_translations": ("curve_tools", "Reset Translations", media.asset_path("reset_animation_image")),
-    "reset_rotations": ("curve_tools", "Reset Rotations", media.asset_path("reset_animation_image")),
-    "reset_scales": ("curve_tools", "Reset Scales", media.asset_path("reset_animation_image")),
-    "reset_trs": ("curve_tools", "Reset Translation Rotation Scale", media.asset_path("reset_animation_image")),
-    "select_opposite": ("opposite", "Select Opposite", media.opposite_select_image),
-    "add_opposite": ("opposite", "Add Opposite", media.opposite_add_image),
-    "copy_opposite": ("opposite", "Copy Opposite", media.opposite_copy_image),
-    "mirror": ("selection", "Mirror", media.mirror_image),
-    "copy_pose": ("copy_paste", "Copy Pose", media.copy_pose_image),
-    "paste_pose": ("copy_paste", "Paste Pose", media.paste_pose_image),
-    "copy_animation": ("copy_paste", "Copy Animation", media.copy_animation_image),
-    "paste_animation": ("copy_paste", "Paste Animation", media.paste_animation_image),
-    "paste_insert_animation": ("copy_paste", "Paste Insert Animation", media.paste_insert_animation_image),
-    "paste_opposite_animation": ("opposite", "Paste Opposite Animation", media.paste_opposite_animation_image),
-    "paste_animation_to": ("copy_paste", "Paste Animation To", media.paste_animation_image),
-    "copy_link": ("copy_paste", "Copy Link Position", media.link_objects_copy_image),
-    "paste_link": ("copy_paste", "Paste Link Position", media.link_objects_paste_image),
-    "copy_worldspace_single_frame": ("worldspace", "Copy World Space Current Frame", media.worldspace_copy_frame_image),
-    "paste_worldspace_single_frame": ("worldspace", "Paste World Space Current Frame", media.worldspace_paste_frame_image),
-    "copy_range_worldspace_animation": ("worldspace", "Copy World Space Selected Range", media.worldspace_copy_animation_image),
-    "worldspace_paste_animation": ("worldspace", "Paste World Space Animation", media.worldspace_paste_animation_image),
-    "worldspace_copy_animation": ("worldspace", "Copy World Space Animation", media.worldspace_copy_animation_image),
-    "create_temp_pivot": ("temp_pivot", "Create Temp Pivot", media.temp_pivot_image),
-    "create_temp_pivot_last": ("temp_pivot", "Create Temp Pivot Last", media.temp_pivot_use_last_image),
-    "create_follow_cam": ("follow_cam", "Create Follow Cam", media.follow_cam_image),
-    "set_auto_tangent": ("tangents", "Auto Tangent", media.auto_tangent_image),
-    "set_spline_tangent": ("tangents", "Spline Tangent", media.spline_tangent_image),
-    "set_clamped_tangent": ("tangents", "Clamped Tangent", media.clamped_tangent_image),
-    "set_linear_tangent": ("tangents", "Linear Tangent", media.linear_tangent_image),
-    "set_flat_tangent": ("tangents", "Flat Tangent", media.flat_tangent_image),
-    "set_step_tangent": ("tangents", "Step Tangent", media.step_tangent_image),
-    "set_plateau_tangent": ("tangents", "Plateau Tangent", media.plateau_tangent_image),
+
+HOTKEY_COMMAND_METADATA = {
+    "open_custom_graph": ("Custom Graph", media.customGraph_image),
+    "toolbar_toggle": ("Toggle Toolbar", media.tool_icon),
+    "toolbar_add_shelf_button": ("Add Toggle Button To Shelf", media.asset_path("tool_icon")),
+    "toolbar_reload": ("Reload", media.reload_image),
+    "toolbar_unload": ("Unload", media.close_image),
+    "check_for_updates": ("Check for Updates", media.check_updates_image),
+    "orbit_window": ("Orbit Window", media.orbit_ui_image),
+    "selection_sets_toggle": ("Selection Sets", media.selection_sets_image),
+    "animation_offset_toggle": ("Animation Offset", media.animation_offset_image),
+    "micro_move_toggle": ("Micro Move", media.ruler_image),
+    "custom_graph_toggle": ("Graph Toolbar Toggle", media.customGraph_image),
+    "hotkeys_window": ("Hotkeys", media.hotkeys_image),
+    "about_window": ("About", media.about_image),
+    "donate_window": ("Donate", media.stripe_image),
+    "bug_report_window": ("Bug Report", media.report_a_bug_image),
+    "smart_rotation": ("Smart Rotation", media.auto_tangent_image),
+    "smart_rotation_release": ("Smart Rotation Release", media.auto_tangent_image),
+    "smart_translation": ("Smart Translation", media.create_locator_image),
+    "smart_translation_release": ("Smart Translation Release", media.create_locator_image),
+    "depth_mover": ("Depth Mover", media.depth_mover_image),
+    "create_locator": ("Create Locator", media.create_locator_image),
+    "isolate_master": ("Isolate", media.isolate_image),
+    "select_rig_controls": ("Select Rig Controls", media.select_rig_controls_image),
+    "select_rig_controls_animated": ("Select Animated Rig Controls", media.select_rig_controls_animated_image),
+    "select_hierarchy": ("Select Hierarchy", media.select_hierarchy_image),
+    "align_selected_objects": ("Align Selected Objects", media.align_menu_image),
+    "create_tracer": ("Create Tracer", media.tracer_image),
+    "refresh_tracer": ("Refresh Tracer", media.refresh_image),
+    "delete_all_animation": ("Delete All Animation", media.delete_animation_image),
+    "insert_inbetween": ("Insert Inbetween", media.insert_inbetween_image),
+    "remove_inbetween": ("Remove Inbetween", media.remove_inbetween_image),
+    "nudge_left": ("Nudge Left", media.nudge_left_image),
+    "nudge_right": ("Nudge Right", media.nudge_right_image),
+    "reset_values": ("Reset Values", media.asset_path("reset_animation_image")),
+    "reset_translations": ("Reset Translations", media.asset_path("reset_animation_image")),
+    "reset_rotations": ("Reset Rotations", media.asset_path("reset_animation_image")),
+    "reset_scales": ("Reset Scales", media.asset_path("reset_animation_image")),
+    "reset_trs": ("Reset Translation Rotation Scale", media.asset_path("reset_animation_image")),
+    "select_opposite": ("Select Opposite", media.opposite_select_image),
+    "add_opposite": ("Add Opposite", media.opposite_add_image),
+    "copy_opposite": ("Copy Opposite", media.opposite_copy_image),
+    "mirror": ("Mirror", media.mirror_image),
+    "copy_pose": ("Copy Pose", media.copy_pose_image),
+    "paste_pose": ("Paste Pose", media.paste_pose_image),
+    "copy_animation": ("Copy Animation", media.copy_animation_image),
+    "paste_animation": ("Paste Animation", media.paste_animation_image),
+    "paste_insert_animation": ("Paste Insert Animation", media.paste_insert_animation_image),
+    "paste_opposite_animation": ("Paste Opposite Animation", media.paste_opposite_animation_image),
+    "paste_animation_to": ("Paste Animation To", media.paste_animation_image),
+    "copy_link": ("Copy Link Position", media.link_objects_copy_image),
+    "paste_link": ("Paste Link Position", media.link_objects_paste_image),
+    "copy_worldspace_single_frame": ("Copy World Space Current Frame", media.worldspace_copy_frame_image),
+    "paste_worldspace_single_frame": ("Paste World Space Current Frame", media.worldspace_paste_frame_image),
+    "copy_range_worldspace_animation": ("Copy World Space Selected Range", media.worldspace_copy_animation_image),
+    "worldspace_paste_animation": ("Paste World Space Animation", media.worldspace_paste_animation_image),
+    "worldspace_copy_animation": ("Copy World Space Animation", media.worldspace_copy_animation_image),
+    "create_temp_pivot": ("Create Temp Pivot", media.temp_pivot_image),
+    "create_temp_pivot_last": ("Create Temp Pivot Last", media.temp_pivot_use_last_image),
+    "create_follow_cam": ("Create Follow Cam", media.follow_cam_image),
+    "set_auto_tangent": ("Auto Tangent", media.auto_tangent_image),
+    "set_spline_tangent": ("Spline Tangent", media.spline_tangent_image),
+    "set_clamped_tangent": ("Clamped Tangent", media.clamped_tangent_image),
+    "set_linear_tangent": ("Linear Tangent", media.linear_tangent_image),
+    "set_flat_tangent": ("Flat Tangent", media.flat_tangent_image),
+    "set_step_tangent": ("Step Tangent", media.step_tangent_image),
+    "set_plateau_tangent": ("Plateau Tangent", media.plateau_tangent_image),
 }
 
 
@@ -433,6 +423,23 @@ def _slider_value_label(value):
     if value > 0:
         return "+{}%".format(value)
     return "{}%".format(value)
+
+
+def _shortcut_mask(shortcut):
+    keys = shortcut.get("keys")
+    if keys == "Click":
+        return 0
+    if not isinstance(keys, (list, tuple)):
+        return None
+
+    mask = 0
+    if QtCore.Qt.Key_Shift in keys:
+        mask |= 1
+    if QtCore.Qt.Key_Control in keys:
+        mask |= 4
+    if QtCore.Qt.Key_Alt in keys:
+        mask |= 8
+    return mask
 
 
 def _trigger_command_string(command_name):
@@ -571,6 +578,7 @@ def _ensure_runtime_binding(command_name, title):
     kwargs = {
         "annotation": title,
         "category": "TheKeyMachine",
+        "showInHotkeyEditor": False,
         "commandLanguage": "python",
         "command": _trigger_command_string(command_name),
     }
@@ -581,9 +589,22 @@ def _ensure_runtime_binding(command_name, title):
             cmds.runTimeCommand(runtime_name, **kwargs)
     except Exception:
         if cmds.runTimeCommand(runtime_name, query=True, exists=True):
-            cmds.runTimeCommand(runtime_name, edit=True, annotation=title, category="TheKeyMachine", command=_trigger_command_string(command_name))
+            cmds.runTimeCommand(
+                runtime_name,
+                edit=True,
+                annotation=title,
+                category="TheKeyMachine",
+                showInHotkeyEditor=False,
+                command=_trigger_command_string(command_name),
+            )
         else:
-            cmds.runTimeCommand(runtime_name, annotation=title, category="TheKeyMachine", command=_trigger_command_string(command_name))
+            cmds.runTimeCommand(
+                runtime_name,
+                annotation=title,
+                category="TheKeyMachine",
+                showInHotkeyEditor=False,
+                command=_trigger_command_string(command_name),
+            )
 
     try:
         cmds.nameCommand(name_command, edit=True, annotation=title, command=runtime_name)
@@ -715,119 +736,76 @@ def _native_tooltip_html(tooltip_data):
     return "".join(parts)
 
 
-def _empty_section(section_id, section_data):
+def _tool_command_row(tool_data):
+    command_name = tool_data.get("command")
+    if not command_name:
+        return None
     return {
-        "id": section_id,
-        "title": section_data["title"],
-        "icon_path": section_data["icon_path"],
-        "commands": [],
+        "command": command_name,
+        "title": tool_data.get("status_title") or tool_data.get("label") or _humanize(command_name),
+        "icon_path": tool_data.get("icon_path"),
+        "badge_text": None if tool_data.get("icon_path") else tool_data.get("text"),
     }
 
 
-def _entry(command_name, title, icon_path=None, badge_text=None, source_tool=None):
+def _variant_command_row(tool_data, variant, shortcut_label=None):
+    command_name = variant.get("command")
+    if not command_name:
+        return None
+    icon_path = variant.get("icon_path") or tool_data.get("icon_path")
+    return {
+        "command": command_name,
+        "title": shortcut_label or variant.get("status_title") or variant.get("label") or variant.get("description") or _humanize(command_name),
+        "icon_path": icon_path,
+        "badge_text": None if icon_path else variant.get("text") or tool_data.get("text"),
+    }
+
+
+def _manual_command_row(command_name):
+    title, icon_path = HOTKEY_COMMAND_METADATA.get(command_name, (_humanize(command_name), None))
     return {
         "command": command_name,
         "title": title,
         "icon_path": icon_path,
-        "badge_text": badge_text,
-        "source_tool": source_tool,
+        "badge_text": None,
     }
 
 
-def _callback_signature(callback):
-    if callback is None:
-        return None
-    if isinstance(callback, partial):
-        return (
-            "partial",
-            _callback_signature(callback.func),
-            tuple(callback.args),
-            tuple(sorted((callback.keywords or {}).items())),
-        )
-    module = getattr(callback, "__module__", "")
-    qualname = getattr(callback, "__qualname__", getattr(callback, "__name__", repr(callback)))
-    defaults = getattr(callback, "__defaults__", None)
-    closure = getattr(callback, "__closure__", None)
-    closure_values = ()
-    if closure:
-        try:
-            closure_values = tuple(cell.cell_contents for cell in closure)
-        except Exception:
-            closure_values = tuple(repr(cell) for cell in closure)
-    return ("callable", module, qualname, defaults, closure_values)
+def _append_section_row(section, seen, title_lookup, icon_lookup, trigger_commands, row):
+    if not row:
+        return
+    command_name = row.get("command")
+    if not command_name or command_name in seen or command_name not in trigger_commands:
+        return
+    section["commands"].append(row)
+    seen.add(command_name)
+    title_lookup[command_name] = row["title"]
+    icon_lookup[command_name] = row.get("icon_path")
 
 
-def _collect_catalog_entries():
-    entries = OrderedDict()
-    tool_callback_signatures = {}
-
-    for tool_key, tool_data in toolbox.TOOL_DEFINITIONS.items():
-        signature = _callback_signature(tool_data.get("callback"))
-        if signature:
-            tool_callback_signatures.setdefault(signature, set()).add(tool_key)
-
-    for tool_key, tool_data in toolbox.TOOL_DEFINITIONS.items():
-        command_name = tool_data.get("command")
-        if command_name:
-            entries.setdefault(
-                command_name,
-                _entry(
-                    command_name,
-                    tool_data.get("status_title") or tool_data.get("label") or _humanize(command_name),
-                    icon_path=tool_data.get("icon_path"),
-                    source_tool=tool_key,
-                ),
-            )
-
-        for variant in tool_data.get("shortcut_variants", []):
-            command_name = variant.get("command")
-            if not command_name:
-                continue
-            variant_signature = _callback_signature(variant.get("callback"))
-            if variant_signature and any(owner != tool_key for owner in tool_callback_signatures.get(variant_signature, ())):
-                continue
-            entries.setdefault(
-                command_name,
-                _entry(
-                    command_name,
-                    variant.get("status_title") or variant.get("label") or variant.get("description") or _humanize(command_name),
-                    icon_path=variant.get("icon_path") or tool_data.get("icon_path"),
-                    source_tool=tool_key,
-                ),
-            )
-
-    for command_name, (section_id, title, icon_path) in _MANUAL_COMMANDS.items():
-        entry = entries.get(command_name)
-        if entry:
-            entry.setdefault("manual_section", section_id)
-            if not entry.get("icon_path") and icon_path:
-                entry["icon_path"] = icon_path
-            if not entry.get("title"):
-                entry["title"] = title
+def _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, tool_id):
+    tool_data = toolbox.get_tool(tool_id)
+    _append_section_row(section, seen, title_lookup, icon_lookup, trigger_commands, _tool_command_row(tool_data))
+    shortcut_labels_by_mask = {}
+    for shortcut in tool_data.get("shortcuts", [])[1:]:
+        shortcut_mask = _shortcut_mask(shortcut)
+        if shortcut_mask is None:
             continue
-        entries[command_name] = _entry(command_name, title, icon_path=icon_path)
-        entries[command_name]["manual_section"] = section_id
+        shortcut_labels_by_mask[shortcut_mask] = shortcut.get("label")
 
-    return entries
-
-
-def _classify_entry_section(entry):
-    command_name = entry["command"]
-    source_tool = entry.get("source_tool")
-
-    for section_id, section_data in _SECTION_SPECS.items():
-        if source_tool and source_tool in section_data.get("tools", []):
-            return section_id
-        if command_name in section_data.get("commands", []):
-            return section_id
-        for prefix in section_data.get("command_prefixes", []):
-            if command_name.startswith(prefix):
-                return section_id
-
-    return entry.get("manual_section")
+    for variant in tool_data.get("shortcut_variants", []):
+        shortcut_label = shortcut_labels_by_mask.get(int(variant.get("mask", -1)))
+        _append_section_row(
+            section,
+            seen,
+            title_lookup,
+            icon_lookup,
+            trigger_commands,
+            _variant_command_row(tool_data, variant, shortcut_label=shortcut_label),
+        )
 
 
-def _slider_section(prefix, title, modes, default_icon=None):
+def _build_slider_hotkey_section(prefix, title, modes, default_icon=None):
     section = {"id": prefix, "title": title, "icon_path": default_icon, "commands": []}
     for mode in modes:
         if not isinstance(mode, dict):
@@ -848,68 +826,49 @@ def _slider_section(prefix, title, modes, default_icon=None):
 
 def _build_command_catalog():
     trigger_commands = set(trigger.list_commands())
-    sections = OrderedDict()
-    section_seen = {}
     title_lookup = {}
     icon_lookup = {}
-    entries = _collect_catalog_entries()
+    sections = []
 
-    for section_id, section_data in _SECTION_SPECS.items():
-        sections[section_id] = _empty_section(section_id, section_data)
-        section_seen[section_id] = set()
+    for section_id, section_data in HOTKEY_SECTION_SPECS.items():
+        section = {
+            "id": section_id,
+            "title": section_data["title"],
+            "icon_path": section_data["icon_path"],
+            "commands": [],
+        }
+        seen = set()
 
-    covered = set()
-    for command_name, entry in entries.items():
-        if command_name not in trigger_commands or command_name in covered:
-            continue
-        section_id = _classify_entry_section(entry)
-        if not section_id:
-            continue
-        if section_id not in sections:
-            sections[section_id] = {
-                "id": section_id,
-                "title": _humanize(section_id),
-                "icon_path": None,
-                "commands": [],
-            }
-            section_seen[section_id] = set()
-        if command_name in section_seen[section_id]:
-            continue
-        sections[section_id]["commands"].append(
-            {
-                "command": command_name,
-                "title": entry["title"],
-                "icon_path": entry.get("icon_path"),
-                "badge_text": entry.get("badge_text"),
-            }
-        )
-        section_seen[section_id].add(command_name)
-        title_lookup[command_name] = entry["title"]
-        icon_lookup[command_name] = entry.get("icon_path")
-        covered.add(command_name)
+        for tool_id in section_data.get("tools", []):
+            _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, tool_id)
+
+        for command_name in section_data.get("commands", []):
+            _append_section_row(section, seen, title_lookup, icon_lookup, trigger_commands, _manual_command_row(command_name))
+
+        for prefix in section_data.get("command_prefixes", []):
+            for command_name in sorted(command for command in trigger_commands if command.startswith(prefix)):
+                _append_section_row(section, seen, title_lookup, icon_lookup, trigger_commands, _manual_command_row(command_name))
+
+        if section["commands"]:
+            sections.append(section)
+
+    from TheKeyMachine.sliders import BLEND_MODES, TANGENT_MODES, TWEEN_MODES
 
     for section in (
-        _slider_section("blend_slider", "Blend Slider", BLEND_MODES, _SECTION_ICONS["blend_slider"]),
-        _slider_section("tween_slider", "Tween Slider", TWEEN_MODES, _SECTION_ICONS["tween_slider"]),
-        _slider_section("tangent_slider", "Tangent Slider", TANGENT_MODES, _SECTION_ICONS["tangent_slider"]),
+        _build_slider_hotkey_section("blend_slider", "Blend Slider", BLEND_MODES, HOTKEY_SECTION_ICONS["blend_slider"]),
+        _build_slider_hotkey_section("tween_slider", "Tween Slider", TWEEN_MODES, HOTKEY_SECTION_ICONS["tween_slider"]),
+        _build_slider_hotkey_section("tangent_slider", "Tangent Slider", TANGENT_MODES, HOTKEY_SECTION_ICONS["tangent_slider"]),
     ):
-        filtered = [entry for entry in section["commands"] if entry["command"] in trigger_commands]
-        if filtered:
-            section["commands"] = filtered
-            sections[section["id"]] = section
-            section_seen.setdefault(section["id"], set())
-            for command in filtered:
-                if command["command"] in section_seen[section["id"]]:
-                    continue
-                title_lookup[command["command"]] = command["title"]
-                icon_lookup[command["command"]] = command.get("icon_path")
-                section_seen[section["id"]].add(command["command"])
-                covered.add(command["command"])
-            section["commands"] = [cmd for cmd in section["commands"] if cmd["command"] in section_seen[section["id"]]]
+        filtered = [row for row in section["commands"] if row["command"] in trigger_commands]
+        if not filtered:
+            continue
+        section["commands"] = filtered
+        sections.append(section)
+        for row in filtered:
+            title_lookup[row["command"]] = row["title"]
+            icon_lookup[row["command"]] = row.get("icon_path")
 
-    sections = OrderedDict((section_id, section) for section_id, section in sections.items() if section["commands"])
-
-    return list(sections.values()), title_lookup, icon_lookup
+    return sections, title_lookup, icon_lookup
 
 
 class HotkeyCaptureEdit(QtWidgets.QLineEdit):
@@ -1096,13 +1055,31 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         main_layout.setSpacing(wutil.DPI(8))
 
         title_wrap = QtWidgets.QWidget()
-        title_layout = QtWidgets.QVBoxLayout(title_wrap)
+        title_layout = QtWidgets.QHBoxLayout(title_wrap)
         title_layout.setContentsMargins(0, wutil.DPI(8), 0, wutil.DPI(10))
-        title_layout.setSpacing(0)
+        title_layout.setSpacing(wutil.DPI(16))
+
+        icon_size = wutil.DPI(51)
+
+        self.window_icon = QtWidgets.QLabel()
+        self.window_icon.setFixedSize(icon_size, icon_size)
+        self.window_icon.setAlignment(QtCore.Qt.AlignCenter)
+        hotkeys_pixmap = QtGui.QPixmap(media.hotkeys_image)
+        if not hotkeys_pixmap.isNull():
+            self.window_icon.setPixmap(
+                hotkeys_pixmap.scaled(
+                    icon_size,
+                    icon_size,
+                    QtCore.Qt.KeepAspectRatio,
+                    QtCore.Qt.SmoothTransformation,
+                )
+            )
+        title_layout.addWidget(self.window_icon, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
         self.window_title = QtWidgets.QLabel("Hotkeys")
         self.window_title.setStyleSheet("color:#d8d8d8;font-size:%spx;font-weight:bold;" % wutil.DPI(22))
-        title_layout.addWidget(self.window_title)
+        title_layout.addWidget(self.window_title, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        title_layout.addStretch(1)
         main_layout.addWidget(title_wrap)
 
         content_layout = QtWidgets.QGridLayout()

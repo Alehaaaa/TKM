@@ -72,10 +72,19 @@ def _get_open_bug_report_dialog():
     global _BUG_REPORT_DIALOG
 
     if _is_valid_dialog(_BUG_REPORT_DIALOG):
-        return _BUG_REPORT_DIALOG
+        try:
+            if _BUG_REPORT_DIALOG.isVisible():
+                return _BUG_REPORT_DIALOG
+        except Exception:
+            pass
+        _clear_bug_report_dialog()
 
     for widget in QtWidgets.QApplication.topLevelWidgets():
-        if isinstance(widget, customDialogs.QFlatBugReportDialog) and _is_valid_dialog(widget):
+        if (
+            isinstance(widget, customDialogs.QFlatBugReportDialog)
+            and _is_valid_dialog(widget)
+            and widget.isVisible()
+        ):
             _set_bug_report_dialog(widget)
             return widget
     return None
@@ -382,6 +391,19 @@ def install_bug_exception_handler():
 def bug_report_window(*args, dialog_title="Sorry, you found a bug!", prefill_name="", prefill_explanation="", prefill_script_error=""):
     existing_dialog = _get_open_bug_report_dialog()
     if existing_dialog:
+        if hasattr(existing_dialog, "apply_prefill"):
+            existing_dialog.apply_prefill(
+                dialog_title=dialog_title,
+                name=prefill_name,
+                explanation=prefill_explanation,
+                script_error=prefill_script_error,
+            )
+        try:
+            existing_dialog.show()
+            existing_dialog.raise_()
+            existing_dialog.activateWindow()
+        except Exception:
+            pass
         return existing_dialog
 
     dlg = customDialogs.QFlatBugReportDialog(
@@ -391,7 +413,10 @@ def bug_report_window(*args, dialog_title="Sorry, you found a bug!", prefill_nam
         prefill_explanation=prefill_explanation,
         prefill_script_error=prefill_script_error,
     )
+    dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
     _set_bug_report_dialog(dlg)
+    if hasattr(dlg, "finished"):
+        dlg.finished.connect(_clear_bug_report_dialog)
     dlg.destroyed.connect(_clear_bug_report_dialog)
     dlg.show_centered()
     return dlg

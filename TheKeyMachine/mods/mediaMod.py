@@ -80,6 +80,7 @@ _ASSET_FILES = {
     "bouncy_curve_image": "bouncy_curve.svg",
     "playblast_image": "playblast.svg",
     "selection_sets_image": "selection_sets.svg",
+    "hotkeys_image": "hotkeys.svg",
     "selection_sets_add_image": "selection_sets_add.svg",
     "selection_sets_reload_image": "selection_sets_reload.svg",
     "selection_sets_import_image": "selection_sets_import.svg",

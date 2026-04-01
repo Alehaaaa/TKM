@@ -2256,6 +2256,36 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ],
         )
 
+        sec = new_section(color=11)
+
+        # Tangents -----------------------------------------------------------------------
+        btn_cycle = cw.create_tool_button_from_data(toolbox.get_tool("tangent_cycle_matcher"))
+        sec.addWidget(btn_cycle, "Cycle Matcher", "cycle", default_visible=False)
+
+        btn_bouncy = cw.create_tool_button_from_data(toolbox.get_tool("tangent_bouncy"))
+        sec.addWidget(btn_bouncy, "Bouncy Tangent", "bouncy")
+
+        btn_tangent_auto = cw.create_tool_button_from_data(toolbox.get_tool("tangent_auto"))
+        sec.addWidget(btn_tangent_auto, "Auto Tangent", "tangent_auto")
+
+        btn_tangent_spline = cw.create_tool_button_from_data(toolbox.get_tool("tangent_spline"))
+        sec.addWidget(btn_tangent_spline, "Spline Tangent", "tangent_spline", default_visible=False)
+
+        btn_tangent_clamped = cw.create_tool_button_from_data(toolbox.get_tool("tangent_clamped"))
+        sec.addWidget(btn_tangent_clamped, "Clamped Tangent", "tangent_clamped", default_visible=False)
+
+        btn_tangent_linear = cw.create_tool_button_from_data(toolbox.get_tool("tangent_linear"))
+        sec.addWidget(btn_tangent_linear, "Linear Tangent", "tangent_linear", default_visible=False)
+
+        btn_tangent_flat = cw.create_tool_button_from_data(toolbox.get_tool("tangent_flat"))
+        sec.addWidget(btn_tangent_flat, "Flat Tangent", "tangent_flat", default_visible=False)
+
+        btn_tangent_step = cw.create_tool_button_from_data(toolbox.get_tool("tangent_step"))
+        sec.addWidget(btn_tangent_step, "Step Tangent", "tangent_step")
+
+        btn_tangent_plateau = cw.create_tool_button_from_data(toolbox.get_tool("tangent_plateau"))
+        sec.addWidget(btn_tangent_plateau, "Plateau Tangent", "tangent_plateau", default_visible=False)
+
         sec = new_section(color=toolColors.purple)
 
         # Animation Offset -----------------------------------------------------------------------
@@ -2795,7 +2825,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             action.triggered.connect(lambda align_name=align_name, align_value=align_value: update_toolbar_icon_alignment(align_name, align_value))
 
         settings_menu.addSection("Hotkeys")
-        settings_menu.addAction("Hotkeys...", hotkeys.show_hotkeys_window, description="Manage trigger hotkeys for TKM tools.")
+        settings_menu.addAction(
+            QtGui.QIcon(media.hotkeys_image),
+            "Hotkeys...",
+            hotkeys.show_hotkeys_window,
+            description="Manage trigger hotkeys for TKM tools.",
+        )
 
         settings_menu.addSection("General")
         settings_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")

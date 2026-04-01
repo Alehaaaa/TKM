@@ -123,9 +123,20 @@ def selection_sets_window(*args, controller=None, reuse_existing=True):
     controller = _resolve_toolbar_controller(controller)
     win = get_selection_sets_window()
     if reuse_existing and win and wutil.is_valid_widget(win):
+        if controller is not None:
+            win.controller = controller
+        reconnect = getattr(win, "_connect_selection_callback", None)
+        if callable(reconnect):
+            reconnect()
         if not win.isVisible():
             win.show()
+        refresh_match_states = getattr(win, "_update_button_match_states", None)
+        if callable(refresh_match_states):
+            refresh_match_states()
         win.apply_stay_on_top_setting()
+        clamp = getattr(win, "clamp_to_current_screen", None)
+        if callable(clamp):
+            clamp()
         win.raise_()
         win.activateWindow()
         _emit_selection_sets_window_state(True)
