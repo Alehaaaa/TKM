@@ -41,6 +41,10 @@ class MicroMoveController(QtCore.QObject):
         settings.set_setting("micro_move_button_state", False)
         self._timer.stop()
         try:
+            bar._clear_micro_cursor()
+        except Exception:
+            pass
+        try:
             cmds.manipMoveContext("dummyCtx")
             cmds.setToolTo("dummyCtx")
         except Exception:

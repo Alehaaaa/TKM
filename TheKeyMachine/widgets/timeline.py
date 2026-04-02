@@ -36,10 +36,36 @@ def _normalize_slider_range(range_array):
     return start, end
 
 
-def get_graph_editor_selected_frames():
+def _normalize_frames(frames):
+    normalized = set()
+    for frame in frames or []:
+        try:
+            normalized.add(int(round(frame)))
+        except Exception:
+            continue
+    return sorted(normalized)
+
+
+def get_graph_editor_selected_tangent_frames():
+    try:
+        tangent_frames = cmds.keyTangent(query=True, selected=True, timeChange=True) or []
+    except Exception:
+        tangent_frames = []
+    return _normalize_frames(tangent_frames)
+
+
+def get_graph_editor_selected_frames(include_tangents=True):
     frames = cmds.keyframe(query=True, selected=True, tc=True) or []
-    frames = sorted({int(frame) for frame in frames})
-    return frames
+    if include_tangents:
+        frames = list(frames) + get_graph_editor_selected_tangent_frames()
+    return _normalize_frames(frames)
+
+
+def get_graph_editor_selected_range(include_tangents=True):
+    frames = get_graph_editor_selected_frames(include_tangents=include_tangents)
+    if not frames:
+        return None
+    return frames[0], frames[-1]
 
 
 def get_selected_time_slider_range():

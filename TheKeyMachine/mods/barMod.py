@@ -22,9 +22,9 @@ import maya.mel as mel
 from maya import OpenMaya as om
 
 try:
-    from PySide2 import QtCore, QtWidgets
+    from PySide2 import QtCore, QtWidgets, QtGui
 except ImportError:
-    from PySide6 import QtWidgets, QtCore
+    from PySide6 import QtWidgets, QtCore, QtGui
 
 
 import json
@@ -42,6 +42,7 @@ import TheKeyMachine.core.runtime_manager as runtime
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
+import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.widgets.customDialogs as customDialogs
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.widgets.timeline as timelineWidgets
@@ -57,6 +58,67 @@ python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 global down_one_level
 down_one_level_var = False
 TEMP_PIVOT_RUNTIME_KEY = "temp_pivot_auto_link"
+MICRO_MOVE_HELPERS_GROUP = "tkm_microMove_helpers"
+
+
+def _build_micro_cursor(image_name):
+    image_path = media.getImage(image_name)
+    pixmap = QtGui.QPixmap(image_path) if image_path else QtGui.QPixmap()
+    if pixmap.isNull():
+        return None
+    return QtGui.QCursor(
+        pixmap.scaled(33, 33, QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation),
+        3,
+        3,
+    )
+
+
+_MICRO_CURSOR_OPEN = _build_micro_cursor("micro_manipulator_open.png")
+_MICRO_CURSOR_PINCHED = _build_micro_cursor("micro_manipulator.png")
+
+
+def _clear_micro_cursor():
+    app = QtWidgets.QApplication.instance()
+    if not app:
+        return
+    try:
+        while app.overrideCursor() is not None:
+            app.restoreOverrideCursor()
+    except Exception:
+        try:
+            app.restoreOverrideCursor()
+        except Exception:
+            pass
+
+
+def _set_micro_cursor(pinched=False):
+    cursor = _MICRO_CURSOR_PINCHED if pinched else _MICRO_CURSOR_OPEN
+    if cursor is None:
+        return
+    _clear_micro_cursor()
+    try:
+        QtWidgets.QApplication.setOverrideCursor(cursor)
+    except Exception:
+        pass
+
+
+def _ensure_micro_move_helpers_group():
+    if not cmds.objExists("TheKeyMachine"):
+        general.create_TheKeyMachine_node()
+
+    if not cmds.objExists(MICRO_MOVE_HELPERS_GROUP):
+        group = cmds.createNode("transform", name=MICRO_MOVE_HELPERS_GROUP)
+    else:
+        group = MICRO_MOVE_HELPERS_GROUP
+
+    try:
+        current_parent = cmds.listRelatives(group, parent=True, fullPath=False) or []
+        if not current_parent or current_parent[0] != "TheKeyMachine":
+            cmds.parent(group, "TheKeyMachine")
+    except Exception:
+        pass
+
+    return group
 
 
 def _active_tint_color():
@@ -2525,12 +2587,15 @@ def micro_move_pre_drag(*args):
     global micro_move_selected_objects, micro_move_drivers
 
     toolCommon.open_undo_chunk(tool_id="micro_move")
+    _set_micro_cursor(pinched=True)
 
     micro_move_selected_objects = util.get_selected_objects()
     if not micro_move_selected_objects:
         raise Exception("Please select an object")
+    original_selection = list(micro_move_selected_objects)
 
     transform_attrs = ["translateX", "translateY", "translateZ"]
+    helpers_group = _ensure_micro_move_helpers_group()
 
     for selected in micro_move_selected_objects:
         for attr in transform_attrs:
@@ -2539,6 +2604,14 @@ def micro_move_pre_drag(*args):
     for selected in micro_move_selected_objects:
         duplicated = cmds.duplicate(selected, name=f"{selected}_connect", parentOnly=True)[0]
         driver = cmds.duplicate(selected, name=f"{selected}_driver", parentOnly=True)[0]
+        try:
+            cmds.parent(duplicated, helpers_group)
+        except Exception:
+            pass
+        try:
+            cmds.parent(driver, helpers_group)
+        except Exception:
+            pass
         micro_move_drivers.append(driver)
 
         # Desactivar los límites de transformación para el driver
@@ -2559,13 +2632,14 @@ def micro_move_pre_drag(*args):
 
         add_micro_move_callback(driver)
 
-    if micro_move_drivers:
-        cmds.select(micro_move_drivers)
+    if original_selection:
+        cmds.select(original_selection, replace=True)
     micro_move_drivers.clear()
 
 
 def micro_move_post_drag():
     global micro_move_selected_objects, micro_move_animation_data
+    _set_micro_cursor(pinched=False)
 
     for selected in micro_move_selected_objects:
         duplicate_name = f"{selected}_connect"
@@ -2594,7 +2668,8 @@ def micro_move_post_drag():
 
     remove_micro_move_callbacks()
     micro_move_animation_data.clear()
-    cmds.select(micro_move_selected_objects)
+    if micro_move_selected_objects:
+        cmds.select(micro_move_selected_objects)
 
     toolCommon.close_undo_chunk()
 
@@ -2675,6 +2750,8 @@ def micro_rotate_pack_funtion():
         micro_rotate_callback_ids = []  # Limpiar la lista después de eliminar los callbacks
 
     micro_rotate_selected_objects = util.get_selected_objects()
+    original_selection = list(micro_rotate_selected_objects)
+    helpers_group = _ensure_micro_move_helpers_group()
 
     transform_attrs = ["rotateX", "rotateY", "rotateZ"]
     for selected in micro_rotate_selected_objects:
@@ -2684,6 +2761,14 @@ def micro_rotate_pack_funtion():
     for selected in micro_rotate_selected_objects:
         connect = cmds.duplicate(selected, name=f"{selected}_connect", parentOnly=True)[0]
         driver = cmds.duplicate(selected, name=f"{selected}_driver", parentOnly=True)[0]
+        try:
+            cmds.parent(connect, helpers_group)
+        except Exception:
+            pass
+        try:
+            cmds.parent(driver, helpers_group)
+        except Exception:
+            pass
         micro_rotate_drivers.append(driver)
 
         # Desactivar los límites de transformación para el driver
@@ -2709,18 +2794,20 @@ def micro_rotate_pack_funtion():
 
         add_micro_rotate_callback(driver, connect)
 
-    if micro_rotate_drivers:
-        cmds.select(micro_rotate_drivers)
+    if original_selection:
+        cmds.select(original_selection, replace=True)
     micro_rotate_drivers.clear()
 
 
 def micro_rotate_pre_drag(*args):
     toolCommon.open_undo_chunk(title="Micro Rotate", tooltip_template=helper.micro_move_tooltip_text)
+    _set_micro_cursor(pinched=True)
     micro_rotate_pack_funtion()
 
 
 def micro_rotate_post_deferred():
     global micro_rotate_selected_objects, micro_rotate_animation_data
+    _set_micro_cursor(pinched=False)
 
     for selected in micro_rotate_selected_objects:
         duplicate_name = f"{selected}_connect"
@@ -2753,7 +2840,8 @@ def micro_rotate_post_deferred():
     remove_micro_rotate_callbacks()
     micro_rotate_animation_data.clear()
     toolCommon.close_undo_chunk()
-    cmds.select(micro_rotate_selected_objects)
+    if micro_rotate_selected_objects:
+        cmds.select(micro_rotate_selected_objects)
 
 
 def remove_micro_rotate_callbacks():
@@ -2774,6 +2862,7 @@ def activate_micro_move(*args):
     current_context = cmds.currentCtx()
     microMoveContext = "microMoveCtx"
     microRotateContext = "microRotateCtx"
+    _ensure_micro_move_helpers_group()
 
     if cmds.contextInfo("dummyCtx", exists=True):
         if cmds.contextInfo(microRotateContext, exists=True):
@@ -2786,11 +2875,13 @@ def activate_micro_move(*args):
             cmds.deleteUI("dummyCtx", toolContext=True)
 
         cmds.setToolTo("moveSuperContext")
+        _clear_micro_cursor()
 
     else:
         if current_context == "RotateSuperContext":
             if cmds.contextInfo(microRotateContext, exists=True):
                 cmds.setToolTo(microRotateContext)
+                _set_micro_cursor(pinched=False)
             else:
                 cmds.manipRotateContext(microRotateContext)
                 # 0 object, 1 world, 2 gimbal
@@ -2802,10 +2893,12 @@ def activate_micro_move(*args):
                     mode=2,
                 )
                 cmds.setToolTo(microRotateContext)
+                _set_micro_cursor(pinched=False)
 
         elif current_context == "moveSuperContext":
             if cmds.contextInfo(microMoveContext, exists=True):
                 cmds.setToolTo(microMoveContext)
+                _set_micro_cursor(pinched=False)
             else:
                 cmds.manipMoveContext(microMoveContext)
                 cmds.manipMoveContext(
@@ -2816,6 +2909,7 @@ def activate_micro_move(*args):
                     mode=0,
                 )
                 cmds.setToolTo(microMoveContext)
+                _set_micro_cursor(pinched=False)
 
 
 # _______________________________________________ BAKE CUSTOM INTERVAL __________________________________________________

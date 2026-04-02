@@ -75,6 +75,9 @@ class AnimationOffsetController(QtCore.QObject):
         return int(cmds.currentTime(query=True))
 
     def _resolve_locked_time_range(self):
+        graph_range = timelineWidgets.get_graph_editor_selected_range()
+        if graph_range:
+            return graph_range
         selected_range = timelineWidgets.get_selected_time_slider_range()
         if selected_range:
             return selected_range
