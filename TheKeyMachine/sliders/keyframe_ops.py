@@ -295,6 +295,24 @@ def cache_keyframe_data(attr_plugs, time_range=None):
     return utils.frame_data_cache
 
 
+def _resolve_neighbor_blend_target(prev_value, next_value, percentage):
+    has_prev = isinstance(prev_value, (int, float))
+    has_next = isinstance(next_value, (int, float))
+
+    if percentage > 0:
+        if has_next:
+            return next_value
+        if has_prev:
+            return prev_value
+    elif percentage < 0:
+        if has_prev:
+            return prev_value
+        if has_next:
+            return next_value
+
+    return None
+
+
 def execute_blend_to_neighbors(percentage, world_space=False):
     """Blends the current pose toward previous/next neighbors (or time range boundaries if selected)."""
     utils.start_dragging()
@@ -320,19 +338,12 @@ def execute_blend_to_neighbors(percentage, world_space=False):
         if not isinstance(orig, (int, float)):
             continue
 
-        if percentage > 0:
-            if nxt is None or not isinstance(nxt, (int, float)):
-                continue
-            t = min(abs(percentage), 100.0) / 100.0
-            new_v = orig + (nxt - orig) * t
-        elif percentage < 0:
-            if prev is None or not isinstance(prev, (int, float)):
-                continue
-            t = min(abs(percentage), 100.0) / 100.0
-            new_v = orig + (prev - orig) * t
-        else:
+        target_value = _resolve_neighbor_blend_target(prev, nxt, percentage)
+        if target_value is None:
             continue
 
+        t = min(abs(percentage), 100.0) / 100.0
+        new_v = orig + (target_value - orig) * t
         _apply_cached_value(attr_full, new_v, current_time, use_direct_attr=cache.get("use_direct_attr", False))
 
 

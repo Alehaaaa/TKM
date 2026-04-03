@@ -456,6 +456,9 @@ animation_offset_tooltip_text = tool_tooltip(
     [
         "Offset the position of animated objects without destroying their existing motion.",
         "The offset propagates across the full animation range for the selected controls.",
+        movie.animation_offset,
+        separator,
+        "Tip: You can select a time range to offset only inside that range.",
     ],
     media.animation_offset_image,
 )

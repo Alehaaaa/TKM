@@ -190,6 +190,37 @@ def format_tooltip_shortcut(keys_list, include_click_suffix=False):
     return result
 
 
+class TooltipMovieLabel(QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._movie = None
+        self._display_size = None
+        self.setAlignment(Qt.AlignCenter)
+
+    def set_tooltip_movie(self, movie, display_size=None):
+        self._movie = movie
+        self._display_size = display_size if display_size and display_size.isValid() else None
+        if self._display_size is not None:
+            self.setFixedSize(self._display_size)
+        elif movie is not None:
+            frame_rect = movie.frameRect()
+            if frame_rect.isValid():
+                self.setFixedSize(frame_rect.size())
+        if movie is not None:
+            movie.frameChanged.connect(self._update_frame)
+            self._update_frame()
+
+    def _update_frame(self, *_):
+        if self._movie is None:
+            return
+        frame = self._movie.currentPixmap()
+        if frame.isNull():
+            return
+        if self._display_size is not None and frame.size() != self._display_size:
+            frame = frame.scaled(self._display_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.setPixmap(frame)
+
+
 class QFlatTooltip(QWidget):
     """A floating tooltip with an arrow pointing to its source."""
 
@@ -571,12 +602,11 @@ class QFlatTooltip(QWidget):
         return QSize(max_width, max(1, int(size.height() * scale)))
 
     def _create_media_label(self, path):
-        lbl = QLabel()
-        lbl.setAlignment(Qt.AlignCenter)
         max_media_width = self._body_max_width()
-        lbl.setMaximumWidth(max_media_width)
 
         if path.lower().endswith(".gif"):
+            lbl = TooltipMovieLabel()
+            lbl.setMaximumWidth(max_media_width)
             movie = QMovie(path)
             movie.setCacheMode(QMovie.CacheAll)
             movie.jumpToFrame(0)
@@ -584,13 +614,14 @@ class QFlatTooltip(QWidget):
             if not frame_size.isValid():
                 frame_size = movie.frameRect().size()
             contained_size = self._contain_size(max_media_width, frame_size)
-            if contained_size is not None:
-                movie.setScaledSize(contained_size)
             movie.finished.connect(movie.start)
+            lbl.set_tooltip_movie(movie, display_size=contained_size)
             movie.start()
-            lbl.setMovie(movie)
             lbl._movie = movie
         else:
+            lbl = QLabel()
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setMaximumWidth(max_media_width)
             pix = QPixmap(path)
             if not pix.isNull():
                 contained_size = self._contain_size(max_media_width, pix.size())
@@ -645,6 +676,7 @@ class QFlatTooltip(QWidget):
     def _populate_body_content(self, layout, body_html):
         for block_type, value in self._iter_body_blocks(body_html):
             if block_type == "separator":
+                layout.addSpacing(wutil.DPI(6))
                 layout.addWidget(self._create_separator())
                 continue
 

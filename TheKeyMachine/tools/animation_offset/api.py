@@ -475,9 +475,12 @@ class AnimationOffsetController(QtCore.QObject):
 
     def activate(self):
         self._enabled = True
+        locked_range = self._resolve_locked_time_range()
+        if locked_range:
+            self._time_range = locked_range
         cmds.select(wutil.get_selected_objects())
         self._connect_runtime_manager()
-        self._resnapshot(update_range=True)
+        self._resnapshot(update_range=self._time_range is None)
         timelineWidgets.show_timeline_tint(
             timerange=self._time_range,
             color=self._resolve_tint_color(),

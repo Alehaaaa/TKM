@@ -54,10 +54,37 @@ def get_graph_editor_selected_tangent_frames():
     return _normalize_frames(tangent_frames)
 
 
+def _get_graph_editor_selected_curves():
+    try:
+        selected_curves = cmds.keyframe(query=True, selected=True, name=True) or []
+    except Exception:
+        selected_curves = []
+    if selected_curves:
+        return selected_curves
+
+    try:
+        return cmds.selectionConnection("graphEditor1FromOutliner", query=True, object=True) or []
+    except Exception:
+        return []
+
+
 def get_graph_editor_selected_frames(include_tangents=True):
-    frames = cmds.keyframe(query=True, selected=True, tc=True) or []
+    try:
+        frames = list(cmds.keyframe(query=True, selected=True, tc=True) or [])
+    except Exception:
+        frames = []
+
+    for curve in _get_graph_editor_selected_curves():
+        try:
+            frames.extend(cmds.keyframe(curve, query=True, selected=True, timeChange=True) or [])
+        except Exception:
+            continue
+
     if include_tangents:
-        frames = list(frames) + get_graph_editor_selected_tangent_frames()
+        try:
+            frames.extend(get_graph_editor_selected_tangent_frames())
+        except Exception:
+            pass
     return _normalize_frames(frames)
 
 

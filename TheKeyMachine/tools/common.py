@@ -128,7 +128,7 @@ def make_undo_chunk_name(tool_id=None, title=None, description="", tooltip_templ
 
 
 def open_undo_chunk(tool_id=None, title=None, description="", tooltip_template=None):
-    open_named_undo_chunk(
+    return open_named_undo_chunk(
         make_undo_chunk_name(
             tool_id=tool_id,
             title=title,
@@ -136,12 +136,14 @@ def open_undo_chunk(tool_id=None, title=None, description="", tooltip_template=N
             tooltip_template=tooltip_template,
         )
     )
-    return True
 
 
 def open_named_undo_chunk(chunk_name):
-    cmds.undoInfo(openChunk=True, chunkName=chunk_name)
-    return True
+    try:
+        cmds.undoInfo(openChunk=True, chunkName=chunk_name)
+        return True
+    except Exception:
+        return False
 
 
 def close_undo_chunk(chunk_opened=True):
