@@ -23,8 +23,9 @@ import sys
 import threading
 import time
 import traceback
-import urllib.parse
-import urllib.request
+from datetime import datetime
+# import urllib.parse
+# import urllib.request
 
 import maya.cmds as cmds
 
@@ -80,11 +81,7 @@ def _get_open_bug_report_dialog():
         _clear_bug_report_dialog()
 
     for widget in QtWidgets.QApplication.topLevelWidgets():
-        if (
-            isinstance(widget, customDialogs.QFlatBugReportDialog)
-            and _is_valid_dialog(widget)
-            and widget.isVisible()
-        ):
+        if isinstance(widget, customDialogs.QFlatBugReportDialog) and _is_valid_dialog(widget) and widget.isVisible():
             _set_bug_report_dialog(widget)
             return widget
     return None
@@ -112,15 +109,6 @@ def _sanitize_payload_value(value):
     return str(value)
 
 
-def _detect_qt_binding():
-    module_name = QtCore.__module__ or ""
-    if module_name.startswith("PySide6"):
-        return "PySide6"
-    if module_name.startswith("PySide2"):
-        return "PySide2"
-    return module_name or "Unknown"
-
-
 def _collect_debug_context():
     info = {
         "tkm_version": general.get_thekeymachine_version(),
@@ -128,7 +116,6 @@ def _collect_debug_context():
         "python_implementation": _safe_call(platform.python_implementation),
         "python_compiler": _safe_call(platform.python_compiler),
         "python_build": _safe_call(platform.python_build),
-        "qt_binding": _detect_qt_binding(),
         "qt_version": _safe_call(QtCore.qVersion),
         "maya_version": _safe_about(version=True),
         "maya_api_version": _safe_about(apiVersion=True),
@@ -154,25 +141,49 @@ def _collect_debug_context():
 
 
 def send_bug_report(name, explanation, script_error):
-    url = ""
-    if not url:
-        return False
-
     payload = {
         "name": name,
         "explanation": explanation,
         "script_error": script_error,
     }
     payload.update(_collect_debug_context())
-    request_data = urllib.parse.urlencode(payload).encode("utf-8")
 
     try:
-        with urllib.request.urlopen(url, request_data) as response:
-            response_data = response.read().decode("utf-8")
+        time.sleep(1.2)
+
+        desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+        if not os.path.isdir(desktop_dir):
+            return False
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        report_path = os.path.join(desktop_dir, "TKM_Bug Report_{}.txt".format(timestamp))
+
+        lines = [
+            "TheKeyMachine Bug Report",
+            "Generated: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "",
+            "[User]",
+            "Name: {}".format(name),
+            "",
+            "[Explanation]",
+            explanation or "",
+            "",
+            "[Script Error]",
+            script_error or "",
+            "",
+            "[System Details]",
+        ]
+        for key in sorted(payload.keys()):
+            if key in ("name", "explanation", "script_error"):
+                continue
+            lines.append("{}: {}".format(key, payload[key]))
+
+        with open(report_path, "w") as report_file:
+            report_file.write("\n".join(lines))
     except Exception:
         return False
 
-    return "success" in response_data
+    return True
 
 
 def _extract_exception_source_file(exc=None, tb=None):
@@ -221,11 +232,7 @@ def _prune_reported_exception_ids(now=None):
     if now is None:
         now = time.time()
     expiry_seconds = 10.0
-    _REPORTED_EXCEPTION_IDS = {
-        key: timestamp
-        for key, timestamp in _REPORTED_EXCEPTION_IDS.items()
-        if (now - timestamp) < expiry_seconds
-    }
+    _REPORTED_EXCEPTION_IDS = {key: timestamp for key, timestamp in _REPORTED_EXCEPTION_IDS.items() if (now - timestamp) < expiry_seconds}
 
 
 def _is_exception_already_reported(exc=None):
@@ -388,7 +395,7 @@ def install_bug_exception_handler():
     _BUG_EXCEPTION_HANDLER_INSTALLED = True
 
 
-def bug_report_window(*args, dialog_title="Sorry, you found a bug!", prefill_name="", prefill_explanation="", prefill_script_error=""):
+def bug_report_window(*args, dialog_title="Report a Bug", prefill_name="", prefill_explanation="", prefill_script_error=""):
     existing_dialog = _get_open_bug_report_dialog()
     if existing_dialog:
         if hasattr(existing_dialog, "apply_prefill"):

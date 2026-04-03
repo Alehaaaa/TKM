@@ -42,6 +42,13 @@ def sync_graph_toolbar_watch() -> None:
         pass
 
 
+def _disconnect_graph_toolbar_sync(callback) -> None:
+    try:
+        custom_graph_bus.graph_toolbar_enabled_changed.disconnect(callback)
+    except Exception:
+        pass
+
+
 def _set_checked_safely(widget, checked: bool) -> bool:
     signal_blocker = getattr(widget, "blockSignals", None)
     blocked = False
@@ -70,19 +77,13 @@ def bind_graph_toolbar_toggle(widget) -> None:
     def _sync(enabled):
         try:
             if not wutil.is_valid_widget(widget):
-                try:
-                    custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync)
-                except Exception:
-                    pass
+                _disconnect_graph_toolbar_sync(_sync)
                 return
         except Exception:
             pass
 
         if not _set_checked_safely(widget, bool(enabled)):
-            try:
-                custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync)
-            except Exception:
-                pass
+            _disconnect_graph_toolbar_sync(_sync)
 
     try:
         _set_checked_safely(widget, get_graph_toolbar_checkbox_state())
@@ -97,7 +98,7 @@ def bind_graph_toolbar_toggle(widget) -> None:
     destroyed_signal = getattr(widget, "destroyed", None)
     if destroyed_signal:
         try:
-            destroyed_signal.connect(lambda *_: custom_graph_bus.graph_toolbar_enabled_changed.disconnect(_sync))
+            destroyed_signal.connect(lambda *_: _disconnect_graph_toolbar_sync(_sync))
         except Exception:
             pass
 

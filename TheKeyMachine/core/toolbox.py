@@ -10,9 +10,11 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.mods.barMod as bar
+import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
+from TheKeyMachine.tools import colors as toolColors
 
 """
 TheKeyMachine Toolbox
@@ -21,6 +23,18 @@ Centralized definitions for all tools to ensure consistent naming,
 icons, callbacks, and documentation across different UI contexts 
 (Main Toolbar, Custom Graph, Context Menus).
 """
+
+TANGENT_TINT_COLOR = toolColors.UI_COLORS.orange.hex
+
+
+def _tangent_menu_setup(tangent_type, tangent_label, icon_path):
+    return lambda menu, source_widget=None: bar.build_tangent_menu(
+        menu,
+        tangent_type=tangent_type,
+        tangent_label=tangent_label,
+        icon_path=icon_path,
+        source_widget=source_widget,
+    )
 
 TOOL_DEFINITIONS = {
     "share_keys": {
@@ -423,14 +437,6 @@ TOOL_DEFINITIONS = {
             },
         ],
     },
-    "deleteAnimation": {
-        "key": "deleteAnimation",
-        "label": "Delete Animation",
-        "command": "delete_animation",
-        "icon_path": media.delete_animation_image,
-        "callback": bar.mod_delete_animation,
-        "tooltip_template": helper.delete_animation_tooltip_text,
-    },
     "delete_all_animation": {
         "key": "delete_all_animation",
         "label": "Delete All Animation",
@@ -439,6 +445,15 @@ TOOL_DEFINITIONS = {
         "callback": bar.mod_delete_animation,
         "tooltip_template": helper.delete_animation_tooltip_text,
         "description": "Delete animation across the full animation context.",
+    },
+    "deleteAnimation": {
+        "key": "deleteAnimation",
+        "label": "Delete Animation",
+        "command": "delete_all_animation",
+        "icon_path": media.delete_animation_image,
+        "callback": bar.mod_delete_animation,
+        "tooltip_template": helper.delete_animation_tooltip_text,
+        "description": "Delete animation across the current animation context.",
     },
     "select_rig_controls": {
         "key": "select_rig_controls",
@@ -567,14 +582,14 @@ TOOL_DEFINITIONS = {
         "icon_path": media.customGraph_image,
         "tooltip_template": helper.customGraph_tooltip_text,
     },
-    "extra_tools": {
-        "key": "extra",
-        "label": "Extra Tools",
-        "text": "E",
-        "tooltip_template": helper.extra_tools_tooltip_text,
-        "description": "Additional curve utilities.",
-        "callback": lambda: keyTools.snapKeyframes(),
-    },
+    # "extra_tools": {
+    #     "key": "extra",
+    #     "label": "Extra Tools",
+    #     "text": "E",
+    #     "tooltip_template": helper.extra_tools_tooltip_text,
+    #     "description": "Additional curve utilities.",
+    #     "callback": lambda: keyTools.snapKeyframes(),
+    # },
     "selectHierarchy": {
         "key": "selectHierarchy",
         "label": "Select Hierarchy",
@@ -1164,6 +1179,7 @@ TOOL_DEFINITIONS = {
         "text": "CM",
         "icon_path": media.asset_path("match_curve_cycle_image"),
         "callback": keyTools.match_curve_cycle,
+        "tint_color": TANGENT_TINT_COLOR,
         "tooltip_template": helper.tangent_cycle_matcher_tooltip_text,
         "description": "Curve cycle matcher.",
     },
@@ -1173,6 +1189,7 @@ TOOL_DEFINITIONS = {
         "text": "BO",
         "icon_path": media.bouncy_tangent_image,
         "callback": keyTools.bouncy_tangets,
+        "tint_color": TANGENT_TINT_COLOR,
         "tooltip_template": helper.tangent_bouncy_tooltip_text,
         "description": "Set bouncy tangents.",
     },
@@ -1182,6 +1199,8 @@ TOOL_DEFINITIONS = {
         "text": "AU",
         "icon_path": media.auto_tangent_image,
         "callback": lambda: bar.setTangent("auto"),
+        "tint_color": TANGENT_TINT_COLOR,
+        "menu_setup_fn": _tangent_menu_setup("auto", "Auto Tangent", media.auto_tangent_image),
         "tooltip_template": helper.auto_tangent_tooltip_text,
         "description": "Set selected keys to Auto tangents.",
     },
@@ -1191,6 +1210,8 @@ TOOL_DEFINITIONS = {
         "text": "SP",
         "icon_path": media.spline_tangent_image,
         "callback": lambda: bar.setTangent("spline"),
+        "tint_color": TANGENT_TINT_COLOR,
+        "menu_setup_fn": _tangent_menu_setup("spline", "Spline Tangent", media.spline_tangent_image),
         "tooltip_template": helper.spline_tangent_tooltip_text,
         "description": "Set selected keys to Spline tangents.",
     },
@@ -1200,6 +1221,8 @@ TOOL_DEFINITIONS = {
         "text": "CL",
         "icon_path": media.clamped_tangent_image,
         "callback": lambda: bar.setTangent("clamped"),
+        "tint_color": TANGENT_TINT_COLOR,
+        "menu_setup_fn": _tangent_menu_setup("clamped", "Clamped Tangent", media.clamped_tangent_image),
         "tooltip_template": helper.clamped_tangent_tooltip_text,
         "description": "Set selected keys to Clamped tangents.",
     },
@@ -1209,6 +1232,8 @@ TOOL_DEFINITIONS = {
         "text": "LI",
         "icon_path": media.linear_tangent_image,
         "callback": lambda: bar.setTangent("linear"),
+        "tint_color": TANGENT_TINT_COLOR,
+        "menu_setup_fn": _tangent_menu_setup("linear", "Linear Tangent", media.linear_tangent_image),
         "tooltip_template": helper.linear_tangent_tooltip_text,
         "description": "Set selected keys to Linear tangents.",
     },
@@ -1218,6 +1243,8 @@ TOOL_DEFINITIONS = {
         "text": "FT",
         "icon_path": media.flat_tangent_image,
         "callback": lambda: bar.setTangent("flat"),
+        "tint_color": TANGENT_TINT_COLOR,
+        "menu_setup_fn": _tangent_menu_setup("flat", "Flat Tangent", media.flat_tangent_image),
         "tooltip_template": helper.flat_tangent_tooltip_text,
         "description": "Set selected keys to Flat tangents.",
     },
@@ -1227,6 +1254,8 @@ TOOL_DEFINITIONS = {
         "text": "ST",
         "icon_path": media.step_tangent_image,
         "callback": lambda: bar.setTangent("step"),
+        "tint_color": TANGENT_TINT_COLOR,
+        "menu_setup_fn": _tangent_menu_setup("step", "Step Tangent", media.step_tangent_image),
         "tooltip_template": helper.step_tangent_tooltip_text,
         "description": "Set selected keys to Stepped tangents.",
     },
@@ -1236,9 +1265,37 @@ TOOL_DEFINITIONS = {
         "text": "PT",
         "icon_path": media.plateau_tangent_image,
         "callback": lambda: bar.setTangent("plateau"),
+        "tint_color": TANGENT_TINT_COLOR,
+        "menu_setup_fn": _tangent_menu_setup("plateau", "Plateau Tangent", media.plateau_tangent_image),
         "tooltip_template": helper.plateau_tangent_tooltip_text,
         "description": "Set selected keys to Plateau tangents.",
     },
+}
+
+
+TOOL_GROUP_DEFINITIONS = {
+    "reset_tools": [
+        {"type": "tool", "id": "reset_objects_mods", "overrides": {"key": "reset_values", "default": True}},
+        {"type": "variant", "tool_id": "reset_objects_mods", "command": "reset_translations"},
+        {"type": "variant", "tool_id": "reset_objects_mods", "command": "reset_rotations"},
+        {"type": "variant", "tool_id": "reset_objects_mods", "command": "reset_scales"},
+        {"type": "variant", "tool_id": "reset_objects_mods", "command": "reset_trs"},
+        {"type": "tool", "id": "reset_set_defaults"},
+        {"type": "tool", "id": "reset_restore_defaults"},
+        "separator",
+        {"type": "tool", "id": "reset_clear_all"},
+        "separator",
+        {
+            "type": "raw",
+            "data": {
+                "key": "reset_help",
+                "label": "Help",
+                "icon_path": media.help_menu_image,
+                "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/reset-to-default"),
+                "pinnable": False,
+            },
+        },
+    ],
 }
 
 
@@ -1306,3 +1363,39 @@ def get_tool(tool_id, **overrides):
         variants.append(_normalize_tool_state(variant, fallback=tool))
     tool["shortcut_variants"] = variants
     return tool
+
+
+def get_tool_variant(tool_id, command_name, **overrides):
+    tool = get_tool(tool_id, **overrides)
+    for variant in tool.get("shortcut_variants", []):
+        if variant.get("command") == command_name:
+            return variant
+    return None
+
+
+def get_tool_group(group_id):
+    group_def = TOOL_GROUP_DEFINITIONS.get(group_id)
+    if not group_def:
+        return []
+
+    resolved = []
+    for item in group_def:
+        if item == "separator":
+            resolved.append("separator")
+            continue
+
+        item_type = item.get("type")
+        if item_type == "tool":
+            resolved.append(get_tool(item["id"], **item.get("overrides", {})))
+            continue
+
+        if item_type == "variant":
+            variant = get_tool_variant(item["tool_id"], item["command"], **item.get("overrides", {}))
+            if variant:
+                resolved.append(variant)
+            continue
+
+        if item_type == "raw":
+            resolved.append(dict(item.get("data", {})))
+
+    return resolved

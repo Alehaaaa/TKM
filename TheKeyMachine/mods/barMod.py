@@ -47,6 +47,7 @@ import TheKeyMachine.widgets.customDialogs as customDialogs
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as util
+from TheKeyMachine.core import selection_targets
 from TheKeyMachine.tools import common as toolCommon
 
 
@@ -121,8 +122,8 @@ def _ensure_micro_move_helpers_group():
     return group
 
 
-def _active_tint_color():
-    return cw.get_active_tool_tint_color()
+def _active_tint_color(default=None):
+    return cw.get_active_tool_tint_color(default=default)
 
 
 def openCustomGraph():
@@ -271,11 +272,29 @@ def get_graph_editor_selected_keyframes():
     return keyframes
 
 
-def _set_tangent_on_target(target, tangent_type, time_range):
-    kwargs = {"time": time_range, "ott": tangent_type}
-    if tangent_type != "step":
-        kwargs["itt"] = tangent_type
+def _set_tangent_on_target(target, tangent_type, time_range, handle_mode="both"):
+    kwargs = {"time": time_range}
+    if handle_mode in ("both", "out"):
+        kwargs["ott"] = tangent_type
+    if handle_mode in ("both", "in"):
+        if tangent_type == "step":
+            if handle_mode == "in":
+                kwargs["itt"] = "stepnext"
+        else:
+            kwargs["itt"] = tangent_type
+    if len(kwargs) <= 1:
+        return
     cmds.keyTangent(target, **kwargs)
+
+
+def _normalize_curve_frames(curve_frames):
+    frames = []
+    for frame in curve_frames or []:
+        try:
+            frames.append(int(round(frame)))
+        except Exception:
+            continue
+    return sorted(set(frames))
 
 
 def _collect_target_curves(target_info):
@@ -316,41 +335,166 @@ def _collect_target_curves(target_info):
     return curves
 
 
-def setTangent(tangent_type):
-    selected_keyframes = get_graph_editor_selected_keyframes()
+def _resolve_tangent_target_info():
+    target_objects = util.get_selected_objects(orderedSelection=True, long=False)
+    selected_channels = selection_targets.get_selected_channels() or []
+
+    target_plugs = []
+    selected_curves = []
+    seen_curves = set()
+
+    if selected_channels:
+        for obj in target_objects:
+            for attr in selected_channels:
+                plug = "{}.{}".format(obj, attr)
+                if not cmds.objExists(plug):
+                    continue
+                target_plugs.append(plug)
+                curves = cmds.listConnections(plug, source=True, destination=False, type="animCurve") or []
+                for curve in curves:
+                    if curve and curve not in seen_curves:
+                        seen_curves.add(curve)
+                        selected_curves.append(curve)
+
+    return {
+        "target_plugs": target_plugs,
+        "target_objects": target_objects,
+        "selected_channels": selected_channels,
+        "selected_curves": selected_curves,
+    }
+
+
+def _curve_frames_in_time_context(curve, time_context):
+    if not curve or not time_context:
+        return []
+
+    if time_context.mode == "current_frame":
+        return [int(cmds.currentTime(query=True))]
+
+    try:
+        curve_frames = cmds.keyframe(curve, query=True, time=time_context.timerange, timeChange=True) or []
+    except Exception:
+        curve_frames = []
+
+    frames = _normalize_curve_frames(curve_frames)
+    if time_context.mode == "graph_editor_keys":
+        selected_frames = {int(frame) for frame in (time_context.frames or ())}
+        if selected_frames:
+            frames = [frame for frame in frames if frame in selected_frames]
+    return frames
+
+
+def _resolve_tangent_time_context(key_scope):
+    default_mode = "all_animation" if key_scope == "all" else "current_frame"
+    return timelineWidgets.resolve_time_context(default_mode=default_mode)
+
+
+def _filter_tangent_targets_by_scope(targets, key_scope):
+    scoped_targets = {
+        curve: list(frames or [])
+        for curve, frames in (targets or {}).items()
+        if frames
+    }
+    if not scoped_targets:
+        return {}
+
+    if key_scope not in ("first", "last"):
+        return scoped_targets
+
+    all_frames = sorted({frame for frames in scoped_targets.values() for frame in frames})
+    if not all_frames:
+        return {}
+
+    target_frame = all_frames[0] if key_scope == "first" else all_frames[-1]
+    return {
+        curve: [target_frame]
+        for curve, frames in scoped_targets.items()
+        if target_frame in frames
+    }
+
+
+def _collect_tangent_targets(key_scope="selection"):
+    time_context = _resolve_tangent_time_context(key_scope)
+    target_info = _resolve_tangent_target_info()
+    if not target_info.get("target_objects") and not target_info.get("target_plugs"):
+        return {}
+
+    selected_keyframes = []
+    if key_scope != "all" and time_context.mode == "graph_editor_keys":
+        selected_keyframes = get_graph_editor_selected_keyframes()
 
     if selected_keyframes:
-        frames = sorted({int(frame) for _curve, frame in selected_keyframes})
-        timerange = (frames[0], frames[-1])
-        tint_session = timelineWidgets.begin_timeline_tint(
-            timerange=timerange,
-            color=_active_tint_color(),
-            key="set_tangent_range",
-        )
-        try:
-            for curve, frame in selected_keyframes:
-                _set_tangent_on_target(curve, tangent_type, (frame, frame))
-        finally:
-            tint_session.finish()
-        return
+        frames_by_curve = {}
+        for curve, frame in selected_keyframes:
+            frames_by_curve.setdefault(curve, set()).add(int(frame))
+        return _filter_tangent_targets_by_scope({
+            curve: sorted(frames)
+            for curve, frames in frames_by_curve.items()
+            if frames
+        }, key_scope)
 
-    target_info = keyTools.resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=False)
-    time_context = target_info["time_context"]
     curves = _collect_target_curves(target_info)
-    if not curves:
+    targets = {}
+    for curve in curves:
+        frames = _curve_frames_in_time_context(curve, time_context)
+        if frames:
+            targets[curve] = frames
+    return _filter_tangent_targets_by_scope(targets, key_scope)
+
+
+def _tangent_target_range(targets):
+    frames = sorted({frame for curve_frames in (targets or {}).values() for frame in curve_frames})
+    if not frames:
+        return None
+    return frames[0], frames[-1]
+
+
+def setTangent(tangent_type, handle_mode="both", key_scope="selection", tint_color=None):
+    time_context = _resolve_tangent_time_context(key_scope)
+    targets = _collect_tangent_targets(key_scope=key_scope)
+    if not targets:
         return util.make_inViewMessage("No animation curves available to set tangents.")
 
-    timerange = time_context.timerange
+    timerange = time_context.timerange if key_scope == "all" else (_tangent_target_range(targets) or time_context.timerange)
+    if not timerange:
+        return util.make_inViewMessage("No animation keys available to set tangents.")
+
     tint_session = timelineWidgets.begin_timeline_tint(
         timerange=timerange,
-        color=_active_tint_color(),
+        color=tint_color or _active_tint_color(),
         key="set_tangent_range",
     )
     try:
-        for curve in curves:
-            _set_tangent_on_target(curve, tangent_type, timerange)
+        for curve, frames in targets.items():
+            for frame in frames:
+                _set_tangent_on_target(curve, tangent_type, (frame, frame), handle_mode=handle_mode)
     finally:
         tint_session.finish()
+
+
+def build_tangent_menu(menu, tangent_type, tangent_label, icon_path=None, source_widget=None):
+    tint_color = cw.get_widget_tint_color(source_widget)
+
+    def _add_action(handle_mode, handle_label, key_scope, scope_label):
+        menu.addAction(
+            QtGui.QIcon(icon_path or ""),
+            handle_label,
+            lambda _checked=False, h=handle_mode, s=key_scope, c=tint_color: setTangent(
+                tangent_type,
+                handle_mode=h,
+                key_scope=s,
+                tint_color=c,
+            ),
+            description="Set {}.".format(scope_label.lower()),
+        )
+
+    _add_action("in", "In Tangent", "selection", "the in tangent on the current selection")
+    _add_action("out", "Out Tangent", "selection", "the out tangent on the current selection")
+    menu.addSeparator()
+    _add_action("both", "First Key", "first", "the first key")
+    _add_action("both", "Last Key", "last", "the last key")
+    menu.addSeparator()
+    _add_action("both", "All Keys", "all", "all keys")
 
 
 def align_selected_objects(*args, pos=True, rot=True, scl=False):

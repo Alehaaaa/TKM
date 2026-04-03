@@ -18,7 +18,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 """
 
 # Maya related imports
-from maya import cmds, mel, utils, OpenMayaUI as mui
+from maya import cmds, mel, OpenMayaUI as mui
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 
 try:
@@ -116,6 +116,7 @@ class LinkObjectImageThread(QtCore.QThread):
 
     def stop(self):
         self._running = False
+
 
 mods = [
     general,
@@ -560,11 +561,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 action.setEnabled(wutil.check_visible_layout(layout))
 
     def _create_dock_menu(self):
-        self.dock_menu = cw.MenuWidget(QtGui.QIcon(media.dock_image), "Dock Window", description="Dock the toolbar to different Maya UI panels.")
+        self.dock_menu = cw.MenuWidget(QtGui.QIcon(media.dock_image), "Dock", description="Move the toolbar to a different Maya area.")
 
         self.pos_ac_group = QActionGroup(self)
         for orient, name in self.docking_orients.items():
-            ori_btn = self.dock_menu.addAction(name, description="Dock TKM {} of the widget.".format(name))
+            ori_btn = self.dock_menu.addAction(name, description="Place the toolbar on the {} side.".format(name.lower()))
             ori_btn.setCheckable(True)
             self.pos_ac_group.addAction(ori_btn)
             ori_btn.triggered.connect(partial(self.dock_to_ui, orient=orient))
@@ -576,7 +577,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         self.dock_ac_group = QActionGroup(self)
         for layout, name in self.docking_layouts.items():
-            dock_btn = self.dock_menu.addAction(name, description="Dock TKM to the {} widget.".format(name))
+            dock_btn = self.dock_menu.addAction(name, description="Dock the toolbar in {}.".format(name))
             dock_btn.setCheckable(True)
             self.dock_ac_group.addAction(dock_btn)
 
@@ -588,6 +589,164 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.dock_menu.aboutToShow.connect(self.update_dock_menu)
 
         return self.dock_menu
+
+    def _create_help_menu(self, parent_menu):
+        help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help")
+        parent_menu.addMenu(help_menu, description="Docs, support, and community links.")
+        help_menu.addAction(
+            QtGui.QIcon(media.report_a_bug_image),
+            "Report a Bug",
+            ui.bug_report_window,
+            description="Send a bug report.",
+        )
+        help_menu.addSeparator()
+        help_menu.addAction(
+            QtGui.QIcon(media.discord_image),
+            "Discord",
+            lambda: general.open_url("https://discord.gg/G2J5yyjz"),
+            description="Open the community server.",
+        )
+        help_menu.addAction(
+            QtGui.QIcon(media.help_menu_image),
+            "Documentation",
+            lambda: general.open_url("https://thekeymachine.gitbook.io/base"),
+            description="Open the docs.",
+        )
+        help_menu.addAction(
+            QtGui.QIcon(media.youtube_image),
+            "YouTube",
+            lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"),
+            description="Watch tutorials and demos.",
+        )
+        return help_menu
+
+    def _create_preferences_menu(
+        self,
+        parent_menu,
+        show_tooltips,
+        overshoot_sliders,
+        alignments,
+        toolbar_alignment,
+        set_overshoot,
+        update_show_tooltips,
+        update_toolbar_icon_alignment,
+    ):
+        preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(media.settings_image), "Preferences")
+        parent_menu.addMenu(preferences_menu, description="General toolbar options.")
+
+        preferences_menu.addSection("Startup")
+        preferences_menu.addAction(
+            QtGui.QIcon(media.asset_path("tool_icon")),
+            "Create a Shelf Button",
+            self.create_shelf_icon,
+            description="Add a shelf button for showing or hiding the toolbar.",
+        )
+
+        run_on_startup_action = preferences_menu.addAction(
+            "Start with Maya",
+            ui.install_userSetup,
+            description="Load TheKeyMachine automatically when Maya starts.",
+        )
+        run_on_startup_action.setCheckable(True)
+        run_on_startup_action.setChecked(ui.check_userSetup())
+
+        preferences_menu.addSection("Alignment")
+        align_group = QActionGroup(preferences_menu)
+        for align_name, align_value in alignments.items():
+            action = preferences_menu.addAction(align_name, description=f"Align toolbar icons to the {align_name.lower()}.")
+            action.setCheckable(True)
+            align_group.addAction(action)
+            if align_value == toolbar_alignment:
+                action.setChecked(True)
+            action.triggered.connect(lambda _checked=False, n=align_name, v=align_value: update_toolbar_icon_alignment(n, v))
+
+        preferences_menu.addSection("Display")
+
+        show_tooltips_action = preferences_menu.addAction("Show Tooltips", description="Show tooltip popups.")
+        show_tooltips_action.setCheckable(True)
+        show_tooltips_action.setChecked(show_tooltips)
+        show_tooltips_action.toggled.connect(update_show_tooltips)
+
+        overshoot_action = preferences_menu.addAction(
+            "Allow Slider Overshoot",
+            description="Let sliders go beyond -100 and 100.",
+        )
+        overshoot_action.setCheckable(True)
+        overshoot_action.setChecked(overshoot_sliders)
+        overshoot_action.toggled.connect(set_overshoot)
+
+        graph_toolbar_action = preferences_menu.addAction(
+            QtGui.QIcon(media.customGraph_image),
+            "Show Graph Editor Toolbar",
+            description="Show the TKM toolbar in the Graph Editor.",
+        )
+        graph_toolbar_action.setCheckable(True)
+        graph_toolbar_action.toggled.connect(self._on_graph_toolbar_menu_toggled)
+        graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
+
+        return preferences_menu
+
+    def _on_graph_toolbar_menu_toggled(self, state):
+        report.safe_execute(graphToolbarApi.set_graph_toolbar_enabled, bool(state), context="graph toolbar toggle")
+        sender = self.sender()
+        if not sender or not isValid(sender):
+            return
+        try:
+            sender.setChecked(bool(graphToolbarApi.get_graph_toolbar_checkbox_state()))
+        except Exception:
+            pass
+
+    def _create_system_menu(self, parent_menu):
+        system_icon_path = os.path.normpath(r"C:\Users\aleha\Documents\maya\scripts\TheKeyMachine\data\img\system.png")
+        system_menu = cw.MenuWidget(QtGui.QIcon(system_icon_path), "System")
+        parent_menu.addMenu(system_menu, description="Maintenance actions.")
+        system_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")
+        system_menu.addAction(QtGui.QIcon(media.close_image), "Unload", self.unload, description="Close TheKeyMachine and remove callbacks.")
+        system_menu.addAction(QtGui.QIcon(media.remove_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
+        return system_menu
+
+    def _create_config_menu(
+        self,
+        parent_button,
+        show_tooltips,
+        overshoot_sliders,
+        alignments,
+        toolbar_alignment,
+        set_overshoot,
+        update_show_tooltips,
+        update_toolbar_icon_alignment,
+    ):
+        toolbar_menu = cw.MenuWidget(parent=parent_button)
+        toolbar_menu.addAction(cw.LogoAction(toolbar_menu))
+        self._create_preferences_menu(
+            toolbar_menu,
+            show_tooltips=show_tooltips,
+            overshoot_sliders=overshoot_sliders,
+            alignments=alignments,
+            toolbar_alignment=toolbar_alignment,
+            set_overshoot=set_overshoot,
+            update_show_tooltips=update_show_tooltips,
+            update_toolbar_icon_alignment=update_toolbar_icon_alignment,
+        )
+        toolbar_menu.addAction(
+            QtGui.QIcon(media.hotkeys_image),
+            "Hotkeys",
+            hotkeys.show_hotkeys_window,
+            description="Edit keyboard shortcuts for TheKeyMachine tools.",
+        )
+        toolbar_menu.addMenu(self._create_dock_menu(), description="Move the toolbar to a different Maya area.")
+        self._create_system_menu(toolbar_menu)
+        toolbar_menu.addSeparator()
+        self._create_help_menu(toolbar_menu)
+        if INTERNET_CONNECTION:
+            toolbar_menu.addAction(
+                QtGui.QIcon(media.check_updates_image),
+                "Check for updates",
+                lambda: updater.check_for_updates(parent_button, force=True),
+                description="Look for a new version.",
+            )
+        toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
+        return toolbar_menu
 
     def create_shelf_icon(self, *args):
         button_name = "TheKeyMachine"
@@ -672,6 +831,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         """
         global _toolbar_instance
         _toolbar_instance = None
+
+        try:
+            if graphToolbarApi.is_graph_toolbar_visible() or graphToolbarApi.get_graph_toolbar_checkbox_state():
+                graphToolbarApi.set_graph_toolbar_enabled(False)
+        except Exception:
+            pass
 
         try:
             runtime.shutdown_runtime_manager()
@@ -1784,9 +1949,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         clear_btn = cw.QFlatToolButton(text="x")
         clear_btn.clicked.connect(
-            lambda *_args, w=clear_btn: w.triggerToolCallback(
-                trigger.make_command_callback("clear_selected_keys", keyTools.clear_selected_keys)
-            )
+            lambda *_args, w=clear_btn: w.triggerToolCallback(trigger.make_command_callback("clear_selected_keys", keyTools.clear_selected_keys))
         )
         sec.addWidget(
             clear_btn,
@@ -1809,7 +1972,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             tooltip_template=helper.select_scene_animation_widget_tooltip_text,
         )
 
-
         # Key Menu -------------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
@@ -1820,7 +1982,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 toolbox.get_tool("bake_animation_custom", key="bk_bake_anim_custom"),
             ],
         )
-
 
         # _____________________ BlendSlider ____________________________ #
 
@@ -2119,23 +2280,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         )
 
         # Reset anim  -------------------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool("reset_objects_mods", key="reset_values", callback=keyTools.reset_object_values, default=True),
-                toolbox.get_tool("reset_set_defaults"),
-                toolbox.get_tool("reset_restore_defaults"),
-                "separator",
-                toolbox.get_tool("reset_clear_all"),
-                "separator",
-                {
-                    "key": "reset_help",
-                    "label": "Help",
-                    "icon_path": media.help_menu_image,
-                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/reset-to-default"),
-                    "pinnable": False,
-                },
-            ],
-        )
+        sec.addWidgetGroup(toolbox.get_tool_group("reset_tools"))
 
         # Delete anim -------------------------------------------------------------------------
         delete_anim_tool = toolbox.get_tool("deleteAnimation")
@@ -2256,7 +2401,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ],
         )
 
-        sec = new_section(color=11)
+        sec = new_section(color=toolColors.orange)
 
         # Tangents -----------------------------------------------------------------------
         btn_cycle = cw.create_tool_button_from_data(toolbox.get_tool("tangent_cycle_matcher"))
@@ -2589,11 +2734,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
                         # fix para mostrar imagenes
                         dot_images = {
-                            "green_dot.png": media.green_dot_image,
-                            "blue_dot.png": media.blue_dot_image,
-                            "red_dot.png": media.red_dot_image,
-                            "grey_dot.png": media.grey_dot_image,
-                            "yellow_dot.png": media.yellow_dot_image,
+                            "dot_green.png": media.dot_green_image,
+                            "dot_blue.png": media.dot_blue_image,
+                            "dot_red.png": media.dot_red_image,
+                            "dot_grey.png": media.dot_grey_image,
+                            "dot_yellow.png": media.dot_yellow_image,
                         }
                         if image in dot_images:
                             image = dot_images[image]
@@ -2667,11 +2812,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
                         # fix para mostrar imagenes
                         dot_images = {
-                            "green_dot.png": media.green_dot_image,
-                            "blue_dot.png": media.blue_dot_image,
-                            "red_dot.png": media.red_dot_image,
-                            "grey_dot.png": media.grey_dot_image,
-                            "yellow_dot.png": media.yellow_dot_image,
+                            "dot_green.png": media.dot_green_image,
+                            "dot_blue.png": media.dot_blue_image,
+                            "dot_red.png": media.dot_red_image,
+                            "dot_grey.png": media.dot_grey_image,
+                            "dot_yellow.png": media.dot_yellow_image,
                         }
                         if image in dot_images:
                             image = dot_images[image]
@@ -2731,124 +2876,20 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             description=settings_tool.get("description"),
         )
 
-        # Build your menu with your cw.MenuWidget; make sure the button is the PARENT
-        toolbar_menu = cw.MenuWidget(parent=toolbar_config_button_widget)
-        toolbar_menu.addAction(cw.LogoAction(toolbar_menu))
-
-        # === Help submenu ===
-        help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help")
-        toolbar_menu.addMenu(help_menu, description="Resources for help, documentation and community.")
-        help_menu.addAction(
-            QtGui.QIcon(media.report_a_bug_image),
-            "Report a bug",
-            ui.bug_report_window,
-            description="Report any bug you may have encountered whilst using the software.",
-        )
-        help_menu.addSeparator()
-        help_menu.addAction(
-            QtGui.QIcon(media.discord_image),
-            "Discord Community",
-            lambda: general.open_url("https://discord.gg/G2J5yyjz"),
-            description="Join the community for questions and support.",
-        )
-        help_menu.addAction(
-            QtGui.QIcon(media.help_menu_image),
-            "Knowledge base",
-            lambda: general.open_url("https://thekeymachine.gitbook.io/base"),
-            description="Read the official documentation.",
-        )
-        help_menu.addAction(
-            QtGui.QIcon(media.youtube_image),
-            "Youtube channel",
-            lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"),
-            description="Watch tutorials and features demos.",
-        )
-
-        # === Settings submenu ===
-        settings_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Settings")
-        toolbar_menu.addMenu(settings_menu, description="Tool configuration, hotkeys and UI preferences.")
-        settings_menu.addSection("Shelf icon")
-        settings_menu.addAction(
-            QtGui.QIcon(media.asset_path("tool_icon")),
-            "Add Toggle Button To Shelf",
-            self.create_shelf_icon,
-            description="Creates a shelf button to show/hide this toolbar.",
-        )
-
-        run_on_startup_action = settings_menu.addAction(
-            "Run on Startup", ui.install_userSetup, description="Make TKM run automatically when Maya starts."
-        )
-        run_on_startup_action.setCheckable(True)
-        run_on_startup_action.setChecked(ui.check_userSetup())
-
-        settings_menu.addSection("Tools settings")
-        show_tooltips_action = settings_menu.addAction("Show tooltips", description="Show or hide floating tooltips.")
-        show_tooltips_action.setCheckable(True)
-
         def update_show_tooltips(value):
             settings.set_setting("show_tooltips", value)
             QFlatTooltipManager.enabled = value
 
-        show_tooltips_action.setChecked(show_tooltips)
-        show_tooltips_action.toggled.connect(update_show_tooltips)
-
-        overshoot_action = settings_menu.addAction("Overshoot Sliders", description="Allow sliders to reach values beyond -100 to 100.")
-        overshoot_action.setCheckable(True)
-        overshoot_action.setChecked(overshootSliders)
-        overshoot_action.toggled.connect(_setOvershoot)
-
-        graph_toolbar_action = settings_menu.addAction(
-            QtGui.QIcon(media.customGraph_image),
-            "Graph Editor Toolbar",
-            description="Show or hide the TKM toolbar inside the Graph Editor.",
+        toolbar_menu = self._create_config_menu(
+            toolbar_config_button_widget,
+            show_tooltips=show_tooltips,
+            overshoot_sliders=overshootSliders,
+            alignments=alignments,
+            toolbar_alignment=toolbar_alignment,
+            set_overshoot=_setOvershoot,
+            update_show_tooltips=update_show_tooltips,
+            update_toolbar_icon_alignment=update_toolbar_icon_alignment,
         )
-        graph_toolbar_action.setCheckable(True)
-
-        def _on_graph_toolbar_toggled(state):
-            report.safe_execute(graphToolbarApi.set_graph_toolbar_enabled, bool(state), context="graph toolbar toggle")
-            try:
-                graph_toolbar_action.setChecked(bool(graphToolbarApi.get_graph_toolbar_checkbox_state()))
-            except Exception:
-                pass
-
-        graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
-        graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
-
-        settings_menu.addSection("Toolbar's icons alignment")
-        align_group = QActionGroup(settings_menu)
-        for align_name, align_value in alignments.items():
-            action = settings_menu.addAction(align_name, description=f"Align icons to the {align_name.lower()}.")
-            action.setCheckable(True)
-            align_group.addAction(action)
-            if align_value == toolbar_alignment:
-                action.setChecked(True)
-            action.triggered.connect(lambda align_name=align_name, align_value=align_value: update_toolbar_icon_alignment(align_name, align_value))
-
-        settings_menu.addSection("Hotkeys")
-        settings_menu.addAction(
-            QtGui.QIcon(media.hotkeys_image),
-            "Hotkeys...",
-            hotkeys.show_hotkeys_window,
-            description="Manage trigger hotkeys for TKM tools.",
-        )
-
-        settings_menu.addSection("General")
-        settings_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")
-        settings_menu.addAction(QtGui.QIcon(media.close_image), "Unload", self.unload, description="Close TheKeyMachine and remove callbacks.")
-        settings_menu.addAction(QtGui.QIcon(media.remove_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
-
-        toolbar_menu.addMenu(self._create_dock_menu(), description="Dock the toolbar to different Maya UI panels.")
-
-        # Separators and others
-        toolbar_menu.addSeparator()
-        if INTERNET_CONNECTION:
-            toolbar_menu.addAction(
-                QtGui.QIcon(media.check_updates_image),
-                "Check for updates",
-                lambda: updater.check_for_updates(toolbar_config_button_widget, force=True),
-                description="Check if there is a new version available.",
-            )
-        toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
 
         def _open_menu_at_cursor():
             toolbar_menu.popup(QtGui.QCursor.pos())

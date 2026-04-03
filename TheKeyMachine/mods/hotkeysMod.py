@@ -13,8 +13,18 @@ import maya.mel as mel
 
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
+
+    try:
+        from PySide6.QtSvg import QSvgRenderer  # type: ignore
+    except ImportError:
+        QSvgRenderer = None  # type: ignore
 except ImportError:
     from PySide2 import QtCore, QtGui, QtWidgets
+
+    try:
+        from PySide2.QtSvg import QSvgRenderer  # type: ignore
+    except ImportError:
+        QSvgRenderer = None  # type: ignore
 
 import TheKeyMachine.core.runtime_manager as runtime
 import TheKeyMachine.core.toolbox as toolbox
@@ -43,8 +53,8 @@ HOTKEY_SECTION_ICONS = {
     "copy_paste": media.copy_animation_image,
     "worldspace": media.worldspace_copy_frame_image,
     "tangents": media.auto_tangent_image,
-    "tween_slider": media.asset_path("yellow_dot_image"),
-    "blend_slider": media.asset_path("green_dot_image"),
+    "tween_slider": media.dot_yellow_image,
+    "blend_slider": media.dot_green_image,
     "tangent_slider": media.auto_tangent_image,
     "bake": media.bake_animation_1_image,
     "tracer": media.tracer_image,
@@ -483,6 +493,37 @@ def _pixmap_for_icon(icon_path, size=18):
     if not icon_path:
         return QtGui.QPixmap()
     return QtGui.QIcon(icon_path).pixmap(wutil.DPI(size), wutil.DPI(size))
+
+
+def _scaled_header_icon_pixmap(icon_path, size):
+    if not icon_path:
+        return QtGui.QPixmap()
+
+    icon_size = size if isinstance(size, QtCore.QSize) else QtCore.QSize(int(size), int(size))
+    lower_path = str(icon_path).lower()
+    if lower_path.endswith(".svg") and QSvgRenderer:
+        renderer = QSvgRenderer(icon_path)
+        if renderer.isValid():
+            screen = QtGui.QGuiApplication.primaryScreen()
+            dpr = screen.devicePixelRatio() if screen else 1.0
+            width = max(1, int(icon_size.width() * dpr))
+            height = max(1, int(icon_size.height() * dpr))
+            pixmap = QtGui.QPixmap(width, height)
+            pixmap.fill(QtCore.Qt.transparent)
+            painter = QtGui.QPainter(pixmap)
+            renderer.render(painter, QtCore.QRectF(0, 0, width, height))
+            painter.end()
+            pixmap.setDevicePixelRatio(dpr)
+            return pixmap
+
+    icon = QtGui.QIcon(icon_path)
+    if not icon.isNull():
+        return icon.pixmap(icon_size)
+
+    pixmap = QtGui.QPixmap(icon_path)
+    if pixmap.isNull():
+        return pixmap
+    return pixmap.scaled(icon_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
 
 
 def _text_badge_pixmap(text, size=18):
@@ -1060,20 +1101,14 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         title_layout.setSpacing(wutil.DPI(16))
 
         icon_size = wutil.DPI(51)
+        icon_qsize = QtCore.QSize(icon_size, icon_size)
 
         self.window_icon = QtWidgets.QLabel()
         self.window_icon.setFixedSize(icon_size, icon_size)
         self.window_icon.setAlignment(QtCore.Qt.AlignCenter)
-        hotkeys_pixmap = QtGui.QPixmap(media.hotkeys_image)
+        hotkeys_pixmap = _scaled_header_icon_pixmap(media.hotkeys_image, icon_qsize)
         if not hotkeys_pixmap.isNull():
-            self.window_icon.setPixmap(
-                hotkeys_pixmap.scaled(
-                    icon_size,
-                    icon_size,
-                    QtCore.Qt.KeepAspectRatio,
-                    QtCore.Qt.SmoothTransformation,
-                )
-            )
+            self.window_icon.setPixmap(hotkeys_pixmap)
         title_layout.addWidget(self.window_icon, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
         self.window_title = QtWidgets.QLabel("Hotkeys")

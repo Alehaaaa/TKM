@@ -1003,10 +1003,27 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
         status_title=data.get("status_title"),
         status_description=data.get("status_description"),
     )
+    if data.get("tint_color") is not None:
+        btn.set_tint_color(data.get("tint_color"))
 
     callback = data.get("callback")
     if callback:
         btn.clicked.connect(lambda *_args, w=btn, cb=callback: w.triggerToolCallback(cb))
+
+    menu_setup_fn = data.get("menu_setup_fn")
+    if callable(menu_setup_fn):
+        btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+
+        def _show_tool_menu(pos, setup_fn=menu_setup_fn, widget=btn):
+            menu = MenuWidget(widget)
+            try:
+                setup_fn(menu, source_widget=widget)
+            except TypeError:
+                setup_fn(menu)
+            if menu.actions():
+                menu.exec_(widget.mapToGlobal(pos))
+
+        btn.customContextMenuRequested.connect(_show_tool_menu)
     return btn
 
 
@@ -2262,12 +2279,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         menu.addSeparator()
 
         menu.addSeparator()
-        pin_def_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin Defaults")
+        pin_def_action = menu.addAction(QtGui.QIcon(media.dot_pins_image), "Pin Defaults")
         if self._all_modes:
             pin_def_action.triggered.connect(lambda: self.pin_defaults(self._default_keys, menu=menu))
         else:
             pin_def_action.triggered.connect(lambda: self.pin_widget_defaults(menu=menu))
-        pin_all_action = menu.addAction(QtGui.QIcon(media.default_dot_image), "Pin All")
+        pin_all_action = menu.addAction(QtGui.QIcon(media.dot_pins_image), "Pin All")
         if self._all_modes:
             pin_all_action.triggered.connect(lambda: self.pin_all(menu=menu))
         else:

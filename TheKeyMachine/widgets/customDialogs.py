@@ -1031,7 +1031,7 @@ class QFlatBugReportDialog(QFlatDialog):
 
     MAX_TEXT_CHARS = 1200
 
-    def __init__(self, parent=None, submit_callback=None, dialog_title="Sorry, you found a bug!", prefill_name="", prefill_explanation="", prefill_script_error=""):
+    def __init__(self, parent=None, submit_callback=None, dialog_title="Report a Bug", prefill_name="", prefill_explanation="", prefill_script_error=""):
         self._submit_callback = submit_callback
         self._send_button = None
         QFlatDialog.__init__(self, parent)

@@ -102,12 +102,12 @@ _ASSET_FILES = {
     "trash_image": "trash.svg",
     "success_image": "success.svg",
     "warning_image": "warning.svg",
-    "green_dot_image": "green_dot.png",
-    "red_dot_image": "red_dot.png",
-    "grey_dot_image": "grey_dot.png",
-    "blue_dot_image": "blue_dot.png",
-    "yellow_dot_image": "yellow_dot.png",
-    "default_dot_image": "round_dot.png",
+    "dot_green_image": "dot_green.png",
+    "dot_red_image": "dot_red.png",
+    "dot_grey_image": "dot_grey.png",
+    "dot_blue_image": "dot_blue.png",
+    "dot_yellow_image": "dot_yellow.png",
+    "dot_pins_image": "dot_round.png",
     "color_image": "color.svg",
     "reload_image": "reload.png",
     "remove_image": "remove.svg",
@@ -131,7 +131,7 @@ _ASSET_FILES = {
 
 _ASSET_ALIASES = {
     "update_image": "settings_update_image",
-    "grey_got_image": "grey_dot_image",
+    "grey_got_image": "dot_grey_image",
 }
 
 _selection_set_icon_shade_names = {
@@ -181,15 +181,10 @@ def _selection_set_icon_filename(color):
     return "_{}{}_set.svg".format(color.family, shade)
 
 
-selection_set_color_icon_names = {
-    color.suffix: _selection_set_icon_filename(color) for color in toolColors.SELECTION_SET_COLORS
-}
-selection_set_color_images = {
-    suffix: getSelectionSetsImage(filename) for suffix, filename in selection_set_color_icon_names.items()
-}
+selection_set_color_icon_names = {color.suffix: _selection_set_icon_filename(color) for color in toolColors.SELECTION_SET_COLORS}
+selection_set_color_images = {suffix: getSelectionSetsImage(filename) for suffix, filename in selection_set_color_icon_names.items()}
 selection_set_color_trash_images = {
-    suffix: getSelectionSetsImage(filename.replace(".svg", "_trash.svg"))
-    for suffix, filename in selection_set_color_icon_names.items()
+    suffix: getSelectionSetsImage(filename.replace(".svg", "_trash.svg")) for suffix, filename in selection_set_color_icon_names.items()
 }
 
 

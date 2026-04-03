@@ -175,10 +175,9 @@ def create_settings_menu(parent_button):
 
         act.toggled.connect(set_align)
 
-    settings_menu.addSection("Hotkeys")
     settings_menu.addAction(
         QtGui.QIcon(media.hotkeys_image),
-        "Hotkeys...",
+        "Hotkeys",
         hotkeys.show_hotkeys_window,
         description="Manage trigger hotkeys.",
     )
@@ -230,18 +229,10 @@ def create_tool_button(
 
 def create_toolbox_button(tool_id, p=None, **overrides):
     tool_data = toolbox.get_tool(tool_id, **overrides)
-    return create_tool_button(
-        icon=tool_data.get("icon_path"),
-        text=tool_data.get("text", ""),
-        tooltip_template=tool_data.get("tooltip_template", ""),
-        description=tool_data.get("description", ""),
-        command=tool_data.get("callback"),
-        shortcuts=tool_data.get("shortcuts"),
-        shortcut_variants=tool_data.get("shortcut_variants"),
-        status_title=tool_data.get("status_title"),
-        status_description=tool_data.get("status_description"),
-        p=p,
-    )
+    btn = cw.create_tool_button_from_data(tool_data)
+    if p:
+        p.addWidget(btn)
+    return btn
 
 
 def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs):
@@ -307,17 +298,25 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
             toolbox.get_tool("flip", text="F", default=True),
             toolbox.get_tool("snap", text="Sn", default=True),
             toolbox.get_tool("overlap", text="O", default=True),
-            toolbox.get_tool("extra_tools", text="E", default=True),
+            {
+                "key": "extra",
+                "label": "Extra Tools",
+                "text": "E",
+                "tooltip_template": helper.extra_tools_tooltip_text,
+                "description": "Open extra graph tools.",
+                "default": True,
+            },
         ]
     )
 
     # Extra/Misc (Retrieving the object to add a menu)
     extra_btn = sec._widgets.get("extra")
-    extra_menu = cw.MenuWidget(parent=extra_btn)
-    extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
-    extra_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-    extra_btn.customContextMenuRequested.connect(lambda pos: extra_menu.exec_(extra_btn.mapToGlobal(pos)))
-    extra_btn.clicked.connect(lambda: extra_menu.exec_(QtGui.QCursor.pos()))
+    if extra_btn and wutil.is_valid_widget(extra_btn):
+        extra_menu = cw.MenuWidget(parent=extra_btn)
+        extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
+        extra_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        extra_btn.customContextMenuRequested.connect(lambda pos: extra_menu.exec_(extra_btn.mapToGlobal(pos)))
+        extra_btn.clicked.connect(lambda: extra_menu.exec_(QtGui.QCursor.pos()))
 
     # _________________  Slider Logic & Wrappers ____________________#
 
@@ -433,23 +432,10 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
 
     # ____________________  Resets  _________________________#
     sec = new_section()
-    btn_reset = create_toolbox_button("graph_reset")
-    sec.addWidget(btn_reset, "Reset", "reset")
-
-    btn_reset_translations = create_toolbox_button("graph_reset_translation")
-    sec.addWidget(btn_reset_translations, "Reset Translations", "reset_translations", default_visible=False)
-
-    btn_reset_rotations = create_toolbox_button("graph_reset_rotation")
-    sec.addWidget(btn_reset_rotations, "Reset Rotations", "reset_rotations", default_visible=False)
-
-    btn_reset_scales = create_toolbox_button("graph_reset_scales")
-    sec.addWidget(btn_reset_scales, "Reset Scales", "reset_scales", default_visible=False)
-
-    btn_reset_trs = create_toolbox_button("graph_reset_trs")
-    sec.addWidget(btn_reset_trs, "Reset Translation Rotation Scale", "reset_translation_rotation_scale", default_visible=False)
+    sec.addWidgetGroup(toolbox.get_tool_group("reset_tools"))
 
     # _________________  Tangents  ____________________#
-    sec = new_section(color=11)
+    sec = new_section(color=toolColors.orange)
     btn_cycle = create_toolbox_button("tangent_cycle_matcher")
     sec.addWidget(btn_cycle, "Cycle Matcher", "cycle", default_visible=False)
 

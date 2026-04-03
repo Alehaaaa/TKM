@@ -152,7 +152,7 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
             cmds.menuItem(
                 l=text,
                 parent=popup_menu,
-                image=media.asset_path("grey_dot_image"),
+                image=media.asset_path("dot_grey_image"),
                 c=lambda x, text=text: isolate_bookmark(bookmark_name=text),
             )
         cmds.menuItem(divider=True, parent=popup_menu)
