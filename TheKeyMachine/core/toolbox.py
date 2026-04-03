@@ -444,16 +444,22 @@ TOOL_DEFINITIONS = {
         "icon_path": media.delete_animation_image,
         "callback": bar.mod_delete_animation,
         "tooltip_template": helper.delete_animation_tooltip_text,
-        "description": "Delete animation across the full animation context.",
-    },
-    "deleteAnimation": {
-        "key": "deleteAnimation",
-        "label": "Delete Animation",
-        "command": "delete_all_animation",
-        "icon_path": media.delete_animation_image,
-        "callback": bar.mod_delete_animation,
-        "tooltip_template": helper.delete_animation_tooltip_text,
-        "description": "Delete animation across the current animation context.",
+        "shortcuts": [
+            {"icon": media.delete_animation_image, "label": "Delete Animation", "keys": "Click"},
+            {"icon": media.delete_animation_image, "label": "Delete Static Keys", "keys": [QtCore.Qt.Key_Shift]},
+        ],
+        "shortcut_variants": [
+            {
+                "mask": 1,
+                "text": "S",
+                "label": "Delete Static Keys",
+                "icon_path": media.delete_animation_image,
+                "tooltip_template": helper.static_tooltip_text,
+                "description": "Flatten the selected curve so it holds the first selected value.",
+                "callback": lambda: keyTools.deleteStaticCurves(),
+                "shortcuts": [{"icon": media.delete_animation_image, "label": "Delete Static Keys", "keys": "Click"}],
+            }
+        ],
     },
     "select_rig_controls": {
         "key": "select_rig_controls",
@@ -1272,8 +1278,11 @@ TOOL_DEFINITIONS = {
     },
 }
 
-
 TOOL_GROUP_DEFINITIONS = {
+    "delete_tools": [
+        {"type": "tool", "id": "delete_all_animation", "overrides": {"key": "delete_anim", "default": True}},
+        {"type": "tool", "id": "static"},
+    ],
     "reset_tools": [
         {"type": "tool", "id": "reset_objects_mods", "overrides": {"key": "reset_values", "default": True}},
         {"type": "variant", "tool_id": "reset_objects_mods", "command": "reset_translations"},
@@ -1310,29 +1319,6 @@ def _variant_command_name(tool_key, variant, index):
     return "{}_option_{}".format(tool_key, index)
 
 
-def _bind_trigger_commands():
-    for tool_key, tool_data in TOOL_DEFINITIONS.items():
-        callback = tool_data.get("callback")
-        if callback:
-            tool_data["raw_callback"] = callback
-            command_name = tool_data.get("command") or tool_key
-            aliases = tool_data.get("command_aliases")
-            tool_data["command"] = command_name
-            tool_data["callback"] = trigger.make_command_callback(command_name, callback, aliases=aliases)
-
-        for index, variant in enumerate(tool_data.get("shortcut_variants", []), start=1):
-            variant_callback = variant.get("callback")
-            if not variant_callback:
-                continue
-            variant["raw_callback"] = variant_callback
-            command_name = variant.get("command") or _variant_command_name(tool_key, variant, index)
-            variant["command"] = command_name
-            variant["callback"] = trigger.make_command_callback(command_name, variant_callback, aliases=variant.get("command_aliases"))
-
-
-_bind_trigger_commands()
-
-
 def _normalize_tool_state(state, fallback=None):
     fallback = fallback or {}
     normalized = dict(fallback)
@@ -1346,6 +1332,56 @@ def _normalize_tool_state(state, fallback=None):
     return normalized
 
 
+def _bind_tool_callback(tool_key, tool_state):
+    callback = tool_state.get("callback")
+    if not callback:
+        return tool_state
+
+    bound = dict(tool_state)
+    command_name = bound.get("command") or tool_key
+    bound["command"] = command_name
+    bound["callback"] = trigger.make_command_callback(command_name, callback, aliases=bound.get("command_aliases"))
+    return bound
+
+
+def _bind_variant_callback(tool_key, variant_state, index):
+    callback = variant_state.get("callback")
+    if not callback:
+        return variant_state
+
+    bound = dict(variant_state)
+    command_name = bound.get("command") or _variant_command_name(tool_key, bound, index)
+    bound["command"] = command_name
+    bound["callback"] = trigger.make_command_callback(command_name, callback, aliases=bound.get("command_aliases"))
+    return bound
+
+
+def _resolve_tool_definition(tool_key, state):
+    tool = _bind_tool_callback(tool_key, _normalize_tool_state(state))
+    tool["shortcut_variants"] = [
+        _bind_variant_callback(tool_key, _normalize_tool_state(variant, fallback=tool), index)
+        for index, variant in enumerate(tool.get("shortcut_variants", []), start=1)
+    ]
+    return tool
+
+
+def _resolve_group_item(item):
+    if item == "separator":
+        return "separator"
+
+    item_type = item.get("type")
+    if item_type == "tool":
+        return get_tool(item["id"], **item.get("overrides", {}))
+
+    if item_type == "variant":
+        return get_tool_variant(item["tool_id"], item["command"], **item.get("overrides", {}))
+
+    if item_type == "raw":
+        return dict(item.get("data", {}))
+
+    return None
+
+
 def get_tool(tool_id, **overrides):
     """Retrieve a tool definition with optional overrides."""
     if tool_id not in TOOL_DEFINITIONS:
@@ -1356,13 +1392,7 @@ def get_tool(tool_id, **overrides):
     # Merge base definition with overrides
     tool = TOOL_DEFINITIONS[tool_id].copy()
     tool.update(overrides)
-    tool = _normalize_tool_state(tool)
-
-    variants = []
-    for variant in tool.get("shortcut_variants", []):
-        variants.append(_normalize_tool_state(variant, fallback=tool))
-    tool["shortcut_variants"] = variants
-    return tool
+    return _resolve_tool_definition(tool_id, tool)
 
 
 def get_tool_variant(tool_id, command_name, **overrides):
@@ -1380,22 +1410,7 @@ def get_tool_group(group_id):
 
     resolved = []
     for item in group_def:
-        if item == "separator":
-            resolved.append("separator")
-            continue
-
-        item_type = item.get("type")
-        if item_type == "tool":
-            resolved.append(get_tool(item["id"], **item.get("overrides", {})))
-            continue
-
-        if item_type == "variant":
-            variant = get_tool_variant(item["tool_id"], item["command"], **item.get("overrides", {}))
-            if variant:
-                resolved.append(variant)
-            continue
-
-        if item_type == "raw":
-            resolved.append(dict(item.get("data", {})))
-
+        resolved_item = _resolve_group_item(item)
+        if resolved_item is not None:
+            resolved.append(resolved_item)
     return resolved

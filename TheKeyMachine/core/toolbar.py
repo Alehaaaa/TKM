@@ -754,6 +754,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         icon_path = media.asset_path("tool_icon")
         icon_path = os.path.normpath(icon_path)
         current_shelf_tab = cmds.tabLayout("ShelfLayout", query=True, selectTab=True)
+
+        for child in cmds.shelfLayout(current_shelf_tab, query=True, childArray=True) or []:
+            if cmds.objectTypeUI(child) != "shelfButton":
+                continue
+
+            if cmds.shelfButton(child, query=True, label=True) == button_name or cmds.shelfButton(child, query=True, command=True) == command:
+                cmds.deleteUI(child)
+
         cmds.shelfButton(parent=current_shelf_tab, image=icon_path, command=command, label=button_name)
 
     # Update the iBookmarks menu when scene changes
@@ -2283,15 +2291,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidgetGroup(toolbox.get_tool_group("reset_tools"))
 
         # Delete anim -------------------------------------------------------------------------
-        delete_anim_tool = toolbox.get_tool("deleteAnimation")
-        delete_anim_btn = cw.create_tool_button_from_data(delete_anim_tool)
-        sec.addWidget(
-            delete_anim_btn,
-            delete_anim_tool.get("label", "Delete Anim"),
-            "delete_anim",
-            tooltip_template=delete_anim_tool.get("tooltip_template"),
-            description=delete_anim_tool.get("description"),
-        )
+        sec.addWidgetGroup(toolbox.get_tool_group("delete_tools"))
 
         sec = new_section(color=toolColors.green)
 

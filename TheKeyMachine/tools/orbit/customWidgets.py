@@ -17,7 +17,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
             toolbox.get_tool("align_selected_objects"),
             toolbox.get_tool("mod_tracer"),
             toolbox.get_tool("reset_objects_mods"),
-            toolbox.get_tool("deleteAnimation"),
+            toolbox.get_tool("delete_all_animation"),
             toolbox.get_tool("selectOpposite"),
             toolbox.get_tool("copyOpposite"),
             toolbox.get_tool("mirror"),

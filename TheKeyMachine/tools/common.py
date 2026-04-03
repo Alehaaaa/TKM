@@ -53,6 +53,8 @@ def get_tool_summary(raw):
 def get_tooltip_title(raw):
     if not raw:
         return ""
+    if hasattr(raw, "title"):
+        return clean_tool_text(getattr(raw, "title", ""))
     match = RE_TOOLTIP_TITLE.search(str(raw))
     if match:
         return clean_tool_text(match.group(1))
@@ -60,6 +62,10 @@ def get_tooltip_title(raw):
 
 
 def get_tooltip_summary(raw):
+    if not raw:
+        return ""
+    if hasattr(raw, "first_line"):
+        return clean_tool_text(getattr(raw, "first_line", ""))
     return get_tool_summary(raw)
 
 

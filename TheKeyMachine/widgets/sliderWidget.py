@@ -520,10 +520,9 @@ QSlider::handle:horizontal {{
             icon_size = int(min(hrect.width(), hrect.height()) * 0.68)
             qicon = QIcon(self._icon_path)
             if not qicon.isNull():
-                pix = qicon.pixmap(QSize(icon_size, icon_size))
-                px = hrect.x() + (hrect.width() - pix.width()) // 2
-                py = hrect.y() + (hrect.height() - pix.height()) // 2
-                p.drawPixmap(px, py, pix)
+                icon_rect = QRect(0, 0, icon_size, icon_size)
+                icon_rect.moveCenter(hrect.center())
+                qicon.paint(p, icon_rect, Qt.AlignCenter)
         else:
             p.setFont(self._text_font)
             fm = p.fontMetrics()

@@ -73,12 +73,20 @@ except ImportError:
 from TheKeyMachine.widgets import util as wutil
 
 
+TOOLTIP_TITLE_FONT_SIZE = "{}px".format(wutil.DPI(35))
+TOOLTIP_BODY_FONT_SIZE = "{}px".format(wutil.DPI(10.5))
+
+
 # Pre-compiled regular expressions for high-performance tooltip parsing
 RE_BR_SPLIT = re.compile(r"<br\s*/?>", re.IGNORECASE)
 RE_TITLE_EXTRACT = re.compile(r"<(b|title)>(.*?)</\1>", re.IGNORECASE)
 RE_IMG_EXTRACT = re.compile(r"<img[^>]*src=['\"](.*?)['\"]", re.IGNORECASE)
+RE_HR_TAG = re.compile(r"<hr\s*/?>", re.IGNORECASE)
+RE_BODY_TOKEN = re.compile(r"(<img[^>]*src=['\"].*?['\"][^>]*>|<hr\s*/?>)", re.IGNORECASE)
+RE_FONT_TAG = re.compile(r"</?font[^>]*>", re.IGNORECASE)
 RE_TAG_STRIP = re.compile(r"<[^>]*>")
 RE_LEADING_BR = re.compile(r"^\s*<br\s*/?>", re.IGNORECASE)
+RE_TRAILING_BR = re.compile(r"(<br\s*/?>\s*)+$", re.IGNORECASE)
 
 IS_MAC = sys.platform == "darwin"
 SHORTCUT_KEY_MAP = {
@@ -88,6 +96,69 @@ SHORTCUT_KEY_MAP = {
     Qt.MiddleButton: "Click" if IS_MAC else "MidClick",
 }
 SHORTCUT_KEY_ORDER = [Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift, Qt.MiddleButton]
+
+
+class TooltipTemplate(str):
+    def __new__(cls, html, title="", body_lines=(), icon=None, icon_width=30):
+        obj = str.__new__(cls, html)
+        obj.title = title
+        obj.body_lines = tuple(line for line in body_lines if line)
+        obj.icon = icon
+        obj.icon_width = icon_width
+        return obj
+
+    @property
+    def first_line(self):
+        return self.body_lines[0] if self.body_lines else ""
+
+
+class TooltipMedia:
+    def __init__(self, path):
+        self.path = str(path)
+
+
+class _TooltipSeparator:
+    pass
+
+
+separator = _TooltipSeparator()
+
+
+def tooltip_media(path):
+    return TooltipMedia(path)
+
+
+def tooltip_body(*paragraphs):
+    lines = []
+    for paragraph in paragraphs:
+        if paragraph is separator:
+            lines.append(paragraph)
+            continue
+        if isinstance(paragraph, TooltipMedia):
+            lines.append(paragraph)
+            continue
+        if paragraph and str(paragraph).strip():
+            lines.append(str(paragraph).strip())
+    return tuple(lines)
+
+
+def tool_tooltip(title, body, icon=None, icon_width=30):
+    body_lines = tooltip_body(*(body if isinstance(body, (list, tuple)) else [body]))
+    icon_html = f"<img src='{icon}' width='{icon_width}'>" if icon else ""
+    body_parts = []
+    for item in body_lines:
+        if item is separator:
+            body_parts.append("<hr>")
+        elif isinstance(item, TooltipMedia):
+            body_parts.append(f"<img src='{item.path}'>")
+        else:
+            body_parts.append(item)
+    body_html = "<br><br>".join(body_parts)
+    html = (
+        f"<font style='color: #cccccc; font-size:{TOOLTIP_TITLE_FONT_SIZE};'><b>{title}</b></font>{icon_html}<br><br>"
+        f"<font style='color: #cccccc; font-size:{TOOLTIP_BODY_FONT_SIZE};'>{body_html}</font>"
+    )
+    return TooltipTemplate(html, title=title, body_lines=body_lines, icon=icon, icon_width=icon_width)
 
 
 def format_tooltip_shortcut(keys_list, include_click_suffix=False):
@@ -330,25 +401,21 @@ class QFlatTooltip(QWidget):
                 body_html = ""
 
         content_layout = QVBoxLayout()
+        content_layout.setSpacing(wutil.DPI(6))
         top_margin = wutil.DPI(0) if self.has_header else wutil.DPI(12)
         content_layout.setContentsMargins(wutil.DPI(12), top_margin, wutil.DPI(12), wutil.DPI(8))
+        self.content_layout = content_layout
 
         if not body_html.strip() and self.description:
             body_html = self.description
 
         if body_html.strip():
-            raw_lbl = QLabel(body_html)
-            raw_lbl.setWordWrap(True)
-            raw_lbl.setOpenExternalLinks(True)
-            raw_lbl.setTextFormat(Qt.RichText)
-            raw_lbl.setMaximumWidth(wutil.DPI(self.MAX_WIDTH))
-            raw_lbl.setStyleSheet(
-                "color: {}; background: transparent; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5))
-            )
-            content_layout.addWidget(raw_lbl)
+            self._populate_body_content(content_layout, body_html)
             self.bg_layout.addLayout(content_layout)
-            self.bg_layout.addSpacing(wutil.DPI(4))
-        self.bg_layout.addSpacing(wutil.DPI(4))
+            if self.shortcuts and "Shortcuts" not in self.tooltip_template:
+                self.bg_layout.addSpacing(wutil.DPI(14))
+            else:
+                self.bg_layout.addSpacing(wutil.DPI(18))
 
         # 5. Shortcuts detection
         if self.shortcuts and "Shortcuts" not in self.tooltip_template:
@@ -370,7 +437,7 @@ class QFlatTooltip(QWidget):
         title_lbl.setMinimumHeight(wutil.DPI(20))
         layout.addWidget(title_lbl)
 
-        self.bg_layout.addSpacing(wutil.DPI(10))
+        self.bg_layout.addSpacing(0)
         self.bg_layout.addWidget(frame)
         self.bg_layout.addSpacing(wutil.DPI(12))
 
@@ -419,7 +486,7 @@ class QFlatTooltip(QWidget):
             )
             max_row_width = max(max_row_width, row_width)
 
-        self.bg_layout.addSpacing(wutil.DPI(16))
+        self.bg_layout.addSpacing(wutil.DPI(18))
         if max_row_width:
             self._shortcut_min_width = min(max_row_width, wutil.DPI(460))
             self.bg_frame.setMinimumWidth(max(self.bg_frame.minimumWidth(), self._shortcut_min_width))
@@ -489,22 +556,103 @@ class QFlatTooltip(QWidget):
                 lbl.setWordWrap(False)
         return lbl
 
-    def _create_media_label(self, path, is_gif=False):
+    def _body_max_width(self):
+        margins = self.content_layout.contentsMargins() if hasattr(self, "content_layout") else self.bg_layout.contentsMargins()
+        return max(1, self.bg_frame.maximumWidth() - margins.left() - margins.right())
+
+    def _contain_size(self, max_width, size):
+        if not size.isValid() or size.width() <= 0:
+            return None
+
+        if size.width() <= max_width:
+            return size
+
+        scale = float(max_width) / float(size.width())
+        return QSize(max_width, max(1, int(size.height() * scale)))
+
+    def _create_media_label(self, path):
         lbl = QLabel()
         lbl.setAlignment(Qt.AlignCenter)
-        lbl.setContentsMargins(wutil.DPI(12), wutil.DPI(4), wutil.DPI(12), wutil.DPI(4))
-        if is_gif or path.endswith(".gif"):
+        max_media_width = self._body_max_width()
+        lbl.setMaximumWidth(max_media_width)
+
+        if path.lower().endswith(".gif"):
             movie = QMovie(path)
-            movie.setScaledSize(QSize(wutil.DPI(300), wutil.DPI(150)))
+            movie.setCacheMode(QMovie.CacheAll)
+            movie.jumpToFrame(0)
+            frame_size = movie.currentImage().size()
+            if not frame_size.isValid():
+                frame_size = movie.frameRect().size()
+            contained_size = self._contain_size(max_media_width, frame_size)
+            if contained_size is not None:
+                movie.setScaledSize(contained_size)
+            movie.finished.connect(movie.start)
             movie.start()
             lbl.setMovie(movie)
+            lbl._movie = movie
         else:
             pix = QPixmap(path)
             if not pix.isNull():
-                if pix.width() > wutil.DPI(300):
-                    pix = pix.scaledToWidth(wutil.DPI(300), Qt.SmoothTransformation)
+                contained_size = self._contain_size(max_media_width, pix.size())
+                if contained_size is not None and pix.size() != contained_size:
+                    pix = pix.scaled(contained_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 lbl.setPixmap(pix)
         return lbl
+
+    def _create_body_text_label(self, html):
+        raw_lbl = QLabel(html)
+        raw_lbl.setWordWrap(True)
+        raw_lbl.setOpenExternalLinks(True)
+        raw_lbl.setTextFormat(Qt.RichText)
+        raw_lbl.setMaximumWidth(self._body_max_width())
+        raw_lbl.setStyleSheet(
+            "color: {}; background: transparent; font-size: {}px; margin: 0; padding: 0;".format(self.TEXT_COLOR, wutil.DPI(10.5))
+        )
+        return raw_lbl
+
+    def _create_separator(self):
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Plain)
+        line.setStyleSheet("background-color: #4a4a4a; color: #4a4a4a; border: none; min-height: 1px; max-height: 1px; margin: 0; padding: 0;")
+        return line
+
+    def _normalize_body_text(self, html):
+        html = RE_FONT_TAG.sub("", html or "")
+        html = RE_LEADING_BR.sub("", html)
+        html = RE_TRAILING_BR.sub("", html)
+        return html.strip()
+
+    def _iter_body_blocks(self, body_html):
+        for part in RE_BODY_TOKEN.split(body_html):
+            part = (part or "").strip()
+            if not part:
+                continue
+
+            if RE_HR_TAG.fullmatch(part):
+                yield ("separator", None)
+                continue
+
+            img_match = RE_IMG_EXTRACT.search(part)
+            if img_match:
+                yield ("media", img_match.group(1))
+                continue
+
+            text_html = self._normalize_body_text(part)
+            if text_html:
+                yield ("text", text_html)
+
+    def _populate_body_content(self, layout, body_html):
+        for block_type, value in self._iter_body_blocks(body_html):
+            if block_type == "separator":
+                layout.addWidget(self._create_separator())
+                continue
+
+            if block_type == "media":
+                layout.addWidget(self._create_media_label(value))
+                continue
+
+            layout.addWidget(self._create_body_text_label(value))
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -567,21 +715,25 @@ class QFlatTooltip(QWidget):
         self.adjustSize()
         w, h = self.width(), self.height()
 
-        pos = QPoint(target_x - w // 2, self._global_anc.top() - h - wutil.DPI(2))
+        gap = wutil.DPI(2)
+        edge_padding = wutil.DPI(5)
+        pos = QPoint(target_x - w // 2, self._global_anc.top() - h - gap)
 
         screen = QGuiApplication.screenAt(cursor_pos) or QGuiApplication.primaryScreen()
         geo = screen.availableGeometry()
+        available_top = self._global_anc.top() - geo.top() - gap
+        available_bottom = geo.bottom() - self._global_anc.bottom() - gap
 
-        if pos.y() < geo.top() + wutil.DPI(5):
-            # Not enough room above, flip to BELOW the widget (arrow on top)
+        if pos.y() < geo.top() + edge_padding and available_bottom > available_top:
+            # If the tooltip does not fit above, only flip below when there is more room there.
             self.side = "top"
             self.main_layout.setContentsMargins(0, ah, 0, 0)
             self.main_layout.activate()
             self.adjustSize()
             w, h = self.width(), self.height()
-            pos.setY(self._global_anc.bottom() + 1 + wutil.DPI(2))
+            pos.setY(self._global_anc.bottom() + 1 + gap)
 
-        final_x = max(geo.left() + wutil.DPI(5), min(pos.x(), geo.right() - w - wutil.DPI(5)))
+        final_x = max(geo.left() + edge_padding, min(pos.x(), geo.right() - w - edge_padding))
         pos.setX(final_x)
         self.move(pos)
 

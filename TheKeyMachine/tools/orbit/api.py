@@ -68,7 +68,7 @@ orbit_actions = {
     "align_selected_objects": "bar.align_selected_objects",
     "mod_tracer": "bar.mod_tracer",
     "reset_objects_mods": "keyTools.reset_objects_mods",
-    "deleteAnimation": "bar.deleteAnimation",
+    "delete_all_animation": "bar.delete_all_animation",
     "selectOpposite": "keyTools.selectOpposite",
     "copyOpposite": "keyTools.copyOpposite",
     "mirror": "keyTools.mirror",
@@ -89,7 +89,7 @@ orbit_action_icons = {
     "bar.align_selected_objects": media.align_menu_image,
     "bar.mod_tracer": media.tracer_image,
     "keyTools.reset_objects_mods": media.asset_path("reset_animation_image"),
-    "bar.deleteAnimation": media.delete_animation_image,
+    "bar.delete_all_animation": media.delete_animation_image,
     "keyTools.selectOpposite": media.opposite_select_image,
     "keyTools.copyOpposite": media.opposite_copy_image,
     "keyTools.mirror": media.mirror_image,
@@ -107,7 +107,7 @@ orbit_action_icons = {
 
 DEFAULT_ORBIT_CONFIGURATION = {
     "button1": "reset_objects_mods",
-    "button2": "deleteAnimation",
+    "button2": "delete_all_animation",
     "button3": "selectOpposite",
     "button4": "copyOpposite",
     "button5": "mirror",
@@ -159,7 +159,7 @@ def execute_action(action_identifier):
             bar.mod_tracer()
         elif action_identifier == "reset_objects_mods":
             keyTools.reset_objects_mods()
-        elif action_identifier == "deleteAnimation":
+        elif action_identifier == "delete_all_animation":
             bar.mod_delete_animation()
         elif action_identifier == "selectOpposite":
             keyTools.selectOpposite()

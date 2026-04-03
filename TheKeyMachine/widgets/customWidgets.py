@@ -40,9 +40,6 @@ and user preference integration.
 RE_HTML_TAGS = re.compile(r"<[^>]*>")
 RE_WHITESPACE = re.compile(r"\s+")
 RE_BR_SPLIT = re.compile(r"<br\s*/?>", re.IGNORECASE)
-RE_NEWLINE_SPLIT = re.compile(r"<br\s*/?>|\r?\n", re.IGNORECASE)
-RE_TKM_TT_SPLIT = re.compile(r"(?:<br\s*/?>\s*){2,}", re.IGNORECASE)
-RE_HELP_SPLIT = re.compile(r"(\.[\s\r\n]|<br\s*/?>|\r?\n)", re.IGNORECASE)
 _ACTIVE_TOOL_WIDGET = None
 
 
@@ -123,26 +120,38 @@ class HelpSystem:
     def clean(raw):
         if not raw:
             return ""
-        # 1. Replace all HTML tags with a space to avoid joining words
-        res = RE_HTML_TAGS.sub(" ", str(raw))
-        # 2. Normalize whitespace and strip
-        return RE_WHITESPACE.sub(" ", res).strip()
+        text = str(raw)
+        result = []
+        in_tag = False
+
+        for char in text:
+            if char == "<":
+                in_tag = True
+                result.append(" ")
+                continue
+            if char == ">":
+                in_tag = False
+                continue
+            if not in_tag:
+                result.append(char)
+
+        return " ".join("".join(result).split()).strip()
 
     @staticmethod
     def get_desc(raw):
         if not raw:
             return ""
-        # Get first line or first sentence of description
-        parts = RE_HELP_SPLIT.split(str(raw), maxsplit=1)
-        if parts:
-            # Reconstruct the sentence if split by period
-            res = parts[0]
-            if len(parts) > 1 and parts[1].startswith("."):
-                res += "."
+        text = str(raw).replace("<br/>", "\n").replace("<br />", "\n").replace("<br>", "\n").replace("\r\n", "\n").replace("\r", "\n")
+        for line in text.split("\n"):
+            clean = HelpSystem.clean(line)
+            if not clean:
+                continue
 
-            clean = HelpSystem.clean(res)
-            if clean:
-                return clean
+            for delimiter in (". ", "! ", "? "):
+                if delimiter in clean:
+                    return clean.split(delimiter, 1)[0] + delimiter[0]
+
+            return clean
         return ""
 
     @classmethod
@@ -150,16 +159,6 @@ class HelpSystem:
         """Pushes data to StatusTip, ToolTip, and internal properties."""
         raw_title = title or ""
         raw_desc = description or ""
-
-        # If title contains TKM's double-break format, split it
-        if not raw_desc and "<br" in raw_title.lower():
-            parts = RE_TKM_TT_SPLIT.split(raw_title, maxsplit=1)
-            if len(parts) > 1:
-                raw_title, raw_desc = parts
-            else:
-                parts = RE_NEWLINE_SPLIT.split(raw_title, maxsplit=1)
-                if len(parts) > 1:
-                    raw_title, raw_desc = parts
 
         c_title = cls.clean(raw_title)
         if not c_title and hasattr(widget_or_action, "objectName"):
@@ -357,8 +356,7 @@ class MenuWidget(QtWidgets.QMenu):
                 label = arg
                 break
 
-        # Push documentation (use label_override, tooltip_template or label as help source)
-        HelpSystem.push(action, label_override or tooltip_template or label or action.text(), description)
+        HelpSystem.push(action, label_override or label or action.text(), description)
         return action
 
     def addMenu(self, *args, **kwargs):
@@ -444,7 +442,7 @@ class TooltipMixin:
             "status_title": status_title,
             "status_description": status_description,
         }
-        HelpSystem.push(self, status_title or tooltip_template or text, status_description if status_description is not None else description)
+        HelpSystem.push(self, status_title or text or tooltip_template, status_description if status_description is not None else description)
 
     def get_help_data(self):
         return getattr(self, "_help_data", {})
@@ -461,7 +459,7 @@ class TooltipMixin:
         data = getattr(self, "_help_data", {})
         HelpSystem.push(
             self,
-            data.get("status_title") or data.get("tooltip_template") or data.get("text", ""),
+            data.get("status_title") or data.get("text", "") or data.get("tooltip_template", ""),
             data.get("status_description") if data.get("status_description") is not None else data.get("description", ""),
         )
 
@@ -710,7 +708,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         if icon:
             self._apply_icon_visual(icon)
         self.setToolTipData(
-            text=tooltip_template or text,
+            text=text,
             description=description,
             shortcuts=shortcuts,
             tooltip_template=tooltip_template,
@@ -849,7 +847,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             self._apply_icon_visual(icon)
             TooltipMixin.setToolTipData(
                 self,
-                text=tooltip_template or text,
+                text=status_title or text,
                 description=description,
                 shortcuts=shortcuts,
                 tooltip_template=tooltip_template,
@@ -859,7 +857,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             )
             HelpSystem.push(
                 self,
-                status_title or tooltip_template or text or "",
+                status_title or text or "",
                 status_description if status_description is not None else description or "",
             )
         finally:
@@ -882,8 +880,8 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             "shortcuts": variant.get("shortcuts", []),
             "tooltip_template": variant.get("tooltip_template", variant.get("text", self._base_state.get("text"))),
             "icon": variant.get("icon_path", self._base_state.get("icon")),
-            "status_title": variant.get("status_title"),
-            "status_description": variant.get("status_description"),
+            "status_title": variant.get("status_title") or variant.get("label") or self._base_state.get("status_title"),
+            "status_description": variant.get("status_description") if variant.get("status_description") is not None else variant.get("description", ""),
         }
 
     def _refresh_modifier_variant_state(self):
@@ -995,13 +993,13 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
         shortcut_variants=data.get("shortcut_variants"),
     )
     btn.setToolTipData(
-        text=data.get("tooltip_template") or data.get("text"),
+        text=data.get("label") or data.get("text"),
         description=data.get("description"),
         shortcuts=data.get("shortcuts"),
         tooltip_template=data.get("tooltip_template"),
         icon=data.get("icon_path"),
-        status_title=data.get("status_title"),
-        status_description=data.get("status_description"),
+        status_title=data.get("status_title") or data.get("label") or data.get("text"),
+        status_description=data.get("status_description") if data.get("status_description") is not None else data.get("description"),
     )
     if data.get("tint_color") is not None:
         btn.set_tint_color(data.get("tint_color"))
@@ -1602,7 +1600,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 icon=existing.get("icon"),
             )
         else:
-            HelpSystem.push(widget, tooltip_template or label, description or "")
+            HelpSystem.push(widget, label, description or "")
 
         return widget
 
