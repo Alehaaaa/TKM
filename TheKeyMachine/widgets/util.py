@@ -127,12 +127,15 @@ class ResetWithoutEmit:
         self._slider = slider
 
     def __call__(self):
-        QSignalBlocker(self._slider)
-        self._slider.setValue(getattr(self._slider, "defaultValue", 0))
-        if hasattr(self._slider, "_apply_stylesheet"):
-            self._slider._apply_stylesheet(thick=False)  # type: ignore[attr-defined]
-        if hasattr(self._slider, "_pressOffset"):
-            self._slider._pressOffset = None  # type: ignore[attr-defined]
+        blocker = QSignalBlocker(self._slider)
+        try:
+            self._slider.setValue(getattr(self._slider, "defaultValue", 0))
+            if hasattr(self._slider, "_apply_stylesheet"):
+                self._slider._apply_stylesheet(thick=False)  # type: ignore[attr-defined]
+            if hasattr(self._slider, "_pressOffset"):
+                self._slider._pressOffset = None  # type: ignore[attr-defined]
+        finally:
+            del blocker
 
 
 def make_inViewMessage(message, icon=None):

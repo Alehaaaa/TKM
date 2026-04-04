@@ -361,10 +361,11 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._pressOffset = True
 
     # --- internals --------------------------------------------------------------
-    def _reset_without_emit(self):
+    def _reset_without_emit(self, emit_finished: bool = True):
         reset = util.ResetWithoutEmit(self)
         reset()
-        self.finished.emit(self.percent())
+        if emit_finished:
+            self.finished.emit(self.percent())
         self._wheel_count = 0
         self._prev_wheel_direction = 0
         self._pressOffset = None
@@ -478,9 +479,10 @@ QSlider::handle:horizontal {{
         if e.button() == Qt.LeftButton and self.isSliderDown():
             self.setSliderDown(False)
             self._apply_stylesheet(thick=False)
-            self.moved.emit(self.percent())
+            # Emit finished so the parent widget can call stop_dragging()
             self.finished.emit(self.percent())
-            self._reset_without_emit()
+            # SliderHandle reset logic handles signal blocking internally
+            self._reset_without_emit(emit_finished=False)
             self._pressOffset = None
         super().mouseReleaseEvent(e)
 
@@ -583,12 +585,14 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     Public composite widget.
 
     Signals:
-      - valueChanged(float): slider percent (drag/wheel/keys or side buttons)
+      - valueChanged(float): live slider percent while dragging/wheeling/keys
+      - valueSet(float): committed slider percent on release or button click
       - dragStarted()
       - dragFinished()
     """
 
     valueChanged = Signal(float)
+    valueSet = Signal(float)
     dragStarted = Signal()
     dragFinished = Signal()
     modeSelected = Signal(str)
@@ -617,6 +621,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._frameButtons = False
         self._tooltipTitle = tooltipTitle
         self._tooltipDescription = tooltipDescription
+        self._modeExecutor = None
+        self._modeFinishHandler = None
 
         self._section_parent = None
         self._section_prefix = ""
@@ -717,12 +723,14 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._slider.started.connect(self._on_drag_started)
         self._slider.moved.connect(self._on_inner_moved)
         self._slider.finished.connect(self._on_inner_finished)
-        self._slider.valueChanged.connect(lambda _v: self.valueChanged.emit(self.percent()))
+        self.valueChanged.connect(self._dispatch_mode_value)
+        self.valueSet.connect(self._dispatch_mode_value)
+        self.dragFinished.connect(self._dispatch_mode_finish)
 
         if dragCommand:
-            self.valueChanged.connect(dragCommand)
+            self._modeExecutor = dragCommand
         if dropCommand:
-            self.dragFinished.connect(dropCommand)
+            self._modeFinishHandler = dropCommand
 
         # initial geometry & tooltip sync
         if tooltipTitle:
@@ -866,18 +874,10 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._rightFrameButton.show() if self._frameButtons else self._rightFrameButton.hide()
 
     def setDragCommand(self, dragCommand):
-        try:
-            self.valueChanged.disconnect()
-        except Exception:
-            pass
-        self.valueChanged.connect(dragCommand)
+        self._modeExecutor = dragCommand
 
     def setDropCommand(self, dropCommand):
-        try:
-            self.dragFinished.disconnect()
-        except Exception:
-            pass
-        self.dragFinished.connect(dropCommand)
+        self._modeFinishHandler = dropCommand
 
     def setRange(self, min_v: int, max_v: int):
         self._slider.setRange(int(min_v * self._scale), int(max_v * self._scale))
@@ -1142,28 +1142,45 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._rightOverlay.hide()
 
     def _on_inner_moved(self, pct: float):
-        self.valueChanged.emit(self.percent())
+        self._emit_value_changed(self.percent())
+
+    def _dispatch_mode_value(self, value: float):
+        if self._modeExecutor is None:
+            return
+        mode = self._get_active_mode()
+        if mode is None:
+            return
+        self._modeExecutor(mode.key, value)
+
+    def _dispatch_mode_finish(self):
+        if self._modeFinishHandler is None:
+            return
+        self._modeFinishHandler()
+
+    def _emit_value_changed(self, value: float):
+        self.valueChanged.emit(float(value))
+
+    def _emit_value_set(self, value: float):
+        self.valueSet.emit(float(value))
 
     def _on_inner_finished(self, pct: float):
+        self._emit_value_set(pct)
+
+        # Notify drag finished (connected to dropCommand which is usually a no-op or specific tool reset)
         self.dragFinished.emit()
 
-        # If dropCommand isn't connected, make sure the undo chunk is closed.
-        try:
-            slider_utils.stop_dragging()
-        except Exception:
-            pass
+        # Finalize the interaction and clean up the undo chunk
+        slider_utils.stop_dragging()
 
         self._leftOverlay.show()
         self._rightOverlay.show()
 
     def _on_button_clicked(self, btn: SliderButton):
+        # Atomic operation for buttons: start -> emit -> stop
         try:
-            self.valueChanged.emit(float(btn.percent))
+            self._emit_value_set(float(btn.percent))
         finally:
-            try:
-                slider_utils.stop_dragging()
-            except Exception:
-                pass
+            slider_utils.stop_dragging()
 
     def leaveEvent(self, e):
         self._disconnect_modifier_watch()

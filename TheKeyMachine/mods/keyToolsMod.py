@@ -76,14 +76,7 @@ BAKE_UNDO_HELP = {
 def clear_timeslider_selection():
     # fix temporal para limpiar el timeslider
     selection = util.get_selected_objects()
-
-    # Crear y eliminar un nodo temporal
-    empty_node = cmds.createNode("transform", name="tempNode")
-    cmds.delete(empty_node)
-
-    # Restaurar la selección original, si había algo seleccionado
-    if selection:
-        cmds.select(selection)
+    cmds.select(selection)
 
 
 def get_time_range_selected():

@@ -697,11 +697,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             pass
 
     def _create_system_menu(self, parent_menu):
-        system_icon_path = os.path.normpath(r"C:\Users\aleha\Documents\maya\scripts\TheKeyMachine\data\img\system.png")
-        system_menu = cw.MenuWidget(QtGui.QIcon(system_icon_path), "System")
+        system_menu = cw.MenuWidget(QtGui.QIcon(media.system_image), "System")
         parent_menu.addMenu(system_menu, description="Maintenance actions.")
         system_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", self.reload, description="Refresh the TKM interface.")
-        system_menu.addAction(QtGui.QIcon(media.close_image), "Unload", self.unload, description="Close TheKeyMachine and remove callbacks.")
+        system_menu.addAction(
+            QtGui.QIcon(media.close_image), "Unload", self.unload, description="Close TheKeyMachine and remove callbacks."
+        )
         system_menu.addAction(QtGui.QIcon(media.remove_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
         return system_menu
 
@@ -759,7 +760,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             if cmds.objectTypeUI(child) != "shelfButton":
                 continue
 
-            if cmds.shelfButton(child, query=True, label=True) == button_name or cmds.shelfButton(child, query=True, command=True) == command:
+            if (
+                cmds.shelfButton(child, query=True, label=True) == button_name
+                or cmds.shelfButton(child, query=True, command=True) == command
+            ):
                 cmds.deleteUI(child)
 
         cmds.shelfButton(parent=current_shelf_tab, image=icon_path, command=command, label=button_name)
@@ -897,7 +901,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     split_name = sub_sel_set.split("_")
                     color_suffix = split_name[-1]
                     set_name = "_".join(split_name[:-1])
-                    set_group_data["sets"].append({"name": set_name, "color_suffix": color_suffix, "objects": cmds.sets(sub_sel_set, q=True)})
+                    set_group_data["sets"].append(
+                        {"name": set_name, "color_suffix": color_suffix, "objects": cmds.sets(sub_sel_set, q=True)}
+                    )
             set_data["set_groups"].append(set_group_data)
 
         export_dir = os.path.dirname(file_path)
@@ -1957,7 +1963,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         clear_btn = cw.QFlatToolButton(text="x")
         clear_btn.clicked.connect(
-            lambda *_args, w=clear_btn: w.triggerToolCallback(trigger.make_command_callback("clear_selected_keys", keyTools.clear_selected_keys))
+            lambda *_args, w=clear_btn: w.triggerToolCallback(
+                trigger.make_command_callback("clear_selected_keys", keyTools.clear_selected_keys)
+            )
         )
         sec.addWidget(
             clear_btn,
@@ -2103,7 +2111,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     show_frames = True
 
                 # Determine initial visibility: pinned setting takes priority, fallback to default_modes membership
-                is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys, namespace="main_toolbar_sliders")
+                is_visible = settings.get_setting(
+                    f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys, namespace="main_toolbar_sliders"
+                )
 
                 s = sw.QFlatSliderWidget(
                     f"bar_{prefix}_{key}",
@@ -2111,7 +2121,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     max=100,
                     text=icon,
                     color=color,
-                    dragCommand=command or (lambda v, k=key, p=prefix: trigger.execute_slider(p, k, v)),
+                    dragCommand=(lambda mode_key, v, p=prefix: blend_to_frame_with_button_values(v) if mode_key == "blend_to_frame" else trigger.execute_slider(p, mode_key, v)),
                     dropCommand=drop_func,
                     tooltipTitle=label,
                     tooltipDescription=desc,
@@ -2127,18 +2137,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                         m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
                         if m_info:
                             slider_instance.setTooltipInfo(m_info["label"], m_info.get("description", ""))
-
-                        # Handle specialized frames visibility
-                        if new_mode == "blend_to_frame":
-                            # Temporary disable: frame capture buttons for Blend to Frame sliders.
-                            # blend_to_key_left_b_qt.show()
-                            # blend_to_key_right_b_qt.show()
-                            slider_instance.setDragCommand(blend_to_frame_with_button_values)
-                        else:
-                            # Temporary disable: frame capture buttons for Blend to Frame sliders.
-                            # blend_to_key_left_b_qt.hide()
-                            # blend_to_key_right_b_qt.hide()
-                            slider_instance.setDragCommand(lambda v, nk=new_mode, p=prefix: trigger.execute_slider(p, nk, v))
 
                         if not temporary:
                             slider_instance.startFlash()
@@ -2395,7 +2393,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     "key": "cp_help",
                     "label": "Help",
                     "icon_path": media.help_menu_image,
-                    "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-paste-animation"),
+                    "callback": lambda: general.open_url(
+                        "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-paste-animation"
+                    ),
                     "pinnable": False,
                 },
             ],
