@@ -1,5 +1,5 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal EnableExtensions EnableDelayedExpansion
 
 set "SCRIPT_DIR=%~dp0"
 set "MOVIES_DIR=%SCRIPT_DIR%movies"
@@ -18,20 +18,32 @@ if not exist "%MOVIES_DIR%" (
 
 set "FOUND_VIDEO=0"
 
-for /r "%MOVIES_DIR%" %%F in (*.mov *.mp4 *.m4v *.avi *.mkv *.webm) do (
-    set "FOUND_VIDEO=1"
-    set "VIDEO=%%~fF"
-    set "GIF=%%~dpnF.gif"
-    set "PALETTE=%%~dpnF_palette.png"
+for %%E in (mov mp4 m4v avi mkv webm) do (
+    for /r "%MOVIES_DIR%" %%F in (*.%%E) do (
+        set "FOUND_VIDEO=1"
+        set "VIDEO=%%~fF"
+        set "GIF=%%~dpnF.gif"
+        set "PALETTE=%%~dpnF_palette.png"
 
-    echo Converting:
-    echo   %%~fF
+        echo Converting:
+        echo   %%~fF
 
-    ffmpeg -y -i "%%~fF" -vf "fps=15,scale=iw:-1:flags=lanczos,palettegen=stats_mode=diff" "!PALETTE!" && ^
-    ffmpeg -y -i "%%~fF" -i "!PALETTE!" -lavfi "fps=15,scale=iw:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=sierra2_4a" "!GIF!"
+        ffmpeg -y -i "%%~fF" -vf "fps=15,scale=iw:-1:flags=lanczos,palettegen=stats_mode=diff" -frames:v 1 -update 1 "!PALETTE!"
+        if errorlevel 1 (
+            echo Failed to generate palette for:
+            echo   %%~fF
+            echo.
+        ) else (
+            ffmpeg -y -i "%%~fF" -i "!PALETTE!" -lavfi "fps=15,scale=iw:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=sierra2_4a" "!GIF!"
+            if errorlevel 1 (
+                echo Failed to create GIF for:
+                echo   %%~fF
+            )
+        )
 
-    if exist "!PALETTE!" del /q "!PALETTE!"
-    echo.
+        if exist "!PALETTE!" del /q "!PALETTE!"
+        echo.
+    )
 )
 
 if "%FOUND_VIDEO%"=="0" (
@@ -39,3 +51,6 @@ if "%FOUND_VIDEO%"=="0" (
 ) else (
     echo Finished converting videos to GIF.
 )
+
+endlocal
+pause
