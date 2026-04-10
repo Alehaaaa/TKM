@@ -10,6 +10,7 @@ import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 
@@ -427,11 +428,11 @@ def bind_selection_sets_toolbar_button(button, controller=None):
             return b._tkm_selection_sets_default_mouse_press(event)
 
         button.mousePressEvent = _selection_sets_mouse_press
-        try:
-            button.customContextMenuRequested.disconnect()
-        except Exception:
-            pass
         button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        button.customContextMenuRequested.connect(
-            lambda pos, b=button, c=controller: build_selection_sets_context_menu(parent=b, controller=c).exec_(b.mapToGlobal(pos))
+        toolCommon.replace_tracked_connection(
+            button,
+            "_tkm_selection_sets_context_menu_slot",
+            button.customContextMenuRequested,
+            lambda pos, b=button, c=controller: build_selection_sets_context_menu(parent=b, controller=c).exec_(b.mapToGlobal(pos)),
+            parent=button,
         )

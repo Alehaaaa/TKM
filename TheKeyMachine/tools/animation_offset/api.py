@@ -124,49 +124,21 @@ class AnimationOffsetController(QtCore.QObject):
 
     def _connect_runtime_manager(self):
         manager = self._runtime_manager
-        try:
-            manager.selection_changed.connect(self._on_selection_changed)
-        except Exception:
-            pass
-        try:
-            manager.time_changed.connect(self._on_time_changed)
-        except Exception:
-            pass
-        try:
-            manager.undo_performed.connect(self._on_undo_performed)
-        except Exception:
-            pass
-        try:
-            manager.scene_opened.connect(self._on_scene_reset)
-        except Exception:
-            pass
-        try:
-            manager.scene_new.connect(self._on_scene_reset)
-        except Exception:
-            pass
+        toolCommon.replace_tracked_connections(
+            self,
+            "_runtime_manager_relays",
+            (
+                (manager.selection_changed, self._on_selection_changed),
+                (manager.time_changed, self._on_time_changed),
+                (manager.undo_performed, self._on_undo_performed),
+                (manager.scene_opened, self._on_scene_reset),
+                (manager.scene_new, self._on_scene_reset),
+            ),
+            parent=self,
+        )
 
     def _disconnect_runtime_manager(self):
-        manager = self._runtime_manager
-        try:
-            manager.selection_changed.disconnect(self._on_selection_changed)
-        except Exception:
-            pass
-        try:
-            manager.time_changed.disconnect(self._on_time_changed)
-        except Exception:
-            pass
-        try:
-            manager.undo_performed.disconnect(self._on_undo_performed)
-        except Exception:
-            pass
-        try:
-            manager.scene_opened.disconnect(self._on_scene_reset)
-        except Exception:
-            pass
-        try:
-            manager.scene_new.disconnect(self._on_scene_reset)
-        except Exception:
-            pass
+        toolCommon.clear_tracked_connections(self, "_runtime_manager_relays")
 
     def _on_selection_changed(self):
         if not self._enabled or self._state == "applying":

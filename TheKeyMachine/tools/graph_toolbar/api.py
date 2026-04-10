@@ -8,6 +8,7 @@ except Exception:
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.core.runtime_manager as runtime
+from TheKeyMachine.tools import common as toolCommon
 
 
 _GRAPH_LAYOUT = "customGraph_columnLayout"
@@ -43,10 +44,17 @@ def sync_graph_toolbar_watch() -> None:
 
 
 def _disconnect_graph_toolbar_sync(callback) -> None:
-    try:
-        custom_graph_bus.graph_toolbar_enabled_changed.disconnect(callback)
-    except Exception:
-        pass
+    relays = getattr(custom_graph_bus, "_tkm_graph_toolbar_sync_relays", [])
+    remaining = []
+    for relay, relay_callback in relays:
+        if relay_callback is callback:
+            try:
+                relay.deleteLater()
+            except Exception:
+                pass
+        else:
+            remaining.append((relay, relay_callback))
+    custom_graph_bus._tkm_graph_toolbar_sync_relays = remaining
 
 
 def _set_checked_safely(widget, checked: bool) -> bool:
@@ -90,17 +98,28 @@ def bind_graph_toolbar_toggle(widget) -> None:
     except Exception:
         pass
 
-    try:
-        custom_graph_bus.graph_toolbar_enabled_changed.connect(_sync)
-    except Exception:
-        pass
+    relay = toolCommon.replace_tracked_connection(
+        widget,
+        "_tkm_graph_toolbar_sync_relay",
+        custom_graph_bus.graph_toolbar_enabled_changed,
+        _sync,
+        parent=widget,
+    )
+    relays = getattr(custom_graph_bus, "_tkm_graph_toolbar_sync_relays", [])
+    relays = [(existing_relay, callback) for existing_relay, callback in relays if callback is not _sync]
+    if relay is not None:
+        relays.append((relay, _sync))
+    custom_graph_bus._tkm_graph_toolbar_sync_relays = relays
 
     destroyed_signal = getattr(widget, "destroyed", None)
     if destroyed_signal:
-        try:
-            destroyed_signal.connect(lambda *_: _disconnect_graph_toolbar_sync(_sync))
-        except Exception:
-            pass
+        toolCommon.replace_tracked_connection(
+            widget,
+            "_tkm_graph_toolbar_destroyed_slot",
+            destroyed_signal,
+            lambda *_: _disconnect_graph_toolbar_sync(_sync),
+            parent=widget,
+        )
 
 
 def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:

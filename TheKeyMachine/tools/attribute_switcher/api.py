@@ -5,6 +5,7 @@ except ImportError:
 
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.settingsMod as settings
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools.attribute_switcher.common import (
     ATTRIBUTE_SWITCHER_GEOMETRY_KEY,
@@ -162,12 +163,14 @@ def _show_attribute_switcher_toolbar_context_menu(button, pos):
 def bind_attribute_switcher_toolbar_button(button):
     attribute_switcher_toolbar_toggle.attach_button(button)
     if button:
-        try:
-            button.customContextMenuRequested.disconnect()
-        except Exception:
-            pass
         button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        button.customContextMenuRequested.connect(lambda pos, b=button: _show_attribute_switcher_toolbar_context_menu(b, pos))
+        toolCommon.replace_tracked_connection(
+            button,
+            "_tkm_attribute_switcher_context_menu_slot",
+            button.customContextMenuRequested,
+            lambda pos, b=button: _show_attribute_switcher_toolbar_context_menu(b, pos),
+            parent=button,
+        )
 
 
 def toggle_attribute_switcher_window():

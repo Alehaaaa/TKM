@@ -155,6 +155,80 @@ def close_undo_chunk(chunk_opened=True):
         pass
 
 
+class _SignalRelay(QtCore.QObject):
+    def __init__(self, callback, parent=None):
+        super().__init__(parent)
+        self._callback = callback
+
+    def trigger(self, *args):
+        if self._callback is None:
+            return
+        self._callback(*args)
+
+
+def safe_signal_connect(signal, slot):
+    try:
+        signal.connect(slot)
+        return True
+    except Exception:
+        return False
+
+
+def clear_tracked_connection(owner, attr_name):
+    relay = getattr(owner, attr_name, None)
+    if relay is None:
+        return False
+    setattr(owner, attr_name, None)
+    try:
+        relay.deleteLater()
+    except Exception:
+        pass
+    return True
+
+
+def replace_tracked_connection(owner, attr_name, signal, callback, parent=None):
+    clear_tracked_connection(owner, attr_name)
+    relay = _SignalRelay(callback, parent=parent)
+    if not safe_signal_connect(signal, relay.trigger):
+        try:
+            relay.deleteLater()
+        except Exception:
+            pass
+        return None
+    setattr(owner, attr_name, relay)
+    return relay
+
+
+def clear_tracked_connections(owner, attr_name):
+    relays = getattr(owner, attr_name, None)
+    if not relays:
+        setattr(owner, attr_name, [])
+        return False
+    setattr(owner, attr_name, [])
+    for relay in relays:
+        try:
+            relay.deleteLater()
+        except Exception:
+            pass
+    return True
+
+
+def replace_tracked_connections(owner, attr_name, pairs, parent=None):
+    clear_tracked_connections(owner, attr_name)
+    relays = []
+    for signal, callback in pairs:
+        relay = _SignalRelay(callback, parent=parent)
+        if safe_signal_connect(signal, relay.trigger):
+            relays.append(relay)
+        else:
+            try:
+                relay.deleteLater()
+            except Exception:
+                pass
+    setattr(owner, attr_name, relays)
+    return relays
+
+
 class ToolbarWindowToggle(QtCore.QObject):
     """Keeps a toolbar button in sync with a floating window."""
 
@@ -162,6 +236,8 @@ class ToolbarWindowToggle(QtCore.QObject):
         super().__init__(parent)
         self._button = None
         self._syncing = False
+        self._button_toggled_relay = None
+        self._button_destroyed_relay = None
         self._is_open_fn = is_open_fn
         self._open_fn = open_fn
         self._close_fn = close_fn
@@ -181,8 +257,20 @@ class ToolbarWindowToggle(QtCore.QObject):
         finally:
             self._syncing = False
         self._disconnect_button(self._button)
-        self._button.toggled.connect(self._on_button_toggled)
-        self._button.destroyed.connect(self._on_button_destroyed)
+        self._button_toggled_relay = replace_tracked_connection(
+            self,
+            "_button_toggled_relay",
+            self._button.toggled,
+            self._on_button_toggled,
+            parent=self._button,
+        )
+        self._button_destroyed_relay = replace_tracked_connection(
+            self,
+            "_button_destroyed_relay",
+            self._button.destroyed,
+            self._on_button_destroyed,
+            parent=self._button,
+        )
 
     def _set_button_checked(self, checked):
         if not self._button:
@@ -222,14 +310,8 @@ class ToolbarWindowToggle(QtCore.QObject):
     def _disconnect_button(self, button):
         if not button:
             return
-        try:
-            button.toggled.disconnect(self._on_button_toggled)
-        except Exception:
-            pass
-        try:
-            button.destroyed.disconnect(self._on_button_destroyed)
-        except Exception:
-            pass
+        clear_tracked_connection(self, "_button_toggled_relay")
+        clear_tracked_connection(self, "_button_destroyed_relay")
 
     def open(self):
         import TheKeyMachine.mods.reportMod as report

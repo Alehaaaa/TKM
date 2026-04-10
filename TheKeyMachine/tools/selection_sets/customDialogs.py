@@ -9,6 +9,7 @@ except ImportError:
 
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
 from TheKeyMachine.tools.selection_sets.customWidgets import SelectionSetButton
@@ -585,15 +586,18 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
     def _connect_selection_callback(self):
         runtime_manager = getattr(self, "_runtime_manager", None)
         if runtime_manager:
-            try:
-                runtime_manager.selection_changed.disconnect(self._schedule_selection_match_refresh)
-            except Exception:
-                pass
+            toolCommon.clear_tracked_connection(self, "_selection_changed_relay")
         try:
             import TheKeyMachine.core.runtime_manager as runtime
 
             self._runtime_manager = runtime.get_runtime_manager()
-            self._runtime_manager.selection_changed.connect(self._schedule_selection_match_refresh)
+            toolCommon.replace_tracked_connection(
+                self,
+                "_selection_changed_relay",
+                self._runtime_manager.selection_changed,
+                self._schedule_selection_match_refresh,
+                parent=self,
+            )
         except Exception:
             self._runtime_manager = None
 
@@ -601,10 +605,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         runtime_manager = getattr(self, "_runtime_manager", None)
         if not runtime_manager:
             return
-        try:
-            runtime_manager.selection_changed.disconnect(self._schedule_selection_match_refresh)
-        except Exception:
-            pass
+        toolCommon.clear_tracked_connection(self, "_selection_changed_relay")
         self._runtime_manager = None
 
     def _schedule_selection_match_refresh(self):

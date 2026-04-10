@@ -1192,26 +1192,18 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         manager = getattr(self, "_runtime_manager", None)
         if manager is None:
             return
-        try:
-            manager.selection_changed.connect(self.refresh)
-        except Exception:
-            pass
-        try:
-            manager.time_changed.connect(self.refresh)
-        except Exception:
-            pass
-        try:
-            manager.undo_performed.connect(self.refresh)
-        except Exception:
-            pass
-        try:
-            manager.scene_opened.connect(self.refresh)
-        except Exception:
-            pass
-        try:
-            manager.scene_new.connect(self.refresh)
-        except Exception:
-            pass
+        toolCommon.replace_tracked_connections(
+            self,
+            "_runtime_manager_relays",
+            (
+                (manager.selection_changed, self.refresh),
+                (manager.time_changed, self.refresh),
+                (manager.undo_performed, self.refresh),
+                (manager.scene_opened, self.refresh),
+                (manager.scene_new, self.refresh),
+            ),
+            parent=self,
+        )
         self._callbacks_connected = True
 
     def apply_active_changes(self):
@@ -1226,26 +1218,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         manager = getattr(self, "_runtime_manager", None)
         if manager is None:
             return
-        try:
-            manager.selection_changed.disconnect(self.refresh)
-        except Exception:
-            pass
-        try:
-            manager.time_changed.disconnect(self.refresh)
-        except Exception:
-            pass
-        try:
-            manager.undo_performed.disconnect(self.refresh)
-        except Exception:
-            pass
-        try:
-            manager.scene_opened.disconnect(self.refresh)
-        except Exception:
-            pass
-        try:
-            manager.scene_new.disconnect(self.refresh)
-        except Exception:
-            pass
+        toolCommon.clear_tracked_connections(self, "_runtime_manager_relays")
         self._callbacks_connected = False
 
     def _get_selected_nodes(self, long=False):
