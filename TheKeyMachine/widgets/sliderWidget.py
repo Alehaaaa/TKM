@@ -5,11 +5,11 @@ import os
 import importlib
 
 try:
-    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSize
+    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent
     from PySide6.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup, QIcon
     from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout
 except ImportError:
-    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSize
+    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent
     from PySide2.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QIcon
     from PySide2.QtWidgets import (
         QWidget,

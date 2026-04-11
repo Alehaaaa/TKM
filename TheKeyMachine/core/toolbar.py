@@ -2121,7 +2121,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     max=100,
                     text=icon,
                     color=color,
-                    dragCommand=(lambda mode_key, v, p=prefix: blend_to_frame_with_button_values(v) if mode_key == "blend_to_frame" else trigger.execute_slider(p, mode_key, v)),
+                    dragCommand=(
+                        lambda mode_key, v, p=prefix: blend_to_frame_with_button_values(v)
+                        if mode_key == "blend_to_frame"
+                        else trigger.execute_slider(p, mode_key, v)
+                    ),
                     dropCommand=drop_func,
                     tooltipTitle=label,
                     tooltipDescription=desc,
