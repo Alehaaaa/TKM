@@ -1,6 +1,5 @@
 from TheKeyMachine.tooltips import QFlatTooltipManager
 from .util import DPI
-import re
 from functools import partial
 import maya.cmds as cmds
 
@@ -36,11 +35,41 @@ and user preference integration.
 """
 
 
-# Pre-compiled regular expressions for performance
-RE_HTML_TAGS = re.compile(r"<[^>]*>")
-RE_WHITESPACE = re.compile(r"\s+")
-RE_BR_SPLIT = re.compile(r"<br\s*/?>", re.IGNORECASE)
 _ACTIVE_TOOL_WIDGET = None
+
+
+def _status_description(description="", status_description=None, tooltip_template=None):
+    _title, resolved_description = toolCommon.resolve_status_metadata(
+        description=description,
+        tooltip_template=tooltip_template,
+        status_description=status_description,
+    )
+    return resolved_description
+
+
+def _help_title(text="", status_title=None, tooltip_template=None):
+    resolved_title, _description = toolCommon.resolve_status_metadata(
+        title=text,
+        tooltip_template=tooltip_template,
+        status_title=status_title,
+    )
+    return resolved_title
+
+
+def _push_help(widget, data):
+    HelpSystem.push(
+        widget,
+        _help_title(
+            text=data.get("text", ""),
+            status_title=data.get("status_title"),
+            tooltip_template=data.get("tooltip_template"),
+        ),
+        _status_description(
+            description=data.get("description", ""),
+            status_description=data.get("status_description"),
+            tooltip_template=data.get("tooltip_template"),
+        ),
+    )
 
 
 def _tool_chunk_name(widget, variant=None):
@@ -118,41 +147,11 @@ class HelpSystem:
 
     @staticmethod
     def clean(raw):
-        if not raw:
-            return ""
-        text = str(raw)
-        result = []
-        in_tag = False
-
-        for char in text:
-            if char == "<":
-                in_tag = True
-                result.append(" ")
-                continue
-            if char == ">":
-                in_tag = False
-                continue
-            if not in_tag:
-                result.append(char)
-
-        return " ".join("".join(result).split()).strip()
+        return toolCommon.clean_tool_text(raw)
 
     @staticmethod
     def get_desc(raw):
-        if not raw:
-            return ""
-        text = str(raw).replace("<br/>", "\n").replace("<br />", "\n").replace("<br>", "\n").replace("\r\n", "\n").replace("\r", "\n")
-        for line in text.split("\n"):
-            clean = HelpSystem.clean(line)
-            if not clean:
-                continue
-
-            for delimiter in (". ", "! ", "? "):
-                if delimiter in clean:
-                    return clean.split(delimiter, 1)[0] + delimiter[0]
-
-            return clean
-        return ""
+        return toolCommon.get_tool_summary(raw)
 
     @classmethod
     def push(cls, widget_or_action, title="", description=""):
@@ -170,8 +169,7 @@ class HelpSystem:
             if c_title.lower() == c_desc.lower():
                 c_desc = ""
             elif c_desc.lower().startswith(c_title.lower()):
-                pattern = re.compile(re.escape(c_title), re.IGNORECASE)
-                c_desc = pattern.sub("", c_desc, count=1).strip()
+                c_desc = c_desc[len(c_title) :].strip(" -:,.")
                 # Restore sentence case safely
                 if c_desc:
                     c_desc = c_desc[0].upper() + c_desc[1:]
@@ -180,6 +178,11 @@ class HelpSystem:
 
         if hasattr(widget_or_action, "setStatusTip"):
             widget_or_action.setStatusTip(status)
+            try:
+                status_event = QtGui.QStatusTipEvent(status)
+                QtWidgets.QApplication.sendEvent(widget_or_action, status_event)
+            except Exception:
+                pass
 
         if hasattr(widget_or_action, "setProperty"):
             widget_or_action.setProperty("tkm_title", raw_title)
@@ -191,6 +194,11 @@ class HelpSystem:
             p = widget_or_action.parent()
             if hasattr(p, "setStatusTip"):
                 p.setStatusTip(status)
+                try:
+                    status_event = QtGui.QStatusTipEvent(status)
+                    QtWidgets.QApplication.sendEvent(p, status_event)
+                except Exception:
+                    pass
 
 
 class QFlatHoverableIcon:
@@ -387,10 +395,7 @@ class MenuWidget(QtWidgets.QMenu):
 
         # Floating Tooltip
         if QFlatTooltipManager.enabled:
-            # Reconstruct the full HTML template from the split properties
-            # Note: we wrap the title in bold if it's plain text to ensure QFlatTooltip finds the header
-            display_title = title if ("<" in title or ">" in title) else f"<b>{title}</b>"
-            tooltip_template = f"{display_title}<br><br>{desc}" if desc else display_title
+            tooltip_template = (title, [desc], None) if desc else title
 
             geometry = self.actionGeometry(action)
             target_rect = QtCore.QRect(self.mapToGlobal(geometry.topLeft()), geometry.size())
@@ -440,9 +445,13 @@ class TooltipMixin:
             "icon": icon,
             "tooltip_template": tooltip_template,
             "status_title": status_title,
-            "status_description": status_description,
+            "status_description": _status_description(
+                description=description,
+                status_description=status_description,
+                tooltip_template=tooltip_template,
+            ),
         }
-        HelpSystem.push(self, status_title or text or tooltip_template, status_description if status_description is not None else description)
+        _push_help(self, self._help_data)
 
     def get_help_data(self):
         return getattr(self, "_help_data", {})
@@ -457,11 +466,7 @@ class TooltipMixin:
     def enterEvent(self, event: QtCore.QEvent):
         # Refresh description and trigger Maya event
         data = getattr(self, "_help_data", {})
-        HelpSystem.push(
-            self,
-            data.get("status_title") or data.get("text", "") or data.get("tooltip_template", ""),
-            data.get("status_description") if data.get("status_description") is not None else data.get("description", ""),
-        )
+        _push_help(self, data)
 
         try:
             super().enterEvent(event)
@@ -855,11 +860,6 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 status_title=status_title,
                 status_description=status_description,
             )
-            HelpSystem.push(
-                self,
-                status_title or text or "",
-                status_description if status_description is not None else description or "",
-            )
         finally:
             self._variant_state_lock = False
 
@@ -881,7 +881,11 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             "tooltip_template": variant.get("tooltip_template", variant.get("text", self._base_state.get("text"))),
             "icon": variant.get("icon_path", self._base_state.get("icon")),
             "status_title": variant.get("status_title") or variant.get("label") or self._base_state.get("status_title"),
-            "status_description": variant.get("status_description") if variant.get("status_description") is not None else variant.get("description", ""),
+            "status_description": _status_description(
+                description=variant.get("description", ""),
+                status_description=variant.get("status_description"),
+                tooltip_template=variant.get("tooltip_template", variant.get("text", self._base_state.get("text"))),
+            ),
         }
 
     def _refresh_modifier_variant_state(self):
@@ -922,8 +926,8 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             return
         if not self._refresh_modifier_variant_state():
             return
-        QFlatTooltipManager.hide()
         data = getattr(self, "_help_data", {})
+        QFlatTooltipManager.hide()
         if data.get("text") or data.get("description") or data.get("tooltip_template"):
             QFlatTooltipManager.delayed_show(anchor_widget=self, **data)
 
@@ -999,7 +1003,11 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
         tooltip_template=data.get("tooltip_template"),
         icon=data.get("icon_path"),
         status_title=data.get("status_title") or data.get("label") or data.get("text"),
-        status_description=data.get("status_description") if data.get("status_description") is not None else data.get("description"),
+        status_description=_status_description(
+            description=data.get("description"),
+            status_description=data.get("status_description"),
+            tooltip_template=data.get("tooltip_template"),
+        ),
     )
     if data.get("tint_color") is not None:
         btn.set_tint_color(data.get("tint_color"))
@@ -1584,7 +1592,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         # Push documentation to the widget (syncs Maya Status Bar and TKM tooltips)
         if hasattr(widget, "setToolTipData"):
-            # If no description/template provided to addWidget, try to preserve widget's own data
+            # Preserve the widget's own resolved help data unless the section explicitly overrides it.
             d = description
             tt = tooltip_template
             existing = getattr(widget, "_help_data", {}) if hasattr(widget, "_help_data") else {}
@@ -1593,11 +1601,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 tt = existing.get("tooltip_template")
 
             widget.setToolTipData(
-                text=label,
+                text=existing.get("text") or label,
                 description=d or "",
                 shortcuts=existing.get("shortcuts", []),
                 tooltip_template=tt,
                 icon=existing.get("icon"),
+                status_title=existing.get("status_title"),
+                status_description=existing.get("status_description"),
             )
         else:
             HelpSystem.push(widget, label, description or "")

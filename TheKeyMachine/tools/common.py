@@ -1,37 +1,76 @@
-import re
 from functools import lru_cache
 
-import maya.cmds as cmds
+import maya.cmds as cmds  # type: ignore
 
 try:
-    from PySide2 import QtCore, QtGui
+    from PySide2 import QtCore, QtGui  # type: ignore
 except ImportError:
-    from PySide6 import QtCore, QtGui
+    from PySide6 import QtCore, QtGui  # type: ignore
 
 from TheKeyMachine.widgets import util as wutil
 from TheKeyMachine.mods import settingsMod as settings
 
 
-RE_HTML_TAGS = re.compile(r"<[^>]*>")
-RE_WHITESPACE = re.compile(r"\s+")
-RE_LINE_SPLIT = re.compile(r"<br\s*/?>|\r?\n", re.IGNORECASE)
-RE_SENTENCE = re.compile(r"(.+?[.!?])(?:\s|$)")
-RE_CAMEL_BREAK = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
-RE_TOOLTIP_TITLE = re.compile(r"<b>(.*?)</b>", re.IGNORECASE | re.DOTALL)
-
 UNDO_PREFIX = "TKM"
+
+def _split_lines(raw):
+    return str(raw or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
+
+def _first_sentence(text):
+    value = clean_tool_text(text)
+    if not value:
+        return ""
+    for index, char in enumerate(value):
+        if char in ".!?":
+            return value[: index + 1].strip()
+    return value
+
+
+def _humanize_compound_word(raw):
+    text = str(raw or "").replace("_", " ").replace("-", " ")
+    result = []
+    prev = ""
+    for char in text:
+        if prev and prev.isalnum() and char.isupper() and not prev.isupper():
+            result.append(" ")
+        result.append(char)
+        prev = char
+    return "".join(result)
+
+
+def _tooltip_parts(raw):
+    if not raw:
+        return "", ""
+
+    if hasattr(raw, "title") or hasattr(raw, "body_lines"):
+        return clean_tool_text(getattr(raw, "title", "")), clean_tool_text(getattr(raw, "first_line", ""))
+
+    if isinstance(raw, (list, tuple)):
+        title = clean_tool_text(raw[0] if len(raw) > 0 else "")
+        body = raw[1] if len(raw) > 1 else ""
+        body_lines = body if isinstance(body, (list, tuple)) else [body]
+        for line in body_lines:
+            if not isinstance(line, str):
+                continue
+            clean_line = clean_tool_text(line)
+            if clean_line:
+                return title, clean_line
+        return title, ""
+
+    return "", ""
 
 
 def clean_tool_text(raw):
     if not raw:
         return ""
-    return RE_WHITESPACE.sub(" ", RE_HTML_TAGS.sub(" ", str(raw))).strip()
+    return " ".join(str(raw).split()).strip()
 
 
 def humanize_tool_name(raw):
     if not raw:
         return ""
-    value = RE_CAMEL_BREAK.sub(" ", str(raw).replace("_", " ").replace("-", " "))
+    value = _humanize_compound_word(raw)
     return clean_tool_text(value).title()
 
 
@@ -39,34 +78,41 @@ def get_tool_summary(raw):
     if not raw:
         return ""
 
-    parts = [clean_tool_text(part) for part in RE_LINE_SPLIT.split(str(raw))]
+    _, tooltip_summary = _tooltip_parts(raw)
+    if tooltip_summary:
+        return _first_sentence(tooltip_summary)
+
+    parts = [clean_tool_text(part) for part in _split_lines(raw)]
     first_line = next((part for part in parts if part), "")
     if not first_line:
         return ""
-
-    sentence = RE_SENTENCE.match(first_line)
-    if sentence:
-        return clean_tool_text(sentence.group(1))
-    return first_line
+    return _first_sentence(first_line)
 
 
 def get_tooltip_title(raw):
     if not raw:
         return ""
-    if hasattr(raw, "title"):
-        return clean_tool_text(getattr(raw, "title", ""))
-    match = RE_TOOLTIP_TITLE.search(str(raw))
-    if match:
-        return clean_tool_text(match.group(1))
-    return ""
+    title, _ = _tooltip_parts(raw)
+    return title
 
 
 def get_tooltip_summary(raw):
     if not raw:
         return ""
-    if hasattr(raw, "first_line"):
-        return clean_tool_text(getattr(raw, "first_line", ""))
+    _, summary = _tooltip_parts(raw)
+    if summary:
+        return summary
     return get_tool_summary(raw)
+
+
+def resolve_status_metadata(title="", description="", tooltip_template=None, status_title=None, status_description=None, fallback_title=""):
+    resolved_title = clean_tool_text(
+        status_title or title or get_tooltip_title(tooltip_template) or fallback_title
+    )
+    resolved_description = status_description
+    if resolved_description is None:
+        resolved_description = get_tooltip_summary(tooltip_template) or description or ""
+    return resolved_title, resolved_description
 
 
 def format_tool_label(title, description="", prefix=UNDO_PREFIX):
@@ -110,8 +156,14 @@ def resolve_undo_metadata(tool_id=None, title=None, description="", tooltip_temp
         tooltip_template = tool.get("tooltip_template") or tooltip_template
 
     if tooltip_template:
-        resolved_title = resolved_title or get_tooltip_title(tooltip_template)
-        resolved_description = resolved_description or get_tooltip_summary(tooltip_template)
+        resolved_title, resolved_description = resolve_status_metadata(
+            title=resolved_title,
+            description=resolved_description,
+            tooltip_template=tooltip_template,
+            status_title=resolved_title or None,
+            status_description=resolved_description or None,
+            fallback_title=tool_id or "tool",
+        )
 
     resolved_title = resolved_title or humanize_tool_name(tool_id or "tool")
     return resolved_title, resolved_description

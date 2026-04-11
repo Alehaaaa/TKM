@@ -17,7 +17,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.84"
+__version__ = "0.1.85"
 __stage__ = "beta"
 __build__ = "313"
 __codename__ = "Iced Coffee"
@@ -42,9 +42,9 @@ def reload():
 
     try:
         try:
-            from PySide6 import QtWidgets
+            from PySide6 import QtWidgets  # type: ignore
         except ImportError:
-            from PySide2 import QtWidgets
+            from PySide2 import QtWidgets  # type: ignore
 
         for widget in QtWidgets.QApplication.topLevelWidgets():
             if widget.property("tkm_floating_widget"):

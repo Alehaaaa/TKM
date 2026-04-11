@@ -15,6 +15,7 @@ import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.tools import common as toolCommon
 
 """
 TheKeyMachine Toolbox
@@ -399,6 +400,7 @@ TOOL_DEFINITIONS = {
                 "mask": 1,
                 "command": "reset_translations",
                 "text": "RT",
+                "label": "Reset Translation",
                 "icon_path": media.asset_path("reset_animation_image"),
                 "tooltip_template": helper.reset_translations_tooltip_text,
                 "description": "Reset only translation values for the selected objects.",
@@ -408,6 +410,7 @@ TOOL_DEFINITIONS = {
                 "mask": 4,
                 "command": "reset_rotations",
                 "text": "RR",
+                "label": "Reset Rotation",
                 "icon_path": media.asset_path("reset_animation_image"),
                 "tooltip_template": helper.reset_rotations_tooltip_text,
                 "description": "Reset only rotation values for the selected objects.",
@@ -417,6 +420,7 @@ TOOL_DEFINITIONS = {
                 "mask": 8,
                 "command": "reset_scales",
                 "text": "RS",
+                "label": "Reset Scales",
                 "icon_path": media.asset_path("reset_animation_image"),
                 "tooltip_template": helper.reset_scales_tooltip_text,
                 "description": "Reset only scale values for the selected objects.",
@@ -426,6 +430,7 @@ TOOL_DEFINITIONS = {
                 "mask": 5,
                 "command": "reset_trs",
                 "text": "RTRS",
+                "label": "Reset Translation Rotation Scale",
                 "icon_path": media.asset_path("reset_animation_image"),
                 "tooltip_template": helper.reset_trs_tooltip_text,
                 "description": "Reset translation, rotation, and scale values for the selected objects.",
@@ -1321,13 +1326,29 @@ def _variant_command_name(tool_key, variant, index):
 
 def _normalize_tool_state(state, fallback=None):
     fallback = fallback or {}
+    raw_state = dict(state or {})
     normalized = dict(fallback)
-    normalized.update(state or {})
+    normalized.update(raw_state)
 
-    label = normalized.get("label") or normalized.get("text") or normalized.get("key", "")
+    label = (
+        raw_state.get("label")
+        or toolCommon.get_tooltip_title(normalized.get("tooltip_template"))
+        or raw_state.get("text")
+        or normalized.get("label")
+        or normalized.get("text")
+        or normalized.get("key", "")
+    )
     normalized.setdefault("description", fallback.get("description", ""))
-    normalized.setdefault("status_title", label)
-    normalized.setdefault("status_description", normalized.get("description", ""))
+    resolved_status_title, resolved_status_description = toolCommon.resolve_status_metadata(
+        title=label,
+        description=normalized.get("description", ""),
+        tooltip_template=normalized.get("tooltip_template"),
+        status_title=raw_state.get("status_title") if "status_title" in raw_state else None,
+        status_description=raw_state.get("status_description") if "status_description" in raw_state else None,
+        fallback_title=normalized.get("key", ""),
+    )
+    normalized["status_title"] = resolved_status_title
+    normalized["status_description"] = resolved_status_description
     normalized.setdefault("shortcuts", fallback.get("shortcuts", []))
     return normalized
 
