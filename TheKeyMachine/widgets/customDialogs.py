@@ -65,7 +65,126 @@ class QFlatDialogButton(dict):
         return not self.__eq__(other)
 
 
-class QFlatDialog(QtWidgets.QDialog):
+class QFlatWindowMixin:
+    """Shared header and footer helpers for QFlat windows."""
+
+    TEXT_COLOR = "#bbbbbb"
+
+    def _scaled_qflat_window_icon(self, icon_path, size):
+        if not icon_path:
+            return QtGui.QPixmap()
+
+        icon_size = size if isinstance(size, QtCore.QSize) else QtCore.QSize(int(size), int(size))
+        lower_path = str(icon_path).lower()
+        if lower_path.endswith(".svg") and QSvgRenderer:
+            renderer = QSvgRenderer(icon_path)
+            if renderer.isValid():
+                screen = QtGui.QGuiApplication.primaryScreen()
+                dpr = screen.devicePixelRatio() if screen else 1.0
+                width = max(1, int(icon_size.width() * dpr))
+                height = max(1, int(icon_size.height() * dpr))
+                pixmap = QtGui.QPixmap(width, height)
+                pixmap.fill(QtCore.Qt.transparent)
+                painter = QtGui.QPainter(pixmap)
+                renderer.render(painter, QtCore.QRectF(0, 0, width, height))
+                painter.end()
+                pixmap.setDevicePixelRatio(dpr)
+                return pixmap
+
+        icon = QtGui.QIcon(icon_path)
+        if not icon.isNull():
+            return icon.pixmap(icon_size)
+
+        pixmap = QtGui.QPixmap(icon_path)
+        if pixmap.isNull():
+            return pixmap
+        return pixmap.scaled(icon_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+
+    def add_qflat_window_header(
+        self,
+        title="",
+        icon_path=None,
+        parent_layout=None,
+        margins=None,
+        spacing=None,
+        icon_size=None,
+        title_size=None,
+        title_color=None,
+    ):
+        layout = parent_layout or getattr(self, "root_layout", None)
+        if layout is None:
+            return None
+
+        if margins is None:
+            margins = (DPI(12), DPI(8), DPI(12), DPI(10))
+        if spacing is None:
+            spacing = DPI(12)
+        if icon_size is None:
+            icon_size = DPI(51)
+        if title_size is None:
+            title_size = DPI(22)
+        if title_color is None:
+            title_color = getattr(self, "TEXT_COLOR", "#bbbbbb")
+
+        header = QtWidgets.QWidget()
+        header_layout = QtWidgets.QHBoxLayout(header)
+        header_layout.setContentsMargins(*margins)
+        header_layout.setSpacing(spacing)
+
+        self.window_icon = QtWidgets.QLabel()
+        self.window_icon.setFixedSize(icon_size, icon_size)
+        self.window_icon.setAlignment(QtCore.Qt.AlignCenter)
+        pixmap = self._scaled_qflat_window_icon(icon_path, QtCore.QSize(icon_size, icon_size))
+        if not pixmap.isNull():
+            self.window_icon.setPixmap(pixmap)
+        self.window_icon.setVisible(bool(icon_path and not pixmap.isNull()))
+        header_layout.addWidget(self.window_icon, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+
+        self.window_title = QtWidgets.QLabel(title or "")
+        self.window_title.setObjectName("qflat_window_title")
+        self.window_title.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.window_title.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.window_title.setWordWrap(False)
+        self.window_title.setStyleSheet(
+            "#qflat_window_title{color:%s;font-size:%spx;font-weight:bold;background:transparent;}"
+            % (title_color, title_size)
+        )
+        header_layout.addWidget(self.window_title, 1, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+
+        self.qflat_window_header = header
+        self.qflat_window_header_layout = header_layout
+        self.title_label = self.window_title
+
+        add_widget = getattr(layout, "addWidget", None)
+        if add_widget:
+            add_widget(header)
+        return header
+
+    def set_qflat_window_title(self, title, window_title=None):
+        if window_title is None:
+            window_title = title
+        if window_title is not None and hasattr(self, "setWindowTitle"):
+            self.setWindowTitle(window_title)
+        label = getattr(self, "window_title", None) or getattr(self, "title_label", None)
+        if label:
+            label.setText(title or "")
+
+    def set_qflat_window_icon(self, icon_path, icon_size=None):
+        label = getattr(self, "window_icon", None)
+        if not label:
+            return
+        if icon_size is None:
+            icon_size = label.width() or DPI(51)
+        pixmap = self._scaled_qflat_window_icon(icon_path, QtCore.QSize(icon_size, icon_size))
+        label.setPixmap(pixmap)
+        label.setVisible(bool(icon_path and not pixmap.isNull()))
+
+    def set_qflat_window_bottom_bar(self, buttons=None, margins=8, spacing=6, closeButton=False, highlight=None):
+        if hasattr(self, "setBottomBar"):
+            self.setBottomBar(buttons=buttons, margins=margins, spacing=spacing, closeButton=closeButton, highlight=highlight)
+
+
+class QFlatDialog(QFlatWindowMixin, QtWidgets.QDialog):
     # Button Preconfigurations
     Yes = QFlatDialogButton("Yes", positive=True, icon=media.apply_image)
     Ok = QFlatDialogButton("Ok", positive=True, icon=media.apply_image)
