@@ -41,6 +41,7 @@ importlib.reload(settings)
 
 class _GlobalSignals(QObject):
     overshootChanged = Signal(bool)
+    eulerFilterChanged = Signal(bool)
 
 
 globalSignals = _GlobalSignals()
@@ -967,7 +968,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             return
 
         # Keep Maya status/help channels and the floating tooltip in sync.
-        cw.HelpSystem.push(target, data.get("tooltip_template") or data.get("text", ""), data.get("description", ""))
+        cw.HelpSystem.push(
+            target,
+            data.get("status_title") or data.get("text", ""),
+            data.get("status_description") or data.get("description", ""),
+        )
         if not self._is_pointer_over_widget():
             return
         QFlatTooltipManager.hide()

@@ -128,6 +128,8 @@ _ASSET_FILES = {
     "tracer_red_image": "tracer_red.svg",
     "tracer_grey_image": "tracer_grey.svg",
     "tracer_blue_image": "tracer_blue.svg",
+    "euler_filter_image": "euler_filter.svg",
+    "sliders_overshoot_image": "sliders_overshoot.svg",
 }
 
 _ASSET_ALIASES = {

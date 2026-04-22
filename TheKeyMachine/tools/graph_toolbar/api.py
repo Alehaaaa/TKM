@@ -79,7 +79,7 @@ def _set_checked_safely(widget, checked: bool) -> bool:
 
 
 def bind_graph_toolbar_toggle(widget) -> None:
-    if not widget:
+    if widget is None:
         return
 
     def _sync(enabled):

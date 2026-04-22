@@ -218,6 +218,27 @@ class _SignalRelay(QtCore.QObject):
         self._callback(*args)
 
 
+class _EventFilterRelay(QtCore.QObject):
+    def __init__(self, widget, event_type, callback, parent=None):
+        super().__init__(parent)
+        self._widget = widget
+        self._event_type = event_type
+        self._callback = callback
+
+    def eventFilter(self, watched, event):
+        if watched is self._widget and event.type() == self._event_type and self._callback:
+            return bool(self._callback(event))
+        return False
+
+    def detach(self):
+        if self._widget:
+            try:
+                self._widget.removeEventFilter(self)
+            except Exception:
+                pass
+        self._widget = None
+
+
 def safe_signal_connect(signal, slot):
     try:
         signal.connect(slot)
@@ -232,6 +253,9 @@ def clear_tracked_connection(owner, attr_name):
         return False
     setattr(owner, attr_name, None)
     try:
+        detach = getattr(relay, "detach", None)
+        if callable(detach):
+            detach()
         relay.deleteLater()
     except Exception:
         pass
@@ -249,6 +273,64 @@ def replace_tracked_connection(owner, attr_name, signal, callback, parent=None):
         return None
     setattr(owner, attr_name, relay)
     return relay
+
+
+def disconnect_signal(signal):
+    try:
+        signal.disconnect()
+        return True
+    except Exception:
+        return False
+
+
+def set_custom_context_menu_handler(widget, attr_name, callback):
+    if not widget:
+        return None
+    widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+    disconnect_signal(widget.customContextMenuRequested)
+    return replace_tracked_connection(
+        widget,
+        attr_name,
+        widget.customContextMenuRequested,
+        callback,
+        parent=widget,
+    )
+
+
+def set_custom_context_menu(widget, attr_name, menu_factory):
+    def _show_context_menu(pos, w=widget, factory=menu_factory):
+        if not w:
+            return
+        menu = factory(w)
+        if not menu:
+            return
+        exec_fn = getattr(menu, "exec", None) or getattr(menu, "exec_", None)
+        if exec_fn:
+            exec_fn(w.mapToGlobal(pos))
+
+    return set_custom_context_menu_handler(widget, attr_name, _show_context_menu)
+
+
+def set_event_handler(widget, attr_name, event_type, callback):
+    if not widget:
+        return None
+    clear_tracked_connection(widget, attr_name)
+    relay = _EventFilterRelay(widget, event_type, callback, parent=widget)
+    widget.installEventFilter(relay)
+    setattr(widget, attr_name, relay)
+    return relay
+
+
+def set_mouse_press_handler(widget, attr_name, callback):
+    return set_event_handler(widget, attr_name, QtCore.QEvent.MouseButtonPress, callback)
+
+
+def bind_toolbar_button_context_menu(toggle, button, attr_name, menu_factory):
+    if toggle:
+        toggle.attach_button(button)
+    if not button:
+        return None
+    return set_custom_context_menu(button, attr_name, menu_factory)
 
 
 def clear_tracked_connections(owner, attr_name):

@@ -80,6 +80,7 @@ import TheKeyMachine.core.toolbox as toolbox  # type: ignore
 import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
 import TheKeyMachine.core.trigger as trigger  # type: ignore
 import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
+import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
 import TheKeyMachine.tools.ibookmarks.api as iBookmarksApi  # type: ignore
@@ -624,15 +625,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self,
         parent_menu,
         show_tooltips,
-        overshoot_sliders,
         alignments,
         toolbar_alignment,
-        set_overshoot,
         update_show_tooltips,
         update_toolbar_icon_alignment,
     ):
         preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(media.settings_image), "Preferences")
         parent_menu.addMenu(preferences_menu, description="General toolbar options.")
+        setting_toggles = self._settings_toggle_specs()
 
         preferences_menu.addSection("Startup")
         preferences_menu.addAction(
@@ -650,6 +650,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         run_on_startup_action.setCheckable(True)
         run_on_startup_action.setChecked(ui.check_userSetup())
 
+        show_tooltips_action = preferences_menu.addAction("Show Tooltips", description="Show tooltip popups.")
+        show_tooltips_action.setCheckable(True)
+        show_tooltips_action.setChecked(show_tooltips)
+        show_tooltips_action.toggled.connect(update_show_tooltips)
+
         preferences_menu.addSection("Alignment")
         align_group = QActionGroup(preferences_menu)
         for align_name, align_value in alignments.items():
@@ -662,39 +667,152 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         preferences_menu.addSection("Display")
 
-        show_tooltips_action = preferences_menu.addAction("Show Tooltips", description="Show tooltip popups.")
-        show_tooltips_action.setCheckable(True)
-        show_tooltips_action.setChecked(show_tooltips)
-        show_tooltips_action.toggled.connect(update_show_tooltips)
+        display_actions = []
+        for spec_key in ("overshoot_sliders", "attribute_switcher_euler_filter", "custom_graph"):
+            spec = setting_toggles[spec_key]
+            action = preferences_menu.addAction(
+                QtGui.QIcon(spec.get("icon_path") or ""),
+                spec["menu_label"],
+                description=spec.get("description", ""),
+            )
+            action.toggled.connect(spec["set_checked"])
+            self._bind_setting_toggle(action, spec)
+            display_actions.append((action, spec))
 
-        overshoot_action = preferences_menu.addAction(
-            "Allow Slider Overshoot",
-            description="Let sliders go beyond -100 and 100.",
-        )
-        overshoot_action.setCheckable(True)
-        overshoot_action.setChecked(overshoot_sliders)
-        overshoot_action.toggled.connect(set_overshoot)
+        def _sync_display_actions():
+            for action, spec in display_actions:
+                self._sync_setting_toggle(action, spec)
 
-        graph_toolbar_action = preferences_menu.addAction(
-            QtGui.QIcon(media.customGraph_image),
-            "Show Graph Editor Toolbar",
-            description="Show the TKM toolbar in the Graph Editor.",
-        )
-        graph_toolbar_action.setCheckable(True)
-        graph_toolbar_action.toggled.connect(self._on_graph_toolbar_menu_toggled)
-        graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
+        parent_menu.aboutToShow.connect(_sync_display_actions)
+        preferences_menu.aboutToShow.connect(_sync_display_actions)
 
         return preferences_menu
 
-    def _on_graph_toolbar_menu_toggled(self, state):
-        report.safe_execute(graphToolbarApi.set_graph_toolbar_enabled, bool(state), context="graph toolbar toggle")
-        sender = self.sender()
-        if not sender or not isValid(sender):
+    def _settings_toggle_specs(self):
+        def _get_overshoot():
+            return settings.get_setting("sliders_overshoot", False)
+
+        def _set_overshoot(state):
+            settings.set_setting("sliders_overshoot", bool(state))
+            sw.globalSignals.overshootChanged.emit(bool(state))
+
+        def _get_euler_filter():
+            return settings.get_setting(
+                "euler_filter",
+                True,
+                namespace=attributeSwitcherApi.ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
+            )
+
+        def _set_euler_filter(state):
+            settings.set_setting(
+                "euler_filter",
+                bool(state),
+                namespace=attributeSwitcherApi.ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
+            )
+            dlg = attributeSwitcherApi.get_attribute_switcher_window()
+            if dlg and wutil.is_valid_widget(dlg):
+                try:
+                    dlg.euler_filter = bool(state)
+                except Exception:
+                    pass
+            sw.globalSignals.eulerFilterChanged.emit(bool(state))
+
+        def _set_graph_toolbar(state):
+            report.safe_execute(
+                graphToolbarApi.set_graph_toolbar_enabled,
+                bool(state),
+                apply=True,
+                context="graph toolbar toggle",
+            )
+
+        return {
+            "overshoot_sliders": {
+                "key": "overshoot_sliders",
+                "label": "Overshoot Sliders",
+                "menu_label": "Overshoot Sliders",
+                "text": "OS",
+                "icon_path": media.sliders_overshoot_image,
+                "description": "Set range for sliders to -150/150, from -100/100.",
+                "get_checked": _get_overshoot,
+                "set_checked": _set_overshoot,
+                "changed_signal": sw.globalSignals.overshootChanged,
+            },
+            "attribute_switcher_euler_filter": {
+                "key": "attribute_switcher_euler_filter",
+                "label": "Auto Euler Filter",
+                "menu_label": "Auto Euler Filter",
+                "text": "EF",
+                "icon_path": media.euler_filter_image,
+                "description": "Apply Euler filtering after Attribute Switcher changes rotation order.",
+                "get_checked": _get_euler_filter,
+                "set_checked": _set_euler_filter,
+                "changed_signal": sw.globalSignals.eulerFilterChanged,
+            },
+            "custom_graph": {
+                "key": "custom_graph",
+                "label": "Graph Editor Toolbar",
+                "menu_label": "Show Graph Editor Toolbar",
+                "text": "GE",
+                "icon_path": media.customGraph_image,
+                "description": "Show the TKM toolbar in the Graph Editor.",
+                "get_checked": graphToolbarApi.get_graph_toolbar_checkbox_state,
+                "set_checked": _set_graph_toolbar,
+                "changed_signal": graphToolbarApi.custom_graph_bus.graph_toolbar_enabled_changed,
+            },
+        }
+
+    def _set_checked_safely(self, widget, checked):
+        if widget is None or not isValid(widget):
             return
         try:
-            sender.setChecked(bool(graphToolbarApi.get_graph_toolbar_checkbox_state()))
+            previous = widget.blockSignals(True)
+        except Exception:
+            previous = False
+        try:
+            widget.setChecked(bool(checked))
         except Exception:
             pass
+        try:
+            widget.blockSignals(previous)
+        except Exception:
+            pass
+
+    def _sync_setting_toggle(self, widget, spec):
+        self._set_checked_safely(widget, spec["get_checked"]())
+
+    def _bind_setting_toggle(self, widget, spec):
+        if widget is None:
+            return
+        widget.setCheckable(True)
+        self._sync_setting_toggle(widget, spec)
+
+        def _sync(_enabled=None, w=widget, s=spec):
+            # Read back from the setting instead of trusting signal payloads; all
+            # settings surfaces then share one source of truth.
+            if w is None or not isValid(w):
+                return
+            self._sync_setting_toggle(w, s)
+
+        signal = spec.get("changed_signal")
+        try:
+            signal.connect(_sync)
+        except Exception:
+            pass
+
+    def _tool_descriptor_from_setting_toggle(self, spec, *, default_visible=False):
+        return {
+            "key": spec["key"],
+            "label": spec["label"],
+            "text": spec.get("text"),
+            "icon_path": spec.get("icon_path"),
+            "description": spec.get("description", ""),
+            "status_description": "Right Click for options.",
+            "checkable": True,
+            "set_checked_fn": spec["get_checked"],
+            "bind_checked_fn": lambda widget, s=spec: self._bind_setting_toggle(widget, s),
+            "callback": spec["set_checked"],
+            "default_visible": default_visible,
+        }
 
     def _create_system_menu(self, parent_menu):
         system_menu = cw.MenuWidget(QtGui.QIcon(media.system_image), "System")
@@ -710,10 +828,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self,
         parent_button,
         show_tooltips,
-        overshoot_sliders,
         alignments,
         toolbar_alignment,
-        set_overshoot,
         update_show_tooltips,
         update_toolbar_icon_alignment,
     ):
@@ -722,10 +838,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self._create_preferences_menu(
             toolbar_menu,
             show_tooltips=show_tooltips,
-            overshoot_sliders=overshoot_sliders,
             alignments=alignments,
             toolbar_alignment=toolbar_alignment,
-            set_overshoot=set_overshoot,
             update_show_tooltips=update_show_tooltips,
             update_toolbar_icon_alignment=update_toolbar_icon_alignment,
         )
@@ -1961,7 +2075,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ],
         )
 
-        clear_btn = cw.QFlatToolButton(text="x")
+        clear_btn = cw.create_tool_button_from_data(
+            {
+                "key": "clear_sel",
+                "label": "Clear Selection",
+                "text": "x",
+                "tooltip_template": helper.clear_selected_keys_widget_tooltip_text,
+            },
+            callback=None,
+        )
         clear_btn.clicked.connect(
             lambda *_args, w=clear_btn: w.triggerToolCallback(
                 trigger.make_command_callback("clear_selected_keys", keyTools.clear_selected_keys)
@@ -1974,7 +2096,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             default_visible=False,
             tooltip_template=helper.clear_selected_keys_widget_tooltip_text,
         )
-        select_scene_btn = cw.QFlatToolButton(text="s")
+        select_scene_btn = cw.create_tool_button_from_data(
+            {
+                "key": "select_scene",
+                "label": "Select Scene Anim",
+                "text": "s",
+                "tooltip_template": helper.select_scene_animation_widget_tooltip_text,
+            },
+            callback=None,
+        )
         select_scene_btn.clicked.connect(
             lambda *_args, w=select_scene_btn: w.triggerToolCallback(
                 trigger.make_command_callback("select_all_animation_curves", keyTools.select_all_animation_curves)
@@ -2684,23 +2814,21 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if orbit_button_widget:
             self._setup_orbit_toolbar_button(orbit_button_widget)
 
-        # customGraph ----------------------------------------------------------------------------
-        graph_toolbar_button = sec.addWidgetGroup(
+
+        sec = new_section()
+        setting_toggles = self._settings_toggle_specs()
+
+        settings_group_button = sec.addWidgetGroup(
             [
-                toolbox.get_tool(
-                    "custom_graph",
-                    checkable=True,
-                    set_checked=lambda: settings.get_setting("graph_toolbar_enabled", True),
-                    callback=trigger.make_command_callback("custom_graph_toggle"),
-                    default_visible=False,
-                )
+                self._tool_descriptor_from_setting_toggle(setting_toggles["overshoot_sliders"], default_visible=False),
+                self._tool_descriptor_from_setting_toggle(setting_toggles["attribute_switcher_euler_filter"], default_visible=False),
+                self._tool_descriptor_from_setting_toggle(setting_toggles["custom_graph"], default_visible=False),
             ]
         )
-        if graph_toolbar_button:
-            graph_toolbar_button.setObjectName("toggle_graph_toolbar_button")
-            graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_button)
 
-        invalidate_caches()
+        if settings_group_button:
+            settings_group_button.setObjectName("toggle_overshoot_sliders_button")
+
 
         def initialize_tool_menu():
             reload(connectToolBox)
@@ -2864,12 +2992,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # _____________________ Workspaces Section ____________________________ #
         sec = new_section(hiddeable=False)
 
-        overshootSliders = settings.get_setting("sliders_overshoot", False)
-
-        def _setOvershoot(state):
-            settings.set_setting("sliders_overshoot", state)
-            sw.globalSignals.overshootChanged.emit(state)
-
         settings_tool = toolbox.get_tool("settings")
         toolbar_config_button_widget = cw.create_tool_button_from_data(settings_tool, callback=None)
         toolbar_config_button_widget.setObjectName("settings_toolbar_button")
@@ -2884,18 +3006,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             settings.set_setting("show_tooltips", value)
             QFlatTooltipManager.enabled = value
 
-        toolbar_menu = self._create_config_menu(
-            toolbar_config_button_widget,
-            show_tooltips=show_tooltips,
-            overshoot_sliders=overshootSliders,
-            alignments=alignments,
-            toolbar_alignment=toolbar_alignment,
-            set_overshoot=_setOvershoot,
-            update_show_tooltips=update_show_tooltips,
-            update_toolbar_icon_alignment=update_toolbar_icon_alignment,
-        )
-
         def _open_menu_at_cursor():
+            toolbar_menu = self._create_config_menu(
+                toolbar_config_button_widget,
+                show_tooltips=show_tooltips,
+                alignments=alignments,
+                toolbar_alignment=toolbar_alignment,
+                update_show_tooltips=update_show_tooltips,
+                update_toolbar_icon_alignment=update_toolbar_icon_alignment,
+            )
             toolbar_menu.popup(QtGui.QCursor.pos())
 
         def _on_toolbar_context_menu(pos):

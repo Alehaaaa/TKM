@@ -8,6 +8,51 @@ from TheKeyMachine.tools.common import FloatingToolWindowMixin
 from TheKeyMachine.widgets import customWidgets as cw, util as wutil
 
 
+class OrbitToolSection(cw.QFlatSectionWidget):
+    def __init__(self, parent=None):
+        super().__init__(
+            parent=parent,
+            spacing=wutil.DPI(2),
+            hiddeable=True,
+            settings_namespace=orbitApi.ORBIT_SETTINGS_NAMESPACE,
+        )
+        QtWidgets.QWidget().setLayout(self.layout())
+        self.setLayout(
+            cw.QFlowLayout(
+                margin=0,
+                Wspacing=wutil.DPI(2),
+                Hspacing=wutil.DPI(2),
+                alignment=QtCore.Qt.AlignHCenter,
+            )
+        )
+        self.layout().setContentsMargins(0, 0, 0, 0)
+        self.layout().setSpacing(0)
+        self.setContentsMargins(0, 0, 0, 0)
+
+        policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        policy.setHeightForWidth(True)
+        self.setSizePolicy(policy)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        return self.layout().heightForWidth(width)
+
+    def _hintWidth(self):
+        return max(1, self.width() or self.layout().sizeHint().width())
+
+    def sizeHint(self):
+        hint = self.layout().sizeHint()
+        hint.setHeight(self.heightForWidth(self._hintWidth()))
+        return hint
+
+    def minimumSizeHint(self):
+        hint = self.layout().minimumSize()
+        hint.setHeight(self.heightForWidth(self._hintWidth()))
+        return hint
+
+
 class OrbitWindowMixin(FloatingToolWindowMixin):
     def _get_menu_items(self):
         import TheKeyMachine.core.toolbox as toolbox
@@ -41,17 +86,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
             if widget:
                 widget.setParent(None)
 
-        self.tools_section = cw.QFlatSectionWidget(
-            spacing=wutil.DPI(2),
-            hiddeable=True,
-            settings_namespace=orbitApi.ORBIT_SETTINGS_NAMESPACE,
-        )
-        self.tools_section.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed)
-        section_layout = self.tools_section.layout()
-        if section_layout:
-            section_layout.setContentsMargins(0, 0, 0, 0)
-            section_layout.setSpacing(0)
-        self.tools_section.setContentsMargins(0, 0, 0, 0)
+        self.tools_section = OrbitToolSection()
         self.set_header_left_widget(self.tools_section, stretch=1)
 
         self._seed_orbit_visibility_settings()
@@ -62,6 +97,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
                 tool_data=tool_data,
                 default_visible=tool_data["key"] in default_actions,
             )
+        self.tools_section.updateGeometry()
 
     def _seed_orbit_visibility_settings(self):
         current_actions = set(orbitApi.load_orbit_configuration().values())

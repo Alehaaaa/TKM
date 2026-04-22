@@ -13,18 +13,8 @@ import maya.mel as mel
 
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
-
-    try:
-        from PySide6.QtSvg import QSvgRenderer  # type: ignore
-    except ImportError:
-        QSvgRenderer = None  # type: ignore
 except ImportError:
     from PySide2 import QtCore, QtGui, QtWidgets
-
-    try:
-        from PySide2.QtSvg import QSvgRenderer  # type: ignore
-    except ImportError:
-        QSvgRenderer = None  # type: ignore
 
 import TheKeyMachine.core.runtime_manager as runtime
 import TheKeyMachine.core.toolbox as toolbox
@@ -495,37 +485,6 @@ def _pixmap_for_icon(icon_path, size=18):
     return QtGui.QIcon(icon_path).pixmap(wutil.DPI(size), wutil.DPI(size))
 
 
-def _scaled_header_icon_pixmap(icon_path, size):
-    if not icon_path:
-        return QtGui.QPixmap()
-
-    icon_size = size if isinstance(size, QtCore.QSize) else QtCore.QSize(int(size), int(size))
-    lower_path = str(icon_path).lower()
-    if lower_path.endswith(".svg") and QSvgRenderer:
-        renderer = QSvgRenderer(icon_path)
-        if renderer.isValid():
-            screen = QtGui.QGuiApplication.primaryScreen()
-            dpr = screen.devicePixelRatio() if screen else 1.0
-            width = max(1, int(icon_size.width() * dpr))
-            height = max(1, int(icon_size.height() * dpr))
-            pixmap = QtGui.QPixmap(width, height)
-            pixmap.fill(QtCore.Qt.transparent)
-            painter = QtGui.QPainter(pixmap)
-            renderer.render(painter, QtCore.QRectF(0, 0, width, height))
-            painter.end()
-            pixmap.setDevicePixelRatio(dpr)
-            return pixmap
-
-    icon = QtGui.QIcon(icon_path)
-    if not icon.isNull():
-        return icon.pixmap(icon_size)
-
-    pixmap = QtGui.QPixmap(icon_path)
-    if pixmap.isNull():
-        return pixmap
-    return pixmap.scaled(icon_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
-
-
 def _text_badge_pixmap(text, size=18):
     pixmap = QtGui.QPixmap(wutil.DPI(size + 8), wutil.DPI(size))
     pixmap.fill(QtCore.Qt.transparent)
@@ -975,7 +934,7 @@ class HotkeyCommandRow(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self.tool_button = QtWidgets.QPushButton(command_data["title"])
+        self.tool_button = QtWidgets.QPushButton(command_data["title"], self)
         self.tool_button.setCursor(QtCore.Qt.PointingHandCursor)
         self.tool_button.setFlat(True)
         self.tool_button.setIconSize(QtCore.QSize(wutil.DPI(20), wutil.DPI(20)))
@@ -990,11 +949,11 @@ class HotkeyCommandRow(QtWidgets.QWidget):
         self.tool_button.released.connect(self._on_tool_released)
         layout.addWidget(self.tool_button, 1)
 
-        self.status_cell = HotkeyStatusLabel()
+        self.status_cell = HotkeyStatusLabel(self)
         self.status_cell.setFixedWidth(wutil.DPI(28))
         layout.addWidget(self.status_cell)
 
-        self.edit = HotkeyCaptureEdit()
+        self.edit = HotkeyCaptureEdit(self)
         self.edit.setMinimumHeight(wutil.DPI(24))
         self.edit.comboChanged.connect(lambda combo, name=command_data["command"]: self.comboChanged.emit(name, combo))
         layout.addWidget(self.edit, 0)
@@ -1067,7 +1026,7 @@ class HotkeyCommandRow(QtWidgets.QWidget):
         return super().eventFilter(watched, event)
 
 
-class TriggerHotkeysDialog(cd.QFlatDialog):
+class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setWindowTitle("TheKeyMachine Hotkeys")
@@ -1090,35 +1049,19 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         self._build_timer.setSingleShot(True)
         self._build_timer.timeout.connect(self._populate_next_batch)
 
-        main = QtWidgets.QWidget()
+        main = QtWidgets.QWidget(self)
         main_layout = QtWidgets.QVBoxLayout(main)
         main_layout.setContentsMargins(wutil.DPI(12), wutil.DPI(12), wutil.DPI(12), wutil.DPI(12))
         main_layout.setSpacing(wutil.DPI(8))
 
-        title_wrap = QtWidgets.QWidget()
-        title_layout = QtWidgets.QHBoxLayout(title_wrap)
-        title_layout.setContentsMargins(0, wutil.DPI(8), 0, wutil.DPI(10))
-        title_layout.setSpacing(wutil.DPI(16))
-
-        icon_size = wutil.DPI(51)
-        icon_qsize = QtCore.QSize(icon_size, icon_size)
-
-        self.window_icon = QtWidgets.QLabel()
-        self.window_icon.setFixedSize(icon_size, icon_size)
-        self.window_icon.setAlignment(QtCore.Qt.AlignCenter)
-        hotkeys_pixmap = _scaled_header_icon_pixmap(media.hotkeys_image, icon_qsize)
-        if not hotkeys_pixmap.isNull():
-            self.window_icon.setPixmap(hotkeys_pixmap)
-        title_layout.addWidget(self.window_icon, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-
-        self.window_title = QtWidgets.QLabel("Hotkeys")
-        self.window_title.setStyleSheet("color:#d8d8d8;font-size:%spx;font-weight:bold;" % wutil.DPI(22))
-        title_layout.addWidget(self.window_title, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        title_layout.addStretch(1)
-        main_layout.addWidget(title_wrap)
+        self.addWindowHeader(
+            parentLayout=main_layout,
+            icon=media.hotkeys_image,
+            text="Hotkeys",
+            textColor="#d8d8d8",
+        )
 
         content_layout = QtWidgets.QGridLayout()
-        content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setHorizontalSpacing(wutil.DPI(12))
         content_layout.setVerticalSpacing(wutil.DPI(8))
         content_layout.setColumnStretch(0, 0)
@@ -1126,12 +1069,11 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         content_layout.setRowStretch(1, 1)
         main_layout.addLayout(content_layout, 1)
 
-        left_widget = QtWidgets.QWidget()
+        left_widget = QtWidgets.QWidget(main)
         left_layout = QtWidgets.QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
 
-        self.section_list = QtWidgets.QListWidget()
+        self.section_list = QtWidgets.QListWidget(left_widget)
         self.section_list.setIconSize(QtCore.QSize(wutil.DPI(43), wutil.DPI(43)))
         self.section_list.setMinimumWidth(wutil.DPI(240))
         self.section_list.setStyleSheet(
@@ -1164,18 +1106,17 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         self.section_list.currentItemChanged.connect(self._on_section_changed)
         left_layout.addWidget(self.section_list, 1)
 
-        right_widget = QtWidgets.QWidget()
+        right_widget = QtWidgets.QWidget(main)
         right_layout = QtWidgets.QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
 
-        self.command_stack = QtWidgets.QStackedWidget()
+        self.command_stack = QtWidgets.QStackedWidget(right_widget)
         self.command_stack.setStyleSheet("QStackedWidget{background:transparent;}")
         right_layout.addWidget(self.command_stack, 1)
 
-        self.tools_title = QtWidgets.QLabel("Tools")
+        self.tools_title = QtWidgets.QLabel("Tools", main)
         self.tools_title.setStyleSheet("color:#bcbcbc;font-size:%spx;" % wutil.DPI(11))
-        self.section_title = QtWidgets.QLabel("Hotkeys")
+        self.section_title = QtWidgets.QLabel("Hotkeys", main)
         self.section_title.setStyleSheet("color:#bcbcbc;font-size:%spx;" % wutil.DPI(11))
 
         content_layout.addWidget(self.tools_title, 0, 0)
@@ -1210,7 +1151,7 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
             self.section_list.setCurrentRow(0)
 
     def _create_command_list(self, section_id):
-        command_list = QtWidgets.QListWidget()
+        command_list = QtWidgets.QListWidget(self.command_stack)
         command_list.setFrameShape(QtWidgets.QFrame.NoFrame)
         command_list.setSpacing(0)
         command_list.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
@@ -1274,7 +1215,7 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         command_list.blockSignals(True)
         for row_index in range(start, end):
             command = self._pending_commands[row_index]
-            row = HotkeyCommandRow(command, self._title_lookup, self._icon_lookup, row_index=row_index)
+            row = HotkeyCommandRow(command, self._title_lookup, self._icon_lookup, row_index=row_index, parent=command_list)
             self._set_row_combo_from_draft(row)
             row.comboChanged.connect(self._on_row_combo_changed)
             row.requestSelect.connect(self._select_command_by_name)

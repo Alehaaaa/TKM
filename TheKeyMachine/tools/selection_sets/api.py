@@ -414,25 +414,23 @@ def bind_selection_sets_toolbar_button(button, controller=None):
     if controller is not None:
         _selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=controller)
     if button:
-        _selection_sets_toolbar_toggle.attach_button(button)
-        if not hasattr(button, "_tkm_selection_sets_default_mouse_press"):
-            button._tkm_selection_sets_default_mouse_press = button.mousePressEvent
-
         def _selection_sets_mouse_press(event, b=button, c=controller):
             if event.button() == QtCore.Qt.LeftButton:
                 variant = getattr(b, "_get_active_shortcut_variant", lambda: None)()
                 if variant and int(variant.get("mask", 0)):
                     b.triggerToolCallback(lambda: toggle_selection_sets_window(controller=c))
                     event.accept()
-                    return
-            return b._tkm_selection_sets_default_mouse_press(event)
+                    return True
+            return False
 
-        button.mousePressEvent = _selection_sets_mouse_press
-        button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        toolCommon.replace_tracked_connection(
+        toolCommon.set_mouse_press_handler(
+            button,
+            "_tkm_selection_sets_mouse_press_filter",
+            _selection_sets_mouse_press,
+        )
+        toolCommon.bind_toolbar_button_context_menu(
+            _selection_sets_toolbar_toggle,
             button,
             "_tkm_selection_sets_context_menu_slot",
-            button.customContextMenuRequested,
-            lambda pos, b=button, c=controller: build_selection_sets_context_menu(parent=b, controller=c).exec_(b.mapToGlobal(pos)),
-            parent=button,
+            lambda parent, c=controller: build_selection_sets_context_menu(parent=parent, controller=c),
         )

@@ -236,7 +236,15 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         tooltip = f"Create {label} Set"
         button_size = max(1, int(round(wutil.DPI(30) * 0.7)))
         icon_size = max(1, int(round(wutil.DPI(28) * 0.7)))
-        btn = cw.QFlatToolButton(icon=media.selection_set_color_images.get(color.suffix), tooltip_template=tooltip)
+        btn = cw.create_tool_button_from_data(
+            {
+                "key": f"selection_set_color{color.suffix}",
+                "label": tooltip,
+                "icon_path": media.selection_set_color_images.get(color.suffix),
+                "tooltip_template": tooltip,
+            },
+            callback=None,
+        )
         btn.setFixedSize(button_size, button_size)
         btn.setIconSize(QtCore.QSize(icon_size, icon_size))
         btn.setCheckable(True)
@@ -401,7 +409,16 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         self.set_header_left_widget(self.header_sets_host, stretch=1)
 
     def _create_header_button(self, icon, tooltip, callback, key, default_visible, description=None):
-        btn = cw.QFlatToolButton(icon=icon, tooltip_template=tooltip, description=description)
+        btn = cw.create_tool_button_from_data(
+            {
+                "key": key,
+                "label": tooltip,
+                "icon_path": icon,
+                "tooltip_template": tooltip,
+                "description": description,
+            },
+            callback=None,
+        )
         btn.setFixedSize(wutil.DPI(26), wutil.DPI(26))
         btn.setIconSize(QtCore.QSize(wutil.DPI(20), wutil.DPI(20)))
         btn.clicked.connect(callback)

@@ -299,16 +299,12 @@ orbit_toolbar_toggle = ToolbarWindowToggle(
 
 
 def bind_orbit_toolbar_button(button):
-    orbit_toolbar_toggle.attach_button(button)
-    if button:
-        button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        toolCommon.replace_tracked_connection(
-            button,
-            "_tkm_orbit_context_menu_slot",
-            button.customContextMenuRequested,
-            lambda pos, b=button: build_orbit_context_menu(parent=b).exec_(b.mapToGlobal(pos)),
-            parent=button,
-        )
+    toolCommon.bind_toolbar_button_context_menu(
+        orbit_toolbar_toggle,
+        button,
+        "_tkm_orbit_context_menu_slot",
+        lambda parent: build_orbit_context_menu(parent=parent),
+    )
 
 
 def toggle_orbit_window():

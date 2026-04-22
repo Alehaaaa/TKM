@@ -20,6 +20,7 @@ _attribute_switcher_instance = None
 
 class AttributeSwitcherWindowBus(QtCore.QObject):
     stateChanged = QtCore.Signal(bool)
+    eulerFilterChanged = QtCore.Signal(bool)
 
 
 attribute_switcher_window_bus = AttributeSwitcherWindowBus()
@@ -38,6 +39,73 @@ def _emit_attribute_switcher_window_state(is_open):
 
 def _attribute_switcher_stays_on_top():
     return settings.get_setting(ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY, False, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
+
+
+def get_attribute_switcher_euler_filter_enabled():
+    return bool(settings.get_setting("euler_filter", True, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE))
+
+
+def emit_attribute_switcher_euler_filter_state():
+    try:
+        import TheKeyMachine.widgets.sliderWidget as sw
+        sw.globalSignals.eulerFilterChanged.emit(get_attribute_switcher_euler_filter_enabled())
+    except Exception:
+        pass
+
+
+def _set_checked_safely(widget, checked):
+    block_signals = getattr(widget, "blockSignals", None)
+    previous = False
+    if callable(block_signals):
+        try:
+            previous = widget.blockSignals(True)
+        except Exception:
+            previous = False
+    try:
+        widget.setChecked(bool(checked))
+    except Exception:
+        pass
+    finally:
+        if callable(block_signals):
+            try:
+                widget.blockSignals(previous)
+            except Exception:
+                pass
+
+
+def bind_attribute_switcher_euler_filter_toggle(widget):
+    if widget is None:
+        return
+
+    import TheKeyMachine.widgets.sliderWidget as sw
+
+    def _sync(enabled):
+        try:
+            if not util.is_valid_widget(widget):
+                return
+        except Exception:
+            pass
+        _set_checked_safely(widget, bool(enabled))
+
+    _set_checked_safely(widget, get_attribute_switcher_euler_filter_enabled())
+    toolCommon.replace_tracked_connection(
+        widget,
+        "_tkm_attribute_switcher_euler_filter_sync_relay",
+        sw.globalSignals.eulerFilterChanged,
+        _sync,
+        parent=widget,
+    )
+
+
+def set_attribute_switcher_euler_filter_enabled(enabled):
+    settings.set_setting("euler_filter", bool(enabled), namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
+    dlg = get_attribute_switcher_window()
+    if dlg and util.is_valid_widget(dlg):
+        try:
+            dlg.euler_filter = bool(enabled)
+        except Exception:
+            pass
+    emit_attribute_switcher_euler_filter_state()
 
 
 def get_attribute_switcher_window():

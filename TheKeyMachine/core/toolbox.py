@@ -153,7 +153,7 @@ TOOL_DEFINITIONS = {
     },
     "orbit": {
         "key": "orbit",
-        "label": "ToolBox Orbit",
+        "label": "Orbit",
         "text": "Orb",
         "icon_path": media.orbit_ui_image,
         "callback": lambda: ui.orbit_window(0, 0),

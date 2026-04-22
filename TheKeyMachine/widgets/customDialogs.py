@@ -38,6 +38,11 @@ import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.widgets.customWidgets as cw
 
 
+def _parent_widget_for_layout(layout, fallback=None):
+    parent = layout.parentWidget() if layout is not None and hasattr(layout, "parentWidget") else None
+    return parent or fallback
+
+
 class QFlatDialogButton(dict):
     """A dictionary subclass that supports the | operator to return a list of buttons."""
 
@@ -69,15 +74,28 @@ class QFlatWindowMixin:
     """Shared header and footer helpers for QFlat windows."""
 
     TEXT_COLOR = "#bbbbbb"
+    WINDOW_HEADER_MARGINS = (0, 8, 0, 10)
+    WINDOW_HEADER_SPACING = 16
+    WINDOW_HEADER_ICON_SIZE = 51
+    WINDOW_HEADER_TITLE_SIZE = 20
 
-    def _scaled_qflat_window_icon(self, icon_path, size):
-        if not icon_path:
+    def _windowIconPixmap(self, icon, size):
+        if not icon:
             return QtGui.QPixmap()
 
         icon_size = size if isinstance(size, QtCore.QSize) else QtCore.QSize(int(size), int(size))
-        lower_path = str(icon_path).lower()
+        if isinstance(icon, QtGui.QIcon):
+            if icon.isNull():
+                return QtGui.QPixmap()
+            return icon.pixmap(icon_size)
+        if isinstance(icon, QtGui.QPixmap):
+            if icon.isNull():
+                return icon
+            return icon.scaled(icon_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+
+        lower_path = str(icon).lower()
         if lower_path.endswith(".svg") and QSvgRenderer:
-            renderer = QSvgRenderer(icon_path)
+            renderer = QSvgRenderer(icon)
             if renderer.isValid():
                 screen = QtGui.QGuiApplication.primaryScreen()
                 dpr = screen.devicePixelRatio() if screen else 1.0
@@ -91,63 +109,70 @@ class QFlatWindowMixin:
                 pixmap.setDevicePixelRatio(dpr)
                 return pixmap
 
-        icon = QtGui.QIcon(icon_path)
-        if not icon.isNull():
-            return icon.pixmap(icon_size)
+        qicon = QtGui.QIcon(icon)
+        if not qicon.isNull():
+            return qicon.pixmap(icon_size)
 
-        pixmap = QtGui.QPixmap(icon_path)
+        pixmap = QtGui.QPixmap(icon)
         if pixmap.isNull():
             return pixmap
         return pixmap.scaled(icon_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
 
-    def add_qflat_window_header(
+    def setWindowTitle(self, title):
+        super().setWindowTitle(title)
+        self.setWindowHeaderTitle(title)
+
+    def windowHeader(self):
+        return getattr(self, "qflat_window_header", None)
+
+    def windowHeaderLayout(self):
+        return getattr(self, "qflat_window_header_layout", None)
+
+    def addWindowHeader(
         self,
-        title="",
-        icon_path=None,
-        parent_layout=None,
-        margins=None,
-        spacing=None,
-        icon_size=None,
-        title_size=None,
-        title_color=None,
+        parentLayout=None,
+        text="",
+        icon=None,
+        textColor=None,
     ):
-        layout = parent_layout or getattr(self, "root_layout", None)
+        layout = parentLayout or getattr(self, "root_layout", None)
         if layout is None:
             return None
 
-        if margins is None:
-            margins = (DPI(12), DPI(8), DPI(12), DPI(10))
-        if spacing is None:
-            spacing = DPI(12)
-        if icon_size is None:
-            icon_size = DPI(51)
-        if title_size is None:
-            title_size = DPI(22)
-        if title_color is None:
-            title_color = getattr(self, "TEXT_COLOR", "#bbbbbb")
+        margins = tuple(DPI(value) for value in self.WINDOW_HEADER_MARGINS)
+        spacing = DPI(self.WINDOW_HEADER_SPACING)
+        icon_size = DPI(self.WINDOW_HEADER_ICON_SIZE)
+        title_size = DPI(self.WINDOW_HEADER_TITLE_SIZE)
+        if textColor is None:
+            textColor = getattr(self, "TEXT_COLOR", "#bbbbbb")
+        if icon is None:
+            icon = getattr(self, "_window_header_icon", None)
+        else:
+            self._window_header_icon = icon
+        text = text or self.windowTitle()
 
-        header = QtWidgets.QWidget()
+        header = QtWidgets.QWidget(_parent_widget_for_layout(layout, self))
         header_layout = QtWidgets.QHBoxLayout(header)
         header_layout.setContentsMargins(*margins)
         header_layout.setSpacing(spacing)
 
-        self.window_icon = QtWidgets.QLabel()
+        self.window_icon = QtWidgets.QLabel(header)
         self.window_icon.setFixedSize(icon_size, icon_size)
         self.window_icon.setAlignment(QtCore.Qt.AlignCenter)
-        pixmap = self._scaled_qflat_window_icon(icon_path, QtCore.QSize(icon_size, icon_size))
+        pixmap = self._windowIconPixmap(icon, QtCore.QSize(icon_size, icon_size))
         if not pixmap.isNull():
             self.window_icon.setPixmap(pixmap)
-        self.window_icon.setVisible(bool(icon_path and not pixmap.isNull()))
+        self.window_icon.setVisible(bool(icon and not pixmap.isNull()))
         header_layout.addWidget(self.window_icon, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
-        self.window_title = QtWidgets.QLabel(title or "")
+        self.window_title = QtWidgets.QLabel(text or "", header)
         self.window_title.setObjectName("qflat_window_title")
         self.window_title.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.window_title.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.window_title.setWordWrap(False)
         self.window_title.setStyleSheet(
             "#qflat_window_title{color:%s;font-size:%spx;font-weight:bold;background:transparent;}"
-            % (title_color, title_size)
+            % (textColor, title_size)
         )
         header_layout.addWidget(self.window_title, 1, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
@@ -155,33 +180,23 @@ class QFlatWindowMixin:
         self.qflat_window_header_layout = header_layout
         self.title_label = self.window_title
 
-        add_widget = getattr(layout, "addWidget", None)
-        if add_widget:
-            add_widget(header)
+        layout.addWidget(header)
         return header
 
-    def set_qflat_window_title(self, title, window_title=None):
-        if window_title is None:
-            window_title = title
-        if window_title is not None and hasattr(self, "setWindowTitle"):
-            self.setWindowTitle(window_title)
-        label = getattr(self, "window_title", None) or getattr(self, "title_label", None)
+    def setWindowHeaderTitle(self, title):
+        label = getattr(self, "window_title", None)
         if label:
             label.setText(title or "")
 
-    def set_qflat_window_icon(self, icon_path, icon_size=None):
+    def setWindowHeaderIcon(self, icon):
+        self._window_header_icon = icon
         label = getattr(self, "window_icon", None)
         if not label:
             return
-        if icon_size is None:
-            icon_size = label.width() or DPI(51)
-        pixmap = self._scaled_qflat_window_icon(icon_path, QtCore.QSize(icon_size, icon_size))
+        icon_size = label.width() or DPI(self.WINDOW_HEADER_ICON_SIZE)
+        pixmap = self._windowIconPixmap(icon, QtCore.QSize(icon_size, icon_size))
         label.setPixmap(pixmap)
-        label.setVisible(bool(icon_path and not pixmap.isNull()))
-
-    def set_qflat_window_bottom_bar(self, buttons=None, margins=8, spacing=6, closeButton=False, highlight=None):
-        if hasattr(self, "setBottomBar"):
-            self.setBottomBar(buttons=buttons, margins=margins, spacing=spacing, closeButton=closeButton, highlight=highlight)
+        label.setVisible(bool(icon and not pixmap.isNull()))
 
 
 class QFlatDialog(QFlatWindowMixin, QtWidgets.QDialog):
@@ -345,12 +360,12 @@ class QFlatConfirmDialog(QFlatDialog):
         self.setMinimumWidth(0)
         self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
 
-        content_widget = QtWidgets.QWidget()
+        content_widget = QtWidgets.QWidget(self)
         content_layout = QtWidgets.QHBoxLayout(content_widget)
         content_layout.setContentsMargins(DPI(25), DPI(20), DPI(25), DPI(20))
 
         if icon:
-            icon_label = QtWidgets.QLabel()
+            icon_label = QtWidgets.QLabel(content_widget)
             pix = QtGui.QPixmap(icon)
             if not pix.isNull():
                 icon_dim = DPI(80)
@@ -363,13 +378,13 @@ class QFlatConfirmDialog(QFlatDialog):
         content_layout.addLayout(text_layout, 1)
 
         if title:
-            self.title_label = QtWidgets.QLabel(title)
+            self.title_label = QtWidgets.QLabel(title, content_widget)
             self.title_label.setWordWrap(True)
             self.title_label.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
             self.title_label.setStyleSheet("font-size: %spx; color: %s; font-weight: bold;" % (DPI(18), self.TEXT_COLOR))
             text_layout.addWidget(self.title_label)
 
-        self.message_label = QtWidgets.QLabel(message)
+        self.message_label = QtWidgets.QLabel(message, content_widget)
         self.message_label.setWordWrap(True)
         self.message_label.setStyleSheet("font-size: %spx; color: %s;" % (DPI(11.5), self.TEXT_COLOR))
         text_layout.addWidget(self.message_label)
@@ -890,7 +905,7 @@ class QFlatCloseableFloatingWidget(QFlatFloatingWidget):
         self.top_bar_layout.setSpacing(0)
 
         self.header_left_container = QtWidgets.QWidget()
-        self.header_left_container.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.header_left_container.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.header_left_layout = QtWidgets.QHBoxLayout(self.header_left_container)
         self.header_left_layout.setContentsMargins(0, 0, 0, 0)
         self.header_left_layout.setSpacing(0)
@@ -904,7 +919,7 @@ class QFlatCloseableFloatingWidget(QFlatFloatingWidget):
         self.header_separator.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.header_separator.setStyleSheet("QFrame { background-color: #3d3d3d; border: none; }")
         self.header_separator.setFixedWidth(max(1, DPI(2)))
-        self.header_separator.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
+        self.header_separator.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.header_separator.setVisible(False)
 
         self._header_right_spacing = QtWidgets.QWidget()
@@ -912,7 +927,7 @@ class QFlatCloseableFloatingWidget(QFlatFloatingWidget):
         self._header_right_spacing.setVisible(False)
 
         self.header_right_container = QtWidgets.QWidget()
-        self.header_right_container.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Expanding)
+        self.header_right_container.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed)
         self.header_right_layout = QtWidgets.QHBoxLayout(self.header_right_container)
         self.header_right_layout.setContentsMargins(0, 0, 0, 0)
         self.header_right_layout.setSpacing(DPI(2))
@@ -1001,9 +1016,8 @@ class QFlatToolBarDialog(QFlatFloatingWidget):
         self.setMinimumWidth(DPI(230))
         self.setMinimumHeight(DPI(300))
 
-        self._opened = False
-
-        # Header
+        # Header. This popup toolbar header intentionally keeps its original
+        # title-first layout; full windows use QFlatToolBarWindowDialog instead.
         title_layout = QtWidgets.QHBoxLayout()
         title_layout.setContentsMargins(DPI(6), DPI(10), 0, DPI(4))
         title_layout.setSpacing(DPI(6))
@@ -1032,6 +1046,16 @@ class QFlatToolBarDialog(QFlatFloatingWidget):
 
         self.mainLayout.addLayout(title_layout)
 
+
+class QFlatToolBarPopupDialog(QFlatToolBarDialog):
+    """
+    Toolbar-style popup dialog that closes after activation changes.
+    """
+
+    def __init__(self, parent=None, *args, **kwargs):
+        super().__init__(parent=parent, *args, **kwargs)
+        self._opened = False
+
     def changeEvent(self, event):
         if event.type() == QtCore.QEvent.ActivationChange:
             if self._opened:
@@ -1041,7 +1065,7 @@ class QFlatToolBarDialog(QFlatFloatingWidget):
         super().changeEvent(event)
 
 
-class QFlatSelectorDialog(QFlatToolBarDialog):
+class QFlatSelectorDialog(QFlatToolBarPopupDialog):
     """
     A modern successor to the Maya textScrollList selector.
     Displays a list of currently selected objects, allowing for quick
@@ -1143,7 +1167,14 @@ class QFlatSelectorDialog(QFlatToolBarDialog):
             cmds.select(clear=True)
 
 
-class QFlatBugReportDialog(QFlatDialog):
+class QFlatToolBarWindowDialog(QFlatDialog):
+    """
+    Full QFlat window shell with a unified top-left icon, title, and bottom bar.
+    """
+    pass
+
+
+class QFlatBugReportDialog(QFlatToolBarWindowDialog):
     """
     Modern bug report dialog that reuses QFlatDialog styling.
     """
@@ -1153,7 +1184,7 @@ class QFlatBugReportDialog(QFlatDialog):
     def __init__(self, parent=None, submit_callback=None, dialog_title="Report a Bug", prefill_name="", prefill_explanation="", prefill_script_error=""):
         self._submit_callback = submit_callback
         self._send_button = None
-        QFlatDialog.__init__(self, parent)
+        super().__init__(parent=parent)
         self.setWindowTitle(dialog_title)
         # More horizontal / less tall default footprint.
         self.setMinimumSize(DPI(600), DPI(450))
@@ -1162,54 +1193,40 @@ class QFlatBugReportDialog(QFlatDialog):
         self._error_color = "#CA6161"
         self._status_placeholder = " "
 
-        content_widget = QtWidgets.QWidget()
+        content_widget = QtWidgets.QWidget(self)
         content_layout = QtWidgets.QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(DPI(24), DPI(20), DPI(24), DPI(10))
-        content_layout.setSpacing(DPI(12))
+        content_layout.setContentsMargins(DPI(12), DPI(12), DPI(12), DPI(12))
+        content_layout.setSpacing(DPI(8))
 
-        header_layout = QtWidgets.QHBoxLayout()
-        header_layout.setSpacing(DPI(12))
+        self.addWindowHeader(
+            parentLayout=content_layout,
+            icon=media.report_a_bug_image,
+            textColor="#CA6161",
+        )
 
-        icon_label = QtWidgets.QLabel()
-        icon_size = QtCore.QSize(DPI(72), DPI(72))
-        icon_label.setFixedSize(icon_size)
-        icon_label.setScaledContents(False)
-        bug_pixmap = self._bug_icon_pixmap(icon_size)
-        if not bug_pixmap.isNull():
-            icon_label.setPixmap(bug_pixmap)
-        header_layout.addWidget(icon_label, alignment=QtCore.Qt.AlignTop)
-
-        text_layout = QtWidgets.QVBoxLayout()
-        text_layout.setSpacing(DPI(4))
-
-        self.title_label = QtWidgets.QLabel("<b>{}</b>".format(dialog_title))
-        self.title_label.setAlignment(QtCore.Qt.AlignLeft)
-        self.title_label.setStyleSheet("color: #CA6161; font-size: %spx;" % DPI(18))
-        text_layout.addWidget(self.title_label)
-
-        subtitle = QtWidgets.QLabel("Have you found a bug? Please fill the report and I will do my best to fix it in the next update.")
+        subtitle = QtWidgets.QLabel(
+            "Have you found a bug? Please fill the report and I will do my best to fix it in the next update.",
+            content_widget,
+        )
         subtitle.setAlignment(QtCore.Qt.AlignLeft)
         subtitle.setWordWrap(True)
         subtitle.setStyleSheet("color: #cccccc; font-size: %spx;" % DPI(11))
-        text_layout.addWidget(subtitle)
+        content_layout.addWidget(subtitle)
 
-        header_layout.addLayout(text_layout, stretch=1)
-        content_layout.addLayout(header_layout)
-
-        self.status_label = QtWidgets.QLabel(self._status_placeholder)
+        self.status_label = QtWidgets.QLabel(self._status_placeholder, content_widget)
         self.status_label.setAlignment(QtCore.Qt.AlignCenter)
         self.status_label.setWordWrap(True)
         self.status_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.status_label.setMinimumHeight(self._status_row_height())
         self.status_label.setStyleSheet("color: %s;" % self._info_color)
 
-        self.name_input = QtWidgets.QLineEdit()
+        self.name_input = QtWidgets.QLineEdit(content_widget)
         self.name_input.setPlaceholderText("* Your name")
         self.name_input.setMaxLength(50)
         if prefill_name:
             self.name_input.setText(prefill_name)
 
-        self.explanation_textbox = QtWidgets.QTextEdit()
+        self.explanation_textbox = QtWidgets.QTextEdit(content_widget)
         self.explanation_textbox.setPlaceholderText(
             "* Describe what happened, what you expected, and the steps to reproduce it."
         )
@@ -1220,7 +1237,7 @@ class QFlatBugReportDialog(QFlatDialog):
         if prefill_explanation:
             self.explanation_textbox.setPlainText(prefill_explanation)
 
-        self.script_error_textbox = QtWidgets.QTextEdit()
+        self.script_error_textbox = QtWidgets.QTextEdit(content_widget)
         self.script_error_textbox.setPlaceholderText(
             "Paste the last Script Editor lines here. Include the traceback or exact error if you have it."
         )
@@ -1238,13 +1255,17 @@ class QFlatBugReportDialog(QFlatDialog):
             widget.setStyleSheet(self._textedit_style())
             widget.textChanged.connect(self._clear_status_message)
 
-        # Keep fields in a single vertical column for faster scanning/filling.
-        content_layout.addWidget(self.name_input)
-        self.details_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        left_fields = QtWidgets.QWidget(content_widget)
+        left_fields_layout = QtWidgets.QVBoxLayout(left_fields)
+        left_fields_layout.setSpacing(DPI(8))
+        left_fields_layout.addWidget(self.name_input)
+        left_fields_layout.addWidget(self.explanation_textbox, 1)
+
+        self.details_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal, content_widget)
         self.details_splitter.setChildrenCollapsible(False)
         self.details_splitter.setOpaqueResize(True)
         self.details_splitter.setHandleWidth(DPI(6))
-        self.details_splitter.addWidget(self.explanation_textbox)
+        self.details_splitter.addWidget(left_fields)
         self.details_splitter.addWidget(self.script_error_textbox)
         self.details_splitter.setStretchFactor(0, 2)
         self.details_splitter.setStretchFactor(1, 1)
@@ -1272,32 +1293,6 @@ class QFlatBugReportDialog(QFlatDialog):
             "QTextEdit {background-color: #2d2d2d;border: 1px solid #393939;border-radius: %spx;color: #cccccc;padding: %spx;font-size: %spx;}"
         ) % (DPI(4), DPI(6), DPI(11))
 
-    def _bug_icon_pixmap(self, size):
-        path = media.report_a_bug_image
-        if not path:
-            return QtGui.QPixmap()
-
-        lower = path.lower()
-        if lower.endswith(".svg") and QSvgRenderer:
-            renderer = QSvgRenderer(path)
-            if renderer.isValid():
-                screen = QtGui.QGuiApplication.primaryScreen()
-                dpr = screen.devicePixelRatio() if screen else 1.0
-                width = max(1, int(size.width() * dpr))
-                height = max(1, int(size.height() * dpr))
-                pixmap = QtGui.QPixmap(width, height)
-                pixmap.fill(QtCore.Qt.transparent)
-                painter = QtGui.QPainter(pixmap)
-                renderer.render(painter, QtCore.QRectF(0, 0, width, height))
-                painter.end()
-                pixmap.setDevicePixelRatio(dpr)
-                return pixmap
-
-        pixmap = QtGui.QPixmap(path)
-        if pixmap.isNull():
-            return pixmap
-        return pixmap.scaled(size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
-
     def _find_button(self, name):
         if not self.bottomBar:
             return None
@@ -1309,7 +1304,6 @@ class QFlatBugReportDialog(QFlatDialog):
     def apply_prefill(self, dialog_title=None, name="", explanation="", script_error=""):
         if dialog_title:
             self.setWindowTitle(dialog_title)
-            self.title_label.setText("<b>{}</b>".format(dialog_title))
         self.name_input.setText(name or "")
         self.explanation_textbox.setPlainText(explanation or "")
         self.script_error_textbox.setPlainText(script_error or "")
@@ -1323,10 +1317,10 @@ class QFlatBugReportDialog(QFlatDialog):
     def _init_splitter_sizes(self):
         if not hasattr(self, "details_splitter"):
             return
-        total = max(DPI(240), self.details_splitter.size().height())
-        upper = max(DPI(130), int(total * 0.68))
-        lower = max(DPI(90), total - upper)
-        self.details_splitter.setSizes([upper, lower])
+        total = max(DPI(420), self.details_splitter.size().width())
+        left = max(DPI(260), int(total * 0.62))
+        right = max(DPI(180), total - left)
+        self.details_splitter.setSizes([left, right])
 
     def _set_send_enabled(self, enabled):
         if self._send_button:
@@ -1530,7 +1524,7 @@ class TKMAboutDialog(QFlatDialog):
         self.adjustSize()
 
 
-class QFlatNumberInput(QFlatToolBarDialog):
+class QFlatNumberInput(QFlatToolBarPopupDialog):
     """
     Flat floating dialog with:
         - title

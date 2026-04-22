@@ -1179,6 +1179,10 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         settings.set_setting(setting, state, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
         setattr(self, setting, state)
 
+        if setting == "euler_filter":
+            import TheKeyMachine.widgets.sliderWidget as sw
+            sw.globalSignals.eulerFilterChanged.emit(bool(state))
+
         if refresh:
             self.refresh(force=True)
 
