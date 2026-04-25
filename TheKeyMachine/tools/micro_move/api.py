@@ -8,7 +8,6 @@ except Exception:
     from shiboken2 import isValid
 
 import TheKeyMachine.mods.barMod as bar
-import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
 
 
@@ -16,7 +15,7 @@ class MicroMoveController(QtCore.QObject):
     def __init__(self, owner):
         super().__init__(owner)
         self._owner = owner
-        self._enabled = bool(settings.get_setting("micro_move_button_state", False))
+        self._enabled = False
         self._timer = QtCore.QTimer(self)
         self._timer.setInterval(500)
         self._timer.timeout.connect(self._refresh_context)
@@ -32,13 +31,11 @@ class MicroMoveController(QtCore.QObject):
     def activate(self):
         toolCommon.open_undo_chunk(tool_id="micro_move")
         self._enabled = True
-        settings.set_setting("micro_move_button_state", True)
         bar.activate_micro_move()
         self._timer.start()
 
     def deactivate(self):
         self._enabled = False
-        settings.set_setting("micro_move_button_state", False)
         self._timer.stop()
         try:
             bar._clear_micro_cursor()
@@ -69,4 +66,3 @@ class MicroMoveController(QtCore.QObject):
             self.activate()
         else:
             self.deactivate()
-

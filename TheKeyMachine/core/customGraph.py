@@ -355,7 +355,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
                 max=100,
                 text=icon,
                 color=color,
-                dragCommand=(lambda mode_key, v: change_func(mode_key, v)),
+                dragCommand=(lambda mode_key, v, session=None: change_func(mode_key, v, session=session)),
                 dropCommand=drop_func,
                 tooltipTitle=label,
                 tooltipDescription=desc,

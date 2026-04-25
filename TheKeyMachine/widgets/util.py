@@ -1,20 +1,14 @@
 import maya.cmds as cmds
 import maya.OpenMayaUI as omui
-try:
-    from maya.api import OpenMaya as om
-except Exception:
-    om = None
 
 try:
     from shiboken6 import wrapInstance, isValid  # type: ignore
     from PySide6 import QtWidgets
-    from PySide6.QtCore import QSignalBlocker
-    from PySide6.QtWidgets import QSlider, QMainWindow
+    from PySide6.QtWidgets import QMainWindow
 except ImportError:
     from shiboken2 import wrapInstance, isValid  # type: ignore
     from PySide2 import QtWidgets
-    from PySide2.QtCore import QSignalBlocker
-    from PySide2.QtWidgets import QSlider, QMainWindow
+    from PySide2.QtWidgets import QMainWindow
 
 from TheKeyMachine.mods import mediaMod as media
 
@@ -42,46 +36,6 @@ def get_screen_resolution():
         screen_rect = desktop.screenGeometry()
 
     return screen_rect.width(), screen_rect.height()
-
-
-def _ls_selected(long=False, ordered=False):
-    if ordered:
-        return cmds.ls(orderedSelection=True, long=long) or cmds.ls(selection=True, long=long) or []
-    return cmds.ls(selection=True, long=long) or []
-
-
-def get_selected_objects(long=False, ordered=False, orderedSelection=None):
-    if orderedSelection is not None:
-        ordered = bool(orderedSelection)
-
-    if ordered:
-        return _ls_selected(long=long, ordered=True)
-
-    if om is None:
-        return _ls_selected(long=long)
-
-    try:
-        selection_list = om.MGlobal.getActiveSelectionList()
-        selection_strings = selection_list.getSelectionStrings()
-    except Exception:
-        return _ls_selected(long=long)
-
-    if not selection_strings:
-        return []
-
-    try:
-        return cmds.ls(selection_strings, long=long) or selection_strings
-    except Exception:
-        return selection_strings
-
-
-def get_selected_object_count():
-    if om is not None:
-        try:
-            return om.MGlobal.getActiveSelectionList().length()
-        except Exception:
-            pass
-    return len(_ls_selected())
 
 
 def get_maya_qt(ptr=None, qt=QMainWindow):
@@ -120,22 +74,6 @@ def check_visible_layout(layout):
         s = False
     return s
 
-
-# --- utility: reset slider value without emitting signals -----------------------
-class ResetWithoutEmit:
-    def __init__(self, slider: QSlider):
-        self._slider = slider
-
-    def __call__(self):
-        blocker = QSignalBlocker(self._slider)
-        try:
-            self._slider.setValue(getattr(self._slider, "defaultValue", 0))
-            if hasattr(self._slider, "_apply_stylesheet"):
-                self._slider._apply_stylesheet(thick=False)  # type: ignore[attr-defined]
-            if hasattr(self._slider, "_pressOffset"):
-                self._slider._pressOffset = None  # type: ignore[attr-defined]
-        finally:
-            del blocker
 
 
 def make_inViewMessage(message, icon=None):

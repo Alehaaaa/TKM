@@ -73,6 +73,7 @@ import TheKeyMachine.mods.mediaMod as media  # type: ignore
 import TheKeyMachine.mods.styleMod as style  # type: ignore
 import TheKeyMachine.mods.barMod as bar  # type: ignore
 import TheKeyMachine.mods.hotkeysMod as hotkeys  # type: ignore
+from TheKeyMachine.core import selection_targets
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.core.customGraph as cg  # type: ignore
 import TheKeyMachine.mods.updater as updater  # type: ignore
@@ -1538,7 +1539,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     def find_matching_selection_set(self, selection=None):
         if selection is None:
-            selection = wutil.get_selected_objects()
+            selection = selection_targets.get_selected_objects()
         return self._find_matching_selection_set(selection)
 
     def show_matching_selection_set_message(self, set_name):
@@ -1555,7 +1556,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         return sel_set_name
 
     def create_new_set_and_update_buttons(self, color_suffix, set_name_field, set_group_combo=None, *args):
-        selection = wutil.get_selected_objects()
+        selection = selection_targets.get_selected_objects()
         if not selection:
             wutil.make_inViewMessage("Select something first")
             return False
@@ -1580,8 +1581,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             new_set = cmds.sets(name=new_set_name, empty=True)
             cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
 
-            if wutil.get_selected_objects():
-                cmds.sets(wutil.get_selected_objects(), add=new_set)
+            if selection_targets.get_selected_objects():
+                cmds.sets(selection_targets.get_selected_objects(), add=new_set)
 
             cmds.sets(new_set, add=sel_set_name)
 
@@ -1633,7 +1634,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 cmds.select(set_name)
 
     def add_selection_to_set(self, set_name, *args):
-        selection = wutil.get_selected_objects()
+        selection = selection_targets.get_selected_objects()
         if not selection:
             return wutil.make_inViewMessage("No selection to add")
         elif not cmds.objExists(set_name):
@@ -1642,7 +1643,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         cmds.sets(selection, add=set_name)
 
     def remove_selection_from_set(self, set_name, *args):
-        selection = wutil.get_selected_objects()
+        selection = selection_targets.get_selected_objects()
         if not selection:
             return wutil.make_inViewMessage("No selection to remove")
         elif not cmds.objExists(set_name):
@@ -1651,7 +1652,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         cmds.sets(selection, remove=set_name)
 
     def update_selection_to_set(self, set_name, *args):
-        selection = wutil.get_selected_objects()
+        selection = selection_targets.get_selected_objects()
         if not selection:
             return wutil.make_inViewMessage("No selection to update")
         elif not cmds.objExists(set_name):
@@ -2129,68 +2130,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ],
         )
 
-        # _____________________ BlendSlider ____________________________ #
-
-        # Wrapper para el modo Pull/Push
-        def pull_push_wrapper(value):
-            keyTools.blend_pull_and_push(value / 10.0)  # Ajusta el valor antes de pasarlo
-            # update_blend_label_with_slider_value(value)
-
-        def blend_to_frame_wrapper(value):
-            blend_to_frame_with_button_values(value)
-            # update_blend_label_with_slider_value(value)
-
-        def blend_to_default_wrapper(value):
-            selected_objects = wutil.get_selected_objects(long=True)
-            if not selected_objects:
-                return
-
-            json_file_path = keyTools.general.get_set_default_data_file()
-
-            # Leer datos guardados si existen
-            if os.path.exists(json_file_path):
-                with open(json_file_path, "r") as file:
-                    data = json.load(file)
-            else:
-                data = {}
-
-            for obj in selected_objects:
-                attrs = cmds.listAttr(obj, keyable=True)
-                if not attrs:
-                    continue
-
-                for attr in attrs:
-                    try:
-                        attr_full = f"{obj}.{attr}"
-                        namespace = obj.split(":")[0] if ":" in obj else "default"
-
-                        # Obtener valor actual
-                        current_value = cmds.getAttr(attr_full)
-
-                        # Obtener valor por defecto desde JSON o Maya
-                        if namespace in data and attr_full in data[namespace]:
-                            default_value = data[namespace][attr_full]
-                        else:
-                            default_query = cmds.attributeQuery(attr, node=obj, listDefault=True)
-                            default_value = default_query[0] if default_query else current_value
-
-                        # Interpolar entre el valor actual y el valor por defecto
-                        new_value = (1 - value) * current_value + value * default_value
-
-                        # Aplicar nuevo valor suavizado
-                        cmds.setAttr(attr_full, new_value)
-
-                    except Exception as e:
-                        report.report_detected_exception(e, context="blend to default")
-
-            # update_blend_label_with_slider_value(value)
-
-        def update_button_with_current_frame(button_name):
-            # Obtener el número del frame actual
-            current_frame = cmds.currentTime(query=True)
-            # Actualizar el texto del botón con el número del frame
-            cmds.button(button_name, edit=True, label=str(int(current_frame)))
-
         # _____________________ Sliders Sections ____________________________ #
         # Temporary disable: frame capture buttons for Blend to Frame sliders.
         # blend_to_key_left_b_qt = cw.QFlatToolButton()
@@ -2204,9 +2143,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # blend_to_key_right_b_qt.setFixedSize(25, 16)
         # blend_to_key_right_b_qt.hide()
         # blend_to_key_right_b_qt.clicked.connect(lambda: blend_to_key_right_b_qt.setText(str(int(cmds.currentTime(q=True)))))
-
-        def blend_to_frame_with_button_values(percentage):
-            trigger.execute_slider("tween", "blend_to_frame", percentage)
 
         def add_mode_sliders(modes_list, prefix, color, change_func, drop_func, default_modes=None):
             # Create a new section for each slider color/type
@@ -2232,12 +2168,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 desc = m.get("description", "")
                 icon = m.get("icon", "SL")
 
-                # Check for specialized commands
-                command = None
                 show_frames = False
 
                 if key == "blend_to_frame":
-                    command = blend_to_frame_with_button_values
                     show_frames = True
 
                 # Determine initial visibility: pinned setting takes priority, fallback to default_modes membership
@@ -2252,9 +2185,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     text=icon,
                     color=color,
                     dragCommand=(
-                        lambda mode_key, v, p=prefix: blend_to_frame_with_button_values(v)
+                        lambda mode_key, v, p=prefix, session=None: sliders.execute_blend_to_frame_with_button_values(v, session=session)
                         if mode_key == "blend_to_frame"
-                        else trigger.execute_slider(p, mode_key, v)
+                        else trigger.execute_slider(p, mode_key, v, session=session)
                     ),
                     dropCommand=drop_func,
                     tooltipTitle=label,
@@ -2443,7 +2376,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         def update_selector_button_text():
             if not wutil.is_valid_widget(selector_button_widget):
                 return
-            num_selected = wutil.get_selected_object_count()
+            num_selected = selection_targets.get_selected_object_count()
             selector_button_widget.setCount(num_selected)
 
         try:

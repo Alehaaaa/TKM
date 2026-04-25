@@ -346,7 +346,6 @@ class MenuWidget(QtWidgets.QMenu):
 
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
-        tooltip_template = kwargs.pop("tooltip_template", kwargs.pop("template", kwargs.pop("tooltip", None)))
         callback = kwargs.pop("callback", None)
         label_override = kwargs.pop("label", None)
 
@@ -433,7 +432,9 @@ class OpenMenuWidget(MenuWidget):
 
 
 class TooltipMixin:
-    def setData(self, text="", description="", shortcuts=None, icon=None, tooltip_template=None, status_title=None, status_description=None):
+    def setData(
+        self, text="", description="", shortcuts=None, icon=None, tooltip_template=None, status_title=None, status_description=None
+    ):
         # Automatically pick up the widget's icon if not provided
         if not icon and hasattr(self, "_icon_path"):
             icon = self._icon_path

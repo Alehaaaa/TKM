@@ -30,7 +30,8 @@ except ImportError:
     QRegularExpression = QRegExp
     QRegularExpressionValidator = QRegExpValidator
 
-from TheKeyMachine.widgets.util import DPI, get_maya_qt, get_selected_objects, is_valid_widget
+from TheKeyMachine.core.selection_targets import get_selected_objects
+from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
 from TheKeyMachine.tooltips.tooltip import QFlatTooltipManager
 
 import TheKeyMachine.mods.mediaMod as media

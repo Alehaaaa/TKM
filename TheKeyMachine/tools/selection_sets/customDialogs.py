@@ -9,6 +9,7 @@ except ImportError:
 
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
+from TheKeyMachine.core import selection_targets
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
@@ -179,7 +180,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         return sanitized
 
     def _build_default_name_from_selection(self):
-        selection = wutil.get_selected_objects()
+        selection = selection_targets.get_selected_objects()
         if not selection:
             return ""
 
@@ -641,7 +642,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         return set(normalized or items)
 
     def _update_button_match_states(self):
-        current_selection = self._normalize_scene_objects(wutil.get_selected_objects(long=True))
+        current_selection = self._normalize_scene_objects(selection_targets.get_selected_objects(long=True))
         for subset, button in list(self._set_buttons.items()):
             if not wutil.is_valid_widget(button):
                 self._set_buttons.pop(subset, None)

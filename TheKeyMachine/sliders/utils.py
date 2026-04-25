@@ -1,129 +1,232 @@
 """
 TheKeyMachine - Slider Utilities
 
-Internal state management and shared helper functions for sliders.
+Session state and shared helper functions for sliders.
 """
 
 import maya.cmds as cmds
-import maya.mel as mel
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Any, Tuple
+
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.core.selection_targets import (
-    resolve_target_attribute_plugs as shared_resolve_target_attribute_plugs,
-)
+from TheKeyMachine.core import selection_targets
 
 
-# Persistent session state for slider operations
-is_dragging = False
-original_keyframes = {}
-original_values = {}
-original_keyframe_values = {}
-generated_keyframe_positions = {}
-initial_noise_values = {}
-pose_buffer = {}
-preserved_time_range = None
+@dataclass
+class SliderTargetContext:
+    """Holds targeting information resolved at the start of a slider interaction."""
+    resolved: bool = False
+    curves: List[str] = field(default_factory=list)
+    # The map of attribute/curve to its affected keyframe times
+    affected_map: Dict[str, List[float]] = field(default_factory=dict)
+    time_range: Optional[Tuple[float, float]] = None
+    has_graph_keys: bool = False
 
-# Caching for keyframe operations
-is_cached = False
-frame_data_cache = {}
-tween_frame_data_cache = {}
+    def clear(self):
+        self.resolved = False
+        self.curves.clear()
+        self.affected_map.clear()
+        self.time_range = None
+        self.has_graph_keys = False
 
-def start_dragging(tool_id=None, title=None, description="", tooltip_template=None):
-    """Starts a Maya undo chunk if not already dragging and resets session data."""
-    global is_dragging, preserved_time_range
-    if not is_dragging:
-        reset_session_data()
-        preserved_time_range = _get_time_slider_range_selection()
-        # Use a consistent chunk name for all TKM slider operations to ensure clean undos
+
+@dataclass
+class SliderCaches:
+    """Holds various caches used during a slider drag to ensure stability."""
+    is_cached: bool = False
+    original_keyframes: Dict[str, Dict[float, float]] = field(default_factory=dict)
+    generated_positions: Dict[str, List[float]] = field(default_factory=dict)
+    initial_noise: Dict[str, List[float]] = field(default_factory=dict)
+    frame_data: Dict[Tuple[str, float], Any] = field(default_factory=dict)
+    tween_frame_data: Dict[Tuple[str, float], Any] = field(default_factory=dict)
+    pose_buffer: Dict[Tuple[str, float], float] = field(default_factory=dict)
+
+    def clear(self, keep_pose=False):
+        self.is_cached = False
+        self.original_keyframes.clear()
+        self.generated_positions.clear()
+        self.initial_noise.clear()
+        self.frame_data.clear()
+        self.tween_frame_data.clear()
+        if not keep_pose:
+            self.pose_buffer.clear()
+
+
+@dataclass
+class TweenFrameData:
+    needsCalculation: bool
+    use_direct_attr: bool = False
+    previousValue: Optional[float] = None
+    nextValue: Optional[float] = None
+    currentValue: Optional[float] = None
+    prev_f: Optional[float] = None
+    next_f: Optional[float] = None
+
+
+@dataclass
+class BlendFrameData:
+    original_value: Optional[float] = None
+    use_direct_attr: bool = False
+    previousValue: Optional[float] = None
+    nextValue: Optional[float] = None
+    prevTanType: Optional[str] = None
+    prev_f: Optional[float] = None
+    next_f: Optional[float] = None
+    defaultValue: Optional[float] = None
+    leftValue: Optional[float] = None
+    rightValue: Optional[float] = None
+    leftFrame: Optional[float] = None
+    rightFrame: Optional[float] = None
+    bufferValue: Optional[float] = None
+
+
+def get_block_neighbors(time, target_times_set, all_keys):
+    """Finds the bounding keyframes outside a continuous selection block."""
+    c_time = float(time)
+    if c_time in all_keys:
+        idx = all_keys.index(c_time)
+        left_idx = idx
+        while left_idx > 0 and all_keys[left_idx - 1] in target_times_set:
+            left_idx -= 1
+        p_time = all_keys[left_idx - 1] if left_idx > 0 else all_keys[left_idx]
+        right_idx = idx
+        while right_idx < len(all_keys) - 1 and all_keys[right_idx + 1] in target_times_set:
+            right_idx += 1
+        n_time = all_keys[right_idx + 1] if right_idx < len(all_keys) - 1 else all_keys[right_idx]
+    else:
+        prev_ks = [f for f in all_keys if f < c_time]
+        next_ks = [f for f in all_keys if f > c_time]
+        p_time = prev_ks[-1] if prev_ks else (all_keys[0] if all_keys else c_time)
+        n_time = next_ks[0] if next_ks else (all_keys[-1] if all_keys else c_time)
+    return p_time, n_time
+
+
+def lerp(a, b, t):
+    return a + (b - a) * t
+
+
+def lerp_towards(left, right, t, current):
+    if t < 0.0:
+        return lerp(left, current, t + 1.0)
+    if t > 0.0:
+        return lerp(current, right, t)
+    return current
+
+
+def resolve_keyframe_targets():
+    """Unified entry for resolving attribute plugs and affected times."""
+    plugs, _src, time_range, has_graph_keys = selection_targets.resolve_target_attribute_plugs()
+    if not plugs:
+        return {}, time_range
+
+    curr = cmds.currentTime(q=True)
+    affected = {}
+    tangent_fs = set()
+    if has_graph_keys:
+        tangent_fs = set(float(f) for f in selection_targets.get_graph_editor_selected_tangent_frames())
+
+    for plug in plugs:
+        if has_graph_keys:
+            ks = set(float(t) for t in (cmds.keyframe(plug, q=True, selected=True, timeChange=True) or []))
+            if tangent_fs:
+                ks |= (tangent_fs & set(float(t) for t in (cmds.keyframe(plug, q=True, timeChange=True) or [])))
+            times = sorted(ks) if ks else [curr]
+        elif time_range:
+            times = cmds.keyframe(plug, q=True, time=(time_range[0], time_range[1]), timeChange=True) or [curr]
+        else:
+            times = [curr]
+        affected[plug] = sorted(list(set(times)))
+    return affected, time_range
+
+
+def resolve_curve_targets():
+    """Unified entry for resolving whole curves and affected times."""
+    curves, _src, time_range, has_graph_keys = selection_targets.resolve_target_curves()
+    if not curves:
+        return [], {}, time_range, has_graph_keys
+
+    curr = cmds.currentTime(q=True)
+    times_map = {}
+    for c in curves:
+        if has_graph_keys:
+            ks = cmds.keyframe(c, q=True, selected=True, timeChange=True) or [curr]
+        elif time_range:
+            ks = cmds.keyframe(c, q=True, time=(time_range[0], time_range[1]), timeChange=True) or [curr]
+        else:
+            ks = [curr]
+        times_map[c] = sorted(list(set(float(t) for t in ks)))
+    return curves, times_map, time_range, has_graph_keys
+
+
+
+class SliderSession:
+    """Per-interaction slider state.
+
+    A session owns the caches for one live slider drag or atomic button action.
+    It is finished on release, which closes the undo chunk and clears its data.
+    """
+
+    def __init__(self, mode, title=None, description="", tooltip_template=None):
+        self.mode = mode
+        self.title = title or "Slider Operation"
+        self.description = description
+        self.tooltip_template = tooltip_template
+
+        self.targets = SliderTargetContext()
+        self.cache = SliderCaches()
+        self._is_open = False
+
+    def ensure_undo_open(self):
+        """Lazily open the undo chunk on the first operation."""
+        if self._is_open:
+            return
         chunk_name = toolCommon.make_undo_chunk_name(
-            tool_id=tool_id,
-            title=title or "Slider Operation",
-            description=description,
-            tooltip_template=tooltip_template,
+            tool_id=self.mode,
+            title=self.title,
+            description=self.description,
+            tooltip_template=self.tooltip_template,
         )
         cmds.undoInfo(openChunk=True, chunkName=chunk_name)
-        is_dragging = True
+        self._is_open = True
 
+    def switch_mode(self, mode, title=None, description="", tooltip_template=None):
+        if mode == self.mode:
+            return
+        self.mode = mode
+        self.title = title or self.title
+        self.description = description
+        self.tooltip_template = tooltip_template
+        
+        # If we switch modes mid-session, we keep the undo chunk open
+        # but reset the resolved targets so they are re-calculated for the new mode.
+        self.reset()
 
-def stop_dragging():
-    """Closes the current Maya undo chunk and resets local state."""
-    global is_dragging
-    if is_dragging:
-        _restore_time_slider_range_selection()
-        try:
-            cmds.undoInfo(closeChunk=True)
-        except Exception:
-            pass
-        is_dragging = False
-    reset_session_data()
+    def reset(self):
+        """Clear drag-scoped caches while keeping the undo chunk open."""
+        self.targets.clear()
+        self.cache.clear(keep_pose=True)
 
+    def snapshot_pose_buffer(self, affected_map):
+        """Capture the current pose for modes that need an original-pose target."""
+        self.cache.pose_buffer.clear()
+        for attr_full, times in (affected_map or {}).items():
+            if not cmds.objExists(attr_full):
+                continue
+            for current_time in times:
+                try:
+                    value = cmds.getAttr(attr_full, time=current_time)
+                except Exception:
+                    continue
+                if isinstance(value, (int, float)):
+                    self.cache.pose_buffer[(attr_full, current_time)] = float(value)
 
-def reset_session_data():
-    """Clears stored keyframe data for the current manipulation session."""
-    global original_keyframes, original_values, original_keyframe_values
-    global generated_keyframe_positions, initial_noise_values
-    global is_cached, frame_data_cache, tween_frame_data_cache, preserved_time_range
-
-    original_keyframes = {}
-    original_values = {}
-    original_keyframe_values = {}
-    generated_keyframe_positions.clear()
-    initial_noise_values.clear()
-
-    is_cached = False
-    frame_data_cache = {}
-    tween_frame_data_cache = {}
-    preserved_time_range = None
-
-
-def _playback_slider_name():
-    try:
-        return mel.eval("$tmpVar=$gPlayBackSlider")
-    except Exception:
-        return None
-
-
-def _get_time_slider_range_selection():
-    slider = _playback_slider_name()
-    if not slider:
-        return None
-    try:
-        time_range = cmds.timeControl(slider, q=True, rangeArray=True)
-        current_time = cmds.currentTime(query=True)
-    except Exception:
-        return None
-    if not time_range or len(time_range) < 2:
-        return None
-    if (time_range[1] - time_range[0]) > 1 or (time_range[0] != current_time and time_range[1] != current_time + 1):
-        return tuple(time_range)
-    return None
-
-
-def _restore_time_slider_range_selection():
-    slider = _playback_slider_name()
-    if not slider or not preserved_time_range:
-        return
-    current_range = _get_time_slider_range_selection()
-    if current_range == preserved_time_range:
-        return
-    try:
-        cmds.timeControl(slider, edit=True, rangeArray=preserved_time_range)
-    except Exception:
-        pass
-
-
-def get_target_curves():
-    """
-    Identifies which curves to operate on.
-    Prefers Graph Editor's selectionConnection if graph_editor is True.
-    """
-    curves = cmds.selectionConnection("graphEditor1FromOutliner", query=True, object=True)
-    if curves:
-        return curves
-    # Fallback to general curve selection
-    return cmds.keyframe(query=True, name=True, sl=True) or []
-
-
-def resolve_target_attribute_plugs():
-    if is_dragging:
-        _restore_time_slider_range_selection()
-    return shared_resolve_target_attribute_plugs()
+    def finish(self):
+        """Close the undo chunk and clear all session-owned state."""
+        if self._is_open:
+            try:
+                cmds.undoInfo(closeChunk=True)
+            except Exception:
+                pass
+            self._is_open = False
+        self.targets.clear()
+        self.cache.clear()

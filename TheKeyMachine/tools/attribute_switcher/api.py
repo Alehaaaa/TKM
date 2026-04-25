@@ -13,7 +13,7 @@ from TheKeyMachine.tools.attribute_switcher.common import (
     ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
 )
 from TheKeyMachine.tools.attribute_switcher.customDialogs import AttributeSwitcherWindow
-from TheKeyMachine.widgets import customWidgets as widgets, util
+from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
 
 _attribute_switcher_instance = None
 
@@ -27,7 +27,7 @@ attribute_switcher_window_bus = AttributeSwitcherWindowBus()
 
 
 def _parent_widget():
-    return util.get_maya_qt(qt=QtWidgets.QWidget)
+    return wutil.get_maya_qt(qt=QtWidgets.QWidget)
 
 
 def _emit_attribute_switcher_window_state(is_open):
@@ -48,6 +48,7 @@ def get_attribute_switcher_euler_filter_enabled():
 def emit_attribute_switcher_euler_filter_state():
     try:
         import TheKeyMachine.widgets.sliderWidget as sw
+
         sw.globalSignals.eulerFilterChanged.emit(get_attribute_switcher_euler_filter_enabled())
     except Exception:
         pass
@@ -81,7 +82,7 @@ def bind_attribute_switcher_euler_filter_toggle(widget):
 
     def _sync(enabled):
         try:
-            if not util.is_valid_widget(widget):
+            if not wutil.is_valid_widget(widget):
                 return
         except Exception:
             pass
@@ -100,7 +101,7 @@ def bind_attribute_switcher_euler_filter_toggle(widget):
 def set_attribute_switcher_euler_filter_enabled(enabled):
     settings.set_setting("euler_filter", bool(enabled), namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
     dlg = get_attribute_switcher_window()
-    if dlg and util.is_valid_widget(dlg):
+    if dlg and wutil.is_valid_widget(dlg):
         try:
             dlg.euler_filter = bool(enabled)
         except Exception:
@@ -110,7 +111,7 @@ def set_attribute_switcher_euler_filter_enabled(enabled):
 
 def get_attribute_switcher_window():
     global _attribute_switcher_instance
-    if _attribute_switcher_instance and util.is_valid_widget(_attribute_switcher_instance):
+    if _attribute_switcher_instance and wutil.is_valid_widget(_attribute_switcher_instance):
         return _attribute_switcher_instance
     _attribute_switcher_instance = None
     return None
@@ -123,7 +124,7 @@ def is_attribute_switcher_window_open():
 
 def _get_attribute_switcher_toolbar_button():
     button = getattr(attribute_switcher_toolbar_toggle, "_button", None)
-    if button and util.is_valid_widget(button) and button.isVisible():
+    if button and wutil.is_valid_widget(button) and button.isVisible():
         return button
     return None
 
@@ -131,7 +132,7 @@ def _get_attribute_switcher_toolbar_button():
 def close_attribute_switcher_window():
     global _attribute_switcher_instance
     dlg = get_attribute_switcher_window()
-    if dlg and util.is_valid_widget(dlg):
+    if dlg and wutil.is_valid_widget(dlg):
         dlg.close()
     _attribute_switcher_instance = None
     _emit_attribute_switcher_window_state(False)
@@ -140,13 +141,13 @@ def close_attribute_switcher_window():
 def attribute_switcher_window(reuse_existing=True, popup=True, anchor_to_toolbar=False):
     global _attribute_switcher_instance
     dlg = get_attribute_switcher_window()
-    if reuse_existing and dlg and util.is_valid_widget(dlg):
+    if reuse_existing and dlg and wutil.is_valid_widget(dlg):
         if not dlg.isVisible():
             dlg.show()
         dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, _attribute_switcher_stays_on_top())
         dlg.show()
         if anchor_to_toolbar:
-            dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=util.DPI(18))
+            dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=wutil.DPI(18))
         elif popup:
             dlg.place_near_cursor()
         dlg.raise_()
@@ -160,7 +161,7 @@ def attribute_switcher_window(reuse_existing=True, popup=True, anchor_to_toolbar
     dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, _attribute_switcher_stays_on_top())
     dlg.show()
     if anchor_to_toolbar:
-        dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=util.DPI(18))
+        dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=wutil.DPI(18))
     elif popup:
         dlg.place_near_cursor()
 
@@ -186,14 +187,14 @@ attribute_switcher_toolbar_toggle = ToolbarWindowToggle(
 def restore_attribute_switcher_default_position():
     settings.set_setting(ATTRIBUTE_SWITCHER_GEOMETRY_KEY, None, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
     dlg = get_attribute_switcher_window()
-    if dlg and util.is_valid_widget(dlg):
-        dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=util.DPI(18))
+    if dlg and wutil.is_valid_widget(dlg):
+        dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=wutil.DPI(18))
 
 
 def _set_attribute_switcher_stays_on_top(enabled):
     settings.set_setting(ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY, bool(enabled), namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
     dlg = get_attribute_switcher_window()
-    if dlg and util.is_valid_widget(dlg):
+    if dlg and wutil.is_valid_widget(dlg):
         dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, bool(enabled))
         dlg.show()
         dlg.raise_()

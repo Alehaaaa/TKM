@@ -135,16 +135,16 @@ def command_string(name: str, *args) -> str:
     return "import TheKeyMachine.core as TKM_CORE; TKM_CORE.trigger.invoke({!r}{})".format(name, serialized_args)
 
 
-def execute_slider(prefix: str, mode: str, value: int = 0):
+def execute_slider(prefix: str, mode: str, value: int = 0, session=None):
     """Execute a slider mode directly without a live slider widget."""
     import TheKeyMachine.sliders as sliders
 
     if prefix == "blend":
-        return sliders.execute_curve_modifier(mode, value)
+        return sliders.execute_curve_modifier(mode, value, session=session)
     if prefix == "tween":
-        return sliders.execute_tween(mode, value)
+        return sliders.execute_tween(mode, value, session=session)
     if prefix == "tangent":
-        return sliders.execute_tangent_blend(mode, value)
+        return sliders.execute_tangent_blend(mode, value, session=session)
     raise ValueError("Unknown slider prefix: {}".format(prefix))
 
 

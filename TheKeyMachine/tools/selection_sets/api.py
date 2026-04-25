@@ -9,6 +9,7 @@ except ImportError:
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.settingsMod as settings
+from TheKeyMachine.core import selection_targets
 from TheKeyMachine.tools import colors as toolColors
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
@@ -162,7 +163,7 @@ def _has_any_selection_sets(controller=None):
 
 
 def _can_open_selection_set_creation(show_message=True):
-    if wutil.get_selected_objects():
+    if selection_targets.get_selected_objects():
         return True
     if show_message:
         wutil.make_inViewMessage("Select something first")

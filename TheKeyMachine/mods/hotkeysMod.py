@@ -17,6 +17,7 @@ except ImportError:
     from PySide2 import QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.core.runtime_manager as runtime
+from TheKeyMachine.core import selection_targets
 import TheKeyMachine.core.toolbox as toolbox
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.mods.generalMod as general
@@ -1495,7 +1496,7 @@ def create_TheKeyMachine_hotkeys(*args):
 
 
 def set_smart_key():
-    selected_objects = wutil.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
     if not selected_objects:
         return
     current_time = cmds.currentTime(query=True)

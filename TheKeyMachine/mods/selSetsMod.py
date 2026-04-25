@@ -23,6 +23,7 @@
 
 import maya.cmds as cmds
 import maya.mel as mel
+from TheKeyMachine.core import selection_targets
 import maya.OpenMaya as om
 
 import json
@@ -61,7 +62,7 @@ json_file = os.path.join(user_scripts_folder, "cg_selections_sets_data.json")
 
 
 def set_button_value(button_name):
-    selection = wutil.get_selected_objects()
+    selection = selection_targets.get_selected_objects()
     button_selections = load_button_selections()
     if button_name in button_selections and button_selections[button_name]["locked"]:
         cmds.warning("SelectionSet is locked. Unlock before overwriting")
@@ -111,7 +112,7 @@ def load_button_selections():
 
 def add_button_selection(button_name):
     # Obtener la selección actual en la escena
-    selection = wutil.get_selected_objects()
+    selection = selection_targets.get_selected_objects()
 
     # Cargar el archivo JSON existente o crear uno nuevo si no existe
     button_selections = load_button_selections()
@@ -137,7 +138,7 @@ def add_button_selection(button_name):
 
 def remove_button_selection(button_name):
     # Obtener la selección actual en la escena
-    selection = wutil.get_selected_objects()
+    selection = selection_targets.get_selected_objects()
 
     # Cargar el archivo JSON existente o crear uno nuevo si no existe
     button_selections = load_button_selections()

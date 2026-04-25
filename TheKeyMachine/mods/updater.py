@@ -36,7 +36,7 @@ from TheKeyMachine.mods.generalMod import get_thekeymachine_version
 from TheKeyMachine.widgets.customDialogs import QFlatConfirmDialog, QFlatTooltipConfirm
 
 from TheKeyMachine.mods import mediaMod as media
-import TheKeyMachine.widgets.util as util
+import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.mods.settingsMod as settings
 
 try:
@@ -328,12 +328,12 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
     def handle_result(success, latest_version):
         if not success:
             if warning:
-                util.make_inViewMessage(latest_version)  # latest_version contains error msg here
+                wutil.make_inViewMessage(latest_version)  # latest_version contains error msg here
             return
 
         if latest_version is None:
             if warning:
-                util.make_inViewMessage("<hl>" + installed_version + "</hl>\nYou are up-to-date.")
+                wutil.make_inViewMessage("<hl>" + installed_version + "</hl>\nYou are up-to-date.")
             return
 
         # Update the icon

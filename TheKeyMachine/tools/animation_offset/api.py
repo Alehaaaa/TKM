@@ -8,11 +8,11 @@ except Exception:
     from shiboken2 import isValid
 
 import TheKeyMachine.core.runtime_manager as runtime
+from TheKeyMachine.core import selection_targets
 import TheKeyMachine.mods.mediaMod as media
 from TheKeyMachine.tools import colors as toolColors
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.timeline as timelineWidgets
-from TheKeyMachine.widgets import util as wutil
 
 
 SUPPORTED_ATTR_TYPES = {
@@ -64,7 +64,7 @@ class AnimationOffsetController(QtCore.QObject):
         return self._enabled
 
     def _selection(self):
-        return wutil.get_selected_objects(long=True)
+        return selection_targets.get_selected_objects(long=True)
 
     def _selection_signature_value(self, selection=None):
         if selection is None:
@@ -75,10 +75,10 @@ class AnimationOffsetController(QtCore.QObject):
         return int(cmds.currentTime(query=True))
 
     def _resolve_locked_time_range(self):
-        graph_range = timelineWidgets.get_graph_editor_selected_range()
+        graph_range = selection_targets.get_graph_editor_selected_range()
         if graph_range:
             return graph_range
-        selected_range = timelineWidgets.get_selected_time_slider_range()
+        selected_range = selection_targets.get_selected_time_slider_range()
         if selected_range:
             return selected_range
         return timelineWidgets.get_playback_range()
@@ -110,14 +110,7 @@ class AnimationOffsetController(QtCore.QObject):
             buttons = app.mouseButtons()
         except Exception:
             return False
-        return bool(
-            buttons
-            & (
-                QtCore.Qt.LeftButton
-                | QtCore.Qt.MiddleButton
-                | QtCore.Qt.RightButton
-            )
-        )
+        return bool(buttons & (QtCore.Qt.LeftButton | QtCore.Qt.MiddleButton | QtCore.Qt.RightButton))
 
     def _is_manip_edit_active(self):
         return self._is_manip_context() and self._mouse_buttons_down()
@@ -233,13 +226,16 @@ class AnimationOffsetController(QtCore.QObject):
             return {}
 
         try:
-            keyframes = cmds.keyframe(
-                obj,
-                attribute=attr,
-                query=True,
-                time=(self._time_range[0], self._time_range[1]),
-                timeChange=True,
-            ) or []
+            keyframes = (
+                cmds.keyframe(
+                    obj,
+                    attribute=attr,
+                    query=True,
+                    time=(self._time_range[0], self._time_range[1]),
+                    timeChange=True,
+                )
+                or []
+            )
         except Exception:
             return {}
 
@@ -326,13 +322,16 @@ class AnimationOffsetController(QtCore.QObject):
     def _ensure_driver_key(self, obj, attr, current_value):
         current_time = self._current_time()
         try:
-            current_keys = cmds.keyframe(
-                obj,
-                attribute=attr,
-                query=True,
-                time=(current_time, current_time),
-                timeChange=True,
-            ) or []
+            current_keys = (
+                cmds.keyframe(
+                    obj,
+                    attribute=attr,
+                    query=True,
+                    time=(current_time, current_time),
+                    timeChange=True,
+                )
+                or []
+            )
         except Exception:
             current_keys = []
 
@@ -383,9 +382,7 @@ class AnimationOffsetController(QtCore.QObject):
 
                 keyed_values = dict(baseline_data.get("keys") or {})
                 other_frames = [
-                    frame
-                    for frame in keyed_values.keys()
-                    if self._time_range[0] <= frame <= self._time_range[1] and frame != current_time
+                    frame for frame in keyed_values.keys() if self._time_range[0] <= frame <= self._time_range[1] and frame != current_time
                 ]
 
                 for frame in sorted(other_frames):
@@ -450,7 +447,7 @@ class AnimationOffsetController(QtCore.QObject):
         locked_range = self._resolve_locked_time_range()
         if locked_range:
             self._time_range = locked_range
-        cmds.select(wutil.get_selected_objects())
+        cmds.select(selection_targets.get_selected_objects())
         self._connect_runtime_manager()
         self._resnapshot(update_range=self._time_range is None)
         timelineWidgets.show_timeline_tint(
@@ -469,7 +466,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._enabled = False
         self._disconnect_runtime_manager()
         self._poll_timer.stop()
-        timelineWidgets.clear_timeline_tint(self._tint_key)
+        runtime.get_runtime_manager().clear_managed_widget(self._tint_key)
         self._state = "idle"
         self._selection_signature = ()
         self._baseline = {}

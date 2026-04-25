@@ -46,7 +46,7 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.widgets.customDialogs as customDialogs
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.widgets.timeline as timelineWidgets
-import TheKeyMachine.widgets.util as util
+import TheKeyMachine.widgets.util as wutil
 from TheKeyMachine.core import selection_targets
 from TheKeyMachine.tools import common as toolCommon
 
@@ -181,7 +181,7 @@ def delete_animation():
 
 
 def createLocator():
-    selection = util.get_selected_objects()
+    selection = selection_targets.get_selected_objects()
     if selection:
         # Verificar si el grupo 'TheKeyMachine' existe, si no, crearlo
         if not cmds.objExists("TheKeyMachine"):
@@ -263,7 +263,7 @@ def get_graph_editor_selected_keyframes():
     if not anim_curves:
         return []
 
-    selected_frames = set(timelineWidgets.get_graph_editor_selected_frames())
+    selected_frames = set(selection_targets.get_graph_editor_selected_frames())
     keyframes = []
     for curve in anim_curves:
         curve_frames = cmds.keyframe(curve, q=True, selected=True) or []
@@ -336,7 +336,7 @@ def _collect_target_curves(target_info):
 
 
 def _resolve_tangent_target_info():
-    target_objects = util.get_selected_objects(orderedSelection=True, long=False)
+    target_objects = selection_targets.get_selected_objects(orderedSelection=True, long=False)
     selected_channels = selection_targets.get_selected_channels() or []
 
     target_plugs = []
@@ -390,11 +390,7 @@ def _resolve_tangent_time_context(key_scope):
 
 
 def _filter_tangent_targets_by_scope(targets, key_scope):
-    scoped_targets = {
-        curve: list(frames or [])
-        for curve, frames in (targets or {}).items()
-        if frames
-    }
+    scoped_targets = {curve: list(frames or []) for curve, frames in (targets or {}).items() if frames}
     if not scoped_targets:
         return {}
 
@@ -406,11 +402,7 @@ def _filter_tangent_targets_by_scope(targets, key_scope):
         return {}
 
     target_frame = all_frames[0] if key_scope == "first" else all_frames[-1]
-    return {
-        curve: [target_frame]
-        for curve, frames in scoped_targets.items()
-        if target_frame in frames
-    }
+    return {curve: [target_frame] for curve, frames in scoped_targets.items() if target_frame in frames}
 
 
 def _collect_tangent_targets(key_scope="selection"):
@@ -427,11 +419,7 @@ def _collect_tangent_targets(key_scope="selection"):
         frames_by_curve = {}
         for curve, frame in selected_keyframes:
             frames_by_curve.setdefault(curve, set()).add(int(frame))
-        return _filter_tangent_targets_by_scope({
-            curve: sorted(frames)
-            for curve, frames in frames_by_curve.items()
-            if frames
-        }, key_scope)
+        return _filter_tangent_targets_by_scope({curve: sorted(frames) for curve, frames in frames_by_curve.items() if frames}, key_scope)
 
     curves = _collect_target_curves(target_info)
     targets = {}
@@ -453,11 +441,11 @@ def setTangent(tangent_type, handle_mode="both", key_scope="selection", tint_col
     time_context = _resolve_tangent_time_context(key_scope)
     targets = _collect_tangent_targets(key_scope=key_scope)
     if not targets:
-        return util.make_inViewMessage("No animation curves available to set tangents.")
+        return wutil.make_inViewMessage("No animation curves available to set tangents.")
 
     timerange = time_context.timerange if key_scope == "all" else (_tangent_target_range(targets) or time_context.timerange)
     if not timerange:
-        return util.make_inViewMessage("No animation keys available to set tangents.")
+        return wutil.make_inViewMessage("No animation keys available to set tangents.")
 
     tint_session = timelineWidgets.begin_timeline_tint(
         timerange=timerange,
@@ -499,11 +487,11 @@ def build_tangent_menu(menu, tangent_type, tangent_label, icon_path=None, source
 
 def align_selected_objects(*args, pos=True, rot=True, scl=False):
     # Obtener los objetos seleccionados
-    sel = util.get_selected_objects()
+    sel = selection_targets.get_selected_objects()
 
     # Asegurarse de que hay al menos dos objetos seleccionados
     if len(sel) < 2:
-        return util.make_inViewMessage("Select at least two objects")
+        return wutil.make_inViewMessage("Select at least two objects")
 
     # Obtener el objeto destino (último objeto en la lista de selección)
     target_obj = sel[-1]
@@ -597,10 +585,10 @@ def isolate_master():
     down_one_level = down_one_level_var
 
     # Guardar la selección actual
-    current_selection = util.get_selected_objects()
+    current_selection = selection_targets.get_selected_objects()
 
     # Obtener los objetos actualmente seleccionados
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
     currentPanel = cmds.getPanel(wf=True)
     if not currentPanel or cmds.getPanel(typeOf=currentPanel) != "modelPanel":
         visible_model_panels = cmds.getPanel(visiblePanels=True) or []
@@ -782,7 +770,7 @@ def select_curves_with_ctrl(obj):
 
 def selectHierarchy():
     # Obtener la selección actual
-    selection = util.get_selected_objects()
+    selection = selection_targets.get_selected_objects()
 
     if selection:
         for obj in selection:
@@ -793,7 +781,7 @@ def selectHierarchy():
 
 
 def create_temp_pivot(use_saved_position=False, *args):
-    seleccion = util.get_selected_objects()
+    seleccion = selection_targets.get_selected_objects()
 
     if not seleccion:
         return
@@ -808,10 +796,10 @@ def create_temp_pivot(use_saved_position=False, *args):
 
         matrix_file_path = general.get_temp_pivot_data_file()
 
-        seleccion = util.get_selected_objects()
+        seleccion = selection_targets.get_selected_objects()
 
         if not seleccion:
-            return util.make_inViewMessage("Select at least one object")
+            return wutil.make_inViewMessage("Select at least one object")
 
         general.create_TheKeyMachine_node()
 
@@ -906,9 +894,9 @@ def create_temp_pivot(use_saved_position=False, *args):
         temp_pivot_obj = temp_pivot_relative_data.get("temp_pivot_obj")
         follow_temp_pivot_objs = temp_pivot_relative_data.get("follow_temp_pivot_objs", {})
 
-        seleccion = util.get_selected_objects()
+        seleccion = selection_targets.get_selected_objects()
         if not seleccion:
-            return util.make_inViewMessage("Select at least one object")
+            return wutil.make_inViewMessage("Select at least one object")
 
         if temp_pivot_obj in seleccion:
             follow_objs = list(follow_temp_pivot_objs.keys())
@@ -944,7 +932,9 @@ def create_temp_pivot(use_saved_position=False, *args):
         manager.disconnect_callbacks(TEMP_PIVOT_RUNTIME_KEY)
 
         temp_pivot_obj_name = "tkm_temp_pivot"
-        attribute_cb = manager.add_node_attribute_changed_callback(temp_pivot_obj_name, attribute_callback_function, key=TEMP_PIVOT_RUNTIME_KEY)
+        attribute_cb = manager.add_node_attribute_changed_callback(
+            temp_pivot_obj_name, attribute_callback_function, key=TEMP_PIVOT_RUNTIME_KEY
+        )
         time_cb = manager.connect_signal(manager.time_changed, time_callback_function, key=TEMP_PIVOT_RUNTIME_KEY, unique=False)
         if attribute_cb is None or not time_cb:
             manager.disconnect_callbacks(TEMP_PIVOT_RUNTIME_KEY)
@@ -1140,7 +1130,7 @@ def worldspace_copy_animation(*args):
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
         # Restaurar el tiempo actual a su estado original
         cmds.currentTime(original_time)
-        util.make_inViewMessage("World Space animation copied")
+        wutil.make_inViewMessage("World Space animation copied")
 
 
 # -------------------- Copy range World Space
@@ -1240,14 +1230,14 @@ def copy_range_worldspace_animation(*args):
         # Restaurar el tiempo actual a su estado original
         keyTools.clear_timeslider_selection()
         cmds.currentTime(original_time)
-        util.make_inViewMessage("World Space animation copied")
+        wutil.make_inViewMessage("World Space animation copied")
 
 
 # ............. copy single frame World Space
 
 
 def copy_worldspace_single_frame(*args):
-    selected_objects = util.get_selected_objects(orderedSelection=True)
+    selected_objects = selection_targets.get_selected_objects(orderedSelection=True)
     if not selected_objects:
         return
 
@@ -1282,7 +1272,7 @@ def copy_worldspace_single_frame(*args):
         with open(worldspace_anim_data_file, "w") as json_file:
             json.dump(payload, json_file)
 
-        util.make_inViewMessage("World Space values for current frame copied")
+        wutil.make_inViewMessage("World Space values for current frame copied")
     finally:
         tint_session.finish()
 
@@ -1318,7 +1308,7 @@ def paste_worldspace_single_frame(*args):
 
         ordered_sources = [obj for obj in ordered_sources if obj in animation_data]
         if not ordered_sources:
-            return util.make_inViewMessage("No World Space data found")
+            return wutil.make_inViewMessage("No World Space data found")
 
         frame_range = timelineWidgets.get_animation_data_timerange(
             {obj_name: {"frames": list((animation_data.get(obj_name) or {}).keys())} for obj_name in ordered_sources},
@@ -1331,21 +1321,21 @@ def paste_worldspace_single_frame(*args):
                 key="worldspace_paste_single_frame",
             )
 
-        target_objects = util.get_selected_objects(orderedSelection=True)
+        target_objects = selection_targets.get_selected_objects(orderedSelection=True)
 
         # No selection: paste back to the originally copied objects (if they still exist)
         if not target_objects:
             target_objects = ordered_sources
             missing = [obj for obj in target_objects if not cmds.objExists(obj)]
             if missing:
-                return util.make_inViewMessage(selection_mismatch_message)
+                return wutil.make_inViewMessage(selection_mismatch_message)
 
         source_count = len(ordered_sources)
         target_count = len(target_objects)
 
         # Multi-source pastes require matching selection size
         if source_count > 1 and target_count != source_count:
-            return util.make_inViewMessage(selection_mismatch_message)
+            return wutil.make_inViewMessage(selection_mismatch_message)
 
         def _first_frame_values(obj_name):
             obj_data = animation_data.get(obj_name) or {}
@@ -1358,7 +1348,7 @@ def paste_worldspace_single_frame(*args):
         if source_count == 1:
             values = _first_frame_values(ordered_sources[0])
             if not values:
-                return util.make_inViewMessage("No World Space data found")
+                return wutil.make_inViewMessage("No World Space data found")
             for obj in target_objects:
                 if cmds.objExists(obj):
                     cmds.xform(obj, translation=values[:3], worldSpace=True)
@@ -1370,7 +1360,7 @@ def paste_worldspace_single_frame(*args):
             source_obj = ordered_sources[idx]
             values = _first_frame_values(source_obj)
             if not values:
-                return util.make_inViewMessage("No World Space data found")
+                return wutil.make_inViewMessage("No World Space data found")
             if cmds.objExists(target_obj):
                 cmds.xform(target_obj, translation=values[:3], worldSpace=True)
                 cmds.xform(target_obj, rotation=values[3:], worldSpace=True)
@@ -1394,7 +1384,7 @@ def paste_worldspace_single_frame(*args):
 #     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
 
 #     if not os.path.exists(worldspace_anim_data_file):
-#         return util.make_inViewMessage("No World Space animation data found")
+#         return wutil.make_inViewMessage("No World Space animation data found")
 
 #     with open(worldspace_anim_data_file, "r") as json_file:
 #         payload = json.load(json_file)
@@ -1468,7 +1458,7 @@ def worldspace_paste_animation(*args):
     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
     try:
         if not os.path.exists(worldspace_anim_data_file):
-            return util.make_inViewMessage("No World Space animation data found")
+            return wutil.make_inViewMessage("No World Space animation data found")
 
         with open(worldspace_anim_data_file, "r") as json_file:
             payload = json.load(json_file)
@@ -1484,23 +1474,23 @@ def worldspace_paste_animation(*args):
 
         ordered_sources = [obj for obj in ordered_sources if obj in animation_data]
         if not ordered_sources:
-            return util.make_inViewMessage("No World Space animation data found")
+            return wutil.make_inViewMessage("No World Space animation data found")
 
-        target_objects = util.get_selected_objects(orderedSelection=True)
+        target_objects = selection_targets.get_selected_objects(orderedSelection=True)
 
         # No selection: paste back to the originally copied objects (if they still exist)
         if not target_objects:
             target_objects = ordered_sources
             missing = [obj for obj in target_objects if not cmds.objExists(obj)]
             if missing:
-                return util.make_inViewMessage(selection_mismatch_message)
+                return wutil.make_inViewMessage(selection_mismatch_message)
 
         source_count = len(ordered_sources)
         target_count = len(target_objects)
 
         # Multi-source pastes require matching selection size
         if source_count > 1 and target_count != source_count:
-            return util.make_inViewMessage(selection_mismatch_message)
+            return wutil.make_inViewMessage(selection_mismatch_message)
 
         # Map source data -> target objects (preserve order)
         if source_count == 1:
@@ -1528,7 +1518,7 @@ def worldspace_paste_animation(*args):
 
         paste_range = timelineWidgets.get_animation_data_timerange(mapped_animation_data, frame_key="frames")
         if not paste_range:
-            return util.make_inViewMessage("No World Space animation data found")
+            return wutil.make_inViewMessage("No World Space animation data found")
 
         tint_session = timelineWidgets.begin_timeline_tint(
             timerange=paste_range,
@@ -1612,11 +1602,11 @@ def mod_tracer(*args):
 
 
 def create_tracer(*args):
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
 
     # Verificar si hay exactamente un objeto seleccionado.
     if len(selected_objects) != 1:
-        return util.make_inViewMessage("Select only one object")
+        return wutil.make_inViewMessage("Select only one object")
 
     # Verifica o crea el grupo 'TheKeyMachine'
     if not cmds.objExists("TheKeyMachine"):
@@ -1626,7 +1616,7 @@ def create_tracer(*args):
     if cmds.objExists("TKM_Tracer"):
         cmds.delete("TKM_Tracer")
 
-    selected_objects_start = util.get_selected_objects()
+    selected_objects_start = selection_targets.get_selected_objects()
     cmds.createNode("transform", name="TKM_Tracer")
     cmds.parent("TKM_Tracer", "TheKeyMachine")
 
@@ -1636,10 +1626,10 @@ def create_tracer(*args):
 
     cmds.select(selected_objects_start)
 
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
 
     if not selected_objects:
-        return util.make_inViewMessage("Select an object to trace")
+        return wutil.make_inViewMessage("Select an object to trace")
 
     if cmds.objExists("tracerHandle"):
         cmds.delete("tracerHandle")
@@ -1669,7 +1659,7 @@ def remove_tracer_node(*args):
 
 def tracer_connected(connected=False, update_cb=None, *args):
     if not cmds.objExists("tracerHandle"):
-        return util.make_inViewMessage("No tracer node in the scene")
+        return wutil.make_inViewMessage("No tracer node in the scene")
 
     is_connected = cmds.isConnected("tracer.points", "tracerHandleShape.points")
 
@@ -1694,7 +1684,7 @@ def tracer_update_checkbox(value):
 
 def tracer_refresh(*args):
     if not cmds.objExists("tracerHandle"):
-        return util.make_inViewMessage("No tracer node in the scene")
+        return wutil.make_inViewMessage("No tracer node in the scene")
     else:
         is_connected = cmds.isConnected("tracer.points", "tracerHandleShape.points")
         if not is_connected:
@@ -1741,14 +1731,14 @@ def create_follow_cam(translation=True, rotation=True, *args):
     global followCam_original_camera
 
     # Obtén el objeto seleccionado en la escena
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
 
     # Verifica si existe el grupo "TheKeyMachine"
     if not cmds.objExists("TheKeyMachine"):
         general.create_TheKeyMachine_node()
 
     if not selected_objects:
-        return util.make_inViewMessage("Select at least one object")
+        return wutil.make_inViewMessage("Select at least one object")
 
     target_object = selected_objects[0]
 
@@ -1816,7 +1806,7 @@ def remove_followCam(*args):
         print(followCam_original_camera)
         cmds.lookThru(panel, followCam_original_camera)
     else:
-        util.make_inViewMessage("No followCam in the scene")
+        wutil.make_inViewMessage("No followCam in the scene")
 
 
 # ________________________SELECTOR______________
@@ -1824,7 +1814,7 @@ def remove_followCam(*args):
 
 def selector_window(*args):
     # Check if anything is selected first
-    if not util.get_selected_objects():
+    if not selection_targets.get_selected_objects():
         return
 
     # Search for an existing instance of the selector window
@@ -1847,7 +1837,7 @@ def select_objects_from_list(list_name, *args):
 
 
 def reload_selected_objects(list_name, *args):
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
     sorted_objects = sorted(selected_objects)
 
     # Borrar los elementos actuales en la lista
@@ -1874,7 +1864,7 @@ def select_rig_controls(*args):
                 curves += find_curves(child)
         return curves
 
-    selected = util.get_selected_objects(long=True)
+    selected = selection_targets.get_selected_objects(long=True)
 
     if not selected:
         return
@@ -1973,7 +1963,7 @@ def select_rig_controls_animated(*args):
         cache[node] = False
         return False
 
-    selected = util.get_selected_objects(long=True)
+    selected = selection_targets.get_selected_objects(long=True)
 
     if not selected:
         return
@@ -2108,7 +2098,7 @@ class DepthControlDragger(MouseDragger):
             om.MGlobal.displayWarning("No camera found.")
             return
 
-        sel = util.get_selected_objects()
+        sel = selection_targets.get_selected_objects()
         if not sel:
             om.MGlobal.displayWarning("Please select an object.")
             return
@@ -2167,16 +2157,16 @@ def gimbal_fixer_window(*args):
 
     main_window = gimbal_fixer_build()
 
-    if util.get_selected_objects():  # Verifica si hay una selección
+    if selection_targets.get_selected_objects():  # Verifica si hay una selección
         update_rotation_order(main_window)  # Ejecuta el botón "Reload"
     else:
-        util.make_inViewMessage("Select a control and reload")
+        wutil.make_inViewMessage("Select a control and reload")
 
 
 def update_rotation_order(window):
-    sel = util.get_selected_objects()
+    sel = selection_targets.get_selected_objects()
     if not sel:
-        return util.make_inViewMessage("Select a control")
+        return wutil.make_inViewMessage("Select a control")
 
     current_rotate_order = cmds.getAttr(f"{sel[0]}.rotateOrder")
     current_rotate_order_text = ROTATE_ORDERS[current_rotate_order]
@@ -2283,7 +2273,7 @@ def convert_rotation_order(rot_order="zxy"):
         om.MGlobal.displayWarning("Wrong rotation order " + str(rot_order))
         return
 
-    sel = util.get_selected_objects()
+    sel = selection_targets.get_selected_objects()
 
     if not sel:
         om.MGlobal.displayWarning("Please select a control.")
@@ -2339,7 +2329,7 @@ def convert_rotation_order(rot_order="zxy"):
 
 
 def gimbal_fixer_build():
-    screen_width, screen_height = util.get_screen_resolution()
+    screen_width, screen_height = wutil.get_screen_resolution()
     screen_width = screen_width
 
     # 4K fix
@@ -2394,7 +2384,7 @@ def gimbal_fixer_build():
     def mouseReleaseEvent(event):
         drag["active"] = False
 
-    parent = util.get_maya_qt(qt=QtWidgets.QWidget)
+    parent = wutil.get_maya_qt(qt=QtWidgets.QWidget)
     window = QtWidgets.QWidget(parent, QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
 
     window.resize(win_h, win_w)
@@ -2733,7 +2723,7 @@ def micro_move_pre_drag(*args):
     toolCommon.open_undo_chunk(tool_id="micro_move")
     _set_micro_cursor(pinched=True)
 
-    micro_move_selected_objects = util.get_selected_objects()
+    micro_move_selected_objects = selection_targets.get_selected_objects()
     if not micro_move_selected_objects:
         raise Exception("Please select an object")
     original_selection = list(micro_move_selected_objects)
@@ -2893,7 +2883,7 @@ def micro_rotate_pack_funtion():
             om.MMessage.removeCallback(id)
         micro_rotate_callback_ids = []  # Limpiar la lista después de eliminar los callbacks
 
-    micro_rotate_selected_objects = util.get_selected_objects()
+    micro_rotate_selected_objects = selection_targets.get_selected_objects()
     original_selection = list(micro_rotate_selected_objects)
     helpers_group = _ensure_micro_move_helpers_group()
 

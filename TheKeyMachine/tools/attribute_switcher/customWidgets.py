@@ -7,7 +7,6 @@ from TheKeyMachine.tools import common as toolCommon
 
 try:
     PYSIDE_VERSION = 6
-    from PySide6 import QtCore, QtGui  # type: ignore
     from PySide6.QtWidgets import (  # type: ignore
         QWidget,
         QHBoxLayout,
@@ -38,11 +37,9 @@ try:
         QPoint,
         QTimer,
         QSize,
-        QRectF,
     )
 except ImportError:
     PYSIDE_VERSION = 2
-    from PySide2 import QtCore, QtGui
     from PySide2.QtWidgets import (
         QWidget,
         QHBoxLayout,
@@ -67,9 +64,10 @@ except ImportError:
         QGuiApplication,
         QBrush,
     )
-    from PySide2.QtCore import Qt, QPointF, QPoint, QTimer, QSize, QRectF
+    from PySide2.QtCore import Qt, QPointF, QPoint, QTimer, QSize
 
 import TheKeyMachine.core.runtime_manager as runtime
+from TheKeyMachine.core import selection_targets
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
 from TheKeyMachine.tools.attribute_switcher.common import (
@@ -95,7 +93,7 @@ import TheKeyMachine.mods.mediaMod as media
 from TheKeyMachine.widgets import customDialogs as cd
 from TheKeyMachine.widgets import customWidgets as cw
 from TheKeyMachine.widgets import timeline as timelineWidgets
-from TheKeyMachine.widgets import util
+from TheKeyMachine.widgets import util as wutil
 
 
 class Grip(QSizeGrip):
@@ -119,14 +117,15 @@ class Grip(QSizeGrip):
             self._parent_widget.showBottomBar()
         self._start_geom = None
 
+
 class FloatingWidget(cd.QFlatDialog):
     """
     A draggable, frameless, rounded widget wrapper.
     Can be instantiated as a temporary popup or a pinned window.
     """
 
-    BORDER_RADIUS = util.DPI(5)
-    AUTO_CLOSE_DIST = util.DPI(10)
+    BORDER_RADIUS = wutil.DPI(5)
+    AUTO_CLOSE_DIST = wutil.DPI(10)
     AUTO_CLOSE_PERIOD_MS = 300
     TEXT_COLOR = COLOR_TEXT_SECONDARY
 
@@ -181,13 +180,18 @@ class FloatingWidget(cd.QFlatDialog):
     def _is_cursor_within_bounds(self):
         """Geometric intersection check for the main widget and its active sub-popups."""
         cursor_pos = QCursor.pos()
-        if not util.is_valid_widget(self):
+        if not wutil.is_valid_widget(self):
             return False
 
         if self.frameGeometry().contains(cursor_pos):
             return True
 
-        if hasattr(self, "_active_popup") and self._active_popup and util.is_valid_widget(self._active_popup) and self._active_popup.isVisible():
+        if (
+            hasattr(self, "_active_popup")
+            and self._active_popup
+            and wutil.is_valid_widget(self._active_popup)
+            and self._active_popup.isVisible()
+        ):
             if self._active_popup.frameGeometry().contains(cursor_pos):
                 return True
         return False
@@ -195,7 +199,7 @@ class FloatingWidget(cd.QFlatDialog):
     def _setup_ui(self):
         self.mainContent = QWidget(self)
         self.mainLayout = QVBoxLayout(self.mainContent)
-        self.mainLayout.setContentsMargins(util.DPI(6), util.DPI(8), util.DPI(6), util.DPI(8))
+        self.mainLayout.setContentsMargins(wutil.DPI(6), wutil.DPI(8), wutil.DPI(6), wutil.DPI(8))
         self.mainLayout.setSpacing(2)
 
         self.root_layout.insertWidget(0, self.mainContent, 1)
@@ -283,7 +287,7 @@ class FloatingWidget(cd.QFlatDialog):
 
             # Check if we moved enough to convert to "show mode" (persistent window)
             drag_dist = (global_position - self._drag_start_pos).manhattanLength()
-            if drag_dist > util.DPI(10):
+            if drag_dist > wutil.DPI(10):
                 self.showBottomBar()
             elif self._auto_close_active is False:
                 # Resume tracking after small click/drag
@@ -325,15 +329,15 @@ class PillSlider(QWidget):
     A custom pill-shaped slider for numeric attributes.
     """
 
-    HEIGHT = util.DPI(32)
-    HANDLE_RADIUS = util.DPI(13)
+    HEIGHT = wutil.DPI(32)
+    HANDLE_RADIUS = wutil.DPI(13)
 
     SNAP_POINTS = [0.0, 0.5, 1.0]
     SNAP_THRESHOLD = 0.06
 
     def __init__(self, value, min_val, max_val, callback, parent=None):
         QWidget.__init__(self, parent)
-        self.setFixedSize(util.DPI(140), self.HEIGHT)
+        self.setFixedSize(wutil.DPI(140), self.HEIGHT)
         self.value = float(value)
         self.min_val = float(min_val)
         self.max_val = float(max_val)
@@ -448,12 +452,12 @@ class AttributePopup(QWidget):
                 background-color: {};
                 border-radius: {}px;
             }}
-        """.format(COLOR_BG_POPUP, util.DPI(8))
+        """.format(COLOR_BG_POPUP, wutil.DPI(8))
         )
 
         self.content_layout = QVBoxLayout(self.main_frame)
-        self.content_layout.setContentsMargins(util.DPI(20), util.DPI(10), util.DPI(18), util.DPI(16))
-        self.content_layout.setSpacing(util.DPI(1))
+        self.content_layout.setContentsMargins(wutil.DPI(20), wutil.DPI(10), wutil.DPI(18), wutil.DPI(16))
+        self.content_layout.setSpacing(wutil.DPI(1))
 
         if self.is_enum:
             self._build_enum_ui()
@@ -463,7 +467,7 @@ class AttributePopup(QWidget):
         # Finalize structure and size
         self.adjustSize()
         self.outer_layout = QVBoxLayout(self)
-        self.outer_layout.setContentsMargins(util.DPI(10), 0, 0, 0)
+        self.outer_layout.setContentsMargins(wutil.DPI(10), 0, 0, 0)
         self.outer_layout.addWidget(self.main_frame)
 
     def _build_enum_ui(self):
@@ -501,13 +505,13 @@ class AttributePopup(QWidget):
 
             # Extra visual grouping for rotation orders (3+3)
             if is_rr and i == 2:
-                self.content_layout.addSpacing(util.DPI(5))
+                self.content_layout.addSpacing(wutil.DPI(5))
 
     def _create_title(self, text):
         title = QLabel(text)
-        title.setContentsMargins(0, 0, 0, util.DPI(4))
+        title.setContentsMargins(0, 0, 0, wutil.DPI(4))
         title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        title.setStyleSheet("color: {}; font-size: {}px;".format(COLOR_TEXT_SECONDARY, util.DPI(11)))
+        title.setStyleSheet("color: {}; font-size: {}px;".format(COLOR_TEXT_SECONDARY, wutil.DPI(11)))
         return title
 
     def _add_separator(self):
@@ -515,9 +519,9 @@ class AttributePopup(QWidget):
         line.setFrameShape(QFrame.HLine)
         line.setFixedHeight(1)
         line.setStyleSheet("background-color: {};".format(COLOR_BG_TRACK))
-        self.content_layout.addSpacing(util.DPI(10))
+        self.content_layout.addSpacing(wutil.DPI(10))
         self.content_layout.addWidget(line)
-        self.content_layout.addSpacing(util.DPI(10))
+        self.content_layout.addSpacing(wutil.DPI(10))
 
     def _add_slider_section(self, title_text, is_all):
         """Creates a section with a title and a PillSlider."""
@@ -532,7 +536,7 @@ class AttributePopup(QWidget):
         btn = QPushButton(text)
         btn.setFlat(True)
         btn.setCursor(Qt.PointingHandCursor)
-        btn.setMinimumWidth(util.DPI(60))
+        btn.setMinimumWidth(wutil.DPI(60))
         btn.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
 
         # Style with design tokens
@@ -552,17 +556,17 @@ class AttributePopup(QWidget):
                 background-color: {6};
                 color: {1};
             }}
-        """.format(COLOR_ACCENT_HOVER, COLOR_ACCENT_DARK, util.DPI(8), util.DPI(18), util.DPI(6), util.DPI(11), COLOR_ACCENT_MAIN)
+        """.format(COLOR_ACCENT_HOVER, COLOR_ACCENT_DARK, wutil.DPI(8), wutil.DPI(18), wutil.DPI(6), wutil.DPI(11), COLOR_ACCENT_MAIN)
         )
 
         # Sync indicator dot
         dot_layout = QHBoxLayout(btn)
-        dot_layout.setContentsMargins(0, 0, util.DPI(6), 0)
+        dot_layout.setContentsMargins(0, 0, wutil.DPI(6), 0)
         dot_layout.addStretch()
 
         dot = QWidget()
         dot.setAttribute(Qt.WA_TransparentForMouseEvents)
-        dot_size = util.DPI(10)
+        dot_size = wutil.DPI(10)
         dot.setFixedSize(dot_size, dot_size)
 
         is_keyed = index in self.marked_indices
@@ -585,8 +589,8 @@ class AttributePopup(QWidget):
         painter.setPen(Qt.NoPen)
         painter.setBrush(QColor(COLOR_BG_POPUP))
 
-        arrow_w = util.DPI(10)
-        arrow_h = util.DPI(15)
+        arrow_w = wutil.DPI(10)
+        arrow_h = wutil.DPI(15)
 
         side = getattr(self, "side", "right")
         arrow_y = getattr(self, "arrow_y", self.height() / 2)
@@ -665,16 +669,16 @@ class AttributePopup(QWidget):
 
         # Ensure it doesn't go off screen vertically
         if y + h > geo.bottom():
-            y = geo.bottom() - h - util.DPI(5)
+            y = geo.bottom() - h - wutil.DPI(5)
         if y < geo.top():
-            y = geo.top() + util.DPI(5)
+            y = geo.top() + wutil.DPI(5)
 
         pos.setY(y)
         # Store local y for the arrow tip to keep pointing at the target
         self.arrow_y = target_y_global - y
 
         # Update margins based on which side the arrow is on
-        arrow_w = util.DPI(10)
+        arrow_w = wutil.DPI(10)
         if self.side == "right":
             self.outer_layout.setContentsMargins(arrow_w, 0, 0, 0)
         else:
@@ -718,29 +722,29 @@ class AttributeItem(QWidget):
 
     def _setup_ui(self):
         self.main_layout = QHBoxLayout(self)
-        self.main_layout.setContentsMargins(util.DPI(6), util.DPI(6), util.DPI(6), util.DPI(6))
-        self.main_layout.setSpacing(util.DPI(6))
+        self.main_layout.setContentsMargins(wutil.DPI(6), wutil.DPI(6), wutil.DPI(6), wutil.DPI(6))
+        self.main_layout.setSpacing(wutil.DPI(6))
 
         self.name_label = QLabel(self.label_text, self)
-        self.name_label.setStyleSheet("color: {}; font-size: {}px;".format(COLOR_TEXT_MAIN, util.DPI(11)))
+        self.name_label.setStyleSheet("color: {}; font-size: {}px;".format(COLOR_TEXT_MAIN, wutil.DPI(11)))
         self.name_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.pill_container = QWidget(self)
-        self.pill_container.setFixedSize(util.DPI(60), util.DPI(16))
+        self.pill_container.setFixedSize(wutil.DPI(60), wutil.DPI(16))
         self.pill_layout = QHBoxLayout(self.pill_container)
-        self.pill_layout.setContentsMargins(util.DPI(2), 0, util.DPI(2), 0)
-        self.pill_layout.setSpacing(util.DPI(2))
+        self.pill_layout.setContentsMargins(wutil.DPI(2), 0, wutil.DPI(2), 0)
+        self.pill_layout.setSpacing(wutil.DPI(2))
 
         # Indicator 'Ball' style
         self.sq_btn = QPushButton(self.pill_container)
-        self.sq_btn.setFixedSize(util.DPI(12), util.DPI(12))
+        self.sq_btn.setFixedSize(wutil.DPI(12), wutil.DPI(12))
         self.sq_btn.setFocusPolicy(Qt.NoFocus)
         self.sq_btn.setAttribute(Qt.WA_TransparentForMouseEvents)
 
         self.val_label = QLabel(
             self.options[int(self.current_idx)] if self.is_enum and self.options else "{:.2f}".format(self.current_idx), self.pill_container
         )
-        self.val_label.setStyleSheet("color: {}; font-size: {}px;".format(COLOR_ACCENT_LIGHT, util.DPI(11)))
+        self.val_label.setStyleSheet("color: {}; font-size: {}px;".format(COLOR_ACCENT_LIGHT, wutil.DPI(11)))
         self.val_label.setAlignment(Qt.AlignCenter)
 
         # Toggles hide text until hover; Enums show text always; Numeric hide always
@@ -757,7 +761,7 @@ class AttributeItem(QWidget):
             self.pill_layout.addStretch()
         else:
             self.pill_layout.removeWidget(self.sq_btn)
-            self.pill_layout.setContentsMargins(util.DPI(2), 0, util.DPI(2), 0)
+            self.pill_layout.setContentsMargins(wutil.DPI(2), 0, wutil.DPI(2), 0)
             self.pill_layout.addWidget(self.val_label)
             self.sq_btn.setParent(self.pill_container)
             QTimer.singleShot(0, self._update_numeric_ball_pos)
@@ -777,7 +781,7 @@ class AttributeItem(QWidget):
             return
         w = self.pill_container.width()
         ball_w = self.sq_btn.width()
-        padding = util.DPI(2)  # Match enum layout margins
+        padding = wutil.DPI(2)  # Match enum layout margins
         usable_w = w - ball_w - (padding * 2)
 
         if self.max_val <= self.min_val:
@@ -804,7 +808,7 @@ class AttributeItem(QWidget):
             pixmap = QPixmap(icon_path)
             if not pixmap.isNull():
                 # Ensure sizes are integers
-                target_size = int(util.DPI(12))
+                target_size = int(wutil.DPI(12))
                 if target_size < 1:
                     target_size = 12
 
@@ -824,12 +828,12 @@ class AttributeItem(QWidget):
             else:
                 # Basic dot fallback if SVG fails to load
                 self.sq_btn.setIcon(QIcon())
-                self.sq_btn.setStyleSheet("background: {}; border-radius: {}px; border: none;".format(ball_color, int(util.DPI(6))))
+                self.sq_btn.setStyleSheet("background: {}; border-radius: {}px; border: none;".format(ball_color, int(wutil.DPI(6))))
         else:
             self.sq_btn.setIcon(QIcon())
-            self.sq_btn.setStyleSheet("background: {}; border-radius: {}px; border: none;".format(ball_color, int(util.DPI(6))))
+            self.sq_btn.setStyleSheet("background: {}; border-radius: {}px; border: none;".format(ball_color, int(wutil.DPI(6))))
 
-        self.pill_container.setStyleSheet("background: {}; border-radius: {}px;".format(pill_bg, util.DPI(8)))
+        self.pill_container.setStyleSheet("background: {}; border-radius: {}px;".format(pill_bg, wutil.DPI(8)))
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -916,11 +920,11 @@ class SetupTargetsDialog(FloatingWidget):
         self.setBottomBar(
             [cd.QFlatDialogButton("Add", callback=self._add_target, icon=media.add_image, highlight=True)],
             closeButton=True,
-            spacing=util.DPI(2),
+            spacing=wutil.DPI(2),
         )
 
     def _add_target(self):
-        for obj in util.get_selected_objects():
+        for obj in selection_targets.get_selected_objects():
             self.targets_list.add_target(obj)
 
     def _create_layouts(self):
@@ -975,7 +979,8 @@ class TargetItemWidget(QWidget):
         close_btn.setFixedSize(15, 15)
         close_btn.setFocusPolicy(Qt.NoFocus)
         close_btn.clicked.connect(self._remove)
-        close_btn.setStyleSheet("""
+        close_btn.setStyleSheet(
+            """
             QPushButton {
                 border: none;
                 background: transparent;
@@ -985,7 +990,9 @@ class TargetItemWidget(QWidget):
             QPushButton:pressed {
                 background: %s;
             }
-            """ % COLOR_BG_MAIN)
+            """
+            % COLOR_BG_MAIN
+        )
 
         layout.addWidget(label)
         layout.addStretch()
@@ -1043,7 +1050,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
     """
 
     def __init__(self, popup=False, parent=None):
-        parent = parent or util.get_maya_qt()
+        parent = parent or wutil.get_maya_qt()
         FloatingWidget.__init__(self, popup=popup, parent=parent)
         self._init_floating_window_behavior()
 
@@ -1100,12 +1107,12 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
     def _create_layouts(self):
         """Builds the main container layouts."""
-        self.mainContent.setMinimumWidth(util.DPI(220))
+        self.mainContent.setMinimumWidth(wutil.DPI(220))
         self.mainContent.setContextMenuPolicy(Qt.CustomContextMenu)
         self.mainContent.customContextMenuRequested.connect(self._show_context_menu)
 
         self.enums_layout = QVBoxLayout()
-        self.enums_layout.setSpacing(util.DPI(1))
+        self.enums_layout.setSpacing(wutil.DPI(1))
 
         self.mainLayout.addLayout(self.enums_layout)
         self.mainLayout.addStretch(1)
@@ -1113,11 +1120,13 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
     def _create_selection_layout(self):
         """Builds the header area showing tool title and current status."""
         selection_layout = QVBoxLayout()
-        selection_layout.setSpacing(util.DPI(5))
-        selection_layout.setContentsMargins(0, util.DPI(6), 0, util.DPI(8))
+        selection_layout.setSpacing(wutil.DPI(5))
+        selection_layout.setContentsMargins(0, wutil.DPI(6), 0, wutil.DPI(8))
 
         selection_title = QLabel("Selection")
-        selection_title.setStyleSheet("font-size: %spx; color: %s; font-weight: bold; background: transparent;" % (util.DPI(18), self.TEXT_COLOR))
+        selection_title.setStyleSheet(
+            "font-size: %spx; color: %s; font-weight: bold; background: transparent;" % (wutil.DPI(18), self.TEXT_COLOR)
+        )
         selection_title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         selection_title.setWordWrap(False)
         selection_title.setFixedHeight(selection_title.fontMetrics().height() + 2)
@@ -1154,12 +1163,8 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         self.namespace_display = self.__fix_setting(
             settings.get_setting("namespace_display", False, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
         )
-        self.all_frames = self.__fix_setting(
-            settings.get_setting("all_frames", False, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
-        )
-        self.euler_filter = self.__fix_setting(
-            settings.get_setting("euler_filter", True, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
-        )
+        self.all_frames = self.__fix_setting(settings.get_setting("all_frames", False, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE))
+        self.euler_filter = self.__fix_setting(settings.get_setting("euler_filter", True, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE))
         self.show_rotate_order = self.__fix_setting(
             settings.get_setting("show_rotate_order", True, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
         )
@@ -1181,6 +1186,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
         if setting == "euler_filter":
             import TheKeyMachine.widgets.sliderWidget as sw
+
             sw.globalSignals.eulerFilterChanged.emit(bool(state))
 
         if refresh:
@@ -1227,7 +1233,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
     def _get_selected_nodes(self, long=False):
         """Returns the current Maya selection."""
-        return util.get_selected_objects(long=long)
+        return selection_targets.get_selected_objects(long=long)
 
     def _fetch_attribute_data(self):
         """Analyzes active selection for compatible space-switch attributes and returns structured data."""
@@ -1352,9 +1358,9 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         """Unified interaction management for multi-window focus tracking."""
         if not is_active:
             cursor_pos = QCursor.pos()
-            if util.is_valid_widget(self) and self.frameGeometry().contains(cursor_pos):
+            if wutil.is_valid_widget(self) and self.frameGeometry().contains(cursor_pos):
                 is_active = True
-            if not is_active and self._active_popup and util.is_valid_widget(self._active_popup) and self._active_popup.isVisible():
+            if not is_active and self._active_popup and wutil.is_valid_widget(self._active_popup) and self._active_popup.isVisible():
                 if self._active_popup.frameGeometry().contains(cursor_pos):
                     is_active = True
 
@@ -1370,7 +1376,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
             self._resume_auto_close()
 
         for (enum_attr, _), (attr_item, _) in self._active_switch_widgets.items():
-            if not util.is_valid_widget(attr_item):
+            if not wutil.is_valid_widget(attr_item):
                 continue
             if hasattr(attr_item, "pill_opacity"):
                 attr_item.pill_opacity.setOpacity(1.0 if self._is_ui_hovered else 0.0)
@@ -1406,10 +1412,10 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
     def _show_pending_popup(self):
         """Displays the attribute choice popup beside the hovered row."""
         # If no pending item or it was deleted, hide current
-        if not self._popup_pending_item or not util.is_valid_widget(self._popup_pending_item):
-            if self._active_popup and util.is_valid_widget(self._active_popup) and not self._active_popup.underMouse():
+        if not self._popup_pending_item or not wutil.is_valid_widget(self._popup_pending_item):
+            if self._active_popup and wutil.is_valid_widget(self._active_popup) and not self._active_popup.underMouse():
                 self._active_popup.hide()
-            elif self._active_popup and util.is_valid_widget(self._active_popup) and self._active_popup.underMouse():
+            elif self._active_popup and wutil.is_valid_widget(self._active_popup) and self._active_popup.underMouse():
                 pass
             return
 
@@ -1418,7 +1424,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         # If current is same item and visible, do nothing
         if (
             self._active_popup
-            and util.is_valid_widget(self._active_popup)
+            and wutil.is_valid_widget(self._active_popup)
             and self._active_popup.item_widget == item
             and self._active_popup.isVisible()
         ):
@@ -1434,7 +1440,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
     def _close_active_popup(self):
         """Safely removes the current popup."""
-        if hasattr(self, "_active_popup") and self._active_popup and util.is_valid_widget(self._active_popup):
+        if hasattr(self, "_active_popup") and self._active_popup and wutil.is_valid_widget(self._active_popup):
             self._active_popup.hide()
             self._active_popup.deleteLater()
             self._active_popup = None
@@ -1728,7 +1734,9 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
         self.context_menu.addSeparator()
 
-        self.euler_filter_action = self.context_menu.addAction("Auto Euler Filter", description="Apply euler filter to switched attributes.")
+        self.euler_filter_action = self.context_menu.addAction(
+            "Auto Euler Filter", description="Apply euler filter to switched attributes."
+        )
         self.euler_filter_action.setCheckable(True)
         self.euler_filter_action.setChecked(self.euler_filter)
 

@@ -19,16 +19,11 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 import maya.cmds as cmds
 import maya.mel as mel
-import maya.OpenMayaUI as mui
 
 try:
-    from shiboken2 import wrapInstance
-    from PySide2.QtWidgets import QDesktopWidget
-    from PySide2 import QtCore, QtGui, QtWidgets
-except ImportError:
-    from shiboken6 import wrapInstance
     from PySide6.QtCore import QTimer
-    from PySide6 import QtCore, QtGui, QtWidgets
+except ImportError:
+    from PySide2.QtCore import QTimer
 
 try:
     from importlib import reload
@@ -37,14 +32,11 @@ except ImportError:
 except ImportError:
     pass
 
-import ssl
 
 import TheKeyMachine.core.runtime_manager as runtime
-import re
 import os
 import platform
 import shutil
-from functools import partial
 
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.keyToolsMod as keyTools
@@ -52,6 +44,7 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.mods.updater as updater
+from TheKeyMachine.core import selection_targets
 import TheKeyMachine.tools.colors as toolColors
 import TheKeyMachine.tools.orbit.api as orbitApi
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
@@ -60,7 +53,22 @@ import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 from TheKeyMachine.mods import settingsMod as settings
 
-mods = [general, keyTools, media, bar, customDialogs, cw, wutil, updater, settings, report, toolColors, orbitApi, attributeSwitcherApi, selectionSetsApi]
+mods = [
+    general,
+    keyTools,
+    media,
+    bar,
+    customDialogs,
+    cw,
+    wutil,
+    updater,
+    settings,
+    report,
+    toolColors,
+    orbitApi,
+    attributeSwitcherApi,
+    selectionSetsApi,
+]
 
 for m in mods:
     reload(m)
@@ -141,6 +149,7 @@ def getImage(*args, image):
 
     return fullImgDir
 
+
 # ________________________________________________ Sync  ______________________________________________________ #
 
 
@@ -149,28 +158,28 @@ def getImage(*args, image):
 filterMode_sync_on_code = """
 
 global proc syncChannelBoxFcurveEd()
-{
+{{
     global string $gChannelBoxName;
 
     string $selAttrs[] = `selectedChannelBoxPlugs`;
-    selectionConnection -e -clear graphEditor1FromOutliner;
-    if (size($selAttrs) > 0) {
-        for ($attr in $selAttrs) {
-            selectionConnection -e -select $attr graphEditor1FromOutliner;
-        }
+    selectionConnection -e -clear {graph_editor_outliner};
+    if (size($selAttrs) > 0) {{
+        for ($attr in $selAttrs) {{
+            selectionConnection -e -select $attr {graph_editor_outliner};
+        }}
         filterUIFilterSelection graphEditor1OutlineEd "";
-    } else if (size($selAttrs) == 0) {
+    }} else if (size($selAttrs) == 0) {{
         string $objects[] = `channelBoxObjects`;
-        for ($obj in $objects) {
-            selectionConnection -e -select $obj graphEditor1FromOutliner;
+        for ($obj in $objects) {{
+            selectionConnection -e -select $obj {graph_editor_outliner};
 
-        }
+        }}
         filterUIClearFilter graphEditor1OutlineEd;
-        
-    }
-}
+
+    }}
+}}
 syncChannelBoxFcurveEd();
-"""
+""".format(graph_editor_outliner=selection_targets.GRAPH_EDITOR_OUTLINER)
 
 filterMode_sync_off_code = """
 

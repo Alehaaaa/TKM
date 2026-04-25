@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from maya import cmds, mel, OpenMayaUI as omui
+from maya import cmds, OpenMayaUI as omui
 
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
@@ -8,8 +8,9 @@ except Exception:
     from PySide2 import QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.core.runtime_manager as runtime
+from TheKeyMachine.core import selection_targets
 from TheKeyMachine.tools import colors as toolColors
-from TheKeyMachine.widgets import util
+from TheKeyMachine.widgets import util as wutil
 
 
 @dataclass(frozen=True)
@@ -22,85 +23,6 @@ class TimeContext:
     @property
     def timerange(self):
         return (self.start_frame, self.end_frame)
-
-
-def _playback_slider_name():
-    return mel.eval("$tmpVar=$gPlayBackSlider")
-
-
-def _normalize_slider_range(range_array):
-    start = int(range_array[0])
-    end = int(range_array[1] - 1)
-    if end < start:
-        end = start
-    return start, end
-
-
-def _normalize_frames(frames):
-    normalized = set()
-    for frame in frames or []:
-        try:
-            normalized.add(int(round(frame)))
-        except Exception:
-            continue
-    return sorted(normalized)
-
-
-def get_graph_editor_selected_tangent_frames():
-    try:
-        tangent_frames = cmds.keyTangent(query=True, selected=True, timeChange=True) or []
-    except Exception:
-        tangent_frames = []
-    return _normalize_frames(tangent_frames)
-
-
-def _get_graph_editor_selected_curves():
-    try:
-        selected_curves = cmds.keyframe(query=True, selected=True, name=True) or []
-    except Exception:
-        selected_curves = []
-    if selected_curves:
-        return selected_curves
-
-    try:
-        return cmds.selectionConnection("graphEditor1FromOutliner", query=True, object=True) or []
-    except Exception:
-        return []
-
-
-def get_graph_editor_selected_frames(include_tangents=True):
-    try:
-        frames = list(cmds.keyframe(query=True, selected=True, tc=True) or [])
-    except Exception:
-        frames = []
-
-    for curve in _get_graph_editor_selected_curves():
-        try:
-            frames.extend(cmds.keyframe(curve, query=True, selected=True, timeChange=True) or [])
-        except Exception:
-            continue
-
-    if include_tangents:
-        try:
-            frames.extend(get_graph_editor_selected_tangent_frames())
-        except Exception:
-            pass
-    return _normalize_frames(frames)
-
-
-def get_graph_editor_selected_range(include_tangents=True):
-    frames = get_graph_editor_selected_frames(include_tangents=include_tangents)
-    if not frames:
-        return None
-    return frames[0], frames[-1]
-
-
-def get_selected_time_slider_range():
-    time_range = cmds.timeControl(_playback_slider_name(), q=True, rangeArray=True)
-    current_time = int(cmds.currentTime(query=True))
-    if (time_range[1] - time_range[0]) > 1 or (time_range[0] != current_time and time_range[1] != current_time + 1):
-        return _normalize_slider_range(time_range)
-    return None
 
 
 def get_playback_range():
@@ -140,7 +62,7 @@ def get_animation_data_timerange(animation_data, frame_key="keyframes"):
 
 
 def resolve_time_context(default_mode="all_animation"):
-    graph_editor_frames = get_graph_editor_selected_frames()
+    graph_editor_frames = selection_targets.get_graph_editor_selected_frames()
     if graph_editor_frames:
         return TimeContext(
             mode="graph_editor_keys",
@@ -149,7 +71,7 @@ def resolve_time_context(default_mode="all_animation"):
             frames=tuple(graph_editor_frames),
         )
 
-    time_slider_range = get_selected_time_slider_range()
+    time_slider_range = selection_targets.get_selected_time_slider_range()
     if time_slider_range:
         return TimeContext(
             mode="time_slider_range",
@@ -172,7 +94,17 @@ def resolve_time_context(default_mode="all_animation"):
 
 
 class TimelineTint(QtWidgets.QWidget):
-    def __init__(self, timerange, color=(200, 120, 200), duration_ms=200, parent=None, center_line=False, icon_path=None, full_width=False, icon_scale=1.0):
+    def __init__(
+        self,
+        timerange,
+        color=(200, 120, 200),
+        duration_ms=200,
+        parent=None,
+        center_line=False,
+        icon_path=None,
+        full_width=False,
+        icon_scale=1.0,
+    ):
         self._full_width = bool(full_width)
         parent_widget = parent or self.get_timeline_widget(full_width=self._full_width)
         super().__init__(parent_widget)
@@ -208,10 +140,10 @@ class TimelineTint(QtWidgets.QWidget):
 
     @classmethod
     def get_timeline_widget(cls, full_width=False):
-        timeline_name = _playback_slider_name()
+        timeline_name = selection_targets.get_playback_slider()
         ptr = omui.MQtUtil.findControl(timeline_name) or omui.MQtUtil.findLayout(timeline_name) or omui.MQtUtil.findMenuItem(timeline_name)
         if ptr:
-            widget = util.get_maya_qt(ptr, QtWidgets.QWidget)
+            widget = wutil.get_maya_qt(ptr, QtWidgets.QWidget)
             if widget and full_width:
                 return widget.parentWidget() or widget
             return widget
@@ -234,15 +166,15 @@ class TimelineTint(QtWidgets.QWidget):
         if self.center_line:
             line_color = _light_tint_line_color(self.color)
             line_pen = QtGui.QPen(line_color)
-            line_pen.setWidth(max(2, int(util.DPI(2))))
+            line_pen.setWidth(max(2, int(wutil.DPI(2))))
             painter.setPen(line_pen)
             line_y = self.height() * 0.5
             painter.drawLine(QtCore.QPointF(rect.left(), line_y), QtCore.QPointF(rect.right(), line_y))
 
         if not self._icon.isNull():
-            base_icon_size = min(util.DPI(18), int(max(12, rect.width() - util.DPI(6))), max(12, self.height() - util.DPI(4)))
+            base_icon_size = min(wutil.DPI(18), int(max(12, rect.width() - wutil.DPI(6))), max(12, self.height() - wutil.DPI(4)))
             icon_size = int(max(12, round(base_icon_size * self.icon_scale)))
-            icon_size = min(icon_size, int(max(12, rect.width() - util.DPI(2))), int(max(12, self.height() - util.DPI(2))))
+            icon_size = min(icon_size, int(max(12, rect.width() - wutil.DPI(2))), int(max(12, self.height() - wutil.DPI(2))))
             icon_rect = QtCore.QRectF(
                 rect.center().x() - (icon_size * 0.5),
                 (self.height() - icon_size) * 0.5,
@@ -253,7 +185,7 @@ class TimelineTint(QtWidgets.QWidget):
 
     def delete_tint(self):
         try:
-            if self._parent_widget and util.is_valid_widget(self._parent_widget):
+            if self._parent_widget and wutil.is_valid_widget(self._parent_widget):
                 self._parent_widget.removeEventFilter(self)
         except Exception:
             pass
@@ -274,7 +206,7 @@ class TimelineTint(QtWidgets.QWidget):
         return super().eventFilter(watched, event)
 
     def _sync_geometry(self):
-        if not self._parent_widget or not util.is_valid_widget(self._parent_widget):
+        if not self._parent_widget or not wutil.is_valid_widget(self._parent_widget):
             return
         new_geometry = self._parent_widget.rect()
         if self.geometry() != new_geometry:
@@ -343,7 +275,9 @@ class TimelineTintSession(QtCore.QObject):
             pass
 
 
-def show_timeline_tint(timerange=None, color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None, icon_scale=1.0):
+def show_timeline_tint(
+    timerange=None, color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None, icon_scale=1.0
+):
     color = color or _default_tint_color()
     context = timerange or resolve_time_context(default_mode="all_animation").timerange
     full_width = _is_full_playback_timerange(context)
@@ -359,7 +293,9 @@ def show_timeline_tint(timerange=None, color=None, duration_ms=200, owner=None, 
     return runtime.get_runtime_manager().register_managed_widget(widget, key=key, owner=owner)
 
 
-def show_timeline_context(default_mode="all_animation", color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None, icon_scale=1.0):
+def show_timeline_context(
+    default_mode="all_animation", color=None, duration_ms=200, owner=None, key=None, center_line=False, icon_path=None, icon_scale=1.0
+):
     context = resolve_time_context(default_mode=default_mode)
     return show_timeline_tint(
         timerange=context.timerange,
@@ -373,11 +309,9 @@ def show_timeline_context(default_mode="all_animation", color=None, duration_ms=
     )
 
 
-def clear_timeline_tint(key):
-    runtime.get_runtime_manager().clear_managed_widget(key)
-
-
-def begin_timeline_tint(timerange=None, color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None, icon_scale=1.0):
+def begin_timeline_tint(
+    timerange=None, color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None, icon_scale=1.0
+):
     widget = show_timeline_tint(
         timerange=timerange,
         color=color,
@@ -391,7 +325,9 @@ def begin_timeline_tint(timerange=None, color=None, owner=None, key=None, min_du
     return TimelineTintSession(widget, key=key, min_duration=min_duration, parent=owner)
 
 
-def begin_timeline_context(default_mode="all_animation", color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None, icon_scale=1.0):
+def begin_timeline_context(
+    default_mode="all_animation", color=None, owner=None, key=None, min_duration=300, center_line=False, icon_path=None, icon_scale=1.0
+):
     context = resolve_time_context(default_mode=default_mode)
     return begin_timeline_tint(
         timerange=context.timerange,

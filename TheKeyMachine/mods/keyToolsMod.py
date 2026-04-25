@@ -48,7 +48,7 @@ from collections import Counter
 import TheKeyMachine.core.runtime_manager as runtime
 
 
-import TheKeyMachine.widgets.util as util
+import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
@@ -75,12 +75,12 @@ BAKE_UNDO_HELP = {
 
 def clear_timeslider_selection():
     # fix temporal para limpiar el timeslider
-    selection = util.get_selected_objects()
+    selection = selection_targets.get_selected_objects()
     cmds.select(selection)
 
 
 def get_time_range_selected():
-    aTimeSlider = mel.eval("$tmpVar=$gPlayBackSlider")
+    aTimeSlider = selection_targets.get_playback_slider()
     timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
 
     # Verificar que el rango de tiempo seleccionado no esta vacío
@@ -92,7 +92,7 @@ def get_time_range_selected():
 
 # Esta es una version nueva que evalua correctamente si es un rango o no. Dejo la otra porque se usa en algunos sitios. Hay que limpiar.
 def get_selected_time_range():
-    time_range = timelineWidgets.get_selected_time_slider_range()
+    time_range = selection_targets.get_selected_time_slider_range()
     if not time_range:
         return None
     return [time_range[0], time_range[1]]
@@ -103,7 +103,7 @@ def get_graph_editor_selected_keyframes():
     if not anim_curves:
         return []
 
-    selected_frames = set(timelineWidgets.get_graph_editor_selected_frames())
+    selected_frames = set(selection_targets.get_graph_editor_selected_frames())
     keyframes = []
     for curve in anim_curves:
         curve_frames = cmds.keyframe(curve, q=True, selected=True) or []
@@ -203,7 +203,7 @@ def resolve_tool_targets(default_mode="all_animation", ordered_selection=False, 
         target_objects.append(obj)
 
     if not target_objects:
-        target_objects = util.get_selected_objects(orderedSelection=ordered_selection, long=long_names)
+        target_objects = selection_targets.get_selected_objects(orderedSelection=ordered_selection, long=long_names)
 
     selected_channels = []
     seen_channels = set()
@@ -297,7 +297,7 @@ def find_all_roots_in_selection():
     """
     Identifica todos los nodos raíces en la selección.
     """
-    selection = util.get_selected_objects()
+    selection = selection_targets.get_selected_objects()
     root_nodes = []
 
     while selection:
@@ -343,9 +343,9 @@ def load_relative_data():
 def copy_link(*args):
     matrix_file_path = general.get_copy_link_data_file()
 
-    seleccion = util.get_selected_objects()
+    seleccion = selection_targets.get_selected_objects()
     if len(seleccion) < 2:
-        return util.make_inViewMessage("Select at least 2 objects")
+        return wutil.make_inViewMessage("Select at least 2 objects")
 
     main_obj = seleccion[-1]
     follow_objs = seleccion[:-1]
@@ -371,7 +371,7 @@ def copy_link(*args):
     with open(matrix_file_path, "w") as f:
         json.dump(save_dict, f)
 
-    util.make_inViewMessage("Copied link data")
+    wutil.make_inViewMessage("Copied link data")
 
     load_relative_data()
 
@@ -519,7 +519,7 @@ def share_keys(*args):
     time_context = target_info["time_context"]
 
     if not objetos and not target_plugs:
-        return util.make_inViewMessage("Select at least one object")
+        return wutil.make_inViewMessage("Select at least one object")
 
     all_frames = set()
     object_plug_frames = {obj: {} for obj in objetos}
@@ -539,7 +539,7 @@ def share_keys(*args):
         all_frames.update(normalized_frames)
 
     if not all_frames:
-        return util.make_inViewMessage("No keys found in selection")
+        return wutil.make_inViewMessage("No keys found in selection")
 
     shared_frames = sorted(all_frames)
     tint_session = _begin_timeline_tint((int(shared_frames[0]), int(shared_frames[-1])), "share_keys")
@@ -572,7 +572,7 @@ def share_keys(*args):
 
 def reblock_move(*args):
     # Obtener la lista de objetos seleccionados
-    objetos = util.get_selected_objects(long=True)  # Usar nombres largos para mayor precisión
+    objetos = selection_targets.get_selected_objects(long=True)  # Usar nombres largos para mayor precisión
 
     # Verificar que haya al menos un objeto seleccionado
     if len(objetos) < 1:
@@ -661,11 +661,11 @@ def reblock_move(*args):
 
 def reblock_insert(*args):
     # Obtener la lista de objetos actualmente seleccionados en la escena
-    objetos = util.get_selected_objects()
+    objetos = selection_targets.get_selected_objects()
 
     # Verificar que haya al menos dos objetos seleccionados
     if len(objetos) < 2:
-        return util.make_inViewMessage("Select at least 2 objects")
+        return wutil.make_inViewMessage("Select at least 2 objects")
 
     # Crear una lista de fotogramas clave de todos los objetos
     frames_claves = []
@@ -706,7 +706,7 @@ def bake_animation(bake_interval=1, window=None):
         selected_channels = target_info["selected_channels"]
 
         if not selected_objects:
-            return util.make_inViewMessage("Select at least one object for baking")
+            return wutil.make_inViewMessage("Select at least one object for baking")
 
         time_context = target_info["time_context"]
         start_frame, end_frame = time_context.timerange
@@ -781,10 +781,10 @@ def bake_animation_4(*args):
 
 def delete_keyframes_before_current_time():
     # Obtén los objetos seleccionados
-    selected = util.get_selected_objects()
+    selected = selection_targets.get_selected_objects()
 
     if not selected:
-        return util.make_inViewMessage("Select at least one object")
+        return wutil.make_inViewMessage("Select at least one object")
 
     # Obtiene el tiempo actual
     current_time = cmds.currentTime(query=True)
@@ -804,10 +804,10 @@ def delete_keyframes_before_current_time():
 
 def delete_keyframes_after_current_time():
     # Obtén los objetos seleccionados
-    selected = util.get_selected_objects()
+    selected = selection_targets.get_selected_objects()
 
     if not selected:
-        return util.make_inViewMessage("Select at least one object")
+        return wutil.make_inViewMessage("Select at least one object")
 
     # Obtiene el tiempo actual
     current_time = cmds.currentTime(query=True)
@@ -843,7 +843,7 @@ def select_all_animation_curves(*args):
         cmds.select(curvas_seleccionadas)
         cmds.selectKey(add=True)
     else:
-        util.make_inViewMessage("No anim curves found")
+        wutil.make_inViewMessage("No anim curves found")
 
 
 def clear_selected_keys(*args):
@@ -980,7 +980,9 @@ def move_keyframes_in_range(*args):
                 grouped_source_times.setdefault(source_time, []).append(plug)
 
         if plugs_with_key_at_current:
-            cmds.keyframe(plugs_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset)
+            cmds.keyframe(
+                plugs_with_key_at_current, edit=True, relative=True, option="over", time=(current_time, current_time), timeChange=offset
+            )
             cmds.currentTime(current_time + offset)
             return
 
@@ -990,534 +992,12 @@ def move_keyframes_in_range(*args):
         toolCommon.close_undo_chunk()
 
 
-# _____________________________________________________________________________________________________________________
-
-is_dragging = False
-original_keyframes = {}
-original_values = {}  # Vamos a guardar el valor original de cada atributo
-frame_data_cache = {}  # New dictionary to cache frame data for performance
-original_keyframe_values = {}
-
-global tween_frame_data_cache
-tween_frame_data_cache = {}
-
-global original_auto_key_state
-original_auto_key_state = None
-
-
-def handle_autokey_start():
-    global original_auto_key_state
-    # Solo guarda el estado original si aún no se ha guardado
-    if original_auto_key_state is None:
-        original_auto_key_state = cmds.autoKeyframe(query=True, state=True)
-        cmds.autoKeyframe(state=False)
-
-
-def handle_autokey_end():
-    global original_auto_key_state
-    # Solo restaura el estado si se ha guardado previamente
-    if original_auto_key_state is not None:
-        cmds.autoKeyframe(state=original_auto_key_state)
-        original_auto_key_state = None  # Restablecer para la próxima operación
-
-
-def blend_pull_and_push(value, objs=None, selection=True):
-    global original_values, original_keyframe_values, is_dragging
-
-    selected_channels = get_selected_channels()
-
-    if not objs and not selection:
-        raise ValueError("No objects given to blend_pull_and_push")
-
-    if not objs:
-        objs = util.get_selected_objects()
-
-    if not is_dragging:
-        toolCommon.open_undo_chunk(title="Pull Push", tooltip_template=helper.pull_push_tooltip_text)
-        is_dragging = True
-
-    selected_keyframes = get_graph_editor_selected_keyframes()
-
-    # Define los factores de cambio
-    rotation_factor = 2.0  # Ajusta este factor según tus necesidades para los atributos de rotación
-    translation_factor = 0.1  # Ajusta este factor según tus necesidades para los atributos de translación
-    other_factor = 0.2  # Ajusta este factor según tus necesidades para otros atributos
-
-    for obj in objs:
-        if not cmds.objExists(obj):
-            continue
-
-        attrs = selected_channels if selected_channels else cmds.listAttr(obj, keyable=True)
-
-        if attrs is None:
-            continue
-
-        for attr in attrs:
-            if not cmds.attributeQuery(attr, node=obj, exists=True):
-                continue
-
-            attrFull = f"{obj}.{attr}"
-
-            if cmds.getAttr(attrFull, lock=True) or not cmds.getAttr(attrFull, keyable=True):
-                # Si el atributo está bloqueado o no es keyable, continuar con el siguiente
-                continue
-
-            if attrFull not in original_values:
-                # Guardar el valor original solo si es numérico
-                original_attr_value = cmds.getAttr(attrFull)
-                if isinstance(original_attr_value, (float, int)):
-                    original_values[attrFull] = original_attr_value
-                else:
-                    continue
-
-            if selected_keyframes:
-                for curve, frame in selected_keyframes:
-                    if curve.startswith(obj) and curve.endswith(attr):
-                        key_identifier = f"{curve}_{frame}"  # Crea un identificador único para el keyframe
-                        if key_identifier not in original_keyframe_values:
-                            original_keyframe_values[key_identifier] = cmds.keyframe(curve, time=(frame,), q=True, valueChange=True)[0]
-
-                        original_value = original_keyframe_values[key_identifier]
-
-                        if attr in ["rx", "ry", "rz"]:
-                            # Aplicar un factor de cambio para los atributos de rotación
-                            newValue = original_value + value * rotation_factor
-                        elif attr in ["tx", "ty", "tz"]:
-                            # Aplicar un factor de cambio para los atributos de translación
-                            newValue = original_value + value * translation_factor
-                        else:
-                            # Aplicar un factor de cambio para otros atributos
-                            newValue = original_value + value * other_factor
-
-                        cmds.keyframe(curve, time=(frame,), valueChange=newValue)
-            else:
-                currentValue = original_values.get(attrFull)
-                if currentValue is not None:
-                    if attr in ["rx", "ry", "rz"]:
-                        # Aplicar un factor de cambio para los atributos de rotación
-                        newValue = currentValue + value * rotation_factor
-                    elif attr in ["tx", "ty", "tz"]:
-                        # Aplicar un factor de cambio para los atributos de translación
-                        newValue = currentValue + value * translation_factor
-                    else:
-                        # Aplicar un factor de cambio para otros atributos
-                        newValue = currentValue + value * other_factor
-
-                    # Limitar el valor entre un min y un max si existe
-                    minValue, maxValue = None, None
-                    if cmds.attributeQuery(attr, node=obj, minExists=True):
-                        minValue = cmds.attributeQuery(attr, node=obj, min=True)[0]
-                    if cmds.attributeQuery(attr, node=obj, maxExists=True):
-                        maxValue = cmds.attributeQuery(attr, node=obj, max=True)[0]
-
-                    if minValue is not None and newValue < minValue:
-                        continue
-
-                    if maxValue is not None and newValue > maxValue:
-                        continue
-
-                    cmds.setAttr(attrFull, newValue)
-
-
-# Blend normal .................................................................................
-
-is_cached = False
-frame_data_cache = {}
-
-
-def cache_keyframe_data(objs):
-    keyframe_data = {}
-    currentTime = cmds.currentTime(query=True)
-    for obj in objs:
-        attrs = cmds.listAttr(obj, keyable=True) or []
-        for attr in attrs:
-            attrFull = f"{obj}.{attr}"
-            if cmds.objExists(attrFull):
-                keyframes = cmds.keyframe(attrFull, query=True) or []
-                original_value = cmds.getAttr(attrFull)
-                previousKeyframes = [frame for frame in keyframes if frame < currentTime]
-                laterKeyframes = [frame for frame in keyframes if frame > currentTime]
-
-                previousFrame = max(previousKeyframes) if previousKeyframes else None
-                nextFrame = min(laterKeyframes) if laterKeyframes else None
-                previousValue = cmds.getAttr(attrFull, time=previousFrame) if previousFrame is not None else None
-                nextValue = cmds.getAttr(attrFull, time=nextFrame) if nextFrame is not None else None
-
-                minValue, maxValue = None, None
-                if cmds.attributeQuery(attr, node=obj, minExists=True):
-                    minValue = cmds.attributeQuery(attr, node=obj, min=True)[0]
-                if cmds.attributeQuery(attr, node=obj, maxExists=True):
-                    maxValue = cmds.attributeQuery(attr, node=obj, max=True)[0]
-
-                # Obtener el tipo de tangente para el keyframe anterior
-                prevTanType = None
-                if previousKeyframes:
-                    prevTanType = cmds.keyTangent(attrFull, query=True, time=(previousFrame,), outTangentType=True)[0]
-
-                keyframe_data[attrFull] = {
-                    "original_value": original_value,
-                    "previousValue": previousValue,
-                    "nextValue": nextValue,
-                    "minValue": minValue,
-                    "maxValue": maxValue,
-                    "prevTanType": prevTanType,  # Añadir tipo de tangente
-                }
-    return keyframe_data
-
-
-# Esta es la funcion para el modo Blend normal
-
-
-def blend_to_key(percentage, objs=None, selection=True):
-    global is_dragging, frame_data_cache, is_cached, last_autokey_time, autokey_interval
-
-    if not is_dragging:
-        toolCommon.open_undo_chunk(title="Blend to Neighbor", tooltip_template=helper.blend_tooltip_text)
-        is_dragging = True
-
-    if objs is None and selection:
-        objs = util.get_selected_objects()
-
-    if not objs:
-        if is_dragging:
-            toolCommon.close_undo_chunk()
-            is_dragging = False
-        return
-
-    if not is_cached:
-        frame_data_cache = cache_keyframe_data(objs)
-        is_cached = True
-
-    # currentTime = cmds.currentTime(query=True)
-
-    for obj in objs:
-        # Sólo atributos escalares keyables (evita double3 compuestos como rotate/translate)
-        attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
-
-        for attr in attrs:
-            attrFull = f"{obj}.{attr}"
-
-            # salta si no existe en la caché
-            if attrFull not in frame_data_cache:
-                continue
-
-            # salta si está bloqueado o no es seteable
-            if cmds.getAttr(attrFull, lock=True) or not cmds.getAttr(attrFull, settable=True):
-                continue
-
-            # salta tipos no numéricos
-            a_type = cmds.getAttr(attrFull, type=True)
-            if a_type in ("enum", "string", "message"):
-                continue
-
-            cachedData = frame_data_cache[attrFull]
-
-            # nombres tal cual en tu cache: "original_value", "previousValue", "nextValue"
-            orig = cachedData.get("original_value")
-            nxt = cachedData.get("nextValue")
-            prev = cachedData.get("previousValue")
-
-            # si por cualquier motivo llega lista/tupla, pasa
-            if any(isinstance(v, (list, tuple)) for v in (orig, nxt, prev) if v is not None):
-                continue
-
-            # también salta si orig no es número
-            if not isinstance(orig, (int, float)):
-                continue
-
-            if nxt is not None and isinstance(nxt, (int, float)) and percentage > 0:
-                difference = nxt - orig
-            elif prev is not None and isinstance(prev, (int, float)):
-                difference = orig - prev
-            else:
-                continue
-
-            weightedDifference = (difference * abs(percentage)) / 50.0
-            currentValue = orig + weightedDifference if percentage > 0 else orig - weightedDifference
-
-            try:
-                cmds.setAttr(attrFull, float(currentValue))
-            except Exception:
-                # por si un attr acepta sólo enteros o tiene límites
-                try:
-                    cmds.setAttr(attrFull, int(round(currentValue)))
-                except Exception:
-                    continue
-
-
-# blend to frame ......................................................................................
-
-
-def cache_blend_frame_data(objs, left_frame, right_frame):
-    frame_data_cache = {}
-    currentTime = cmds.currentTime(query=True)
-    for obj in objs:
-        attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []  # Solo atributos escalares (numéricos)
-        for attr in attrs:
-            attrFull = f"{obj}.{attr}"
-            if cmds.objExists(attrFull):
-                leftValue = cmds.getAttr(attrFull, time=left_frame) if left_frame is not None else None
-                rightValue = cmds.getAttr(attrFull, time=right_frame) if right_frame is not None else None
-
-                # Obtener el tipo de tangente para el keyframe anterior
-                keyframes = cmds.keyframe(attrFull, query=True) or []
-                previousKeyframes = [frame for frame in keyframes if frame < currentTime]
-                prevTanType = None
-                if previousKeyframes:
-                    previousFrame = max(previousKeyframes)
-                    prevTanType = cmds.keyTangent(attrFull, query=True, time=(previousFrame,), outTangentType=True)[0]
-
-                frame_data_cache[attrFull] = {
-                    "leftValue": leftValue,
-                    "rightValue": rightValue,
-                    "original_value": cmds.getAttr(attrFull),
-                    "needsCalculation": True,
-                    "prevTanType": prevTanType,  # Añadir tipo de tangente
-                }
-    return frame_data_cache
-
-
-# Esta es la funcion para el modo Blend to Frame
-
-
-def blend_to_frame(percentage, left_frame=None, right_frame=None, objs=None, selection=True):
-    global is_dragging, frame_data_cache, is_cached
-
-    if not objs and not selection:
-        raise ValueError("No objects given to blend_to_frame")
-
-    if not objs:
-        objs = util.get_selected_objects()
-
-    if not is_dragging:
-        toolCommon.open_undo_chunk(title="Blend to Frame", tooltip_template=helper.blend_to_frame_tooltip_text)
-        is_dragging = True
-
-    if not is_cached:
-        frame_data_cache = cache_blend_frame_data(objs, left_frame, right_frame)
-        is_cached = True
-
-    for obj in objs:
-        attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
-
-        for attr in attrs:
-            attrFull = f"{obj}.{attr}"
-            if attrFull not in frame_data_cache:
-                continue
-
-            cachedData = frame_data_cache[attrFull]
-            if not cachedData["needsCalculation"]:
-                continue
-
-            original_value = cachedData["original_value"]
-            previousValue = cachedData["leftValue"]
-            nextValue = cachedData["rightValue"]
-
-            if nextValue is not None and percentage > 0:
-                difference = nextValue - original_value
-            elif previousValue is not None:
-                difference = original_value - previousValue
-
-            else:
-                continue
-
-            weightedDifference = (difference * abs(percentage)) / 50.0
-            currentValue = original_value + weightedDifference if percentage > 0 else original_value - weightedDifference
-
-            cmds.setAttr(attrFull, currentValue)
-
-
-def blendSliderReset(slider):
-    global original_keyframes, original_values, is_dragging, frame_data_cache, original_keyframe_values, is_cached
-
-    # Comprobar si frame_data_cache tiene elementos
-    if frame_data_cache:
-        currentTime = cmds.currentTime(query=True)
-        for attrFull, cacheData in frame_data_cache.items():
-            if "prevTanType" in cacheData:
-                prevTanType = cacheData["prevTanType"]
-                # Ajustar 'step' a 'stepnext'
-                if prevTanType == "step":
-                    prevTanType = "stepnext"
-                # Crear un nuevo keyframe
-                cmds.setKeyframe(attrFull, time=currentTime)
-                # Aplicar la tangente al keyframe
-                cmds.keyTangent(attrFull, edit=True, time=(currentTime,), inTangentType=prevTanType, outTangentType=prevTanType)
-
-        frame_data_cache = {}
-        is_cached = False
-
-    # Resetear las variables globales
-    original_keyframes = {}
-    original_values = {}
-    original_keyframe_values = {}
-
-    if is_dragging:
-        toolCommon.close_undo_chunk()
-        is_dragging = False
-
-    cmds.floatSlider(slider, edit=True, value=0)
-
-
-# _____________________________________________________ Tween Machine _______________________________________________________________#
-
-
-def prepare_tween_data(objs=None, attrs=None):
-    global tween_frame_data_cache
-    tween_frame_data_cache = {}
-    currentTime = cmds.currentTime(query=True)
-
-    for obj in objs or util.get_selected_objects():
-        if not cmds.objExists(obj):
-            continue
-
-        current_attrs = attrs if attrs else cmds.listAttr(obj, keyable=True)
-        if current_attrs is None:
-            continue
-
-        for attr in current_attrs:
-            attrFull = "%s.%s" % (obj, attr)
-            keyframes = cmds.keyframe(attrFull, query=True) or []
-
-            if not keyframes:
-                continue
-
-            previousKeyframes = [frame for frame in keyframes if frame < currentTime]
-            laterKeyframes = [frame for frame in keyframes if frame > currentTime]
-
-            if not previousKeyframes or not laterKeyframes:
-                tween_frame_data_cache[attrFull] = {"needsCalculation": False}
-                continue
-
-            previousFrame = max(previousKeyframes)
-            nextFrame = min(laterKeyframes)
-
-            previousValue = cmds.getAttr(attrFull, time=previousFrame)
-            nextValue = cmds.getAttr(attrFull, time=nextFrame)
-
-            tween_frame_data_cache[attrFull] = {
-                "previousValue": previousValue,
-                "nextValue": nextValue,
-                "needsCalculation": previousValue != nextValue,
-            }
-
-            previousKeyframes = [frame for frame in keyframes if frame < currentTime]
-            if previousKeyframes:
-                previousFrame = max(previousKeyframes)
-                prevTanType = cmds.keyTangent(attrFull, query=True, time=(previousFrame,), outTangentType=True)[0]
-
-                tween_frame_data_cache[attrFull]["prevTanType"] = prevTanType
-
-    return tween_frame_data_cache
-
-
-def tween(percentage):
-    global is_dragging, tween_frame_data_cache
-
-    if not tween_frame_data_cache:
-        tween_frame_data_cache = prepare_tween_data()
-
-    if not is_dragging:
-        toolCommon.open_undo_chunk(title="Tweener", tooltip_template=helper.tweener_tooltip_text)
-        is_dragging = True
-
-    currentTime = cmds.currentTime(query=True)
-    adjustments = []
-
-    for attrFull, cache in tween_frame_data_cache.items():
-        if not cache.get("needsCalculation", False):
-            continue
-
-        # salta attrs inexistentes/bloqueados/no seteables/no numéricos
-        try:
-            if not cmds.objExists(attrFull):
-                continue
-            if cmds.getAttr(attrFull, lock=True) or not cmds.getAttr(attrFull, settable=True):
-                continue
-            a_type = cmds.getAttr(attrFull, type=True)
-            if a_type in ("enum", "string", "message"):
-                continue
-        except Exception:
-            continue
-
-        previousValue = cache.get("previousValue")
-        nextValue = cache.get("nextValue")
-
-        # sin valores válidos, nada que hacer
-        if previousValue is None or nextValue is None:
-            continue
-
-        # evita restar listas/tuplas (double3, matrices, etc.)
-        if isinstance(previousValue, (list, tuple)) or isinstance(nextValue, (list, tuple)):
-            continue
-
-        # exige número escalar
-        if not isinstance(previousValue, (int, float)) or not isinstance(nextValue, (int, float)):
-            continue
-
-        difference = nextValue - previousValue
-        weightedDifference = (difference * percentage) / 100.0
-        currentValue = previousValue + weightedDifference
-
-        adjustments.append((attrFull, currentValue))
-
-    apply_tween_adjustments(adjustments, currentTime, tween_frame_data_cache)
-
-
-def apply_tween_adjustments(adjustments, currentTime, tween_frame_data_cache):
-    for attrFull, currentValue in adjustments:
-        obj, attr = attrFull.split(".")
-
-        if cmds.attributeQuery(attr, node=obj, minExists=True):
-            minLimit = cmds.attributeQuery(attr, node=obj, minimum=True)[0]
-            currentValue = max(currentValue, minLimit)
-
-        if cmds.attributeQuery(attr, node=obj, maxExists=True):
-            maxLimit = cmds.attributeQuery(attr, node=obj, maximum=True)[0]
-            currentValue = min(currentValue, maxLimit)
-
-        cmds.setAttr(attrFull, currentValue)
-
-
-def tweenSliderReset(slider):
-    global original_keyframes, original_values, is_dragging, tween_frame_data_cache
-
-    currentTime = cmds.currentTime(query=True)
-
-    # Comprobar si tween_frame_data_cache tiene elementos
-    if tween_frame_data_cache:
-        for attrFull, cacheData in tween_frame_data_cache.items():
-            # Crear un nuevo keyframe
-            cmds.setKeyframe(attrFull, time=currentTime)
-
-            if "prevTanType" in cacheData:
-                prevTanType = cacheData["prevTanType"]
-                # Ajustar 'step' a 'stepnext'
-                if prevTanType == "step":
-                    prevTanType = "step"
-                # Aplicar la tangente al keyframe
-                cmds.keyTangent(attrFull, edit=True, time=(currentTime,), inTangentType=prevTanType, outTangentType=prevTanType)
-
-            if "currentValue" in cacheData:
-                currentValue = cacheData["currentValue"]
-                cmds.setAttr(attrFull, currentValue)
-
-    # Resetear las variables globales
-    original_keyframes = {}
-    original_values = {}
-    tween_frame_data_cache = {}
-
-    if is_dragging:
-        toolCommon.close_undo_chunk()
-        is_dragging = False
-
-
 # _____________________________________________________ Key Tools  Customgraph _______________________________________________________________#
 
 
 def deleteStaticCurves():
     # Obtener los objetos seleccionados con sus nombres completos una sola vez
-    selected_objects = util.get_selected_objects(long=True)
+    selected_objects = selection_targets.get_selected_objects(long=True)
 
     # También incluir las formas de los objetos seleccionados
     selected_shapes = []
@@ -1546,7 +1026,7 @@ def deleteStaticCurves():
 
 def snapKeyframes():
     # Obtén la selección actual
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
 
     for obj in selected_objects:
         if not cmds.attributeQuery("translateX", node=obj, exists=True):
@@ -1634,7 +1114,7 @@ def match_keys():
 
     # Verificar si hay al menos dos curvas seleccionadas
     if not selected_curves:
-        return util.make_inViewMessage("Select at least two animation curves")
+        return wutil.make_inViewMessage("Select at least two animation curves")
 
     else:
         # Obtener los keyframes de la primera curva seleccionada
@@ -1692,7 +1172,7 @@ def flipKeyGroup():
                 flipped_value = pivot + (pivot - value)  # Calcula el valor opuesto en relación al pivot
                 cmds.keyframe(curve, edit=True, time=(t, t), valueChange=flipped_value)
     else:
-        return util.make_inViewMessage("Select at least one keyframe in Graph Editor")
+        return wutil.make_inViewMessage("Select at least one keyframe in Graph Editor")
 
 
 def flipFromKeyframe():
@@ -1722,18 +1202,11 @@ def mod_overlap_animation(*args):
         overlap_forward()
 
 
-def get_selected_objects():
-    """
-    Devuelve una lista de objetos seleccionados en el orden en que se seleccionaron.
-    """
-    return util.get_selected_objects(orderedSelection=True, long=True)
-
-
 def overlap_forward(*args):
     frames_to_move = 1
 
     # Obtén el orden de los objetos seleccionados
-    selected_objects_order = get_selected_objects()
+    selected_objects_order = selection_targets.get_selected_objects(orderedSelection=True, long=True)
     # Intenta obtener las curvas seleccionadas del Graph Editor
     selected_anim_curves = getSelectedCurves()
 
@@ -1743,7 +1216,7 @@ def overlap_forward(*args):
 
         # Si no hay canales seleccionados, muestra un mensaje al usuario y termina la ejecución
         if not selected_channels:
-            return util.make_inViewMessage("Select animation curves or channels in the Channel Box")
+            return wutil.make_inViewMessage("Select animation curves or channels in the Channel Box")
 
         selected_anim_curves = [
             cmds.listConnections(f"{obj}.{channel}", type="animCurve")[0]
@@ -1766,7 +1239,7 @@ def overlap_backward(*args):
     frames_to_move = -1
 
     # Obtén el orden de los objetos seleccionados
-    selected_objects_order = get_selected_objects()
+    selected_objects_order = selection_targets.get_selected_objects(orderedSelection=True, long=True)
 
     # Intenta obtener las curvas seleccionadas del Graph Editor
     selected_anim_curves = getSelectedCurves()
@@ -1777,7 +1250,7 @@ def overlap_backward(*args):
 
         # Si no hay canales seleccionados, muestra un mensaje al usuario y termina la ejecución
         if not selected_channels:
-            return util.make_inViewMessage("Select animation curves or channels in the Channel Box")
+            return wutil.make_inViewMessage("Select animation curves or channels in the Channel Box")
 
         selected_anim_curves = [
             cmds.listConnections(f"{obj}.{channel}", type="animCurve")[0]
@@ -1801,18 +1274,18 @@ def overlap_backward(*args):
 
 def isolateCurve():
     # Obtén las curvas seleccionadas en el Graph Editor
-    selected_objects = cmds.selectionConnection("graphEditor1FromOutliner", q=1, object=1)
+    selected_objects = selection_targets.get_graph_editor_outliner_items()
 
     if not selected_objects:
         cmds.warning("There are not selected curves in Graph Editor")
     else:
         for s in selected_objects:
-            mel.eval("isolateAnimCurve true graphEditor1FromOutliner graphEditor1GraphEd;")
+            mel.eval("isolateAnimCurve true {} {};".format(selection_targets.GRAPH_EDITOR_OUTLINER, selection_targets.GRAPH_EDITOR))
 
 
 def toggleMute():
     # Obtener las curvas seleccionadas en el Graph Editor
-    selected_curves = cmds.selectionConnection("graphEditor1FromOutliner", q=1, object=1)
+    selected_curves = selection_targets.get_graph_editor_outliner_items()
 
     if selected_curves:
         for curve in selected_curves:
@@ -1832,7 +1305,7 @@ def toggleMute():
 
 def toggleLock():
     # Obtén las curvas seleccionadas en el Graph Editor
-    selected_objects = cmds.selectionConnection("graphEditor1FromOutliner", q=1, object=1)
+    selected_objects = selection_targets.get_graph_editor_outliner_items()
 
     # Si no hay objetos seleccionados, lanza un error
     if not selected_objects:
@@ -1878,7 +1351,7 @@ def reset_objects_mods(*args):
 
 def save_default_values(*args):
     # Obtener objetos seleccionados
-    objetos_seleccionados = util.get_selected_objects(long=True)
+    objetos_seleccionados = selection_targets.get_selected_objects(long=True)
 
     json_file_path = general.get_set_default_data_file()
 
@@ -1917,7 +1390,7 @@ def save_default_values(*args):
     with open(json_file_path, "w") as file:
         json.dump(data, file, indent=4)
 
-    util.make_inViewMessage("Default values saved")
+    wutil.make_inViewMessage("Default values saved")
 
 
 def restore_default_data(*args):
@@ -1930,7 +1403,7 @@ def restore_default_data(*args):
 
         cmds.warning("All default values restored")
     else:
-        return util.make_inViewMessage("No default values found to restore")
+        return wutil.make_inViewMessage("No default values found to restore")
 
 
 def remove_default_values_for_selected_object(*args):
@@ -1941,10 +1414,10 @@ def remove_default_values_for_selected_object(*args):
         with open(json_file_path, "r") as file:
             data = json.load(file)
     else:
-        return util.make_inViewMessage("No default values found to remove")
+        return wutil.make_inViewMessage("No default values found to remove")
 
     # Obtener objetos seleccionados
-    objetos_seleccionados = util.get_selected_objects(long=True)
+    objetos_seleccionados = selection_targets.get_selected_objects(long=True)
 
     for obj in objetos_seleccionados:
         # Extraer el namespace y el nombre corto del objeto
@@ -1968,7 +1441,7 @@ def remove_default_values_for_selected_object(*args):
     with open(json_file_path, "w") as file:
         json.dump(data, file, indent=4)
 
-    util.make_inViewMessage("Default values removed")
+    wutil.make_inViewMessage("Default values removed")
 
 
 def reset_object_values(reset_translations=False, reset_rotations=False, reset_scales=False):
@@ -2121,7 +1594,7 @@ def get_default_value(node):
 
 
 def get_default_value_main():
-    selected_curves = cmds.selectionConnection("graphEditor1FromOutliner", query=True, object=True)
+    selected_curves = selection_targets.get_graph_editor_outliner_items()
 
     if selected_curves:
         for curve in selected_curves:
@@ -2138,7 +1611,7 @@ def get_default_value_main():
 
 def get_namespace_from_selection(*args):
     # Obtener el namespace del objeto seleccionado (si existe)
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
     if selected_objects:
         object_name = selected_objects[0]
         if ":" in object_name:
@@ -2171,7 +1644,7 @@ def select_objects_from_selected_curves(*args):
 
     if selected_objects:
         cmds.selectKey(selected_curves, add=True)  # Seleccionar las claves en el Graph Editor
-        mel.eval("isolateAnimCurve true graphEditor1FromOutliner graphEditor1GraphEd;")
+        mel.eval("isolateAnimCurve true {} {};".format(selection_targets.GRAPH_EDITOR_OUTLINER, selection_targets.GRAPH_EDITOR))
         cmds.select(list(selected_objects), replace=True)  # Seleccionar los objetos en la vista 3D
 
 
@@ -2240,7 +1713,7 @@ def selectOppositeHandler(*args):
 def selectOpposite(*args):
     global MIRROR_PATTERNS
 
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
     opposite_controls = []
 
     for obj in selected_objects:
@@ -2255,7 +1728,7 @@ def selectOpposite(*args):
 def addSelectOpposite(*args):
     global MIRROR_PATTERNS
 
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
     opposite_controls = []
 
     for obj in selected_objects:
@@ -2300,7 +1773,7 @@ def copyOpposite(*args):
                     return attr.replace(from_pattern, to_pattern)
             return attr
 
-        selected_objects = util.get_selected_objects()
+        selected_objects = selection_targets.get_selected_objects()
 
         for obj in selected_objects:
             opposite_obj = find_opposite_name(obj)
@@ -2440,10 +1913,10 @@ def mirror(*args):
                     cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
 
         def mirror_controls():
-            selected_controls = util.get_selected_objects()
+            selected_controls = selection_targets.get_selected_objects()
 
             if not selected_controls:
-                return util.make_inViewMessage("Select at least one object")
+                return wutil.make_inViewMessage("Select at least one object")
 
             processed_controls = set()
 
@@ -2561,10 +2034,10 @@ def mirror_to_opposite(*args):
                 cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
 
     def mirror_controls():
-        selected_controls = util.get_selected_objects()
+        selected_controls = selection_targets.get_selected_objects()
 
         if not selected_controls:
-            return util.make_inViewMessage("Select at least one object")
+            return wutil.make_inViewMessage("Select at least one object")
 
         processed_controls = set()
 
@@ -2626,14 +2099,14 @@ def add_mirror_invert_exception(*args):
 
     def create_mirror_exception():
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = util.get_selected_objects()
+        selected_controls = selection_targets.get_selected_objects()
         selected_channels = get_selected_channels()
 
         if selected_controls and selected_channels:
             add_exceptions_to_json(selected_controls, selected_channels, mirror_exceptions_file_path)
             cmds.warning("Exception created")
         else:
-            util.make_inViewMessage("Select controls and channels to create an exception")
+            wutil.make_inViewMessage("Select controls and channels to create an exception")
 
     create_mirror_exception()
 
@@ -2674,14 +2147,14 @@ def add_mirror_keep_exception(*args):
 
     def create_mirror_exception():
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = util.get_selected_objects()
+        selected_controls = selection_targets.get_selected_objects()
         selected_channels = get_selected_channels()
 
         if selected_controls and selected_channels:
             add_exceptions_to_json(selected_controls, selected_channels, mirror_exceptions_file_path)
             cmds.warning("Exception created")
         else:
-            util.make_inViewMessage("Select controls and channels to create an exception")
+            wutil.make_inViewMessage("Select controls and channels to create an exception")
 
     create_mirror_exception()
 
@@ -2723,14 +2196,14 @@ def remove_mirror_invert_exception(*args):
 
     def remove_mirror_exceptions():
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = util.get_selected_objects()
+        selected_controls = selection_targets.get_selected_objects()
         selected_channels = get_selected_channels()
 
         if selected_controls and selected_channels:
             remove_exceptions_from_json(selected_controls, selected_channels, mirror_exceptions_file_path)
             print("Exception removed")
         else:
-            util.make_inViewMessage("Select controls and channels to remove exceptions")
+            wutil.make_inViewMessage("Select controls and channels to remove exceptions")
 
     remove_mirror_exceptions()
 
@@ -2757,7 +2230,7 @@ def copy_animation(*args):
         with open(json_file_path, "w") as json_file:
             json.dump(animation_data, json_file, indent=4)
 
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
 
     if not selected_objects:
         return
@@ -2816,7 +2289,7 @@ def copy_animation(*args):
                 key="copy_animation_range",
             )
 
-        util.make_inViewMessage("Animation saved")
+        wutil.make_inViewMessage("Animation saved")
     except Exception as e:
         cmds.warning(f"Error saving animation: {e}")
     finally:
@@ -2848,7 +2321,7 @@ def paste_animation(*args):
         return timelineWidgets.get_animation_data_timerange(animation_data)
 
     # Obtener los objetos seleccionados
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
 
     if not selected_objects:
         return
@@ -2868,7 +2341,7 @@ def paste_animation(*args):
         if tint_session:
             tint_session.finish()
 
-    util.make_inViewMessage("Animation restored")
+    wutil.make_inViewMessage("Animation restored")
 
 
 # PASTE INSERT _________________________________________________________________________
@@ -2896,7 +2369,7 @@ def paste_insert_animation(*args):
                             cmds.setKeyframe(control, time=adjusted_frame, attribute=channel, value=value)
 
     # Obtener los objetos seleccionados y el tiempo actual
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
     current_time = cmds.currentTime(query=True)
 
     if not selected_objects:
@@ -2907,7 +2380,7 @@ def paste_insert_animation(*args):
     # Aplicar animación a los objetos seleccionados en el tiempo actual
     apply_animation_from_json(json_file_path, selected_objects, current_time)
 
-    util.make_inViewMessage("Animation inserted")
+    wutil.make_inViewMessage("Animation inserted")
 
 
 # PASTE OPPOSITE ________________________________________________________________________
@@ -2962,7 +2435,7 @@ def paste_opposite_animation(*args):
                 for frame, value in zip(channel_data["keyframes"], mirrored_values):
                     cmds.setKeyframe(full_mirror_control_name, time=frame, attribute=channel, value=value)
 
-    util.make_inViewMessage("Mirror Animation Restored")
+    wutil.make_inViewMessage("Mirror Animation Restored")
 
 
 def paste_animation_to(source_control_name=None, replace=True, insert_at_current=False, *args, **kwargs):
@@ -2988,9 +2461,9 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             return json.load(f)
 
     # Destinos: selección actual
-    targets = util.get_selected_objects()
+    targets = selection_targets.get_selected_objects()
     if not targets:
-        return util.make_inViewMessage("Select at least one destination control")
+        return wutil.make_inViewMessage("Select at least one destination control")
 
     # Cargar JSON
     json_file_path = general.get_copy_animation_file()
@@ -3016,7 +2489,9 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             source_control_name = available_sources[0]
         else:
             cmds.warning(
-                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(", ".join(available_sources))
+                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(
+                    ", ".join(available_sources)
+                )
             )
             return
     else:
@@ -3031,7 +2506,9 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             break
 
     if matched_source is None:
-        cmds.warning("Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources)))
+        cmds.warning(
+            "Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources))
+        )
         return
 
     src_channels = animation_data.get(matched_source, {})
@@ -3095,7 +2572,9 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
         mode = "inserted at current time" if insert_at_current else "pasted"
         repl = " (replaced existing keys)" if replace else ""
         cmds.warning(
-            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(mode, _short(matched_source), len(targets), repl, total_keys_set)
+            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(
+                mode, _short(matched_source), len(targets), repl, total_keys_set
+            )
         )
 
 
@@ -3108,7 +2587,7 @@ def copy_pose(*args):
         with open(json_file_path, "w") as json_file:
             json.dump(pose_data, json_file, indent=4)
 
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
 
     if not selected_objects:
         return
@@ -3141,7 +2620,7 @@ def copy_pose(*args):
 
         save_pose_to_json(json_file_path, pose_data)
 
-        util.make_inViewMessage("Pose saved")
+        wutil.make_inViewMessage("Pose saved")
     finally:
         tint_session.finish()
 
@@ -3191,7 +2670,7 @@ def paste_pose(*args):
                             report.report_detected_exception(e, context="paste pose attribute set")
 
     # Obtener los objetos seleccionados
-    selected_objects = util.get_selected_objects()
+    selected_objects = selection_targets.get_selected_objects()
 
     if not selected_objects:
         return
@@ -3203,7 +2682,7 @@ def paste_pose(*args):
         # Aplicar pose a los objetos seleccionados
         apply_pose_from_json(json_file_path, selected_objects)
 
-        util.make_inViewMessage("Pose pasted")
+        wutil.make_inViewMessage("Pose pasted")
     finally:
         tint_session.finish()
 
@@ -3329,7 +2808,7 @@ def bouncy_tangets(*args, angle_adjustment_factor=1.3):  # Ajuste de ángulo
     target_keyframes = _collect_bouncy_target_keyframes(target_info)
 
     if not target_keyframes:
-        return util.make_inViewMessage("No animation keys available for bouncy tangents.")
+        return wutil.make_inViewMessage("No animation keys available for bouncy tangents.")
 
     time_context = target_info.get("time_context")
     if target_info.get("selected_keyframes"):
@@ -3355,12 +2834,16 @@ def bouncy_tangets(*args, angle_adjustment_factor=1.3):  # Ajuste de ángulo
                 continue
 
             if currentIndex > 0:
-                inAngle = calculateTangentAngle(curve, keyTimes[currentIndex - 1], keyValues[currentIndex - 1], time, keyValues[currentIndex])
+                inAngle = calculateTangentAngle(
+                    curve, keyTimes[currentIndex - 1], keyValues[currentIndex - 1], time, keyValues[currentIndex]
+                )
             else:
                 inAngle = 0
 
             if currentIndex < len(keyTimes) - 1:
-                outAngle = calculateTangentAngle(curve, time, keyValues[currentIndex], keyTimes[currentIndex + 1], keyValues[currentIndex + 1])
+                outAngle = calculateTangentAngle(
+                    curve, time, keyValues[currentIndex], keyTimes[currentIndex + 1], keyValues[currentIndex + 1]
+                )
             else:
                 outAngle = 0
 

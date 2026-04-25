@@ -32,6 +32,7 @@ import json
 import subprocess
 import os
 import sys
+from TheKeyMachine.core import selection_targets
 
 
 def load_config():
@@ -204,7 +205,7 @@ def create_TheKeyMachine_node():
     # Guardar la selección inicial
     from TheKeyMachine.widgets import util as wutil
 
-    initial_selection = wutil.get_selected_objects()
+    initial_selection = selection_targets.get_selected_objects()
 
     tkm_version = get_thekeymachine_version()
     tkm_stage = get_thekeymachine_stage_version()
@@ -239,7 +240,7 @@ def create_ibookmarks_node():
     # Guardar la selección inicial
     from TheKeyMachine.widgets import util as wutil
 
-    initial_selection = wutil.get_selected_objects()
+    initial_selection = selection_targets.get_selected_objects()
 
     if not cmds.objExists("iBookmarks"):
         node = cmds.createNode("transform", name="iBookmarks")

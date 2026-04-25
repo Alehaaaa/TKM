@@ -5,11 +5,11 @@ import os
 import importlib
 
 try:
-    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent
+    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker
     from PySide6.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup, QIcon
     from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout
 except ImportError:
-    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent
+    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker
     from PySide2.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QIcon
     from PySide2.QtWidgets import (
         QWidget,
@@ -24,17 +24,17 @@ except ImportError:
     )
 
 import TheKeyMachine.mods.uiMod as ui
-import TheKeyMachine.widgets.util as util
+import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
-from TheKeyMachine.sliders import utils as slider_utils
+from TheKeyMachine.sliders import api as slider_api
 import TheKeyMachine.core.runtime_manager as runtime
 from TheKeyMachine.tools import colors as toolColors
 
 from TheKeyMachine.tooltips import QFlatTooltipManager, format_tooltip_shortcut
 
 importlib.reload(ui)
-importlib.reload(util)
+importlib.reload(wutil)
 importlib.reload(cw)
 importlib.reload(settings)
 
@@ -61,6 +61,22 @@ class SliderMode:
 
     def __repr__(self):
         return f"<SliderMode {self.key}>"
+
+
+class ResetWithoutEmit:
+    """Context manager to reset a slider without triggering signal emissions."""
+
+    def __init__(self, slider: QSlider):
+        self._slider = slider
+        self._blocker = None
+
+    def __enter__(self):
+        self._blocker = QSignalBlocker(self._slider)
+        self._slider.setValue(getattr(self._slider, "defaultValue", 0))
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._blocker = None
 
 
 """
@@ -114,7 +130,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
         self._percent = percent
         self._color = color
         self._frameButton = bool(frameButton)
-        self._box_sz = util.DPI(7) if (self._frameButton or abs(percent) == 100) else util.DPI(3)
+        self._box_sz = wutil.DPI(7) if (self._frameButton or abs(percent) == 100) else wutil.DPI(3)
         self.setFixedHeight(parent.height())
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -192,7 +208,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
             if self._worldSpace:
                 cx, cy = w // 2, h // 2
-                r = util.DPI(int(min(w, h) * 0.24))  # smaller globe
+                r = wutil.DPI(int(min(w, h) * 0.24))  # smaller globe
 
                 p.setPen(Qt.NoPen)
                 p.setBrush(glow_color if is_glow else main_color)
@@ -250,9 +266,9 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         # theme/state
         self._color = color
         self._text = text
-        self._thin_h = util.DPI(10)
-        self._handle = util.DPI(24)
-        self._handle_radius = util.DPI(5)
+        self._thin_h = wutil.DPI(10)
+        self._handle = wutil.DPI(24)
+        self._handle_radius = wutil.DPI(5)
         self._padding_lr = 0
         self._pressOffset: Optional[int | bool] = None  # bool True = "wheel active"
         self._hover = False
@@ -264,23 +280,15 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._wheel_count = 0
         self._prev_wheel_direction = 0
 
-        # wheel-reset timer (end interaction after a pause)
-        self._wheel_reset_timer = QTimer(self)
-        self._wheel_reset_timer.setSingleShot(True)
-        self._wheel_reset_timer.setInterval(500)
-        self._wheel_reset_timer.timeout.connect(self._reset_without_emit)
-
         # fonts
         self._value_font = QFont()
-        self._value_font.setPointSize(util.DPI(14))
+        self._value_font.setPointSize(wutil.DPI(14))
         self._text_font = QFont()
-        self._text_font.setPixelSize(int(util.DPI(11)))
+        self._text_font.setPixelSize(int(wutil.DPI(11)))
 
         # size
-        self.setFixedWidth(util.DPI(200))
-        self.setFixedHeight(util.DPI(24))
-
-        self.valueChanged.connect(self._update_self_tooltip)
+        self.setFixedWidth(wutil.DPI(200))
+        self.setFixedHeight(wutil.DPI(24))
 
         self._apply_stylesheet(thick=False)
 
@@ -363,14 +371,15 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
     # --- internals --------------------------------------------------------------
     def _reset_without_emit(self, emit_finished: bool = True):
-        reset = util.ResetWithoutEmit(self)
-        reset()
+        last_percent = self.percent()
+        with ResetWithoutEmit(self):
+            self._pressOffset = None
+            self._apply_stylesheet(thick=False)
+
         if emit_finished:
-            self.finished.emit(self.percent())
+            self.finished.emit(last_percent)
         self._wheel_count = 0
         self._prev_wheel_direction = 0
-        self._pressOffset = None
-        self._apply_stylesheet(thick=False)
         self.update()
 
     def _apply_stylesheet(self, *, thick: bool):
@@ -384,7 +393,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
             handle_border = "none"
         else:
             handle_bg = SLIDER_HANDLE_NEUTRAL_HEX
-            handle_border = f"{util.DPI(1)}px solid {UI_COLORS.darker_gray.hex}"
+            handle_border = f"{wutil.DPI(1)}px solid {UI_COLORS.darker_gray.hex}"
         self.setStyleSheet(
             f"""
 QSlider::groove:horizontal {{
@@ -480,7 +489,7 @@ QSlider::handle:horizontal {{
         if e.button() == Qt.LeftButton and self.isSliderDown():
             self.setSliderDown(False)
             self._apply_stylesheet(thick=False)
-            # Emit finished so the parent widget can call stop_dragging()
+            # Emit finished so the configured drop handler can finalize the operation.
             self.finished.emit(self.percent())
             # SliderHandle reset logic handles signal blocking internally
             self._reset_without_emit(emit_finished=False)
@@ -536,7 +545,7 @@ QSlider::handle:horizontal {{
             path = QPainterPath()
             path.addText(tx, ty, self._text_font, self._text)
 
-            p.setPen(QPen(QColor(UI_COLORS.dark_gray.hex), util.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            p.setPen(QPen(QColor(UI_COLORS.dark_gray.hex), wutil.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
             p.setBrush(Qt.NoBrush)
             p.drawPath(path)
 
@@ -559,8 +568,8 @@ QSlider::handle:horizontal {{
         # live % display while dragging/wheeling
         cx = hrect.center().x()
         mid = self.width() // 2
-        pad = util.DPI(10)  # slightly more padding from handle
-        edge_pad = util.DPI(14)  # padding from the widget edges
+        pad = wutil.DPI(10)  # slightly more padding from handle
+        edge_pad = wutil.DPI(14)  # padding from the widget edges
 
         if cx < mid:
             # Handle is on the left half, draw text in the right half space
@@ -624,6 +633,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._tooltipDescription = tooltipDescription
         self._modeExecutor = None
         self._modeFinishHandler = None
+        self._sliderSession = None
 
         self._section_parent = None
         self._section_prefix = ""
@@ -1155,12 +1165,22 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         mode = self._get_active_mode()
         if mode is None:
             return
-        self._modeExecutor(mode.key, value)
+        if self._sliderSession is None:
+            self._sliderSession = slider_api.create_session(mode.key)
+        elif self._sliderSession.mode != mode.key:
+            self._sliderSession.switch_mode(mode.key)
+        self._modeExecutor(mode.key, value, session=self._sliderSession)
 
     def _dispatch_mode_finish(self):
-        if self._modeFinishHandler is None:
+        if self._sliderSession is None:
             return
-        self._modeFinishHandler()
+        try:
+            if self._modeFinishHandler is not None:
+                self._modeFinishHandler(session=self._sliderSession)
+            else:
+                self._sliderSession.finish()
+        finally:
+            self._sliderSession = None
 
     def _emit_value_changed(self, value: float):
         self.valueChanged.emit(float(value))
@@ -1174,9 +1194,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         # Notify drag finished (connected to dropCommand which is usually a no-op or specific tool reset)
         self.dragFinished.emit()
 
-        # Finalize the interaction and clean up the undo chunk
-        slider_utils.stop_dragging()
-
         self._leftOverlay.show()
         self._rightOverlay.show()
 
@@ -1185,7 +1202,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         try:
             self._emit_value_set(float(btn.percent))
         finally:
-            slider_utils.stop_dragging()
+            self.dragFinished.emit()
 
     def leaveEvent(self, e):
         self._disconnect_modifier_watch()
