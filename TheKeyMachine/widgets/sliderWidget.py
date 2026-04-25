@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 import os
 import importlib
+import traceback
 
 try:
     from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker
@@ -24,6 +25,7 @@ except ImportError:
     )
 
 import TheKeyMachine.mods.uiMod as ui
+import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
@@ -34,6 +36,7 @@ from TheKeyMachine.tools import colors as toolColors
 from TheKeyMachine.tooltips import QFlatTooltipManager, format_tooltip_shortcut
 
 importlib.reload(ui)
+importlib.reload(report)
 importlib.reload(wutil)
 importlib.reload(cw)
 importlib.reload(settings)
@@ -494,6 +497,11 @@ QSlider::handle:horizontal {{
             # SliderHandle reset logic handles signal blocking internally
             self._reset_without_emit(emit_finished=False)
             self._pressOffset = None
+            e.accept()
+            parent = self.parent()
+            if parent and hasattr(parent, "_restore_buttons_after_drag"):
+                parent._restore_buttons_after_drag()
+            return
         super().mouseReleaseEvent(e)
 
     def wheelEvent(self, e: QWheelEvent):
@@ -521,7 +529,8 @@ QSlider::handle:horizontal {{
         p.setRenderHint(QPainter.Antialiasing)
 
         base_color = QColor(self._color)
-        if getattr(self, "_handle_hover", False) or bool(self._pressOffset):
+        handle_highlighted = getattr(self, "_handle_hover", False) or bool(self._pressOffset)
+        if handle_highlighted:
             main_color = QColor(
                 min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
             )
@@ -534,6 +543,8 @@ QSlider::handle:horizontal {{
             if not qicon.isNull():
                 icon_rect = QRect(0, 0, icon_size, icon_size)
                 icon_rect.moveCenter(hrect.center())
+                if handle_highlighted:
+                    qicon = cw.QFlatHoverableIcon._color_icon(qicon, main_color, icon_rect.size())
                 qicon.paint(p, icon_rect, Qt.AlignCenter)
         else:
             p.setFont(self._text_font)
@@ -549,7 +560,7 @@ QSlider::handle:horizontal {{
             p.setBrush(Qt.NoBrush)
             p.drawPath(path)
 
-            if getattr(self, "_handle_hover", False) or bool(self._pressOffset):
+            if handle_highlighted:
                 glow_color = QColor(255, 255, 255, 40)
                 p.setBrush(glow_color)
                 p.setPen(Qt.NoPen)
@@ -1153,6 +1164,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         QFlatTooltipManager.hide()
 
         self.dragStarted.emit()
+        self._leftOverlay.setEnabled(False)
+        self._rightOverlay.setEnabled(False)
         self._leftOverlay.hide()
         self._rightOverlay.hide()
 
@@ -1169,7 +1182,10 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._sliderSession = slider_api.create_session(mode.key)
         elif self._sliderSession.mode != mode.key:
             self._sliderSession.switch_mode(mode.key)
-        self._modeExecutor(mode.key, value, session=self._sliderSession)
+        try:
+            self._modeExecutor(mode.key, value, session=self._sliderSession)
+        except Exception as exc:
+            self._cancel_active_drag_after_error(exc)
 
     def _dispatch_mode_finish(self):
         if self._sliderSession is None:
@@ -1181,6 +1197,30 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                 self._sliderSession.finish()
         finally:
             self._sliderSession = None
+
+    def _cancel_active_drag_after_error(self, exc):
+        traceback_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        report._emit_exception_to_script_editor(traceback_text)
+        report.report_detected_exception(
+            exc=exc,
+            context="slider drag",
+            source_file=report._extract_exception_source_file(exc=exc),
+            traceback_text=traceback_text,
+        )
+
+        try:
+            self._dispatch_mode_finish()
+        except Exception:
+            pass
+
+        if self._slider:
+            try:
+                self._slider.setSliderDown(False)
+                self._slider._reset_without_emit(emit_finished=False)
+            except Exception:
+                pass
+
+        self._restore_buttons_after_drag()
 
     def _emit_value_changed(self, value: float):
         self.valueChanged.emit(float(value))
@@ -1194,6 +1234,9 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         # Notify drag finished (connected to dropCommand which is usually a no-op or specific tool reset)
         self.dragFinished.emit()
 
+    def _restore_buttons_after_drag(self):
+        self._leftOverlay.setEnabled(True)
+        self._rightOverlay.setEnabled(True)
         self._leftOverlay.show()
         self._rightOverlay.show()
 
@@ -1210,6 +1253,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         # Finalize the interaction if we were wheeling when the mouse leaves the widget
         if self._slider and self._slider._pressOffset is not None and not self._slider.isSliderDown():
             self._slider._reset_without_emit()
+            self._restore_buttons_after_drag()
         super().leaveEvent(e)
 
     def enterEvent(self, e):

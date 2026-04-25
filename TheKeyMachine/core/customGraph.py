@@ -59,15 +59,89 @@ for m in mods:
 
 UI_COLORS = toolColors.UI_COLORS
 
-_GRAPH_LAYOUT = "customGraph_columnLayout"
+_GRAPH_TOOLBAR_OBJECT = "tkm_customGraph_flowToolbar"
+_GRAPH_TOOLBAR_DOCK_SETTING = "graph_toolbar_dock_position"
+_DOCK_BOTTOM_GRAPH = "bottom_graph_editor"
+_DOCK_TOP_GRAPH = "top_graph_editor"
+_DOCK_BOTTOM_MENU = "bottom_menu"
+_DOCK_OPTIONS = (
+    (_DOCK_TOP_GRAPH, "Top of Graph Editor", "Place the toolbar at the top of the Graph Editor."),
+    (_DOCK_BOTTOM_GRAPH, "Bottom of Graph Editor", "Place the toolbar at the bottom of the Graph Editor."),
+    # (_DOCK_BOTTOM_MENU, "Bottom of Menu", "Place the toolbar directly below the Graph Editor menu."),
+)
+_GRAPH_TOOLBAR_WIDGET = None
+
+
+def _normalize_dock_position(position=None):
+    allowed_positions = {position for position, _label, _description in _DOCK_OPTIONS}
+    position = position or settings.get_setting(_GRAPH_TOOLBAR_DOCK_SETTING, _DOCK_BOTTOM_GRAPH)
+    return position if position in allowed_positions else _DOCK_BOTTOM_GRAPH
+
+
+def _graph_toolbar_alignment():
+    align_str = settings.get_setting("graph_toolbar_alignment", "Center")
+    if align_str == "Center":
+        return QtCore.Qt.AlignHCenter
+    if align_str == "Right":
+        return QtCore.Qt.AlignRight
+    return QtCore.Qt.AlignLeft
+
+
+def _find_graph_editor_widget():
+    graph_ptr = mui.MQtUtil.findControl("graphEditor1")
+    return wutil.get_maya_qt(graph_ptr, QtWidgets.QWidget) if graph_ptr else None
+
+
+def getCustomGraphWidget():
+    global _GRAPH_TOOLBAR_WIDGET
+
+    graph_qw = _find_graph_editor_widget()
+    if not graph_qw:
+        _GRAPH_TOOLBAR_WIDGET = None
+        return None
+
+    if (
+        _GRAPH_TOOLBAR_WIDGET
+        and wutil.is_valid_widget(_GRAPH_TOOLBAR_WIDGET)
+        and _GRAPH_TOOLBAR_WIDGET.objectName() == _GRAPH_TOOLBAR_OBJECT
+        and graph_qw.isAncestorOf(_GRAPH_TOOLBAR_WIDGET)
+    ):
+        return _GRAPH_TOOLBAR_WIDGET
+
+    toolbar_widget = graph_qw.findChild(QtWidgets.QWidget, _GRAPH_TOOLBAR_OBJECT)
+    if toolbar_widget and wutil.is_valid_widget(toolbar_widget):
+        _GRAPH_TOOLBAR_WIDGET = toolbar_widget
+        return toolbar_widget
+
+    _GRAPH_TOOLBAR_WIDGET = None
+    return None
+
+
+def _iter_graph_toolbar_widgets():
+    graph_qw = _find_graph_editor_widget()
+    if not graph_qw:
+        return []
+    return [widget for widget in graph_qw.findChildren(QtWidgets.QWidget, _GRAPH_TOOLBAR_OBJECT) if wutil.is_valid_widget(widget)]
+
+
+def _delete_graph_toolbar_widget(toolbar_widget):
+    if toolbar_widget and wutil.is_valid_widget(toolbar_widget):
+        try:
+            parent = toolbar_widget.parentWidget()
+            if parent and parent.layout():
+                parent.layout().removeWidget(toolbar_widget)
+            toolbar_widget.setObjectName("{}_deleted".format(_GRAPH_TOOLBAR_OBJECT))
+            toolbar_widget.setParent(None)
+            toolbar_widget.deleteLater()
+        except Exception:
+            pass
 
 
 def removeCustomGraph() -> None:
-    if cmds.columnLayout(_GRAPH_LAYOUT, exists=True):
-        try:
-            cmds.deleteUI(_GRAPH_LAYOUT)
-        except Exception:
-            pass
+    global _GRAPH_TOOLBAR_WIDGET
+    for toolbar_widget in _iter_graph_toolbar_widgets():
+        _delete_graph_toolbar_widget(toolbar_widget)
+    _GRAPH_TOOLBAR_WIDGET = None
     graphToolbarApi.emit_graph_toolbar_state()
 
 
@@ -113,6 +187,92 @@ def create_settings_menu(parent_button):
     menu = cw.MenuWidget(parent=parent_button)
     menu.addAction(cw.LogoAction(menu))
 
+    # Settings submenu
+    settings_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Settings", description="Tool configuration and preferences.")
+    menu.addMenu(settings_menu)
+
+    settings_menu.addSection("Graph toolbar")
+    graph_toolbar_action = settings_menu.addAction(
+        QtGui.QIcon(media.customGraph_image),
+        "Graph Editor Toolbar",
+        description="Show or hide the TKM toolbar inside the Graph Editor.",
+    )
+    graph_toolbar_action.setCheckable(True)
+
+    def _on_graph_toolbar_toggled(state):
+        graphToolbarApi.set_graph_toolbar_enabled(bool(state))
+
+    graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
+    graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
+
+    dock_menu = cw.MenuWidget(QtGui.QIcon(media.dock_image), "Dock", description="Move the Graph Editor toolbar.")
+    menu.addMenu(dock_menu)
+    dock_group = QActionGroup(dock_menu)
+    dock_group.setExclusive(True)
+
+
+    dock_actions = {}
+    for position, label, description in _DOCK_OPTIONS:
+        action = dock_menu.addAction(label, description=description)
+        action.setCheckable(True)
+        dock_group.addAction(action)
+        action.triggered.connect(lambda checked=False, p=position: moveCustomGraphDock(p))
+        dock_actions[position] = action
+
+    def _sync_dock_menu():
+        current_position = settings.get_setting(_GRAPH_TOOLBAR_DOCK_SETTING, _DOCK_BOTTOM_GRAPH)
+        if current_position not in dock_actions:
+            current_position = _DOCK_BOTTOM_GRAPH
+        for position, action in dock_actions.items():
+            if not wutil.is_valid_widget(action):
+                continue
+            try:
+                action.blockSignals(True)
+                action.setChecked(position == current_position)
+                action.blockSignals(False)
+            except RuntimeError:
+                continue
+
+    _sync_dock_menu()
+
+    settings_menu.addSection("Toolbar's icons alignment")
+    align_group = QActionGroup(settings_menu)
+    left_align = settings_menu.addAction("Left", description="Align icons to the left.")
+    center_align = settings_menu.addAction("Center", description="Align icons to the center.")
+    right_align = settings_menu.addAction("Right", description="Align icons to the right.")
+
+    current_align = settings.get_setting("graph_toolbar_alignment", "Center")
+    align_map = {"Left": left_align, "Center": center_align, "Right": right_align}
+
+    for label, act in align_map.items():
+        act.setCheckable(True)
+        align_group.addAction(act)
+        if label == current_align:
+            act.setChecked(True)
+
+        def set_align(state, alignment_label=label):
+            if state:
+                applyCustomGraphAlignment(alignment_label)
+
+        act.toggled.connect(set_align)
+
+    settings_menu.addSection("General")
+    settings_menu.addAction(
+        QtGui.QIcon(media.close_image),
+        "Close",
+        lambda: QtCore.QTimer.singleShot(0, removeCustomGraph),
+        description="Close only the TKM Graph Editor toolbar.",
+    )
+
+    menu.addAction(
+        QtGui.QIcon(media.hotkeys_image),
+        "Hotkeys",
+        hotkeys.show_hotkeys_window,
+        description="Manage trigger hotkeys.",
+    )
+
+    menu.addSeparator()
+
     # Help submenu
     help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help", description="Resources for help and learning.")
     menu.addMenu(help_menu)
@@ -135,65 +295,87 @@ def create_settings_menu(parent_button):
         description="Watch tutorials.",
     )
 
-    # Settings submenu
-    settings_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Settings", description="Tool configuration and preferences.")
-    menu.addMenu(settings_menu)
-
-    settings_menu.addSection("Graph toolbar")
-    graph_toolbar_action = settings_menu.addAction(
-        QtGui.QIcon(media.customGraph_image),
-        "Graph Editor Toolbar",
-        description="Show or hide the TKM toolbar inside the Graph Editor.",
-    )
-    graph_toolbar_action.setCheckable(True)
-
-    def _on_graph_toolbar_toggled(state):
-        graphToolbarApi.set_graph_toolbar_enabled(bool(state))
-
-    graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
-    graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
-
-    settings_menu.addSection("Toolbar's icons alignment")
-    align_group = QActionGroup(settings_menu)
-    left_align = settings_menu.addAction("Left", description="Align icons to the left.")
-    center_align = settings_menu.addAction("Center", description="Align icons to the center.")
-    right_align = settings_menu.addAction("Right", description="Align icons to the right.")
-
-    current_align = settings.get_setting("graph_toolbar_alignment", "Center")
-    align_map = {"Left": left_align, "Center": center_align, "Right": right_align}
-
-    for label, act in align_map.items():
-        act.setCheckable(True)
-        align_group.addAction(act)
-        if label == current_align:
-            act.setChecked(True)
-
-        def set_align(state, alignment_label=label):
-            if state:
-                settings.set_setting("graph_toolbar_alignment", alignment_label)
-                createCustomGraph()
-
-        act.toggled.connect(set_align)
-
-    settings_menu.addAction(
-        QtGui.QIcon(media.hotkeys_image),
-        "Hotkeys",
-        hotkeys.show_hotkeys_window,
-        description="Manage trigger hotkeys.",
-    )
-
-    settings_menu.addSection("General")
-    settings_menu.addAction(
-        QtGui.QIcon(media.close_image),
-        "Close",
-        lambda: QtCore.QTimer.singleShot(0, removeCustomGraph),
-        description="Close only the TKM Graph Editor toolbar.",
-    )
-
-    menu.addSeparator()
     menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
 
     return menu
+
+
+def _place_graph_toolbar_widget(toolbar_widget, dock_position=None):
+    dock_position = _normalize_dock_position(dock_position)
+
+    graph_qw = _find_graph_editor_widget()
+    graph_layout = graph_qw.layout() if graph_qw else None
+    if not graph_layout or not wutil.is_valid_widget(toolbar_widget):
+        return False
+
+    parent = toolbar_widget.parentWidget()
+    if parent and parent.layout():
+        parent.layout().removeWidget(toolbar_widget)
+    toolbar_widget.setParent(graph_qw)
+
+    if dock_position == _DOCK_TOP_GRAPH:
+        graph_layout.insertWidget(0, toolbar_widget)
+    # if dock_position == _DOCK_BOTTOM_MENU:
+    #     graph_layout.insertWidget(0, toolbar_widget)
+    # elif dock_position == _DOCK_TOP_GRAPH:
+    #     graph_layout.insertWidget(0, toolbar_widget)
+    else:
+        graph_layout.addWidget(toolbar_widget)
+
+    toolbar_widget.show()
+    return True
+
+
+def applyCustomGraphAlignment(alignment_label=None):
+    if alignment_label:
+        settings.set_setting("graph_toolbar_alignment", alignment_label)
+
+    toolbar_widget = getCustomGraphWidget()
+    if not toolbar_widget:
+        return False
+
+    layout = toolbar_widget.layout()
+    if not layout:
+        return False
+
+    try:
+        layout.setAlignment(_graph_toolbar_alignment())
+        layout.invalidate()
+        toolbar_widget.updateGeometry()
+        toolbar_widget.update()
+        toolbar_widget._update_height()
+        return True
+    except Exception:
+        return False
+
+
+def moveCustomGraphDock(position=None):
+    position = _normalize_dock_position(position)
+    settings.set_setting(_GRAPH_TOOLBAR_DOCK_SETTING, position)
+    toolbar_widget = getCustomGraphWidget()
+    if toolbar_widget and wutil.is_valid_widget(toolbar_widget):
+        if _place_graph_toolbar_widget(toolbar_widget, position):
+            try:
+                toolbar_widget._update_height()
+            except Exception:
+                pass
+    else:
+        createCustomGraph(force=True)
+
+
+def ensureCustomGraph():
+    if not settings.get_setting("graph_toolbar_enabled", True):
+        removeCustomGraph()
+        return None
+
+    toolbar_widget = getCustomGraphWidget()
+    if toolbar_widget and wutil.is_valid_widget(toolbar_widget):
+        _place_graph_toolbar_widget(toolbar_widget)
+        applyCustomGraphAlignment()
+        return toolbar_widget
+
+    createCustomGraph(force=True)
+    return getCustomGraphWidget()
 
 
 def create_tool_button(
@@ -236,18 +418,12 @@ def create_toolbox_button(tool_id, p=None, **overrides):
 
 
 def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs):
-    if not force and not settings.get_setting("graph_toolbar_enabled", True):
-        removeCustomGraph()
-        return
+    global _GRAPH_TOOLBAR_WIDGET
 
-    def add_to_flow(widget):
-        if widget and wutil.is_valid_widget(widget):
-            flowtoolbar_layout.addWidget(widget)
-        return widget
+    if not force and not settings.get_setting("graph_toolbar_enabled", True):
+        return removeCustomGraph()
 
     graph_vis = cmds.getPanel(vis=True)
-    layout = _GRAPH_LAYOUT
-
     if "graphEditor1" not in graph_vis:
         if not force:
             return
@@ -258,34 +434,27 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
                 QtCore.QTimer.singleShot(100, lambda: createCustomGraph(force=True, _attempt=_attempt + 1))
             return
 
-    if "graphEditor1" in graph_vis:
-        if cmds.columnLayout(layout, exists=True):
-            cmds.deleteUI(layout)
-            cmds.columnLayout(layout, adj=1, p="graphEditor1")
-        else:
-            cmds.columnLayout(layout, adj=1, p="graphEditor1")
+    removeCustomGraph()
 
-    flow_qw = cw.QFlowContainer()
-    flow_qw.setObjectName("tkm_customGraph_flowToolbar")
+    graph_qw = _find_graph_editor_widget()
+    if not graph_qw or not graph_qw.layout():
+        return
 
-    align_str = settings.get_setting("graph_toolbar_alignment", "Center")
-    align_val = QtCore.Qt.AlignLeft
-    if align_str == "Center":
-        align_val = QtCore.Qt.AlignHCenter
-    elif align_str == "Right":
-        align_val = QtCore.Qt.AlignRight
+    flow_qw = cw.QFlowContainer(graph_qw)
+    flow_qw.setObjectName(_GRAPH_TOOLBAR_OBJECT)
+    flow_qw.hide()
+    _GRAPH_TOOLBAR_WIDGET = flow_qw
 
-    flowtoolbar_layout = cw.QFlowLayout(flow_qw, margin=2, Wspacing=18, Hspacing=6, alignment=align_val)
+    flowtoolbar_layout = cw.QFlowLayout(flow_qw, margin=2, Wspacing=18, Hspacing=6, alignment=_graph_toolbar_alignment())
 
     def new_section(hiddeable=True, color=None):
-        sec = cw.QFlatSectionWidget(hiddeable=hiddeable, color=color)
+        sec = cw.QFlatSectionWidget(
+            hiddeable=hiddeable,
+            settings_namespace="graph_toolbar_toolbuttons",
+            color=color,
+        )
         flowtoolbar_layout.addWidget(sec)
         return sec
-
-    parent_ptr = mui.MQtUtil.findControl(layout)
-    parent_qw = wutil.get_maya_qt(parent_ptr, QtWidgets.QWidget)
-    if parent_qw and parent_qw.layout():
-        parent_qw.layout().addWidget(flow_qw)
 
     # ________________ Key Tools Buttons  ___________________#
     sec = new_section()
@@ -321,18 +490,18 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     # _________________  Slider Logic & Wrappers ____________________#
 
     # 1. Sliders Sections - Tween, Blend, and Tangent
-    def add_mode_sliders(modes_list, default_key_setting, prefix, color, change_func, drop_func, default_modes=None, ws_support=False):
+    def add_mode_sliders(modes_list, prefix, color, change_func, drop_func, default_modes=None, ws_support=False):
         # Create a new section for each slider color/type
         sec = new_section()
         sec.set_settings_namespace("graph_toolbar_sliders")
-
-        current_default = settings.get_setting(default_key_setting, modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"])
+        sec.set_persist_slider_modes(False)
 
         # Static default list for "Pin Defaults"
         if default_modes:
             static_default_keys = [f"{prefix}_{k}" for k in default_modes]
         else:
-            static_default_keys = [f"{prefix}_{current_default}"]
+            first_mode = modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"]
+            static_default_keys = [f"{prefix}_{first_mode}"]
 
         for m in modes_list:
             if m == "separator":
@@ -366,10 +535,6 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
             # Setup mode switching for this specific slider instance
             def make_mode_setter(slider_instance, prefix_val):
                 def setter(new_mode, temporary=False):
-                    # For compatibility, if they change mode via the slider's OWN menu,
-                    # we update the global setting and the slider's state.
-                    if not temporary:
-                        settings.set_setting(f"graph_{prefix_val}_mode", new_mode)
                     slider_instance.setCurrentMode(new_mode, temporary=temporary)
                     # Find info for new mode to update tooltip
                     m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
@@ -389,7 +554,6 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
 
     add_mode_sliders(
         sliders.TWEEN_MODES,
-        "graph_tween_mode",
         "tween",
         UI_COLORS.yellow.hex,
         sliders.execute_tween,
@@ -399,7 +563,6 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     )
     add_mode_sliders(
         sliders.BLEND_MODES,
-        "graph_blend_mode",
         "blend",
         UI_COLORS.green.hex,
         sliders.execute_curve_modifier,
@@ -408,9 +571,8 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     )
     add_mode_sliders(
         sliders.TANGENT_MODES,
-        "tangent_mode",
         "tangent",
-        "#ea7760",
+        UI_COLORS.orange.hex,
         sliders.execute_tangent_blend,
         sliders.stop_dragging,
         default_modes=["blend_best_guess"],
@@ -493,10 +655,15 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     )
     sec.addWidget(settings_btn, "Settings", "settings")
 
-    settings_menu = create_settings_menu(settings_btn)
-
     def _open_settings_menu():
-        settings_menu.exec_(QtGui.QCursor.pos())
+        settings_menu = create_settings_menu(settings_btn)
+        try:
+            settings_menu.exec_(QtGui.QCursor.pos())
+        finally:
+            try:
+                settings_menu.deleteLater()
+            except Exception:
+                pass
 
     def _on_toolbar_context_menu(pos):
         if flow_qw.childAt(pos):
@@ -510,4 +677,5 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     flow_qw.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
     flow_qw.customContextMenuRequested.connect(_on_toolbar_context_menu)
 
+    _place_graph_toolbar_widget(flow_qw)
     QtCore.QTimer.singleShot(50, flow_qw._update_height)

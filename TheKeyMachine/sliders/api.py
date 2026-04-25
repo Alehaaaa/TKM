@@ -60,6 +60,16 @@ DISPATCH_MAPS = {
 }
 
 
+def _resolve_type_key(type_key, mode):
+    """Return the registered slider family for a mode, falling back to the requested family."""
+    if mode in DISPATCH_MAPS.get(type_key, {}):
+        return type_key
+    for candidate_type, dispatch in DISPATCH_MAPS.items():
+        if mode in dispatch:
+            return candidate_type
+    return type_key
+
+
 def create_session(mode):
     """Create a per-interaction slider session for the given mode."""
     return utils.SliderSession(
@@ -94,6 +104,7 @@ def stop_dragging(session=None):
 
 def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
     """Unified internal dispatcher for all slider operations."""
+    type_key = _resolve_type_key(type_key, mode)
     session, should_finish = _resolve_session(mode, session)
     try:
         dispatch = DISPATCH_MAPS.get(type_key, {})
@@ -111,10 +122,11 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
         # Call with appropriate signature based on type
         if type_key == "tween":
             func(session, value, world_space)
+        elif type_key == "tangent":
+            func(session, None, value / 100.0)
         else:
-            # Curve and Tangent ops take (session, curves=None, value)
-            # Tangents use factor (0..1), Curves use raw percent (0..100)
-            func(session, None, value if type_key == "curve" else value / 100.0)
+            # Curve and time ops both expect the raw slider percentage.
+            func(session, None, value)
             
         return session
     finally:

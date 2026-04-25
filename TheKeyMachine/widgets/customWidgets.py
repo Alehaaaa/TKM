@@ -1600,6 +1600,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._default_keys = []
         self._all_modes = []  # Full ordered mode list (SliderMode objects + "separator")
         self._mode_to_slot = {}  # mode_key -> slot_key (live, authoritative mapping)
+        self._persist_slider_modes = True
 
         # Tool-group action pinning support
         # _tool_groups: widget_key -> {label, icon_path, menu_factory, actions: [...]}
@@ -1635,6 +1636,9 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     def set_settings_namespace(self, namespace):
         self._settings_namespace = namespace
 
+    def set_persist_slider_modes(self, enabled):
+        self._persist_slider_modes = bool(enabled)
+
     def set_tint_color(self, color):
         self._tint_color = color
 
@@ -1668,9 +1672,11 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if is_valid_widget(widget) and hasattr(widget, "_current_mode"):
             cm = getattr(widget, "_current_mode", None)
             if cm:
-                saved_mode_key = self._get_setting(f"slider_mode_{key}", cm.key)
-                if saved_mode_key != cm.key and hasattr(widget, "setCurrentMode"):
-                    widget.setCurrentMode(saved_mode_key)
+                saved_mode_key = cm.key
+                if self._persist_slider_modes:
+                    saved_mode_key = self._get_setting(f"slider_mode_{key}", cm.key)
+                    if saved_mode_key != cm.key and hasattr(widget, "setCurrentMode"):
+                        widget.setCurrentMode(saved_mode_key)
                 # Register current mode in the section's live map
                 current_cm = getattr(widget, "_current_mode", None)
                 if current_cm:
@@ -2068,7 +2074,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._mode_to_slot.pop(old_key, None)
         if new_key:
             self._mode_to_slot[new_key] = slot_key
-            self._set_setting(f"slider_mode_{slot_key}", new_key)
+            if self._persist_slider_modes:
+                self._set_setting(f"slider_mode_{slot_key}", new_key)
 
     def _set_visible_modes(self, desired_mode_keys, menu=None):
         """
@@ -2160,7 +2167,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 if not act_key or act_key == group_key:
                     continue
                 should_pin = bool(act_info.get("default", False))
-                settings.set_setting(f"pin_action_{act_key}", should_pin)
+                self._set_setting(f"pin_action_{act_key}", should_pin)
                 if should_pin:
                     self._create_pinned_action_button(group_key, act_info)
                 else:
@@ -2184,7 +2191,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 act_key = act_info.get("key")
                 if not act_key or act_key == group_key:
                     continue
-                settings.set_setting(f"pin_action_{act_key}", True)
+                self._set_setting(f"pin_action_{act_key}", True)
                 self._create_pinned_action_button(group_key, act_info)
 
         self._sync_widget_menu_actions(menu)
@@ -2337,10 +2344,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                             def _make_pin_handler(gk, ai, ak):
                                 def handler(checked):
                                     if checked:
-                                        settings.set_setting(f"pin_action_{ak}", True)
+                                        self._set_setting(f"pin_action_{ak}", True)
                                         self._create_pinned_action_button(gk, ai)
                                     else:
-                                        settings.set_setting(f"pin_action_{ak}", False)
+                                        self._set_setting(f"pin_action_{ak}", False)
                                         self._remove_pinned_action_button(ak)
 
                                 return handler

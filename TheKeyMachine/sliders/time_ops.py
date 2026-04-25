@@ -9,7 +9,15 @@ from . import utils
 
 
 def _resolve_targets_for_session(session):
-    return utils.resolve_curve_targets()
+    """Resolve and cache curve targets on the session for the lifetime of one drag."""
+    if not session.targets.resolved:
+        curves, times_map, time_range, has_graph_keys = utils.resolve_curve_targets()
+        session.targets.curves = curves
+        session.targets.affected_map = times_map
+        session.targets.time_range = time_range
+        session.targets.has_graph_keys = has_graph_keys
+        session.targets.resolved = True
+    return session.targets.curves, session.targets.affected_map
 
 
 def apply_time_offset(session, curves=None, amount=0.0):

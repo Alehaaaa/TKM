@@ -2,6 +2,8 @@
 
 # TheKeyMachine
 
+![Version](https://img.shields.io/badge/version-0.1.87-blue.svg)
+
 TheKeyMachine (TKM) is an open source Maya animation toolset built for faster key editing, cleaner selection workflows, smarter copy/paste utilities, floating tools, and timeline-aware operations.
 
 It is designed for 3D animators working in Autodesk Maya and currently supports Maya 2022, 2023, 2024, and 2025 on Windows, Linux, and macOS.
@@ -98,7 +100,7 @@ This keeps major tool logic separated from the main toolbar assembly.
 
 ## Version
 
-Current version: `0.1.84`
+Current version: `0.1.87`
 
 This build focuses on a cleaner hotkeys workflow, more consistent shared tools, and more reliable floating windows.
 

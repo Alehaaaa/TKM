@@ -88,7 +88,7 @@ def _make_ui_palette():
         white=_color("white", "#e9edf2"),
         dark_white=_color("dark_white", "#cfd6df"),
         cyan=_color("cyan", "#58e1ff"),
-        orange=_color("orange", "#C9844B"),
+        orange=_color("orange", "#dd7466"),
         yellow=_color("yellow", "#d4d361"),
         green=_color("green", "#4fb697"),
         blue=_color("blue", "#58e1ff"),

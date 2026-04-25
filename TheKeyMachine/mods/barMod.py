@@ -2142,12 +2142,9 @@ class UndoSetup:
 
 class StopRefresh:
     def __enter__(self):
-        self.resetAutoKey = cmds.autoKeyframe(query=True, state=True)
-        cmds.autoKeyframe(state=False)
         cmds.refresh(suspend=True)
 
     def __exit__(self, *args):
-        cmds.autoKeyframe(state=self.resetAutoKey)
         cmds.refresh(suspend=False)
 
 

@@ -56,6 +56,21 @@ def _ensure_tangent_cache(session, curve, keys):
     session.cache.frame_data[(curve, "tangents")] = cache
 
 
+def _curve_has_weighted_tangents(curve):
+    try:
+        weighted = cmds.keyTangent(curve, query=True, weightedTangents=True)
+        if isinstance(weighted, (list, tuple)):
+            return bool(weighted[0]) if weighted else False
+        return bool(weighted)
+    except Exception:
+        pass
+
+    try:
+        return bool(cmds.getAttr("{}.weightedTangents".format(curve)))
+    except Exception:
+        return False
+
+
 def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1.0):
     """Blends the selected tangents toward a specific Maya tangent type."""
     resolved_curves, affected_map = _resolve_targets_for_session(session)
@@ -104,7 +119,7 @@ def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1
             session.cache.frame_data[target_cache_key] = targets
 
         target_tangents = session.cache.frame_data[target_cache_key]
-        is_weighted = cmds.animCurveInfo(curve, query=True, weightedTangents=True)
+        is_weighted = _curve_has_weighted_tangents(curve)
         
         for time in keys:
             if time not in orig_tangents or time not in target_tangents:

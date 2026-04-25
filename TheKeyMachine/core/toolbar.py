@@ -912,6 +912,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         customGraph_module_name = "TheKeyMachine.core.customGraph"
 
         try:
+            report.uninstall_bug_exception_handler()
+        except Exception:
+            pass
+
+        try:
             runtime.shutdown_runtime_manager()
         except Exception:
             pass
@@ -958,6 +963,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         """
         global _toolbar_instance
         _toolbar_instance = None
+
+        try:
+            report.uninstall_bug_exception_handler()
+        except Exception:
+            pass
 
         try:
             if graphToolbarApi.is_graph_toolbar_visible() or graphToolbarApi.get_graph_toolbar_checkbox_state():
@@ -2003,7 +2013,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.toolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=10, Hspacing=6, alignment=toolbar_alignment)
 
         def new_section(spacing=0, hiddeable=True, color=None):
-            sec = cw.QFlatSectionWidget(spacing=spacing, hiddeable=hiddeable, color=color)
+            sec = cw.QFlatSectionWidget(
+                spacing=spacing,
+                hiddeable=hiddeable,
+                settings_namespace="main_toolbar_toolbuttons",
+                color=color,
+            )
             self.toolbar_layout.addWidget(sec)
             return sec
 
@@ -2068,6 +2083,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.move_keyframes_intField = cw.QFlatSpinBox()
         self.move_keyframes_intField.setFixedWidth(50)
         sec.addWidget(self.move_keyframes_intField, "Nudge Value", "nudge_val")
+
+        sec.addSeparator()
+
         sec.addWidgetGroup(
             [
                 toolbox.get_tool("share_keys", default=True),
@@ -2119,6 +2137,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             tooltip_template=helper.select_scene_animation_widget_tooltip_text,
         )
 
+        sec.addSeparator()
+
         # Key Menu -------------------------------------------------------------------------------
         sec.addWidgetGroup(
             [
@@ -2148,6 +2168,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             # Create a new section for each slider color/type
             sec = new_section()
             sec.set_settings_namespace("main_toolbar_sliders")
+            sec.set_persist_slider_modes(False)
 
             # Static default list for "Pin Defaults" — uses provided list or falls back to first mode
             if default_modes:
@@ -2753,7 +2774,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         settings_group_button = sec.addWidgetGroup(
             [
-                self._tool_descriptor_from_setting_toggle(setting_toggles["overshoot_sliders"], default_visible=False),
+                self._tool_descriptor_from_setting_toggle(setting_toggles["overshoot_sliders"], default_visible=True),
                 self._tool_descriptor_from_setting_toggle(setting_toggles["attribute_switcher_euler_filter"], default_visible=False),
                 self._tool_descriptor_from_setting_toggle(setting_toggles["custom_graph"], default_visible=False),
             ]

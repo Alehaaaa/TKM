@@ -45,6 +45,10 @@ _BUG_EXCEPTION_LAST_SIGNATURE = None
 _BUG_EXCEPTION_LAST_TIME = 0.0
 _BUG_REPORT_DIALOG = None
 _REPORTED_EXCEPTION_IDS = {}
+_PREVIOUS_EXCEPTHOOK = None
+_PREVIOUS_THREADING_EXCEPTHOOK = None
+_TKM_EXCEPTHOOK_MARKER = "_tkm_bug_exception_hook"
+_TKM_PREVIOUS_HOOK_ATTR = "_tkm_previous_hook"
 
 
 def _is_valid_dialog(dialog):
@@ -211,6 +215,24 @@ def _format_exception_source_file(filename):
     return os.path.basename(normalized) or "unknown.py"
 
 
+def _is_thekeymachine_frame(filename):
+    normalized = os.path.normpath(filename or "")
+    parts = [part for part in normalized.split(os.sep) if part]
+    return "TheKeyMachine" in parts
+
+
+def _traceback_has_thekeymachine_frame(tb):
+    if tb is None:
+        return False
+    try:
+        for frame in traceback.extract_tb(tb):
+            if _is_thekeymachine_frame(frame.filename):
+                return True
+    except Exception:
+        return False
+    return False
+
+
 def _format_detected_bug_name(source_file):
     return "Error Detection on file {}".format(source_file or "unknown.py")
 
@@ -346,50 +368,86 @@ def wrap_callback(callback, context=None, source_file=None, default=None):
     return _wrapped
 
 
-def install_bug_exception_handler():
-    global _BUG_EXCEPTION_HANDLER_INSTALLED
-    if _BUG_EXCEPTION_HANDLER_INSTALLED:
-        return
+def _restore_previous_hook(owner, hook_name):
+    restored = False
+    while True:
+        current_hook = getattr(owner, hook_name, None)
+        if current_hook is None or not getattr(current_hook, _TKM_EXCEPTHOOK_MARKER, False):
+            return restored
 
+        previous_hook = getattr(current_hook, _TKM_PREVIOUS_HOOK_ATTR, None)
+        if previous_hook is None:
+            return restored
+        try:
+            setattr(owner, hook_name, previous_hook)
+            restored = True
+        except Exception:
+            return restored
+
+
+def uninstall_bug_exception_handler():
+    global _BUG_EXCEPTION_HANDLER_INSTALLED, _PREVIOUS_EXCEPTHOOK, _PREVIOUS_THREADING_EXCEPTHOOK
+
+    _restore_previous_hook(sys, "excepthook")
+    if hasattr(threading, "excepthook"):
+        _restore_previous_hook(threading, "excepthook")
+
+    _PREVIOUS_EXCEPTHOOK = None
+    _PREVIOUS_THREADING_EXCEPTHOOK = None
+    _BUG_EXCEPTION_HANDLER_INSTALLED = False
+
+
+def install_bug_exception_handler():
+    global _BUG_EXCEPTION_HANDLER_INSTALLED, _PREVIOUS_EXCEPTHOOK, _PREVIOUS_THREADING_EXCEPTHOOK
+
+    uninstall_bug_exception_handler()
     previous_excepthook = sys.excepthook
+    _PREVIOUS_EXCEPTHOOK = previous_excepthook
 
     def _tkm_excepthook(exc_type, exc_value, exc_tb):
         if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
             if previous_excepthook:
                 previous_excepthook(exc_type, exc_value, exc_tb)
             return
-        try:
-            report_detected_exception(
-                exc=exc_value,
-                source_file=_extract_exception_source_file(tb=exc_tb),
-                traceback_text="".join(traceback.format_exception(exc_type, exc_value, exc_tb)),
-            )
-        except Exception:
-            pass
+        if _traceback_has_thekeymachine_frame(exc_tb):
+            try:
+                report_detected_exception(
+                    exc=exc_value,
+                    source_file=_extract_exception_source_file(tb=exc_tb),
+                    traceback_text="".join(traceback.format_exception(exc_type, exc_value, exc_tb)),
+                )
+            except Exception:
+                pass
         if previous_excepthook:
             previous_excepthook(exc_type, exc_value, exc_tb)
 
+    setattr(_tkm_excepthook, _TKM_EXCEPTHOOK_MARKER, True)
+    setattr(_tkm_excepthook, _TKM_PREVIOUS_HOOK_ATTR, previous_excepthook)
     sys.excepthook = _tkm_excepthook
 
     if hasattr(threading, "excepthook"):
         previous_threading_hook = threading.excepthook
+        _PREVIOUS_THREADING_EXCEPTHOOK = previous_threading_hook
 
         def _tkm_threading_excepthook(args):
             if issubclass(args.exc_type, (KeyboardInterrupt, SystemExit)):
                 if previous_threading_hook:
                     previous_threading_hook(args)
                 return
-            try:
-                report_detected_exception(
-                    exc=args.exc_value,
-                    source_file=_extract_exception_source_file(tb=args.exc_traceback),
-                    traceback_text="".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)),
-                )
-            except Exception:
-                pass
+            if _traceback_has_thekeymachine_frame(args.exc_traceback):
+                try:
+                    report_detected_exception(
+                        exc=args.exc_value,
+                        source_file=_extract_exception_source_file(tb=args.exc_traceback),
+                        traceback_text="".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)),
+                    )
+                except Exception:
+                    pass
             if previous_threading_hook:
                 previous_threading_hook(args)
 
+        setattr(_tkm_threading_excepthook, _TKM_EXCEPTHOOK_MARKER, True)
+        setattr(_tkm_threading_excepthook, _TKM_PREVIOUS_HOOK_ATTR, previous_threading_hook)
         threading.excepthook = _tkm_threading_excepthook
 
     _BUG_EXCEPTION_HANDLER_INSTALLED = True

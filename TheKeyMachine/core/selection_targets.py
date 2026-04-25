@@ -123,6 +123,27 @@ def get_target_curves():
         return []
 
 
+def resolve_target_curves():
+    time_range = get_selected_time_range()
+
+    try:
+        selected_key_curves = cmds.keyframe(query=True, selected=True, name=True) or []
+    except Exception:
+        selected_key_curves = []
+    if selected_key_curves:
+        return selected_key_curves, "graph_editor", time_range, True
+
+    curves = get_graph_editor_outliner_items()
+    if curves:
+        return curves, "graph_editor_outliner", time_range, False
+
+    curves = get_target_curves()
+    if curves:
+        return curves, "graph_editor", time_range, False
+
+    return [], "none", time_range, False
+
+
 def resolve_target_attribute_plugs():
     time_range = get_selected_time_range()
 

@@ -17,7 +17,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.86"
+__version__ = "0.1.87"
 __stage__ = "beta"
 __build__ = "313"
 __codename__ = "Iced Coffee"
@@ -37,6 +37,13 @@ def reload():
         import TheKeyMachine.core.runtime_manager as runtime
 
         runtime.shutdown_runtime_manager()
+    except Exception:
+        pass
+
+    try:
+        import TheKeyMachine.mods.reportMod as report
+
+        report.uninstall_bug_exception_handler()
     except Exception:
         pass
 

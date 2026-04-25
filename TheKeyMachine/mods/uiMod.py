@@ -21,8 +21,10 @@ import maya.cmds as cmds
 import maya.mel as mel
 
 try:
+    from PySide6 import QtCore
     from PySide6.QtCore import QTimer
 except ImportError:
+    from PySide2 import QtCore
     from PySide2.QtCore import QTimer
 
 try:
@@ -321,10 +323,6 @@ def uninstall():
                 else:
                     cmds.warning("TheKeyMachine folder not found")
 
-            # Elimina customGraph
-            if cmds.columnLayout("customGraph_columnLayout", exists=True):
-                cmds.deleteUI("customGraph_columnLayout")
-
             # Necesitamos retrasar la eliminacion del workspace para dar tiempo a parar el callback 'centrar toolbar'
             def remove_tkm_workspace():
                 # Elimina el workspaceControl llamado "k" y "s""
@@ -355,37 +353,28 @@ def uninstall():
 
 
 def donate_window():
-    from TheKeyMachine.widgets.customDialogs import QFlatConfirmDialog
-
-    screen_width, screen_height = wutil.get_screen_resolution()
-
+    link = "https://github.com/Alehaaaa/TKM"
     msg = (
-        (
-            "<br><span style='font-size: 14px; color:#cccccc'>"
-            "The development of TheKeyMachine is a big effort in terms of energy and time.<br><br>If you use this tool professionally or regularly, please try to make a donation.<br> This will greatly help the project grow and have continuity. Every small amount counts.<br>"
-            "Thank you!<br><br><br>"
-            "Support TheKeyMachine <a href='http://thekeymachine.xyz/donate.php' style='color:#86CDAD;'><br>http://thekeymachine.xyz/donate</a></span><br><br>"
-        )
-        if screen_width == 3840
-        else (
-            "<br><span style='font-size: 12px; color:#cccccc'>"
-            "The development of TheKeyMachine is a big effort<br>in terms of time and energy.<br><br>If you use this tool professionally or regularly,<br>please try to make a donation.<br><br> This will greatly help the project grow<br> and have continuity. Every small amount counts.<br>"
-            "Thank you!<br><br><br>"
-            "Support TheKeyMachine <a href='http://thekeymachine.xyz/donate.php' style='color:#86CDAD;'><br>http://thekeymachine.xyz/donate</a></span><br><br>"
-        )
+        "The development of TheKeyMachine is a big effort in terms of time and energy.",
+        "If you use this tool professionally or regularly, please try to make a donation.",
+        "This will greatly help the project grow and have continuity. Every small amount counts.",
+        "Thank you!",
+        "",
+        f"Support TheKeyMachine <a href='{link}' style='color:#86CDAD;'><br>{link}</a>",
     )
 
-    # Convert a label-like hack in QFlatConfirmDialog to support link opening
-    dlg = QFlatConfirmDialog(
+    dlg = customDialogs.QFlatConfirmDialog(
         parent=None,
         window="Donate",
-        title="",
+        title="Donate to TheKeyMachine",
         message=msg,
-        icon=media.stripe_image,
         closeButton=True,
+        icon="",
     )
+    dlg.message_label.setTextFormat(QtCore.Qt.RichText)
+    dlg.message_label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
     dlg.message_label.setOpenExternalLinks(True)
-    dlg.exec_()
+    return dlg.exec_()
 
 
 def about_window():
@@ -398,4 +387,5 @@ report_detected_exception = report.report_detected_exception
 safe_execute = report.safe_execute
 wrap_callback = report.wrap_callback
 install_bug_exception_handler = report.install_bug_exception_handler
+uninstall_bug_exception_handler = report.uninstall_bug_exception_handler
 bug_report_window = report.bug_report_window

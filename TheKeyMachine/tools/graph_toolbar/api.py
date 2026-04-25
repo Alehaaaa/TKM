@@ -1,5 +1,3 @@
-from maya import cmds
-
 try:
     from PySide6 import QtCore
 except Exception:
@@ -9,9 +7,6 @@ import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.core.runtime_manager as runtime
 from TheKeyMachine.tools import common as toolCommon
-
-
-_GRAPH_LAYOUT = "customGraph_columnLayout"
 
 
 class CustomGraphBus(QtCore.QObject):
@@ -26,7 +21,13 @@ def get_graph_toolbar_checkbox_state() -> bool:
 
 
 def is_graph_toolbar_visible() -> bool:
-    return bool(cmds.columnLayout(_GRAPH_LAYOUT, exists=True))
+    try:
+        from TheKeyMachine.core import customGraph
+
+        widget = customGraph.getCustomGraphWidget()
+        return bool(widget and wutil.is_valid_widget(widget) and widget.isVisible())
+    except Exception:
+        return False
 
 
 def emit_graph_toolbar_state() -> None:
@@ -131,16 +132,13 @@ def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
 
     from TheKeyMachine.core import customGraph
 
-    if enabled and is_graph_toolbar_visible():
-        return
-
     try:
         if enabled:
-            QtCore.QTimer.singleShot(0, customGraph.createCustomGraph)
+            QtCore.QTimer.singleShot(0, customGraph.ensureCustomGraph)
         else:
             QtCore.QTimer.singleShot(0, customGraph.removeCustomGraph)
     except Exception:
         if enabled:
-            customGraph.createCustomGraph()
+            customGraph.ensureCustomGraph()
         else:
             customGraph.removeCustomGraph()

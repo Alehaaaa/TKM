@@ -335,7 +335,7 @@ class QFlatConfirmDialog(QFlatDialog):
         window="Confirm",
         title="",
         message="",
-        buttons=["Ok"],
+        buttons=[],
         closeButton=True,
         highlight=None,
         icon=None,
@@ -343,8 +343,10 @@ class QFlatConfirmDialog(QFlatDialog):
         parent=None,
         **kwargs,
     ):
+        if not closeButton:
+            buttons=["Ok"]
         QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, closeButton=closeButton, **kwargs)
-
+        
         new_flags = self.windowFlags() | QtCore.Qt.Dialog
         if parent and (parent.windowFlags() & QtCore.Qt.Tool):
             new_flags |= QtCore.Qt.Tool
@@ -353,11 +355,12 @@ class QFlatConfirmDialog(QFlatDialog):
         if parent:
             self.setParent(parent)
 
+        self._exclusive = exclusive
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
         self.setWindowTitle(window or "Confirm")
+        
         self.clicked_button = None
 
-        self._exclusive = exclusive
         self.setMinimumWidth(0)
         self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
 
@@ -384,6 +387,9 @@ class QFlatConfirmDialog(QFlatDialog):
             self.title_label.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
             self.title_label.setStyleSheet("font-size: %spx; color: %s; font-weight: bold;" % (DPI(18), self.TEXT_COLOR))
             text_layout.addWidget(self.title_label)
+
+        if isinstance(message, (list, tuple)):
+            message = "<br><br>".join(message)
 
         self.message_label = QtWidgets.QLabel(message, content_widget)
         self.message_label.setWordWrap(True)
@@ -425,12 +431,14 @@ class QFlatConfirmDialog(QFlatDialog):
         highlight=None,
         closeButton=True,
         title=None,
+        icon=None,
         **kwargs,
     ):
-        if buttons is None and not closeButton:
-            buttons = [cls.Close]
+        if buttons is None:
+            closeButton = True
         dlg = cls(
             window=window,
+            icon=icon,
             title=title,
             message=message,
             buttons=buttons,
@@ -451,6 +459,7 @@ class QFlatConfirmDialog(QFlatDialog):
         buttons=None,
         highlight=None,
         closeButton=False,
+        icon=None,
         title="Are you sure?",
         **kwargs,
     ):
@@ -458,6 +467,7 @@ class QFlatConfirmDialog(QFlatDialog):
             buttons = [cls.Yes, cls.No]
         dlg = cls(
             window=window,
+            icon=icon,
             title=title,
             message=message,
             buttons=buttons,
@@ -1181,6 +1191,7 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
     """
 
     MAX_TEXT_CHARS = 1200
+    MAX_SCRIPT_ERROR_CHARS = 12000
 
     def __init__(self, parent=None, submit_callback=None, dialog_title="Report a Bug", prefill_name="", prefill_explanation="", prefill_script_error=""):
         self._submit_callback = submit_callback
@@ -1245,7 +1256,9 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
         self.script_error_textbox.setAcceptRichText(False)
         self.script_error_textbox.setMinimumHeight(DPI(80))
         self.script_error_textbox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        self.script_error_textbox.textChanged.connect(lambda: self._enforce_text_limit(self.script_error_textbox))
+        self.script_error_textbox.textChanged.connect(
+            lambda: self._enforce_text_limit(self.script_error_textbox, limit=self.MAX_SCRIPT_ERROR_CHARS)
+        )
         if prefill_script_error:
             self.script_error_textbox.setPlainText(prefill_script_error)
 
@@ -1359,15 +1372,16 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
             return
         self.status_label.setText(self._status_placeholder)
 
-    def _enforce_text_limit(self, widget):
+    def _enforce_text_limit(self, widget, limit=None):
+        limit = int(limit or self.MAX_TEXT_CHARS)
         text = widget.toPlainText()
-        if len(text) <= self.MAX_TEXT_CHARS:
+        if len(text) <= limit:
             return
         cursor = widget.textCursor()
         pos = cursor.position()
         widget.blockSignals(True)
-        widget.setPlainText(text[: self.MAX_TEXT_CHARS])
-        cursor.setPosition(min(pos, self.MAX_TEXT_CHARS))
+        widget.setPlainText(text[:limit])
+        cursor.setPosition(min(pos, limit))
         widget.setTextCursor(cursor)
         widget.blockSignals(False)
 
