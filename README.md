@@ -98,10 +98,4 @@ Dedicated modules live under `TheKeyMachine/tools/` for:
 
 This keeps major tool logic separated from the main toolbar assembly.
 
-## Version
-
-Current version: `0.1.87`
-
-This build focuses on a cleaner hotkeys workflow, more consistent shared tools, and more reliable floating windows.
-
 <img width="200px" src="./TheKeyMachine/data/img/install_example.png" />
