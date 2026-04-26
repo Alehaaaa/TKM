@@ -103,89 +103,67 @@ def get_tkm_node_image():
     return os.path.join(INSTALL_PATH, "TheKeyMachine", "data", "img", "tkm_node.png")
 
 
+def get_tool_data_path(tool_name, filename=None):
+    """Generic factory for tool-specific user data paths."""
+    folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools", tool_name)
+    if filename:
+        return os.path.join(folder, filename)
+    return folder
+
+
 # MIRROR EXCEPTIONS ___________________
 def get_mirror_exceptions_file():
-    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/mirror")
-    mirror_exceptions_file_path = os.path.join(cache_folder, "mirror_data.json")
-    return mirror_exceptions_file_path
-
-
-def get_mirror_exceptions_folder():
-    folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/mirror")
-    return folder
+    return get_tool_data_path("mirror", "mirror_data.json")
 
 
 # SET DEFAULT VALUES ___________________
 def get_set_default_data_file():
-    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/reset_default")
-    mirror_exceptions_file_path = os.path.join(cache_folder, "reset_default_data.json")
-    return mirror_exceptions_file_path
-
-
-def get_set_default_data_folder():
-    folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/reset_default")
-    return folder
+    return get_tool_data_path("reset_default", "reset_default_data.json")
 
 
 # COPY PASTE ANIMATION ___________________
 def get_copy_animation_file():
-    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_animation")
-    copy_animation_file_path = os.path.join(cache_folder, "copy_animation_data.json")
-    return copy_animation_file_path
+    return get_tool_data_path("copy_animation", "copy_animation_data.json")
 
 
 # COPY PASTE POSE ___________________
 def get_copy_paste_pose_file():
-    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_paste_pose")
-    copy_paste_pose_file_path = os.path.join(cache_folder, "copy_paste_pose_data.json")
-    return copy_paste_pose_file_path
+    return get_tool_data_path("copy_paste_pose", "copy_paste_pose_data.json")
 
 
 # TEMP PIVOT _____________________________
 def get_temp_pivot_data_file():
-    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/temp_pivot")
-    temp_pivot_file_path = os.path.join(cache_folder, "temp_pivot_data.json")
-    return temp_pivot_file_path
+    return get_tool_data_path("temp_pivot", "temp_pivot_data.json")
 
 
 def get_temp_pivot_data_folder():
-    temp_pivot_data_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/temp_pivot")
-    return temp_pivot_data_folder
+    return get_tool_data_path("temp_pivot")
 
 
 # COPY LINK ______________________________
 def get_copy_link_data_file():
-    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_link")
-    copy_link_file_path = os.path.join(cache_folder, "copy_link_data.json")
-    return copy_link_file_path
+    return get_tool_data_path("copy_link", "copy_link_data.json")
 
 
 def get_copy_link_data_folder():
-    copy_link_data_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_link")
-    return copy_link_data_folder
+    return get_tool_data_path("copy_link")
 
 
 # COPY WORLDSPACE ________________________
 def get_copy_worldspace_data_file():
-    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_worldspace")
-    copy_worldspace_file_path = os.path.join(cache_folder, "copy_worldspace_data.json")
-    return copy_worldspace_file_path
+    return get_tool_data_path("copy_worldspace", "copy_worldspace_data.json")
 
 
 def get_copy_worldspace_data_folder():
-    copy_worldspace_data_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_worldspace")
-    return copy_worldspace_data_folder
+    return get_tool_data_path("copy_worldspace")
 
 
 def get_copy_worldspace_single_frame_data_file():
-    cache_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_worldspace")
-    copy_worldspace_single_frame_file_path = os.path.join(cache_folder, "copy_worldspace_single_frame_data.json")
-    return copy_worldspace_single_frame_file_path
+    return get_tool_data_path("copy_worldspace", "copy_worldspace_single_frame_data.json")
 
 
 def get_copy_worldspace_single_frame_data_folder():
-    copy_worldspace_single_frame_data_folder = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/tools/copy_worldspace")
-    return copy_worldspace_single_frame_data_folder
+    return get_tool_data_path("copy_worldspace")
 
 
 # ------------------------------------------------------------------------

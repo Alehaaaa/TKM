@@ -1741,20 +1741,318 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def toggle_selection_sets_workspace(self, *args):
         ui.toggle_selection_sets_window(controller=self)
 
+    def _create_nudge_value_widget(self, sec, item_data):
+        self.move_keyframes_intField = cw.QFlatSpinBox()
+        self.move_keyframes_intField.setFixedWidth(wutil.DPI(50))
+        sec.addWidget(self.move_keyframes_intField, "Nudge Value", "nudge_val")
+        return self.move_keyframes_intField
+
+    def _create_isolate_down_level_widget(self, sec, item_data):
+        widget_data = {
+            "key": "isolate_down_level",
+            "label": "Down one level",
+            "checkable": True,
+            "set_checked_fn": lambda: bar.down_one_level,
+            "callback": bar.toggle_down_one_level,
+            "pinnable": False,
+        }
+        btn = cw.create_tool_button_from_data(widget_data)
+        sec.addWidget(btn, widget_data["label"], widget_data["key"], default_visible=True)
+        return btn
+
+    def _create_tracer_connected_widget(self, sec, item_data):
+        widget_data = {
+            "key": "tracer_connected",
+            "label": "Connected",
+            "checkable": True,
+            "set_checked_fn": lambda: getattr(bar, "is_tracer_connected", lambda: False)(),
+            "callback": lambda x: bar.tracer_connected(connected=x, update_cb=bar.tracer_update_checkbox),
+            "pinnable": False,
+        }
+        btn = cw.create_tool_button_from_data(widget_data)
+        sec.addWidget(btn, widget_data["label"], widget_data["key"], default_visible=True)
+        return btn
+
+    def _create_link_autolink_widget(self, sec, item_data):
+        return None  # Handled in _create_link_tools_group
+
+    def _create_selector_widget(self, sec, item_data):
+        selector_tool = toolbox.get_tool("selector")
+        btn = cw.QFlatSelectorButton(icon=selector_tool.get("icon_path"), tooltip_template=selector_tool.get("tooltip_template"))
+        btn.clicked.connect(selector_tool.get("callback"))
+        sec.addWidget(btn, selector_tool.get("label", "Selector"), selector_tool.get("key", "selector"), tooltip_template=selector_tool.get("tooltip_template"))
+
+        def update_selector_button_text(btn=btn):
+            if not wutil.is_valid_widget(btn):
+                return
+            num_selected = selection_targets.get_selected_object_count()
+            btn.setCount(num_selected)
+
+        try:
+            self._runtime_manager.selection_changed.connect(update_selector_button_text)
+        except Exception:
+            pass
+        update_selector_button_text()
+        return btn
+
+    def _create_animation_offset_widget(self, sec, item_data):
+        tool = toolbox.get_tool("animation_offset")
+        btn = cw.create_tool_button_from_data(tool)
+        btn.setObjectName("anim_offset_button")
+        btn.setCheckable(True)
+        btn.setChecked(bool(self.toggleAnimOffsetButtonState))
+        self.animation_offset_button_widget = btn
+        sec.addWidget(btn, tool.get("label", "Anim Offset"), tool.get("key", "animation_offset"), tooltip_template=tool.get("tooltip_template"))
+        return btn
+
+    def _create_micro_move_widget(self, sec, item_data):
+        tool = toolbox.get_tool("micro_move")
+        btn = cw.create_tool_button_from_data(tool)
+        btn.setObjectName("micro_move_button")
+        btn.setCheckable(True)
+        btn.setChecked(self.micro_move_controller.is_enabled())
+        sec.addWidget(btn, tool.get("label", "Micro Move"), tool.get("key", "micro_move"), tooltip_template=tool.get("tooltip_template"))
+        return btn
+
+    def _create_link_tools_group(self, sec, group_data):
+        self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
+        self.link_obj_toggle_state = False
+        link_btn_placeholder = []
+
+        def toggle_link_obj_button_image(btn):
+            if not isValid(self):
+                return
+            self.link_obj_toggle_state = not self.link_obj_toggle_state
+            new_image = media.link_objects_on_image if self.link_obj_toggle_state else media.link_objects_image
+            btn.setIcon(QtGui.QIcon(new_image))
+
+        def start_link_obj_toggle_image_thread(btn):
+            if hasattr(self, "link_obj_thread") and self.link_obj_thread:
+                try:
+                    self.link_obj_thread.stop()
+                    self.link_obj_thread.wait(500)
+                except:
+                    pass
+            self.link_obj_thread = LinkObjectImageThread(interval_seconds=0.3, parent=self)
+            self.link_obj_thread.tick.connect(partial(toggle_link_obj_button_image, btn))
+            self.link_obj_thread.start()
+
+        def stop_link_obj_toggle_image_thread():
+            if hasattr(self, "link_obj_thread") and self.link_obj_thread:
+                try:
+                    self.link_obj_thread.stop()
+                    self.link_obj_thread.wait(500)
+                except:
+                    pass
+                self.link_obj_thread = None
+
+        def toggle_auto_link_callback(state, btn):
+            self.link_checkbox_state = state
+            settings.set_setting("link_checkbox_state", self.link_checkbox_state)
+            if self.link_checkbox_state:
+                start_link_obj_toggle_image_thread(btn)
+                keyTools.add_link_obj_callbacks()
+            else:
+                stop_link_obj_toggle_image_thread()
+                keyTools.remove_link_obj_callbacks()
+                QTimer.singleShot(800, lambda: btn.setIcon(QtGui.QIcon(media.link_objects_image)))
+
+        resolved_items = []
+        for item in group_data["items"]:
+            if item.get("key") == "link_autolink":
+                item["callback"] = lambda state: toggle_auto_link_callback(state, link_btn_placeholder[0])
+                item["set_checked_fn"] = lambda: self.link_checkbox_state
+            resolved_items.append(item)
+
+        btn_group = sec.addWidgetGroup(resolved_items)
+        if btn_group:
+            link_btn_placeholder.append(btn_group)
+            if self.link_checkbox_state:
+                start_link_obj_toggle_image_thread(btn_group)
+                keyTools.add_link_obj_callbacks()
+        return btn_group
+
+    def _populate_toolbar_from_layout(self, layout_id, new_section_fn):
+        sections = toolbox.get_toolbar_sections(layout_id, resolve_items=False)
+        for section_def in sections:
+            sec_id = section_def["id"]
+            sec_label = section_def.get("label", "")
+            sec_color = section_def.get("color")
+            sec_hiddeable = section_def.get("hiddeable", True)
+
+            if section_def.get("type") == "slider":
+                self._add_slider_section_from_data(section_def, new_section_fn)
+                continue
+
+            sec = new_section_fn(color=sec_color, hiddeable=sec_hiddeable)
+            resolved_section = toolbox.get_tool_section(sec_id)
+            for item in resolved_section["items"]:
+                if item == "separator":
+                    sec.addSeparator()
+                    continue
+
+                if isinstance(item, dict):
+                    if item.get("type") == "group":
+                        if item.get("label") == "Links":
+                            self._create_link_tools_group(sec, item)
+                        else:
+                            sec.addWidgetGroup(item["items"])
+                        continue
+
+                    widget_key = item.get("widget")
+                    if widget_key:
+                        factory_name = f"_create_{widget_key}_widget"
+                        if hasattr(self, factory_name):
+                            getattr(self, factory_name)(sec, item)
+                        continue
+
+                    # Special tool overrides
+                    if item.get("id") == "selector":
+                        self._create_selector_widget(sec, item)
+                        continue
+                    if item.get("key") == "animation_offset":
+                        self._create_animation_offset_widget(sec, item)
+                        continue
+                    if item.get("key") == "micro_move":
+                        self._create_micro_move_widget(sec, item)
+                        continue
+                    if item.get("key") == "orbit":
+                        orbit_btn = cw.create_tool_button_from_data(item)
+                        sec.addWidget(orbit_btn, item["label"], item["key"])
+                        self._setup_orbit_toolbar_button(orbit_btn)
+                        continue
+                    if item.get("key") == "selection_sets":
+                        ss_btn = cw.create_tool_button_from_data(item)
+                        sec.addWidget(ss_btn, item["label"], item["key"])
+                        ui.bind_selection_sets_toolbar_button(ss_btn, controller=self)
+                        continue
+                    if item.get("key") == "attribute_switcher":
+                        as_btn = cw.create_tool_button_from_data(item)
+                        sec.addWidget(as_btn, item["label"], item["key"])
+                        ui.bind_attribute_switcher_toolbar_button(as_btn)
+                        continue
+                    if item.get("key") == "settings":
+                        self._add_settings_button(sec, item)
+                        continue
+
+                    # Default tool
+                    btn = cw.create_tool_button_from_data(item)
+                    sec.addWidget(btn, item.get("label", ""), item.get("key", ""), default_visible=item.get("default_visible", True))
+
+    def _add_slider_section_from_data(self, section_def, new_section_fn):
+        sec = new_section_fn()
+        sec.set_settings_namespace("main_toolbar_sliders")
+        sec.set_persist_slider_modes(False)
+
+        prefix = section_def["slider_type"]
+        color = section_def["color"]
+        modes = getattr(sliders, section_def["modes_attr"])
+        default_modes = section_def.get("default_modes", [])
+        static_default_keys = [f"{prefix}_{k}" for k in default_modes]
+
+        for m in modes:
+            if m == "separator":
+                sec.addSeparator()
+                continue
+            if not isinstance(m, dict):
+                continue
+
+            key = m["key"]
+            label = m["label"]
+            desc = m.get("description", "")
+            icon = m.get("icon", "SL")
+            is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys, namespace="main_toolbar_sliders")
+
+            s = sw.QFlatSliderWidget(
+                f"bar_{prefix}_{key}",
+                min=-100,
+                max=100,
+                text=icon,
+                color=color,
+                dragCommand=lambda mode_key, v, p=prefix, session=None: trigger.execute_slider(p, mode_key, v, session=session),
+                tooltipTitle=label,
+                tooltipDescription=desc,
+            )
+            s.setModes(modes)
+            s.setCurrentMode(key)
+
+            def make_mode_setter(slider_instance):
+                def setter(new_mode, temporary=False):
+                    slider_instance.setCurrentMode(new_mode, temporary=temporary)
+                    m_info = next((item for item in modes if isinstance(item, dict) and item["key"] == new_mode), None)
+                    if m_info:
+                        slider_instance.setTooltipInfo(m_info["label"], m_info.get("description", ""))
+                    if not temporary:
+                        slider_instance.startFlash()
+                return setter
+
+            s.modeRequested.connect(make_mode_setter(s))
+            sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
+
+        sec.add_final_actions(static_default_keys)
+
+        if prefix == "blend":
+            self.blend_slider_widget = s  # Keep last as ref if needed? No, this adds all.
+            # Actually we might want a specific slider widget reference.
+        elif prefix == "tween":
+            self.tween_slider_widget = s
+
+    def _get_current_icon_alignment(self):
+        alignment_name = settings.get_setting("toolbar_icon_alignment", "Center")
+        alignments = {"Left": QtCore.Qt.AlignLeft, "Center": QtCore.Qt.AlignHCenter, "Right": QtCore.Qt.AlignRight}
+        return alignments.get(alignment_name, QtCore.Qt.AlignHCenter)
+
+    def _add_settings_button(self, sec, item):
+        show_tooltips = settings.get_setting("show_tooltips", True)
+        alignments = {"Left": QtCore.Qt.AlignLeft, "Center": QtCore.Qt.AlignHCenter, "Right": QtCore.Qt.AlignRight}
+        toolbar_alignment = self._get_current_icon_alignment()
+        INTERNET_CONNECTION = general.config.get("INTERNET_CONNECTION", True)
+
+        def update_show_tooltips(value):
+            settings.set_setting("show_tooltips", value)
+            QFlatTooltipManager.enabled = value
+
+        def update_toolbar_icon_alignment(alignment_name):
+            settings.set_setting("toolbar_icon_alignment", alignment_name)
+            self.buildUI()
+
+        def _build_settings_menu(_menu, source_widget=None):
+            return toolMenus.build_main_settings_menu(
+                self,
+                source_widget or btn,
+                show_tooltips=show_tooltips,
+                alignments=alignments,
+                toolbar_alignment=toolbar_alignment,
+                update_show_tooltips=update_show_tooltips,
+                update_toolbar_icon_alignment=update_toolbar_icon_alignment,
+                internet_connection=INTERNET_CONNECTION,
+            )
+
+        settings_tool = toolbox.get_tool("settings", menu_setup_fn=_build_settings_menu)
+        btn = cw.create_tool_button_from_data(settings_tool)
+        btn.setObjectName("settings_toolbar_button")
+        sec.addWidget(btn, settings_tool.get("label", "Settings"), settings_tool.get("key", "settings"))
+
+        def _open_menu_at_cursor():
+            toolbar_menu = _build_settings_menu(None, source_widget=btn)
+            toolbar_menu.popup(QtGui.QCursor.pos())
+
+        def _on_toolbar_context_menu(pos):
+            if self.main_toolbar_widget.childAt(pos):
+                return
+            _open_menu_at_cursor()
+
+        self.main_toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.main_toolbar_widget.customContextMenuRequested.connect(_on_toolbar_context_menu)
+
+        if INTERNET_CONNECTION:
+            updater.check_for_updates(btn, warning=False, force=False)
+
     def buildUI(self):
         ### ______________________________________________________ TOOLBAR ICON SIZE  ___________________________________________________
         alignments = {"Left": QtCore.Qt.AlignLeft, "Center": QtCore.Qt.AlignHCenter, "Right": QtCore.Qt.AlignRight}
 
-        def get_current_icon_alignment():
-            toolbar_alignment_str = settings.get_setting("toolbar_icon_alignment", "Center")
-            return alignments.get(toolbar_alignment_str, QtCore.Qt.AlignHCenter)
-
-        def update_toolbar_icon_alignment(alignment, value):
-            if alignment and value:
-                settings.set_setting("toolbar_icon_alignment", alignment)
-                self.toolbar_layout.setAlignment(value)
-                self.toolbar_layout.update()
-
+    def buildUI(self):
         ### ______________________________________________________ TOOLBAR LAYOUT _____________________________________________________________________###
 
         if self.layout():
@@ -1767,7 +2065,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.main_layout.addWidget(self.main_toolbar_widget)
 
         # Use QFlowLayout to allow wrapping
-        toolbar_alignment = get_current_icon_alignment()
+        toolbar_alignment = self._get_current_icon_alignment()
         self.toolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=10, Hspacing=6, alignment=toolbar_alignment)
 
         def new_section(spacing=0, hiddeable=True, color=None):
@@ -1780,707 +2078,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             self.toolbar_layout.addWidget(sec)
             return sec
 
-        # Placeholder for tooltip functions to be defined later
-        show_tooltips = settings.get_setting("show_tooltips", True)
-
-        def section_tool(section_id, key):
-            for item in toolbox.get_tool_section(section_id)["items"]:
-                if isinstance(item, dict) and item.get("key") == key:
-                    return item
-            return toolbox.get_tool(key)
-
-        # _____________________ Key Editing Section __________________________________________________ #
-        sec = new_section(color=toolColors.green)
-
-        sec.addWidgetGroup(
-            [
-                section_tool("main_key_editing", "move_left"),
-                section_tool("main_key_editing", "nudge_remove_inbetween"),
-            ],
-        )
-
-        sec.addWidgetGroup(
-            [
-                section_tool("main_key_editing", "move_right"),
-                section_tool("main_key_editing", "nudge_insert_inbetween"),
-            ],
-        )
-
-        self.move_keyframes_intField = cw.QFlatSpinBox()
-        self.move_keyframes_intField.setFixedWidth(50)
-        sec.addWidget(self.move_keyframes_intField, "Nudge Value", "nudge_val")
-
-        sec.addSeparator()
-
-        sec.addWidgetGroup(
-            [
-                section_tool("main_key_editing", "share_keys"),
-                section_tool("main_key_editing", "reblock"),
-                # toolbox.get_tool("gimbal", key="bk_gimbal"),
-            ],
-        )
-
-        clear_tool = toolbox.get_tool("clear_selected_keys")
-        clear_btn = cw.create_tool_button_from_data(clear_tool)
-        sec.addWidget(
-            clear_btn,
-            clear_tool.get("label", "Clear Selection"),
-            clear_tool.get("key", "clear_sel"),
-            default_visible=False,
-            tooltip_template=clear_tool.get("tooltip_template"),
-        )
-        select_scene_tool = toolbox.get_tool("select_scene_animation")
-        select_scene_btn = cw.create_tool_button_from_data(select_scene_tool)
-        sec.addWidget(
-            select_scene_btn,
-            select_scene_tool.get("label", "Select Scene Anim"),
-            select_scene_tool.get("key", "select_scene"),
-            default_visible=False,
-            tooltip_template=select_scene_tool.get("tooltip_template"),
-        )
-
-        sec.addSeparator()
-
-        # Key Menu -------------------------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                section_tool("main_key_editing", "bake_animation_1"),
-                section_tool("main_key_editing", "bake_animation_2"),
-                section_tool("main_key_editing", "bake_animation_3"),
-                section_tool("main_key_editing", "bake_animation_4"),
-                section_tool("main_key_editing", "bake_animation_custom"),
-            ],
-        )
-
-        # _____________________ Sliders Sections ____________________________ #
-        # Temporary disable: frame capture buttons for Blend to Frame sliders.
-        # blend_to_key_left_b_qt = cw.QFlatToolButton()
-        # blend_to_key_left_b_qt.setText("1")
-        # blend_to_key_left_b_qt.setFixedSize(25, 16)
-        # blend_to_key_left_b_qt.hide()
-        # blend_to_key_left_b_qt.clicked.connect(lambda: blend_to_key_left_b_qt.setText(str(int(cmds.currentTime(q=True)))))
-
-        # blend_to_key_right_b_qt = cw.QFlatToolButton()
-        # blend_to_key_right_b_qt.setText("1")
-        # blend_to_key_right_b_qt.setFixedSize(25, 16)
-        # blend_to_key_right_b_qt.hide()
-        # blend_to_key_right_b_qt.clicked.connect(lambda: blend_to_key_right_b_qt.setText(str(int(cmds.currentTime(q=True)))))
-
-        def add_mode_sliders(modes_list, prefix, color, change_func, default_modes=None):
-            # Create a new section for each slider color/type
-            sec = new_section()
-            sec.set_settings_namespace("main_toolbar_sliders")
-            sec.set_persist_slider_modes(False)
-
-            # Static default list for "Pin Defaults" — uses provided list or falls back to first mode
-            if default_modes:
-                static_default_keys = [f"{prefix}_{k}" for k in default_modes]
-            else:
-                first_mode = modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"]
-                static_default_keys = [f"{prefix}_{first_mode}"]
-
-            for m in modes_list:
-                if m == "separator":
-                    sec.addSeparator()
-                    continue
-                if not isinstance(m, dict):
-                    continue
-
-                key = m["key"]
-                label = m["label"]
-                desc = m.get("description", "")
-                icon = m.get("icon", "SL")
-
-                show_frames = False
-
-                if key == "blend_to_frame":
-                    show_frames = True
-
-                # Determine initial visibility: pinned setting takes priority, fallback to default_modes membership
-                is_visible = settings.get_setting(
-                    f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys, namespace="main_toolbar_sliders"
-                )
-
-                s = sw.QFlatSliderWidget(
-                    f"bar_{prefix}_{key}",
-                    min=-100,
-                    max=100,
-                    text=icon,
-                    color=color,
-                    dragCommand=(
-                        lambda mode_key, v, p=prefix, session=None: sliders.execute_blend_to_frame_with_button_values(v, session=session)
-                        if mode_key == "blend_to_frame"
-                        else trigger.execute_slider(p, mode_key, v, session=session)
-                    ),
-                    tooltipTitle=label,
-                    tooltipDescription=desc,
-                )
-                s.setModes(modes_list)
-                s.setCurrentMode(key)
-
-                # Setup mode switching
-                def make_mode_setter(slider_instance, prefix_val, show_f):
-                    def setter(new_mode, temporary=False):
-                        # Switch to solo mode logic: simply update instance and metadata
-                        slider_instance.setCurrentMode(new_mode, temporary=temporary)
-                        m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
-                        if m_info:
-                            slider_instance.setTooltipInfo(m_info["label"], m_info.get("description", ""))
-
-                        if not temporary:
-                            slider_instance.startFlash()
-
-                    return setter
-
-                s.modeRequested.connect(make_mode_setter(s, prefix, show_frames))
-
-                # Add to section with registration
-                sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
-
-            # Add the final pin actions (Pin Defaults/All)
-            sec.add_final_actions(static_default_keys)
-
-        # Create separate sections for Blend and Tween sliders - Standardized setting names
-        add_mode_sliders(
-            sliders.BLEND_MODES,
-            "blend",
-            UI_COLORS.green.hex,
-            sliders.execute_curve_modifier,
-            default_modes=["connect_neighbors"],
-        )
-        add_mode_sliders(
-            sliders.TWEEN_MODES,
-            "tween",
-            UI_COLORS.yellow.hex,
-            sliders.execute_tween,
-            default_modes=["tweener"],
-        )
-
-        # ----------------------------------------------- ToolsButtons -------------------------------------------------------- #
-
-        # Pointer  -------------------------------------------------------------------------
-
-        sec = new_section(color=toolColors.red)
-
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool("select_rig_controls", default=True),
-                toolbox.get_tool("pointer_sel_anim_rig"),
-                "separator",
-                toolbox.get_tool("pointer_depth_mover"),
-            ],
-        )
-
-        # Isolate -------------------------------------------------------------------------
-
-        sec.addWidgetGroup(
-            [
-                {
-                    **toolbox.get_tool("isolate_master"),
-                    "key": "isolate",
-                    "default": True,
-                },
-                toolbox.get_tool("isolate_bookmarks"),
-                "separator",
-                {
-                    "key": "isolate_down_level",
-                    "label": "Down one level",
-                    "checkable": True,
-                    "set_checked_fn": lambda: bar.down_one_level,  # Assuming bar.down_one_level tracks state
-                    "callback": bar.toggle_down_one_level,
-                    "pinnable": False,
-                },
-                "separator",
-                toolbox.get_tool("isolate_help"),
-            ],
-        )
-
-        # Create Locators  ----------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                {
-                    **toolbox.get_tool("create_locator"),
-                    "key": "create_locator",
-                    "default": True,
-                },
-                toolbox.get_tool("locator_select_temp"),
-                toolbox.get_tool("locator_remove_temp"),
-            ],
-        )
-
-        # align / match transforms ----------------------------------------------------------
-
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool("align_selected_objects", key="align", default=True),
-                toolbox.get_tool("align_translation"),
-                toolbox.get_tool("align_rotation"),
-                toolbox.get_tool("align_scale"),
-                "separator",
-                toolbox.get_tool("align_range"),
-                "separator",
-                toolbox.get_tool("align_help"),
-            ],
-        )
-
-        # Tracer -----------------------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool("mod_tracer", key="tracer", default=True),
-                {
-                    "key": "tracer_connected",
-                    "label": "Connected",
-                    "checkable": True,
-                    "set_checked_fn": lambda: getattr(bar, "is_tracer_connected", lambda: False)(),  # Assuming a state check exists
-                    "callback": lambda x: bar.tracer_connected(connected=x, update_cb=bar.tracer_update_checkbox),
-                    "pinnable": False,
-                },
-                "separator",
-                toolbox.get_tool("tracer_refresh"),
-                toolbox.get_tool("tracer_show_hide"),
-                toolbox.get_tool("tracer_offset_node"),
-                "separator",
-                toolbox.get_tool("tracer_grey"),
-                toolbox.get_tool("tracer_red"),
-                toolbox.get_tool("tracer_blue"),
-                "separator",
-                toolbox.get_tool("tracer_remove"),
-            ],
-        )
-
-        # Reset anim  -------------------------------------------------------------------------
-        sec.addWidgetGroup(toolbox.get_tool_section("reset_tools")["items"])
-
-        # Delete anim -------------------------------------------------------------------------
-        sec.addWidgetGroup(toolbox.get_tool_section("delete_tools")["items"])
-
-        sec = new_section(color=toolColors.green)
-
-        selector_tool = toolbox.get_tool("selector")
-        selector_button_widget = cw.QFlatSelectorButton(
-            icon=selector_tool.get("icon_path"),
-            tooltip_template=selector_tool.get("tooltip_template"),
-        )
-        selector_button_widget.clicked.connect(selector_tool.get("callback"))
-        sec.addWidget(
-            selector_button_widget,
-            selector_tool.get("label", "Selector"),
-            selector_tool.get("key", "selector"),
-            tooltip_template=selector_tool.get("tooltip_template"),
-        )
-
-        def update_selector_button_text():
-            if not wutil.is_valid_widget(selector_button_widget):
-                return
-            num_selected = selection_targets.get_selected_object_count()
-            selector_button_widget.setCount(num_selected)
-
-        try:
-            self._runtime_manager.selection_changed.connect(update_selector_button_text)
-        except Exception:
-            pass
-        update_selector_button_text()
-
-        # Select opposite ---------------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool("selectOpposite", key="opposite_select", default=True),
-                toolbox.get_tool("opposite_add"),
-                toolbox.get_tool("opposite_copy"),
-            ]
-        )
-
-        # Mirror -----------------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                {
-                    **toolbox.get_tool("mirror"),
-                    "key": "mirror",
-                    "default": True,
-                },
-                toolbox.get_tool("mirror_add_invert"),
-                toolbox.get_tool("mirror_add_keep"),
-                toolbox.get_tool("mirror_remove_exc"),
-                "separator",
-                toolbox.get_tool("mirror_help"),
-            ],
-        )
-
-        # Select hierarchy -----------------------------------------------------------------------
-        select_hierarchy_tool = toolbox.get_tool("selectHierarchy")
-        select_hierarchy_button_widget = cw.create_tool_button_from_data(select_hierarchy_tool)
-        sec.addWidget(
-            select_hierarchy_button_widget,
-            select_hierarchy_tool.get("label", "Select Hierarchy"),
-            "select_hierarchy",
-            tooltip_template=select_hierarchy_tool.get("tooltip_template"),
-            description=select_hierarchy_tool.get("description"),
-        )
-
-        sec = new_section(color=toolColors.green)
-
-        # Copy Paste Pose -----------------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool("copy_pose", default=True),
-                toolbox.get_tool("paste_pose_direct"),
-                "separator",
-                toolbox.get_tool("pose_help"),
-            ],
-        )
-
-        # Copy Paste Animation -----------------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool("copy_animation", key="cp_copy_anim", default=True),
-                toolbox.get_tool("paste_animation_direct"),
-                toolbox.get_tool("paste_insert_animation_direct"),
-                toolbox.get_tool("paste_opposite_animation_direct"),
-                toolbox.get_tool("paste_animation_to"),
-                "separator",
-                toolbox.get_tool("copy_animation_help"),
-            ],
-        )
-
-        tangent_section = toolbox.get_tool_section("tangent_buttons", resolve_items=False)
-        sec = new_section(color=tangent_section.get("color", toolColors.orange))
-
-        # Tangents -----------------------------------------------------------------------
-        btn_cycle = cw.create_tool_button_from_data(toolbox.get_tool("tangent_cycle_matcher"))
-        sec.addWidget(btn_cycle, "Cycle Matcher", "cycle", default_visible=False)
-
-        btn_bouncy = cw.create_tool_button_from_data(toolbox.get_tool("tangent_bouncy"))
-        sec.addWidget(btn_bouncy, "Bouncy Tangent", "bouncy")
-
-        btn_tangent_auto = cw.create_tool_button_from_data(toolbox.get_tool("tangent_auto"))
-        sec.addWidget(btn_tangent_auto, "Auto Tangent", "tangent_auto")
-
-        btn_tangent_spline = cw.create_tool_button_from_data(toolbox.get_tool("tangent_spline"))
-        sec.addWidget(btn_tangent_spline, "Spline Tangent", "tangent_spline", default_visible=False)
-
-        btn_tangent_clamped = cw.create_tool_button_from_data(toolbox.get_tool("tangent_clamped"))
-        sec.addWidget(btn_tangent_clamped, "Clamped Tangent", "tangent_clamped", default_visible=False)
-
-        btn_tangent_linear = cw.create_tool_button_from_data(toolbox.get_tool("tangent_linear"))
-        sec.addWidget(btn_tangent_linear, "Linear Tangent", "tangent_linear", default_visible=False)
-
-        btn_tangent_flat = cw.create_tool_button_from_data(toolbox.get_tool("tangent_flat"))
-        sec.addWidget(btn_tangent_flat, "Flat Tangent", "tangent_flat", default_visible=False)
-
-        btn_tangent_step = cw.create_tool_button_from_data(toolbox.get_tool("tangent_step"))
-        sec.addWidget(btn_tangent_step, "Step Tangent", "tangent_step")
-
-        btn_tangent_plateau = cw.create_tool_button_from_data(toolbox.get_tool("tangent_plateau"))
-        sec.addWidget(btn_tangent_plateau, "Plateau Tangent", "tangent_plateau", default_visible=False)
-
-        sec = new_section(color=toolColors.purple)
-
-        # Animation Offset -----------------------------------------------------------------------
-        animation_offset_tool = toolbox.get_tool("animation_offset")
-        animation_offset_button_widget = cw.create_tool_button_from_data(animation_offset_tool)
-        animation_offset_button_widget.setObjectName("anim_offset_button")
-        animation_offset_button_widget.setCheckable(True)
-        animation_offset_button_widget.setChecked(bool(self.toggleAnimOffsetButtonState))
-        self.animation_offset_button_widget = animation_offset_button_widget
-        sec.addWidget(
-            animation_offset_button_widget,
-            animation_offset_tool.get("label", "Anim Offset"),
-            animation_offset_tool.get("key", "animation_offset"),
-            tooltip_template=animation_offset_tool.get("tooltip_template"),
-        )
-
-        sec = new_section(color=toolColors.purple)
-
-        # Temp Pivot ----------------------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool("temp_pivot", default=True),
-                toolbox.get_tool("tp_last_used"),
-                "separator",
-                toolbox.get_tool("temp_pivot_help"),
-            ],
-        )
-
-        # Micro Move ----------------------------------------------------------------------------
-        micro_move_tool = toolbox.get_tool("micro_move")
-        micro_move_button_widget = cw.create_tool_button_from_data(micro_move_tool)
-        micro_move_button_widget.setObjectName("micro_move_button")
-        micro_move_button_widget.setCheckable(True)
-        micro_move_button_widget.setChecked(self.micro_move_controller.is_enabled())
-        sec.addWidget(
-            micro_move_button_widget,
-            micro_move_tool.get("label", "Micro Move"),
-            micro_move_tool.get("key", "micro_move"),
-            tooltip_template=micro_move_tool.get("tooltip_template"),
-        )
-
-        sec.addWidgetGroup(
-            [
-                toolbox.get_tool("follow_cam", default=True),
-                toolbox.get_tool("fcam_trans_only"),
-                toolbox.get_tool("fcam_rot_only"),
-                "separator",
-                toolbox.get_tool("fcam_remove"),
-            ],
-        )
-
-        sec = new_section(color=toolColors.green)
-
-        # Copy Link -----------------------------------------------------------------------
-
-        self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
-        self.link_obj_image_timer = False
-        self.link_obj_thread = None
-        self.link_obj_toggle_state = False
-
-        # ------funciones para crear el flashing icon al crear el auto-link callback
-
-        def toggle_link_obj_button_image():
-            if not isValid(self):
-                return
-            # For simplicity, we can use a custom property or just toggle based on a global state
-            self.link_obj_toggle_state = not self.link_obj_toggle_state
-
-            new_image = media.link_objects_on_image if self.link_obj_toggle_state else media.link_objects_image
-            link_objects_button_widget.setIcon(QtGui.QIcon(new_image))
-
-        def start_link_obj_toggle_image_thread():
-            self.link_obj_image_timer = True
-            if self.link_obj_thread:
-                try:
-                    self.link_obj_thread.stop()
-                    self.link_obj_thread.wait(500)
-                except Exception:
-                    pass
-            self.link_obj_thread = LinkObjectImageThread(interval_seconds=0.3, parent=self)
-            self.link_obj_thread.tick.connect(toggle_link_obj_button_image)
-            self.link_obj_thread.start()
-
-        def stop_link_obj_toggle_image_thread():
-            self.link_obj_image_timer = False
-            if self.link_obj_thread:
-                try:
-                    self.link_obj_thread.stop()
-                    self.link_obj_thread.wait(500)
-                except Exception:
-                    pass
-                self.link_obj_thread = None
-
-        # Añade el auto-link callback
-        def add_link_objects_callback(*args):
-            start_link_obj_toggle_image_thread()
-            keyTools.add_link_obj_callbacks()
-
-        # Borra el auto-link callback.
-        def remove_link_objects_callback(*args):
-            stop_link_obj_toggle_image_thread()
-            keyTools.remove_link_obj_callbacks()
-            QTimer.singleShot(800, restore_link_objects_image)
-
-        def restore_link_objects_image():
-            link_objects_button_widget.setIcon(QtGui.QIcon(media.link_objects_image))
-
-        def toggle_auto_link_callback(*args):
-            # If toggle_auto_link_callback is called from the menu, it should toggle the state.
-            # If called from initialize_on_startup, it should just set it up based on current state.
-            if args and isinstance(args[0], bool):
-                # menu triggered
-                self.link_checkbox_state = args[0]
-            else:
-                # manual call or no-arg (we don't want to toggle if it's already set)
-                pass
-
-            settings.set_setting("link_checkbox_state", self.link_checkbox_state)
-
-            if self.link_checkbox_state:
-                add_link_objects_callback()
-            else:
-                remove_link_objects_callback()
-
-        # Initialize on startup
-        if self.link_checkbox_state:
-            add_link_objects_callback()
-
-        link_objects_button_widget = sec.addWidgetGroup(
-            [
-                toolbox.get_tool("mod_link_objects", key="link_objects", default=True),
-                toolbox.get_tool("link_copy"),
-                toolbox.get_tool("link_paste"),
-                "separator",
-                {
-                    "key": "link_autolink",
-                    "label": "Auto-link",
-                    "icon_path": media.link_objects_image,
-                    "callback": toggle_auto_link_callback,
-                    "checkable": True,
-                    "set_checked_fn": lambda: self.link_checkbox_state,
-                    "pinnable": False,
-                },
-                "separator",
-                toolbox.get_tool("link_help"),
-            ],
-        )
-
-        # Copy World Space ----------------------------------------------------------------------------
-        sec.addWidgetGroup(
-            [
-                # toolbox.get_tool("worldspace", default=True),
-                toolbox.get_tool("copy_worldspace_single_frame", key="ws_copy_frame", label="Copy World Space", default=True),
-                toolbox.get_tool("ws_copy_range"),
-                "separator",
-                toolbox.get_tool("ws_paste_frame"),
-                toolbox.get_tool("ws_paste"),
-                "separator",
-                toolbox.get_tool("worldspace_help"),
-            ],
-        )
-
-        attribute_switcher_button_widget = sec.addWidgetGroup(
-            [
-                toolbox.get_tool("attribute_switcher", callback=None, default=True),
-            ],
-        )
-        if attribute_switcher_button_widget:
-            attribute_switcher_button_widget.setObjectName("toggle_attribute_switcher_window_b")
-            ui.bind_attribute_switcher_toolbar_button(attribute_switcher_button_widget)
-
-        sec = new_section()
-
-        # Selection Sets  ----------------------------------------------------------------------------
-        selection_sets_button_widget = sec.addWidgetGroup(
-            [
-                toolbox.get_tool("selection_sets", callback=None, default=True),
-                {
-                    "key": "orbit_auto_transparency",
-                    "label": "Auto Transparency",
-                    "description": "Make floating windows translucent when not hovered.",
-                    "checkable": True,
-                    "set_checked_fn": lambda: settings.get_setting(
-                        "orbit_auto_transparency",
-                        True,
-                        namespace=ui.ORBIT_SETTINGS_NAMESPACE,
-                    ),
-                    "callback": lambda state: settings.set_setting(
-                        "orbit_auto_transparency",
-                        state,
-                        namespace=ui.ORBIT_SETTINGS_NAMESPACE,
-                    ),
-                    "pinnable": False,
-                },
-            ]
-        )
-        if selection_sets_button_widget:
-            selection_sets_button_widget.setObjectName("toggle_selection_sets_workspace_b")
-            ui.bind_selection_sets_toolbar_button(selection_sets_button_widget, controller=self)
-
-        # custom tools ----------------------------------------------------------------------------
-        orbit_button_widget = sec.addWidgetGroup(
-            [
-                toolbox.get_tool("orbit", callback=None, default=True),
-                {
-                    "key": "orbit_auto_transparency",
-                    "label": "Auto Transparency",
-                    "description": "Make the Orbit window translucent when not hovered.",
-                    "checkable": True,
-                    "set_checked_fn": lambda: settings.get_setting(
-                        "orbit_auto_transparency",
-                        True,
-                        namespace=ui.ORBIT_SETTINGS_NAMESPACE,
-                    ),
-                    "callback": lambda state: settings.set_setting(
-                        "orbit_auto_transparency",
-                        state,
-                        namespace=ui.ORBIT_SETTINGS_NAMESPACE,
-                    ),
-                    "pinnable": False,
-                },
-            ]
-        )
-        if orbit_button_widget:
-            self._setup_orbit_toolbar_button(orbit_button_widget)
-
-        sec = new_section()
-        setting_toggles = self._settings_toggle_specs()
-
-        settings_group_button = sec.addWidgetGroup(
-            [
-                self._tool_descriptor_from_setting_toggle(setting_toggles["overshoot_sliders"], default_visible=True),
-                self._tool_descriptor_from_setting_toggle(setting_toggles["attribute_switcher_euler_filter"], default_visible=False),
-                self._tool_descriptor_from_setting_toggle(setting_toggles["custom_graph"], default_visible=False),
-            ]
-        )
-
-        if settings_group_button:
-            settings_group_button.setObjectName("toggle_overshoot_sliders_button")
-
-        custom_tools_tool = toolbox.get_tool("custom_tools")
-        toolBox_button_widget = cw.create_tool_button_from_data(custom_tools_tool)
-        toolBox_button_widget.setVisible(bool(CUSTOM_TOOLS_MENU))
-        sec.addWidget(
-            toolBox_button_widget,
-            custom_tools_tool.get("label", "Custom Tools"),
-            custom_tools_tool.get("key", "custom_tools"),
-            tooltip_template=custom_tools_tool.get("tooltip_template"),
-            default_visible=False,
-        )
-
-        # custom scripts ----------------------------------------------------------------------------
-
-        custom_scripts_tool = toolbox.get_tool("custom_scripts")
-        customScripts_button_widget = cw.create_tool_button_from_data(custom_scripts_tool)
-        customScripts_button_widget.setVisible(bool(CUSTOM_SCRIPTS_MENU))
-        sec.addWidget(
-            customScripts_button_widget,
-            custom_scripts_tool.get("label", "Custom Scripts"),
-            custom_scripts_tool.get("key", "custom_scripts"),
-            tooltip_template=custom_scripts_tool.get("tooltip_template"),
-            default_visible=False,
-        )
-
-        # _____________________ Workspaces Section ____________________________ #
-        sec = new_section(hiddeable=False)
-
-        def update_show_tooltips(value):
-            settings.set_setting("show_tooltips", value)
-            QFlatTooltipManager.enabled = value
-
-        def _build_settings_menu(_menu, source_widget=None):
-            return toolMenus.build_main_settings_menu(
-                self,
-                source_widget or toolbar_config_button_widget,
-                show_tooltips=show_tooltips,
-                alignments=alignments,
-                toolbar_alignment=toolbar_alignment,
-                update_show_tooltips=update_show_tooltips,
-                update_toolbar_icon_alignment=update_toolbar_icon_alignment,
-                internet_connection=INTERNET_CONNECTION,
-            )
-
-        settings_tool = toolbox.get_tool("settings", menu_setup_fn=_build_settings_menu)
-        toolbar_config_button_widget = cw.create_tool_button_from_data(settings_tool)
-        toolbar_config_button_widget.setObjectName("settings_toolbar_button")
-        sec.addWidget(
-            toolbar_config_button_widget,
-            settings_tool.get("label", "Settings"),
-            settings_tool.get("key", "settings"),
-            description=settings_tool.get("description"),
-        )
-
-        def _open_menu_at_cursor():
-            toolbar_menu = _build_settings_menu(None, source_widget=toolbar_config_button_widget)
-            toolbar_menu.popup(QtGui.QCursor.pos())
-
-        def _on_toolbar_context_menu(pos):
-            if self.main_toolbar_widget.childAt(pos):
-                return
-            _open_menu_at_cursor()
-
-        self.main_toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.main_toolbar_widget.customContextMenuRequested.connect(_on_toolbar_context_menu)
-
-        if INTERNET_CONNECTION:
-            # Launch background update check
-            updater.check_for_updates(toolbar_config_button_widget, warning=False, force=False)
+        self._populate_toolbar_from_layout("main", new_section)
 
 
 _toolbar_instance = None

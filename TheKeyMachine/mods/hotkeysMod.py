@@ -220,7 +220,15 @@ HOTKEY_SECTION_SPECS = OrderedDict(
             {
                 "title": "Tracer",
                 "icon_path": HOTKEY_SECTION_ICONS["tracer"],
-                "tools": ["tracer_refresh", "tracer_show_hide", "tracer_offset_node", "tracer_grey", "tracer_red", "tracer_blue", "tracer_remove"],
+                "tools": [
+                    "tracer_refresh",
+                    "tracer_show_hide",
+                    "tracer_offset_node",
+                    "tracer_grey",
+                    "tracer_red",
+                    "tracer_blue",
+                    "tracer_remove",
+                ],
                 "commands": ["create_tracer"],
             },
         ),
@@ -237,7 +245,7 @@ HOTKEY_SECTION_SPECS = OrderedDict(
             {
                 "title": "Opposite",
                 "icon_path": HOTKEY_SECTION_ICONS["opposite"],
-                "tools": ["selectOpposite", "paste_opposite_animation_direct"],
+                "tools": ["selectOpposite", "paste_opposite_animation"],
             },
         ),
         (
@@ -755,7 +763,11 @@ def _variant_command_row(tool_data, variant, shortcut_label=None):
     icon_path = variant.get("icon_path") or tool_data.get("icon_path")
     return {
         "command": command_name,
-        "title": shortcut_label or variant.get("status_title") or variant.get("label") or variant.get("description") or _humanize(command_name),
+        "title": shortcut_label
+        or variant.get("status_title")
+        or variant.get("label")
+        or variant.get("description")
+        or _humanize(command_name),
         "icon_path": icon_path,
         "badge_text": None if icon_path else variant.get("text") or tool_data.get("text"),
     }
@@ -785,6 +797,7 @@ def _append_section_row(section, seen, title_lookup, icon_lookup, trigger_comman
 
 def _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, tool_id):
     import TheKeyMachine.core.toolbox as toolbox
+
     tool_data = toolbox.get_tool(tool_id)
     _append_section_row(section, seen, title_lookup, icon_lookup, trigger_commands, _tool_command_row(tool_data))
     shortcut_labels_by_mask = {}
@@ -942,7 +955,9 @@ class HotkeyCommandRow(QtWidgets.QWidget):
         self.tool_button.setMinimumHeight(wutil.DPI(24))
         if self._icon_path:
             cw.QFlatHoverableIcon.apply(self.tool_button, self._icon_path, highlight=False)
-            self._pressed_icon = cw.QFlatHoverableIcon._color_icon(QtGui.QIcon(self._icon_path), self._accent_color, self.tool_button.iconSize())
+            self._pressed_icon = cw.QFlatHoverableIcon._color_icon(
+                QtGui.QIcon(self._icon_path), self._accent_color, self.tool_button.iconSize()
+            )
         elif command_data.get("badge_text"):
             self.tool_button.setIcon(QtGui.QIcon(_text_badge_pixmap(command_data.get("badge_text"))))
         self.tool_button.clicked.connect(lambda *_: trigger.invoke(self.command_name()))
@@ -1163,7 +1178,9 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             "QListWidget::item{padding:0px;margin:0px;border:none;background:transparent;}"
             "QListWidget::item:selected{background:transparent;border:none;}"
         )
-        command_list.currentItemChanged.connect(lambda current, previous, sid=section_id: self._on_command_item_changed(sid, current, previous))
+        command_list.currentItemChanged.connect(
+            lambda current, previous, sid=section_id: self._on_command_item_changed(sid, current, previous)
+        )
         self.command_stack.addWidget(command_list)
         return command_list
 
