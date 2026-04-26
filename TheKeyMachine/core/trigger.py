@@ -23,10 +23,18 @@ def _register_core_commands() -> None:
     register_command("toolbar_unload", _unload_main_toolbar)
     register_command("toolbar_add_shelf_button", _create_toolbar_shelf_button)
     register_command("check_for_updates", _check_for_updates)
-    register_command("selection_sets_toggle", _toggle_selection_sets, aliases=["selection_sets"])
-    register_command("animation_offset_toggle", _toggle_animation_offset, aliases=["animation_offset"])
-    register_command("micro_move_toggle", _toggle_micro_move, aliases=["micro_move"])
-    register_command("custom_graph_toggle", _toggle_graph_toolbar, aliases=["custom_graph"])
+    register_command("selection_sets", _toggle_selection_sets, aliases=["selection_sets_toggle"])
+    register_command("animation_offset", _toggle_animation_offset, aliases=["animation_offset_toggle"])
+    register_command("micro_move", _toggle_micro_move, aliases=["micro_move_toggle"])
+    register_command("custom_graph", _toggle_graph_toolbar, aliases=["custom_graph_toggle"])
+    register_command("overshoot_sliders", _toggle_sliders_overshoot, aliases=["sliders_overshoot_toggle"])
+    register_command(
+        "attribute_switcher_euler_filter",
+        _toggle_attribute_switcher_euler_filter,
+        aliases=["attribute_switcher_euler_filter_toggle"],
+    )
+    register_command("custom_tools", _open_custom_tools_config)
+    register_command("custom_scripts", _open_custom_scripts_config)
     register_command("about_window", _open_about_window)
     register_command("donate_window", _open_donate_window)
     register_command("bug_report_window", _open_bug_report_window)
@@ -124,6 +132,7 @@ def make_command_callback(name: str, callback: Optional[Callable] = None, aliase
         return invoke(name, *args, **kwargs)
 
     _proxy.__name__ = name
+    _proxy._tkm_trigger_proxy = True
     return _proxy
 
 
@@ -218,6 +227,36 @@ def _toggle_graph_toolbar(state: bool = True, *_args, **_kwargs):
     )
 
 
+def _toggle_sliders_overshoot(*_args, **_kwargs):
+    import TheKeyMachine.mods.settingsMod as settings
+    import TheKeyMachine.widgets.sliderWidget as sw
+
+    state = not bool(settings.get_setting("sliders_overshoot", False))
+    settings.set_setting("sliders_overshoot", state)
+    sw.globalSignals.overshootChanged.emit(state)
+    return state
+
+
+def _toggle_attribute_switcher_euler_filter(*_args, **_kwargs):
+    import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
+
+    state = not attributeSwitcherApi.get_attribute_switcher_euler_filter_enabled()
+    attributeSwitcherApi.set_attribute_switcher_euler_filter_enabled(state)
+    return state
+
+
+def _open_custom_tools_config(*_args, **_kwargs):
+    import TheKeyMachine.mods.generalMod as general
+
+    return general.open_file("TheKeyMachine_user_data/connect/tools", "tools.py")
+
+
+def _open_custom_scripts_config(*_args, **_kwargs):
+    import TheKeyMachine.mods.generalMod as general
+
+    return general.open_file("TheKeyMachine_user_data/connect/scripts", "scripts.py")
+
+
 def _toggle_main_toolbar(*_args, **_kwargs):
     import TheKeyMachine.core.toolbar as toolbar_mod
 
@@ -306,7 +345,6 @@ def _open_orbit_window(*_args, **_kwargs):
 
 def _register_builtin_commands():
     _register_core_commands()
-    register_command("open_custom_graph", _make_module_command("TheKeyMachine.core.customGraph", "createCustomGraph"))
     register_command("hotkeys_window", _make_module_command("TheKeyMachine.mods.hotkeysMod", "show_hotkeys_window"))
     register_command("smart_rotation", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_rotation_manipulator"))
     register_command("smart_rotation_release", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_rotation_manipulator_release"))
@@ -322,21 +360,21 @@ def _register_builtin_commands():
     register_command("select_rig_controls_animated", _make_module_command("TheKeyMachine.mods.barMod", "select_rig_controls_animated"))
     register_command("select_hierarchy", _make_module_command("TheKeyMachine.mods.barMod", "selectHierarchy"))
     register_command("align_selected_objects", _make_module_command("TheKeyMachine.mods.barMod", "align_selected_objects"))
-    register_command("create_tracer", _make_module_command("TheKeyMachine.mods.barMod", "mod_tracer"))
+    register_command("create_tracer", _make_module_command("TheKeyMachine.mods.barMod", "mod_tracer"), aliases=["mod_tracer"])
     register_command("refresh_tracer", _make_module_command("TheKeyMachine.mods.barMod", "tracer_refresh"))
     register_command("delete_animation", _make_module_command("TheKeyMachine.mods.barMod", "mod_delete_animation"))
     register_command("delete_all_animation", _make_module_command("TheKeyMachine.mods.barMod", "mod_delete_animation"))
-    register_command("copy_worldspace_single_frame", _make_module_command("TheKeyMachine.mods.barMod", "copy_worldspace_single_frame"))
-    register_command("paste_worldspace_single_frame", _make_module_command("TheKeyMachine.mods.barMod", "paste_worldspace_single_frame"))
+    register_command("ws_copy_frame", _make_module_command("TheKeyMachine.mods.barMod", "copy_worldspace_single_frame"))
+    register_command("ws_paste_frame", _make_module_command("TheKeyMachine.mods.barMod", "paste_worldspace_single_frame"))
     register_command(
-        "copy_range_worldspace_animation", _make_module_command("TheKeyMachine.mods.barMod", "copy_range_worldspace_animation")
+        "ws_copy_range", _make_module_command("TheKeyMachine.mods.barMod", "copy_range_worldspace_animation")
     )
-    register_command("worldspace_paste_animation", _make_module_command("TheKeyMachine.mods.barMod", "color_worldspace_paste_animation"))
+    register_command("ws_paste", _make_module_command("TheKeyMachine.mods.barMod", "color_worldspace_paste_animation"))
     register_command("worldspace_copy_animation", _make_module_command("TheKeyMachine.mods.barMod", "color_worldspace_copy_animation"))
-    register_command("create_temp_pivot", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", False))
-    register_command("create_temp_pivot_last", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", True))
+    register_command("temp_pivot", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", False), aliases=["create_temp_pivot"])
+    register_command("temp_pivot_last", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", True), aliases=["create_temp_pivot_last", "tp_last_used"])
     register_command(
-        "create_follow_cam", _make_module_command("TheKeyMachine.mods.barMod", "create_follow_cam", translation=True, rotation=True)
+        "follow_cam", _make_module_command("TheKeyMachine.mods.barMod", "create_follow_cam", translation=True, rotation=True), aliases=["create_follow_cam"]
     )
     register_command("set_auto_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "auto"))
     register_command("set_spline_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "spline"))
@@ -347,7 +385,7 @@ def _register_builtin_commands():
     register_command("set_plateau_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "plateau"))
 
     register_command(
-        "reset_values", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_objects_mods"), aliases=["reset_objects_mods"]
+        "reset_objects_mods", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_objects_mods"), aliases=["reset_values"]
     )
     register_command(
         "reset_translations",
@@ -382,17 +420,17 @@ def _register_builtin_commands():
     register_command("paste_insert_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_insert_animation"))
     register_command("paste_opposite_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_opposite_animation"))
     register_command("paste_animation_to", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_animation_to"))
-    register_command("copy_link", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_link"))
-    register_command("paste_link", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_link"))
+    register_command("link_copy", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_link"), aliases=["copy_link"])
+    register_command("link_paste", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_link"), aliases=["paste_link"])
     register_command(
-        "insert_inbetween",
+        "nudge_insert_inbetween",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "insert_inbetween", _nudge_value()),
-        aliases=["nudge_insertInbetween"],
+        aliases=["insert_inbetween", "nudge_insertInbetween"],
     )
     register_command(
-        "remove_inbetween",
+        "nudge_remove_inbetween",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "remove_inbetween", _nudge_value()),
-        aliases=["nudge_removeInbetween"],
+        aliases=["remove_inbetween", "nudge_removeInbetween"],
     )
     register_command(
         "nudge_left",

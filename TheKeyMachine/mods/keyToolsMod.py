@@ -17,22 +17,19 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-import maya.cmds as cmds
-import maya.mel as mel
+from maya import cmds, mel
 
 try:
-    import maya.OpenMaya as om
+    import maya.OpenMaya as om # type: ignore
 except ImportError:
-    import maya.api.OpenMaya as om
+    import maya.api.OpenMaya as om # type: ignore
 
 try:
-    from PySide6.QtGui import QRegularExpressionValidator
-    from PySide6.QtCore import QRegularExpression
-    from PySide6 import QtGui
+    from PySide6.QtGui import QRegularExpressionValidator # type: ignore
+    from PySide6.QtCore import QRegularExpression # type: ignore
 except ImportError:
-    from PySide2.QtGui import QRegExpValidator
-    from PySide2.QtCore import QRegExp
-    from PySide2 import QtGui
+    from PySide2.QtGui import QRegExpValidator # type: ignore
+    from PySide2.QtCore import QRegExp # type: ignore
 
     QRegularExpression = QRegExp
     QRegularExpressionValidator = QRegExpValidator

@@ -1,15 +1,11 @@
-import os
-
-import maya.cmds as cmds
+from maya import cmds
 
 try:
-    from PySide2 import QtCore, QtGui, QtWidgets
+    from PySide2 import QtCore, QtGui, QtWidgets  # type: ignore
 except ImportError:
-    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
 
-import TheKeyMachine.mods.barMod as bar
-import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.keyToolsMod as keyTools
+import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools.common import ToolbarWindowToggle
@@ -18,6 +14,7 @@ from TheKeyMachine.widgets import customWidgets as cw, util as wutil
 
 ORBIT_SETTINGS_NAMESPACE = "orbit_window"
 ORBIT_AUTO_TRANSPARENCY_KEY = "orbit_auto_transparency"
+ORBIT_BUTTON_CONFIGURATION_KEY = "button_configuration"
 
 def _window_class():
     from TheKeyMachine.tools.orbit.customDialogs import OrbitWindow
@@ -59,67 +56,41 @@ def _set_orbit_stays_on_top(enabled):
         win.apply_stay_on_top_setting()
 
 
-def temp_pivot_action():
-    bar.create_temp_pivot(False)
+ORBIT_ACTIONS = (
+    "isolate_master",
+    "align_selected_objects",
+    "create_tracer",
+    "reset_objects_mods",
+    "delete_all_animation",
+    "select_opposite",
+    "copy_opposite",
+    "mirror",
+    "copy_animation",
+    "paste_animation",
+    "paste_insert_animation",
+    "copy_pose",
+    "paste_pose",
+    "select_hierarchy",
+    "link_copy",
+    "temp_pivot",
+    "ws_copy_frame",
+    "ws_paste_frame",
+)
+ORBIT_ACTION_SET = set(ORBIT_ACTIONS)
 
-
-orbit_actions = {
-    "isolate_master": "bar.isolate_master",
-    "align_selected_objects": "bar.align_selected_objects",
-    "mod_tracer": "bar.mod_tracer",
-    "reset_objects_mods": "keyTools.reset_objects_mods",
-    "delete_all_animation": "bar.delete_all_animation",
-    "selectOpposite": "keyTools.selectOpposite",
-    "copyOpposite": "keyTools.copyOpposite",
-    "mirror": "keyTools.mirror",
-    "copy_animation": "keyTools.copy_animation",
-    "paste_animation": "keyTools.paste_animation",
-    "paste_insert_animation": "keyTools.paste_insert_animation",
-    "selectHierarchy": "bar.selectHierarchy",
-    "mod_link_objects": "keyTools.copy_link",
-    "temp_pivot": "temp_pivot_action",
-    "copy_pose": "keyTools.copy_pose",
-    "paste_pose": "keyTools.paste_pose",
-    "copy_worldspace_single_frame": "bar.copy_worldspace_single_frame",
-    "paste_worldspace_single_frame": "bar.paste_worldspace_single_frame",
-}
-
-orbit_action_icons = {
-    "bar.isolate_master": media.isolate_image,
-    "bar.align_selected_objects": media.align_menu_image,
-    "bar.mod_tracer": media.tracer_image,
-    "keyTools.reset_objects_mods": media.asset_path("reset_animation_image"),
-    "bar.delete_all_animation": media.delete_animation_image,
-    "keyTools.selectOpposite": media.opposite_select_image,
-    "keyTools.copyOpposite": media.opposite_copy_image,
-    "keyTools.mirror": media.mirror_image,
-    "keyTools.copy_animation": media.copy_animation_image,
-    "keyTools.paste_animation": media.paste_animation_image,
-    "keyTools.paste_insert_animation": media.paste_insert_animation_image,
-    "bar.selectHierarchy": media.select_hierarchy_image,
-    "keyTools.copy_link": media.link_objects_image,
-    "temp_pivot_action": media.temp_pivot_image,
-    "keyTools.copy_pose": media.copy_pose_image,
-    "keyTools.paste_pose": media.paste_pose_image,
-    "bar.copy_worldspace_single_frame": media.worldspace_copy_frame_image,
-    "bar.paste_worldspace_single_frame": media.worldspace_paste_frame_image,
-}
+DEFAULT_ORBIT_ACTIONS = (
+    "reset_objects_mods",
+    "delete_all_animation",
+    "select_opposite",
+    "copy_opposite",
+    "mirror",
+    "select_hierarchy",
+    "isolate_master",
+)
 
 DEFAULT_ORBIT_CONFIGURATION = {
-    "button1": "reset_objects_mods",
-    "button2": "delete_all_animation",
-    "button3": "selectOpposite",
-    "button4": "copyOpposite",
-    "button5": "mirror",
-    "button6": "selectHierarchy",
-    "button7": "isolate_master",
+    "button{}".format(index): action_identifier for index, action_identifier in enumerate(DEFAULT_ORBIT_ACTIONS, start=1)
 }
-
-LEGACY_ACTION_ALIASES = {"accion_temp_pivot": "temp_pivot"}
-
-
-def normalize_action_identifier(action_identifier):
-    return LEGACY_ACTION_ALIASES.get(action_identifier, action_identifier)
 
 
 def _orbit_button_sort_key(button_id):
@@ -128,15 +99,14 @@ def _orbit_button_sort_key(button_id):
 
 
 def sanitize_orbit_configuration(config):
-    valid_actions = set(orbit_actions.keys())
     sanitized = {}
     seen_actions = set()
 
     for button_id in sorted(config.keys(), key=_orbit_button_sort_key):
         if not str(button_id).startswith("button"):
             continue
-        action_identifier = normalize_action_identifier(config.get(button_id, ""))
-        if action_identifier not in valid_actions or action_identifier in seen_actions:
+        action_identifier = config.get(button_id, "")
+        if action_identifier not in ORBIT_ACTION_SET or action_identifier in seen_actions:
             continue
         sanitized[button_id] = action_identifier
         seen_actions.add(action_identifier)
@@ -145,88 +115,50 @@ def sanitize_orbit_configuration(config):
 
 
 def execute_action(action_identifier):
-    action_identifier = normalize_action_identifier(action_identifier)
+    if action_identifier not in ORBIT_ACTION_SET or not trigger.has_command(action_identifier):
+        return
+
     chunk_opened = False
     try:
         toolCommon.open_undo_chunk(tool_id=action_identifier)
         chunk_opened = True
-
-        if action_identifier == "isolate_master":
-            bar.isolate_master()
-        elif action_identifier == "align_selected_objects":
-            bar.align_selected_objects()
-        elif action_identifier == "mod_tracer":
-            bar.mod_tracer()
-        elif action_identifier == "reset_objects_mods":
-            keyTools.reset_objects_mods()
-        elif action_identifier == "delete_all_animation":
-            bar.mod_delete_animation()
-        elif action_identifier == "selectOpposite":
-            keyTools.selectOpposite()
-        elif action_identifier == "copyOpposite":
-            keyTools.copyOpposite()
-        elif action_identifier == "mirror":
-            keyTools.mirror()
-        elif action_identifier == "copy_animation":
-            keyTools.copy_animation()
-        elif action_identifier == "paste_animation":
-            keyTools.paste_animation()
-        elif action_identifier == "paste_insert_animation":
-            keyTools.paste_insert_animation()
-        elif action_identifier == "copy_pose":
-            keyTools.copy_pose()
-        elif action_identifier == "paste_pose":
-            keyTools.paste_pose()
-        elif action_identifier == "selectHierarchy":
-            bar.selectHierarchy()
-        elif action_identifier == "mod_link_objects":
-            keyTools.copy_link()
-        elif action_identifier == "temp_pivot":
-            temp_pivot_action()
-        elif action_identifier == "copy_worldspace_single_frame":
-            bar.copy_worldspace_single_frame()
-        elif action_identifier == "paste_worldspace_single_frame":
-            bar.paste_worldspace_single_frame()
+        trigger.invoke(action_identifier)
     finally:
         if chunk_opened:
             toolCommon.close_undo_chunk()
 
 
-def _config_path():
-    return os.path.join(general.config["USER_FOLDER_PATH"], "TheKeyMachine_user_data", "tools", "orbit", "orbit.py")
-
-
 def save_orbit_button_config():
-    config_path = _config_path()
-    config_dir = os.path.dirname(config_path)
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
-
     sanitized = sanitize_orbit_configuration(orbit_configuration)
-    with open(config_path, "w") as file:
-        for button_id in sorted(sanitized.keys(), key=_orbit_button_sort_key):
-            file.write(f"{button_id} = '{sanitized[button_id]}'\n")
+    settings.set_setting(
+        ORBIT_BUTTON_CONFIGURATION_KEY,
+        sanitized,
+        namespace=ORBIT_SETTINGS_NAMESPACE,
+    )
 
 
 def load_orbit_configuration():
-    config_path = _config_path()
-    config_dir = os.path.dirname(config_path)
     config = dict(DEFAULT_ORBIT_CONFIGURATION)
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
+    stored_config = settings.get_setting(
+        ORBIT_BUTTON_CONFIGURATION_KEY,
+        None,
+        namespace=ORBIT_SETTINGS_NAMESPACE,
+    )
 
-    try:
-        with open(config_path, "r") as file:
-            for line in file.readlines():
-                if line.startswith("button"):
-                    key, value = line.split("=")
-                    config[key.strip()] = value.strip().strip("'")
-    except FileNotFoundError:
-        with open(config_path, "w") as file:
-            for key, value in config.items():
-                file.write(f"{key} = '{value}'\n")
+    if isinstance(stored_config, dict):
+        config.update(sanitize_orbit_configuration(stored_config))
+    else:
+        stored_config = None
 
-    return sanitize_orbit_configuration(config)
+    sanitized = sanitize_orbit_configuration(config)
+    if stored_config != sanitized:
+        settings.set_setting(
+            ORBIT_BUTTON_CONFIGURATION_KEY,
+            sanitized,
+            namespace=ORBIT_SETTINGS_NAMESPACE,
+        )
+
+    return sanitized
 
 
 orbit_configuration = load_orbit_configuration()

@@ -895,7 +895,10 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
         btn.setChecked(bool(self.toggleAnimOffsetButtonState))
         self.animation_offset_button_widget = btn
         sec.addWidget(
-            btn, tool.get("label", "Anim Offset"), tool.get("key", "animation_offset"), tooltip_template=tool.get("tooltip_template")
+            btn,
+            tool.get("label", "Anim Offset"),
+            tool.get("key", "animation_offset"),
+            tooltip_template=tool.get("tooltip_template"),
         )
         return btn
 
@@ -905,7 +908,12 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
         btn.setObjectName("micro_move_button")
         btn.setCheckable(True)
         btn.setChecked(self.micro_move_controller.is_enabled())
-        sec.addWidget(btn, tool.get("label", "Micro Move"), tool.get("key", "micro_move"), tooltip_template=tool.get("tooltip_template"))
+        sec.addWidget(
+            btn,
+            tool.get("label", "Micro Move"),
+            tool.get("key", "micro_move"),
+            tooltip_template=tool.get("tooltip_template"),
+        )
         return btn
 
     def _create_setting_toggle_widget(self, sec, item_data, spec_key):

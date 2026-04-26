@@ -1,7 +1,7 @@
 try:
-    from PySide2 import QtCore, QtWidgets
+    from PySide2 import QtCore, QtWidgets  # type: ignore
 except ImportError:
-    from PySide6 import QtCore, QtWidgets
+    from PySide6 import QtCore, QtWidgets  # type: ignore
 
 import TheKeyMachine.tools.orbit.api as orbitApi
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
@@ -60,22 +60,22 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
         return [
             toolbox.get_tool("isolate_master"),
             toolbox.get_tool("align_selected_objects"),
-            toolbox.get_tool("mod_tracer"),
+            toolbox.get_tool("create_tracer"),
             toolbox.get_tool("reset_objects_mods"),
             toolbox.get_tool("delete_all_animation"),
-            toolbox.get_tool("selectOpposite"),
-            toolbox.get_tool("copyOpposite"),
+            toolbox.get_tool("select_opposite"),
+            toolbox.get_tool("copy_opposite"),
             toolbox.get_tool("mirror"),
             toolbox.get_tool("copy_animation"),
             toolbox.get_tool("paste_animation"),
             toolbox.get_tool("paste_insert_animation"),
             toolbox.get_tool("copy_pose"),
             toolbox.get_tool("paste_pose"),
-            toolbox.get_tool("selectHierarchy"),
-            toolbox.get_tool("mod_link_objects"),
+            toolbox.get_tool("select_hierarchy"),
+            toolbox.get_tool("link_copy"),
             toolbox.get_tool("temp_pivot"),
-            toolbox.get_tool("copy_worldspace_single_frame", label="Copy World Space Current Frame"),
-            toolbox.get_tool("paste_worldspace_single_frame", label="Paste World Space Current Frame"),
+            toolbox.get_tool("ws_copy_frame", label="Copy World Space Current Frame"),
+            toolbox.get_tool("ws_paste_frame", label="Paste World Space Current Frame"),
         ]
 
     def _setup_orbit_ui(self):
@@ -91,7 +91,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
 
         self._seed_orbit_visibility_settings()
 
-        default_actions = set(orbitApi.DEFAULT_ORBIT_CONFIGURATION.values())
+        default_actions = set(orbitApi.DEFAULT_ORBIT_ACTIONS)
         for tool_data in self._get_menu_items():
             self._create_orbit_tool_button(
                 tool_data=tool_data,

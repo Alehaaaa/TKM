@@ -463,6 +463,12 @@ link_objects_tooltip_text = (
     media.link_objects_image,
 )
 
+copy_link_tooltip_text = (
+    "Copy Link Position",
+    ["Save the current relative relationship from the selected objects."],
+    media.link_objects_copy_image,
+)
+
 follow_cam_tooltip_text = (
     "Follow Cam",
     [
