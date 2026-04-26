@@ -1,13 +1,13 @@
 from TheKeyMachine.tooltips import QFlatTooltipManager
-from .util import DPI
 from functools import partial
-import maya.cmds as cmds
 
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
 import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
 from TheKeyMachine.tools import colors as toolColors  # type: ignore
 from TheKeyMachine.tools import common as toolCommon  # type: ignore
+
+from .util import DPI
 
 try:
     import TheKeyMachine_user_data.preferences.user_preferences as user_preferences  # type: ignore
@@ -1062,7 +1062,11 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
 
         btn.customContextMenuRequested.connect(_show_tool_menu)
         if data.get("type") == "menu":
-            btn.clicked.connect(lambda _checked=False, widget=btn: _show_tool_menu(widget.rect().bottomLeft()))
+            btn.clicked.connect(
+                lambda _checked=False, widget=btn: widget.customContextMenuRequested.emit(
+                    widget.mapFromGlobal(QtGui.QCursor.pos())
+                )
+            )
     return btn
 
 
@@ -1385,7 +1389,6 @@ class QFillFlowLayout(QtWidgets.QLayout):
         if not test_only:
             for row_items, row_width, row_height in rows:
                 count = len(row_items)
-                total_spacing = spacing_x * max(0, count - 1)
                 extra_width = max(0, available_width - row_width)
                 extra_each, extra_remainder = divmod(extra_width, count)
                 current_x = effective_rect.x()
@@ -1655,7 +1658,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     def _set_setting(self, key, value):
         settings.set_setting(key, value, namespace=self._settings_namespace)
 
-    def addWidget(self, widget, label, key, default_visible=True, description=None, tooltip_template=None):
+    def addWidget(self, widget, label, key, default=True, description=None, tooltip_template=None, pinnable=True):
         """Add a widget to the section with a toggle key."""
         # Auto-extract help metadata from widget if not provided
         if (not tooltip_template or not description) and hasattr(widget, "get_toolTipData"):
@@ -1687,19 +1690,30 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     self._mode_to_slot[current_cm.key] = key
 
         if self._hiddeable:
-            self._menu_metadata.append(
-                {
-                    "type": "widget",
-                    "key": key,
-                    "label": label,
-                    "description": description,
-                    "tooltip_template": tooltip_template,
-                    "default": default_visible,
-                }
-            )
-
-            # Load stored visibility or use default
-            visible = self._get_setting(f"pin_{key}", default_visible)
+            if pinnable is not False:
+                # Avoid duplicate metadata entries for the same key
+                existing_entry = next((m for m in self._menu_metadata if m.get("key") == key), None)
+                if existing_entry:
+                    existing_entry.update({
+                        "label": label,
+                        "description": description,
+                        "tooltip_template": tooltip_template,
+                        "default": default,
+                    })
+                else:
+                    self._menu_metadata.append(
+                        {
+                            "type": "widget",
+                            "key": key,
+                            "label": label,
+                            "description": description,
+                            "tooltip_template": tooltip_template,
+                            "default": default,
+                        }
+                    )
+                visible = self._get_setting(f"pin_{key}", default)
+            else:
+                visible = default
             widget.setVisible(visible)
 
         # Push documentation to the widget (syncs Maya Status Bar and TKM tooltips).
@@ -1733,7 +1747,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         return widget
 
-    def addWidgetGroup(self, widgets_list, default_visible=True):
+    def addWidgetGroup(self, widgets_list, default=True):
         """
         All-in-one: adds a widget to the section AND builds its right-click menu
         from a descriptor list, enabling individual action pinning.
@@ -1752,7 +1766,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
               key, label, icon_path, callback,
              checkable (bool), set_checked_fn/set_checked (callable),
              bind_checked_fn (callable), tooltip, description.
-        default_visible : bool
+        default : bool
         description : str
         """
         default_items = [i for i in widgets_list if isinstance(i, dict) and i.get("default")]
@@ -1769,7 +1783,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             )
             label = default_item.get("label", "Unknown")
             key = default_item.get("key", "unknown")
-            item_default_visible = default_item.get("default_visible", default_visible)
+            item_default = default_item.get("default", default)
 
             checkable, set_checked_fn = _setup_setting_synced_checkable(widget, default_item)
 
@@ -1781,9 +1795,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 widget,
                 label,
                 key,
-                default_visible=item_default_visible,
+                default=item_default,
                 description=default_item.get("description"),
                 tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or label,
+                pinnable=default_item.get("pinnable", True),
             )
             group_widgets.append((key, widget))
 
@@ -1796,12 +1811,23 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         # 3. Build QMenu + pinnable_actions from the descriptor list
         pinnable_actions = []
         for item in widgets_list:
-            if item == "separator":
+            if item == "separator" or not isinstance(item, dict):
                 continue
+
+            item_key = item.get("key")
+            if not item_key:
+                continue
+
+            # If the item is already a default (primary) button, we don't need it
+            # in the pinnable sub-actions list because it's already in the main menu list.
+            is_item_default = bool(item.get("default", default))
+            if is_item_default:
+                continue
+
             if item.get("pinnable") is not False:
                 pinnable_actions.append(
                     {
-                        "key": item["key"],
+                        "key": item_key,
                         "label": item.get("label", ""),
                         "icon_path": item.get("icon_path"),
                         "callback": item.get("callback"),
@@ -1810,7 +1836,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         "bind_checked_fn": item.get("bind_checked_fn"),
                         "tooltip_template": item.get("tooltip_template") or item.get("tooltip"),
                         "description": item.get("description"),
-                        "default": bool(item.get("default", False)),
+                        "default": is_item_default,
                     }
                 )
 
@@ -1939,6 +1965,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         except Exception:
                             pass
 
+                    try:
+                        widget.customContextMenuRequested.disconnect()
+                    except Exception:
+                        pass
                     widget.customContextMenuRequested.connect(_ctx)
 
         # Restore any previously pinned sub-actions on load
@@ -2367,7 +2397,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                                 title=act_label,
                                 icon=icon,
                             )
-
                         menu.addSeparator()
 
         menu.addSeparator()

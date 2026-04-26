@@ -140,18 +140,6 @@ class Color:
         self.color = palette or toolColors.UI_COLORS
 
 
-# ________________________________________________ General  ______________________________________________________ #
-
-
-def getImage(*args, image):
-    img_dir = os.path.join(INSTALL_PATH, "TheKeyMachine/data/img/")
-
-    # Ruta del archivo de configuración
-    fullImgDir = os.path.join(img_dir, image)
-
-    return fullImgDir
-
-
 # ________________________________________________ Sync  ______________________________________________________ #
 
 

@@ -140,11 +140,11 @@ def execute_slider(prefix: str, mode: str, value: int = 0, session=None):
     import TheKeyMachine.sliders as sliders
 
     if prefix == "blend":
-        return sliders.execute_curve_modifier(mode, value, session=session)
+        return sliders.execute_blend_slider(mode, value, session=session)
     if prefix == "tween":
-        return sliders.execute_tween(mode, value, session=session)
+        return sliders.execute_tween_slider(mode, value, session=session)
     if prefix == "tangent":
-        return sliders.execute_tangent_blend(mode, value, session=session)
+        return sliders.execute_tangent_slider(mode, value, session=session)
     raise ValueError("Unknown slider prefix: {}".format(prefix))
 
 
@@ -311,7 +311,9 @@ def _register_builtin_commands():
     register_command("smart_rotation", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_rotation_manipulator"))
     register_command("smart_rotation_release", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_rotation_manipulator_release"))
     register_command("smart_translation", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_translate_manipulator"))
-    register_command("smart_translation_release", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_translate_manipulator_release"))
+    register_command(
+        "smart_translation_release", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_translate_manipulator_release")
+    )
 
     register_command("create_locator", _make_module_command("TheKeyMachine.mods.barMod", "createLocator"))
     register_command("depth_mover", _make_module_command("TheKeyMachine.mods.barMod", "depth_mover"))
@@ -326,12 +328,16 @@ def _register_builtin_commands():
     register_command("delete_all_animation", _make_module_command("TheKeyMachine.mods.barMod", "mod_delete_animation"))
     register_command("copy_worldspace_single_frame", _make_module_command("TheKeyMachine.mods.barMod", "copy_worldspace_single_frame"))
     register_command("paste_worldspace_single_frame", _make_module_command("TheKeyMachine.mods.barMod", "paste_worldspace_single_frame"))
-    register_command("copy_range_worldspace_animation", _make_module_command("TheKeyMachine.mods.barMod", "copy_range_worldspace_animation"))
+    register_command(
+        "copy_range_worldspace_animation", _make_module_command("TheKeyMachine.mods.barMod", "copy_range_worldspace_animation")
+    )
     register_command("worldspace_paste_animation", _make_module_command("TheKeyMachine.mods.barMod", "color_worldspace_paste_animation"))
     register_command("worldspace_copy_animation", _make_module_command("TheKeyMachine.mods.barMod", "color_worldspace_copy_animation"))
     register_command("create_temp_pivot", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", False))
     register_command("create_temp_pivot_last", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", True))
-    register_command("create_follow_cam", _make_module_command("TheKeyMachine.mods.barMod", "create_follow_cam", translation=True, rotation=True))
+    register_command(
+        "create_follow_cam", _make_module_command("TheKeyMachine.mods.barMod", "create_follow_cam", translation=True, rotation=True)
+    )
     register_command("set_auto_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "auto"))
     register_command("set_spline_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "spline"))
     register_command("set_clamped_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "clamped"))
@@ -340,7 +346,9 @@ def _register_builtin_commands():
     register_command("set_step_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "step"))
     register_command("set_plateau_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "plateau"))
 
-    register_command("reset_values", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_objects_mods"), aliases=["reset_objects_mods"])
+    register_command(
+        "reset_values", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_objects_mods"), aliases=["reset_objects_mods"]
+    )
     register_command(
         "reset_translations",
         _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_object_values", reset_translations=True),
@@ -362,7 +370,9 @@ def _register_builtin_commands():
             reset_scales=True,
         ),
     )
-    register_command("select_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "selectOpposite"), aliases=["selectOpposite"])
+    register_command(
+        "select_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "selectOpposite"), aliases=["selectOpposite"]
+    )
     register_command("add_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "addSelectOpposite"), aliases=["opposite_add"])
     register_command("copy_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copyOpposite"), aliases=["copyOpposite"])
     register_command("copy_pose", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_pose"))
@@ -387,12 +397,12 @@ def _register_builtin_commands():
     register_command(
         "nudge_left",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", -_nudge_value()),
-        aliases=["move_left", "move_keyframes_left"],
+        aliases=["nudge_left", "move_keyframes_left"],
     )
     register_command(
         "nudge_right",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", _nudge_value()),
-        aliases=["move_right", "move_keyframes_right"],
+        aliases=["nudge_right", "move_keyframes_right"],
     )
 
 

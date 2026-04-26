@@ -27,16 +27,6 @@ INSTALL_PATH = config["INSTALL_PATH"]
 TOOLTIPS_MOVIES_PATH = os.path.join(INSTALL_PATH, "TheKeyMachine", "tooltips", "movies")
 
 
-# ---------------------------------------------
-
-
-def getImage(image):
-    img_dir = os.path.join(INSTALL_PATH, "TheKeyMachine/data/img/")
-
-    fullImgDir = os.path.join(img_dir, image)
-    return fullImgDir
-
-
 # ----------------------------------------------  TOOLTIPS  --------------------------------------------------------
 
 
@@ -549,8 +539,7 @@ insert_inbetween_tooltip_text = (
 
 static_tooltip_text = (
     "Delete Static Keys",
-    ["Flatten the selected curve so it holds the value of its first selected key.",
-     movie.delete_all_animation_static],
+    ["Flatten the selected curve so it holds the value of its first selected key.", movie.delete_all_animation_static],
     media.delete_animation_image,
 )
 

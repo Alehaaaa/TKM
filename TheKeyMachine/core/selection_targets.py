@@ -76,24 +76,94 @@ def get_selected_channels():
         return None
 
 
-def get_graph_editor_selected_attribute_plugs():
-    anim_curves = cmds.keyframe(q=True, selected=True, name=True) or []
-    if not anim_curves:
-        return []
-
-    plugs = []
+def _unique(items):
+    unique_items = []
     seen = set()
-    for curve in anim_curves:
+    for item in items or []:
+        if item and item not in seen:
+            seen.add(item)
+            unique_items.append(item)
+    return unique_items
+
+
+def _plugs_from_anim_curves(curves):
+    plugs = []
+    for curve in curves or []:
         try:
-            dest = cmds.listConnections("{}.output".format(curve), s=False, d=True, p=True) or []
+            dest = cmds.listConnections("{}.output".format(curve), source=False, destination=True, plugs=True) or []
         except Exception:
             dest = []
-        for plug in dest:
-            if not plug or plug in seen or "." not in plug:
-                continue
-            seen.add(plug)
-            plugs.append(plug)
-    return plugs
+        plugs.extend(plug for plug in dest if plug and "." in plug)
+    return _unique(plugs)
+
+
+def _anim_curves_from_plugs(plugs):
+    curves = []
+    for plug in plugs or []:
+        if not plug or not cmds.objExists(plug):
+            continue
+        try:
+            curves.extend(cmds.listConnections(plug, source=True, destination=False, type="animCurve") or [])
+        except Exception:
+            pass
+    return _unique(curves)
+
+
+def _attribute_plugs_from_nodes(nodes):
+    selected_channels = get_selected_channels()
+    if selected_channels:
+        plugs = ["{}.{}".format(obj, attr) for obj in nodes for attr in selected_channels]
+        source = "channel_box"
+    else:
+        plugs = []
+        for obj in nodes:
+            try:
+                attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
+            except Exception:
+                attrs = []
+            plugs.extend(["{}.{}".format(obj, attr) for attr in attrs])
+        source = "keyable_scalar"
+
+    return [plug for plug in plugs if plug and cmds.objExists(plug)], source
+
+
+def _selected_object_attribute_plugs():
+    nodes = get_selected_objects()
+    if not nodes:
+        return [], "none"
+    return _attribute_plugs_from_nodes(nodes)
+
+
+def _is_anim_curve(node):
+    try:
+        return bool(node and cmds.objExists(node) and cmds.nodeType(node).startswith("animCurve"))
+    except Exception:
+        return False
+
+
+def _resolve_graph_outliner_items(items):
+    plugs = []
+    curves = []
+    nodes = []
+    for item in items or []:
+        if not item:
+            continue
+        if "." in item and cmds.objExists(item):
+            plugs.append(item)
+        elif _is_anim_curve(item):
+            curves.append(item)
+        else:
+            nodes.append(item)
+
+    node_plugs, _source = _attribute_plugs_from_nodes(nodes)
+    plugs = _unique(plugs + node_plugs + _plugs_from_anim_curves(curves))
+    curves = _unique(curves + _anim_curves_from_plugs(plugs))
+    return plugs, curves
+
+
+def get_graph_editor_selected_attribute_plugs():
+    anim_curves = cmds.keyframe(q=True, selected=True, name=True) or []
+    return _plugs_from_anim_curves(anim_curves)
 
 
 def get_graph_editor_outliner_items():
@@ -110,11 +180,12 @@ def get_graph_editor_selected_curves():
         selected_curves = []
     if selected_curves:
         return selected_curves
-    return get_graph_editor_outliner_items()
+    _plugs, curves = _resolve_graph_outliner_items(get_graph_editor_outliner_items())
+    return curves
 
 
 def get_target_curves():
-    curves = get_graph_editor_outliner_items()
+    _plugs, curves = _resolve_graph_outliner_items(get_graph_editor_outliner_items())
     if curves:
         return curves
     try:
@@ -123,7 +194,13 @@ def get_target_curves():
         return []
 
 
-def resolve_target_curves():
+def get_selected_object_curves():
+    plugs, _source = _selected_object_attribute_plugs()
+    return _anim_curves_from_plugs(plugs)
+
+
+def _resolve_slider_targets():
+    """Resolve slider targets once, then expose plug/curve views for each slider family."""
     time_range = get_selected_time_range()
 
     try:
@@ -131,43 +208,60 @@ def resolve_target_curves():
     except Exception:
         selected_key_curves = []
     if selected_key_curves:
-        return selected_key_curves, "graph_editor", time_range, True
+        return {
+            "plugs": _plugs_from_anim_curves(selected_key_curves),
+            "curves": _unique(selected_key_curves),
+            "source": "graph_editor",
+            "time_range": time_range,
+            "has_graph_keys": True,
+        }
 
-    curves = get_graph_editor_outliner_items()
-    if curves:
-        return curves, "graph_editor_outliner", time_range, False
+    graph_items = get_graph_editor_outliner_items()
+    if graph_items:
+        graph_plugs, graph_curves = _resolve_graph_outliner_items(graph_items)
+        if graph_plugs or graph_curves:
+            return {
+                "plugs": graph_plugs,
+                "curves": graph_curves,
+                "source": "graph_editor_outliner",
+                "time_range": time_range,
+                "has_graph_keys": False,
+            }
 
-    curves = get_target_curves()
-    if curves:
-        return curves, "graph_editor", time_range, False
+    try:
+        legacy_graph_curves = cmds.keyframe(query=True, name=True, sl=True) or []
+    except Exception:
+        legacy_graph_curves = []
+    if legacy_graph_curves:
+        return {
+            "plugs": _plugs_from_anim_curves(legacy_graph_curves),
+            "curves": _unique(legacy_graph_curves),
+            "source": "graph_editor",
+            "time_range": time_range,
+            "has_graph_keys": False,
+        }
 
-    return [], "none", time_range, False
+    plugs, source = _selected_object_attribute_plugs()
+    if plugs:
+        return {
+            "plugs": plugs,
+            "curves": _anim_curves_from_plugs(plugs),
+            "source": source,
+            "time_range": time_range,
+            "has_graph_keys": False,
+        }
+
+    return {"plugs": [], "curves": [], "source": "none", "time_range": time_range, "has_graph_keys": False}
 
 
 def resolve_target_attribute_plugs():
-    time_range = get_selected_time_range()
+    targets = _resolve_slider_targets()
+    return targets["plugs"], targets["source"], targets["time_range"], targets["has_graph_keys"]
 
-    graph_plugs = get_graph_editor_selected_attribute_plugs()
-    if graph_plugs:
-        return graph_plugs, "graph_editor", time_range, True
 
-    nodes = get_selected_objects()
-    if not nodes:
-        return [], "none", time_range, False
-
-    selected_channels = get_selected_channels()
-    if selected_channels:
-        candidates = ["{}.{}".format(obj, attr) for obj in nodes for attr in selected_channels]
-        source = "channel_box"
-    else:
-        candidates = []
-        for obj in nodes:
-            attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
-            candidates.extend(["{}.{}".format(obj, attr) for attr in attrs])
-        source = "keyable_scalar"
-
-    candidates = [plug for plug in candidates if plug and cmds.objExists(plug)]
-    return candidates, source, time_range, False
+def resolve_target_curves():
+    targets = _resolve_slider_targets()
+    return targets["curves"], targets["source"], targets["time_range"], targets["has_graph_keys"]
 
 
 def get_playback_slider():

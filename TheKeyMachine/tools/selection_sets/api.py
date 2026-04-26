@@ -260,21 +260,13 @@ def export_selection_sets(controller=None):
         controller.export_sets()
 
 
-def clear_all_selection_sets(controller=None, parent=None):
-    _confirm_clear_selection_sets(controller=controller, parent=parent)
-
-
-def restore_selection_sets_default_position(controller=None):
-    settings.set_setting("selection_sets_geometry", None, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
-    win = get_selection_sets_window()
-    if win and wutil.is_valid_widget(win):
-        _place_selection_sets_window_default(win)
-
-
-def _confirm_clear_selection_sets(controller=None, parent=None):
+def clear_all_selection_sets(controller=None, parent=None, menu=None):
     controller = _resolve_toolbar_controller(controller)
     if controller is None:
         return
+    if menu:
+        menu.close()
+
     clicked = customDialogs.QFlatConfirmDialog.question(
         parent=parent,
         window="Selection Sets",
@@ -286,6 +278,13 @@ def _confirm_clear_selection_sets(controller=None, parent=None):
     )
     if clicked and clicked.get("name") == "Yes":
         controller.clear_selection_sets()
+
+
+def restore_selection_sets_default_position(controller=None):
+    settings.set_setting("selection_sets_geometry", None, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
+    win = get_selection_sets_window()
+    if win and wutil.is_valid_widget(win):
+        _place_selection_sets_window_default(win)
 
 
 def build_selection_sets_context_menu(parent=None, controller=None):
@@ -332,7 +331,7 @@ def build_selection_sets_context_menu(parent=None, controller=None):
         QtGui.QIcon(media.trash_image),
         "Clear All Select Sets",
         description="Delete every selection set in the current scene.",
-    ).triggered.connect(lambda *_: _confirm_clear_selection_sets(controller=controller, parent=parent))
+    ).triggered.connect(lambda *_: clear_all_selection_sets(controller=controller, parent=parent, menu=menu))
 
     menu.addSeparator()
 
@@ -415,6 +414,7 @@ def bind_selection_sets_toolbar_button(button, controller=None):
     if controller is not None:
         _selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=controller)
     if button:
+
         def _selection_sets_mouse_press(event, b=button, c=controller):
             if event.button() == QtCore.Qt.LeftButton:
                 variant = getattr(b, "_get_active_shortcut_variant", lambda: None)()

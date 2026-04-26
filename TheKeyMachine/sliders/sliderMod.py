@@ -14,7 +14,7 @@ from . import tangent_ops
 from . import time_ops
 
 
-def execute_tween(session, value, world_space=False):
+def execute_tweener(session, value, world_space=False):
     return keyframe_ops.apply_tween(session, value, world_space=world_space)
 
 

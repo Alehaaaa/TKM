@@ -172,8 +172,7 @@ class QFlatWindowMixin:
         self.window_title.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.window_title.setWordWrap(False)
         self.window_title.setStyleSheet(
-            "#qflat_window_title{color:%s;font-size:%spx;font-weight:bold;background:transparent;}"
-            % (textColor, title_size)
+            "#qflat_window_title{color:%s;font-size:%spx;font-weight:bold;background:transparent;}" % (textColor, title_size)
         )
         header_layout.addWidget(self.window_title, 1, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
@@ -343,10 +342,10 @@ class QFlatConfirmDialog(QFlatDialog):
         parent=None,
         **kwargs,
     ):
-        if not closeButton:
-            buttons=["Ok"]
+        if not buttons and not closeButton:
+            buttons = ["Ok"]
         QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, closeButton=closeButton, **kwargs)
-        
+
         new_flags = self.windowFlags() | QtCore.Qt.Dialog
         if parent and (parent.windowFlags() & QtCore.Qt.Tool):
             new_flags |= QtCore.Qt.Tool
@@ -358,7 +357,7 @@ class QFlatConfirmDialog(QFlatDialog):
         self._exclusive = exclusive
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
         self.setWindowTitle(window or "Confirm")
-        
+
         self.clicked_button = None
 
         self.setMinimumWidth(0)
@@ -532,7 +531,9 @@ class QFlatTooltipConfirm(QFlatDialog):
 
         # Style the frame
         self.setStyleSheet(
-            "QFlatTooltipConfirm > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(self.BG_COLOR, DPI(self.BORDER_RADIUS))
+            "QFlatTooltipConfirm > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(
+                self.BG_COLOR, DPI(self.BORDER_RADIUS)
+            )
         )
 
         self.bg_frame = QtWidgets.QFrame()
@@ -583,10 +584,13 @@ class QFlatTooltipConfirm(QFlatDialog):
                     has_header = True
             elif child.tag == "title":
                 inner_text = (child.text or "") + "".join(
-                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode") for c in child
+                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
+                    for c in child
                 )
                 lbl = QtWidgets.QLabel(inner_text)
-                lbl.setStyleSheet("color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(self.TEXT_COLOR, DPI(18)))
+                lbl.setStyleSheet(
+                    "color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(self.TEXT_COLOR, DPI(18))
+                )
                 lbl.setWordWrap(True)
                 header_layout.addWidget(lbl)
                 has_header = True
@@ -609,7 +613,8 @@ class QFlatTooltipConfirm(QFlatDialog):
 
             if child.tag == "text":
                 inner_text = (child.text or "") + "".join(
-                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode") for c in child
+                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
+                    for c in child
                 )
                 lbl = QtWidgets.QLabel(inner_text)
                 lbl.setWordWrap(True)
@@ -1182,6 +1187,7 @@ class QFlatToolBarWindowDialog(QFlatDialog):
     """
     Full QFlat window shell with a unified top-left icon, title, and bottom bar.
     """
+
     pass
 
 
@@ -1193,7 +1199,15 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
     MAX_TEXT_CHARS = 1200
     MAX_SCRIPT_ERROR_CHARS = 12000
 
-    def __init__(self, parent=None, submit_callback=None, dialog_title="Report a Bug", prefill_name="", prefill_explanation="", prefill_script_error=""):
+    def __init__(
+        self,
+        parent=None,
+        submit_callback=None,
+        dialog_title="Report a Bug",
+        prefill_name="",
+        prefill_explanation="",
+        prefill_script_error="",
+    ):
         self._submit_callback = submit_callback
         self._send_button = None
         super().__init__(parent=parent)
@@ -1239,9 +1253,7 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
             self.name_input.setText(prefill_name)
 
         self.explanation_textbox = QtWidgets.QTextEdit(content_widget)
-        self.explanation_textbox.setPlaceholderText(
-            "* Describe what happened, what you expected, and the steps to reproduce it."
-        )
+        self.explanation_textbox.setPlaceholderText("* Describe what happened, what you expected, and the steps to reproduce it.")
         self.explanation_textbox.setAcceptRichText(False)
         self.explanation_textbox.setMinimumHeight(DPI(110))
         self.explanation_textbox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)

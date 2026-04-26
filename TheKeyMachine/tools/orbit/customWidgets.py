@@ -95,7 +95,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
         for tool_data in self._get_menu_items():
             self._create_orbit_tool_button(
                 tool_data=tool_data,
-                default_visible=tool_data["key"] in default_actions,
+                default=tool_data["key"] in default_actions,
             )
         self.tools_section.updateGeometry()
 
@@ -112,7 +112,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
                     namespace=orbitApi.ORBIT_SETTINGS_NAMESPACE,
                 )
 
-    def _create_orbit_tool_button(self, tool_data, default_visible):
+    def _create_orbit_tool_button(self, tool_data, default):
         label = tool_data.get("label") or tool_data.get("key")
         action_identifier = tool_data["key"]
         tooltip_text = tool_data.get("tooltip_template") or label
@@ -134,7 +134,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
             btn,
             label=label,
             key=action_identifier,
-            default_visible=default_visible,
+            default=default,
             description=description,
             tooltip_template=tooltip_text,
         )

@@ -134,11 +134,11 @@ def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
 
     try:
         if enabled:
-            QtCore.QTimer.singleShot(0, customGraph.ensureCustomGraph)
+            QtCore.QTimer.singleShot(0, customGraph.createCustomGraph)
         else:
             QtCore.QTimer.singleShot(0, customGraph.removeCustomGraph)
     except Exception:
         if enabled:
-            customGraph.ensureCustomGraph()
+            customGraph.createCustomGraph()
         else:
             customGraph.removeCustomGraph()

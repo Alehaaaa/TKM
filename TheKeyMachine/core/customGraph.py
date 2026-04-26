@@ -40,7 +40,7 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
 import TheKeyMachine.core.toolMenus as toolMenus
 import TheKeyMachine.core.toolbox as toolbox
-from TheKeyMachine.tools import colors as toolColors
+import TheKeyMachine.core.trigger as trigger
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
@@ -50,13 +50,11 @@ import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 
-mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolMenus, toolbox]
+mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolMenus, toolbox, trigger]
 
 for m in mods:
     importlib.reload(m)
 
-
-UI_COLORS = toolColors.UI_COLORS
 
 _GRAPH_TOOLBAR_OBJECT = "tkm_customGraph_flowToolbar"
 _GRAPH_TOOLBAR_DOCK_SETTING = "graph_toolbar_dock_position"
@@ -296,6 +294,144 @@ def create_toolbox_button(tool_id, p=None, **overrides):
     return btn
 
 
+def _add_graph_slider_section_from_data(section_def, new_section_fn):
+    sec = new_section_fn(color=section_def.get("color"))
+    sec.set_settings_namespace("graph_toolbar_sliders")
+    sec.set_persist_slider_modes(False)
+
+    prefix = section_def["slider_type"]
+    color = section_def["color"]
+    modes = getattr(sliders, section_def["modes_attr"])
+    default_modes = section_def.get("default_modes", [])
+    static_default_keys = [f"{prefix}_{key}" for key in default_modes]
+
+    for mode in modes:
+        if mode == "separator":
+            sec.addSeparator()
+            continue
+        if not isinstance(mode, dict):
+            continue
+
+        key = mode["key"]
+        label = mode["label"]
+        desc = mode.get("description", "")
+        icon = mode.get("icon", "SL")
+        is_visible = settings.get_setting(
+            f"pin_{prefix}_{key}",
+            f"{prefix}_{key}" in static_default_keys,
+            namespace="graph_toolbar_sliders",
+        )
+
+        slider = sw.QFlatSliderWidget(
+            f"graph_{prefix}_{key}",
+            min=-100,
+            max=100,
+            text=icon,
+            color=color,
+            dragCommand=lambda mode_key, value, p=prefix, session=None: trigger.execute_slider(
+                p,
+                mode_key,
+                value,
+                session=session,
+            ),
+            tooltipTitle=label,
+            tooltipDescription=desc,
+        )
+        slider.setModes(modes)
+        slider.setCurrentMode(key)
+
+        def make_mode_setter(slider_instance):
+            def setter(new_mode, temporary=False):
+                slider_instance.setCurrentMode(new_mode, temporary=temporary)
+                mode_info = next((item for item in modes if isinstance(item, dict) and item["key"] == new_mode), None)
+                if mode_info:
+                    slider_instance.setTooltipInfo(mode_info["label"], mode_info.get("description", ""))
+                if not temporary:
+                    slider_instance.startFlash()
+
+            return setter
+
+        slider.modeRequested.connect(make_mode_setter(slider))
+        sec.addWidget(slider, label, f"{prefix}_{key}", default=is_visible, description=desc)
+
+    sec.add_final_actions(static_default_keys)
+    return sec
+
+
+def _add_graph_group_items(sec, items):
+    group_tools = []
+
+    def flush_group_tools():
+        if group_tools:
+            sec.addWidgetGroup(list(group_tools))
+            group_tools[:] = []
+
+    for item in items:
+        if item == "separator":
+            flush_group_tools()
+            sec.addSeparator()
+            continue
+        if isinstance(item, dict) and item.get("type") == "widget":
+            flush_group_tools()
+            continue
+        group_tools.append(item)
+
+    flush_group_tools()
+
+
+def _add_graph_tool_item(sec, item, graph_settings_menu_fn):
+    if item.get("key") == "settings":
+        settings_tool = dict(item)
+        settings_tool["menu_setup_fn"] = graph_settings_menu_fn
+        settings_btn = cw.create_tool_button_from_data(settings_tool)
+        sec.addWidget(
+            settings_btn,
+            settings_tool.get("label", "Settings"),
+            settings_tool.get("key", "settings"),
+            default=settings_tool.get("default", True),
+            description=settings_tool.get("description"),
+        )
+        return settings_btn
+
+    btn = cw.create_tool_button_from_data(item)
+    sec.addWidget(
+        btn,
+        item.get("label", ""),
+        item.get("key", ""),
+        default=item.get("default", True),
+        description=item.get("description"),
+        tooltip_template=item.get("tooltip_template"),
+        pinnable=item.get("pinnable", True),
+    )
+    return btn
+
+
+def _populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn):
+    sections = toolbox.get_toolbar_sections("graph", resolve_items=False)
+    for section_def in sections:
+        if section_def.get("type") == "slider":
+            _add_graph_slider_section_from_data(section_def, new_section_fn)
+            continue
+
+        sec = new_section_fn(
+            color=section_def.get("color"),
+            hiddeable=section_def.get("hiddeable", True),
+        )
+        resolved_section = toolbox.get_tool_section(section_def["id"])
+        for item in resolved_section["items"]:
+            if item == "separator":
+                sec.addSeparator()
+                continue
+
+            if isinstance(item, dict):
+                if item.get("type") == "group":
+                    _add_graph_group_items(sec, item.get("items", []))
+                    continue
+                if item.get("type") == "widget":
+                    continue
+                _add_graph_tool_item(sec, item, graph_settings_menu_fn)
+
+
 def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs):
     global _GRAPH_TOOLBAR_WIDGET
 
@@ -324,7 +460,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     flow_qw.hide()
     _GRAPH_TOOLBAR_WIDGET = flow_qw
 
-    flowtoolbar_layout = cw.QFlowLayout(flow_qw, margin=2, Wspacing=18, Hspacing=6, alignment=_graph_toolbar_alignment())
+    flowtoolbar_layout = cw.QFlowLayout(flow_qw, margin=2, Wspacing=10, Hspacing=6, alignment=_graph_toolbar_alignment())
 
     def new_section(hiddeable=True, color=None):
         sec = cw.QFlatSectionWidget(
@@ -335,182 +471,9 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         flowtoolbar_layout.addWidget(sec)
         return sec
 
-    # ________________ Key Tools Buttons  ___________________#
-    sec = new_section()
-
-    sec.addWidgetGroup(
-        [
-            toolbox.get_tool("static", default=True),
-            toolbox.get_tool("share_keys", text="sK", default=True),
-            toolbox.get_tool("match", text="M", default=True),
-            toolbox.get_tool("flip", text="F", default=True),
-            toolbox.get_tool("snap", text="Sn", default=True),
-            toolbox.get_tool("overlap", text="O", default=True),
-            toolbox.get_tool("extra_graph_tools", default=True),
-        ]
-    )
-
-    # _________________  Slider Logic & Wrappers ____________________#
-
-    # 1. Sliders Sections - Tween, Blend, and Tangent
-    def add_mode_sliders(modes_list, prefix, color, change_func, default_modes=None, ws_support=False):
-        # Create a new section for each slider color/type
-        sec = new_section()
-        sec.set_settings_namespace("graph_toolbar_sliders")
-        sec.set_persist_slider_modes(False)
-
-        # Static default list for "Pin Defaults"
-        if default_modes:
-            static_default_keys = [f"{prefix}_{k}" for k in default_modes]
-        else:
-            first_mode = modes_list[0]["key"] if isinstance(modes_list[0], dict) else modes_list[1]["key"]
-            static_default_keys = [f"{prefix}_{first_mode}"]
-
-        for m in modes_list:
-            if m == "separator":
-                sec.addSeparator()
-                continue
-            if not isinstance(m, dict):
-                continue
-
-            key = m["key"]
-            label = m["label"]
-            desc = m.get("description", "")
-            icon = m.get("icon", "SL")
-
-            # Determine initial visibility: pinned setting takes priority, fallback to default_modes membership
-            is_visible = settings.get_setting(f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys, namespace="graph_toolbar_sliders")
-
-            s = sw.QFlatSliderWidget(
-                f"graph_{prefix}_{key}",
-                min=-100,
-                max=100,
-                text=icon,
-                color=color,
-                dragCommand=(lambda mode_key, v, session=None: change_func(mode_key, v, session=session)),
-                tooltipTitle=label,
-                tooltipDescription=desc,
-            )
-            s.setModes(modes_list)
-            s.setCurrentMode(key)
-
-            # Setup mode switching for this specific slider instance
-            def make_mode_setter(slider_instance, prefix_val):
-                def setter(new_mode, temporary=False):
-                    slider_instance.setCurrentMode(new_mode, temporary=temporary)
-                    # Find info for new mode to update tooltip
-                    m_info = next((item for item in modes_list if isinstance(item, dict) and item["key"] == new_mode), None)
-                    if m_info:
-                        slider_instance.setTooltipInfo(m_info["label"], m_info.get("description", ""))
-                    if not temporary:
-                        slider_instance.startFlash()
-
-                return setter
-
-            s.modeRequested.connect(make_mode_setter(s, prefix))
-
-            sec.addWidget(s, label, f"{prefix}_{key}", default_visible=is_visible, description=desc)
-
-        # Add the final pin actions at the bottom of the section menu
-        sec.add_final_actions(static_default_keys)
-
-    add_mode_sliders(
-        sliders.TWEEN_MODES,
-        "tween",
-        UI_COLORS.yellow.hex,
-        sliders.execute_tween,
-        default_modes=["tweener"],
-        ws_support=True,
-    )
-    add_mode_sliders(
-        sliders.BLEND_MODES,
-        "blend",
-        UI_COLORS.green.hex,
-        sliders.execute_curve_modifier,
-        default_modes=["connect_neighbors"],
-    )
-    add_mode_sliders(
-        sliders.TANGENT_MODES,
-        "tangent",
-        UI_COLORS.orange.hex,
-        sliders.execute_tangent_blend,
-        default_modes=["blend_best_guess"],
-    )
-
-    # _________________  Iso / Mute / Lock  _________________#
-    sec = new_section()
-    btn_iso = create_toolbox_button("graph_isolate_curves")
-    sec.addWidget(btn_iso, "Isolate", "iso")
-
-    btn_mute = create_toolbox_button("graph_toggle_mute")
-    sec.addWidget(btn_mute, "Mute", "mute")
-
-    btn_lock = create_toolbox_button("graph_toggle_lock")
-    sec.addWidget(btn_lock, "Lock", "lock")
-
-    btn_fi = create_toolbox_button("graph_filter")
-    sec.addWidget(btn_fi, "Filter", "filter")
-
-    # ____________________  Resets  _________________________#
-    sec = new_section()
-    sec.addWidgetGroup(toolbox.get_tool_section("reset_tools")["items"])
-
-    # _________________  Tangents  ____________________#
-    tangent_section = toolbox.get_tool_section("tangent_buttons", resolve_items=False)
-    sec = new_section(color=tangent_section.get("color", toolColors.orange))
-    btn_cycle = create_toolbox_button("tangent_cycle_matcher")
-    sec.addWidget(btn_cycle, "Cycle Matcher", "cycle", default_visible=False)
-
-    btn_bouncy = create_toolbox_button("tangent_bouncy")
-    sec.addWidget(btn_bouncy, "Bouncy Tangent", "bouncy")
-
-    btn_tangent_auto = create_toolbox_button("tangent_auto")
-    sec.addWidget(btn_tangent_auto, "Auto Tangent", "tangent_auto")
-
-    btn_tangent_spline = create_toolbox_button("tangent_spline")
-    sec.addWidget(btn_tangent_spline, "Spline Tangent", "tangent_spline")
-
-    btn_tangent_clamped = create_toolbox_button("tangent_clamped")
-    sec.addWidget(btn_tangent_clamped, "Clamped Tangent", "tangent_clamped", default_visible=False)
-
-    btn_tangent_linear = create_toolbox_button("tangent_linear")
-    sec.addWidget(btn_tangent_linear, "Linear Tangent", "tangent_linear")
-
-    btn_tangent_flat = create_toolbox_button("tangent_flat")
-    sec.addWidget(btn_tangent_flat, "Flat Tangent", "tangent_flat", default_visible=False)
-
-    btn_tangent_step = create_toolbox_button("tangent_step")
-    sec.addWidget(btn_tangent_step, "Step Tangent", "tangent_step")
-
-    btn_tangent_plateau = create_toolbox_button("tangent_plateau")
-    sec.addWidget(btn_tangent_plateau, "Plateau Tangent", "tangent_plateau", default_visible=False)
-
-    # _________________  Opacity Slider  ____________________#
-
-    def set_opacity_from_slider(value):
-        # Normalize percent to 0..1
-        v = value / 100.0
-        graph_editor_window = get_graph_editor_window()
-        if graph_editor_window is None:
-            cmds.warning("GraphEditor opacity is not available when it's docked")
-        else:
-            graph_editor_window.setWindowOpacity(v)
-
-    def get_graph_editor_window():
-        if not cmds.window("graphEditor1Window", exists=True):
-            cmds.GraphEditor()
-        ptr = mui.MQtUtil.findWindow("graphEditor1Window")
-        if ptr is not None:
-            return wutil.get_maya_qt(ptr, QtWidgets.QWidget)
-        else:
-            return None
-
-    # ________________ System/Core Section ___________________#
-    sec = new_section(hiddeable=False)
-
     def _build_graph_settings_menu(_menu, source_widget=None):
         return toolMenus.build_graph_settings_menu(
-            source_widget or settings_btn,
+            source_widget or flow_qw,
             dock_options=_DOCK_OPTIONS,
             dock_setting=_GRAPH_TOOLBAR_DOCK_SETTING,
             default_dock_position=_DOCK_BOTTOM_GRAPH,
@@ -519,19 +482,12 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
             remove_toolbar_fn=removeCustomGraph,
         )
 
-    settings_tool = toolbox.get_tool("settings", menu_setup_fn=_build_graph_settings_menu)
-    settings_btn = cw.create_tool_button_from_data(settings_tool)
-    sec.addWidget(
-        settings_btn,
-        settings_tool.get("label", "Settings"),
-        settings_tool.get("key", "settings"),
-        description=settings_tool.get("description"),
-    )
+    _populate_graph_toolbar_from_layout(new_section, _build_graph_settings_menu)
 
     def _on_toolbar_context_menu(pos):
         if flow_qw.childAt(pos):
             return
-        settings_menu = _build_graph_settings_menu(None, source_widget=settings_btn)
+        settings_menu = _build_graph_settings_menu(None, source_widget=flow_qw)
         settings_menu.exec_(QtGui.QCursor.pos())
 
     flow_qw.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)

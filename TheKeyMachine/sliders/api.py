@@ -13,8 +13,8 @@ from TheKeyMachine.tools import common as toolCommon
 # Dispatch maps for various slider types
 DISPATCH_MAPS = {
     "tween": {
-        "tweener": sliderMod.execute_tween,
-        "tweener_worldspace": lambda s, v, ws: sliderMod.execute_tween(s, v, world_space=True),
+        "tweener": sliderMod.execute_tweener,
+        "tweener_worldspace": lambda s, v, ws: sliderMod.execute_tweener(s, v, world_space=True),
         "blend_to_buffer": sliderMod.execute_blend_to_buffer,
         "blend_to_default": sliderMod.execute_blend_to_default,
         "blend_to_ease": sliderMod.execute_blend_to_ease,
@@ -56,7 +56,7 @@ DISPATCH_MAPS = {
     "time": {
         "time_offsetter": sliderMod.execute_time_offsetter,
         "time_offsetter_stagger": sliderMod.execute_time_stagger,
-    }
+    },
 }
 
 
@@ -109,16 +109,16 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
     try:
         dispatch = DISPATCH_MAPS.get(type_key, {})
         func = dispatch.get(mode)
-        
+
         if not func:
             # Fallback for generic tween if mode not explicitly mapped
             if type_key == "tween":
                 session.ensure_undo_open()
-                sliderMod.execute_tween(session, value, world_space=world_space)
+                sliderMod.execute_tweener(session, value, world_space=world_space)
             return session
-            
+
         session.ensure_undo_open()
-        
+
         # Call with appropriate signature based on type
         if type_key == "tween":
             func(session, value, world_space)
@@ -127,24 +127,24 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
         else:
             # Curve and time ops both expect the raw slider percentage.
             func(session, None, value)
-            
+
         return session
     finally:
         if should_finish:
             session.finish()
 
 
-def execute_tween(mode, value, world_space=False, session=None):
+def execute_tween_slider(mode, value, world_space=False, session=None):
     """Yellow slider modes."""
     return _execute_slider_op("tween", mode, value, world_space, session)
 
 
-def execute_curve_modifier(mode, value, session=None):
+def execute_blend_slider(mode, value, session=None):
     """Green slider modes."""
     return _execute_slider_op("curve", mode, value, session=session)
 
 
-def execute_tangent_blend(mode, value, session=None):
+def execute_tangent_slider(mode, value, session=None):
     """Orange slider modes."""
     return _execute_slider_op("tangent", mode, value, session=session)
 
@@ -156,4 +156,4 @@ def execute_time_modifier(mode, value, session=None):
 
 def execute_blend_to_frame_with_button_values(value, session=None):
     """Legacy helper for frame buttons."""
-    return execute_tween("blend_to_frame", value, session=session)
+    return execute_tween_slider("blend_to_frame", value, session=session)

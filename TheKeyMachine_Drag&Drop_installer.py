@@ -17,11 +17,9 @@ Developed by: Rodrigo Torres / rodritorres.com
 
 import sys
 import os
-import platform
 import shutil
 
 import maya.cmds as cmds
-import maya.utils as utils
 import maya.OpenMayaUI as omui
 
 try:
@@ -31,32 +29,10 @@ except ImportError:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
 
-__version__ = "0.1.89"
+__version__ = "0.1.90"
 __stage__ = "beta"
-__build__ = "315"
-__codename__ = "Iced Coffee"
-
-
-def get_screen_resolution():
-    app = QtWidgets.QApplication.instance()
-    if not app:
-        app = QtWidgets.QApplication([])
-
-    try:
-        # PySide2
-        from PySide2.QtGui import QDesktopWidget
-
-        desktop = QDesktopWidget()
-        screen_rect = desktop.screenGeometry()
-    except ImportError:
-        # PySide6
-        screen = app.primaryScreen()
-        screen_rect = screen.geometry()
-
-    screen_width = screen_rect.width()
-    screen_height = screen_rect.height()
-
-    return screen_width, screen_height
+__build__ = "316"
+__codename__ = "Cold Brew"
 
 
 def get_dpi_scale():

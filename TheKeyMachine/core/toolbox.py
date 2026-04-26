@@ -16,7 +16,6 @@ import TheKeyMachine.core.toolMenus as toolMenus
 import TheKeyMachine.tools.ibookmarks.api as iBookmarksApi
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 from TheKeyMachine.tools import colors as toolColors
-from TheKeyMachine.tools import common as toolCommon
 
 """
 TheKeyMachine Toolbox
@@ -146,17 +145,45 @@ TOOL_DEFINITIONS = {
         "callback": trigger.make_command_callback("micro_move_toggle"),
         "tooltip_template": helper.micro_move_tooltip_text,
     },
-    "move_left": {
+    "isolate_down_level": {
+        "type": "widget",
+        "key": "isolate_down_level",
+        "label": "Down one level",
+    },
+    "tracer_connected": {
+        "type": "widget",
+        "key": "tracer_connected",
+        "label": "Connected",
+    },
+    "link_autolink": {
+        "type": "check",
+        "key": "link_autolink",
+        "label": "Auto-link",
+        "icon_path": media.link_objects_image,
+        "checkable": True,
+        "pinnable": False,
+    },
+    "overshoot_sliders": {
+        "type": "widget",
+        "key": "overshoot_sliders",
+        "label": "Overshoot Sliders",
+    },
+    "attribute_switcher_euler_filter": {
+        "type": "widget",
+        "key": "attribute_switcher_euler_filter",
+        "label": "Auto Euler Filter",
+    },
+    "nudge_left": {
         "type": "tool",
-        "key": "move_left",
+        "key": "nudge_left",
         "label": "Nudge Left",
         "icon_path": media.nudge_left_image,
         "callback": trigger.make_command_callback("nudge_left"),
         "description": "Nudge selected keys to the left.",
     },
-    "move_right": {
+    "nudge_right": {
         "type": "tool",
-        "key": "move_right",
+        "key": "nudge_right",
         "label": "Nudge Right",
         "icon_path": media.nudge_right_image,
         "callback": trigger.make_command_callback("nudge_right"),
@@ -180,6 +207,13 @@ TOOL_DEFINITIONS = {
         "tooltip_template": helper.insert_inbetween_tooltip_text,
         "description": "Insert inbetweens using the current nudge step value.",
     },
+    "nudge_value": {
+        "type": "widget",
+        "key": "nudge_value",
+        "label": "Nudge Value",
+        "tooltip_template": helper.move_keyframes_intField_widget_tooltip_text,
+        "default": True,
+    },
     "clear_selected_keys": {
         "type": "tool",
         "key": "clear_sel",
@@ -187,7 +221,6 @@ TOOL_DEFINITIONS = {
         "text": "x",
         "callback": trigger.make_command_callback("clear_selected_keys", keyTools.clear_selected_keys),
         "tooltip_template": helper.clear_selected_keys_widget_tooltip_text,
-        "default_visible": False,
     },
     "select_scene_animation": {
         "type": "tool",
@@ -196,7 +229,6 @@ TOOL_DEFINITIONS = {
         "text": "s",
         "callback": trigger.make_command_callback("select_all_animation_curves", keyTools.select_all_animation_curves),
         "tooltip_template": helper.select_scene_animation_widget_tooltip_text,
-        "default_visible": False,
     },
     "static": {
         "type": "tool",
@@ -432,6 +464,7 @@ TOOL_DEFINITIONS = {
         "icon_path": media.selector_image,
         "callback": bar.selector_window,
         "tooltip_template": helper.selector_tooltip_text,
+        "default": True,
     },
     "create_locator": {
         "type": "tool",
@@ -1082,18 +1115,18 @@ TOOL_SECTION_DEFINITIONS = {
         "color": toolColors.green,
         "items": [
             {
-                "id": "move_left",
+                "id": "nudge_left",
                 "default": True,
                 "shortcuts": [{"id": "nudge_remove_inbetween", "keys": [QtCore.Qt.Key_Shift]}],
             },
             {"id": "nudge_remove_inbetween"},
             {
-                "id": "move_right",
+                "id": "nudge_right",
                 "default": True,
                 "shortcuts": [{"id": "nudge_insert_inbetween", "keys": [QtCore.Qt.Key_Shift]}],
             },
             {"id": "nudge_insert_inbetween"},
-            {"widget": "nudge_value"},
+            {"type": "widget", "key": "nudge_value", "default": True},
         ],
     },
     "key_sync_tools": {
@@ -1135,8 +1168,8 @@ TOOL_SECTION_DEFINITIONS = {
             {"group": "nudge_tools"},
             "separator",
             {"group": "key_sync_tools"},
-            {"id": "clear_selected_keys", "default_visible": False},
-            {"id": "select_scene_animation", "default_visible": False},
+            {"id": "clear_selected_keys"},
+            {"id": "select_scene_animation"},
             "separator",
             {"group": "bake_tools"},
         ],
@@ -1195,7 +1228,7 @@ TOOL_SECTION_DEFINITIONS = {
             },
             {"id": "isolate_bookmarks"},
             "separator",
-            {"widget": "isolate_down_level"},
+            {"type": "widget", "key": "isolate_down_level"},
             "separator",
             {"id": "isolate_help"},
         ],
@@ -1246,7 +1279,7 @@ TOOL_SECTION_DEFINITIONS = {
                     {"id": "tracer_remove", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt]},
                 ],
             },
-            {"widget": "tracer_connected"},
+            {"type": "widget", "key": "tracer_connected"},
             "separator",
             {"id": "tracer_refresh"},
             {"id": "tracer_show_hide"},
@@ -1409,15 +1442,15 @@ TOOL_SECTION_DEFINITIONS = {
         "label": "Tangents",
         "color": toolColors.orange,
         "items": [
-            {"id": "tangent_cycle_matcher", "key": "cycle", "default_visible": False},
-            {"id": "tangent_bouncy", "key": "bouncy"},
-            {"id": "tangent_auto"},
-            {"id": "tangent_spline", "default_visible": False},
-            {"id": "tangent_clamped", "default_visible": False},
-            {"id": "tangent_linear", "default_visible": False},
-            {"id": "tangent_flat", "default_visible": False},
-            {"id": "tangent_step"},
-            {"id": "tangent_plateau", "default_visible": False},
+            {"id": "tangent_cycle_matcher", "key": "cycle"},
+            {"id": "tangent_bouncy", "key": "bouncy", "default": True},
+            {"id": "tangent_auto", "default": True},
+            {"id": "tangent_spline", "default": True},
+            {"id": "tangent_clamped"},
+            {"id": "tangent_linear", "default": True},
+            {"id": "tangent_flat"},
+            {"id": "tangent_step", "default": True},
+            {"id": "tangent_plateau"},
         ],
     },
     # --- Special Tools ---
@@ -1478,7 +1511,7 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "link_copy"},
             {"id": "link_paste"},
             "separator",
-            {"widget": "link_autolink"},
+            {"id": "link_autolink"},
             "separator",
             {"id": "link_help"},
         ],
@@ -1512,7 +1545,7 @@ TOOL_SECTION_DEFINITIONS = {
         "items": [
             {"group": "link_tools"},
             {"group": "worldspace_tools"},
-            {"id": "attribute_switcher"},
+            {"id": "attribute_switcher", "default": True},
         ],
     },
     # --- Workspaces & Extensions ---
@@ -1526,12 +1559,12 @@ TOOL_SECTION_DEFINITIONS = {
     "extension_tools": {
         "label": "Extensions",
         "items": [
-            {"widget": "overshoot_sliders"},
-            {"widget": "attribute_switcher_euler_filter"},
-            {"id": "custom_graph", "default_visible": False},
+            {"type": "widget", "key": "overshoot_sliders", "default": True},
+            {"type": "widget", "key": "attribute_switcher_euler_filter"},
+            {"id": "custom_graph"},
             "separator",
-            {"id": "custom_tools", "default_visible": False},
-            {"id": "custom_scripts", "default_visible": False},
+            {"id": "custom_tools"},
+            {"id": "custom_scripts"},
         ],
     },
     "system": {
@@ -1543,14 +1576,19 @@ TOOL_SECTION_DEFINITIONS = {
     "graph_key_tools": {
         "label": "Graph Key Tools",
         "items": [
-            {"id": "static", "default": True},
+            {
+                "id": "delete_all_animation",
+                "key": "delete_anim",
+                "default": True,
+                "shortcuts": [{"id": "static", "keys": [QtCore.Qt.Key_Shift]}],
+            },
             {
                 "id": "share_keys",
                 "text": "sK",
                 "default": True,
                 "shortcuts": [{"id": "reblock", "keys": [QtCore.Qt.Key_Shift]}],
             },
-            {"id": "match", "text": "M", "default": True},
+            # {"id": "match", "text": "M", "default": True},
             {"id": "flip", "text": "F", "default": True},
             {"id": "snap", "text": "Sn", "default": True},
             {"id": "overlap", "text": "O", "default": True},
@@ -1560,10 +1598,10 @@ TOOL_SECTION_DEFINITIONS = {
     "graph_curve_tools": {
         "label": "Graph Curve Tools",
         "items": [
-            {"id": "graph_isolate_curves", "key": "iso"},
-            {"id": "graph_toggle_mute", "key": "mute"},
-            {"id": "graph_toggle_lock", "key": "lock"},
-            {"id": "graph_filter", "key": "filter"},
+            {"id": "graph_isolate_curves", "key": "iso", "default": True},
+            {"id": "graph_toggle_mute", "key": "mute", "default": True},
+            {"id": "graph_toggle_lock", "key": "lock", "default": True},
+            {"id": "graph_filter", "key": "filter", "default": True},
         ],
     },
 }
@@ -1585,6 +1623,7 @@ TOOLBAR_SECTION_LAYOUTS = {
     ],
     "graph": [
         "graph_key_tools",
+        "align_tools",
         "slider_tween",
         "slider_blend",
         "slider_tangent",
@@ -1596,48 +1635,22 @@ TOOLBAR_SECTION_LAYOUTS = {
 }
 
 
-def _normalize_tool_state(state, fallback=None):
-    fallback = fallback or {}
-    raw_state = dict(state or {})
-    normalized = dict(fallback)
-    normalized.update(raw_state)
+def _resolve_tool_definition(tool_key, tool_state):
+    """
+    Finalizes a tool definition before use.
+    Ensures 'key' exists and callbacks are bound.
+    """
+    res = dict(tool_state)
+    res.setdefault("key", tool_key)
+    res.setdefault("default", False)
 
-    label = (
-        raw_state.get("label")
-        or toolCommon.get_tooltip_title(normalized.get("tooltip_template"))
-        or raw_state.get("text")
-        or normalized.get("label")
-        or normalized.get("text")
-        or normalized.get("key", "")
-    )
-    normalized.setdefault("description", fallback.get("description", ""))
-    resolved_status_title, resolved_status_description = toolCommon.resolve_status_metadata(
-        title=label,
-        description=normalized.get("description", ""),
-        tooltip_template=normalized.get("tooltip_template"),
-        status_title=raw_state.get("status_title") if "status_title" in raw_state else None,
-        status_description=raw_state.get("status_description") if "status_description" in raw_state else None,
-        fallback_title=normalized.get("key", ""),
-    )
-    normalized["status_title"] = resolved_status_title
-    normalized["status_description"] = resolved_status_description
-    return normalized
-
-
-def _bind_tool_callback(tool_key, tool_state):
-    callback = tool_state.get("callback")
-    if not callback:
-        return tool_state
-
-    bound = dict(tool_state)
-    command_name = bound.get("command") or tool_key
-    bound["command"] = command_name
-    bound["callback"] = trigger.make_command_callback(command_name, callback, aliases=bound.get("command_aliases"))
-    return bound
-
-
-def _resolve_tool_definition(tool_key, state):
-    return _bind_tool_callback(tool_key, _normalize_tool_state(state))
+    callback = res.get("callback")
+    if callback:
+        command_name = res.get("command") or tool_key
+        res["command"] = command_name
+        if getattr(callback, "__name__", None) != command_name or res.get("command_aliases"):
+            res["callback"] = trigger.make_command_callback(command_name, callback, aliases=res.get("command_aliases"))
+    return res
 
 
 def _keys_to_mask(keys):
@@ -1679,8 +1692,8 @@ def _resolve_shortcut_item(item):
     if item.get("id"):
         variant = get_tool(item["id"], **_item_options(item, exclude_keys=True))
     elif item.get("type") == "raw":
-        variant = _normalize_tool_state(_resolve_raw_item(item))
-        variant = _bind_tool_callback(variant.get("key", "shortcut"), variant)
+        raw_data = _resolve_raw_item(item)
+        variant = _resolve_tool_definition(raw_data.get("key", "shortcut"), raw_data)
     else:
         return None, None
 
@@ -1720,7 +1733,10 @@ def _resolve_section_item_data(item):
     if item_type == "raw":
         return _resolve_raw_item(item)
 
-    if item.get("widget"):
+    if item_type == "widget":
+        tool_id = item.get("id") or item.get("key")
+        if tool_id and tool_id in TOOL_DEFINITIONS:
+            return get_tool(tool_id, **_item_options(item))
         return dict(item)
 
     return None
@@ -1731,10 +1747,10 @@ def get_tool(tool_id, **overrides):
     if tool_id not in TOOL_DEFINITIONS:
         res = {"key": tool_id, "label": tool_id.replace("_", " ").capitalize()}
         res.update(overrides)
-        return _normalize_tool_state(res)
+        return _resolve_tool_definition(tool_id, res)
 
     # Merge base definition with overrides
-    tool = TOOL_DEFINITIONS[tool_id].copy()
+    tool = dict(TOOL_DEFINITIONS[tool_id])
     tool.update(overrides)
     return _resolve_tool_definition(tool_id, tool)
 

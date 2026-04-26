@@ -225,7 +225,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
             if not set_name:
                 self.name_field.setFocus(QtCore.Qt.ActiveWindowFocusReason)
                 return
-            created = self.controller.create_new_set_and_update_buttons(suffix, self.name_field, None)
+            created = self.controller.create_new_set_and_update_buttons(suffix, self.name_field)
             if created:
                 self._completed = True
                 self.close()
@@ -233,7 +233,9 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
                     self.on_created()
 
     def _create_color_button(self, color):
-        label = getattr(color, "label", "") or (self.controller.color_names.get(color.suffix, "") if hasattr(self.controller, "color_names") else "")
+        label = getattr(color, "label", "") or (
+            self.controller.color_names.get(color.suffix, "") if hasattr(self.controller, "color_names") else ""
+        )
         tooltip = f"Create {label} Set"
         button_size = max(1, int(round(wutil.DPI(30) * 0.7)))
         icon_size = max(1, int(round(wutil.DPI(28) * 0.7)))
@@ -357,7 +359,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             "Create Selection Set",
             self._open_set_creation_window,
             key="selection_sets_add_btn",
-            default_visible=True,
+            default=True,
             description="Create a new selection set from the current selection.",
         )
         self.refresh_button = self._create_header_button(
@@ -365,7 +367,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             "Reload Selection Sets",
             self.refresh,
             key="selection_sets_refresh_btn",
-            default_visible=False,
+            default=False,
             description="Reload the selection set list from the current scene data.",
         )
         self.export_button = self._create_header_button(
@@ -373,7 +375,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             "Export Selection Sets",
             self._export_sets,
             key="selection_sets_export_btn",
-            default_visible=False,
+            default=False,
             description="Export selection sets to a file for reuse in another scene.",
         )
         self.import_button = self._create_header_button(
@@ -381,7 +383,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             "Import Selection Sets",
             self._import_sets,
             key="selection_sets_import_btn",
-            default_visible=False,
+            default=False,
             description="Import selection sets from a previously exported file.",
         )
         self._install_header_context_menu()
@@ -409,7 +411,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         self.header_sets_layout.addStretch(1)
         self.set_header_left_widget(self.header_sets_host, stretch=1)
 
-    def _create_header_button(self, icon, tooltip, callback, key, default_visible, description=None):
+    def _create_header_button(self, icon, tooltip, callback, key, default, description=None):
         btn = cw.create_tool_button_from_data(
             {
                 "key": key,
@@ -428,7 +430,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
                 btn,
                 label=tooltip,
                 key=key,
-                default_visible=default_visible,
+                default=default,
                 description=description or tooltip,
                 tooltip_template=tooltip,
             )
@@ -662,8 +664,12 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
     def _show_set_menu(self, controller, subset):
         menu = QtWidgets.QMenu()
         menu.addAction(QtGui.QIcon(media.add_image), "Add Selection").triggered.connect(lambda: controller.add_selection_to_set(subset))
-        menu.addAction(QtGui.QIcon(media.subtract_image), "Remove Selection").triggered.connect(lambda: controller.remove_selection_from_set(subset))
-        menu.addAction(QtGui.QIcon(media.reload_image), "Update Selection").triggered.connect(lambda: controller.update_selection_to_set(subset))
+        menu.addAction(QtGui.QIcon(media.subtract_image), "Remove Selection").triggered.connect(
+            lambda: controller.remove_selection_from_set(subset)
+        )
+        menu.addAction(QtGui.QIcon(media.reload_image), "Update Selection").triggered.connect(
+            lambda: controller.update_selection_to_set(subset)
+        )
         menu.addSeparator()
 
         color_menu = QtWidgets.QMenu("Change Color")
@@ -675,11 +681,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             )
 
         menu.addAction(QtGui.QIcon(media.rename_image), "Rename").triggered.connect(
-            lambda: (
-                self._set_buttons.get(subset).start_inline_rename()
-                if self._set_buttons.get(subset)
-                else controller.change_set_name_window(subset, subset.rsplit("_", 1)[0])
-            )
+            lambda: self._set_buttons.get(subset).start_inline_rename()
         )
         menu.addAction(QtGui.QIcon(media.trash_image), "Delete").triggered.connect(lambda: controller.remove_set_and_update_buttons(subset))
         current_color_suffix = f"_{subset.rsplit('_', 1)[-1]}"

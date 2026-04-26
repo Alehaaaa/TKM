@@ -183,7 +183,7 @@ HOTKEY_SECTION_SPECS = OrderedDict(
             {
                 "title": "Nudge",
                 "icon_path": HOTKEY_SECTION_ICONS["tempo_controls"],
-                "tools": ["move_left", "move_right"],
+                "tools": ["nudge_left", "nudge_right"],
                 "commands": ["insert_inbetween", "remove_inbetween", "nudge_left", "nudge_right"],
             },
         ),
