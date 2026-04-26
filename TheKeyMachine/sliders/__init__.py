@@ -6,11 +6,6 @@ from TheKeyMachine.tooltips import parse_tt
 from .manager import TWEEN_MODES, BLEND_MODES, TANGENT_MODES
 
 
-def start_dragging(mode):
-    from . import api
-    return api.start_dragging(mode)
-
-
 def execute_tween(mode, value, world_space=False, session=None):
     from . import api
     return api.execute_tween(mode, value, world_space=world_space, session=session)

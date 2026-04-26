@@ -439,7 +439,7 @@ class TooltipMixin:
         if not icon and hasattr(self, "_icon_path"):
             icon = self._icon_path
 
-        self._help_data = {
+        self._toolTipData = {
             "text": text,
             "description": description,
             "shortcuts": shortcuts or [],
@@ -452,10 +452,10 @@ class TooltipMixin:
                 tooltip_template=tooltip_template,
             ),
         }
-        _push_help(self, self._help_data)
+        _push_help(self, self._toolTipData)
 
-    def get_help_data(self):
-        return getattr(self, "_help_data", {})
+    def get_toolTipData(self):
+        return getattr(self, "_toolTipData", {})
 
     def setToolTipData(self, **kwargs):
         self._has_tooltip = True
@@ -466,7 +466,7 @@ class TooltipMixin:
 
     def enterEvent(self, event: QtCore.QEvent):
         # Refresh description and trigger Maya event
-        data = getattr(self, "_help_data", {})
+        data = getattr(self, "_toolTipData", {})
         _push_help(self, data)
 
         try:
@@ -731,7 +731,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         if isinstance(icon, (str, bytes)):
             self._icon_path = str(icon)
             self._apply_icon_visual(self._icon_path)
-            data = getattr(self, "_help_data", {})
+            data = getattr(self, "_toolTipData", {})
             self.setToolTipData(icon=self._icon_path, **data)
         elif icon:
             super().setIcon(icon)
@@ -941,7 +941,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             return
         if not self._refresh_modifier_variant_state():
             return
-        data = getattr(self, "_help_data", {})
+        data = getattr(self, "_toolTipData", {})
         QFlatTooltipManager.hide()
         if data.get("text") or data.get("description") or data.get("tooltip_template"):
             QFlatTooltipManager.delayed_show(anchor_widget=self, **data)
@@ -1658,8 +1658,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     def addWidget(self, widget, label, key, default_visible=True, description=None, tooltip_template=None):
         """Add a widget to the section with a toggle key."""
         # Auto-extract help metadata from widget if not provided
-        if (not tooltip_template or not description) and hasattr(widget, "get_help_data"):
-            data = widget.get_help_data()
+        if (not tooltip_template or not description) and hasattr(widget, "get_toolTipData"):
+            data = widget.get_toolTipData()
             tooltip_template = tooltip_template or data.get("tooltip_template") or data.get("text")
             description = description or data.get("description")
 
@@ -1708,8 +1708,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if hasattr(widget, "setToolTipData"):
             d = description
             tt = tooltip_template
-            existing = getattr(widget, "_help_data", {}) if hasattr(widget, "_help_data") else {}
-            if not d and not tt and hasattr(widget, "_help_data"):
+            existing = getattr(widget, "_toolTipData", {}) if hasattr(widget, "_toolTipData") else {}
+            if not d and not tt and hasattr(widget, "_toolTipData"):
                 d = existing.get("description")
                 tt = existing.get("tooltip_template")
             status_description = existing.get("status_description")

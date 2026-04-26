@@ -1866,7 +1866,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # blend_to_key_right_b_qt.hide()
         # blend_to_key_right_b_qt.clicked.connect(lambda: blend_to_key_right_b_qt.setText(str(int(cmds.currentTime(q=True)))))
 
-        def add_mode_sliders(modes_list, prefix, color, change_func, drop_func, default_modes=None):
+        def add_mode_sliders(modes_list, prefix, color, change_func, default_modes=None):
             # Create a new section for each slider color/type
             sec = new_section()
             sec.set_settings_namespace("main_toolbar_sliders")
@@ -1912,7 +1912,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                         if mode_key == "blend_to_frame"
                         else trigger.execute_slider(p, mode_key, v, session=session)
                     ),
-                    dropCommand=drop_func,
                     tooltipTitle=label,
                     tooltipDescription=desc,
                 )
@@ -1947,7 +1946,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             "blend",
             UI_COLORS.green.hex,
             sliders.execute_curve_modifier,
-            sliders.stop_dragging,
             default_modes=["connect_neighbors"],
         )
         add_mode_sliders(
@@ -1955,7 +1953,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             "tween",
             UI_COLORS.yellow.hex,
             sliders.execute_tween,
-            sliders.stop_dragging,
             default_modes=["tweener"],
         )
 

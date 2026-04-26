@@ -353,7 +353,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     # _________________  Slider Logic & Wrappers ____________________#
 
     # 1. Sliders Sections - Tween, Blend, and Tangent
-    def add_mode_sliders(modes_list, prefix, color, change_func, drop_func, default_modes=None, ws_support=False):
+    def add_mode_sliders(modes_list, prefix, color, change_func, default_modes=None, ws_support=False):
         # Create a new section for each slider color/type
         sec = new_section()
         sec.set_settings_namespace("graph_toolbar_sliders")
@@ -388,7 +388,6 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
                 text=icon,
                 color=color,
                 dragCommand=(lambda mode_key, v, session=None: change_func(mode_key, v, session=session)),
-                dropCommand=drop_func,
                 tooltipTitle=label,
                 tooltipDescription=desc,
             )
@@ -420,7 +419,6 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         "tween",
         UI_COLORS.yellow.hex,
         sliders.execute_tween,
-        sliders.stop_dragging,
         default_modes=["tweener"],
         ws_support=True,
     )
@@ -429,7 +427,6 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         "blend",
         UI_COLORS.green.hex,
         sliders.execute_curve_modifier,
-        sliders.stop_dragging,
         default_modes=["connect_neighbors"],
     )
     add_mode_sliders(
@@ -437,7 +434,6 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         "tangent",
         UI_COLORS.orange.hex,
         sliders.execute_tangent_blend,
-        sliders.stop_dragging,
         default_modes=["blend_best_guess"],
     )
 
