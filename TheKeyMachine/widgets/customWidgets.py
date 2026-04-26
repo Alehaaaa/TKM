@@ -1052,13 +1052,17 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
         def _show_tool_menu(pos, setup_fn=menu_setup_fn, widget=btn):
             menu = MenuWidget(widget)
             try:
-                setup_fn(menu, source_widget=widget)
+                built_menu = setup_fn(menu, source_widget=widget)
             except TypeError:
-                setup_fn(menu)
+                built_menu = setup_fn(menu)
+            if built_menu is not None:
+                menu = built_menu
             if menu.actions():
                 menu.exec_(widget.mapToGlobal(pos))
 
         btn.customContextMenuRequested.connect(_show_tool_menu)
+        if data.get("type") == "menu":
+            btn.clicked.connect(lambda _checked=False, widget=btn: _show_tool_menu(widget.rect().bottomLeft()))
     return btn
 
 
@@ -1076,7 +1080,7 @@ def _sync_checked_from_setting(control, state_fn):
 
 
 def _setup_setting_synced_checkable(control, data):
-    checkable = bool(data.get("checkable", False))
+    checkable = bool(data.get("checkable", data.get("type") == "check"))
     state_fn = _checked_state_fn(data)
     bind_fn = data.get("bind_checked_fn")
 

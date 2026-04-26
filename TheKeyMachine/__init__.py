@@ -17,9 +17,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.87"
+__version__ = "0.1.88"
 __stage__ = "beta"
-__build__ = "313"
+__build__ = "314"
 __codename__ = "Iced Coffee"
 
 

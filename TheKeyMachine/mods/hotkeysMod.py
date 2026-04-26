@@ -18,7 +18,6 @@ except ImportError:
 
 import TheKeyMachine.core.runtime_manager as runtime
 from TheKeyMachine.core import selection_targets
-import TheKeyMachine.core.toolbox as toolbox
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.mediaMod as media
@@ -785,6 +784,7 @@ def _append_section_row(section, seen, title_lookup, icon_lookup, trigger_comman
 
 
 def _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, tool_id):
+    import TheKeyMachine.core.toolbox as toolbox
     tool_data = toolbox.get_tool(tool_id)
     _append_section_row(section, seen, title_lookup, icon_lookup, trigger_commands, _tool_command_row(tool_data))
     shortcut_labels_by_mask = {}

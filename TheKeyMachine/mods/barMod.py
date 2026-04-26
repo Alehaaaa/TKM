@@ -460,31 +460,6 @@ def setTangent(tangent_type, handle_mode="both", key_scope="selection", tint_col
         tint_session.finish()
 
 
-def build_tangent_menu(menu, tangent_type, tangent_label, icon_path=None, source_widget=None):
-    tint_color = cw.get_widget_tint_color(source_widget)
-
-    def _add_action(handle_mode, handle_label, key_scope, scope_label):
-        menu.addAction(
-            QtGui.QIcon(icon_path or ""),
-            handle_label,
-            lambda _checked=False, h=handle_mode, s=key_scope, c=tint_color: setTangent(
-                tangent_type,
-                handle_mode=h,
-                key_scope=s,
-                tint_color=c,
-            ),
-            description="Set {}.".format(scope_label.lower()),
-        )
-
-    _add_action("in", "In Tangent", "selection", "the in tangent on the current selection")
-    _add_action("out", "Out Tangent", "selection", "the out tangent on the current selection")
-    menu.addSeparator()
-    _add_action("both", "First Key", "first", "the first key")
-    _add_action("both", "Last Key", "last", "the last key")
-    menu.addSeparator()
-    _add_action("both", "All Keys", "all", "all keys")
-
-
 def align_selected_objects(*args, pos=True, rot=True, scl=False):
     # Obtener los objetos seleccionados
     sel = selection_targets.get_selected_objects()

@@ -44,6 +44,16 @@ def get_maya_qt(ptr=None, qt=QMainWindow):
     return wrapInstance(int(ptr), qt)
 
 
+def get_maya_window_size():
+    maya_main_window = get_maya_qt()
+    return maya_main_window.width(), maya_main_window.height()
+
+
+def get_maya_window_geometry():
+    maya_main_window = get_maya_qt()
+    return maya_main_window.geometry()
+
+
 def get_control_widget(name, qt_type=QtWidgets.QWidget):
     ptr = omui.MQtUtil.findControl(name)
     if ptr:

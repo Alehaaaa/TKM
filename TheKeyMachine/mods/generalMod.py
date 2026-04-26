@@ -18,16 +18,6 @@ Modified by: Alehaaaa / alehaaaa.github.io
 """
 
 import maya.cmds as cmds
-from maya import OpenMayaUI as omui
-
-
-try:
-    from shiboken2 import wrapInstance
-    from PySide2 import QtWidgets
-except ImportError:
-    from shiboken6 import wrapInstance
-    from PySide6 import QtWidgets
-
 import json
 import subprocess
 import os
@@ -203,8 +193,6 @@ def get_copy_worldspace_single_frame_data_folder():
 
 def create_TheKeyMachine_node():
     # Guardar la selección inicial
-    from TheKeyMachine.widgets import util as wutil
-
     initial_selection = selection_targets.get_selected_objects()
 
     tkm_version = get_thekeymachine_version()
@@ -238,8 +226,6 @@ def create_TheKeyMachine_node():
 
 def create_ibookmarks_node():
     # Guardar la selección inicial
-    from TheKeyMachine.widgets import util as wutil
-
     initial_selection = selection_targets.get_selected_objects()
 
     if not cmds.objExists("iBookmarks"):
@@ -265,24 +251,6 @@ def get_local_config_file():
     config_file = os.path.join(scripts_dir, "configuration.py")
 
     return config_file
-
-
-def get_maya_window_size():
-    # Obtén el objeto de la ventana principal de Maya
-    maya_main_window_ptr = omui.MQtUtil.mainWindow()
-    maya_main_window = wrapInstance(int(maya_main_window_ptr), QtWidgets.QWidget)
-
-    # Obtén el tamaño de la ventana
-    width = maya_main_window.width()
-    height = maya_main_window.height()
-
-    return width, height
-
-
-def get_maya_window_geometry():
-    maya_main_window_ptr = omui.MQtUtil.mainWindow()
-    maya_main_window = wrapInstance(int(maya_main_window_ptr), QtWidgets.QMainWindow)
-    return maya_main_window.geometry()
 
 
 def open_url(url):

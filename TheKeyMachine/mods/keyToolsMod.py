@@ -248,26 +248,6 @@ def set_share_keys_mode(mode):
     settings.set_setting(SHARE_KEYS_MODE_SETTING, mode)
 
 
-def build_share_keys_menu(menu, source_widget=None):
-    _ = source_widget
-    action_group = QtGui.QActionGroup(menu)
-    action_group.setExclusive(True)
-
-    preserve_tangent_action = menu.addAction("Preserve Tangent Type")
-    preserve_tangent_action.setCheckable(True)
-    preserve_tangent_action.setChecked(get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_TANGENT)
-    preserve_tangent_action.triggered.connect(lambda checked=False: set_share_keys_mode(SHARE_KEYS_MODE_PRESERVE_TANGENT))
-    action_group.addAction(preserve_tangent_action)
-
-    preserve_shape_action = menu.addAction("Preserve Anim Curve Shape")
-    preserve_shape_action.setCheckable(True)
-    preserve_shape_action.setChecked(get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE)
-    preserve_shape_action.triggered.connect(lambda checked=False: set_share_keys_mode(SHARE_KEYS_MODE_PRESERVE_SHAPE))
-    action_group.addAction(preserve_shape_action)
-
-    menu.addSeparator()
-
-
 # Estas dos funciones la idea era usarlas para hacer overlap
 
 

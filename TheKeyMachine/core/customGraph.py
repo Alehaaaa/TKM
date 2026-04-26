@@ -24,10 +24,8 @@ import importlib
 
 try:
     from PySide2 import QtCore, QtGui, QtWidgets
-    from PySide2.QtWidgets import QActionGroup
 except ImportError:
     from PySide6 import QtCore, QtGui, QtWidgets
-    from PySide6.QtGui import QActionGroup
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -40,6 +38,7 @@ import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.selSetsMod as selSets
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
+import TheKeyMachine.core.toolMenus as toolMenus
 import TheKeyMachine.core.toolbox as toolbox
 from TheKeyMachine.tools import colors as toolColors
 
@@ -51,7 +50,7 @@ import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 
-mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolbox]
+mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolMenus, toolbox]
 
 for m in mods:
     importlib.reload(m)
@@ -178,126 +177,6 @@ def _show_graph_editor() -> None:
 def apply_base_stylesheet(button):
     """Fallback stylesheet for standard buttons if needed"""
     pass
-
-
-def create_settings_menu(parent_button):
-    """Creates a config menu consistent with the main toolbar"""
-    import TheKeyMachine.mods.hotkeysMod as hotkeys
-
-    menu = cw.MenuWidget(parent=parent_button)
-    menu.addAction(cw.LogoAction(menu))
-
-    # Settings submenu
-    settings_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Settings", description="Tool configuration and preferences.")
-    menu.addMenu(settings_menu)
-
-    settings_menu.addSection("Graph toolbar")
-    graph_toolbar_action = settings_menu.addAction(
-        QtGui.QIcon(media.customGraph_image),
-        "Graph Editor Toolbar",
-        description="Show or hide the TKM toolbar inside the Graph Editor.",
-    )
-    graph_toolbar_action.setCheckable(True)
-
-    def _on_graph_toolbar_toggled(state):
-        graphToolbarApi.set_graph_toolbar_enabled(bool(state))
-
-    graph_toolbar_action.toggled.connect(_on_graph_toolbar_toggled)
-    graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
-
-    dock_menu = cw.MenuWidget(QtGui.QIcon(media.dock_image), "Dock", description="Move the Graph Editor toolbar.")
-    menu.addMenu(dock_menu)
-    dock_group = QActionGroup(dock_menu)
-    dock_group.setExclusive(True)
-
-
-    dock_actions = {}
-    for position, label, description in _DOCK_OPTIONS:
-        action = dock_menu.addAction(label, description=description)
-        action.setCheckable(True)
-        dock_group.addAction(action)
-        action.triggered.connect(lambda checked=False, p=position: moveCustomGraphDock(p))
-        dock_actions[position] = action
-
-    def _sync_dock_menu():
-        current_position = settings.get_setting(_GRAPH_TOOLBAR_DOCK_SETTING, _DOCK_BOTTOM_GRAPH)
-        if current_position not in dock_actions:
-            current_position = _DOCK_BOTTOM_GRAPH
-        for position, action in dock_actions.items():
-            if not wutil.is_valid_widget(action):
-                continue
-            try:
-                action.blockSignals(True)
-                action.setChecked(position == current_position)
-                action.blockSignals(False)
-            except RuntimeError:
-                continue
-
-    _sync_dock_menu()
-
-    settings_menu.addSection("Toolbar's icons alignment")
-    align_group = QActionGroup(settings_menu)
-    left_align = settings_menu.addAction("Left", description="Align icons to the left.")
-    center_align = settings_menu.addAction("Center", description="Align icons to the center.")
-    right_align = settings_menu.addAction("Right", description="Align icons to the right.")
-
-    current_align = settings.get_setting("graph_toolbar_alignment", "Center")
-    align_map = {"Left": left_align, "Center": center_align, "Right": right_align}
-
-    for label, act in align_map.items():
-        act.setCheckable(True)
-        align_group.addAction(act)
-        if label == current_align:
-            act.setChecked(True)
-
-        def set_align(state, alignment_label=label):
-            if state:
-                applyCustomGraphAlignment(alignment_label)
-
-        act.toggled.connect(set_align)
-
-    settings_menu.addSection("General")
-    settings_menu.addAction(
-        QtGui.QIcon(media.close_image),
-        "Close",
-        lambda: QtCore.QTimer.singleShot(0, removeCustomGraph),
-        description="Close only the TKM Graph Editor toolbar.",
-    )
-
-    menu.addAction(
-        QtGui.QIcon(media.hotkeys_image),
-        "Hotkeys",
-        hotkeys.show_hotkeys_window,
-        description="Manage trigger hotkeys.",
-    )
-
-    menu.addSeparator()
-
-    # Help submenu
-    help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help", description="Resources for help and learning.")
-    menu.addMenu(help_menu)
-    help_menu.addAction(
-        QtGui.QIcon(media.discord_image),
-        "Discord Community",
-        lambda: general.open_url("https://discord.gg/G2J5yyjz"),
-        description="Join the community for support.",
-    )
-    help_menu.addAction(
-        QtGui.QIcon(media.help_menu_image),
-        "Knowledge base",
-        lambda: general.open_url("https://thekeymachine.gitbook.io/base"),
-        description="Read the official documentation.",
-    )
-    help_menu.addAction(
-        QtGui.QIcon(media.youtube_image),
-        "Youtube channel",
-        lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"),
-        description="Watch tutorials.",
-    )
-
-    menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
-
-    return menu
 
 
 def _place_graph_toolbar_widget(toolbar_widget, dock_position=None):
@@ -467,25 +346,9 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
             toolbox.get_tool("flip", text="F", default=True),
             toolbox.get_tool("snap", text="Sn", default=True),
             toolbox.get_tool("overlap", text="O", default=True),
-            {
-                "key": "extra",
-                "label": "Extra Tools",
-                "text": "E",
-                "tooltip_template": helper.extra_tools_tooltip_text,
-                "description": "Open extra graph tools.",
-                "default": True,
-            },
+            toolbox.get_tool("extra_graph_tools", default=True),
         ]
     )
-
-    # Extra/Misc (Retrieving the object to add a menu)
-    extra_btn = sec._widgets.get("extra")
-    if extra_btn and wutil.is_valid_widget(extra_btn):
-        extra_menu = cw.MenuWidget(parent=extra_btn)
-        extra_menu.addAction("Select object from selected curve", lambda: keyTools.select_objects_from_selected_curves())
-        extra_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        extra_btn.customContextMenuRequested.connect(lambda pos: extra_menu.exec_(extra_btn.mapToGlobal(pos)))
-        extra_btn.clicked.connect(lambda: extra_menu.exec_(QtGui.QCursor.pos()))
 
     # _________________  Slider Logic & Wrappers ____________________#
 
@@ -589,15 +452,16 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     btn_lock = create_toolbox_button("graph_toggle_lock")
     sec.addWidget(btn_lock, "Lock", "lock")
 
-    btn_fi = create_toolbox_button("graph_filter", callback=lambda: ui.customGraph_filter_mods())
+    btn_fi = create_toolbox_button("graph_filter")
     sec.addWidget(btn_fi, "Filter", "filter")
 
     # ____________________  Resets  _________________________#
     sec = new_section()
-    sec.addWidgetGroup(toolbox.get_tool_group("reset_tools"))
+    sec.addWidgetGroup(toolbox.get_tool_section("reset_tools")["items"])
 
     # _________________  Tangents  ____________________#
-    sec = new_section(color=toolColors.orange)
+    tangent_section = toolbox.get_tool_section("tangent_buttons", resolve_items=False)
+    sec = new_section(color=tangent_section.get("color", toolColors.orange))
     btn_cycle = create_toolbox_button("tangent_cycle_matcher")
     sec.addWidget(btn_cycle, "Cycle Matcher", "cycle", default_visible=False)
 
@@ -648,31 +512,31 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     # ________________ System/Core Section ___________________#
     sec = new_section(hiddeable=False)
 
-    settings_btn = create_tool_button(
-        icon=media.settings_image,
-        description="Access Graph Editor toolbar preferences, and view credits.",
-        status_title="Settings",
-    )
-    sec.addWidget(settings_btn, "Settings", "settings")
+    def _build_graph_settings_menu(_menu, source_widget=None):
+        return toolMenus.build_graph_settings_menu(
+            source_widget or settings_btn,
+            dock_options=_DOCK_OPTIONS,
+            dock_setting=_GRAPH_TOOLBAR_DOCK_SETTING,
+            default_dock_position=_DOCK_BOTTOM_GRAPH,
+            move_dock_fn=moveCustomGraphDock,
+            apply_alignment_fn=applyCustomGraphAlignment,
+            remove_toolbar_fn=removeCustomGraph,
+        )
 
-    def _open_settings_menu():
-        settings_menu = create_settings_menu(settings_btn)
-        try:
-            settings_menu.exec_(QtGui.QCursor.pos())
-        finally:
-            try:
-                settings_menu.deleteLater()
-            except Exception:
-                pass
+    settings_tool = toolbox.get_tool("settings", menu_setup_fn=_build_graph_settings_menu)
+    settings_btn = cw.create_tool_button_from_data(settings_tool)
+    sec.addWidget(
+        settings_btn,
+        settings_tool.get("label", "Settings"),
+        settings_tool.get("key", "settings"),
+        description=settings_tool.get("description"),
+    )
 
     def _on_toolbar_context_menu(pos):
         if flow_qw.childAt(pos):
             return
-        _open_settings_menu()
-
-    settings_btn.clicked.connect(_open_settings_menu)
-    settings_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-    settings_btn.customContextMenuRequested.connect(lambda pos: _open_settings_menu())
+        settings_menu = _build_graph_settings_menu(None, source_widget=settings_btn)
+        settings_menu.exec_(QtGui.QCursor.pos())
 
     flow_qw.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
     flow_qw.customContextMenuRequested.connect(_on_toolbar_context_menu)
