@@ -255,7 +255,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
     started = Signal()
     moved = Signal(float)
-    finished = Signal(float)
+    finished = Signal()
 
     def __init__(self, parent: QWidget, *, text: str, color: str):
         super().__init__(Qt.Horizontal, parent)
@@ -339,7 +339,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
     def set_percent(self, pct: float):
         self.setValue(int(round(pct * 1000)))
         self.moved.emit(self.percent())
-        self.finished.emit(self.percent())
+        self.finished.emit()
 
     def set_range(self, min_v: int, max_v: int):
         self.setRange(int(min_v * 1000), int(max_v * 1000))
@@ -373,14 +373,13 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._pressOffset = True
 
     # --- internals --------------------------------------------------------------
-    def _reset_without_emit(self, emit_finished: bool = True):
-        last_percent = self.percent()
+    def _reset_without_emit(self):
         with ResetWithoutEmit(self):
             self._pressOffset = None
             self._apply_stylesheet(thick=False)
 
-        if emit_finished:
-            self.finished.emit(last_percent)
+        self.finished.emit()
+
         self._wheel_count = 0
         self._prev_wheel_direction = 0
         self.update()
@@ -492,16 +491,11 @@ QSlider::handle:horizontal {{
         if e.button() == Qt.LeftButton and self.isSliderDown():
             self.setSliderDown(False)
             self._apply_stylesheet(thick=False)
-            # Emit finished so the configured drop handler can finalize the operation.
-            self.finished.emit(self.percent())
-            # SliderHandle reset logic handles signal blocking internally
-            self._reset_without_emit(emit_finished=False)
+            self.finished.emit()
+
+            self._reset_without_emit()
             self._pressOffset = None
-            e.accept()
-            parent = self.parent()
-            if parent and hasattr(parent, "_restore_buttons_after_drag"):
-                parent._restore_buttons_after_drag()
-            return
+            return e.accept()
         super().mouseReleaseEvent(e)
 
     def wheelEvent(self, e: QWheelEvent):
@@ -743,8 +737,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         # bridge slider signals
         self._slider.started.connect(self._on_drag_started)
-        self._slider.moved.connect(self._on_inner_moved)
-        self._slider.finished.connect(self._on_inner_finished)
+        self._slider.moved.connect(self._on_drag_moved)
+        self._slider.finished.connect(self._on_drag_finished)
         self.valueChanged.connect(self._dispatch_mode_value)
         self.valueSet.connect(self._dispatch_mode_value)
         self.dragFinished.connect(self._dispatch_mode_finish)
@@ -1164,12 +1158,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         QFlatTooltipManager.hide()
 
         self.dragStarted.emit()
-        self._leftOverlay.setEnabled(False)
-        self._rightOverlay.setEnabled(False)
+
         self._leftOverlay.hide()
         self._rightOverlay.hide()
 
-    def _on_inner_moved(self, pct: float):
+    def _on_drag_moved(self, pct: float):
         self._emit_value_changed(self.percent())
 
     def _dispatch_mode_value(self, value: float):
@@ -1199,6 +1192,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._sliderSession = None
 
     def _cancel_active_drag_after_error(self, exc):
+        try:
+            self._dispatch_mode_finish()
+        except Exception:
+            pass
+
         traceback_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
         report._emit_exception_to_script_editor(traceback_text)
         report.report_detected_exception(
@@ -1208,11 +1206,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             traceback_text=traceback_text,
         )
 
-        try:
-            self._dispatch_mode_finish()
-        except Exception:
-            pass
-
         if self._slider:
             try:
                 self._slider.setSliderDown(False)
@@ -1220,7 +1213,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             except Exception:
                 pass
 
-        self._restore_buttons_after_drag()
 
     def _emit_value_changed(self, value: float):
         self.valueChanged.emit(float(value))
@@ -1228,20 +1220,13 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     def _emit_value_set(self, value: float):
         self.valueSet.emit(float(value))
 
-    def _on_inner_finished(self, pct: float):
-        self._emit_value_set(pct)
-
-        # Notify drag finished (connected to dropCommand which is usually a no-op or specific tool reset)
+    def _on_drag_finished(self):
         self.dragFinished.emit()
 
-    def _restore_buttons_after_drag(self):
-        self._leftOverlay.setEnabled(True)
-        self._rightOverlay.setEnabled(True)
         self._leftOverlay.show()
         self._rightOverlay.show()
 
     def _on_button_clicked(self, btn: SliderButton):
-        # Atomic operation for buttons: start -> emit -> stop
         try:
             self._emit_value_set(float(btn.percent))
         finally:
@@ -1253,7 +1238,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         # Finalize the interaction if we were wheeling when the mouse leaves the widget
         if self._slider and self._slider._pressOffset is not None and not self._slider.isSliderDown():
             self._slider._reset_without_emit()
-            self._restore_buttons_after_drag()
         super().leaveEvent(e)
 
     def enterEvent(self, e):
