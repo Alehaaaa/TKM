@@ -31,9 +31,9 @@ except ImportError:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
 
-__version__ = "0.1.88"
+__version__ = "0.1.89"
 __stage__ = "beta"
-__build__ = "314"
+__build__ = "315"
 __codename__ = "Iced Coffee"
 
 
@@ -59,248 +59,181 @@ def get_screen_resolution():
     return screen_width, screen_height
 
 
-# def update_maya_env():
-#     version_maya = cmds.about(version=True)
-#     user_dir = cmds.internalVar(userAppDir=True)
-#     maya_dir = os.path.join(user_dir, version_maya)
+def get_dpi_scale():
+    try:
+        from PySide2.QtWidgets import QApplication
+    except ImportError:
+        from PySide6.QtWidgets import QApplication
 
-#     env_file_path = os.path.join(maya_dir, "Maya.env")
-
-#     user_app_folder = cmds.internalVar(userAppDir=True)
-#     tkm_img_folder = os.path.join(user_app_folder, "scripts/TheKeyMachine/data/img")
-
-#     new_line = f"\n# THIS LINE IS HERE FOR UNINSTALLING PURPOSES, PLEASE DO NOT TOUCH. START OF THEKEYMACHINE CODE\nXBMLANGPATH = {tkm_img_folder};%XBMLANGPATH%\n# END OF THEKEYMACHINE CODE\n"
-
-#     if platform.system() != 'Windows':
-#         new_line = f"\n# THIS LINE IS HERE FOR UNINSTALLING PURPOSES, PLEASE DO NOT TOUCH. START OF THEKEYMACHINE CODE\nXBMLANGPATH = {tkm_img_folder}:$XBMLANGPATH\n# END OF THEKEYMACHINE CODE\n"
-
-#     if not os.path.exists(env_file_path):
-#         with open(env_file_path, 'w') as file:
-#             file.write(new_line)
-#     else:
-#         with open(env_file_path, 'a') as file:
-#             file.write(new_line)
+    app = QApplication.instance() or QApplication([])
+    return app.devicePixelRatio()
 
 
-def onMayaDroppedPythonFile(*args):
-    QtWidgets.QApplication.processEvents()
-    utils.executeDeferred(TheKeyMachine_installer)
+def DPI(value):
+    return int(value * get_dpi_scale())
 
 
-def install(button, tkm_version, window):
-    screen_width, screen_height = get_screen_resolution()
-    screen_width = screen_width
-
+def install(button, tkm_version_label, window):
     current_dir = os.path.dirname(__file__)
     source_dir = os.path.join(current_dir, "TheKeyMachine")
-
     user_dir = cmds.internalVar(userAppDir=True)
-    destination_dir = os.path.join(user_dir, "scripts", "TheKeyMachine")
+    destination_dir = os.path.normpath(os.path.join(user_dir, "scripts", "TheKeyMachine"))
 
-    if not os.path.exists(os.path.join(user_dir, "scripts")):
-        os.makedirs(os.path.join(user_dir, "scripts"))
+    if not os.path.exists(source_dir):
+        QtWidgets.QMessageBox.critical(window, "Installation Error", "Source 'TheKeyMachine' folder not found in the installer directory.")
+        return
 
+    # Ensure scripts directory exists
+    os.makedirs(os.path.dirname(destination_dir), exist_ok=True)
+
+    # Handle existing installation
     if os.path.exists(destination_dir):
-        uninstalled_folder_path = os.path.join(destination_dir, "uninstalled")
-        if os.path.exists(uninstalled_folder_path):
-            shutil.rmtree(destination_dir)
-            print("Old TheKeyMachine folder removed.")
+        msg = "TheKeyMachine is already installed. Do you want to overwrite it?"
+        res = QtWidgets.QMessageBox.question(window, "Already Installed", msg, QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if res == QtWidgets.QMessageBox.Yes:
+            try:
+                shutil.rmtree(destination_dir)
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(window, "Error", f"Could not remove old installation: {e}")
+                return
         else:
-            msg_box = QtWidgets.QMessageBox()
-            msg_box.setWindowTitle("Installation Warning")
-            msg_box.setText(
-                "TheKeyMachine folder already exists in the scripts directory. Please remove it before proceeding with the installation."
-            )
-            msg_box.setIcon(QtWidgets.QMessageBox.Warning)
-            ok_button = msg_box.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
-            ok_button.setMinimumHeight(30)
-            ok_button.setMinimumWidth(80)
-            msg_box.exec()
             return
 
     try:
         shutil.copytree(source_dir, destination_dir)
     except Exception as e:
-        QtWidgets.QMessageBox.critical(button, "Installation Error", f"An error occurred while copying files: {str(e)}")
+        QtWidgets.QMessageBox.critical(window, "Installation Error", f"Failed to copy files: {e}")
         return
 
-    # update_maya_env() # No need as images are referenced as filepath
+    tkm_version_label.setText("<p style='color: #b9e861; font-weight: bold;'>Installation Completed Successfully!</p>")
 
-    tkm_version.setText("<p style='color: #b9e861;'>Installation completed</p>")
-    tkm_version.setGeometry(222, 190, 250, 20)
-
-    if screen_width == 3840:
-        tkm_version.setGeometry(320, 190, 250, 20)
-
-    QtCore.QTimer.singleShot(1600, window.close)
-    QtCore.QTimer.singleShot(1700, load_ui)
+    # Reload and create shelf icon
+    QtCore.QTimer.singleShot(1500, window.close)
+    QtCore.QTimer.singleShot(1600, load_ui)
 
 
 def load_ui():
-    import importlib
-    import TheKeyMachine.core.toolbar
+    try:
+        try:
+            from importlib import reload
+        except ImportError:
+            from imp import reload
+        except ImportError:
+            pass
+        import sys
 
-    TheKeyMachine.core.toolbar.tb.create_shelf_icon()
-    importlib.reload(TheKeyMachine.core.toolbar)
-    TheKeyMachine.core.toolbar.tb.startUI()
+        # Clean up any partial imports
+        modules_to_del = [m for m in sys.modules if m.startswith("TheKeyMachine")]
+        for m in modules_to_del:
+            del sys.modules[m]
+
+        import TheKeyMachine.core.toolbar as toolbar
+
+        reload(toolbar)
+
+        toolbar.show()
+        if tb := toolbar.get_toolbar():
+            tb.create_shelf_icon()
+    except Exception as e:
+        print(f"Error loading TheKeyMachine after install: {e}")
 
 
 def maya_main_window():
     main_window_ptr = omui.MQtUtil.mainWindow()
-    return wrapInstance(int(main_window_ptr), QtWidgets.QWidget)
+    if main_window_ptr:
+        return wrapInstance(int(main_window_ptr), QtWidgets.QWidget)
+    return None
 
 
 def TheKeyMachine_installer():
-    screen_width, screen_height = get_screen_resolution()
-    screen_width = screen_width
+    if sys.version_info.major != 3:
+        return cmds.confirmDialog(title="Error", message="TheKeyMachine requires Python 3.", button=["Ok"])
 
-    os_platform = platform.system()
-    supported_os = ["Windows", "Linux", "Darwin"]
+    try:
+        cmds.deleteUI("TheKeyMachineInstaller", window=True)
+    except Exception:
+        pass
 
-    python_version = sys.version_info.major
-    supported_python_versions = [3]
+    parent = maya_main_window()
+    window = QtWidgets.QDialog(parent)
+    window.setObjectName("TheKeyMachineInstaller")
+    window.setWindowTitle("TheKeyMachine Installer")
+    window.setFixedSize(DPI(500), DPI(650))
 
-    if os_platform in supported_os and python_version in supported_python_versions:
-        try:
-            cmds.deleteUI("TheKeyMachineInstaller", window=True)
-        except RuntimeError:
-            pass
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(DPI(30), DPI(20), DPI(30), DPI(30))
+    main_layout.setSpacing(DPI(15))
 
-        parent = maya_main_window()
-        window = QtWidgets.QMainWindow(parent)
-        window.setObjectName("TheKeyMachineInstaller")
-        window.setWindowTitle("TheKeyMachine Installer")
+    # Header / Logo
+    header_layout = QtWidgets.QVBoxLayout()
+    header_layout.setAlignment(QtCore.Qt.AlignCenter)
 
-        window.setFixedSize(550, 600)
+    logo_path = os.path.join(os.path.dirname(__file__), "TheKeyMachine", "data", "img", "TheKeyMachine_logo_250.png")
+    if os.path.exists(logo_path):
+        logo_label = QtWidgets.QLabel()
+        pix = QtGui.QPixmap(logo_path)
+        logo_label.setPixmap(pix.scaled(DPI(220), DPI(220), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+        header_layout.addWidget(logo_label)
 
-        parent_geometry = parent.geometry()
-        if screen_width == 3840:
-            center_x = parent_geometry.center().x() - 1000 * 0.5
-            center_y = parent_geometry.center().y() - 1000 * 0.5
-        else:
-            center_x = parent_geometry.center().x() - 550 * 0.5
-            center_y = parent_geometry.center().y() - 700 * 0.5
+    subtitle_label = QtWidgets.QLabel("Animation toolset for Maya Animators")
+    subtitle_label.setStyleSheet("font-style: italic; color: #aaa;")
+    subtitle_label.setAlignment(QtCore.Qt.AlignCenter)
+    header_layout.addWidget(subtitle_label)
 
-        window.move(center_x, center_y)
+    version_str = f"v{__version__} {__stage__} (Build {__build__}) - {__codename__}"
+    tkm_version_label = QtWidgets.QLabel(version_str)
+    tkm_version_label.setStyleSheet("color: #888; font-size: 10px;")
+    tkm_version_label.setAlignment(QtCore.Qt.AlignCenter)
+    header_layout.addWidget(tkm_version_label)
 
-        image_path = os.path.join(os.path.dirname(__file__), "TheKeyMachine", "data", "img", "TheKeyMachine_logo_250.png")
-        image_label = QtWidgets.QLabel(window)
-        pixmap = QtGui.QPixmap(image_path)
-        image_label.setPixmap(pixmap)
-        image_label.setGeometry(150, 1, 250, 200)
+    main_layout.addLayout(header_layout)
 
-        label_below_image = QtWidgets.QLabel("Animation toolset for Maya Animators", window)
-        label_below_image.setGeometry(175, 152, 250, 20)
+    # Info Text
+    info_label = QtWidgets.QLabel(
+        "This script will install TheKeyMachine. Please note that this is a beta version. By installing, you agree to the terms below."
+    )
+    info_label.setWordWrap(True)
+    info_label.setStyleSheet("line-height: 140%;")
+    main_layout.addWidget(info_label)
 
-        tkm_version = QtWidgets.QLabel(f"{__version__} {__stage__} {__build__} {__codename__}", window)
-        tkm_version.setGeometry(220, 190, 250, 20)
+    # License Box
+    license_text = QtWidgets.QTextEdit()
+    license_text.setReadOnly(True)
+    license_text.setHtml("""
+        <div style='color: #bbb;'>
+        <b>1. Freedom to Use:</b> You are free to use, modify, and distribute the software under GPL 3.0 terms.<br><br>
+        <b>2. Copyleft:</b> Modifications must remain open source under the same license.<br><br>
+        <b>3. No Warranty:</b> Provided "as-is" without any warranty. Authors are not liable for damages.<br><br>
+        <b>4. Jurisdiction:</b> Local legal system applies for disputes.
+        </div>
+    """)
+    license_text.setStyleSheet("background-color: #2b2b2b; border: 1px solid #3d3d3d; border-radius: 4px; padding: 5px;")
+    main_layout.addWidget(license_text)
 
-        text_label = QtWidgets.QLabel(window)
-        text_label.setGeometry(40, 230, 480, 100)
-        text_label.setText(
-            "This script will install TheKeyMachine on your computer. "
-            "Please note that this is a beta version, so there may be errors and even Maya crashes. "
-            "By installing this software, you agree to abide by the terms and conditions of the license agreement "
-            "and the Privacy Policy. Please read both agreements carefully before proceeding."
-        )
+    # Acceptance
+    license_checkbox = QtWidgets.QCheckBox("I accept the terms and conditions")
+    main_layout.addWidget(license_checkbox)
 
-        text_label.setWordWrap(True)
-        text_label.setAlignment(QtCore.Qt.AlignLeft)
+    # Install Button
+    install_btn = QtWidgets.QPushButton("Install TheKeyMachine")
+    install_btn.setFixedHeight(DPI(45))
+    install_btn.setCursor(QtCore.Qt.PointingHandCursor)
+    install_btn.setEnabled(False)
+    install_btn.setStyleSheet("""
+        QPushButton {
+            background-color: #444;
+            color: #eee;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        QPushButton:hover { background-color: #555; }
+        QPushButton:pressed { background-color: #333; }
+        QPushButton:disabled { background-color: #2a2a2a; color: #666; }
+    """)
+    main_layout.addWidget(install_btn)
 
-        license_text = QtWidgets.QTextEdit(window)
-        license_text.setGeometry(35, 320, 480, 150)
+    # Connections
+    license_checkbox.toggled.connect(install_btn.setEnabled)
+    install_btn.clicked.connect(lambda: install(install_btn, tkm_version_label, window))
 
-        license_text_code = """
-        By using this software, you agree to be bound by the following terms and conditions based on the GNU General Public License (GPL) version 3.0:<br><br>
-
-        <b>1. Freedom to Use:</b><br>
-        You are free to use, copy, modify, and distribute the software for any purpose, as long as you comply with the terms of the GPL.<br><br>
-
-        <b>2. Copyleft:</b><br>
-        If you modify the software and distribute your modified version, you must make the source code available to the recipients and license it under the same GPL 3.0 terms. This ensures that the freedoms you received are preserved for others.<br><br>
-
-        <b>3. No Warranty:</b><br>
-        The software is provided "as-is" without any warranty. The authors are not liable for any damages or issues that arise from using the software.<br><br>
-
-        <b>4. Redistribution:</b><br>
-        You may distribute copies of the software, including modifications, under the terms of the GPL 3.0. However, you must make sure that the recipients are aware of the GPL license and have access to the source code.<br><br>
-
-        <b>5. Tivoization:</b><br>
-        If you distribute the software with hardware, you must not impose restrictions that prevent users from modifying the software and running their modified versions on that hardware.<br><br>
-
-        <b>6. Patents:</b><br>
-        If you distribute the software, you grant users a license to use any patents you hold that are necessary for them to use the software. You cannot initiate patent lawsuits related to the software.<br><br>
-
-        <b>7. Compatibility with Other Licenses:</b><br>
-        The GPL 3.0 may not be compatible with other licenses. If you combine GPL-licensed software with software under a different license, the combined work must comply with the GPL.<br><br>
-
-        <b>8. Jurisdiction:</b><br>
-        In case of legal disputes, the GPL allows users to bring issues to courts under the jurisdiction of their local legal system. For further information, consult the full GPL 3.0 license.<br><br>
-
-        By using or distributing this software, you acknowledge that you have read, understood, and agree to be bound by the terms and conditions of the GPL 3.0 license.
-        """
-
-        license_text.setHtml(license_text_code)
-        license_text.setReadOnly(True)
-        license_text.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-
-        license_checkbox = QtWidgets.QCheckBox("I accept the terms and conditions of the license agreement and the Privacy Policy", window)
-        license_checkbox.setGeometry(35, 500, 480, 30)
-
-        button = QtWidgets.QPushButton("Install TheKeyMachine", window)
-        button.setStyleSheet("""
-            QPushButton {
-                color: #ccc;
-                background-color: #5d5d5d;
-                border-radius: 5px;
-                font: 12px;
-            }
-            QPushButton:hover:!pressed {
-                color: #ccc;
-                background-color: #757575;
-                border-radius: 5px;
-                font: 12px;
-            }
-            QPushButton:disabled {
-                background-color: #3d3d3d;
-                color: #8a8a8a;
-            }
-        """)
-        button.setGeometry(35, 540, 480, 40)
-        button.clicked.connect(lambda: install(button, tkm_version, window))
-        button.setEnabled(False)
-        license_checkbox.clicked.connect(lambda: button.setEnabled(license_checkbox.isChecked()))
-
-        if screen_width == 3840:
-            window.setFixedSize(800, 900)
-            image_label.setGeometry(270, 1, 250, 200)
-            label_below_image.setGeometry(265, 155, 350, 20)
-            tkm_version.setGeometry(320, 190, 350, 20)
-            text_label.setGeometry(40, 230, 730, 150)
-            license_text.setGeometry(35, 350, 730, 350)
-            license_checkbox.setGeometry(35, 700, 750, 80)
-            button.setGeometry(35, 800, 730, 60)
-
-            button.setStyleSheet("""
-                QPushButton {
-                    color: #ccc;
-                    background-color: #5d5d5d;
-                    border-radius: 5px;
-                    font: 18px;
-                }
-                QPushButton:hover:!pressed {
-                    color: #ccc;
-                    background-color: #7a7a7a;
-                    border-radius: 5px;
-                    font: 18px;
-                }
-            """)
-
-        window.show()
-    else:
-        cmds.confirmDialog(
-            title="Error",
-            message="Oh no! Unfortunately, you are using an incompatible version of Maya or operating system. TheKeyMachine is only available for Maya 2022, 2023, 2024 on Linux, Windows and MacOS.",
-            button=["Ok"],
-            defaultButton="Ok",
-        )
+    window.show()
