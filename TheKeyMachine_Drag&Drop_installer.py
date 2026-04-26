@@ -31,9 +31,9 @@ except ImportError:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
 
-__version__ = "0.1.83"
+__version__ = "0.1.88"
 __stage__ = "beta"
-__build__ = "312"
+__build__ = "314"
 __codename__ = "Iced Coffee"
 
 
@@ -108,7 +108,9 @@ def install(button, tkm_version, window):
         else:
             msg_box = QtWidgets.QMessageBox()
             msg_box.setWindowTitle("Installation Warning")
-            msg_box.setText("TheKeyMachine folder already exists in the scripts directory. Please remove it before proceeding with the installation.")
+            msg_box.setText(
+                "TheKeyMachine folder already exists in the scripts directory. Please remove it before proceeding with the installation."
+            )
             msg_box.setIcon(QtWidgets.QMessageBox.Warning)
             ok_button = msg_box.addButton("OK", QtWidgets.QMessageBox.AcceptRole)
             ok_button.setMinimumHeight(30)
@@ -135,7 +137,6 @@ def install(button, tkm_version, window):
 
 
 def load_ui():
-
     import importlib
     import TheKeyMachine.core.toolbar
 
