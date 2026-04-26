@@ -72,8 +72,7 @@ def reload():
 
     reload(t)
 
-    tb = t.get_toolbar()
-    if tb:
+    if tb := t.get_toolbar():
         tb.reload()
     else:
         t.show()
