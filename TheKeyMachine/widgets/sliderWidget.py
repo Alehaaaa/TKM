@@ -6,23 +6,13 @@ import importlib
 import traceback
 
 try:
-    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker
-    from PySide6.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup, QIcon
-    from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout
+    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker # type: ignore
+    from PySide6.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup, QIcon # type: ignore
+    from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout # type: ignore
 except ImportError:
-    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker
-    from PySide2.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QIcon
-    from PySide2.QtWidgets import (
-        QWidget,
-        QHBoxLayout,
-        QSizePolicy,
-        QSlider,
-        QPushButton,
-        QActionGroup,
-        QStyle,
-        QStyleOptionSlider,
-        QLayout,
-    )
+    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker # type: ignore
+    from PySide2.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QIcon # type: ignore
+    from PySide2.QtWidgets import QWidget, QHBoxLayout, QSizePolicy, QSlider, QPushButton, QActionGroup, QStyle, QStyleOptionSlider, QLayout # type: ignore
 
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.reportMod as report

@@ -15,13 +15,13 @@ except ImportError:
     user_preferences = None
 
 try:
-    from PySide6 import QtWidgets, QtCore, QtGui
-    from shiboken6 import isValid
+    from PySide6 import QtWidgets, QtCore, QtGui # type: ignore
+    from shiboken6 import isValid # type: ignore
 
     QAction = QtGui.QAction
 except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui
-    from shiboken2 import isValid
+    from PySide2 import QtWidgets, QtCore, QtGui # type: ignore
+    from shiboken2 import isValid # type: ignore
 
     QAction = QtWidgets.QAction
 

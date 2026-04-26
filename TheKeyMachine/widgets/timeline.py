@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from maya import cmds, OpenMayaUI as omui
 
 try:
-    from PySide6 import QtCore, QtGui, QtWidgets
-except Exception:
-    from PySide2 import QtCore, QtGui, QtWidgets
+    from PySide6 import QtCore, QtGui, QtWidgets # type: ignore
+except ImportError:
+    from PySide2 import QtCore, QtGui, QtWidgets # type: ignore
 
 import TheKeyMachine.core.runtime_manager as runtime
 from TheKeyMachine.core import selection_targets

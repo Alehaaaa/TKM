@@ -17,15 +17,15 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-import maya.cmds as cmds
-import maya.OpenMayaUI as mui
+import maya.cmds as cmds # type: ignore
+import maya.OpenMayaUI as mui # type: ignore
 
 import importlib
 
 try:
-    from PySide2 import QtCore, QtGui, QtWidgets
+    from PySide2 import QtCore, QtGui, QtWidgets # type: ignore
 except ImportError:
-    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6 import QtCore, QtGui, QtWidgets # type: ignore
 
 
 # -----------------------------------------------------------------------------------------------------------------------------

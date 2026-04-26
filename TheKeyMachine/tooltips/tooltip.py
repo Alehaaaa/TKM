@@ -415,9 +415,6 @@ class QFlatTooltip(QWidget):
 
         self.close()
 
-    def _format_keys(self, keys_list):
-        return format_tooltip_shortcut(keys_list, include_click_suffix=True)
-
     def _setup_ui(self):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -532,7 +529,7 @@ class QFlatTooltip(QWidget):
 
             command = sh.get("keys", "")
             if isinstance(command, list):
-                command = self._format_keys(command)
+                command = format_tooltip_shortcut(command, include_click_suffix=True)
             keys = QLabel(command)
             keys.setWordWrap(False)
             keys.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)

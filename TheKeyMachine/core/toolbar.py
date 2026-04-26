@@ -19,17 +19,14 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 # Maya related imports
 from maya import cmds, mel, OpenMayaUI as mui
-from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
+from maya.app.general.mayaMixin import MayaQWidgetDockableMixin # type: ignore
 
 try:
-    from PySide6 import QtWidgets, QtCore, QtGui
-    from PySide6.QtCore import QTimer
-    from shiboken6 import isValid
-
+    from PySide6 import QtWidgets, QtCore, QtGui # type: ignore
+    from shiboken6 import isValid # type: ignore
 except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui
-    from PySide2.QtCore import QTimer
-    from shiboken2 import isValid
+    from PySide2 import QtWidgets, QtCore, QtGui # type: ignore
+    from shiboken2 import isValid # type: ignore
 
 
 # Standard library imports
@@ -280,7 +277,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
         self.buildUI()
 
         # Reconcile Graph Editor state at startup; ongoing tracking uses the event filter.
-        QTimer.singleShot(0, self._sync_graph_editor_on_startup)
+        QtCore.QTimer.singleShot(0, self._sync_graph_editor_on_startup)
 
     def closeEvent(self, event):
         """
@@ -336,7 +333,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
             return
         if not settings.get_setting("graph_toolbar_enabled", True):
             return
-        QTimer.singleShot(0, cg.createCustomGraph)
+        QtCore.QTimer.singleShot(0, cg.createCustomGraph)
 
     def _sync_graph_editor_on_startup(self):
         if not isValid(self):
@@ -346,7 +343,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
 
         graph_vis = cmds.getPanel(vis=True) or []
         if "graphEditor1" in graph_vis:
-            QTimer.singleShot(0, cg.createCustomGraph)
+            QtCore.QTimer.singleShot(0, cg.createCustomGraph)
 
     def showWindow(self):
         # Build up kwargs for the visibleChangeCommand
@@ -391,8 +388,8 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
             cmds.workspaceControl(workspace_control, **kwargs)
 
         # Force initial resize
-        QTimer.singleShot(200, self.shelf_tabbar)
-        QTimer.singleShot(500, self.update_height)
+        QtCore.QTimer.singleShot(200, self.shelf_tabbar)
+        QtCore.QTimer.singleShot(500, self.update_height)
 
     def visible_change_command(self, *args):
         if not isValid(self):
@@ -415,7 +412,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
         if not self.isFloating():
             workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
             if cmds.workspaceControl(workspace_control, q=True, collapse=True):
-                timer = QTimer(self)
+                timer = QtCore.QTimer(self)
                 timer.setSingleShot(True)
 
                 timer.timeout.connect(
@@ -1005,7 +1002,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
             else:
                 stop_link_obj_toggle_image_thread()
                 keyTools.remove_link_obj_callbacks()
-                QTimer.singleShot(800, lambda: btn.setIcon(QtGui.QIcon(media.link_objects_image)))
+                QtCore.QTimer.singleShot(800, lambda: btn.setIcon(QtGui.QIcon(media.link_objects_image)))
 
         resolved_items = []
         for item in group_data["items"]:
