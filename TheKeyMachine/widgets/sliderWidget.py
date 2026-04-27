@@ -6,13 +6,13 @@ import importlib
 import traceback
 
 try:
-    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker # type: ignore
-    from PySide6.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup, QIcon # type: ignore
-    from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout # type: ignore
+    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker  # type: ignore
+    from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup, QIcon  # type: ignore
+    from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout  # type: ignore
 except ImportError:
-    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker # type: ignore
-    from PySide2.QtGui import QColor, QCursor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QIcon # type: ignore
-    from PySide2.QtWidgets import QWidget, QHBoxLayout, QSizePolicy, QSlider, QPushButton, QActionGroup, QStyle, QStyleOptionSlider, QLayout # type: ignore
+    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker  # type: ignore
+    from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QIcon  # type: ignore
+    from PySide2.QtWidgets import QWidget, QHBoxLayout, QSizePolicy, QSlider, QPushButton, QActionGroup, QStyle, QStyleOptionSlider, QLayout  # type: ignore
 
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.reportMod as report
@@ -779,7 +779,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             return mode
         return None
 
-
     ################################ PUBLIC API ################################
 
     def setText(self, text: str):
@@ -897,7 +896,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if not mode:
             self.resetDefaultMode()
             return False
-            
+
         active_preview_key = self._temporary_mode.key if self._temporary_mode else None
         if active_preview_key == mode.key:
             return False
@@ -925,7 +924,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         for b in self._leftButtons + self._rightButtons:
             b.setTooltipInfo(title, description)
 
-
     ################################ GETTERS ################################
 
     def value(self) -> int:
@@ -947,7 +945,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def idle(self) -> bool:
         return not self._slider._is_active()
-
 
     ################################ HELPERS ################################
 
@@ -994,7 +991,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             return self.underMouse()
         except Exception:
             return False
-
 
     ############### CONTEXT MENU METHODS ###############
 
@@ -1105,7 +1101,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._run_dragCommand(percent)
 
     def _on_drag_finished(self):
-        if not getattr(self._slider, '_dragged', True):
+        if not getattr(self._slider, "_dragged", True):
             # Pure click-and-release with no drag movement
             self.valueSet.emit(0.0)
             self._run_dragCommand(0.0)
@@ -1123,12 +1119,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         finally:
             self.dragFinished.emit()
             self._finish_active_session()
-    
+
     def _finish_active_session(self):
         if self._sliderSession is not None:
             self._sliderSession.finish()
             self._sliderSession = None
-
 
     def _run_dragCommand(self, value: float):
         if self._dragCommand is None:
@@ -1173,7 +1168,6 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if not self._is_pointer_over_widget():
             return
         self.setTemporaryMode(runtime.get_modifier_mask(), requires_mid_click=False)
-
 
     ############### EVENT METHODS ###############
 
