@@ -63,7 +63,7 @@ ORBIT_ACTIONS = (
     "reset_objects_mods",
     "delete_all_animation",
     "select_opposite",
-    "copy_opposite",
+    "opposite_copy",
     "mirror",
     "copy_animation",
     "paste_animation",
@@ -77,12 +77,15 @@ ORBIT_ACTIONS = (
     "ws_paste_frame",
 )
 ORBIT_ACTION_SET = set(ORBIT_ACTIONS)
+ORBIT_ACTION_MIGRATIONS = {
+    "copy_opposite": "opposite_copy",
+}
 
 DEFAULT_ORBIT_ACTIONS = (
     "reset_objects_mods",
     "delete_all_animation",
     "select_opposite",
-    "copy_opposite",
+    "opposite_copy",
     "mirror",
     "select_hierarchy",
     "isolate_master",
@@ -106,6 +109,7 @@ def sanitize_orbit_configuration(config):
         if not str(button_id).startswith("button"):
             continue
         action_identifier = config.get(button_id, "")
+        action_identifier = ORBIT_ACTION_MIGRATIONS.get(action_identifier, action_identifier)
         if action_identifier not in ORBIT_ACTION_SET or action_identifier in seen_actions:
             continue
         sanitized[button_id] = action_identifier

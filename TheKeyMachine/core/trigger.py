@@ -5,40 +5,35 @@ Central trigger registry for toolbar tools, hotkeys, and slider commands.
 from __future__ import annotations
 
 import importlib
-from typing import Callable, Dict, Iterable, Optional
+from typing import Callable, Dict, Optional
 
 
 SLIDER_BUTTON_VALUES = (-150, -125, -105, -100, -50, -15, -5, 0, 5, 15, 50, 100, 105, 125, 150)
 
 _COMMANDS: Dict[str, Callable] = {}
-_ALIASES: Dict[str, str] = {}
 _BUILTINS_LOADED = False
 _SLIDERS_LOADED = False
 _TOOLBOX_LOADED = False
 
 
 def _register_core_commands() -> None:
-    register_command("toolbar_toggle", _toggle_main_toolbar, aliases=["toggle_main_toolbar"])
+    register_command("toolbar_toggle", _toggle_main_toolbar)
     register_command("toolbar_reload", _reload_main_toolbar)
     register_command("toolbar_unload", _unload_main_toolbar)
     register_command("toolbar_add_shelf_button", _create_toolbar_shelf_button)
     register_command("check_for_updates", _check_for_updates)
-    register_command("selection_sets", _toggle_selection_sets, aliases=["selection_sets_toggle"])
-    register_command("animation_offset", _toggle_animation_offset, aliases=["animation_offset_toggle"])
-    register_command("micro_move", _toggle_micro_move, aliases=["micro_move_toggle"])
-    register_command("custom_graph", _toggle_graph_toolbar, aliases=["custom_graph_toggle"])
-    register_command("overshoot_sliders", _toggle_sliders_overshoot, aliases=["sliders_overshoot_toggle"])
-    register_command(
-        "attribute_switcher_euler_filter",
-        _toggle_attribute_switcher_euler_filter,
-        aliases=["attribute_switcher_euler_filter_toggle"],
-    )
+    register_command("selection_sets", _toggle_selection_sets)
+    register_command("animation_offset", _toggle_animation_offset)
+    register_command("micro_move", _toggle_micro_move)
+    register_command("custom_graph", _toggle_graph_toolbar)
+    register_command("overshoot_sliders", _toggle_sliders_overshoot)
+    register_command("attribute_switcher_euler_filter", _toggle_attribute_switcher_euler_filter)
     register_command("custom_tools", _open_custom_tools_config)
     register_command("custom_scripts", _open_custom_scripts_config)
     register_command("about_window", _open_about_window)
     register_command("donate_window", _open_donate_window)
     register_command("bug_report_window", _open_bug_report_window)
-    register_command("orbit_window", _open_orbit_window, aliases=["orbit"])
+    register_command("orbit_window", _open_orbit_window)
 
 
 def _ensure_builtin_commands() -> None:
@@ -74,24 +69,19 @@ def _ensure_toolbox_commands() -> None:
     _TOOLBOX_LOADED = True
 
 
-def register_command(name: str, callback: Callable, aliases: Optional[Iterable[str]] = None) -> Callable:
+def register_command(name: str, callback: Callable) -> Callable:
     """Register or replace a callable command."""
     _COMMANDS[name] = callback
-    _ALIASES[name] = name
-    for alias in aliases or ():
-        if alias:
-            _ALIASES[alias] = name
     return callback
 
 
 def get_command(name: str) -> Optional[Callable]:
-    resolved_name = resolve_command_name(name)
-    callback = _COMMANDS.get(resolved_name)
+    callback = _COMMANDS.get(name)
     if callback is None:
         _ensure_builtin_commands()
         _ensure_slider_commands()
         _ensure_toolbox_commands()
-        callback = _COMMANDS.get(resolve_command_name(name))
+        callback = _COMMANDS.get(name)
     return callback
 
 
@@ -103,17 +93,12 @@ def list_commands() -> list[str]:
 
 
 def has_command(name: str) -> bool:
-    resolved_name = resolve_command_name(name)
-    if resolved_name in _COMMANDS:
+    if name in _COMMANDS:
         return True
     _ensure_builtin_commands()
     _ensure_slider_commands()
     _ensure_toolbox_commands()
-    return resolve_command_name(name) in _COMMANDS
-
-
-def resolve_command_name(name: str) -> str:
-    return _ALIASES.get(name, name)
+    return name in _COMMANDS
 
 
 def invoke(name: str, *args, **kwargs):
@@ -123,10 +108,10 @@ def invoke(name: str, *args, **kwargs):
     return callback(*args, **kwargs)
 
 
-def make_command_callback(name: str, callback: Optional[Callable] = None, aliases: Optional[Iterable[str]] = None) -> Callable:
+def make_command_callback(name: str, callback: Optional[Callable] = None) -> Callable:
     """Register a command and return a stable callback proxy that invokes it by name."""
     if callback is not None:
-        register_command(name, callback, aliases=aliases)
+        register_command(name, callback)
 
     def _proxy(*args, **kwargs):
         return invoke(name, *args, **kwargs)
@@ -164,15 +149,13 @@ def _slider_value_suffix(value: int) -> str:
     return str(value)
 
 
-def register_slider_mode(prefix: str, mode: str, aliases: Optional[Iterable[str]] = None) -> None:
+def register_slider_mode(prefix: str, mode: str) -> None:
     base_command_name = "slider_{}_{}".format(prefix, mode)
     for slider_value in SLIDER_BUTTON_VALUES:
         command_name = "{}_{}".format(base_command_name, _slider_value_suffix(slider_value))
-        command_aliases = aliases if slider_value == 0 else None
         register_command(
             command_name,
             lambda p=prefix, m=mode, v=slider_value: execute_slider(p, m, v),
-            aliases=command_aliases,
         )
 
 
@@ -360,9 +343,8 @@ def _register_builtin_commands():
     register_command("select_rig_controls_animated", _make_module_command("TheKeyMachine.mods.barMod", "select_rig_controls_animated"))
     register_command("select_hierarchy", _make_module_command("TheKeyMachine.mods.barMod", "selectHierarchy"))
     register_command("align_selected_objects", _make_module_command("TheKeyMachine.mods.barMod", "align_selected_objects"))
-    register_command("create_tracer", _make_module_command("TheKeyMachine.mods.barMod", "mod_tracer"), aliases=["mod_tracer"])
-    register_command("refresh_tracer", _make_module_command("TheKeyMachine.mods.barMod", "tracer_refresh"))
-    register_command("delete_animation", _make_module_command("TheKeyMachine.mods.barMod", "mod_delete_animation"))
+    register_command("create_tracer", _make_module_command("TheKeyMachine.mods.barMod", "mod_tracer"))
+    register_command("tracer_refresh", _make_module_command("TheKeyMachine.mods.barMod", "tracer_refresh"))
     register_command("delete_all_animation", _make_module_command("TheKeyMachine.mods.barMod", "mod_delete_animation"))
     register_command("ws_copy_frame", _make_module_command("TheKeyMachine.mods.barMod", "copy_worldspace_single_frame"))
     register_command("ws_paste_frame", _make_module_command("TheKeyMachine.mods.barMod", "paste_worldspace_single_frame"))
@@ -370,32 +352,17 @@ def _register_builtin_commands():
         "ws_copy_range", _make_module_command("TheKeyMachine.mods.barMod", "copy_range_worldspace_animation")
     )
     register_command("ws_paste", _make_module_command("TheKeyMachine.mods.barMod", "color_worldspace_paste_animation"))
-    register_command("worldspace_copy_animation", _make_module_command("TheKeyMachine.mods.barMod", "color_worldspace_copy_animation"))
-    register_command("temp_pivot", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", False), aliases=["create_temp_pivot"])
-    register_command("temp_pivot_last", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", True), aliases=["create_temp_pivot_last", "tp_last_used"])
-    register_command(
-        "follow_cam", _make_module_command("TheKeyMachine.mods.barMod", "create_follow_cam", translation=True, rotation=True), aliases=["create_follow_cam"]
-    )
-    register_command("set_auto_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "auto"))
-    register_command("set_spline_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "spline"))
-    register_command("set_clamped_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "clamped"))
-    register_command("set_linear_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "linear"))
-    register_command("set_flat_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "flat"))
-    register_command("set_step_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "step"))
-    register_command("set_plateau_tangent", _make_module_command("TheKeyMachine.mods.barMod", "setTangent", "plateau"))
-
-    register_command(
-        "reset_objects_mods", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_objects_mods"), aliases=["reset_values"]
-    )
+    register_command("temp_pivot", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", False))
+    register_command("temp_pivot_last", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", True))
+    register_command("follow_cam", _make_module_command("TheKeyMachine.mods.barMod", "create_follow_cam", translation=True, rotation=True))
+    register_command("reset_objects_mods", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_objects_mods"))
     register_command(
         "reset_translations",
         _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_object_values", reset_translations=True),
-        aliases=["reset_translation"],
     )
     register_command(
         "reset_rotations",
         _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_object_values", reset_rotations=True),
-        aliases=["reset_rotation"],
     )
     register_command("reset_scales", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_object_values", reset_scales=True))
     register_command(
@@ -408,11 +375,9 @@ def _register_builtin_commands():
             reset_scales=True,
         ),
     )
-    register_command(
-        "select_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "selectOpposite"), aliases=["selectOpposite"]
-    )
-    register_command("add_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "addSelectOpposite"), aliases=["opposite_add"])
-    register_command("copy_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copyOpposite"), aliases=["copyOpposite"])
+    register_command("select_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "selectOpposite"))
+    register_command("opposite_add", _make_module_command("TheKeyMachine.mods.keyToolsMod", "addSelectOpposite"))
+    register_command("opposite_copy", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copyOpposite"))
     register_command("copy_pose", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_pose"))
     register_command("paste_pose", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_pose"))
     register_command("copy_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_animation"))
@@ -420,27 +385,23 @@ def _register_builtin_commands():
     register_command("paste_insert_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_insert_animation"))
     register_command("paste_opposite_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_opposite_animation"))
     register_command("paste_animation_to", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_animation_to"))
-    register_command("link_copy", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_link"), aliases=["copy_link"])
-    register_command("link_paste", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_link"), aliases=["paste_link"])
+    register_command("link_copy", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_link"))
+    register_command("link_paste", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_link"))
     register_command(
         "nudge_insert_inbetween",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "insert_inbetween", _nudge_value()),
-        aliases=["insert_inbetween", "nudge_insertInbetween"],
     )
     register_command(
         "nudge_remove_inbetween",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "remove_inbetween", _nudge_value()),
-        aliases=["remove_inbetween", "nudge_removeInbetween"],
     )
     register_command(
         "nudge_left",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", -_nudge_value()),
-        aliases=["nudge_left", "move_keyframes_left"],
     )
     register_command(
         "nudge_right",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", _nudge_value()),
-        aliases=["nudge_right", "move_keyframes_right"],
     )
 
 

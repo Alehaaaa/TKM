@@ -113,6 +113,34 @@ def lerp_towards(left, right, t, current):
     return current
 
 
+def _ensure_key_between_neighbors(plug, curr):
+    """If *plug* has animation with keys on both sides of *curr* but none at
+    *curr* itself, plant a key there so the slider can operate on it.
+
+    Returns True if a key was created, False otherwise.
+    """
+    all_keys = cmds.keyframe(plug, q=True, timeChange=True)
+    if not all_keys:
+        return False
+    all_keys = sorted(set(float(k) for k in all_keys))
+    if float(curr) in all_keys:
+        return False
+    has_prev = any(k < float(curr) for k in all_keys)
+    has_next = any(k > float(curr) for k in all_keys)
+    if not (has_prev and has_next):
+        return False
+    # Attribute must be writable
+    try:
+        if cmds.getAttr(plug, lock=True) or not cmds.getAttr(plug, settable=True):
+            return False
+        if cmds.getAttr(plug, type=True) in ("enum", "string", "message"):
+            return False
+        cmds.setKeyframe(plug, time=(curr,), insert=True)
+        return True
+    except Exception:
+        return False
+
+
 def resolve_keyframe_targets():
     """Unified entry for resolving attribute plugs and affected times."""
     plugs, _src, time_range, has_graph_keys = selection_targets.resolve_target_attribute_plugs()
@@ -134,6 +162,7 @@ def resolve_keyframe_targets():
         elif time_range:
             times = cmds.keyframe(plug, q=True, time=(time_range[0], time_range[1]), timeChange=True) or [curr]
         else:
+            _ensure_key_between_neighbors(plug, curr)
             times = [curr]
         affected[plug] = sorted(list(set(times)))
     return affected, time_range

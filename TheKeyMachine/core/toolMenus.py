@@ -5,13 +5,15 @@ except ImportError:
 
 from functools import partial
 
-from maya import mel
+from maya import cmds, mel
 
 try:
     from PySide6 import QtCore, QtGui
+
     QActionGroup = QtGui.QActionGroup
 except ImportError:
     from PySide2 import QtCore, QtGui, QtWidgets
+
     QActionGroup = QtWidgets.QActionGroup
 
 import TheKeyMachine.mods.hotkeysMod as hotkeys
@@ -122,9 +124,7 @@ def build_share_keys_menu(menu, source_widget=None):
     preserve_tangent_action = menu.addAction("Preserve Tangent Type")
     preserve_tangent_action.setCheckable(True)
     preserve_tangent_action.setChecked(keyTools.get_share_keys_mode() == keyTools.SHARE_KEYS_MODE_PRESERVE_TANGENT)
-    preserve_tangent_action.triggered.connect(
-        lambda checked=False: keyTools.set_share_keys_mode(keyTools.SHARE_KEYS_MODE_PRESERVE_TANGENT)
-    )
+    preserve_tangent_action.triggered.connect(lambda checked=False: keyTools.set_share_keys_mode(keyTools.SHARE_KEYS_MODE_PRESERVE_TANGENT))
     action_group.addAction(preserve_tangent_action)
 
     preserve_shape_action = menu.addAction("Preserve Anim Curve Shape")
@@ -136,23 +136,36 @@ def build_share_keys_menu(menu, source_widget=None):
     menu.addSeparator()
 
 
-def build_tangent_menu(menu, tangent_type, tangent_label, icon_path=None, source_widget=None):
+def build_tangent_menu(menu, tangent_type, tangent_label, icon_path=None, source_widget=None, maya_default_tangent=False):
     import TheKeyMachine.mods.barMod as bar
 
     tint_color = cw.get_widget_tint_color(source_widget)
+
+    def _set_tangent(handle_mode, key_scope, tint):
+        if tangent_type == "bouncy":
+            return keyTools.bouncy_tangets(
+                handle_mode=handle_mode,
+                key_scope=key_scope,
+                tint_color=tint,
+            )
+
+        return bar.setTangent(
+            tangent_type,
+            handle_mode=handle_mode,
+            key_scope=key_scope,
+            tint_color=tint,
+        )
 
     def _add_action(handle_mode, handle_label, key_scope, scope_label):
         menu.addAction(
             QtGui.QIcon(icon_path or ""),
             handle_label,
-            lambda _checked=False, h=handle_mode, s=key_scope, c=tint_color: bar.setTangent(
-                tangent_type,
-                handle_mode=h,
-                key_scope=s,
-                tint_color=c,
-            ),
+            lambda _checked=False, h=handle_mode, s=key_scope, c=tint_color: _set_tangent(h, s, c),
             description="Set {}.".format(scope_label.lower()),
         )
+
+    def _set_maya_default_tangent():
+        cmds.keyTangent(**{"global": True, "inTangentType": tangent_type, "outTangentType": tangent_type})
 
     _add_action("in", "In Tangent", "selection", "the in tangent on the current selection")
     _add_action("out", "Out Tangent", "selection", "the out tangent on the current selection")
@@ -161,6 +174,27 @@ def build_tangent_menu(menu, tangent_type, tangent_label, icon_path=None, source
     _add_action("both", "Last Key", "last", "the last key")
     menu.addSeparator()
     _add_action("both", "All Keys", "all", "all keys")
+
+    if maya_default_tangent:
+        menu.addAction(
+            QtGui.QIcon(icon_path or ""),
+            "Set Maya Default Tangent",
+            lambda _checked=False: _set_maya_default_tangent(),
+            description="Use {} for newly created keys.".format(tangent_label),
+        )
+
+
+def build_cycle_matcher_menu(menu, icon_path=None, source_widget=None):
+    def _add_action(target_key, label):
+        menu.addAction(
+            QtGui.QIcon(icon_path or ""),
+            label,
+            lambda _checked=False, k=target_key: keyTools.match_curve_cycle(target_key=k),
+            description="Match the cycle on the {}.".format(label.lower()),
+        )
+
+    _add_action("first", "First Key")
+    _add_action("last", "Last Key")
 
 
 def sync_main_dock_menu(toolbar):
@@ -261,7 +295,9 @@ def add_main_preferences_menu(
         description="Add a shelf button for showing or hiding the toolbar.",
     )
 
-    run_on_startup_action = preferences_menu.addAction("Start with Maya", ui.install_userSetup, description="Load TheKeyMachine automatically when Maya starts.")
+    run_on_startup_action = preferences_menu.addAction(
+        "Start with Maya", ui.install_userSetup, description="Load TheKeyMachine automatically when Maya starts."
+    )
     run_on_startup_action.setCheckable(True)
     run_on_startup_action.setChecked(ui.check_userSetup())
 

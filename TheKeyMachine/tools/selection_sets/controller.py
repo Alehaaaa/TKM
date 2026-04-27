@@ -15,8 +15,11 @@ from TheKeyMachine.tools.selection_sets import api as selectionSetsApi
 from TheKeyMachine.widgets import util as wutil
 
 
-class SelectionSetsControllerMixin:
+class SelectionSetsController:
     color_names = dict(selectionSetsApi.selection_set_color_names)
+
+    def __init__(self, owner=None):
+        self.owner = owner
 
     def export_sets(self, file_path=None, *args):
         if not file_path:
@@ -346,9 +349,6 @@ class SelectionSetsControllerMixin:
             cmds.delete(set_name)
 
         cmds.evalDeferred(self.create_buttons_for_sel_sets)
-
-    def start_selection_sets_UI(self):
-        selectionSetsApi.open_selection_sets_toolbar_action(controller=self)
 
     def toggle_selection_sets_workspace(self, *args):
         selectionSetsApi.toggle_selection_sets_window(controller=self)

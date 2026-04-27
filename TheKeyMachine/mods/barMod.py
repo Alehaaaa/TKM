@@ -122,8 +122,23 @@ def _ensure_micro_move_helpers_group():
     return group
 
 
-def _active_tint_color(default=None):
-    return cw.get_active_tool_tint_color(default=default)
+def _active_tint_color(key=None, default=None):
+    if isinstance(key, str) and key.startswith("#"):
+        return key
+
+    if key:
+        try:
+            import TheKeyMachine.core.toolbox as toolbox
+
+            color = toolbox.get_tool_tint_color(key)
+            if color is not None:
+                return color
+        except Exception:
+            pass
+
+    if isinstance(default, str):
+        return default if default.startswith("#") else None
+    return default
 
 
 def openCustomGraph():
@@ -150,8 +165,8 @@ def delete_animation():
     time_context = target_info["time_context"]
     tint_session = timelineWidgets.begin_timeline_context(
         default_mode="all_animation",
-        color=_active_tint_color(),
-        key="delete_animation_range",
+        color=_active_tint_color("delete_all_animation"),
+        key="delete_all_animation",
     )
 
     try:
@@ -447,10 +462,11 @@ def setTangent(tangent_type, handle_mode="both", key_scope="selection", tint_col
     if not timerange:
         return wutil.make_inViewMessage("No animation keys available to set tangents.")
 
+    tangent_tool_key = "tangent_{}".format(tangent_type)
     tint_session = timelineWidgets.begin_timeline_tint(
         timerange=timerange,
-        color=tint_color or _active_tint_color(),
-        key="set_tangent_range",
+        color=tint_color or _active_tint_color(tangent_tool_key),
+        key=tangent_tool_key,
     )
     try:
         for curve, frames in targets.items():
@@ -1058,8 +1074,8 @@ def worldspace_copy_animation(*args):
         if all_keyframes:
             tint_session = timelineWidgets.begin_timeline_tint(
                 timerange=(int(all_keyframes[0]), int(all_keyframes[-1])),
-                color=_active_tint_color(),
-                key="worldspace_copy_all",
+                color=_active_tint_color("worldspace"),
+                key="worldspace",
             )
         for frame in all_keyframes:
             # Verificar si el proceso fue interrumpido por el usuario
@@ -1157,8 +1173,8 @@ def copy_range_worldspace_animation(*args):
         if all_keyframes:
             tint_session = timelineWidgets.begin_timeline_tint(
                 timerange=(int(all_keyframes[0]), int(all_keyframes[-1])),
-                color=_active_tint_color(),
-                key="worldspace_copy_range",
+                color=_active_tint_color("ws_copy_range"),
+                key="ws_copy_range",
             )
 
         for frame in all_keyframes:
@@ -1222,8 +1238,8 @@ def copy_worldspace_single_frame(*args):
     current_time = cmds.currentTime(query=True)
     tint_session = timelineWidgets.begin_timeline_tint(
         timerange=(int(current_time), int(current_time)),
-        color=_active_tint_color(),
-        key="worldspace_copy_single_frame",
+        color=_active_tint_color("ws_copy_frame"),
+        key="ws_copy_frame",
     )
 
     try:
@@ -1292,8 +1308,8 @@ def paste_worldspace_single_frame(*args):
         if frame_range:
             tint_session = timelineWidgets.begin_timeline_tint(
                 timerange=frame_range,
-                color=_active_tint_color(),
-                key="worldspace_paste_single_frame",
+                color=_active_tint_color("ws_paste_frame"),
+                key="ws_paste_frame",
             )
 
         target_objects = selection_targets.get_selected_objects(orderedSelection=True)
@@ -1497,8 +1513,8 @@ def worldspace_paste_animation(*args):
 
         tint_session = timelineWidgets.begin_timeline_tint(
             timerange=paste_range,
-            color=_active_tint_color(),
-            key="worldspace_paste_range",
+            color=_active_tint_color("ws_paste"),
+            key="ws_paste",
         )
 
         all_frames = sorted(frame_set)

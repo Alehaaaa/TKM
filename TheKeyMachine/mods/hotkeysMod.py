@@ -28,10 +28,14 @@ HOTKEYS_WINDOW_KEY = "tkm_hotkeys_window"
 HOTKEYS_EXPORT_DIR = os.path.join(general.USER_FOLDER_PATH, "TheKeyMachine_user_data", "tools", "hotkeys")
 
 
+
 def _ensure_hotkey_folder():
     folder = HOTKEYS_EXPORT_DIR
     os.makedirs(folder, exist_ok=True)
     return folder
+
+
+
 
 
 def _combo_from_assign_command_key_string(key_string):
@@ -53,12 +57,9 @@ def _combo_from_assign_command_key_string(key_string):
 
 def _load_hotkeys_from_maya():
     mapping = {}
-    try:
-        count = cmds.assignCommand(query=True, numElements=True) or 0
-    except Exception:
-        return mapping
+    stale_assignments = []
 
-    for index in range(1, int(count) + 1):
+    for index in range(1, (cmds.assignCommand(query=True, numElements=True) or 0) + 1):
         try:
             name = cmds.assignCommand(index, query=True, name=True)
             key_string = cmds.assignCommand(index, query=True, keyString=True)
@@ -69,8 +70,15 @@ def _load_hotkeys_from_maya():
         combo = _combo_from_assign_command_key_string(key_string)
         if not combo:
             continue
-        command_name = trigger.resolve_command_name(str(name).replace("TKMTriggerName_", "", 1))
+        command_name = str(name).replace("TKMTriggerName_", "", 1)
+        if not trigger.has_command(command_name):
+            stale_assignments.append(combo)
+            continue
         mapping[command_name] = combo
+
+    if stale_assignments:
+        _clear_stale_hotkey_assignments(stale_assignments)
+
     return mapping
 
 
@@ -82,7 +90,12 @@ def _normalize_hotkey_mapping(data):
         normalized_combo = _normalize_combo(combo)
         if not normalized_combo:
             continue
-        mapping[trigger.resolve_command_name(str(name))] = normalized_combo
+        command_name = str(name)
+        if not trigger.has_command(command_name):
+            continue
+        if command_name in mapping:
+            continue
+        mapping[command_name] = normalized_combo
     return mapping
 
 
@@ -318,6 +331,15 @@ def _assign_hotkey(command_name, title, combo):
     )
 
 
+
+
+
+def _clear_stale_hotkey_assignments(stale_assignments):
+    for combo in stale_assignments:
+        _clear_hotkey(combo)
+    _save_hotkeys_to_maya()
+
+
 def _qt_key_to_combo(event):
     key = event.key()
     modifiers = event.modifiers()
@@ -429,7 +451,7 @@ def _native_tooltip_html(tooltip_data):
 
 
 def _tool_command_row(tool_data):
-    command_name = tool_data.get("command")
+    command_name = tool_data.get("key") or tool_data.get("id")
     if not command_name:
         return None
     return {
@@ -441,7 +463,7 @@ def _tool_command_row(tool_data):
 
 
 def _variant_command_row(tool_data, variant, shortcut_label=None):
-    command_name = variant.get("command")
+    command_name = variant.get("key") or variant.get("id")
     if not command_name:
         return None
     icon_path = variant.get("icon_path") or tool_data.get("icon_path")
@@ -517,19 +539,16 @@ def _append_toolbox_item_rows(section, seen, title_lookup, icon_lookup, trigger_
     if not isinstance(item, dict):
         return
 
-    if item.get("id"):
-        _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, item["id"])
+    item_key = item.get("key") or item.get("id")
+    if item_key:
+        _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, item_key)
         return
 
     if item.get("type") == "widget":
-        tool_id = item.get("id") or item.get("key")
-        if tool_id and tool_id in toolbox.TOOL_DEFINITIONS:
-            _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, tool_id)
+        tool_key = item.get("key") or item.get("id")
+        if tool_key and tool_key in toolbox.TOOL_DEFINITIONS:
+            _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, tool_key)
         return
-
-    if item.get("type") == "raw":
-        row = _tool_command_row(toolbox._resolve_tool_definition(item.get("key", "raw_tool"), toolbox._resolve_raw_item(item)))
-        _append_section_row(section, seen, title_lookup, icon_lookup, trigger_commands, row)
 
 
 def _slider_modes_from_section(section_data):

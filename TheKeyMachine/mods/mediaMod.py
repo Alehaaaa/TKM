@@ -132,20 +132,11 @@ _ASSET_FILES = {
     "sliders_overshoot_image": "sliders_overshoot.svg",
 }
 
-_ASSET_ALIASES = {
-    "update_image": "settings_update_image",
-    "grey_got_image": "dot_grey_image",
-}
-
 _selection_set_icon_shade_names = {
     "light": "Light",
     "base": "",
     "dark": "Dark",
 }
-
-
-def _resolve_asset_name(name: str) -> str:
-    return _ASSET_ALIASES.get(name, name)
 
 
 def getImage(image: str) -> str:
@@ -157,8 +148,7 @@ def getSelectionSetsImage(image: str) -> str:
 
 
 def asset_path(name: str, default=None):
-    asset_name = _resolve_asset_name(name)
-    filename = _ASSET_FILES.get(asset_name)
+    filename = _ASSET_FILES.get(name)
     if not filename:
         return default
     return getImage(filename)

@@ -15,13 +15,13 @@ except ImportError:
     user_preferences = None
 
 try:
-    from PySide6 import QtWidgets, QtCore, QtGui # type: ignore
-    from shiboken6 import isValid # type: ignore
+    from PySide6 import QtWidgets, QtCore, QtGui  # type: ignore
+    from shiboken6 import isValid  # type: ignore
 
     QAction = QtGui.QAction
 except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui # type: ignore
-    from shiboken2 import isValid # type: ignore
+    from PySide2 import QtWidgets, QtCore, QtGui  # type: ignore
+    from shiboken2 import isValid  # type: ignore
 
     QAction = QtWidgets.QAction
 
@@ -33,9 +33,6 @@ Centralized repository for UI components used throughout the toolbar.
 Includes QFlatToolButton with automated sizing, hover effects (glow), 
 and user preference integration.
 """
-
-
-_ACTIVE_TOOL_WIDGET = None
 
 
 def _status_description(description="", status_description=None, tooltip_template=None):
@@ -104,17 +101,6 @@ def get_widget_tint_color(widget, default=None):
     except Exception:
         pass
     return default
-
-
-def get_active_tool_widget():
-    global _ACTIVE_TOOL_WIDGET
-    if _ACTIVE_TOOL_WIDGET and isValid(_ACTIVE_TOOL_WIDGET):
-        return _ACTIVE_TOOL_WIDGET
-    return None
-
-
-def get_active_tool_tint_color(default=None):
-    return get_widget_tint_color(get_active_tool_widget(), default=default)
 
 
 def _default_pressed_color_hex():
@@ -804,9 +790,6 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         )
 
     def triggerToolCallback(self, base_callback, *args, **kwargs):
-        global _ACTIVE_TOOL_WIDGET
-        previous_widget = _ACTIVE_TOOL_WIDGET
-        _ACTIVE_TOOL_WIDGET = self
         variant = self._get_active_shortcut_variant()
         callback = variant.get("callback") if variant else None
         chunk_opened = False
@@ -823,7 +806,6 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                     toolCommon.close_undo_chunk()
                 except Exception:
                     pass
-            _ACTIVE_TOOL_WIDGET = previous_widget
 
     def _apply_icon_visual(self, icon):
         if isinstance(icon, (str, bytes)):
@@ -1063,9 +1045,7 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
         btn.customContextMenuRequested.connect(_show_tool_menu)
         if data.get("type") == "menu":
             btn.clicked.connect(
-                lambda _checked=False, widget=btn: widget.customContextMenuRequested.emit(
-                    widget.mapFromGlobal(QtGui.QCursor.pos())
-                )
+                lambda _checked=False, widget=btn: widget.customContextMenuRequested.emit(widget.mapFromGlobal(QtGui.QCursor.pos()))
             )
     return btn
 
@@ -1128,7 +1108,7 @@ class QFlowLayout(QtWidgets.QLayout):
         super().__init__(parent)
         self._item_list = []
 
-        # Handle 'Wspacing' alias from toolbar.py
+        # Handle 'Wspacing'
         self._Hspacing = kwargs.get("Wspacing", Hspacing)
         self._Vspacing = kwargs.get("Hspacing", Vspacing) if "Wspacing" in kwargs else Vspacing
 
@@ -1694,12 +1674,14 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 # Avoid duplicate metadata entries for the same key
                 existing_entry = next((m for m in self._menu_metadata if m.get("key") == key), None)
                 if existing_entry:
-                    existing_entry.update({
-                        "label": label,
-                        "description": description,
-                        "tooltip_template": tooltip_template,
-                        "default": default,
-                    })
+                    existing_entry.update(
+                        {
+                            "label": label,
+                            "description": description,
+                            "tooltip_template": tooltip_template,
+                            "default": default,
+                        }
+                    )
                 else:
                     self._menu_metadata.append(
                         {
@@ -1778,6 +1760,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             widget = create_tool_button_from_data(
                 default_item,
                 callback=None,
+                menu_setup_fn=None,
                 tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or default_item.get("label"),
                 description=default_item.get("description") or "",
             )
@@ -1802,11 +1785,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             )
             group_widgets.append((key, widget))
 
+        item_by_key = {item.get("key"): item for item in widgets_list if isinstance(item, dict) and item.get("key")}
+
         # 2. Resolve the group properties from the first default tool
         first_item = default_items[0] if default_items else {}
         group_label = first_item.get("label", "Group")
         group_icon_p = first_item.get("icon_path") or ""
-        menu_setup_fn = first_item.get("menu_setup_fn")
 
         # 3. Build QMenu + pinnable_actions from the descriptor list
         pinnable_actions = []
@@ -1841,7 +1825,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 )
 
         # 3. Build QMenu from the descriptor list (factory will manage visibility)
-        def menu_factory(section=self, source_widget=None, widgets=widgets_list, setup_fn=menu_setup_fn):
+        def menu_factory(section=self, source_widget=None, widgets=widgets_list, source_items=item_by_key):
             menu = MenuWidget(source_widget)
             menu.setTearOffEnabled(True)
 
@@ -1851,8 +1835,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     if w == source_widget:
                         source_key = k
                         break
+                if source_key is None:
+                    source_key = source_widget.property("tkm_pinned_action_key")
 
             checkable_sync_pairs = []
+            source_item = source_items.get(source_key) or {}
+            setup_fn = source_item.get("menu_setup_fn") or first_item.get("menu_setup_fn")
             if callable(setup_fn):
                 try:
                     setup_fn(menu, source_widget=source_widget)
@@ -1947,14 +1935,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if menu_factory:
                 widget = self._widgets.get(w_key)
                 if widget and isValid(widget):
-                    # Enable tear-off once on the live menu object
-                    try:
-                        m = menu_factory()
-                        if m and isValid(m):
-                            m.setTearOffEnabled(True)
-                    except Exception:
-                        pass
-
                     widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
                     def _ctx(pos, mf=menu_factory, w=widget):

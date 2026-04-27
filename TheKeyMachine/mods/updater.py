@@ -354,7 +354,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 anchor_widget,
                 title="Update available",
                 template=template,
-                icon=media.asset_path("update_image"),
+                icon=media.asset_path("settings_update_image"),
                 buttons=[
                     QFlatTooltipConfirm.CustomButton("Install", positive=True, icon=media.asset_path("install_image")),
                     QFlatTooltipConfirm.CustomButton("Skip", positive=True, icon=media.asset_path("skip_image")),
@@ -368,7 +368,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 "Update available",
                 title=f"Version {latest_version.strip()} available",
                 message="A new version of TheKeyMachine is available to download and install.",
-                icon=media.asset_path("update_image"),
+                icon=media.asset_path("settings_update_image"),
                 buttons=[
                     QFlatConfirmDialog.CustomButton("Install", positive=True, icon=media.asset_path("install_image")),
                     QFlatConfirmDialog.CustomButton("Skip", positive=True, icon=media.asset_path("skip_image")),

@@ -67,7 +67,8 @@ def _resolve_toolbar_controller(controller=None):
         from TheKeyMachine.core.toolbar import get_toolbar
     except Exception:
         return None
-    return get_toolbar()
+    toolbar = get_toolbar()
+    return getattr(toolbar, "selection_sets_controller", toolbar)
 
 
 def _selection_sets_auto_transparency_enabled():

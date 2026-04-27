@@ -19,21 +19,20 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 # Maya related imports
 from maya import cmds, mel, OpenMayaUI as mui
-from maya.app.general.mayaMixin import MayaQWidgetDockableMixin # type: ignore
+from maya.app.general.mayaMixin import MayaQWidgetDockableMixin  # type: ignore
 
 try:
-    from PySide6 import QtWidgets, QtCore, QtGui # type: ignore
-    from shiboken6 import isValid # type: ignore
+    from PySide6 import QtWidgets, QtCore, QtGui  # type: ignore
+    from shiboken6 import isValid  # type: ignore
 except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui # type: ignore
-    from shiboken2 import isValid # type: ignore
+    from PySide2 import QtWidgets, QtCore, QtGui  # type: ignore
+    from shiboken2 import isValid  # type: ignore
 
 
 # Standard library imports
 import os
 import time
 import shutil
-import platform
 
 from functools import partial
 
@@ -76,7 +75,8 @@ import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
 import TheKeyMachine.tools.ibookmarks.api as iBookmarksApi  # type: ignore
 
-from TheKeyMachine.tools.selection_sets.controller import SelectionSetsControllerMixin  # type: ignore
+from TheKeyMachine.tools.link_objects.pulse_thread import LinkObjectPulseThread  # type: ignore
+from TheKeyMachine.tools.selection_sets.controller import SelectionSetsController  # type: ignore
 from TheKeyMachine.tools import colors as toolColors  # type: ignore
 
 from TheKeyMachine.core import selection_targets
@@ -88,26 +88,6 @@ from TheKeyMachine.widgets import util as wutil  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 
 from TheKeyMachine.tooltips import QFlatTooltipManager
-
-
-class LinkObjectImageThread(QtCore.QThread):
-    tick = QtCore.Signal()
-
-    def __init__(self, interval_seconds=0.3, parent=None):
-        super().__init__(parent)
-        self._interval_ms = max(1, int(float(interval_seconds) * 1000))
-        self._running = False
-
-    def run(self):
-        self._running = True
-        while self._running:
-            self.msleep(self._interval_ms)
-            if not self._running:
-                break
-            self.tick.emit()
-
-    def stop(self):
-        self._running = False
 
 
 mods = [
@@ -220,18 +200,20 @@ except ImportError:
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-WorkspaceName = "k"
+WORKSPACE_NAME = "k"
+WORKSPACE_CONTROL_NAME = WORKSPACE_NAME + "WorkspaceControl"
 
 
 UI_COLORS = toolColors.UI_COLORS
 
 
-class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.QDialog):
+class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setWindowTitle("TheKeyMachine")
-        self.setObjectName(WorkspaceName)
+        self.setObjectName(WORKSPACE_NAME)
         self.setContextMenuPolicy(QtCore.Qt.PreventContextMenu)
+        self.selection_sets_controller = SelectionSetsController(owner=self)
 
         self._runtime_manager = runtime.get_runtime_manager()
         report.install_bug_exception_handler()
@@ -270,9 +252,8 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
         self.setgroup_buttons = {}
 
         # Link object runtime states
-        self.link_obj_image_timer = False
         self.link_obj_toggle_state = False
-        self.link_obj_thread = None
+        self.link_obj_pulse_thread = None
 
         self.buildUI()
 
@@ -302,15 +283,14 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
 
         self.micro_move_controller.deactivate()
 
-        # Stop link objects image toggle thread
-        self.link_obj_image_timer = False
-        if hasattr(self, "link_obj_thread") and self.link_obj_thread:
+        # Stop link objects button pulse thread
+        if hasattr(self, "link_obj_pulse_thread") and self.link_obj_pulse_thread:
             try:
-                self.link_obj_thread.stop()
-                self.link_obj_thread.wait(500)
+                self.link_obj_pulse_thread.stop()
+                self.link_obj_pulse_thread.wait(500)
             except Exception:
                 pass
-            self.link_obj_thread = None
+            self.link_obj_pulse_thread = None
 
         # Cleanup painter
         if self.shelf_painter and isValid(self.shelf_painter):
@@ -327,6 +307,9 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
         if not isValid(self):
             return
         self.update_iBookmarks_menu()
+
+    def toggle_selection_sets_workspace(self, *args):
+        return self.selection_sets_controller.toggle_selection_sets_workspace(*args)
 
     def _on_graph_editor_opened(self, *_args):
         if not isValid(self):
@@ -354,14 +337,6 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
         # Show the window first to ensure parenting is established
         self.show(dockable=True, retain=False, **visible_change_kwargs)
 
-        # Now we can safely check for workspace names
-        try:
-            parent = self.parent()
-            workspace_control = parent.objectName() if parent and isValid(parent) else self.objectName() + "WorkspaceControl"
-        except (RuntimeError, AttributeError):
-            workspace_control = self.objectName() + "WorkspaceControl"
-
-        # Build up kwargs for the workspaceControl command
         kwargs = {
             "e": True,
             "visibleChangeCommand": self.visible_change_command,
@@ -372,20 +347,19 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
             kwargs["rsw"] = 900
             kwargs["rsh"] = 40
 
-        # Check if it was just created
-        if cmds.workspaceControl(workspace_control, q=True, exists=True):
+        if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
             try:
                 layout, orient = self.docking_position
                 if wutil.check_visible_layout(layout):
                     dock_to = self.get_dock_to_control_name(layout)
-                    cmds.workspaceControl(workspace_control, edit=True, dtc=(dock_to, orient))
+                    cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, dtc=(dock_to, orient))
 
-                cmds.workspaceControl(workspace_control, edit=True, tabPosition=["west", 0])
+                cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, tabPosition=["west", 0])
             except Exception:
                 pass
 
             # Update the workspace control with our kwargs (like visibleChangeCommand)
-            cmds.workspaceControl(workspace_control, **kwargs)
+            cmds.workspaceControl(WORKSPACE_CONTROL_NAME, **kwargs)
 
         # Force initial resize
         QtCore.QTimer.singleShot(200, self.shelf_tabbar)
@@ -410,15 +384,14 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
                 return
 
         if not self.isFloating():
-            workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
-            if cmds.workspaceControl(workspace_control, q=True, collapse=True):
+            if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, collapse=True):
                 timer = QtCore.QTimer(self)
                 timer.setSingleShot(True)
 
                 timer.timeout.connect(
                     partial(
                         cmds.workspaceControl,
-                        workspace_control,
+                        WORKSPACE_CONTROL_NAME,
                         e=True,
                         collapse=False,
                         tp=["west", 0],
@@ -448,8 +421,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
 
             self.shelf_painter = None
 
-        workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
-        qctrl = mui.MQtUtil.findControl(workspace_control)
+        qctrl = mui.MQtUtil.findControl(WORKSPACE_CONTROL_NAME)
         control = wutil.get_maya_qt(qctrl)
         tab_handle = control.parent().parent()
 
@@ -468,8 +440,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
 
     def update_height(self):
         if not self.isFloating():
-            workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
-            tkm_widget = mui.MQtUtil.findControl(workspace_control)
+            tkm_widget = mui.MQtUtil.findControl(WORKSPACE_CONTROL_NAME)
             if not tkm_widget:
                 return
             tkm_ui = wutil.get_maya_qt(tkm_widget, QtWidgets.QWidget)
@@ -529,8 +500,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
             settings.set_setting("docking_position", self.docking_position)
 
         # Make the workspaceControl call just once
-        workspace_control = self.parent().objectName() if self.parent() else self.objectName() + "WorkspaceControl"
-        cmds.workspaceControl(workspace_control, **kwargs)
+        cmds.workspaceControl(WORKSPACE_CONTROL_NAME, **kwargs)
 
     def _settings_toggle_specs(self):
         def _get_overshoot():
@@ -701,9 +671,8 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
 
         # Close and delete the UI
         try:
-            workspace_control = WorkspaceName + "WorkspaceControl"
-            if cmds.workspaceControl(workspace_control, q=True, exists=True):
-                cmds.deleteUI(workspace_control, control=True)
+            if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
+                cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
         except Exception:
             pass
 
@@ -755,9 +724,8 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
             pass
 
         try:
-            workspace_control = WorkspaceName + "WorkspaceControl"
-            if cmds.workspaceControl(workspace_control, q=True, exists=True):
-                cmds.deleteUI(workspace_control, control=True)
+            if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
+                cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
         except Exception:
             pass
 
@@ -805,49 +773,6 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
                 button_widget.setChecked(bool(current_state))
             finally:
                 button_widget.blockSignals(blocked)
-
-    def show_sys_info(self):
-        os_info = platform.system() + " " + platform.release()
-
-        tkm_stage = general.get_thekeymachine_version()
-        tkm_version = general.get_thekeymachine_version()
-
-        app = QtWidgets.QApplication.instance()
-        if not app:
-            app = QtWidgets.QApplication([])
-
-        try:
-            # PySide2
-            desktop = QtWidgets.QDesktopWidget()
-            screen_rect = desktop.screenGeometry()
-        except Exception:
-            # PySide6
-            screen = app.primaryScreen()
-            screen_rect = screen.geometry()
-        width, height = screen_rect.width(), screen_rect.height()
-
-        tkm_toolbar_width = cmds.workspaceControl(WorkspaceName, query=True, width=True)
-        toolbar_s = settings.get_setting("toolbar_size", 1580)
-        sobrante = tkm_toolbar_width - toolbar_s
-
-        # El margen que necesitamos meter en el separador de la izq es la mitad de lo que sobra
-        margen = sobrante / 2
-
-        print("_____________________ TKM sys info ______________________")
-        print("")
-        print(f"TKM version: {tkm_stage} v{tkm_version}")
-        print("Operating System: " + os_info)
-        print("Install path: " + INSTALL_PATH)
-        print("User folder path: " + USER_FOLDER_PATH)
-        print("User preference file: " + settings.get_preferences_file())
-        print("")
-        print(f"Screen resolution: {width}x{height}")
-        print(f"Toolbar size: {toolbar_s}")
-        print(f"Toolbar width: {tkm_toolbar_width}")
-        print(f"Toolbar sides: {sobrante}")
-        print(f"Toolbar push: {margen}")
-        print("")
-        print("_________________________________________________________")
 
     def _create_nudge_value_widget(self, sec, item_data):
         self.move_keyframes_intField = cw.QFlatSpinBox()
@@ -939,76 +864,64 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
         sec.addWidget(btn, data["label"], data["key"], default=item_data.get("default", True))
         return btn
 
-    def _create_overshoot_sliders_widget(self, sec, item_data):
-        return self._create_setting_toggle_widget(sec, item_data, "overshoot_sliders")
-
-    def _create_attribute_switcher_euler_filter_widget(self, sec, item_data):
-        return self._create_setting_toggle_widget(sec, item_data, "attribute_switcher_euler_filter")
-
     def _create_toolbar_widget_from_data(self, sec, item):
         widget_key = item.get("key") or item.get("id")
         factory_name = f"_create_{widget_key}_widget"
         if hasattr(self, factory_name):
             return getattr(self, factory_name)(sec, item)
+        else:
+            return self._create_setting_toggle_widget(sec, item, widget_key)
         return None
 
     def _add_group_items(self, sec, items):
-        group_tools = []
-
-        def flush_group_tools():
-            if group_tools:
-                sec.addWidgetGroup(list(group_tools))
-                group_tools[:] = []
+        group_tools = [item for item in items if not (isinstance(item, dict) and item.get("type") == "widget")]
+        if group_tools:
+            sec.addWidgetGroup(group_tools)
 
         for group_item in items:
             if isinstance(group_item, dict) and group_item.get("type") == "widget":
-                flush_group_tools()
                 self._create_toolbar_widget_from_data(sec, group_item)
-            else:
-                group_tools.append(group_item)
-
-        flush_group_tools()
 
     def _create_link_tools_group(self, sec, group_data):
         self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
         self.link_obj_toggle_state = False
         link_btn_placeholder = []
 
-        def toggle_link_obj_button_image(btn):
+        def pulse_link_obj_button(btn):
             if not isValid(self):
                 return
             self.link_obj_toggle_state = not self.link_obj_toggle_state
             new_image = media.link_objects_on_image if self.link_obj_toggle_state else media.link_objects_image
             btn.setIcon(QtGui.QIcon(new_image))
 
-        def start_link_obj_toggle_image_thread(btn):
-            if hasattr(self, "link_obj_thread") and self.link_obj_thread:
+        def start_link_obj_pulse(btn):
+            if hasattr(self, "link_obj_pulse_thread") and self.link_obj_pulse_thread:
                 try:
-                    self.link_obj_thread.stop()
-                    self.link_obj_thread.wait(500)
+                    self.link_obj_pulse_thread.stop()
+                    self.link_obj_pulse_thread.wait(500)
                 except Exception:
                     pass
-            self.link_obj_thread = LinkObjectImageThread(interval_seconds=0.3, parent=self)
-            self.link_obj_thread.tick.connect(partial(toggle_link_obj_button_image, btn))
-            self.link_obj_thread.start()
+            self.link_obj_pulse_thread = LinkObjectPulseThread(interval_seconds=0.3, parent=self)
+            self.link_obj_pulse_thread.tick.connect(partial(pulse_link_obj_button, btn))
+            self.link_obj_pulse_thread.start()
 
-        def stop_link_obj_toggle_image_thread():
-            if hasattr(self, "link_obj_thread") and self.link_obj_thread:
+        def stop_link_obj_pulse():
+            if hasattr(self, "link_obj_pulse_thread") and self.link_obj_pulse_thread:
                 try:
-                    self.link_obj_thread.stop()
-                    self.link_obj_thread.wait(500)
+                    self.link_obj_pulse_thread.stop()
+                    self.link_obj_pulse_thread.wait(500)
                 except Exception:
                     pass
-                self.link_obj_thread = None
+                self.link_obj_pulse_thread = None
 
         def toggle_auto_link_callback(state, btn):
             self.link_checkbox_state = state
             settings.set_setting("link_checkbox_state", self.link_checkbox_state)
             if self.link_checkbox_state:
-                start_link_obj_toggle_image_thread(btn)
+                start_link_obj_pulse(btn)
                 keyTools.add_link_obj_callbacks()
             else:
-                stop_link_obj_toggle_image_thread()
+                stop_link_obj_pulse()
                 keyTools.remove_link_obj_callbacks()
                 QtCore.QTimer.singleShot(800, lambda: btn.setIcon(QtGui.QIcon(media.link_objects_image)))
 
@@ -1024,7 +937,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
         if btn_group:
             link_btn_placeholder.append(btn_group)
             if self.link_checkbox_state:
-                start_link_obj_toggle_image_thread(btn_group)
+                start_link_obj_pulse(btn_group)
                 keyTools.add_link_obj_callbacks()
         return btn_group
 
@@ -1076,7 +989,7 @@ class toolbar(SelectionSetsControllerMixin, MayaQWidgetDockableMixin, QtWidgets.
                     if item.get("key") == "selection_sets":
                         ss_btn = cw.create_tool_button_from_data(item, callback=None)
                         sec.addWidget(ss_btn, item["label"], item["key"])
-                        ui.bind_selection_sets_toolbar_button(ss_btn, controller=self)
+                        ui.bind_selection_sets_toolbar_button(ss_btn, controller=self.selection_sets_controller)
                         continue
                     if item.get("key") == "attribute_switcher":
                         as_btn = cw.create_tool_button_from_data(item, callback=None)
@@ -1259,9 +1172,8 @@ def show():
 
     # Close existing UI robustly
     try:
-        workspace_control = WorkspaceName + "WorkspaceControl"
-        if cmds.workspaceControl(workspace_control, q=True, exists=True):
-            cmds.deleteUI(workspace_control, control=True)
+        if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
+            cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
     except Exception:
         pass
 
@@ -1279,14 +1191,13 @@ def show():
 def toggle():
     global _toolbar_instance
     try:
-        workspace_control = WorkspaceName + "WorkspaceControl"
-        if cmds.workspaceControl(workspace_control, query=True, exists=True):
-            vis_state = cmds.workspaceControl(workspace_control, query=True, visible=True)
+        if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True):
+            vis_state = cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, visible=True)
 
             if vis_state:
-                cmds.workspaceControl(workspace_control, edit=True, visible=False)
+                cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, visible=False)
             else:
-                cmds.workspaceControl(workspace_control, edit=True, restore=True)
+                cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
             return
     except Exception:
         pass

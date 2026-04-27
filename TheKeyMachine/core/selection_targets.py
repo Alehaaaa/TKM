@@ -238,7 +238,7 @@ def _resolve_slider_targets():
             "curves": _unique(legacy_graph_curves),
             "source": "graph_editor",
             "time_range": time_range,
-            "has_graph_keys": False,
+            "has_graph_keys": True,
         }
 
     plugs, source = _selected_object_attribute_plugs()

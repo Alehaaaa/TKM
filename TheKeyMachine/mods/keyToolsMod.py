@@ -20,16 +20,16 @@ Modified by: Alehaaaa / alehaaaa.github.io
 from maya import cmds, mel
 
 try:
-    import maya.OpenMaya as om # type: ignore
+    import maya.OpenMaya as om  # type: ignore
 except ImportError:
-    import maya.api.OpenMaya as om # type: ignore
+    import maya.api.OpenMaya as om  # type: ignore
 
 try:
-    from PySide6.QtGui import QRegularExpressionValidator # type: ignore
-    from PySide6.QtCore import QRegularExpression # type: ignore
+    from PySide6.QtGui import QRegularExpressionValidator  # type: ignore
+    from PySide6.QtCore import QRegularExpression  # type: ignore
 except ImportError:
-    from PySide2.QtGui import QRegExpValidator # type: ignore
-    from PySide2.QtCore import QRegExp # type: ignore
+    from PySide2.QtGui import QRegExpValidator  # type: ignore
+    from PySide2.QtCore import QRegExp  # type: ignore
 
     QRegularExpression = QRegExp
     QRegularExpressionValidator = QRegExpValidator
@@ -113,23 +113,23 @@ def get_working_time_context(default_mode="all_animation"):
     return timelineWidgets.resolve_time_context(default_mode=default_mode)
 
 
-def _begin_timeline_context_tint(default_mode, key, owner=None):
-    import TheKeyMachine.widgets.customWidgets as cw
+def _begin_timeline_context_tint(default_mode, key, owner=None, color=None):
+    import TheKeyMachine.mods.barMod as bar
 
     return timelineWidgets.begin_timeline_context(
         default_mode=default_mode,
-        color=cw.get_active_tool_tint_color(),
+        color=color or bar._active_tint_color(key),
         owner=owner,
         key=key,
     )
 
 
-def _begin_timeline_tint(timerange, key, owner=None):
-    import TheKeyMachine.widgets.customWidgets as cw
+def _begin_timeline_tint(timerange, key, owner=None, color=None):
+    import TheKeyMachine.mods.barMod as bar
 
     return timelineWidgets.begin_timeline_tint(
         timerange=timerange,
-        color=cw.get_active_tool_tint_color(),
+        color=color or bar._active_tint_color(key),
         owner=owner,
         key=key,
     )
@@ -674,6 +674,7 @@ def reblock_insert(*args):
 
 def bake_animation(bake_interval=1, window=None):
     bake_title, bake_tooltip = BAKE_UNDO_HELP.get(bake_interval, ("Bake Animation", helper.bake_animation_custom_tooltip_text))
+    tool_key = "bake_animation_{}".format(bake_interval) if bake_interval in BAKE_UNDO_HELP else "bake_animation_custom"
     toolCommon.open_undo_chunk(title=bake_title, tooltip_template=bake_tooltip)
     tint_session = None
 
@@ -689,7 +690,7 @@ def bake_animation(bake_interval=1, window=None):
         start_frame, end_frame = time_context.timerange
         tint_session = _begin_timeline_tint(
             timerange=time_context.timerange,
-            key="bake_animation_range",
+            key=tool_key,
             owner=window,
         )
 
@@ -1459,7 +1460,7 @@ def reset_object_values(reset_translations=False, reset_rotations=False, reset_s
 
         target_info = resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=True)
         time_context = target_info["time_context"]
-        tint_session = _begin_timeline_context_tint("current_frame", "reset_defaults_range")
+        tint_session = _begin_timeline_context_tint("current_frame", "reset_objects_mods")
 
         selected_objects = target_info["target_objects"]
         target_plugs = target_info["target_plugs"]
@@ -1721,7 +1722,7 @@ def addSelectOpposite(*args):
 
 
 def copyOpposite(*args):
-    toolCommon.open_undo_chunk(tool_id="copyOpposite")
+    toolCommon.open_undo_chunk(tool_id="opposite_copy")
 
     try:
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
@@ -2263,7 +2264,7 @@ def copy_animation(*args):
         if tint_range:
             tint_session = _begin_timeline_tint(
                 timerange=tint_range,
-                key="copy_animation_range",
+                key="copy_animation",
             )
 
         wutil.make_inViewMessage("Animation saved")
@@ -2312,7 +2313,7 @@ def paste_animation(*args):
         if paste_range:
             tint_session = _begin_timeline_tint(
                 timerange=paste_range,
-                key="paste_animation_range",
+                key="paste_animation",
             )
     finally:
         if tint_session:
@@ -2570,7 +2571,7 @@ def copy_pose(*args):
         return
 
     pose_data = {}
-    tint_session = _begin_timeline_context_tint("current_frame", "copy_pose_frame")
+    tint_session = _begin_timeline_context_tint("current_frame", "copy_pose")
 
     try:
         # Procesar cada objeto seleccionado
@@ -2653,7 +2654,7 @@ def paste_pose(*args):
         return
 
     json_file_path = general.get_copy_paste_pose_file()
-    tint_session = _begin_timeline_context_tint("current_frame", "paste_pose_frame")
+    tint_session = _begin_timeline_context_tint("current_frame", "paste_pose")
 
     try:
         # Aplicar pose a los objetos seleccionados
@@ -2670,31 +2671,35 @@ def paste_pose(*args):
 # MATCH CYCLE
 
 
-def match_curve_cycle(*args):
+def _copy_curve_key_state(curve, source_time, target_time):
+    source_value = cmds.keyframe(curve, time=(source_time, source_time), query=True, valueChange=True)[0]
+    source_in_tangent_type = cmds.keyTangent(curve, time=(source_time,), query=True, inTangentType=True)[0]
+    source_out_tangent_type = cmds.keyTangent(curve, time=(source_time,), query=True, outTangentType=True)[0]
+    source_in_angle = cmds.keyTangent(curve, time=(source_time,), query=True, inAngle=True)[0]
+    source_out_angle = cmds.keyTangent(curve, time=(source_time,), query=True, outAngle=True)[0]
+
+    cmds.keyframe(curve, time=(target_time, target_time), valueChange=source_value)
+    cmds.keyTangent(
+        curve,
+        time=(target_time,),
+        edit=True,
+        inTangentType=source_in_tangent_type,
+        outTangentType=source_out_tangent_type,
+    )
+    cmds.keyTangent(curve, time=(target_time,), edit=True, inAngle=source_in_angle, outAngle=source_out_angle)
+
+
+def match_curve_cycle(*args, target_key="last"):
     curveNames = getSelectedCurves()
 
     for curve in curveNames:
-        # Obtén el tiempo y valor del primer keyframe
         firstKeyTime = cmds.findKeyframe(curve, which="first")
-        firstKeyValue = cmds.keyframe(curve, time=(firstKeyTime, firstKeyTime), query=True, valueChange=True)[0]
-
-        # Obtén las propiedades de las tangentes del primer keyframe
-        firstInTangentType = cmds.keyTangent(curve, time=(firstKeyTime,), query=True, inTangentType=True)[0]
-        firstOutTangentType = cmds.keyTangent(curve, time=(firstKeyTime,), query=True, outTangentType=True)[0]
-        firstOutAngle = cmds.keyTangent(curve, time=(firstKeyTime,), query=True, outAngle=True)[0]
-        firstInAngle = cmds.keyTangent(curve, time=(firstKeyTime,), query=True, inAngle=True)[0]
-
-        # Obtén el tiempo del último keyframe
         lastKeyTime = cmds.findKeyframe(curve, which="last")
 
-        # Establece el valor del último keyframe igual al primer keyframe
-        cmds.keyframe(curve, time=(lastKeyTime, lastKeyTime), valueChange=firstKeyValue)
-
-        # Copia las propiedades de las tangentes del primer keyframe al último keyframe
-        cmds.keyTangent(curve, time=(lastKeyTime,), edit=True, inTangentType=firstInTangentType, outTangentType=firstOutTangentType)
-
-        # Ajusta los ángulos de las tangentes del último keyframe para que coincidan con los del primer keyframe
-        cmds.keyTangent(curve, time=(lastKeyTime,), edit=True, inAngle=firstInAngle, outAngle=firstOutAngle)
+        if target_key == "first":
+            _copy_curve_key_state(curve, lastKeyTime, firstKeyTime)
+        else:
+            _copy_curve_key_state(curve, firstKeyTime, lastKeyTime)
 
 
 # Bouncy Tangent tangets
@@ -2750,10 +2755,25 @@ def _collect_bouncy_target_curves(target_info):
     return curves
 
 
-def _collect_bouncy_target_keyframes(target_info):
+def _filter_bouncy_keyframes_by_scope(target_keyframes, key_scope):
+    if key_scope not in ("first", "last"):
+        return target_keyframes
+
+    frames = sorted({float(frame) for _curve, frame in target_keyframes})
+    if not frames:
+        return []
+
+    target_frame = frames[0] if key_scope == "first" else frames[-1]
+    return [(curve, frame) for curve, frame in target_keyframes if float(frame) == target_frame]
+
+
+def _collect_bouncy_target_keyframes(target_info, key_scope="selection"):
     selected_keyframes = target_info.get("selected_keyframes") or []
-    if selected_keyframes:
-        return [(curve, float(frame)) for curve, frame in selected_keyframes]
+    if selected_keyframes and key_scope != "all":
+        return _filter_bouncy_keyframes_by_scope(
+            [(curve, float(frame)) for curve, frame in selected_keyframes],
+            key_scope,
+        )
 
     time_context = target_info.get("time_context")
     curves = _collect_bouncy_target_curves(target_info)
@@ -2777,12 +2797,13 @@ def _collect_bouncy_target_keyframes(target_info):
             seen.add(item)
             targets.append(item)
 
-    return targets
+    return _filter_bouncy_keyframes_by_scope(targets, key_scope)
 
 
-def bouncy_tangets(*args, angle_adjustment_factor=1.3):  # Ajuste de ángulo
-    target_info = resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=False)
-    target_keyframes = _collect_bouncy_target_keyframes(target_info)
+def bouncy_tangets(*args, angle_adjustment_factor=1.3, handle_mode="both", key_scope="selection", tint_color=None):  # Ajuste de ángulo
+    default_mode = "all_animation" if key_scope == "all" else "current_frame"
+    target_info = resolve_tool_targets(default_mode=default_mode, ordered_selection=True, long_names=False)
+    target_keyframes = _collect_bouncy_target_keyframes(target_info, key_scope=key_scope)
 
     if not target_keyframes:
         return wutil.make_inViewMessage("No animation keys available for bouncy tangents.")
@@ -2794,7 +2815,7 @@ def bouncy_tangets(*args, angle_adjustment_factor=1.3):  # Ajuste de ángulo
     else:
         tint_range = time_context.timerange if time_context else None
 
-    tint_session = _begin_timeline_tint(tint_range, "bouncy_tangent_range") if tint_range else None
+    tint_session = _begin_timeline_tint(tint_range, "tangent_bouncy", color=tint_color) if tint_range else None
     try:
         for curve, time in target_keyframes:
             keyTimes = cmds.keyframe(curve, query=True, timeChange=True) or []
@@ -2827,15 +2848,18 @@ def bouncy_tangets(*args, angle_adjustment_factor=1.3):  # Ajuste de ángulo
             adjusted_in_angle = max(-85, min(85, inAngle * angle_adjustment_factor))
             adjusted_out_angle = max(-85, min(85, outAngle * angle_adjustment_factor))
 
-            cmds.keyTangent(
-                curve,
-                time=(time, time),
-                edit=True,
-                lock=False,
-                absolute=True,
-                inAngle=adjusted_in_angle,
-                outAngle=adjusted_out_angle,
-            )
+            tangent_kwargs = {
+                "time": (time, time),
+                "edit": True,
+                "lock": False,
+                "absolute": True,
+            }
+            if handle_mode in ("both", "in"):
+                tangent_kwargs["inAngle"] = adjusted_in_angle
+            if handle_mode in ("both", "out"):
+                tangent_kwargs["outAngle"] = adjusted_out_angle
+            if "inAngle" in tangent_kwargs or "outAngle" in tangent_kwargs:
+                cmds.keyTangent(curve, **tangent_kwargs)
     finally:
         if tint_session:
             tint_session.finish()

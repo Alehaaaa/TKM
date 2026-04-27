@@ -38,112 +38,81 @@ def _tool_menu_builder(builder_name, **preset_kwargs):
 TOOL_DEFINITIONS = {
     "toolbar_toggle": {
         "type": "tool",
-        "key": "toolbar_toggle",
-        "command": "toolbar_toggle",
         "label": "Toggle Toolbar",
         "icon_path": media.tool_icon,
     },
     "toolbar_add_shelf_button": {
         "type": "tool",
-        "key": "toolbar_add_shelf_button",
-        "command": "toolbar_add_shelf_button",
         "label": "Add Toggle Button To Shelf",
         "icon_path": media.asset_path("tool_icon"),
     },
     "toolbar_reload": {
         "type": "tool",
-        "key": "toolbar_reload",
-        "command": "toolbar_reload",
         "label": "Reload",
         "icon_path": media.reload_image,
     },
     "toolbar_unload": {
         "type": "tool",
-        "key": "toolbar_unload",
-        "command": "toolbar_unload",
         "label": "Unload",
         "icon_path": media.close_image,
     },
     "check_for_updates": {
         "type": "tool",
-        "key": "check_for_updates",
-        "command": "check_for_updates",
         "label": "Check for Updates",
         "icon_path": media.check_updates_image,
     },
     "orbit_window": {
         "type": "tool",
-        "key": "orbit_window",
-        "command": "orbit_window",
         "label": "Orbit Window",
         "icon_path": media.orbit_ui_image,
     },
     "hotkeys_window": {
         "type": "tool",
-        "key": "hotkeys_window",
-        "command": "hotkeys_window",
         "label": "Hotkeys",
         "icon_path": media.hotkeys_image,
     },
     "about_window": {
         "type": "tool",
-        "key": "about_window",
-        "command": "about_window",
         "label": "About",
         "icon_path": media.about_image,
     },
     "donate_window": {
         "type": "tool",
-        "key": "donate_window",
-        "command": "donate_window",
         "label": "Donate",
         "icon_path": media.stripe_image,
     },
     "bug_report_window": {
         "type": "tool",
-        "key": "bug_report_window",
-        "command": "bug_report_window",
         "label": "Bug Report",
         "icon_path": media.report_a_bug_image,
     },
     "smart_rotation": {
         "type": "tool",
-        "key": "smart_rotation",
-        "command": "smart_rotation",
         "label": "Smart Rotation",
         "icon_path": media.auto_tangent_image,
     },
     "smart_rotation_release": {
         "type": "tool",
-        "key": "smart_rotation_release",
-        "command": "smart_rotation_release",
         "label": "Smart Rotation Release",
         "icon_path": media.auto_tangent_image,
     },
     "smart_translation": {
         "type": "tool",
-        "key": "smart_translation",
-        "command": "smart_translation",
         "label": "Smart Translation",
         "icon_path": media.create_locator_image,
     },
     "smart_translation_release": {
         "type": "tool",
-        "key": "smart_translation_release",
-        "command": "smart_translation_release",
         "label": "Smart Translation Release",
         "icon_path": media.create_locator_image,
     },
     "depth_mover": {
         "type": "tool",
-        "key": "depth_mover",
-        "command": "depth_mover",
         "label": "Depth Mover",
         "icon_path": media.depth_mover_image,
     },
     "share_keys": {
         "type": "tool",
-        "key": "share_keys",
         "label": "Share Keys",
         "text": "sK",
         "icon_path": media.share_keys_image,
@@ -153,7 +122,6 @@ TOOL_DEFINITIONS = {
     },
     "reblock": {
         "type": "tool",
-        "key": "reblock",
         "label": "reBlock",
         "text": "rB",
         "icon_path": media.reblock_keys_image,
@@ -163,7 +131,6 @@ TOOL_DEFINITIONS = {
     },
     "bake_animation_custom": {
         "type": "tool",
-        "key": "bake_animation_custom",
         "label": "Bake Custom Interval",
         "text": "BA",
         "icon_path": media.bake_animation_custom_image,
@@ -172,7 +139,6 @@ TOOL_DEFINITIONS = {
     },
     "bake_animation_1": {
         "type": "tool",
-        "key": "bake_animation_1",
         "label": "Bake on Ones",
         "text": "BA",
         "icon_path": media.bake_animation_1_image,
@@ -181,7 +147,6 @@ TOOL_DEFINITIONS = {
     },
     "bake_animation_2": {
         "type": "tool",
-        "key": "bake_animation_2",
         "label": "Bake on Twos",
         "text": "BA",
         "icon_path": media.bake_animation_2_image,
@@ -190,7 +155,6 @@ TOOL_DEFINITIONS = {
     },
     "bake_animation_3": {
         "type": "tool",
-        "key": "bake_animation_3",
         "label": "Bake on Threes",
         "text": "BA",
         "icon_path": media.bake_animation_3_image,
@@ -199,7 +163,6 @@ TOOL_DEFINITIONS = {
     },
     "bake_animation_4": {
         "type": "tool",
-        "key": "bake_animation_4",
         "label": "Bake on Fours",
         "text": "BA",
         "icon_path": media.bake_animation_3_image,
@@ -208,7 +171,6 @@ TOOL_DEFINITIONS = {
     },
     "orbit": {
         "type": "check",
-        "key": "orbit",
         "label": "Orbit",
         "text": "Orb",
         "icon_path": media.orbit_ui_image,
@@ -217,7 +179,6 @@ TOOL_DEFINITIONS = {
     },
     "attribute_switcher": {
         "type": "check",
-        "key": "attribute_switcher",
         "label": "Attribute Switcher",
         "text": "SSw",
         "icon_path": media.attribute_switcher_image,
@@ -226,7 +187,6 @@ TOOL_DEFINITIONS = {
     },
     "gimbal": {
         "type": "tool",
-        "key": "gimbal",
         "label": "Gimbal Fixer",
         "text": "Gim",
         "icon_path": media.reblock_keys_image,
@@ -235,7 +195,6 @@ TOOL_DEFINITIONS = {
     },
     "worldspace": {
         "type": "tool",
-        "key": "worldspace",
         "label": "World Space",
         "text": "WS",
         "icon_path": media.worldspace_copy_animation_image,
@@ -244,7 +203,6 @@ TOOL_DEFINITIONS = {
     },
     "temp_pivot": {
         "type": "tool",
-        "key": "temp_pivot",
         "label": "Temp Pivot",
         "text": "TP",
         "icon_path": media.temp_pivot_image,
@@ -253,7 +211,6 @@ TOOL_DEFINITIONS = {
     },
     "micro_move": {
         "type": "check",
-        "key": "micro_move",
         "label": "Micro Move",
         "text": "MM",
         "icon_path": media.ruler_image,
@@ -262,17 +219,14 @@ TOOL_DEFINITIONS = {
     },
     "isolate_down_level": {
         "type": "widget",
-        "key": "isolate_down_level",
         "label": "Down one level",
     },
     "tracer_connected": {
         "type": "widget",
-        "key": "tracer_connected",
         "label": "Connected",
     },
     "link_autolink": {
         "type": "check",
-        "key": "link_autolink",
         "label": "Auto-link",
         "icon_path": media.link_objects_image,
         "checkable": True,
@@ -280,7 +234,6 @@ TOOL_DEFINITIONS = {
     },
     "overshoot_sliders": {
         "type": "check",
-        "key": "overshoot_sliders",
         "label": "Overshoot Sliders",
         "text": "OS",
         "icon_path": media.sliders_overshoot_image,
@@ -288,7 +241,6 @@ TOOL_DEFINITIONS = {
     },
     "attribute_switcher_euler_filter": {
         "type": "check",
-        "key": "attribute_switcher_euler_filter",
         "label": "Auto Euler Filter",
         "text": "EF",
         "icon_path": media.euler_filter_image,
@@ -296,7 +248,6 @@ TOOL_DEFINITIONS = {
     },
     "nudge_left": {
         "type": "tool",
-        "key": "nudge_left",
         "label": "Nudge Left",
         "icon_path": media.nudge_left_image,
         "callback": trigger.make_command_callback("nudge_left"),
@@ -305,7 +256,6 @@ TOOL_DEFINITIONS = {
     },
     "nudge_right": {
         "type": "tool",
-        "key": "nudge_right",
         "label": "Nudge Right",
         "icon_path": media.nudge_right_image,
         "callback": trigger.make_command_callback("nudge_right"),
@@ -314,7 +264,6 @@ TOOL_DEFINITIONS = {
     },
     "nudge_remove_inbetween": {
         "type": "tool",
-        "key": "nudge_remove_inbetween",
         "label": "Remove Inbetween",
         "icon_path": media.remove_inbetween_image,
         "callback": trigger.make_command_callback("nudge_remove_inbetween"),
@@ -323,7 +272,6 @@ TOOL_DEFINITIONS = {
     },
     "nudge_insert_inbetween": {
         "type": "tool",
-        "key": "nudge_insert_inbetween",
         "label": "Insert Inbetween",
         "icon_path": media.insert_inbetween_image,
         "callback": trigger.make_command_callback("nudge_insert_inbetween"),
@@ -332,14 +280,12 @@ TOOL_DEFINITIONS = {
     },
     "nudge_value": {
         "type": "widget",
-        "key": "nudge_value",
         "label": "Nudge Value",
         "tooltip_template": helper.move_keyframes_intField_widget_tooltip_text,
         "default": True,
     },
     "clear_selected_keys": {
         "type": "tool",
-        "key": "clear_selected_keys",
         "label": "Clear Selection",
         "text": "x",
         "callback": trigger.make_command_callback("clear_selected_keys", keyTools.clear_selected_keys),
@@ -347,15 +293,13 @@ TOOL_DEFINITIONS = {
     },
     "select_scene_animation": {
         "type": "tool",
-        "key": "select_scene_animation",
         "label": "Select Scene Anim",
         "text": "s",
-        "callback": trigger.make_command_callback("select_all_animation_curves", keyTools.select_all_animation_curves),
+        "callback": keyTools.select_all_animation_curves,
         "tooltip_template": helper.select_scene_animation_widget_tooltip_text,
     },
     "delete_static_animation": {
         "type": "tool",
-        "key": "delete_static_animation",
         "label": "Delete Static Keys",
         "text": "S",
         "icon_path": media.delete_animation_image,
@@ -365,7 +309,6 @@ TOOL_DEFINITIONS = {
     },
     "match": {
         "type": "tool",
-        "key": "match",
         "label": "Match",
         "text": "M",
         "icon_path": media.match_image,
@@ -375,7 +318,6 @@ TOOL_DEFINITIONS = {
     },
     "flip": {
         "type": "tool",
-        "key": "flip",
         "label": "Flip",
         "text": "F",
         "tooltip_template": helper.flip_tooltip_text,
@@ -384,7 +326,6 @@ TOOL_DEFINITIONS = {
     },
     "snap": {
         "type": "tool",
-        "key": "snap",
         "label": "Snap",
         "text": "Sn",
         "tooltip_template": helper.snap_tooltip_text,
@@ -393,7 +334,6 @@ TOOL_DEFINITIONS = {
     },
     "overlap": {
         "type": "tool",
-        "key": "overlap",
         "label": "Overlap",
         "text": "O",
         "tooltip_template": helper.overlap_tooltip_text,
@@ -402,7 +342,6 @@ TOOL_DEFINITIONS = {
     },
     "isolate_master": {
         "type": "tool",
-        "key": "isolate_master",
         "label": "Isolate",
         "icon_path": media.isolate_image,
         "callback": bar.isolate_master,
@@ -410,7 +349,6 @@ TOOL_DEFINITIONS = {
     },
     "align_selected_objects": {
         "type": "tool",
-        "key": "align_selected_objects",
         "label": "Align",
         "icon_path": media.match_image,
         "callback": bar.align_selected_objects,
@@ -418,7 +356,6 @@ TOOL_DEFINITIONS = {
     },
     "create_tracer": {
         "type": "tool",
-        "key": "create_tracer",
         "label": "Tracer",
         "icon_path": media.tracer_image,
         "callback": bar.create_tracer,
@@ -426,7 +363,6 @@ TOOL_DEFINITIONS = {
     },
     "reset_objects_mods": {
         "type": "tool",
-        "key": "reset_objects_mods",
         "label": "Reset Values",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": keyTools.reset_objects_mods,
@@ -434,16 +370,13 @@ TOOL_DEFINITIONS = {
     },
     "delete_all_animation": {
         "type": "tool",
-        "key": "delete_all_animation",
         "label": "Delete All Animation",
-        "command": "delete_all_animation",
         "icon_path": media.delete_animation_image,
         "callback": bar.mod_delete_animation,
         "tooltip_template": helper.delete_animation_tooltip_text,
     },
     "select_rig_controls": {
         "type": "tool",
-        "key": "select_rig_controls",
         "label": "Select Rig Controls",
         "icon_path": media.select_rig_controls_image,
         "callback": bar.select_rig_controls,
@@ -454,7 +387,6 @@ TOOL_DEFINITIONS = {
     },
     "select_rig_controls_animated": {
         "type": "tool",
-        "key": "select_rig_controls_animated",
         "label": "Select Animated Rig Controls",
         "icon_path": media.select_rig_controls_animated_image,
         "tooltip_template": helper.select_rig_controls_animated_tooltip_text,
@@ -465,23 +397,13 @@ TOOL_DEFINITIONS = {
     },
     "select_opposite": {
         "type": "tool",
-        "key": "select_opposite",
         "label": "Select Opposite",
         "icon_path": media.opposite_select_image,
         "callback": keyTools.selectOpposite,
         "tooltip_template": helper.opposite_select_tooltip_text,
     },
-    "copy_opposite": {
-        "type": "tool",
-        "key": "copy_opposite",
-        "label": "Copy Opposite",
-        "icon_path": media.opposite_copy_image,
-        "callback": keyTools.copyOpposite,
-        "tooltip_template": helper.opposite_copy_tooltip_text,
-    },
     "selection_sets": {
         "type": "check",
-        "key": "selection_sets",
         "label": "Selection Sets",
         "text": "SS",
         "icon_path": media.selection_sets_image,
@@ -490,7 +412,6 @@ TOOL_DEFINITIONS = {
     },
     "selection_sets_quick_export": {
         "type": "tool",
-        "key": "selection_sets_quick_export",
         "label": "Quick Export",
         "text": "QEx",
         "icon_path": media.selection_sets_export_image,
@@ -500,7 +421,6 @@ TOOL_DEFINITIONS = {
     },
     "selection_sets_quick_import": {
         "type": "tool",
-        "key": "selection_sets_quick_import",
         "label": "Quick Import",
         "text": "QIm",
         "icon_path": media.selection_sets_import_image,
@@ -510,7 +430,6 @@ TOOL_DEFINITIONS = {
     },
     "selection_sets_export": {
         "type": "tool",
-        "key": "selection_sets_export",
         "label": "Export",
         "text": "Ex",
         "icon_path": media.selection_sets_export_image,
@@ -520,7 +439,6 @@ TOOL_DEFINITIONS = {
     },
     "selection_sets_import": {
         "type": "tool",
-        "key": "selection_sets_import",
         "label": "Import",
         "text": "Im",
         "icon_path": media.selection_sets_import_image,
@@ -530,7 +448,6 @@ TOOL_DEFINITIONS = {
     },
     "selection_sets_clear_all": {
         "type": "tool",
-        "key": "selection_sets_clear_all",
         "label": "Clear All Select Sets",
         "text": "Clr",
         "icon_path": media.trash_image,
@@ -540,7 +457,6 @@ TOOL_DEFINITIONS = {
     },
     "custom_graph": {
         "type": "check",
-        "key": "custom_graph",
         "label": "Graph Editor Toolbar",
         "text": "GE",
         "icon_path": media.customGraph_image,
@@ -549,24 +465,14 @@ TOOL_DEFINITIONS = {
     },
     "extra_graph_tools": {
         "type": "menu",
-        "key": "extra_graph_tools",
         "label": "Extra Tools",
         "text": "E",
         "menu_setup_fn": _tool_menu_builder("build_extra_graph_tools_menu"),
         "tooltip_template": helper.extra_tools_tooltip_text,
         "description": "Open extra graph tools.",
     },
-    # "extra_tools": {
-    #     "key": "extra",
-    #     "label": "Extra Tools",
-    #     "text": "E",
-    #     "tooltip_template": helper.extra_tools_tooltip_text,
-    #     "description": "Additional curve utilities.",
-    #     "callback": lambda: keyTools.snapKeyframes(),
-    # },
     "select_hierarchy": {
         "type": "tool",
-        "key": "select_hierarchy",
         "label": "Select Hierarchy",
         "icon_path": media.select_hierarchy_image,
         "callback": bar.selectHierarchy,
@@ -574,7 +480,6 @@ TOOL_DEFINITIONS = {
     },
     "selector": {
         "type": "tool",
-        "key": "selector",
         "label": "Selector",
         "icon_path": media.selector_image,
         "callback": bar.selector_window,
@@ -583,7 +488,6 @@ TOOL_DEFINITIONS = {
     },
     "create_locator": {
         "type": "tool",
-        "key": "create_locator",
         "label": "Create Locator",
         "icon_path": media.create_locator_image,
         "callback": bar.createLocator,
@@ -591,28 +495,24 @@ TOOL_DEFINITIONS = {
     },
     "locator_select_temp": {
         "type": "tool",
-        "key": "locator_select_temp",
         "label": "Select Temp Locators",
         "icon_path": media.create_locator_image,
         "callback": bar.selectTempLocators,
     },
     "locator_remove_temp": {
         "type": "tool",
-        "key": "locator_remove_temp",
         "label": "Remove Temp Locators",
         "icon_path": media.create_locator_image,
         "callback": bar.deleteTempLocators,
     },
     "isolate_bookmarks": {
         "type": "tool",
-        "key": "isolate_bookmarks",
         "label": "Bookmarks",
         "icon_path": media.ibookmarks_menu_image,
         "callback": iBookmarksApi.create_ibookmarks_window,
     },
     "isolate_help": {
         "type": "tool",
-        "key": "isolate_help",
         "label": "Help",
         "icon_path": media.help_menu_image,
         "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/isolate"),
@@ -620,7 +520,6 @@ TOOL_DEFINITIONS = {
     },
     "align_help": {
         "type": "tool",
-        "key": "align_help",
         "label": "Help",
         "icon_path": media.help_menu_image,
         "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/match-align"),
@@ -628,7 +527,6 @@ TOOL_DEFINITIONS = {
     },
     "copy_pose": {
         "type": "tool",
-        "key": "copy_pose",
         "label": "Copy Pose",
         "icon_path": media.copy_pose_image,
         "callback": keyTools.copy_pose,
@@ -636,7 +534,6 @@ TOOL_DEFINITIONS = {
     },
     "paste_pose": {
         "type": "tool",
-        "key": "paste_pose",
         "label": "Paste Pose",
         "icon_path": media.paste_pose_image,
         "callback": keyTools.paste_pose,
@@ -644,7 +541,6 @@ TOOL_DEFINITIONS = {
     },
     "copy_animation": {
         "type": "tool",
-        "key": "copy_animation",
         "label": "Copy Animation",
         "icon_path": media.copy_animation_image,
         "callback": keyTools.copy_animation,
@@ -654,7 +550,6 @@ TOOL_DEFINITIONS = {
     },
     "paste_animation": {
         "type": "tool",
-        "key": "paste_animation",
         "label": "Paste Animation",
         "icon_path": media.paste_animation_image,
         "callback": keyTools.paste_animation,
@@ -662,7 +557,6 @@ TOOL_DEFINITIONS = {
     },
     "paste_insert_animation": {
         "type": "tool",
-        "key": "paste_insert_animation",
         "label": "Paste Insert Animation",
         "icon_path": media.paste_insert_animation_image,
         "callback": keyTools.paste_insert_animation,
@@ -670,7 +564,6 @@ TOOL_DEFINITIONS = {
     },
     "follow_cam": {
         "type": "tool",
-        "key": "follow_cam",
         "label": "Follow Cam",
         "icon_path": media.follow_cam_image,
         "callback": lambda *args: bar.create_follow_cam(translation=True, rotation=True),
@@ -678,7 +571,6 @@ TOOL_DEFINITIONS = {
     },
     "animation_offset": {
         "type": "check",
-        "key": "animation_offset",
         "label": "Anim Offset",
         "icon_path": media.animation_offset_image,
         "callback": trigger.make_command_callback("animation_offset"),
@@ -686,8 +578,6 @@ TOOL_DEFINITIONS = {
     },
     "ws_copy_frame": {
         "type": "tool",
-        "key": "ws_copy_frame",
-        "command": "ws_copy_frame",
         "label": "Copy World Space",
         "icon_path": media.worldspace_copy_frame_image,
         "callback": bar.copy_worldspace_single_frame,
@@ -695,105 +585,90 @@ TOOL_DEFINITIONS = {
     },
     "align_translation": {
         "type": "tool",
-        "key": "align_translation",
         "label": "Translation",
         "icon_path": media.align_menu_image,
         "callback": partial(bar.align_selected_objects, pos=True, rot=False, scl=False),
     },
     "align_rotation": {
         "type": "tool",
-        "key": "align_rotation",
         "label": "Rotation",
         "icon_path": media.align_menu_image,
         "callback": partial(bar.align_selected_objects, pos=False, rot=True, scl=False),
     },
     "align_scale": {
         "type": "tool",
-        "key": "align_scale",
         "label": "Scale",
         "icon_path": media.align_menu_image,
         "callback": partial(bar.align_selected_objects, pos=False, rot=False, scl=True),
     },
     "align_range": {
         "type": "tool",
-        "key": "align_range",
         "label": "Match Range",
         "icon_path": media.match_image,
         "callback": bar.align_range,
     },
     "tracer_refresh": {
         "type": "tool",
-        "key": "tracer_refresh",
         "label": "Refresh Tracer",
         "icon_path": media.refresh_image,
         "callback": bar.tracer_refresh,
     },
     "tracer_show_hide": {
         "type": "tool",
-        "key": "tracer_show_hide",
         "label": "Toggle Tracer",
         "icon_path": media.tracer_show_hide_image,
         "callback": bar.tracer_show_hide,
     },
     "tracer_offset_node": {
         "type": "tool",
-        "key": "tracer_offset_node",
         "label": "Select Offset Object",
         "icon_path": media.tracer_select_offset_image,
         "callback": bar.select_tracer_offset_node,
     },
     "tracer_grey": {
         "type": "tool",
-        "key": "tracer_grey",
         "label": "Tracer Style: Grey",
         "icon_path": media.tracer_grey_image,
         "callback": bar.set_tracer_grey_color,
     },
     "tracer_red": {
         "type": "tool",
-        "key": "tracer_red",
         "label": "Tracer Style: Red",
         "icon_path": media.tracer_red_image,
         "callback": bar.set_tracer_red_color,
     },
     "tracer_blue": {
         "type": "tool",
-        "key": "tracer_blue",
         "label": "Tracer Style: Blue",
         "icon_path": media.tracer_blue_image,
         "callback": bar.set_tracer_blue_color,
     },
     "tracer_remove": {
         "type": "tool",
-        "key": "tracer_remove",
         "label": "Remove Tracer",
         "icon_path": media.remove_image,
         "callback": bar.remove_tracer_node,
     },
     "reset_set_defaults": {
         "type": "tool",
-        "key": "reset_set_defaults",
         "label": "Set Default Values For Selected",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": keyTools.save_default_values,
     },
     "reset_restore_defaults": {
         "type": "tool",
-        "key": "reset_restore_defaults",
         "label": "Restore Default Values For Selected",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": keyTools.remove_default_values_for_selected_object,
     },
     "reset_clear_all": {
         "type": "tool",
-        "key": "reset_clear_all",
         "label": "Clear All Saved Data",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": keyTools.restore_default_data,
     },
     "reset_help": {
         "type": "tool",
-        "key": "reset_help",
         "label": "Help",
         "icon_path": media.help_menu_image,
         "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/reset-to-default"),
@@ -801,7 +676,6 @@ TOOL_DEFINITIONS = {
     },
     "mirror": {
         "type": "tool",
-        "key": "mirror",
         "label": "Mirror",
         "icon_path": media.mirror_image,
         "callback": keyTools.mirror,
@@ -809,28 +683,24 @@ TOOL_DEFINITIONS = {
     },
     "mirror_add_invert": {
         "type": "tool",
-        "key": "mirror_add_invert",
         "label": "Add Exception Invert",
         "icon_path": media.mirror_image,
         "callback": keyTools.add_mirror_invert_exception,
     },
     "mirror_add_keep": {
         "type": "tool",
-        "key": "mirror_add_keep",
         "label": "Add Exception Keep",
         "icon_path": media.mirror_image,
         "callback": keyTools.add_mirror_keep_exception,
     },
     "mirror_remove_exc": {
         "type": "tool",
-        "key": "mirror_remove_exc",
         "label": "Remove Exception",
         "icon_path": media.mirror_image,
         "callback": keyTools.remove_mirror_invert_exception,
     },
     "mirror_help": {
         "type": "tool",
-        "key": "mirror_help",
         "label": "Help",
         "icon_path": media.help_menu_image,
         "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/mirror"),
@@ -838,7 +708,6 @@ TOOL_DEFINITIONS = {
     },
     "opposite_add": {
         "type": "tool",
-        "key": "opposite_add",
         "label": "Add Opposite",
         "icon_path": media.opposite_add_image,
         "callback": keyTools.addSelectOpposite,
@@ -846,7 +715,6 @@ TOOL_DEFINITIONS = {
     },
     "opposite_copy": {
         "type": "tool",
-        "key": "opposite_copy",
         "label": "Copy Opposite",
         "icon_path": media.opposite_copy_image,
         "callback": keyTools.copyOpposite,
@@ -854,7 +722,6 @@ TOOL_DEFINITIONS = {
     },
     "pose_help": {
         "type": "tool",
-        "key": "pose_help",
         "label": "Help",
         "icon_path": media.help_menu_image,
         "callback": lambda: general.open_url(
@@ -864,21 +731,18 @@ TOOL_DEFINITIONS = {
     },
     "paste_opposite_animation": {
         "type": "tool",
-        "key": "paste_opposite_animation",
         "label": "Paste Opposite",
         "icon_path": media.paste_opposite_animation_image,
         "callback": keyTools.paste_opposite_animation,
     },
     "paste_animation_to": {
         "type": "tool",
-        "key": "paste_animation_to",
         "label": "Paste To",
         "icon_path": media.paste_animation_image,
         "callback": keyTools.paste_animation_to,
     },
     "copy_animation_help": {
         "type": "tool",
-        "key": "copy_animation_help",
         "label": "Help",
         "icon_path": media.help_menu_image,
         "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-paste-animation"),
@@ -886,14 +750,12 @@ TOOL_DEFINITIONS = {
     },
     "temp_pivot_last": {
         "type": "tool",
-        "key": "temp_pivot_last",
         "label": "Use Last Pivot",
         "icon_path": media.temp_pivot_use_last_image,
         "callback": lambda: bar.create_temp_pivot(True),
     },
     "temp_pivot_help": {
         "type": "tool",
-        "key": "temp_pivot_help",
         "label": "Help",
         "icon_path": media.help_menu_image,
         "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/temp-pivots"),
@@ -901,28 +763,24 @@ TOOL_DEFINITIONS = {
     },
     "fcam_trans_only": {
         "type": "tool",
-        "key": "fcam_trans_only",
         "label": "Follow only Translation",
         "icon_path": media.follow_cam_image,
         "callback": lambda: bar.create_follow_cam(translation=True, rotation=False),
     },
     "fcam_rot_only": {
         "type": "tool",
-        "key": "fcam_rot_only",
         "label": "Follow only Rotation",
         "icon_path": media.follow_cam_image,
         "callback": lambda: bar.create_follow_cam(translation=False, rotation=True),
     },
     "fcam_remove": {
         "type": "tool",
-        "key": "fcam_remove",
         "label": "Remove Follow Cam",
         "icon_path": media.remove_image,
         "callback": bar.remove_followCam,
     },
     "link_copy": {
         "type": "tool",
-        "key": "link_copy",
         "label": "Copy Link Position",
         "icon_path": media.link_objects_copy_image,
         "callback": keyTools.copy_link,
@@ -930,7 +788,6 @@ TOOL_DEFINITIONS = {
     },
     "link_paste": {
         "type": "tool",
-        "key": "link_paste",
         "label": "Paste Link Position",
         "icon_path": media.link_objects_paste_image,
         "callback": keyTools.paste_link,
@@ -938,7 +795,6 @@ TOOL_DEFINITIONS = {
     },
     "link_help": {
         "type": "tool",
-        "key": "link_help",
         "label": "Help",
         "icon_path": media.help_menu_image,
         "callback": lambda: general.open_url("https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/link-objects"),
@@ -946,8 +802,6 @@ TOOL_DEFINITIONS = {
     },
     "ws_copy_range": {
         "type": "tool",
-        "key": "ws_copy_range",
-        "command": "ws_copy_range",
         "label": "Copy World Space - Selected Range",
         "icon_path": media.worldspace_copy_animation_image,
         "callback": bar.copy_range_worldspace_animation,
@@ -955,8 +809,6 @@ TOOL_DEFINITIONS = {
     },
     "ws_paste_frame": {
         "type": "tool",
-        "key": "ws_paste_frame",
-        "command": "ws_paste_frame",
         "label": "Paste World Space",
         "icon_path": media.worldspace_paste_frame_image,
         "callback": bar.paste_worldspace_single_frame,
@@ -964,8 +816,6 @@ TOOL_DEFINITIONS = {
     },
     "ws_paste": {
         "type": "tool",
-        "key": "ws_paste",
-        "command": "ws_paste",
         "label": "Paste World Space - All Animation",
         "icon_path": media.worldspace_paste_animation_image,
         "callback": bar.color_worldspace_paste_animation,
@@ -973,7 +823,6 @@ TOOL_DEFINITIONS = {
     },
     "worldspace_help": {
         "type": "tool",
-        "key": "worldspace_help",
         "label": "Help",
         "description": "World Space tools.",
         "icon_path": media.help_menu_image,
@@ -984,8 +833,6 @@ TOOL_DEFINITIONS = {
     },
     "custom_tools": {
         "type": "menu",
-        "key": "custom_tools",
-        "command": "custom_tools",
         "label": "Custom Tools",
         "icon_path": media.custom_tools_image,
         "callback": trigger.make_command_callback("custom_tools"),
@@ -994,8 +841,6 @@ TOOL_DEFINITIONS = {
     },
     "custom_scripts": {
         "type": "menu",
-        "key": "custom_scripts",
-        "command": "custom_scripts",
         "label": "Custom Scripts",
         "icon_path": media.custom_scripts_image,
         "callback": trigger.make_command_callback("custom_scripts"),
@@ -1004,14 +849,12 @@ TOOL_DEFINITIONS = {
     },
     "settings": {
         "type": "menu",
-        "key": "settings",
         "label": "Settings",
         "icon_path": media.settings_image,
         "description": "Access global preferences, check for updates, and view credits.",
     },
     "graph_isolate_curves": {
         "type": "tool",
-        "key": "graph_isolate_curves",
         "label": "Isolate",
         "icon_path": media.isolate_image,
         "callback": keyTools.isolateCurve,
@@ -1020,7 +863,6 @@ TOOL_DEFINITIONS = {
     },
     "graph_toggle_mute": {
         "type": "tool",
-        "key": "graph_toggle_mute",
         "label": "Mute",
         "text": "Mt",
         "callback": keyTools.toggleMute,
@@ -1029,7 +871,6 @@ TOOL_DEFINITIONS = {
     },
     "graph_toggle_lock": {
         "type": "tool",
-        "key": "graph_toggle_lock",
         "label": "Lock",
         "text": "Lk",
         "callback": keyTools.toggleLock,
@@ -1038,7 +879,6 @@ TOOL_DEFINITIONS = {
     },
     "graph_filter": {
         "type": "tool",
-        "key": "graph_filter",
         "label": "Filter",
         "text": "Fi",
         "callback": ui.customGraph_filter_mods,
@@ -1047,10 +887,8 @@ TOOL_DEFINITIONS = {
     },
     "reset_translations": {
         "type": "tool",
-        "key": "reset_translations",
         "label": "Reset Translations",
         "text": "RT",
-        "command": "reset_translations",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": lambda: keyTools.reset_object_values(reset_translations=True),
         "tooltip_template": helper.reset_translations_tooltip_text,
@@ -1058,10 +896,8 @@ TOOL_DEFINITIONS = {
     },
     "reset_rotations": {
         "type": "tool",
-        "key": "reset_rotations",
         "label": "Reset Rotations",
         "text": "RR",
-        "command": "reset_rotations",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": lambda: keyTools.reset_object_values(reset_rotations=True),
         "tooltip_template": helper.reset_rotations_tooltip_text,
@@ -1069,10 +905,8 @@ TOOL_DEFINITIONS = {
     },
     "reset_scales": {
         "type": "tool",
-        "key": "reset_scales",
         "label": "Reset Scales",
         "text": "RS",
-        "command": "reset_scales",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": lambda: keyTools.reset_object_values(reset_scales=True),
         "tooltip_template": helper.reset_scales_tooltip_text,
@@ -1080,10 +914,8 @@ TOOL_DEFINITIONS = {
     },
     "reset_trs": {
         "type": "tool",
-        "key": "reset_trs",
         "label": "Reset Translation Rotation Scale",
         "text": "RTRS",
-        "command": "reset_trs",
         "icon_path": media.asset_path("reset_animation_image"),
         "callback": lambda: keyTools.reset_object_values(
             reset_translations=True,
@@ -1095,111 +927,134 @@ TOOL_DEFINITIONS = {
     },
     "tangent_cycle_matcher": {
         "type": "tool",
-        "key": "tangent_cycle_matcher",
         "label": "Cycle Matcher",
         "text": "CM",
         "icon_path": media.asset_path("match_curve_cycle_image"),
         "callback": keyTools.match_curve_cycle,
+        "menu_setup_fn": _tool_menu_builder("build_cycle_matcher_menu", icon_path=media.asset_path("match_curve_cycle_image")),
         "tooltip_template": helper.tangent_cycle_matcher_tooltip_text,
         "description": "Curve cycle matcher.",
     },
     "tangent_bouncy": {
         "type": "tool",
-        "key": "tangent_bouncy",
         "label": "Bouncy Tangent",
         "text": "BO",
         "icon_path": media.bouncy_tangent_image,
         "callback": keyTools.bouncy_tangets,
+        "menu_setup_fn": _tool_menu_builder(
+            "build_tangent_menu", tangent_type="bouncy", tangent_label="Bouncy Tangent", icon_path=media.bouncy_tangent_image
+        ),
         "tooltip_template": helper.tangent_bouncy_tooltip_text,
         "description": "Set bouncy tangents.",
     },
     "tangent_auto": {
         "type": "tool",
-        "key": "tangent_auto",
         "label": "Auto Tangent",
         "text": "AU",
         "icon_path": media.auto_tangent_image,
         "callback": lambda: bar.setTangent("auto"),
         "menu_setup_fn": _tool_menu_builder(
-            "build_tangent_menu", tangent_type="auto", tangent_label="Auto Tangent", icon_path=media.auto_tangent_image
+            "build_tangent_menu",
+            tangent_type="auto",
+            tangent_label="Auto Tangent",
+            icon_path=media.auto_tangent_image,
+            maya_default_tangent=True,
         ),
         "tooltip_template": helper.auto_tangent_tooltip_text,
         "description": "Set selected keys to Auto tangents.",
     },
     "tangent_spline": {
         "type": "tool",
-        "key": "tangent_spline",
         "label": "Spline Tangent",
         "text": "SP",
         "icon_path": media.spline_tangent_image,
         "callback": lambda: bar.setTangent("spline"),
         "menu_setup_fn": _tool_menu_builder(
-            "build_tangent_menu", tangent_type="spline", tangent_label="Spline Tangent", icon_path=media.spline_tangent_image
+            "build_tangent_menu",
+            tangent_type="spline",
+            tangent_label="Spline Tangent",
+            icon_path=media.spline_tangent_image,
+            maya_default_tangent=True,
         ),
         "tooltip_template": helper.spline_tangent_tooltip_text,
         "description": "Set selected keys to Spline tangents.",
     },
     "tangent_clamped": {
         "type": "tool",
-        "key": "tangent_clamped",
         "label": "Clamped Tangent",
         "text": "CL",
         "icon_path": media.clamped_tangent_image,
         "callback": lambda: bar.setTangent("clamped"),
         "menu_setup_fn": _tool_menu_builder(
-            "build_tangent_menu", tangent_type="clamped", tangent_label="Clamped Tangent", icon_path=media.clamped_tangent_image
+            "build_tangent_menu",
+            tangent_type="clamped",
+            tangent_label="Clamped Tangent",
+            icon_path=media.clamped_tangent_image,
+            maya_default_tangent=True,
         ),
         "tooltip_template": helper.clamped_tangent_tooltip_text,
         "description": "Set selected keys to Clamped tangents.",
     },
     "tangent_linear": {
         "type": "tool",
-        "key": "tangent_linear",
         "label": "Linear Tangent",
         "text": "LI",
         "icon_path": media.linear_tangent_image,
         "callback": lambda: bar.setTangent("linear"),
         "menu_setup_fn": _tool_menu_builder(
-            "build_tangent_menu", tangent_type="linear", tangent_label="Linear Tangent", icon_path=media.linear_tangent_image
+            "build_tangent_menu",
+            tangent_type="linear",
+            tangent_label="Linear Tangent",
+            icon_path=media.linear_tangent_image,
+            maya_default_tangent=True,
         ),
         "tooltip_template": helper.linear_tangent_tooltip_text,
         "description": "Set selected keys to Linear tangents.",
     },
     "tangent_flat": {
         "type": "tool",
-        "key": "tangent_flat",
         "label": "Flat Tangent",
         "text": "FT",
         "icon_path": media.flat_tangent_image,
         "callback": lambda: bar.setTangent("flat"),
         "menu_setup_fn": _tool_menu_builder(
-            "build_tangent_menu", tangent_type="flat", tangent_label="Flat Tangent", icon_path=media.flat_tangent_image
+            "build_tangent_menu",
+            tangent_type="flat",
+            tangent_label="Flat Tangent",
+            icon_path=media.flat_tangent_image,
+            maya_default_tangent=True,
         ),
         "tooltip_template": helper.flat_tangent_tooltip_text,
         "description": "Set selected keys to Flat tangents.",
     },
     "tangent_step": {
         "type": "tool",
-        "key": "tangent_step",
         "label": "Step Tangent",
         "text": "ST",
         "icon_path": media.step_tangent_image,
         "callback": lambda: bar.setTangent("step"),
         "menu_setup_fn": _tool_menu_builder(
-            "build_tangent_menu", tangent_type="step", tangent_label="Step Tangent", icon_path=media.step_tangent_image
+            "build_tangent_menu",
+            tangent_type="step",
+            tangent_label="Step Tangent",
+            icon_path=media.step_tangent_image,
+            maya_default_tangent=True,
         ),
         "tooltip_template": helper.step_tangent_tooltip_text,
         "description": "Set selected keys to Stepped tangents.",
     },
     "tangent_plateau": {
         "type": "tool",
-        "key": "tangent_plateau",
         "label": "Plateau Tangent",
         "text": "PT",
         "icon_path": media.plateau_tangent_image,
         "callback": lambda: bar.setTangent("plateau"),
         "menu_setup_fn": _tool_menu_builder(
-            "build_tangent_menu", tangent_type="plateau", tangent_label="Plateau Tangent", icon_path=media.plateau_tangent_image
+            "build_tangent_menu",
+            tangent_type="plateau",
+            tangent_label="Plateau Tangent",
+            icon_path=media.plateau_tangent_image,
+            maya_default_tangent=True,
         ),
         "tooltip_template": helper.plateau_tangent_tooltip_text,
         "description": "Set selected keys to Plateau tangents.",
@@ -1587,6 +1442,7 @@ TOOL_SECTION_DEFINITIONS = {
         "items": [
             {"id": "tangent_cycle_matcher"},
             {"id": "tangent_bouncy", "default": True},
+            "separator",
             {"id": "tangent_auto", "default": True},
             {"id": "tangent_spline", "default": True},
             {"id": "tangent_clamped"},
@@ -1793,20 +1649,19 @@ TOOLBAR_SECTION_LAYOUTS = {
 def _resolve_tool_definition(tool_key, tool_state):
     """
     Finalizes a tool definition before use.
-    Ensures 'key' exists and callbacks are bound.
+    Ensures canonical ids exist and callbacks are bound.
     """
     res = dict(tool_state)
+    res.setdefault("id", tool_key)
     res.setdefault("key", tool_key)
     res.setdefault("default", False)
 
     callback = res.get("callback")
     if callback:
-        command_name = res.get("command") or tool_key
-        res["command"] = command_name
-        if getattr(callback, "__name__", None) != command_name or res.get("command_aliases"):
-            res["callback"] = trigger.make_command_callback(command_name, callback, aliases=res.get("command_aliases"))
+        if getattr(callback, "__name__", None) != tool_key:
+            res["callback"] = trigger.make_command_callback(tool_key, callback)
         elif not getattr(callback, "_tkm_trigger_proxy", False):
-            trigger.register_command(command_name, callback)
+            trigger.register_command(tool_key, callback)
     return res
 
 
@@ -1832,15 +1687,9 @@ def _item_options(item, *, exclude_keys=False):
 def _shortcut_display(tool_state, keys):
     return {
         "icon": tool_state.get("icon_path"),
-        "label": tool_state.get("label") or tool_state.get("status_title") or tool_state.get("key"),
+        "label": tool_state.get("label") or tool_state.get("status_title") or tool_state.get("id"),
         "keys": keys,
     }
-
-
-def _resolve_raw_item(item):
-    if "data" in item:
-        return dict(item.get("data", {}))
-    return _item_options(item, exclude_keys=True)
 
 
 def _resolve_shortcut_item(item):
@@ -1848,9 +1697,6 @@ def _resolve_shortcut_item(item):
 
     if item.get("id"):
         variant = get_tool(item["id"], **_item_options(item, exclude_keys=True))
-    elif item.get("type") == "raw":
-        raw_data = _resolve_raw_item(item)
-        variant = _resolve_tool_definition(raw_data.get("key", "shortcut"), raw_data)
     else:
         return None, None
 
@@ -1886,11 +1732,7 @@ def _resolve_section_item_data(item):
         tool = get_tool(item["id"], **_item_options(item))
         return _apply_section_shortcuts(tool, item)
 
-    item_type = item.get("type")
-    if item_type == "raw":
-        return _resolve_raw_item(item)
-
-    if item_type == "widget":
+    if item.get("type") == "widget":
         tool_id = item.get("id") or item.get("key")
         if tool_id and tool_id in TOOL_DEFINITIONS:
             return get_tool(tool_id, **_item_options(item))
@@ -1902,9 +1744,7 @@ def _resolve_section_item_data(item):
 def get_tool(tool_id, **overrides):
     """Retrieve a tool definition with optional overrides."""
     if tool_id not in TOOL_DEFINITIONS:
-        res = {"key": tool_id, "label": tool_id.replace("_", " ").capitalize()}
-        res.update(overrides)
-        return _resolve_tool_definition(tool_id, res)
+        raise KeyError("Unknown tool id: {}".format(tool_id))
 
     # Merge base definition with overrides
     tool = dict(TOOL_DEFINITIONS[tool_id])
@@ -1918,7 +1758,9 @@ def _resolve_section_item(item):
 
     if item.get("section"):
         section = get_tool_section(item["section"])
-        return section.get("items", []) if section else []
+        if section:
+            return {"type": "group", "items": section.get("items", []), "label": section.get("label")}
+        return []
 
     if item.get("group"):
         group = get_tool_section(item["group"])
@@ -1951,6 +1793,61 @@ def get_tool_section(section_id, resolve_items=True):
             resolved.append(resolved_item)
     section["items"] = resolved
     return section
+
+
+def _tool_color_to_hex(color):
+    if color is None:
+        return None
+    if hasattr(color, "base") and hasattr(color.base, "hex"):
+        return color.base.hex
+    if hasattr(color, "hex"):
+        return color.hex
+    return color
+
+
+def _section_item_tint_color(item, tool_key, inherited_color=None):
+    if item == "separator" or item is None:
+        return None
+
+    if isinstance(item, str):
+        return inherited_color if item == tool_key else None
+
+    if not isinstance(item, dict):
+        return None
+
+    if item.get("section") or item.get("group"):
+        section = TOOL_SECTION_DEFINITIONS.get(item.get("section") or item.get("group"))
+        if not section:
+            return None
+        section_color = section.get("color", inherited_color)
+        if section_color is None:
+            section_color = inherited_color
+        for child in section.get("items", []):
+            color = _section_item_tint_color(child, tool_key, inherited_color=section_color)
+            if color is not None:
+                return color
+        return None
+
+    tool_id = item.get("id") or item.get("key")
+    if tool_id == tool_key:
+        return inherited_color
+
+    for shortcut in item.get("shortcuts") or []:
+        color = _section_item_tint_color(shortcut, tool_key, inherited_color=inherited_color)
+        if color is not None:
+            return color
+
+    return None
+
+
+def get_tool_tint_color(tool_key, default=None):
+    for section in TOOL_SECTION_DEFINITIONS.values():
+        section_color = section.get("color")
+        for item in section.get("items", []):
+            color = _section_item_tint_color(item, tool_key, inherited_color=section_color)
+            if color is not None:
+                return _tool_color_to_hex(color)
+    return default
 
 
 def get_toolbar_sections(layout_id, resolve_items=True):

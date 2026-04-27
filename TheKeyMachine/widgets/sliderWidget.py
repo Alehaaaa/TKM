@@ -421,6 +421,7 @@ QSlider::handle:horizontal {{
             if hrect.contains(e.pos()):
                 self._apply_stylesheet(thick=True)
                 self._pressOffset = e.pos().x() - hrect.x()
+                self._dragged = False
                 self.setSliderDown(True)
                 self.started.emit()
                 e.accept()
@@ -462,6 +463,7 @@ QSlider::handle:horizontal {{
                 ratio = 0.0
             rng = float(self.maximum() - self.minimum())
             self.setSliderPosition(int(round(self.minimum() + ratio * rng)))
+            self._dragged = True
             self.moved.emit(self.percent())
             e.accept()
             return
@@ -1103,6 +1105,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._run_dragCommand(percent)
 
     def _on_drag_finished(self):
+        if not getattr(self._slider, '_dragged', True):
+            # Pure click-and-release with no drag movement
+            self.valueSet.emit(0.0)
+            self._run_dragCommand(0.0)
+
         self.dragFinished.emit()
         self._finish_active_session()
 

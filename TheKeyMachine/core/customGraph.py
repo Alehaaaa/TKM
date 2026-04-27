@@ -359,24 +359,9 @@ def _add_graph_slider_section_from_data(section_def, new_section_fn):
 
 
 def _add_graph_group_items(sec, items):
-    group_tools = []
-
-    def flush_group_tools():
-        if group_tools:
-            sec.addWidgetGroup(list(group_tools))
-            group_tools[:] = []
-
-    for item in items:
-        if item == "separator":
-            flush_group_tools()
-            sec.addSeparator()
-            continue
-        if isinstance(item, dict) and item.get("type") == "widget":
-            flush_group_tools()
-            continue
-        group_tools.append(item)
-
-    flush_group_tools()
+    group_tools = [item for item in items if not (isinstance(item, dict) and item.get("type") == "widget")]
+    if group_tools:
+        sec.addWidgetGroup(group_tools)
 
 
 def _add_graph_tool_item(sec, item, graph_settings_menu_fn):
@@ -408,6 +393,7 @@ def _add_graph_tool_item(sec, item, graph_settings_menu_fn):
 
 def _populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn):
     sections = toolbox.get_toolbar_sections("graph", resolve_items=False)
+    grouped_section_ids = {"graph_key_tools", "reset_tools"}
     for section_def in sections:
         if section_def.get("type") == "slider":
             _add_graph_slider_section_from_data(section_def, new_section_fn)
@@ -418,6 +404,10 @@ def _populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn):
             hiddeable=section_def.get("hiddeable", True),
         )
         resolved_section = toolbox.get_tool_section(section_def["id"])
+        if section_def["id"] in grouped_section_ids:
+            _add_graph_group_items(sec, resolved_section["items"])
+            continue
+
         for item in resolved_section["items"]:
             if item == "separator":
                 sec.addSeparator()
