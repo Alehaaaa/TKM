@@ -268,7 +268,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._handle_hover = False
         self._tooltip_title = ""
         self._tooltip_description = ""
-        self._icon_path = text if self._looks_like_icon_path(text) else None
+        self._icon = text if self._looks_like_icon(text) else None
 
         self._wheel_count = 0
         self._prev_wheel_direction = 0
@@ -312,7 +312,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self.setToolTipData(text=title, description=self._tooltip_description)
 
     @staticmethod
-    def _looks_like_icon_path(value: str) -> bool:
+    def _looks_like_icon(value: str) -> bool:
         if not value or not isinstance(value, str):
             return False
         return os.path.isabs(value) or os.path.splitext(value)[1].lower() in {".svg", ".png", ".jpg", ".jpeg", ".bmp", ".ico"}
@@ -513,9 +513,9 @@ QSlider::handle:horizontal {{
         else:
             main_color = base_color
 
-        if self._icon_path:
+        if self._icon:
             icon_size = int(min(hrect.width(), hrect.height()) * 0.68)
-            qicon = QIcon(self._icon_path)
+            qicon = QIcon(self._icon)
             if not qicon.isNull():
                 icon_rect = QRect(0, 0, icon_size, icon_size)
                 icon_rect.moveCenter(hrect.center())
@@ -783,7 +783,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def setText(self, text: str):
         self._slider._text = text
-        self._slider._icon_path = text if self._slider._looks_like_icon_path(text) else None
+        self._slider._icon = text if self._slider._looks_like_icon(text) else None
         self._slider.update()
 
     def setColor(self, color: str):

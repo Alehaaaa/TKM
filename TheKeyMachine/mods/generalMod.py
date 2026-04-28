@@ -118,7 +118,7 @@ def get_mirror_exceptions_file():
 
 # SET DEFAULT VALUES ___________________
 def get_set_default_data_file():
-    return get_tool_data_path("reset_default", "reset_default_data.json")
+    return get_tool_data_path("default_default", "default_default_data.json")
 
 
 # COPY PASTE ANIMATION ___________________
@@ -184,8 +184,8 @@ def create_TheKeyMachine_node():
         node = cmds.container(type="dagContainer", name="TheKeyMachine")
 
         # Establecer el icono del assetNode
-        icon_path = get_tkm_node_image()
-        cmds.setAttr(node + ".iconName", icon_path, type="string")
+        icon = get_tkm_node_image()
+        cmds.setAttr(node + ".iconName", icon, type="string")
 
         # Bloquear y ocultar todos los atributos de transformación
         attributes = ["translateX", "translateY", "translateZ", "rotateX", "rotateY", "rotateZ", "scaleX", "scaleY", "scaleZ", "visibility"]

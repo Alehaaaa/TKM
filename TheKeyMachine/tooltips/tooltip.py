@@ -349,7 +349,7 @@ class QFlatTooltip(QWidget):
         self.icon_obj = icon_obj
         self.text = text
         self.description = description
-        self.icon_path = icon  # Store for reference
+        self.icon = icon  # Store for reference
         self._shortcut_min_width = 0
 
         self.tooltip_template = _tooltip_template_from_data(
@@ -447,8 +447,8 @@ class QFlatTooltip(QWidget):
             template_icon = getattr(self.tooltip_template, "icon", None)
             if template_icon:
                 header_pixmap = QIcon(template_icon)
-            elif self.icon_path and isinstance(self.icon_path, (str, bytes)):
-                header_pixmap = QIcon(self.icon_path)
+            elif self.icon and isinstance(self.icon, (str, bytes)):
+                header_pixmap = QIcon(self.icon)
 
         if header_title or header_pixmap:
             header_frame, header_layout = self._create_section_frame("")
@@ -515,8 +515,8 @@ class QFlatTooltip(QWidget):
             row.setContentsMargins(wutil.DPI(12), 0, wutil.DPI(12), 0)
             row.setSpacing(wutil.DPI(20))
 
-            icon_path = sh.get("icon", "default")
-            row.addWidget(self._create_icon_label(icon_path, dim=shortcut_icon_dim))
+            icon = sh.get("icon", "default")
+            row.addWidget(self._create_icon_label(icon, dim=shortcut_icon_dim))
 
             label_text = sh.get("label", "")
             name = QLabel(label_text)
@@ -561,8 +561,8 @@ class QFlatTooltip(QWidget):
         if hasattr(source, "pixmap"):
             pix = source.pixmap(target_size)
         elif isinstance(source, (str, bytes)):
-            icon_path = source.decode() if isinstance(source, bytes) else source
-            pix = self._load_icon_pixmap(icon_path, target_size)
+            icon = source.decode() if isinstance(source, bytes) else source
+            pix = self._load_icon_pixmap(icon, target_size)
         elif isinstance(source, QPixmap):
             pix = source.scaled(target_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         else:

@@ -191,11 +191,11 @@ class QFlatHoverableIcon:
     HIGHLIGHT_HEX = "#282828"
 
     @staticmethod
-    def apply(btn, icon_path, highlight=False, brighten_amount=80):
-        if not icon_path:
+    def apply(btn, icon, highlight=False, brighten_amount=80):
+        if not icon:
             return
 
-        base_icon = QtGui.QIcon(icon_path)
+        base_icon = QtGui.QIcon(icon)
         icon_size = btn.iconSize()
 
         if highlight:
@@ -422,8 +422,8 @@ class TooltipMixin:
         self, text="", description="", shortcuts=None, icon=None, tooltip_template=None, status_title=None, status_description=None
     ):
         # Automatically pick up the widget's icon if not provided
-        if not icon and hasattr(self, "_icon_path"):
-            icon = self._icon_path
+        if not icon and hasattr(self, "_icon"):
+            icon = self._icon
 
         self._toolTipData = {
             "text": text,
@@ -513,7 +513,7 @@ class QFlatButton(QtWidgets.QPushButton):
         text,
         color=DEFAULT_COLOR,
         background=DEFAULT_BACKGROUND,
-        icon_path=None,
+        icon=None,
         border=BUTTON_BORDER_RADIUS,
         highlight=False,
         parent=None,
@@ -526,8 +526,8 @@ class QFlatButton(QtWidgets.QPushButton):
 
         # Consistent Icon Size
         self.setIconSize(QtCore.QSize(DPI(19), DPI(19)))
-        if icon_path:
-            QFlatHoverableIcon.apply(self, icon_path, highlight=highlight)
+        if icon:
+            QFlatHoverableIcon.apply(self, icon, highlight=highlight)
 
         v_padding = 2  # Tight padding since height is fixed
 
@@ -690,7 +690,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         # Small margin to prevent glow clipping (w-2 x h-2)
         self.setIconSize(QtCore.QSize(w - 2, h - 2))
 
-        self._icon_path = icon
+        self._icon = icon
         self._highlight = highlight
         self._base_state = {
             "text": text,
@@ -715,10 +715,10 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
         if isinstance(icon, (str, bytes)):
-            self._icon_path = str(icon)
-            self._apply_icon_visual(self._icon_path)
+            self._icon = str(icon)
+            self._apply_icon_visual(self._icon)
             data = getattr(self, "_toolTipData", {})
-            self.setToolTipData(icon=self._icon_path, **data)
+            self.setToolTipData(icon=self._icon, **data)
         elif icon:
             super().setIcon(icon)
 
@@ -871,7 +871,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             "description": variant.get("description", ""),
             "shortcuts": variant.get("shortcuts", []),
             "tooltip_template": tooltip_template,
-            "icon": variant.get("icon_path", self._base_state.get("icon")),
+            "icon": variant.get("icon", self._base_state.get("icon")),
             "status_title": (
                 variant.get("status_title")
                 or variant.get("label")
@@ -1002,7 +1002,7 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
 
     btn = QFlatToolButton(
         parent=parent,
-        icon=data.get("icon_path"),
+        icon=data.get("icon"),
         text=display_text,
         tooltip_template=tooltip_template,
         description=description,
@@ -1014,7 +1014,7 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
         description=description,
         shortcuts=data.get("shortcuts"),
         tooltip_template=tooltip_template,
-        icon=data.get("icon_path"),
+        icon=data.get("icon"),
         status_title=title,
         status_description=status_description,
         display_text=display_text,
@@ -1027,11 +1027,11 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
         checkable, state_fn = _setup_setting_synced_checkable(btn, data)
         _connect_tool_button_callback(btn, callback, checkable, state_fn)
 
-    menu_setup_fn = data.get("menu_setup_fn")
-    if callable(menu_setup_fn):
+    menu = data.get("menu")
+    if callable(menu):
         btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
-        def _show_tool_menu(pos, setup_fn=menu_setup_fn, widget=btn):
+        def _show_tool_menu(pos, setup_fn=menu, widget=btn):
             menu = MenuWidget(widget)
             try:
                 built_menu = setup_fn(menu, source_widget=widget)
@@ -1590,7 +1590,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._persist_slider_modes = True
 
         # Tool-group action pinning support
-        # _tool_groups: widget_key -> {label, icon_path, menu_factory, actions: [...]}
+        # _tool_groups: widget_key -> {label, icon, menu_factory, actions: [...]}
         self._tool_groups = {}
         # _pinned_action_buttons: action_key -> QFlatToolButton (live instances)
         self._pinned_action_buttons = {}
@@ -1745,7 +1745,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         widgets : list
             List of action descriptors or the string ``"separator"``.
             Each descriptor dict may contain:
-              key, label, icon_path, callback,
+              key, label, icon, callback,
              checkable (bool), set_checked_fn/set_checked (callable),
              bind_checked_fn (callable), tooltip, description.
         default : bool
@@ -1760,7 +1760,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             widget = create_tool_button_from_data(
                 default_item,
                 callback=None,
-                menu_setup_fn=None,
+                menu=None,
                 tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or default_item.get("label"),
                 description=default_item.get("description") or "",
             )
@@ -1790,7 +1790,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         # 2. Resolve the group properties from the first default tool
         first_item = default_items[0] if default_items else {}
         group_label = first_item.get("label", "Group")
-        group_icon_p = first_item.get("icon_path") or ""
+        group_icon_p = first_item.get("icon") or ""
 
         # 3. Build QMenu + pinnable_actions from the descriptor list
         pinnable_actions = []
@@ -1813,7 +1813,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     {
                         "key": item_key,
                         "label": item.get("label", ""),
-                        "icon_path": item.get("icon_path"),
+                        "icon": item.get("icon"),
                         "callback": item.get("callback"),
                         "checkable": item.get("checkable", False),
                         "set_checked_fn": _checked_state_fn(item),
@@ -1840,7 +1840,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
             checkable_sync_pairs = []
             source_item = source_items.get(source_key) or {}
-            setup_fn = source_item.get("menu_setup_fn") or first_item.get("menu_setup_fn")
+            setup_fn = source_item.get("menu") or first_item.get("menu")
             if callable(setup_fn):
                 try:
                     setup_fn(menu, source_widget=source_widget)
@@ -1853,7 +1853,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                 if item.get("key") == source_key:
                     continue
-                act_icon_p = item.get("icon_path") or ""
+                act_icon_p = item.get("icon") or ""
                 cb = item.get("callback")
                 checkable = item.get("checkable", False)
 
@@ -1896,7 +1896,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         return group_widgets[0][1] if group_widgets else None
 
-    def register_action_group(self, widget_keys, group_label, group_icon_path, pinnable_actions, menu_factory=None):
+    def register_action_group(self, widget_keys, group_label, group_icon, pinnable_actions, menu_factory=None):
         """
         Register a tool group so its sub-actions can be pinned as standalone buttons.
 
@@ -1906,13 +1906,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             The key(s) used when the parent button(s) were added via addWidget.
         group_label : str
             Display label for the group (e.g. "Pointer").
-        group_icon_path : str
+        group_icon : str
             Path to the group's main icon (used as fallback for actions).
         pinnable_actions : list of dict
             Each dict must contain:
                 key         - unique string key for this action (scoped to section)
                 label       - display label
-                icon_path   - path to icon (or None)
+                icon   - path to icon (or None)
                 callback    - callable to invoke on click
                 set_checked bool (optional, default False)
                 set_checked_fn - callable() -> bool (optional, for checkable items)
@@ -1926,7 +1926,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for w_key in keys_list:
             self._tool_groups[w_key] = {
                 "label": group_label,
-                "icon_path": group_icon_path,
+                "icon": group_icon,
                 "menu_factory": menu_factory,
                 "actions": pinnable_actions,
             }
@@ -1969,7 +1969,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             return existing
 
         group_info = self._tool_groups.get(group_key, {})
-        icon_path = act_info.get("icon_path") or group_info.get("icon_path") or ""
+        icon = act_info.get("icon") or group_info.get("icon") or ""
         tooltip_template = act_info.get("tooltip_template") or act_info.get("tooltip") or act_info.get("label", "")
         description = act_info.get("description", "")
         callback = act_info.get("callback")
@@ -1977,7 +1977,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         btn = create_tool_button_from_data(
             act_info,
             callback=None,
-            icon_path=icon_path or None,
+            icon=icon or None,
             tooltip_template=tooltip_template,
             description=description,
         )
@@ -2343,7 +2343,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     # sub-actions inline (separated) so the user can pin them as buttons.
                     group_info = self._tool_groups.get(key)
                     if group_info and group_info.get("actions"):
-                        group_icon_path = group_info.get("icon_path") or ""
+                        group_icon = group_info.get("icon") or ""
 
                         for act_info in group_info["actions"]:
                             act_key = act_info["key"]
@@ -2351,7 +2351,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                                 continue
 
                             act_label = act_info.get("label", "")
-                            act_icon_path = act_info.get("icon_path") or group_icon_path
+                            act_icon = act_info.get("icon") or group_icon
                             existing_btn = self._pinned_action_buttons.get(act_key)
                             is_pinned = bool(existing_btn and isValid(existing_btn))
 
@@ -2366,7 +2366,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                                 return handler
 
-                            icon = QtGui.QIcon(act_icon_path or "") if act_icon_path else QtGui.QIcon()
+                            icon = QtGui.QIcon(act_icon or "") if act_icon else QtGui.QIcon()
                             self._add_checkable_menu_action(
                                 menu,
                                 act_key,

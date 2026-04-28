@@ -457,7 +457,7 @@ class AnimationOffsetController(QtCore.QObject):
             owner=self._owner,
             key=self._tint_key,
             center_line=True,
-            icon_path=media.animation_offset_image,
+            icon=media.animation_offset_image,
             icon_scale=1.15,
         )
         self._poll_timer.start()

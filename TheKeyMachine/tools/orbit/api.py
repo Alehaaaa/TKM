@@ -60,7 +60,7 @@ ORBIT_ACTIONS = (
     "isolate_master",
     "align_selected_objects",
     "create_tracer",
-    "reset_objects_mods",
+    "default_objects_mods",
     "delete_all_animation",
     "select_opposite",
     "opposite_copy",
@@ -82,7 +82,7 @@ ORBIT_ACTION_MIGRATIONS = {
 }
 
 DEFAULT_ORBIT_ACTIONS = (
-    "reset_objects_mods",
+    "default_objects_mods",
     "delete_all_animation",
     "select_opposite",
     "opposite_copy",

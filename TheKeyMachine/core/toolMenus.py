@@ -136,7 +136,7 @@ def build_share_keys_menu(menu, source_widget=None):
     menu.addSeparator()
 
 
-def build_tangent_menu(menu, tangent_type, tangent_label, icon_path=None, source_widget=None, maya_default_tangent=False):
+def build_tangent_menu(menu, tangent_type, tangent_label, icon=None, source_widget=None, maya_default_tangent=False):
     import TheKeyMachine.mods.barMod as bar
 
     tint_color = cw.get_widget_tint_color(source_widget)
@@ -158,7 +158,7 @@ def build_tangent_menu(menu, tangent_type, tangent_label, icon_path=None, source
 
     def _add_action(handle_mode, handle_label, key_scope, scope_label):
         menu.addAction(
-            QtGui.QIcon(icon_path or ""),
+            QtGui.QIcon(icon or ""),
             handle_label,
             lambda _checked=False, h=handle_mode, s=key_scope, c=tint_color: _set_tangent(h, s, c),
             description="Set {}.".format(scope_label.lower()),
@@ -177,17 +177,17 @@ def build_tangent_menu(menu, tangent_type, tangent_label, icon_path=None, source
 
     if maya_default_tangent:
         menu.addAction(
-            QtGui.QIcon(icon_path or ""),
+            QtGui.QIcon(icon or ""),
             "Set Maya Default Tangent",
             lambda _checked=False: _set_maya_default_tangent(),
             description="Use {} for newly created keys.".format(tangent_label),
         )
 
 
-def build_cycle_matcher_menu(menu, icon_path=None, source_widget=None):
+def build_cycle_matcher_menu(menu, icon=None, source_widget=None):
     def _add_action(target_key, label):
         menu.addAction(
-            QtGui.QIcon(icon_path or ""),
+            QtGui.QIcon(icon or ""),
             label,
             lambda _checked=False, k=target_key: keyTools.match_curve_cycle(target_key=k),
             description="Match the cycle on the {}.".format(label.lower()),
@@ -322,7 +322,7 @@ def add_main_preferences_menu(
     for spec_key in ("overshoot_sliders", "attribute_switcher_euler_filter", "custom_graph"):
         spec = setting_toggles[spec_key]
         action = preferences_menu.addAction(
-            QtGui.QIcon(spec.get("icon_path") or ""),
+            QtGui.QIcon(spec.get("icon") or ""),
             spec["menu_label"],
             description=spec.get("description", ""),
         )

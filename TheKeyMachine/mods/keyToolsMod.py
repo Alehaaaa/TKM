@@ -135,7 +135,7 @@ def _begin_timeline_tint(timerange, key, owner=None, color=None):
     )
 
 
-def _get_reset_value_for_attribute(obj, attr, data):
+def _get_default_value_for_attribute(obj, attr, data):
     short_name = obj.split("|")[-1]
     parts = short_name.split(":")
     namespace = parts[0] if len(parts) > 1 else "default"
@@ -1313,18 +1313,18 @@ def toggleLock():
 # _____________________________________________________ Resets _______________________________________________________________#
 
 
-def reset_objects_mods(*args):
+def default_objects_mods(*args):
     # Get the current state of the modifiers
     mods = runtime.get_modifier_mask()
     shift_pressed = bool(mods & 1)
     ctrl_pressed = bool(mods & 4)
 
     if shift_pressed:
-        reset_object_values(reset_translations=True)
+        default_object_values(default_translations=True)
     elif ctrl_pressed:
-        reset_object_values(reset_rotations=True)
+        default_object_values(default_rotations=True)
     else:
-        reset_object_values()
+        default_object_values()
 
 
 def save_default_values(*args):
@@ -1422,26 +1422,26 @@ def remove_default_values_for_selected_object(*args):
     wutil.make_inViewMessage("Default values removed")
 
 
-def reset_object_values(reset_translations=False, reset_rotations=False, reset_scales=False):
-    reset_trs = reset_translations and reset_rotations and reset_scales
-    if reset_trs:
+def default_object_values(default_translations=False, default_rotations=False, default_scales=False):
+    default_trs = default_translations and default_rotations and default_scales
+    if default_trs:
         title = "Reset Translation Rotation Scale"
-        tooltip_template = helper.reset_trs_tooltip_text
-    elif reset_scales:
+        tooltip_template = helper.default_trs_tooltip_text
+    elif default_scales:
         title = "Reset Scales"
-        tooltip_template = helper.reset_scales_tooltip_text
-    elif reset_rotations:
+        tooltip_template = helper.default_scales_tooltip_text
+    elif default_rotations:
         title = "Reset Rotation"
-        tooltip_template = helper.reset_rotations_tooltip_text
-    elif reset_translations:
+        tooltip_template = helper.default_rotations_tooltip_text
+    elif default_translations:
         title = "Reset Translation"
-        tooltip_template = helper.reset_translations_tooltip_text
+        tooltip_template = helper.default_translations_tooltip_text
     else:
         title = None
-        tooltip_template = helper.reset_values_tooltip_text
+        tooltip_template = helper.default_values_tooltip_text
 
     toolCommon.open_undo_chunk(
-        tool_id="reset_objects_mods",
+        tool_id="default_objects_mods",
         title=title,
         tooltip_template=tooltip_template,
     )
@@ -1460,7 +1460,7 @@ def reset_object_values(reset_translations=False, reset_rotations=False, reset_s
 
         target_info = resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=True)
         time_context = target_info["time_context"]
-        tint_session = _begin_timeline_context_tint("current_frame", "reset_objects_mods")
+        tint_session = _begin_timeline_context_tint("current_frame", "default_objects_mods")
 
         selected_objects = target_info["target_objects"]
         target_plugs = target_info["target_plugs"]
@@ -1471,25 +1471,25 @@ def reset_object_values(reset_translations=False, reset_rotations=False, reset_s
                 if not target_plugs:
                     continue
                 obj, attr = target_plugs[0].split(".", 1)
-                if reset_translations and not attr.startswith("translate"):
+                if default_translations and not attr.startswith("translate"):
                     continue
-                if reset_rotations and not attr.startswith("rotate"):
+                if default_rotations and not attr.startswith("rotate"):
                     continue
-                if reset_scales and not attr.startswith("scale"):
+                if default_scales and not attr.startswith("scale"):
                     continue
-                if not any((reset_translations, reset_rotations, reset_scales)):
+                if not any((default_translations, default_rotations, default_scales)):
                     pass
                 elif not (
-                    (reset_translations and attr.startswith("translate"))
-                    or (reset_rotations and attr.startswith("rotate"))
-                    or (reset_scales and attr.startswith("scale"))
+                    (default_translations and attr.startswith("translate"))
+                    or (default_rotations and attr.startswith("rotate"))
+                    or (default_scales and attr.startswith("scale"))
                 ):
                     continue
-                reset_value = _get_reset_value_for_attribute(obj, attr, data)
-                if reset_value is None:
+                default_value = _get_default_value_for_attribute(obj, attr, data)
+                if default_value is None:
                     continue
                 try:
-                    cmds.keyframe(curve, edit=True, valueChange=reset_value, time=(frame, frame))
+                    cmds.keyframe(curve, edit=True, valueChange=default_value, time=(frame, frame))
                 except Exception as e:
                     print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
             return
@@ -1498,16 +1498,16 @@ def reset_object_values(reset_translations=False, reset_rotations=False, reset_s
             if "." not in attr_plug:
                 continue
             obj, attr = attr_plug.split(".", 1)
-            if reset_translations and not attr.startswith("translate"):
+            if default_translations and not attr.startswith("translate"):
                 continue
-            if reset_rotations and not attr.startswith("rotate"):
+            if default_rotations and not attr.startswith("rotate"):
                 continue
-            if reset_scales and not attr.startswith("scale"):
+            if default_scales and not attr.startswith("scale"):
                 continue
-            if any((reset_translations, reset_rotations, reset_scales)) and not (
-                (reset_translations and attr.startswith("translate"))
-                or (reset_rotations and attr.startswith("rotate"))
-                or (reset_scales and attr.startswith("scale"))
+            if any((default_translations, default_rotations, default_scales)) and not (
+                (default_translations and attr.startswith("translate"))
+                or (default_rotations and attr.startswith("rotate"))
+                or (default_scales and attr.startswith("scale"))
             ):
                 continue
 
@@ -1522,23 +1522,23 @@ def reset_object_values(reset_translations=False, reset_rotations=False, reset_s
                     if node_type not in ["animCurveTL", "animCurveTA", "animCurveTT", "animCurveTU"]:
                         cmds.disconnectAttr(connections[0], attr_plug)
 
-                reset_value = _get_reset_value_for_attribute(obj, attr, data)
-                if reset_value is None:
+                default_value = _get_default_value_for_attribute(obj, attr, data)
+                if default_value is None:
                     continue
 
                 if time_context.mode == "current_frame":
-                    cmds.setAttr(attr_plug, reset_value)
+                    cmds.setAttr(attr_plug, default_value)
                     continue
 
                 keyframes = cmds.keyframe(attr_plug, query=True, time=(time_context.start_frame, time_context.end_frame)) or []
                 for frame in sorted(set(int(k) for k in keyframes)):
-                    cmds.setKeyframe(obj, attribute=attr, time=(frame,), value=reset_value)
+                    cmds.setKeyframe(obj, attribute=attr, time=(frame,), value=default_value)
             except Exception as e:
                 print(f"Could not process the attribute {attr} on {obj}: {str(e)}")
                 continue
 
     except Exception as e:
-        cmds.warning("Error during reset: {}".format(str(e)))
+        cmds.warning("Error during default: {}".format(str(e)))
     finally:
         if tint_session:
             tint_session.finish()

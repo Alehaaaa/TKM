@@ -34,7 +34,7 @@ _ASSET_FILES = {
     "create_locator_image": "cube.svg",
     "align_menu_image": "magnet.svg",
     "tracer_image": "tracer.svg",
-    "reset_animation_image": "eraser.svg",
+    "default_animation_image": "eraser.svg",
     "delete_animation_image": "delete_animation.svg",
     "match_image": "magnet.svg",
     "opposite_select_image": "opposite_select.svg",

@@ -242,7 +242,7 @@ def create_tool_button(
     """Helper to create a QFlatToolButton with our tooltip system"""
     btn = cw.create_tool_button_from_data(
         {
-            "icon_path": icon,
+            "icon": icon,
             "text": text,
             "tooltip_template": tooltip_template,
             "description": description,
@@ -339,7 +339,7 @@ def _add_graph_group_items(sec, items):
 def _add_graph_tool_item(sec, item, graph_settings_menu_fn):
     if item.get("key") == "settings":
         settings_tool = dict(item)
-        settings_tool["menu_setup_fn"] = graph_settings_menu_fn
+        settings_tool["menu"] = graph_settings_menu_fn
         settings_btn = cw.create_tool_button_from_data(settings_tool)
         sec.addWidget(
             settings_btn,
@@ -365,7 +365,7 @@ def _add_graph_tool_item(sec, item, graph_settings_menu_fn):
 
 def _populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn):
     sections = toolbox.get_toolbar_sections("graph", resolve_items=False)
-    grouped_section_ids = {"graph_key_tools", "reset_tools"}
+    grouped_section_ids = {"graph_key_tools", "default_tools"}
     for section_def in sections:
         if section_def.get("type") == "slider":
             _add_graph_slider_section_from_data(section_def, new_section_fn)

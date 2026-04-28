@@ -34,7 +34,7 @@ This version is modified by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.io
 - `Create Locator` tools for quick temporary setup work
 - `Align` for translation, rotation, scale, full transform, and range matching
 - `Tracer` for animation tracing, refresh, visibility, and style switching
-- `Reset Values` on the current frame, selected keys, or ranges
+- `Default Values` on the current frame, selected keys, or ranges
 - `Delete Anim` in the active time context
 - `Selector` for a live selection list window
 - `Select Opposite` and `Mirror` for side-based workflows

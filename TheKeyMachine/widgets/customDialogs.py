@@ -251,7 +251,7 @@ class QFlatDialog(QFlatWindowMixin, QtWidgets.QDialog):
             btn = cw.QFlatButton(
                 text=config.get("name", "Button"),
                 background=config.get("background", "#5D5D5D"),
-                icon_path=config.get("icon"),
+                icon=config.get("icon"),
                 highlight=is_highlighted,
             )
 
@@ -1024,7 +1024,7 @@ class QFlatToolBarDialog(QFlatFloatingWidget):
     """
 
     title = "Dialog"
-    icon_path = None
+    icon = None
 
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent=parent, *args, **kwargs)
@@ -1047,11 +1047,11 @@ class QFlatToolBarDialog(QFlatFloatingWidget):
         self.title_label.setWordWrap(False)
         title_layout.addWidget(self.title_label)
 
-        if self.icon_path:
+        if self.icon:
             icon_label = QtWidgets.QLabel()
             icon_size = DPI(30)
 
-            icon = QtGui.QIcon(self.icon_path)
+            icon = QtGui.QIcon(self.icon)
             pixmap = icon.pixmap(icon_size, icon_size)
 
             icon_label.setPixmap(pixmap)
@@ -1090,7 +1090,7 @@ class QFlatSelectorDialog(QFlatToolBarPopupDialog):
 
     def __init__(self, parent=None):
         self.title = "Selector"
-        self.icon_path = media.selector_image
+        self.icon = media.selector_image
         super().__init__(parent=parent)
         self.title_label.setText("0")
 
@@ -1569,7 +1569,7 @@ class QFlatNumberInput(QFlatToolBarPopupDialog):
         parent=None,
     ):
         self.title = "Bake Custom Interval"
-        self.icon_path = media.bake_animation_custom_image
+        self.icon = media.bake_animation_custom_image
         self.start_value = 1.0
 
         self.COLOR_BG_TRACK = self.DARK_BG_COLOR

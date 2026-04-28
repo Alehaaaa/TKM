@@ -803,9 +803,9 @@ class AttributeItem(QWidget):
 
         if self.enum_attr == "rotateOrder":
             self.sq_btn.setStyleSheet("background: transparent; border: none;")
-            icon_path = ATTRIBUTE_SWITCHER_GLOBE_IMAGE
+            icon = ATTRIBUTE_SWITCHER_GLOBE_IMAGE
 
-            pixmap = QPixmap(icon_path)
+            pixmap = QPixmap(icon)
             if not pixmap.isNull():
                 # Ensure sizes are integers
                 target_size = int(wutil.DPI(12))

@@ -130,7 +130,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.mainLayout.setSpacing(wutil.DPI(5))
 
     def _create_action_button(self, text, callback, highlight=False, icon=None, fixed_width=None):
-        button = cw.QFlatButton(text=text, icon_path=icon, highlight=highlight)
+        button = cw.QFlatButton(text=text, icon=icon, highlight=highlight)
         button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         if fixed_width is not None:
             button.setFixedWidth(fixed_width)
@@ -243,7 +243,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
             {
                 "key": f"selection_set_color{color.suffix}",
                 "label": tooltip,
-                "icon_path": media.selection_set_color_images.get(color.suffix),
+                "icon": media.selection_set_color_images.get(color.suffix),
                 "tooltip_template": tooltip,
             },
             callback=None,
@@ -284,7 +284,7 @@ class SelectionSetMembersDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.list_widget.itemSelectionChanged.connect(self._sync_selection)
         self.mainLayout.addWidget(self.list_widget, 1)
 
-        reload_btn = cw.QFlatButton(text="Reload", icon_path=media.reload_image, highlight=True)
+        reload_btn = cw.QFlatButton(text="Reload", icon=media.reload_image, highlight=True)
         reload_btn.clicked.connect(self.reload_members)
         self.mainLayout.addWidget(reload_btn)
 
@@ -416,7 +416,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             {
                 "key": key,
                 "label": tooltip,
-                "icon_path": icon,
+                "icon": icon,
                 "tooltip_template": tooltip,
                 "description": description,
             },

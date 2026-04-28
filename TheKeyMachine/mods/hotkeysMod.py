@@ -184,10 +184,10 @@ def _combo_key(combo):
     return "{}|{}|{}|{}".format(combo["maya_key"], int(combo["ctrl"]), int(combo["shift"]), int(combo["alt"]))
 
 
-def _pixmap_for_icon(icon_path, size=18):
-    if not icon_path:
+def _pixmap_for_icon(icon, size=18):
+    if not icon:
         return QtGui.QPixmap()
-    return QtGui.QIcon(icon_path).pixmap(wutil.DPI(size), wutil.DPI(size))
+    return QtGui.QIcon(icon).pixmap(wutil.DPI(size), wutil.DPI(size))
 
 
 def _text_badge_pixmap(text, size=18):
@@ -457,8 +457,8 @@ def _tool_command_row(tool_data):
     return {
         "command": command_name,
         "title": tool_data.get("status_title") or tool_data.get("label") or _humanize(command_name),
-        "icon_path": tool_data.get("icon_path"),
-        "badge_text": None if tool_data.get("icon_path") else tool_data.get("text"),
+        "icon": tool_data.get("icon"),
+        "badge_text": None if tool_data.get("icon") else tool_data.get("text"),
     }
 
 
@@ -466,7 +466,7 @@ def _variant_command_row(tool_data, variant, shortcut_label=None):
     command_name = variant.get("key") or variant.get("id")
     if not command_name:
         return None
-    icon_path = variant.get("icon_path") or tool_data.get("icon_path")
+    icon = variant.get("icon") or tool_data.get("icon")
     return {
         "command": command_name,
         "title": shortcut_label
@@ -474,8 +474,8 @@ def _variant_command_row(tool_data, variant, shortcut_label=None):
         or variant.get("label")
         or variant.get("description")
         or _humanize(command_name),
-        "icon_path": icon_path,
-        "badge_text": None if icon_path else variant.get("text") or tool_data.get("text"),
+        "icon": icon,
+        "badge_text": None if icon else variant.get("text") or tool_data.get("text"),
     }
 
 
@@ -491,7 +491,7 @@ def _append_section_row(section, seen, title_lookup, icon_lookup, trigger_comman
     section["commands"].append(row)
     seen.add(command_name)
     title_lookup[command_name] = row["title"]
-    icon_lookup[command_name] = row.get("icon_path")
+    icon_lookup[command_name] = row.get("icon")
 
 
 def _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, tool_id):
@@ -575,7 +575,7 @@ def _iter_slider_percentage_rows(slider_type, mode):
         yield {
             "command": "slider_{}_{}_{}".format(slider_type, mode["key"], _slider_value_suffix(value)),
             "title": value_title,
-            "icon_path": mode_icon,
+            "icon": mode_icon,
             "badge_text": None if mode_icon else mode_badge,
         }
 
@@ -585,8 +585,8 @@ def _append_slider_mode_rows(section, slider_type, mode):
         return
 
     mode_icon = _slider_mode_icon(mode)
-    if not section["icon_path"] and mode_icon:
-        section["icon_path"] = mode_icon
+    if not section["icon"] and mode_icon:
+        section["icon"] = mode_icon
 
     for row in _iter_slider_percentage_rows(slider_type, mode):
         section["commands"].append(row)
@@ -594,7 +594,7 @@ def _append_slider_mode_rows(section, slider_type, mode):
 
 def _build_slider_hotkey_section(section_id, section_data):
     slider_type = section_data.get("slider_type") or section_id.split("_", 1)[0]
-    section = {"id": section_id, "title": section_data.get("label", _humanize(section_id)), "icon_path": None, "commands": []}
+    section = {"id": section_id, "title": section_data.get("label", _humanize(section_id)), "icon": None, "commands": []}
     modes = _slider_modes_from_section(section_data)
     for mode in modes:
         _append_slider_mode_rows(section, slider_type, mode)
@@ -633,7 +633,7 @@ def _build_command_catalog():
             section = {
                 "id": section_id,
                 "title": section_data.get("hotkey_label") or section_data.get("label") or _humanize(section_id),
-                "icon_path": section_data.get("icon_path"),
+                "icon": section_data.get("icon"),
                 "commands": [],
             }
             seen = set()
@@ -645,12 +645,12 @@ def _build_command_catalog():
         if not filtered:
             continue
         section["commands"] = filtered
-        if not section.get("icon_path"):
-            section["icon_path"] = next((row.get("icon_path") for row in filtered if row.get("icon_path")), None)
+        if not section.get("icon"):
+            section["icon"] = next((row.get("icon") for row in filtered if row.get("icon")), None)
         sections.append(section)
         for row in filtered:
             title_lookup[row["command"]] = row["title"]
-            icon_lookup[row["command"]] = row.get("icon_path")
+            icon_lookup[row["command"]] = row.get("icon")
 
     return sections, title_lookup, icon_lookup
 
@@ -711,7 +711,7 @@ class HotkeyCommandRow(QtWidgets.QWidget):
         self._selected = False
         self._base_bg = "#303030" if (row_index % 2 == 0) else "#292929"
         self._accent_color = accent_color
-        self._icon_path = command_data.get("icon_path")
+        self._icon = command_data.get("icon")
         self._pressed_icon = None
 
         layout = QtWidgets.QHBoxLayout(self)
@@ -723,10 +723,10 @@ class HotkeyCommandRow(QtWidgets.QWidget):
         self.tool_button.setFlat(True)
         self.tool_button.setIconSize(QtCore.QSize(wutil.DPI(20), wutil.DPI(20)))
         self.tool_button.setMinimumHeight(wutil.DPI(24))
-        if self._icon_path:
-            cw.QFlatHoverableIcon.apply(self.tool_button, self._icon_path, highlight=False)
+        if self._icon:
+            cw.QFlatHoverableIcon.apply(self.tool_button, self._icon, highlight=False)
             self._pressed_icon = cw.QFlatHoverableIcon._color_icon(
-                QtGui.QIcon(self._icon_path), self._accent_color, self.tool_button.iconSize()
+                QtGui.QIcon(self._icon), self._accent_color, self.tool_button.iconSize()
             )
         elif command_data.get("badge_text"):
             self.tool_button.setIcon(QtGui.QIcon(_text_badge_pixmap(command_data.get("badge_text"))))
@@ -758,8 +758,8 @@ class HotkeyCommandRow(QtWidgets.QWidget):
     def setCombo(self, combo):
         self.edit.setCombo(combo)
 
-    def set_status(self, icon_path=None, tooltip="", tooltip_data=None):
-        self.status_cell.setPixmap(_pixmap_for_icon(icon_path, size=16) if icon_path else QtGui.QPixmap())
+    def set_status(self, icon=None, tooltip="", tooltip_data=None):
+        self.status_cell.setPixmap(_pixmap_for_icon(icon, size=16) if icon else QtGui.QPixmap())
         if tooltip_data:
             self.status_cell.setToolTip(_native_tooltip_html(tooltip_data))
         elif tooltip:
@@ -803,8 +803,8 @@ class HotkeyCommandRow(QtWidgets.QWidget):
             self.tool_button.setIcon(self._pressed_icon)
 
     def _on_tool_released(self):
-        if self._icon_path:
-            self.tool_button.setIcon(QtGui.QIcon(self._icon_path))
+        if self._icon:
+            self.tool_button.setIcon(QtGui.QIcon(self._icon))
 
     def eventFilter(self, watched, event):
         if event.type() in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.FocusIn):
@@ -929,7 +929,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
     def _populate_sections(self):
         self.section_list.clear()
         for section in self._sections:
-            item = QtWidgets.QListWidgetItem(QtGui.QIcon(section.get("icon_path") or ""), section["title"])
+            item = QtWidgets.QListWidgetItem(QtGui.QIcon(section.get("icon") or ""), section["title"])
             item.setData(QtCore.Qt.UserRole, section["id"])
             item.setSizeHint(QtCore.QSize(0, wutil.DPI(62)))
             self.section_list.addItem(item)

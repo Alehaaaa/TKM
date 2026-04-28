@@ -355,24 +355,24 @@ def _register_builtin_commands():
     register_command("temp_pivot", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", False))
     register_command("temp_pivot_last", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", True))
     register_command("follow_cam", _make_module_command("TheKeyMachine.mods.barMod", "create_follow_cam", translation=True, rotation=True))
-    register_command("reset_objects_mods", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_objects_mods"))
+    register_command("default_objects_mods", _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_objects_mods"))
     register_command(
-        "reset_translations",
-        _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_object_values", reset_translations=True),
+        "default_translations",
+        _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_object_values", default_translations=True),
     )
     register_command(
-        "reset_rotations",
-        _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_object_values", reset_rotations=True),
+        "default_rotations",
+        _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_object_values", default_rotations=True),
     )
-    register_command("reset_scales", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reset_object_values", reset_scales=True))
+    register_command("default_scales", _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_object_values", default_scales=True))
     register_command(
-        "reset_trs",
+        "default_trs",
         _make_module_command(
             "TheKeyMachine.mods.keyToolsMod",
-            "reset_object_values",
-            reset_translations=True,
-            reset_rotations=True,
-            reset_scales=True,
+            "default_object_values",
+            default_translations=True,
+            default_rotations=True,
+            default_scales=True,
         ),
     )
     register_command("select_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "selectOpposite"))

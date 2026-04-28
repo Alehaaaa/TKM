@@ -545,7 +545,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 "label": "Overshoot Sliders",
                 "menu_label": "Overshoot Sliders",
                 "text": "OS",
-                "icon_path": media.sliders_overshoot_image,
+                "icon": media.sliders_overshoot_image,
                 "description": "Set range for sliders to -150/150, from -100/100.",
                 "get_checked": _get_overshoot,
                 "set_checked": _set_overshoot,
@@ -556,7 +556,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 "label": "Auto Euler Filter",
                 "menu_label": "Auto Euler Filter",
                 "text": "EF",
-                "icon_path": media.euler_filter_image,
+                "icon": media.euler_filter_image,
                 "description": "Apply Euler filtering after Attribute Switcher changes rotation order.",
                 "get_checked": _get_euler_filter,
                 "set_checked": _set_euler_filter,
@@ -567,7 +567,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 "label": "Graph Editor Toolbar",
                 "menu_label": "Show Graph Editor Toolbar",
                 "text": "GE",
-                "icon_path": media.customGraph_image,
+                "icon": media.customGraph_image,
                 "description": "Show the TKM toolbar in the Graph Editor.",
                 "get_checked": graphToolbarApi.get_graph_toolbar_checkbox_state,
                 "set_checked": _set_graph_toolbar,
@@ -614,8 +614,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def create_shelf_icon(self, *args):
         button_name = "TheKeyMachine"
         command = "import TheKeyMachine;TheKeyMachine.toggle()"
-        icon_path = media.asset_path("tool_icon")
-        icon_path = os.path.normpath(icon_path)
+        icon = media.asset_path("tool_icon")
+        icon = os.path.normpath(icon)
         current_shelf_tab = cmds.tabLayout("ShelfLayout", query=True, selectTab=True)
 
         for child in cmds.shelfLayout(current_shelf_tab, query=True, childArray=True) or []:
@@ -628,7 +628,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             ):
                 cmds.deleteUI(child)
 
-        cmds.shelfButton(parent=current_shelf_tab, image=icon_path, command=command, label=button_name)
+        cmds.shelfButton(parent=current_shelf_tab, image=icon, command=command, label=button_name)
 
     # Update the iBookmarks menu when scene changes
     def update_iBookmarks_menu(self, *args):
@@ -788,7 +788,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     def _create_selector_widget(self, sec, item_data):
         selector_tool = toolbox.get_tool("selector", **{k: v for k, v in item_data.items() if k not in {"id", "shortcuts"}})
-        btn = cw.QFlatSelectorButton(icon=selector_tool.get("icon_path"), tooltip_template=selector_tool.get("tooltip_template"))
+        btn = cw.QFlatSelectorButton(icon=selector_tool.get("icon"), tooltip_template=selector_tool.get("tooltip_template"))
         btn.clicked.connect(selector_tool.get("callback"))
         sec.addWidget(
             btn,
@@ -852,7 +852,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             "key": spec["key"],
             "label": spec["label"],
             "text": spec.get("text"),
-            "icon_path": spec.get("icon_path"),
+            "icon": spec.get("icon"),
             "description": spec.get("description", ""),
             "checkable": True,
             "set_checked_fn": spec["get_checked"],
@@ -1105,7 +1105,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 internet_connection=INTERNET_CONNECTION,
             )
 
-        settings_tool = toolbox.get_tool("settings", menu_setup_fn=_build_settings_menu)
+        settings_tool = toolbox.get_tool("settings", menu=_build_settings_menu)
         btn = cw.create_tool_button_from_data(settings_tool)
         btn.setObjectName("settings_toolbar_button")
         sec.addWidget(btn, settings_tool.get("label", "Settings"), settings_tool.get("key", "settings"))

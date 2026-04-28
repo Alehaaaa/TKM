@@ -49,7 +49,7 @@ nudge_keyleft_b_widget_tooltip_text = (
 
 remove_inbetween_b_widget_tooltip_text = (
     "Remove Inbetween",
-    ["Remove one inbetween."],
+    ["Remove inbetweens using the current nudge step value."],
 )
 
 
@@ -60,7 +60,7 @@ move_keyframes_intField_widget_tooltip_text = (
 
 insert_inbetween_b_widget_tooltip_text = (
     "Insert Inbetween",
-    ["Add one inbetween."],
+    ["Add inbetweens using the current nudge step value.."],
 )
 
 
@@ -336,13 +336,13 @@ tracer_tooltip_text = (
     media.tracer_image,
 )
 
-reset_values_tooltip_text = (
+default_values_tooltip_text = (
     "Reset to Default",
     [
         "Reset objects or attributes to their default values.",
-        "Select channels in the Channel Box to reset only specific attributes.",
+        "Select channels in the Channel Box to default only specific attributes.",
     ],
-    media.asset_path("reset_animation_image"),
+    media.asset_path("default_animation_image"),
 )
 
 delete_animation_tooltip_text = (
@@ -543,7 +543,7 @@ insert_inbetween_tooltip_text = (
     media.insert_inbetween_image,
 )
 
-static_tooltip_text = (
+delete_static_animation_tooltip_text = (
     "Delete Static Keys",
     ["Flatten the selected curve so it holds the value of its first selected key.", movie.delete_all_animation_static],
     media.delete_animation_image,
@@ -607,28 +607,28 @@ tracer_remove_tooltip_text = (
     media.remove_image,
 )
 
-reset_translations_tooltip_text = (
+default_translations_tooltip_text = (
     "Reset Translation",
     ["Reset only translation values on the current selection."],
-    media.asset_path("reset_animation_image"),
+    media.asset_path("default_animation_image"),
 )
 
-reset_rotations_tooltip_text = (
+default_rotations_tooltip_text = (
     "Reset Rotation",
     ["Reset only rotation values on the current selection."],
-    media.asset_path("reset_animation_image"),
+    media.asset_path("default_animation_image"),
 )
 
-reset_scales_tooltip_text = (
+default_scales_tooltip_text = (
     "Reset Scales",
     ["Reset only scale values on the current selection."],
-    media.asset_path("reset_animation_image"),
+    media.asset_path("default_animation_image"),
 )
 
-reset_trs_tooltip_text = (
+default_trs_tooltip_text = (
     "Reset Translation Rotation Scale",
     ["Reset translation, rotation, and scale values on the current selection."],
-    media.asset_path("reset_animation_image"),
+    media.asset_path("default_animation_image"),
 )
 
 quick_export_selection_sets_tooltip_text = (
@@ -726,10 +726,10 @@ graph_filter_tooltip_text = (
     ],
 )
 
-graph_reset_tooltip_text = (
+graph_default_tooltip_text = (
     "Reset Curves",
     ["Reset the selected curves to their default values."],
-    media.asset_path("reset_animation_image"),
+    media.asset_path("default_animation_image"),
 )
 
 tangent_cycle_matcher_tooltip_text = (
