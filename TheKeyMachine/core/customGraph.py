@@ -62,31 +62,37 @@ _DOCK_BOTTOM_GRAPH = "bottom_graph_editor"
 _DOCK_TOP_GRAPH = "top_graph_editor"
 _DOCK_BOTTOM_MENU = "bottom_menu"
 _DOCK_OPTIONS = (
+    (_DOCK_BOTTOM_MENU, "Under Menu", "Place the toolbar directly below the Graph Editor menu."),
     (_DOCK_TOP_GRAPH, "Top of Graph Editor", "Place the toolbar at the top of the Graph Editor."),
     (_DOCK_BOTTOM_GRAPH, "Bottom of Graph Editor", "Place the toolbar at the bottom of the Graph Editor."),
-    # (_DOCK_BOTTOM_MENU, "Bottom of Menu", "Place the toolbar directly below the Graph Editor menu."),
 )
+
+_ALIGNMENT_DICT = {
+    "Left": QtCore.Qt.AlignLeft,
+    "Center": QtCore.Qt.AlignHCenter,
+    "Right": QtCore.Qt.AlignRight,
+}
+
 _GRAPH_TOOLBAR_WIDGET = None
-
-
-def _normalize_dock_position(position=None):
-    allowed_positions = {position for position, _label, _description in _DOCK_OPTIONS}
-    position = position or settings.get_setting(_GRAPH_TOOLBAR_DOCK_SETTING, _DOCK_BOTTOM_GRAPH)
-    return position if position in allowed_positions else _DOCK_BOTTOM_GRAPH
 
 
 def _graph_toolbar_alignment():
     align_str = settings.get_setting("graph_toolbar_alignment", "Center")
-    if align_str == "Center":
-        return QtCore.Qt.AlignHCenter
-    if align_str == "Right":
-        return QtCore.Qt.AlignRight
-    return QtCore.Qt.AlignLeft
+    return _ALIGNMENT_DICT.get(align_str, QtCore.Qt.AlignHCenter)
 
 
 def _find_graph_editor_widget():
     graph_ptr = mui.MQtUtil.findControl("graphEditor1")
-    return wutil.get_maya_qt(graph_ptr, QtWidgets.QWidget) if graph_ptr else None
+    graph_qw = wutil.get_maya_qt(graph_ptr, QtWidgets.QWidget) if graph_ptr else None
+    if graph_qw:
+        for child in graph_qw.children():
+            if not isinstance(child, QtWidgets.QWidget):
+                continue
+            if isinstance(child, QtWidgets.QMenuBar) or child.objectName() == _GRAPH_TOOLBAR_OBJECT:
+                continue
+            if child.layout():
+                return child
+    return graph_qw
 
 
 def getCustomGraphWidget():
@@ -141,61 +147,28 @@ def removeCustomGraph() -> None:
     _GRAPH_TOOLBAR_WIDGET = None
     graphToolbarApi.emit_graph_toolbar_state()
 
-
-def _show_graph_editor() -> None:
-    """Open and raise Maya's Graph Editor window for explicit toolbar launches."""
-    try:
-        cmds.GraphEditor()
-    except Exception:
-        pass
-
-    try:
-        if cmds.window("graphEditor1Window", exists=True):
-            cmds.showWindow("graphEditor1Window")
-    except Exception:
-        pass
-
-    try:
-        ptr = mui.MQtUtil.findWindow("graphEditor1Window")
-        graph_window = wutil.get_maya_qt(ptr, QtWidgets.QWidget) if ptr else None
-        if graph_window:
-            if hasattr(graph_window, "showNormal"):
-                graph_window.showNormal()
-            graph_window.raise_()
-            graph_window.activateWindow()
-    except Exception:
-        pass
-
-
 # -----------------------------------------------------------------------------------------------------------------------------
 #                                                       customGraph build                                                     #
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-def apply_base_stylesheet(button):
-    """Fallback stylesheet for standard buttons if needed"""
-    pass
-
-
-def _place_graph_toolbar_widget(toolbar_widget, dock_position=None):
-    dock_position = _normalize_dock_position(dock_position)
-
-    graph_qw = _find_graph_editor_widget()
+def _place_graph_toolbar_widget(toolbar_widget, dock_position=None, graph_qw=None):
+    if not graph_qw:
+        graph_qw = _find_graph_editor_widget()
     graph_layout = graph_qw.layout() if graph_qw else None
-    if not graph_layout or not wutil.is_valid_widget(toolbar_widget):
-        return False
 
     parent = toolbar_widget.parentWidget()
     if parent and parent.layout():
         parent.layout().removeWidget(toolbar_widget)
     toolbar_widget.setParent(graph_qw)
 
-    if dock_position == _DOCK_TOP_GRAPH:
-        graph_layout.insertWidget(0, toolbar_widget)
-    # if dock_position == _DOCK_BOTTOM_MENU:
-    #     graph_layout.insertWidget(0, toolbar_widget)
-    # elif dock_position == _DOCK_TOP_GRAPH:
-    #     graph_layout.insertWidget(0, toolbar_widget)
+    if hasattr(graph_layout, "insertWidget"):
+        if dock_position == _DOCK_BOTTOM_MENU:
+            graph_layout.insertWidget(0, toolbar_widget)
+        elif dock_position == _DOCK_TOP_GRAPH:
+            graph_layout.insertWidget(1, toolbar_widget)
+        else:  # _DOCK_BOTTOM_GRAPH
+            graph_layout.addWidget(toolbar_widget)
     else:
         graph_layout.addWidget(toolbar_widget)
 
@@ -227,7 +200,6 @@ def applyCustomGraphAlignment(alignment_label=None):
 
 
 def moveCustomGraphDock(position=None):
-    position = _normalize_dock_position(position)
     settings.set_setting(_GRAPH_TOOLBAR_DOCK_SETTING, position)
     toolbar_widget = getCustomGraphWidget()
     if toolbar_widget and wutil.is_valid_widget(toolbar_widget):
@@ -432,7 +404,12 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     if "graphEditor1" not in graph_vis:
         if not force:
             return
-        _show_graph_editor()
+
+        if cmds.window("graphEditor1Window", exists=True):
+            cmds.showWindow("graphEditor1Window")
+        else:
+            cmds.GraphEditor()
+
         graph_vis = cmds.getPanel(vis=True) or []
         if "graphEditor1" not in graph_vis:
             if _attempt < 5:
@@ -442,10 +419,10 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     removeCustomGraph()
 
     graph_qw = _find_graph_editor_widget()
-    if not graph_qw or not graph_qw.layout():
+    if not graph_qw:
         return
 
-    flow_qw = cw.QFlowContainer(graph_qw)
+    flow_qw = cw.QFlowContainer()
     flow_qw.setObjectName(_GRAPH_TOOLBAR_OBJECT)
     flow_qw.hide()
     _GRAPH_TOOLBAR_WIDGET = flow_qw
@@ -483,5 +460,5 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     flow_qw.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
     flow_qw.customContextMenuRequested.connect(_on_toolbar_context_menu)
 
-    _place_graph_toolbar_widget(flow_qw)
+    _place_graph_toolbar_widget(flow_qw, graph_qw=graph_qw)
     QtCore.QTimer.singleShot(50, flow_qw._update_height)
