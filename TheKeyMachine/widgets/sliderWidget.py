@@ -6,11 +6,11 @@ import importlib
 import traceback
 
 try:
-    from PySide6.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker  # type: ignore
+    from PySide6.QtCore import Qt, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker  # type: ignore
     from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup, QIcon  # type: ignore
     from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout  # type: ignore
 except ImportError:
-    from PySide2.QtCore import Qt, QObject, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker  # type: ignore
+    from PySide2.QtCore import Qt, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker  # type: ignore
     from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QIcon  # type: ignore
     from PySide2.QtWidgets import QWidget, QHBoxLayout, QSizePolicy, QSlider, QPushButton, QActionGroup, QStyle, QStyleOptionSlider, QLayout  # type: ignore
 
@@ -32,18 +32,20 @@ importlib.reload(cw)
 importlib.reload(settings)
 
 
-class _GlobalSignals(QObject):
-    overshootChanged = Signal(bool)
-    eulerFilterChanged = Signal(bool)
-
-
-globalSignals = _GlobalSignals()
-
-
 class SliderMode:
     """Professional object representation of a slider mode."""
 
-    def __init__(self, key, label=None, icon=None, description="", worldSpace=False, frameButtons=False, shortcut=None):
+    def __init__(
+        self,
+        key,
+        label=None,
+        icon=None,
+        description="",
+        worldSpace=False,
+        frameButtons=False,
+        shortcut=None,
+        tooltip_template=None,
+    ):
         self.key = key
         self.label = label or key.replace("_", " ").title()
         self.icon = icon  # Short text for the handle
@@ -51,6 +53,7 @@ class SliderMode:
         self.worldSpace = worldSpace
         self.frameButtons = frameButtons
         self.shortcut = list(shortcut or [])
+        self.tooltip_template = tooltip_template
 
     def __repr__(self):
         return f"<SliderMode {self.key}>"
@@ -731,7 +734,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         # Connect to global signal and initialize
         self.setOvershoot(settings.get_setting("sliders_overshoot", False))
-        globalSignals.overshootChanged.connect(self.setOvershoot)
+        runtime.get_runtime_manager().overshootChanged.connect(self.setOvershoot)
 
         # add to provided layout, if any
         if p is not None:
@@ -1015,7 +1018,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             if shortcut_text:
                 label = "{}\t{}".format(mode.label, shortcut_text)
 
-            act = menu.addAction(label, description=mode.description)
+            act = menu.addAction(label, description=mode.description, tooltip_template=getattr(mode, "tooltip_template", None), label=mode.label)
             act.setCheckable(True)
             act.setActionGroup(group)
 

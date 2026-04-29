@@ -247,6 +247,29 @@ def safe_signal_connect(signal, slot):
         return False
 
 
+def set_checked_safely(widget, checked):
+    if not widget:
+        return False
+    block_signals = getattr(widget, "blockSignals", None)
+    previous = False
+    if callable(block_signals):
+        try:
+            previous = widget.blockSignals(True)
+        except Exception:
+            previous = False
+    try:
+        widget.setChecked(bool(checked))
+        return True
+    except Exception:
+        return False
+    finally:
+        if callable(block_signals):
+            try:
+                widget.blockSignals(previous)
+            except Exception:
+                pass
+
+
 def clear_tracked_connection(owner, attr_name):
     relay = getattr(owner, attr_name, None)
     if relay is None:
@@ -481,6 +504,10 @@ class ToolbarWindowToggle(QtCore.QObject):
             self._button.setChecked(bool(is_open))
         finally:
             self._syncing = False
+
+
+class WindowStateBus(QtCore.QObject):
+    stateChanged = QtCore.Signal(bool)
 
 
 class FloatingToolWindowMixin:

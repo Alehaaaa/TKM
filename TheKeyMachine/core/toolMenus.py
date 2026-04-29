@@ -23,6 +23,7 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.updater as updater
+import TheKeyMachine.core.tool_widgets as toolWidgets
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
 import TheKeyMachine.widgets.customWidgets as cw
 from TheKeyMachine.widgets import util as wutil
@@ -285,7 +286,7 @@ def add_main_preferences_menu(
 ):
     preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(media.settings_image), "Preferences")
     parent_menu.addMenu(preferences_menu, description="General toolbar options.")
-    setting_toggles = toolbar._settings_toggle_specs()
+    setting_toggles = toolWidgets.setting_toggle_specs()
 
     preferences_menu.addSection("Startup")
     preferences_menu.addAction(
@@ -327,12 +328,12 @@ def add_main_preferences_menu(
             description=spec.get("description", ""),
         )
         action.toggled.connect(spec["set_checked"])
-        toolbar._bind_setting_toggle(action, spec)
+        toolWidgets.bind_setting_toggle(action, spec)
         display_actions.append((action, spec))
 
     def _sync_display_actions():
         for action, spec in display_actions:
-            toolbar._sync_setting_toggle(action, spec)
+            toolWidgets.sync_setting_toggle(action, spec)
 
     parent_menu.aboutToShow.connect(_sync_display_actions)
     preferences_menu.aboutToShow.connect(_sync_display_actions)

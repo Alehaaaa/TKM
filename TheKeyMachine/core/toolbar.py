@@ -67,10 +67,10 @@ import TheKeyMachine.core.customGraph as cg  # type: ignore
 import TheKeyMachine.mods.updater as updater  # type: ignore
 import TheKeyMachine.core.toolMenus as toolMenus  # type: ignore
 import TheKeyMachine.core.toolbox as toolbox  # type: ignore
+import TheKeyMachine.core.tool_widgets as toolWidgets  # type: ignore
 import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
 import TheKeyMachine.core.trigger as trigger  # type: ignore
 import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
-import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
 import TheKeyMachine.tools.ibookmarks.api as iBookmarksApi  # type: ignore
@@ -109,6 +109,7 @@ mods = [
     sliders,
     toolMenus,
     toolbox,
+    toolWidgets,
     animationOffsetApi,
     graphToolbarApi,
     microMoveApi,
@@ -502,115 +503,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Make the workspaceControl call just once
         cmds.workspaceControl(WORKSPACE_CONTROL_NAME, **kwargs)
 
-    def _settings_toggle_specs(self):
-        def _get_overshoot():
-            return settings.get_setting("sliders_overshoot", False)
-
-        def _set_overshoot(state):
-            settings.set_setting("sliders_overshoot", bool(state))
-            sw.globalSignals.overshootChanged.emit(bool(state))
-
-        def _get_euler_filter():
-            return settings.get_setting(
-                "euler_filter",
-                True,
-                namespace=attributeSwitcherApi.ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
-            )
-
-        def _set_euler_filter(state):
-            settings.set_setting(
-                "euler_filter",
-                bool(state),
-                namespace=attributeSwitcherApi.ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
-            )
-            dlg = attributeSwitcherApi.get_attribute_switcher_window()
-            if dlg and wutil.is_valid_widget(dlg):
-                try:
-                    dlg.euler_filter = bool(state)
-                except Exception:
-                    pass
-            sw.globalSignals.eulerFilterChanged.emit(bool(state))
-
-        def _set_graph_toolbar(state):
-            report.safe_execute(
-                graphToolbarApi.set_graph_toolbar_enabled,
-                bool(state),
-                apply=True,
-                context="graph toolbar toggle",
-            )
-
-        return {
-            "overshoot_sliders": {
-                "key": "overshoot_sliders",
-                "label": "Overshoot Sliders",
-                "menu_label": "Overshoot Sliders",
-                "text": "OS",
-                "icon": media.sliders_overshoot_image,
-                "description": "Set range for sliders to -150/150, from -100/100.",
-                "get_checked": _get_overshoot,
-                "set_checked": _set_overshoot,
-                "changed_signal": sw.globalSignals.overshootChanged,
-            },
-            "attribute_switcher_euler_filter": {
-                "key": "attribute_switcher_euler_filter",
-                "label": "Auto Euler Filter",
-                "menu_label": "Auto Euler Filter",
-                "text": "EF",
-                "icon": media.euler_filter_image,
-                "description": "Apply Euler filtering after Attribute Switcher changes rotation order.",
-                "get_checked": _get_euler_filter,
-                "set_checked": _set_euler_filter,
-                "changed_signal": sw.globalSignals.eulerFilterChanged,
-            },
-            "custom_graph": {
-                "key": "custom_graph",
-                "label": "Graph Editor Toolbar",
-                "menu_label": "Show Graph Editor Toolbar",
-                "text": "GE",
-                "icon": media.customGraph_image,
-                "description": "Show the TKM toolbar in the Graph Editor.",
-                "get_checked": graphToolbarApi.get_graph_toolbar_checkbox_state,
-                "set_checked": _set_graph_toolbar,
-                "changed_signal": graphToolbarApi.custom_graph_bus.graph_toolbar_enabled_changed,
-            },
-        }
-
-    def _set_checked_safely(self, widget, checked):
-        if widget is None or not isValid(widget):
-            return
-        try:
-            previous = widget.blockSignals(True)
-        except Exception:
-            previous = False
-        try:
-            widget.setChecked(bool(checked))
-        except Exception:
-            pass
-        try:
-            widget.blockSignals(previous)
-        except Exception:
-            pass
-
-    def _sync_setting_toggle(self, widget, spec):
-        self._set_checked_safely(widget, spec["get_checked"]())
-
-    def _bind_setting_toggle(self, widget, spec):
-        if widget is None:
-            return
-        widget.setCheckable(True)
-        self._sync_setting_toggle(widget, spec)
-
-        def _sync(_enabled=None, w=widget, s=spec):
-            if w is None or not isValid(w):
-                return
-            self._sync_setting_toggle(w, s)
-
-        signal = spec.get("changed_signal")
-        try:
-            signal.connect(_sync)
-        except Exception:
-            pass
-
     def create_shelf_icon(self, *args):
         button_name = "TheKeyMachine"
         command = "import TheKeyMachine;TheKeyMachine.toggle()"
@@ -775,16 +667,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 button_widget.blockSignals(blocked)
 
     def _create_nudge_value_widget(self, sec, item_data):
-        self.move_keyframes_intField = cw.QFlatSpinBox()
-        self.move_keyframes_intField.setFixedWidth(wutil.DPI(50))
-        sec.addWidget(
-            self.move_keyframes_intField,
-            item_data.get("label", "Nudge Value"),
-            item_data.get("key", "nudge_value"),
-            default=item_data.get("default", True),
-            tooltip_template=item_data.get("tooltip_template"),
-        )
-        return self.move_keyframes_intField
+        return toolWidgets.create_widget_from_data(sec, item_data, owner=self)
 
     def _create_selector_widget(self, sec, item_data):
         selector_tool = toolbox.get_tool("selector", **{k: v for k, v in item_data.items() if k not in {"id", "shortcuts"}})
@@ -842,36 +725,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         return btn
 
     def _create_setting_toggle_widget(self, sec, item_data, spec_key):
-        specs = self._settings_toggle_specs()
-        spec = specs.get(spec_key)
-        if not spec:
-            return None
-
-        # Build descriptor bridging specs to tool buttons
-        data = {
-            "key": spec["key"],
-            "label": spec["label"],
-            "text": spec.get("text"),
-            "icon": spec.get("icon"),
-            "description": spec.get("description", ""),
-            "checkable": True,
-            "set_checked_fn": spec["get_checked"],
-            "bind_checked_fn": lambda widget, s=spec: self._bind_setting_toggle(widget, s),
-            "callback": spec["set_checked"],
-        }
-
-        btn = cw.create_tool_button_from_data(data)
-        sec.addWidget(btn, data["label"], data["key"], default=item_data.get("default", True))
-        return btn
+        data = dict(item_data)
+        data["key"] = spec_key
+        return toolWidgets.create_widget_from_data(sec, data, owner=self)
 
     def _create_toolbar_widget_from_data(self, sec, item):
         widget_key = item.get("key") or item.get("id")
         factory_name = f"_create_{widget_key}_widget"
         if hasattr(self, factory_name):
             return getattr(self, factory_name)(sec, item)
-        else:
-            return self._create_setting_toggle_widget(sec, item, widget_key)
-        return None
+        return toolWidgets.create_widget_from_data(sec, item, owner=self)
 
     def _add_group_items(self, sec, items):
         group_tools = [item for item in items if not (isinstance(item, dict) and item.get("type") == "widget")]

@@ -166,13 +166,7 @@ def load_orbit_configuration():
 
 
 orbit_configuration = load_orbit_configuration()
-
-
-class OrbitWindowBus(QtCore.QObject):
-    stateChanged = QtCore.Signal(bool)
-
-
-orbit_window_bus = OrbitWindowBus()
+orbit_window_bus = toolCommon.WindowStateBus()
 
 
 def get_orbit_window():

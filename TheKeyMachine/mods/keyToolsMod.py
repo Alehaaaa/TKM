@@ -833,12 +833,9 @@ def clear_selected_keys(*args):
 
 def __get_move_keyframes_offset():
     try:
-        from TheKeyMachine.core.toolbar import get_toolbar
+        from TheKeyMachine.core import trigger
 
-        tb = get_toolbar()
-
-        if tb and hasattr(tb, "move_keyframes_intField"):
-            return int(tb.move_keyframes_intField.value())
+        return trigger.nudge_value()
     except Exception:
         pass
     return 1

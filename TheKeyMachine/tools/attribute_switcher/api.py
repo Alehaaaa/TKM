@@ -5,6 +5,7 @@ except ImportError:
 
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.settingsMod as settings
+import TheKeyMachine.core.runtime_manager as runtime
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools.attribute_switcher.common import (
@@ -18,12 +19,7 @@ from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
 _attribute_switcher_instance = None
 
 
-class AttributeSwitcherWindowBus(QtCore.QObject):
-    stateChanged = QtCore.Signal(bool)
-    eulerFilterChanged = QtCore.Signal(bool)
-
-
-attribute_switcher_window_bus = AttributeSwitcherWindowBus()
+attribute_switcher_window_bus = toolCommon.WindowStateBus()
 
 
 def _parent_widget():
@@ -47,38 +43,14 @@ def get_attribute_switcher_euler_filter_enabled():
 
 def emit_attribute_switcher_euler_filter_state():
     try:
-        import TheKeyMachine.widgets.sliderWidget as sw
-
-        sw.globalSignals.eulerFilterChanged.emit(get_attribute_switcher_euler_filter_enabled())
+        runtime.get_runtime_manager().eulerFilterChanged.emit(get_attribute_switcher_euler_filter_enabled())
     except Exception:
         pass
-
-
-def _set_checked_safely(widget, checked):
-    block_signals = getattr(widget, "blockSignals", None)
-    previous = False
-    if callable(block_signals):
-        try:
-            previous = widget.blockSignals(True)
-        except Exception:
-            previous = False
-    try:
-        widget.setChecked(bool(checked))
-    except Exception:
-        pass
-    finally:
-        if callable(block_signals):
-            try:
-                widget.blockSignals(previous)
-            except Exception:
-                pass
 
 
 def bind_attribute_switcher_euler_filter_toggle(widget):
     if widget is None:
         return
-
-    import TheKeyMachine.widgets.sliderWidget as sw
 
     def _sync(enabled):
         try:
@@ -86,13 +58,13 @@ def bind_attribute_switcher_euler_filter_toggle(widget):
                 return
         except Exception:
             pass
-        _set_checked_safely(widget, bool(enabled))
+        toolCommon.set_checked_safely(widget, bool(enabled))
 
-    _set_checked_safely(widget, get_attribute_switcher_euler_filter_enabled())
+    toolCommon.set_checked_safely(widget, get_attribute_switcher_euler_filter_enabled())
     toolCommon.replace_tracked_connection(
         widget,
         "_tkm_attribute_switcher_euler_filter_sync_relay",
-        sw.globalSignals.eulerFilterChanged,
+        runtime.get_runtime_manager().eulerFilterChanged,
         _sync,
         parent=widget,
     )
@@ -223,23 +195,13 @@ def build_attribute_switcher_context_menu(parent=None):
     return menu
 
 
-def _show_attribute_switcher_toolbar_context_menu(button, pos):
-    menu = build_attribute_switcher_context_menu(parent=button)
-    exec_fn = getattr(menu, "exec", None) or getattr(menu, "exec_", None)
-    exec_fn(button.mapToGlobal(pos))
-
-
 def bind_attribute_switcher_toolbar_button(button):
-    attribute_switcher_toolbar_toggle.attach_button(button)
-    if button:
-        button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        toolCommon.replace_tracked_connection(
-            button,
-            "_tkm_attribute_switcher_context_menu_slot",
-            button.customContextMenuRequested,
-            lambda pos, b=button: _show_attribute_switcher_toolbar_context_menu(b, pos),
-            parent=button,
-        )
+    toolCommon.bind_toolbar_button_context_menu(
+        attribute_switcher_toolbar_toggle,
+        button,
+        "_tkm_attribute_switcher_context_menu_slot",
+        lambda parent: build_attribute_switcher_context_menu(parent=parent),
+    )
 
 
 def toggle_attribute_switcher_window():

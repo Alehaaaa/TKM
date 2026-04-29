@@ -58,27 +58,6 @@ def _disconnect_graph_toolbar_sync(callback) -> None:
     custom_graph_bus._tkm_graph_toolbar_sync_relays = remaining
 
 
-def _set_checked_safely(widget, checked: bool) -> bool:
-    signal_blocker = getattr(widget, "blockSignals", None)
-    blocked = False
-    if callable(signal_blocker):
-        try:
-            blocked = widget.blockSignals(True)
-        except Exception:
-            blocked = False
-    try:
-        widget.setChecked(bool(checked))
-        return True
-    except Exception:
-        return False
-    finally:
-        if callable(signal_blocker):
-            try:
-                widget.blockSignals(blocked)
-            except Exception:
-                pass
-
-
 def bind_graph_toolbar_toggle(widget) -> None:
     if widget is None:
         return
@@ -91,11 +70,11 @@ def bind_graph_toolbar_toggle(widget) -> None:
         except Exception:
             pass
 
-        if not _set_checked_safely(widget, bool(enabled)):
+        if not toolCommon.set_checked_safely(widget, bool(enabled)):
             _disconnect_graph_toolbar_sync(_sync)
 
     try:
-        _set_checked_safely(widget, get_graph_toolbar_checkbox_state())
+        toolCommon.set_checked_safely(widget, get_graph_toolbar_checkbox_state())
     except Exception:
         pass
 

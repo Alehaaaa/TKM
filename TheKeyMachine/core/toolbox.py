@@ -234,16 +234,22 @@ TOOL_DEFINITIONS = {
     "overshoot_sliders": {
         "type": "check",
         "label": "Overshoot Sliders",
+        "menu_label": "Overshoot Sliders",
         "text": "OS",
         "icon": media.sliders_overshoot_image,
         "callback": trigger.make_command_callback("overshoot_sliders"),
+        "description": "Set range for sliders to -150/150, from -100/100.",
+        "setting_toggle": "overshoot_sliders",
     },
     "attribute_switcher_euler_filter": {
         "type": "check",
         "label": "Auto Euler Filter",
+        "menu_label": "Auto Euler Filter",
         "text": "EF",
         "icon": media.euler_filter_image,
         "callback": trigger.make_command_callback("attribute_switcher_euler_filter"),
+        "description": "Apply Euler filtering after Attribute Switcher changes rotation order.",
+        "setting_toggle": "attribute_switcher_euler_filter",
     },
     "nudge_left": {
         "type": "tool",
@@ -437,10 +443,13 @@ TOOL_DEFINITIONS = {
     "custom_graph": {
         "type": "check",
         "label": "Graph Editor Toolbar",
+        "menu_label": "Show Graph Editor Toolbar",
         "text": "GE",
         "icon": media.customGraph_image,
         "callback": trigger.make_command_callback("custom_graph"),
         "tooltip_template": helper.customGraph_tooltip_text,
+        "description": "Show the TKM toolbar in the Graph Editor.",
+        "setting_toggle": "custom_graph",
     },
     "extra_graph_tools": {
         "type": "menu",
@@ -1613,37 +1622,6 @@ TOOLBAR_SECTION_LAYOUTS = {
 }
 
 
-def _resolve_tool_definition(tool_key, tool_state):
-    """
-    Finalizes a tool definition before use.
-    Ensures canonical ids exist and callbacks are bound.
-    """
-    res = dict(tool_state)
-    res.setdefault("id", tool_key)
-    res.setdefault("key", tool_key)
-    res.setdefault("default", False)
-
-    callback = res.get("callback")
-    if callback:
-        if getattr(callback, "__name__", None) != tool_key:
-            res["callback"] = trigger.make_command_callback(tool_key, callback)
-        elif not getattr(callback, "_tkm_trigger_proxy", False):
-            trigger.register_command(tool_key, callback)
-    return res
-
-
-def _keys_to_mask(keys):
-    keys = keys or []
-    mask = 0
-    if QtCore.Qt.Key_Shift in keys:
-        mask |= 1
-    if QtCore.Qt.Key_Control in keys:
-        mask |= 4
-    if QtCore.Qt.Key_Alt in keys:
-        mask |= 8
-    return mask
-
-
 def _item_options(item, *, exclude_keys=False):
     ignored = {"id", "section", "widget", "shortcuts"}
     if exclude_keys:
@@ -1651,61 +1629,42 @@ def _item_options(item, *, exclude_keys=False):
     return {key: value for key, value in item.items() if key not in ignored}
 
 
-def _shortcut_display(tool_state, keys):
-    return {
-        "icon": tool_state.get("icon"),
-        "label": tool_state.get("label") or tool_state.get("status_title") or tool_state.get("id"),
-        "keys": keys,
-    }
-
-
-def _resolve_shortcut_item(item):
-    keys = item.get("keys", [])
-
-    if item.get("id"):
-        variant = get_tool(item["id"], **_item_options(item, exclude_keys=True))
-    else:
-        return None, None
-
-    variant["mask"] = _keys_to_mask(keys)
-    variant.setdefault("shortcuts", [_shortcut_display(variant, "Click")])
-    return variant, _shortcut_display(variant, keys)
-
-
-def _apply_section_shortcuts(tool, item):
+def _apply_shortcuts(tool, item):
     shortcut_items = item.get("shortcuts") or []
     if not shortcut_items:
         return tool
 
-    resolved_shortcuts = [_shortcut_display(tool, "Click")]
+    key_masks = (
+        (QtCore.Qt.Key_Shift, 1),
+        (QtCore.Qt.Key_Control, 4),
+        (QtCore.Qt.Key_Alt, 8),
+    )
+
+    def shortcut_display(tool_state, keys):
+        return {
+            "icon": tool_state.get("icon"),
+            "label": tool_state.get("label") or tool_state.get("status_title") or tool_state.get("id"),
+            "keys": keys,
+        }
+
+    def shortcut_mask(keys):
+        return sum(mask for key, mask in key_masks if key in (keys or []))
+
+    shortcuts = [shortcut_display(tool, "Click")]
     variants = []
     for shortcut_item in shortcut_items:
-        variant, shortcut = _resolve_shortcut_item(shortcut_item)
-        if variant is None:
+        tool_id = shortcut_item.get("id")
+        if not tool_id:
             continue
-        resolved_shortcuts.append(shortcut)
+        variant = get_tool(tool_id, **_item_options(shortcut_item, exclude_keys=True))
+        variant["mask"] = shortcut_mask(shortcut_item.get("keys", []))
+        variant.setdefault("shortcuts", [shortcut_display(variant, "Click")])
+        shortcuts.append(shortcut_display(variant, shortcut_item.get("keys", [])))
         variants.append(variant)
 
-    tool["shortcuts"] = resolved_shortcuts
+    tool["shortcuts"] = shortcuts
     tool["shortcut_variants"] = variants
     return tool
-
-
-def _resolve_section_item_data(item):
-    if item == "separator":
-        return "separator"
-
-    if item.get("id"):
-        tool = get_tool(item["id"], **_item_options(item))
-        return _apply_section_shortcuts(tool, item)
-
-    if item.get("type") == "widget":
-        tool_id = item.get("id") or item.get("key")
-        if tool_id and tool_id in TOOL_DEFINITIONS:
-            return get_tool(tool_id, **_item_options(item))
-        return dict(item)
-
-    return None
 
 
 def get_tool(tool_id, **overrides):
@@ -1713,29 +1672,43 @@ def get_tool(tool_id, **overrides):
     if tool_id not in TOOL_DEFINITIONS:
         raise KeyError("Unknown tool id: {}".format(tool_id))
 
-    # Merge base definition with overrides
     tool = dict(TOOL_DEFINITIONS[tool_id])
     tool.update(overrides)
-    return _resolve_tool_definition(tool_id, tool)
+    tool.setdefault("id", tool_id)
+    tool.setdefault("key", tool_id)
+    tool.setdefault("default", False)
+
+    callback = tool.get("callback")
+    if callback:
+        if getattr(callback, "__name__", None) != tool_id:
+            tool["callback"] = trigger.make_command_callback(tool_id, callback)
+        elif not getattr(callback, "_tkm_trigger_proxy", False):
+            trigger.register_command(tool_id, callback)
+    return tool
 
 
 def _resolve_section_item(item):
     if isinstance(item, str):
         return item
 
-    if item.get("section"):
-        section = get_tool_section(item["section"])
+    section_ref = item.get("section") or item.get("group")
+    if section_ref:
+        section = get_tool_section(section_ref)
         if section:
             return {"type": "group", "items": section.get("items", []), "label": section.get("label")}
         return []
 
-    if item.get("group"):
-        group = get_tool_section(item["group"])
-        if group:
-            return {"type": "group", "items": group.get("items", []), "label": group.get("label")}
-        return []
+    tool_id = item.get("id")
+    if tool_id:
+        return _apply_shortcuts(get_tool(tool_id, **_item_options(item)), item)
 
-    return _resolve_section_item_data(item)
+    if item.get("type") == "widget":
+        tool_id = item.get("key")
+        if tool_id and tool_id in TOOL_DEFINITIONS:
+            return get_tool(tool_id, **_item_options(item))
+        return dict(item)
+
+    return None
 
 
 def get_tool_section(section_id, resolve_items=True):
@@ -1762,58 +1735,51 @@ def get_tool_section(section_id, resolve_items=True):
     return section
 
 
-def _tool_color_to_hex(color):
-    if color is None:
-        return None
-    if hasattr(color, "base") and hasattr(color.base, "hex"):
-        return color.base.hex
-    if hasattr(color, "hex"):
-        return color.hex
-    return color
-
-
-def _section_item_tint_color(item, tool_key, inherited_color=None):
-    if item == "separator" or item is None:
-        return None
-
-    if isinstance(item, str):
-        return inherited_color if item == tool_key else None
-
-    if not isinstance(item, dict):
-        return None
-
-    if item.get("section") or item.get("group"):
-        section = TOOL_SECTION_DEFINITIONS.get(item.get("section") or item.get("group"))
-        if not section:
+def get_tool_tint_color(tool_key, default=None):
+    def color_to_hex(color):
+        if color is None:
             return None
-        section_color = section.get("color", inherited_color)
-        if section_color is None:
-            section_color = inherited_color
-        for child in section.get("items", []):
-            color = _section_item_tint_color(child, tool_key, inherited_color=section_color)
+        if hasattr(color, "base") and hasattr(color.base, "hex"):
+            return color.base.hex
+        if hasattr(color, "hex"):
+            return color.hex
+        return color
+
+    def find_tint(item, inherited_color=None):
+        if item == "separator" or item is None:
+            return None
+        if isinstance(item, str):
+            return inherited_color if item == tool_key else None
+        if not isinstance(item, dict):
+            return None
+
+        section_ref = item.get("section") or item.get("group")
+        if section_ref:
+            section = TOOL_SECTION_DEFINITIONS.get(section_ref)
+            if not section:
+                return None
+            section_color = section.get("color") or inherited_color
+            for child in section.get("items", []):
+                color = find_tint(child, inherited_color=section_color)
+                if color is not None:
+                    return color
+            return None
+
+        if (item.get("id") or item.get("key")) == tool_key:
+            return inherited_color
+
+        for shortcut in item.get("shortcuts") or []:
+            color = find_tint(shortcut, inherited_color=inherited_color)
             if color is not None:
                 return color
         return None
 
-    tool_id = item.get("id") or item.get("key")
-    if tool_id == tool_key:
-        return inherited_color
-
-    for shortcut in item.get("shortcuts") or []:
-        color = _section_item_tint_color(shortcut, tool_key, inherited_color=inherited_color)
-        if color is not None:
-            return color
-
-    return None
-
-
-def get_tool_tint_color(tool_key, default=None):
     for section in TOOL_SECTION_DEFINITIONS.values():
         section_color = section.get("color")
         for item in section.get("items", []):
-            color = _section_item_tint_color(item, tool_key, inherited_color=section_color)
+            color = find_tint(item, inherited_color=section_color)
             if color is not None:
-                return _tool_color_to_hex(color)
+                return color_to_hex(color)
     return default
 
 

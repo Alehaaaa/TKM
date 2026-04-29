@@ -332,6 +332,8 @@ class MenuWidget(QtWidgets.QMenu):
 
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
+        tooltip_template = kwargs.pop("tooltip_template", None)
+        tooltip_template = kwargs.pop("template", tooltip_template)
         callback = kwargs.pop("callback", None)
         label_override = kwargs.pop("label", None)
 
@@ -349,7 +351,16 @@ class MenuWidget(QtWidgets.QMenu):
                 label = arg
                 break
 
-        HelpSystem.push(action, label_override or label or action.text(), description)
+        title = label_override or toolCommon.get_tooltip_title(tooltip_template) or label or action.text()
+        resolved_description = _status_description(
+            description=description or "",
+            tooltip_template=tooltip_template,
+        )
+        if hasattr(action, "setProperty"):
+            action.setProperty("tkm_tooltip_template", tooltip_template)
+        if tooltip_template and hasattr(action, "setToolTip"):
+            action.setToolTip(str(tooltip_template))
+        HelpSystem.push(action, title, resolved_description)
         return action
 
     def addMenu(self, *args, **kwargs):
@@ -376,17 +387,18 @@ class MenuWidget(QtWidgets.QMenu):
         # Force push to Maya channels
         title = action.property("tkm_title") or action.text()
         desc = action.property("tkm_description") or ""
+        tooltip_template = action.property("tkm_tooltip_template") or None
         HelpSystem.push(action, title, desc)
 
         # Floating Tooltip
         if QFlatTooltipManager.enabled:
-            tooltip_template = (title, [desc], None) if desc else title
+            display_template = tooltip_template or ((title, [desc], None) if desc else title)
 
             geometry = self.actionGeometry(action)
             target_rect = QtCore.QRect(self.mapToGlobal(geometry.topLeft()), geometry.size())
             icon = action.icon() if not action.icon().isNull() else None
             QFlatTooltipManager.delayed_show(
-                text=title, anchor_widget=self, target_rect=target_rect, description=desc, tooltip_template=tooltip_template, icon_obj=icon
+                text=title, anchor_widget=self, target_rect=target_rect, description=desc, tooltip_template=display_template, icon_obj=icon
             )
 
     def hideEvent(self, event):
@@ -1089,18 +1101,29 @@ def _connect_tool_button_callback(button, callback, checkable=False, state_fn=No
 
         def _checked_cb(*args, cb=callback, b=button, fn=state_fn):
             checked = bool(args[0]) if args else b.isChecked()
-            b.triggerToolCallback(cb, checked)
+            runtime.set_active_tool_source(b)
             try:
-                valid = isValid(b)
-            except Exception:
-                valid = False
-            if valid:
-                _sync_checked_from_setting(b, fn)
+                b.triggerToolCallback(cb, checked)
+                try:
+                    valid = isValid(b)
+                except Exception:
+                    valid = False
+                if valid:
+                    _sync_checked_from_setting(b, fn)
+            finally:
+                runtime.clear_active_tool_source(b)
 
         button.clicked.connect(_checked_cb)
         return
 
-    button.clicked.connect(lambda *_args, cb=callback, b=button: b.triggerToolCallback(cb))
+    def _clicked_cb(*_args, cb=callback, b=button):
+        runtime.set_active_tool_source(b)
+        try:
+            return b.triggerToolCallback(cb)
+        finally:
+            runtime.clear_active_tool_source(b)
+
+    button.clicked.connect(_clicked_cb)
 
 
 class QFlowLayout(QtWidgets.QLayout):
@@ -1600,7 +1623,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._overlay_btn = QtWidgets.QToolButton(self)
             self._overlay_btn.setFixedSize(8, 8)
             self._overlay_btn.setVisible(False)
-            HelpSystem.push(self._overlay_btn, "Section Config", "Manage which tools are pinned for quick access.")
+            HelpSystem.push(self._overlay_btn, "Pinned Tools", "Manage which tools are pinned for quick access.")
 
             # Ensure the tiny button pushes its help to Maya on hover
             def _push_help(event, btn=self._overlay_btn):
@@ -2266,15 +2289,25 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 break
             parent = parent.parent()
 
-    def _add_checkable_menu_action(self, menu, key, label, checked, handler, description="", title=None, icon=None):
+    def _add_checkable_menu_action(
+        self,
+        menu,
+        key,
+        label,
+        checked,
+        handler,
+        description="",
+        title=None,
+        icon=None,
+        tooltip_template=None,
+    ):
         if icon and not icon.isNull():
-            action = menu.addAction(icon, label, description=description)
+            action = menu.addAction(icon, label, description=description, tooltip_template=tooltip_template, label=title)
         else:
-            action = menu.addAction(label, description=description)
+            action = menu.addAction(label, description=description, tooltip_template=tooltip_template, label=title)
         action.setCheckable(True)
         action.setChecked(bool(checked))
         action.triggered.connect(handler)
-        HelpSystem.push(action, title or label, description or "")
         menu._tkm_actions[key] = action
         return action
 
@@ -2317,6 +2350,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     make_mode_toggle(mode.key),
                     description=mode.description,
                     title=mode.label,
+                    tooltip_template=getattr(mode, "tooltip_template", None),
                 )
 
         else:
@@ -2337,6 +2371,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         self._make_toggle_handler(key, menu=menu),
                         description=item.get("description") or "",
                         title=item["label"],
+                        tooltip_template=item.get("tooltip_template"),
                     )
 
                     # If this widget has a registered action group, show its pinnable
@@ -2376,6 +2411,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                                 description=act_info.get("description") or "",
                                 title=act_label,
                                 icon=icon,
+                                tooltip_template=act_info.get("tooltip_template") or act_info.get("tooltip"),
                             )
                         menu.addSeparator()
 

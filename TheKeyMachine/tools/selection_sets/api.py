@@ -94,11 +94,7 @@ def _set_selection_sets_stays_on_top(enabled):
         win.apply_stay_on_top_setting()
 
 
-class SelectionSetsWindowBus(QtCore.QObject):
-    stateChanged = QtCore.Signal(bool)
-
-
-selection_sets_window_bus = SelectionSetsWindowBus()
+selection_sets_window_bus = toolCommon.WindowStateBus()
 
 
 def get_selection_sets_window():

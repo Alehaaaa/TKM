@@ -40,6 +40,7 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
 import TheKeyMachine.core.toolMenus as toolMenus
 import TheKeyMachine.core.toolbox as toolbox
+import TheKeyMachine.core.tool_widgets as toolWidgets
 import TheKeyMachine.core.trigger as trigger
 
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
@@ -50,7 +51,7 @@ import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.sliders as sliders  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 
-mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolMenus, toolbox, trigger]
+mods = [general, ui, keyTools, selSets, media, style, sw, cw, helper, sliders, toolMenus, toolbox, toolWidgets, trigger]
 
 for m in mods:
     importlib.reload(m)
@@ -66,6 +67,7 @@ _DOCK_OPTIONS = (
     (_DOCK_TOP_GRAPH, "Top of Graph Editor", "Place the toolbar at the top of the Graph Editor."),
     (_DOCK_BOTTOM_GRAPH, "Bottom of Graph Editor", "Place the toolbar at the bottom of the Graph Editor."),
 )
+_DOCK_POSITION_IDS = {position for position, _label, _description in _DOCK_OPTIONS}
 
 _ALIGNMENT_DICT = {
     "Left": QtCore.Qt.AlignLeft,
@@ -120,30 +122,22 @@ def getCustomGraphWidget():
     return None
 
 
-def _iter_graph_toolbar_widgets():
-    graph_qw = _find_graph_editor_widget()
-    if not graph_qw:
-        return []
-    return [widget for widget in graph_qw.findChildren(QtWidgets.QWidget, _GRAPH_TOOLBAR_OBJECT) if wutil.is_valid_widget(widget)]
-
-
-def _delete_graph_toolbar_widget(toolbar_widget):
-    if toolbar_widget and wutil.is_valid_widget(toolbar_widget):
-        try:
-            parent = toolbar_widget.parentWidget()
-            if parent and parent.layout():
-                parent.layout().removeWidget(toolbar_widget)
-            toolbar_widget.setObjectName("{}_deleted".format(_GRAPH_TOOLBAR_OBJECT))
-            toolbar_widget.setParent(None)
-            toolbar_widget.deleteLater()
-        except Exception:
-            pass
-
-
 def removeCustomGraph() -> None:
     global _GRAPH_TOOLBAR_WIDGET
-    for toolbar_widget in _iter_graph_toolbar_widgets():
-        _delete_graph_toolbar_widget(toolbar_widget)
+    graph_qw = _find_graph_editor_widget()
+    if graph_qw:
+        for toolbar_widget in graph_qw.findChildren(QtWidgets.QWidget, _GRAPH_TOOLBAR_OBJECT):
+            if not wutil.is_valid_widget(toolbar_widget):
+                continue
+            try:
+                parent = toolbar_widget.parentWidget()
+                if parent and parent.layout():
+                    parent.layout().removeWidget(toolbar_widget)
+                toolbar_widget.setObjectName("{}_deleted".format(_GRAPH_TOOLBAR_OBJECT))
+                toolbar_widget.setParent(None)
+                toolbar_widget.deleteLater()
+            except Exception:
+                pass
     _GRAPH_TOOLBAR_WIDGET = None
     graphToolbarApi.emit_graph_toolbar_state()
 
@@ -153,6 +147,11 @@ def removeCustomGraph() -> None:
 
 
 def _place_graph_toolbar_widget(toolbar_widget, dock_position=None, graph_qw=None):
+    if dock_position is None:
+        dock_position = settings.get_setting(_GRAPH_TOOLBAR_DOCK_SETTING, _DOCK_BOTTOM_GRAPH)
+    if dock_position not in _DOCK_POSITION_IDS:
+        dock_position = _DOCK_BOTTOM_GRAPH
+
     if not graph_qw:
         graph_qw = _find_graph_editor_widget()
     graph_layout = graph_qw.layout() if graph_qw else None
@@ -227,45 +226,6 @@ def ensureCustomGraph():
     return getCustomGraphWidget()
 
 
-def create_tool_button(
-    icon=None,
-    text="",
-    tooltip_template="",
-    description="",
-    command=None,
-    shortcuts=None,
-    shortcut_variants=None,
-    status_title=None,
-    status_description=None,
-    p=None,
-):
-    """Helper to create a QFlatToolButton with our tooltip system"""
-    btn = cw.create_tool_button_from_data(
-        {
-            "icon": icon,
-            "text": text,
-            "tooltip_template": tooltip_template,
-            "description": description,
-            "callback": command,
-            "shortcuts": shortcuts,
-            "shortcut_variants": shortcut_variants,
-            "status_title": status_title,
-            "status_description": status_description,
-        }
-    )
-    if p:
-        p.addWidget(btn)
-    return btn
-
-
-def create_toolbox_button(tool_id, p=None, **overrides):
-    tool_data = toolbox.get_tool(tool_id, **overrides)
-    btn = cw.create_tool_button_from_data(tool_data)
-    if p:
-        p.addWidget(btn)
-    return btn
-
-
 def _add_graph_slider_section_from_data(section_def, new_section_fn):
     sec = new_section_fn(color=section_def.get("color"))
     sec.set_settings_namespace("graph_toolbar_sliders")
@@ -330,40 +290,77 @@ def _add_graph_slider_section_from_data(section_def, new_section_fn):
     return sec
 
 
-def _add_graph_group_items(sec, items):
-    group_tools = [item for item in items if not (isinstance(item, dict) and item.get("type") == "widget")]
-    if group_tools:
-        sec.addWidgetGroup(group_tools)
-
-
-def _add_graph_tool_item(sec, item, graph_settings_menu_fn):
-    if item.get("key") == "settings":
-        settings_tool = dict(item)
-        settings_tool["menu"] = graph_settings_menu_fn
-        settings_btn = cw.create_tool_button_from_data(settings_tool)
+def _add_graph_section_items(sec, items, graph_settings_menu_fn, toolbar_widget=None):
+    def add_tool_item(item):
+        btn = cw.create_tool_button_from_data(item)
         sec.addWidget(
-            settings_btn,
-            settings_tool.get("label", "Settings"),
-            settings_tool.get("key", "settings"),
-            default=settings_tool.get("default", True),
-            description=settings_tool.get("description"),
+            btn,
+            item.get("label", ""),
+            item.get("key", ""),
+            default=item.get("default", True),
+            description=item.get("description"),
+            tooltip_template=item.get("tooltip_template"),
+            pinnable=item.get("pinnable", True),
         )
-        return settings_btn
+        return btn
 
-    btn = cw.create_tool_button_from_data(item)
-    sec.addWidget(
-        btn,
-        item.get("label", ""),
-        item.get("key", ""),
-        default=item.get("default", True),
-        description=item.get("description"),
-        tooltip_template=item.get("tooltip_template"),
-        pinnable=item.get("pinnable", True),
-    )
-    return btn
+    for item in items:
+        if item == "separator":
+            sec.addSeparator()
+            continue
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") == "widget":
+            toolWidgets.create_widget_from_data(sec, item, owner=toolbar_widget)
+            continue
+        if item.get("type") == "group":
+            _add_graph_group(sec, item.get("items", []), graph_settings_menu_fn, toolbar_widget=toolbar_widget)
+            continue
+
+        if item.get("key") == "settings":
+            settings_tool = dict(item)
+            settings_tool["menu"] = graph_settings_menu_fn
+            settings_btn = cw.create_tool_button_from_data(settings_tool)
+            sec.addWidget(
+                settings_btn,
+                settings_tool.get("label", "Settings"),
+                settings_tool.get("key", "settings"),
+                default=settings_tool.get("default", True),
+                description=settings_tool.get("description"),
+            )
+            continue
+
+        add_tool_item(item)
 
 
-def _populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn):
+def _add_graph_group(sec, items, graph_settings_menu_fn, toolbar_widget=None):
+    group_run = []
+
+    def flush_group_run():
+        if not group_run:
+            return
+        while group_run and group_run[0] == "separator":
+            sec.addSeparator()
+            group_run.pop(0)
+        if group_run:
+            sec.addWidgetGroup(list(group_run))
+        group_run[:] = []
+
+    for item in items:
+        if isinstance(item, dict) and item.get("type") == "widget":
+            flush_group_run()
+            toolWidgets.create_widget_from_data(sec, item, owner=toolbar_widget)
+            continue
+        if isinstance(item, dict) and item.get("type") == "group":
+            flush_group_run()
+            _add_graph_group(sec, item.get("items", []), graph_settings_menu_fn, toolbar_widget=toolbar_widget)
+            continue
+        group_run.append(item)
+
+    flush_group_run()
+
+
+def _populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn, toolbar_widget=None):
     sections = toolbox.get_toolbar_sections("graph", resolve_items=False)
     grouped_section_ids = {"graph_key_tools", "default_tools"}
     for section_def in sections:
@@ -377,21 +374,10 @@ def _populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn):
         )
         resolved_section = toolbox.get_tool_section(section_def["id"])
         if section_def["id"] in grouped_section_ids:
-            _add_graph_group_items(sec, resolved_section["items"])
+            _add_graph_group(sec, resolved_section["items"], graph_settings_menu_fn, toolbar_widget=toolbar_widget)
             continue
 
-        for item in resolved_section["items"]:
-            if item == "separator":
-                sec.addSeparator()
-                continue
-
-            if isinstance(item, dict):
-                if item.get("type") == "group":
-                    _add_graph_group_items(sec, item.get("items", []))
-                    continue
-                if item.get("type") == "widget":
-                    continue
-                _add_graph_tool_item(sec, item, graph_settings_menu_fn)
+        _add_graph_section_items(sec, resolved_section["items"], graph_settings_menu_fn, toolbar_widget=toolbar_widget)
 
 
 def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs):
@@ -449,7 +435,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
             remove_toolbar_fn=removeCustomGraph,
         )
 
-    _populate_graph_toolbar_from_layout(new_section, _build_graph_settings_menu)
+    _populate_graph_toolbar_from_layout(new_section, _build_graph_settings_menu, toolbar_widget=flow_qw)
 
     def _on_toolbar_context_menu(pos):
         if flow_qw.childAt(pos):

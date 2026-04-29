@@ -165,9 +165,39 @@ def _toolbar():
     return get_toolbar()
 
 
-def _nudge_value(default: int = 1) -> int:
+def _owner_nudge_widget(source_widget):
+    widget = source_widget
+    while widget is not None:
+        nudge_widget = getattr(widget, "move_keyframes_intField", None)
+        if nudge_widget is not None:
+            return nudge_widget
+        try:
+            widget = widget.parentWidget()
+        except Exception:
+            return None
+    return None
+
+
+def _fallback_nudge_widget():
     toolbar = _toolbar()
     widget = getattr(toolbar, "move_keyframes_intField", None)
+    if widget is not None:
+        return widget
+    try:
+        from TheKeyMachine.core import customGraph
+
+        graph_toolbar = customGraph.getCustomGraphWidget()
+        return getattr(graph_toolbar, "move_keyframes_intField", None)
+    except Exception:
+        return None
+
+
+def nudge_value(default: int = 1, source_widget=None) -> int:
+    import TheKeyMachine.core.runtime_manager as runtime
+
+    widget = _owner_nudge_widget(source_widget or runtime.get_active_tool_source())
+    if widget is None:
+        widget = _fallback_nudge_widget()
     if widget is None:
         return default
     try:
@@ -175,6 +205,10 @@ def _nudge_value(default: int = 1) -> int:
     except Exception:
         return default
     return value or default
+
+
+def _nudge_value(default: int = 1) -> int:
+    return nudge_value(default=default)
 
 
 def _toggle_animation_offset(*_args, **_kwargs):
@@ -212,11 +246,11 @@ def _toggle_graph_toolbar(state: bool = True, *_args, **_kwargs):
 
 def _toggle_sliders_overshoot(*_args, **_kwargs):
     import TheKeyMachine.mods.settingsMod as settings
-    import TheKeyMachine.widgets.sliderWidget as sw
+    import TheKeyMachine.core.runtime_manager as runtime
 
     state = not bool(settings.get_setting("sliders_overshoot", False))
     settings.set_setting("sliders_overshoot", state)
-    sw.globalSignals.overshootChanged.emit(state)
+    runtime.get_runtime_manager().overshootChanged.emit(state)
     return state
 
 

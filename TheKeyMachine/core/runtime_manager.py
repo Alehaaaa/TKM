@@ -26,6 +26,7 @@ except Exception:  # pragma: no cover
 
 _OPTIONVAR_NAME = "TKM_RuntimeManager"
 _MANAGER: Optional["RuntimeManager"] = None
+_ACTIVE_TOOL_SOURCE = None
 
 
 def _load_state() -> Dict[str, Any]:
@@ -121,6 +122,21 @@ def get_modifier_state() -> Dict[str, bool]:
     }
 
 
+def set_active_tool_source(widget) -> None:
+    global _ACTIVE_TOOL_SOURCE
+    _ACTIVE_TOOL_SOURCE = widget
+
+
+def clear_active_tool_source(widget=None) -> None:
+    global _ACTIVE_TOOL_SOURCE
+    if widget is None or _ACTIVE_TOOL_SOURCE is widget:
+        _ACTIVE_TOOL_SOURCE = None
+
+
+def get_active_tool_source():
+    return _ACTIVE_TOOL_SOURCE
+
+
 class RuntimeManager(QtCore.QObject):
     callback_fired = QtCore.Signal(str)
 
@@ -134,6 +150,8 @@ class RuntimeManager(QtCore.QObject):
     graph_editor_opened = QtCore.Signal()
 
     modifiers_changed = QtCore.Signal(bool, bool, bool)
+    overshootChanged = QtCore.Signal(bool)
+    eulerFilterChanged = QtCore.Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)

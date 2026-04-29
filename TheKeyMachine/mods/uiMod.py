@@ -83,56 +83,21 @@ INSTALL_PATH = general.config["INSTALL_PATH"]
 USER_FOLDER_PATH = general.config["USER_FOLDER_PATH"]
 
 
-def orbit_window(*args, **kwargs):
-    return orbitApi.orbit_window(*args, **kwargs)
+orbit_window = orbitApi.orbit_window
+close_orbit_window = orbitApi.close_orbit_window
+bind_orbit_toolbar_button = orbitApi.bind_orbit_toolbar_button
 
+attribute_switcher_window = attributeSwitcherApi.attribute_switcher_window
+close_attribute_switcher_window = attributeSwitcherApi.close_attribute_switcher_window
+bind_attribute_switcher_toolbar_button = attributeSwitcherApi.bind_attribute_switcher_toolbar_button
+toggle_attribute_switcher_window = attributeSwitcherApi.toggle_attribute_switcher_window
 
-def close_orbit_window(*args, **kwargs):
-    return orbitApi.close_orbit_window(*args, **kwargs)
-
-
-def bind_orbit_toolbar_button(*args, **kwargs):
-    return orbitApi.bind_orbit_toolbar_button(*args, **kwargs)
-
-
-def attribute_switcher_window(*args, **kwargs):
-    return attributeSwitcherApi.attribute_switcher_window(*args, **kwargs)
-
-
-def close_attribute_switcher_window(*args, **kwargs):
-    return attributeSwitcherApi.close_attribute_switcher_window(*args, **kwargs)
-
-
-def bind_attribute_switcher_toolbar_button(*args, **kwargs):
-    return attributeSwitcherApi.bind_attribute_switcher_toolbar_button(*args, **kwargs)
-
-
-def toggle_attribute_switcher_window(*args, **kwargs):
-    return attributeSwitcherApi.toggle_attribute_switcher_window(*args, **kwargs)
-
-
-def open_selection_set_creation_dialog(*args, **kwargs):
-    return selectionSetsApi.open_selection_set_creation_dialog(*args, **kwargs)
-
-
-def open_selection_sets_toolbar_action(*args, **kwargs):
-    return selectionSetsApi.open_selection_sets_toolbar_action(*args, **kwargs)
-
-
-def toggle_selection_sets_window(*args, **kwargs):
-    return selectionSetsApi.toggle_selection_sets_window(*args, **kwargs)
-
-
-def refresh_selection_sets_window(*args, **kwargs):
-    return selectionSetsApi.refresh_selection_sets_window(*args, **kwargs)
-
-
-def close_selection_sets_window(*args, **kwargs):
-    return selectionSetsApi.close_selection_sets_window(*args, **kwargs)
-
-
-def bind_selection_sets_toolbar_button(*args, **kwargs):
-    return selectionSetsApi.bind_selection_sets_toolbar_button(*args, **kwargs)
+open_selection_set_creation_dialog = selectionSetsApi.open_selection_set_creation_dialog
+open_selection_sets_toolbar_action = selectionSetsApi.open_selection_sets_toolbar_action
+toggle_selection_sets_window = selectionSetsApi.toggle_selection_sets_window
+refresh_selection_sets_window = selectionSetsApi.refresh_selection_sets_window
+close_selection_sets_window = selectionSetsApi.close_selection_sets_window
+bind_selection_sets_toolbar_button = selectionSetsApi.bind_selection_sets_toolbar_button
 
 
 class Color:
