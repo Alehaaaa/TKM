@@ -5,6 +5,7 @@ from TheKeyMachine.tools.graph_toolbar.api import (
     get_graph_toolbar_checkbox_state,
     is_graph_toolbar_visible,
     set_graph_toolbar_enabled,
+    shutdown_graph_toolbar_runtime,
     sync_graph_toolbar_watch,
 )
 

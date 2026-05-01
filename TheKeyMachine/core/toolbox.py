@@ -1093,7 +1093,7 @@ TOOL_SECTION_DEFINITIONS = {
     # --- Key Editing ---
     "nudge_tools": {
         "label": "Nudge",
-        "color": toolColors.green,
+        "color": toolColors.TOOLBAR_GREEN,
         "items": [
             {
                 "id": "nudge_left",
@@ -1107,167 +1107,7 @@ TOOL_SECTION_DEFINITIONS = {
                 "shortcuts": [{"id": "nudge_insert_inbetween", "keys": [QtCore.Qt.Key_Shift]}],
             },
             {"id": "nudge_insert_inbetween"},
-            {"type": "widget", "key": "nudge_value", "default": True},
-        ],
-    },
-    "key_sync_tools": {
-        "label": "Key Sync",
-        "color": toolColors.green,
-        "items": [
-            {
-                "id": "share_keys",
-                "default": True,
-                "shortcuts": [{"id": "reblock", "keys": [QtCore.Qt.Key_Shift]}],
-            },
-            {"id": "reblock"},
-        ],
-    },
-    "bake_tools": {
-        "label": "Bake",
-        "color": toolColors.green,
-        "items": [
-            {
-                "id": "bake_animation_1",
-                "default": True,
-                "shortcuts": [
-                    {"id": "bake_animation_2", "keys": [QtCore.Qt.Key_Control]},
-                    {"id": "bake_animation_3", "keys": [QtCore.Qt.Key_Shift]},
-                    {"id": "bake_animation_4", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
-                    {"id": "bake_animation_custom", "keys": [QtCore.Qt.Key_Alt]},
-                ],
-            },
-            {"id": "bake_animation_2"},
-            {"id": "bake_animation_3"},
-            {"id": "bake_animation_4"},
-            {"id": "bake_animation_custom"},
-        ],
-    },
-    "main_key_editing": {
-        "label": "Key Editing",
-        "color": toolColors.green,
-        "items": [
-            {"group": "nudge_tools"},
-            "separator",
-            {"group": "key_sync_tools"},
-            {"id": "clear_selected_keys"},
-            {"id": "select_scene_animation"},
-            "separator",
-            {"group": "bake_tools"},
-        ],
-    },
-    # --- Sliders ---
-    "slider_blend": {
-        "label": "Blend Sliders",
-        "color": toolColors.UI_COLORS.green.hex,
-        "type": "slider",
-        "slider_type": "blend",
-        "modes_attr": "BLEND_MODES",
-        "default_modes": ["connect_neighbors"],
-    },
-    "slider_tween": {
-        "label": "Tween Sliders",
-        "color": toolColors.UI_COLORS.yellow.hex,
-        "type": "slider",
-        "slider_type": "tween",
-        "modes_attr": "TWEEN_MODES",
-        "default_modes": ["tweener"],
-    },
-    "slider_tangent": {
-        "label": "Tangent Sliders",
-        "color": toolColors.UI_COLORS.orange.hex,
-        "type": "slider",
-        "slider_type": "tangent",
-        "modes_attr": "TANGENT_MODES",
-        "default_modes": ["blend_best_guess"],
-    },
-    # --- Scene Tools ---
-    "pointer_tools": {
-        "label": "Pointer",
-        "color": toolColors.red,
-        "items": [
-            {
-                "id": "select_rig_controls",
-                "default": True,
-                "shortcuts": [{"id": "select_rig_controls_animated", "keys": [QtCore.Qt.Key_Control]}],
-            },
-            {"id": "select_rig_controls_animated"},
-            "separator",
-            {"id": "depth_mover"},
-        ],
-    },
-    "isolate_tools": {
-        "label": "Isolate",
-        "color": toolColors.red,
-        "items": [
-            {
-                "id": "isolate_master",
-                "default": True,
-                "shortcuts": [
-                    {"id": "isolate_bookmarks", "keys": [QtCore.Qt.Key_Control]},
-                ],
-            },
-            {"id": "isolate_bookmarks"},
-            "separator",
-            {"type": "widget", "key": "isolate_down_level"},
-            "separator",
-            {"id": "isolate_help"},
-        ],
-    },
-    "locator_tools": {
-        "label": "Locators",
-        "color": toolColors.red,
-        "items": [
-            {"id": "create_locator", "default": True},
-            {"id": "locator_select_temp"},
-            {"id": "locator_remove_temp"},
-        ],
-    },
-    "align_tools": {
-        "label": "Align",
-        "color": toolColors.red,
-        "items": [
-            {
-                "id": "align_selected_objects",
-                "default": True,
-                "shortcuts": [
-                    {"id": "align_translation", "keys": [QtCore.Qt.Key_Shift]},
-                    {"id": "align_rotation", "keys": [QtCore.Qt.Key_Control]},
-                    {"id": "align_scale", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
-                ],
-            },
-            {"id": "align_translation"},
-            {"id": "align_rotation"},
-            {"id": "align_scale"},
-            "separator",
-            {"id": "align_range"},
-            "separator",
-            {"id": "align_help"},
-        ],
-    },
-    "tracer_tools": {
-        "label": "Tracer",
-        "color": toolColors.red,
-        "items": [
-            {
-                "id": "create_tracer",
-                "default": True,
-                "shortcuts": [
-                    {"id": "tracer_refresh", "keys": [QtCore.Qt.Key_Shift]},
-                    {"id": "tracer_show_hide", "keys": [QtCore.Qt.Key_Control]},
-                    {"id": "tracer_remove", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt]},
-                ],
-            },
-            {"type": "widget", "key": "tracer_connected"},
-            "separator",
-            {"id": "tracer_refresh"},
-            {"id": "tracer_show_hide"},
-            {"id": "tracer_offset_node"},
-            "separator",
-            {"id": "tracer_grey"},
-            {"id": "tracer_red"},
-            {"id": "tracer_blue"},
-            "separator",
-            {"id": "tracer_remove"},
+            {"type": "widget", "id": "nudge_value", "default": True},
         ],
     },
     "default_tools": {
@@ -1296,9 +1136,49 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "default_help"},
         ],
     },
+    "bake_tools": {
+        "label": "Bake",
+        "color": toolColors.TOOLBAR_GREEN,
+        "items": [
+            {
+                "id": "bake_animation_1",
+                "default": True,
+                "shortcuts": [
+                    {"id": "bake_animation_2", "keys": [QtCore.Qt.Key_Control]},
+                    {"id": "bake_animation_3", "keys": [QtCore.Qt.Key_Shift]},
+                    {"id": "bake_animation_4", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+                    {"id": "bake_animation_custom", "keys": [QtCore.Qt.Key_Alt]},
+                ],
+            },
+            {"id": "bake_animation_2"},
+            {"id": "bake_animation_3"},
+            {"id": "bake_animation_4"},
+            {"id": "bake_animation_custom"},
+        ],
+    },
+    "key_sync_tools": {
+        "label": "Key Sync",
+        "color": toolColors.TOOLBAR_GREEN,
+        "items": [
+            {
+                "id": "share_keys",
+                "default": True,
+                "shortcuts": [{"id": "reblock", "keys": [QtCore.Qt.Key_Shift]}],
+            },
+            {"id": "reblock"},
+        ],
+    },
+    "key_selection_tools": {
+        "label": "Key Selection",
+        "color": toolColors.TOOLBAR_GREEN,
+        "items": [
+            {"id": "clear_selected_keys"},
+            {"id": "select_scene_animation"},
+        ],
+    },
     "delete_tools": {
         "label": "Delete Animation",
-        "color": toolColors.red,
+        "color": toolColors.TOOLBAR_RED,
         "items": [
             {
                 "id": "delete_all_animation",
@@ -1308,9 +1188,91 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "delete_static_animation"},
         ],
     },
+    "main_key_editing": {
+        "label": "Key Editing",
+        "color": toolColors.TOOLBAR_GREEN,
+        "toolbar": False,
+        "items": [
+            {"section": "nudge_tools"},
+            "separator",
+            {"section": "key_sync_tools"},
+            {"id": "clear_selected_keys"},
+            {"id": "select_scene_animation"},
+            "separator",
+            {"section": "bake_tools"},
+        ],
+    },
+    # --- Sliders ---
+    "slider_blend": {
+        "label": "Blend Sliders",
+        "color": toolColors.TOOLBAR_GREEN,
+        "type": "slider",
+        "slider_type": "blend",
+        "modes_attr": "BLEND_MODES",
+        "default_modes": ["connect_neighbors"],
+    },
+    "slider_tween": {
+        "label": "Tween Sliders",
+        "color": toolColors.TOOLBAR_YELLOW,
+        "type": "slider",
+        "slider_type": "tween",
+        "modes_attr": "TWEEN_MODES",
+        "default_modes": ["tweener"],
+    },
+    "slider_tangent": {
+        "label": "Tangent Sliders",
+        "color": toolColors.TOOLBAR_ORANGE,
+        "type": "slider",
+        "slider_type": "tangent",
+        "modes_attr": "TANGENT_MODES",
+        "default_modes": ["blend_best_guess"],
+    },
+    # --- Scene Tools ---
+    "pointer_tools": {
+        "label": "Pointer",
+        "color": toolColors.TOOLBAR_RED,
+        "items": [
+            {
+                "id": "select_rig_controls",
+                "default": True,
+                "shortcuts": [{"id": "select_rig_controls_animated", "keys": [QtCore.Qt.Key_Control]}],
+            },
+            {"id": "select_rig_controls_animated"},
+            "separator",
+            {"id": "depth_mover"},
+        ],
+    },
+    "isolate_tools": {
+        "label": "Isolate",
+        "color": toolColors.TOOLBAR_RED,
+        "items": [
+            {
+                "id": "isolate_master",
+                "default": True,
+                "shortcuts": [
+                    {"id": "isolate_bookmarks", "keys": [QtCore.Qt.Key_Control]},
+                ],
+            },
+            {"id": "isolate_bookmarks"},
+            "separator",
+            {"type": "widget", "id": "isolate_down_level"},
+            "separator",
+            {"id": "isolate_help"},
+        ],
+    },
+    "locator_tools": {
+        "label": "Locators",
+        "color": toolColors.TOOLBAR_RED,
+        "items": [
+            {"id": "create_locator", "default": True},
+            {"id": "locator_select_temp"},
+            {"id": "locator_remove_temp"},
+        ],
+    },
     "main_scene_tools": {
         "label": "Scene Tools",
-        "color": toolColors.red,
+        "color": toolColors.TOOLBAR_RED,
+        "toolbar": False,
         "items": [
             {"section": "pointer_tools"},
             {"section": "isolate_tools"},
@@ -1322,9 +1284,17 @@ TOOL_SECTION_DEFINITIONS = {
         ],
     },
     # --- Selection & Pose ---
+    "selector_tools": {
+        "label": "Selector",
+        "color": toolColors.TOOLBAR_GREEN,
+        "items": [
+            {"id": "selector"},
+            {"id": "select_hierarchy"},
+        ],
+    },
     "opposite_tools": {
         "label": "Opposite",
-        "color": toolColors.green,
+        "color": toolColors.TOOLBAR_GREEN,
         "items": [
             {
                 "id": "select_opposite",
@@ -1340,7 +1310,7 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "mirror_tools": {
         "label": "Mirror",
-        "color": toolColors.green,
+        "color": toolColors.TOOLBAR_GREEN,
         "items": [
             {
                 "id": "mirror",
@@ -1358,19 +1328,42 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "mirror_help"},
         ],
     },
+    "align_tools": {
+        "label": "Align",
+        "color": toolColors.TOOLBAR_RED,
+        "items": [
+            {
+                "id": "align_selected_objects",
+                "default": True,
+                "shortcuts": [
+                    {"id": "align_translation", "keys": [QtCore.Qt.Key_Shift]},
+                    {"id": "align_rotation", "keys": [QtCore.Qt.Key_Control]},
+                    {"id": "align_scale", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+                ],
+            },
+            {"id": "align_translation"},
+            {"id": "align_rotation"},
+            {"id": "align_scale"},
+            "separator",
+            {"id": "align_range"},
+            "separator",
+            {"id": "align_help"},
+        ],
+    },
     "selection_tools": {
         "label": "Selection",
-        "color": toolColors.green,
+        "color": toolColors.TOOLBAR_GREEN,
+        "toolbar": False,
         "items": [
             {"id": "selector"},
-            {"group": "opposite_tools"},
-            {"group": "mirror_tools"},
+            {"section": "opposite_tools"},
+            {"section": "mirror_tools"},
             {"id": "select_hierarchy"},
         ],
     },
-    "pose_tools": {
-        "label": "Pose",
-        "color": toolColors.green,
+    "pose_animation_section": {
+        "label": "Pose & Animation",
+        "color": toolColors.TOOLBAR_GREEN,
         "items": [
             {
                 "id": "copy_pose",
@@ -1379,13 +1372,6 @@ TOOL_SECTION_DEFINITIONS = {
             },
             {"id": "paste_pose"},
             "separator",
-            {"id": "pose_help"},
-        ],
-    },
-    "copy_animation_tools": {
-        "label": "Copy Animation",
-        "color": toolColors.green,
-        "items": [
             {
                 "id": "copy_animation",
                 "default": True,
@@ -1399,22 +1385,12 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "paste_insert_animation"},
             {"id": "paste_opposite_animation"},
             {"id": "paste_animation_to"},
-            "separator",
-            {"id": "copy_animation_help"},
-        ],
-    },
-    "pose_animation_section": {
-        "label": "Pose & Animation",
-        "color": toolColors.green,
-        "items": [
-            {"group": "pose_tools"},
-            {"group": "copy_animation_tools"},
         ],
     },
     # --- Tangents ---
     "tangent_buttons": {
         "label": "Tangents",
-        "color": toolColors.orange,
+        "color": toolColors.TOOLBAR_ORANGE,
         "items": [
             {"id": "tangent_cycle_matcher"},
             {"id": "tangent_bouncy", "default": True},
@@ -1429,9 +1405,23 @@ TOOL_SECTION_DEFINITIONS = {
         ],
     },
     # --- Special Tools ---
+    "animation_offset_tools": {
+        "label": "Animation Offset",
+        "color": toolColors.TOOLBAR_PURPLE,
+        "items": [
+            {"id": "animation_offset", "default": True},
+        ],
+    },
+    "micro_move_tools": {
+        "label": "Micro Move",
+        "color": toolColors.TOOLBAR_PURPLE,
+        "items": [
+            {"id": "micro_move"},
+        ],
+    },
     "temp_pivot_tools": {
         "label": "Temp Pivot",
-        "color": toolColors.purple,
+        "color": toolColors.TOOLBAR_PURPLE,
         "items": [
             {
                 "id": "temp_pivot",
@@ -1445,7 +1435,7 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "follow_cam_tools": {
         "label": "Follow Cam",
-        "color": toolColors.purple,
+        "color": toolColors.TOOLBAR_PURPLE,
         "items": [
             {
                 "id": "follow_cam",
@@ -1464,20 +1454,21 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "special_tools_section": {
         "label": "Special Tools",
-        "color": toolColors.purple,
+        "color": toolColors.TOOLBAR_PURPLE,
+        "toolbar": False,
         "items": [
             {"id": "animation_offset"},
             "separator",
             {"id": "micro_move"},
             "separator",
-            {"group": "temp_pivot_tools"},
-            {"group": "follow_cam_tools"},
+            {"section": "temp_pivot_tools"},
+            {"section": "follow_cam_tools"},
         ],
     },
     # --- Links & Worldspace ---
-    "link_tools": {
-        "label": "Links",
-        "color": toolColors.green,
+    "link_worldspace_tools": {
+        "label": "Links & Worldspace",
+        "color": toolColors.TOOLBAR_GREEN,
         "items": [
             {
                 "id": "link_copy",
@@ -1491,13 +1482,6 @@ TOOL_SECTION_DEFINITIONS = {
             "separator",
             {"id": "link_autolink"},
             "separator",
-            {"id": "link_help"},
-        ],
-    },
-    "worldspace_tools": {
-        "label": "World Space",
-        "color": toolColors.green,
-        "items": [
             {
                 "id": "ws_copy_frame",
                 "label": "Copy World Space",
@@ -1512,24 +1496,37 @@ TOOL_SECTION_DEFINITIONS = {
             "separator",
             {"id": "ws_paste_frame"},
             {"id": "ws_paste"},
-            "separator",
-            {"id": "worldspace_help"},
+        ],
+    },
+    "attribute_tools": {
+        "label": "Attributes",
+        "color": toolColors.TOOLBAR_GREEN,
+        "items": [
+            {"id": "attribute_switcher", "default": True},
+        ],
+    },
+    "gimbal_tools": {
+        "label": "Gimbal",
+        "color": toolColors.TOOLBAR_GREEN,
+        "items": [
+            {"id": "gimbal"},
         ],
     },
     "link_worldspace_section": {
         "label": "Links & World Space",
-        "color": toolColors.green,
+        "color": toolColors.TOOLBAR_GREEN,
+        "toolbar": False,
         "items": [
-            {"group": "link_tools"},
-            {"group": "worldspace_tools"},
+            {"section": "link_tools"},
+            {"section": "worldspace_tools"},
             {"id": "attribute_switcher", "default": True},
             "separator",
             {"id": "gimbal"},
         ],
     },
     # --- Workspaces & Extensions ---
-    "workspace_tools": {
-        "label": "Workspaces",
+    "selection_set_tools": {
+        "label": "Selection Sets",
         "items": [
             {
                 "id": "selection_sets",
@@ -1542,24 +1539,79 @@ TOOL_SECTION_DEFINITIONS = {
                     {"id": "selection_sets_clear_all", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]},
                 ],
             },
+        ],
+    },
+    "orbit_tools": {
+        "label": "Orbit",
+        "items": [
             {"id": "orbit", "default": True},
+        ],
+    },
+    "tracer_tools": {
+        "label": "Tracer",
+        "color": toolColors.TOOLBAR_RED,
+        "items": [
+            {
+                "id": "create_tracer",
+                "default": True,
+                "shortcuts": [
+                    {"id": "tracer_refresh", "keys": [QtCore.Qt.Key_Shift]},
+                    {"id": "tracer_show_hide", "keys": [QtCore.Qt.Key_Control]},
+                    {"id": "tracer_remove", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt]},
+                ],
+            },
+            {"type": "widget", "id": "tracer_connected"},
+            "separator",
+            {"id": "tracer_refresh"},
+            {"id": "tracer_show_hide"},
+            {"id": "tracer_offset_node"},
+            "separator",
+            {"id": "tracer_grey"},
+            {"id": "tracer_red"},
+            {"id": "tracer_blue"},
+            "separator",
+            {"id": "tracer_remove"},
+        ],
+    },
+    "workspace_tools": {
+        "label": "Workspaces",
+        "toolbar": False,
+        "items": [
+            {"section": "selection_set_tools"},
+            {"section": "orbit_tools"},
+        ],
+    },
+    "slider_option_tools": {
+        "label": "Slider Options",
+        "items": [
+            {"type": "widget", "id": "overshoot_sliders", "default": True},
+        ],
+    },
+    "graph_toolbar_tools": {
+        "label": "Graph Toolbar",
+        "items": [
+            {"type": "widget", "id": "attribute_switcher_euler_filter"},
+            {"id": "custom_graph"},
+        ],
+    },
+    "custom_extension_tools": {
+        "label": "Custom Tools",
+        "items": [
+            {"id": "custom_tools"},
+            {"id": "custom_scripts"},
         ],
     },
     "extension_tools": {
         "label": "Extensions",
+        "toolbar": False,
         "items": [
-            {"type": "widget", "key": "overshoot_sliders", "default": True},
-            {"type": "widget", "key": "attribute_switcher_euler_filter"},
+            {"type": "widget", "id": "overshoot_sliders", "default": True},
+            {"type": "widget", "id": "attribute_switcher_euler_filter"},
             {"id": "custom_graph"},
             "separator",
             {"id": "custom_tools"},
             {"id": "custom_scripts"},
         ],
-    },
-    "system": {
-        "label": "System",
-        "hiddeable": False,
-        "items": [{"id": "settings"}],
     },
     # --- Graph Editor Specific ---
     "graph_key_tools": {
@@ -1570,15 +1622,10 @@ TOOL_SECTION_DEFINITIONS = {
                 "default": True,
                 "shortcuts": [{"id": "delete_static_animation", "keys": [QtCore.Qt.Key_Shift]}],
             },
-            {
-                "id": "share_keys",
-                "text": "sK",
-                "default": True,
-                "shortcuts": [{"id": "reblock", "keys": [QtCore.Qt.Key_Shift]}],
-            },
-            {"id": "flip", "text": "F", "default": True},
-            {"id": "snap", "text": "Sn", "default": True},
-            {"id": "overlap", "text": "O", "default": True},
+            {"id": "reblock"},
+            {"id": "flip"},
+            {"id": "snap"},
+            {"id": "overlap"},
             {"id": "extra_graph_tools", "default": True},
         ],
     },
@@ -1591,40 +1638,30 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "graph_filter", "default": True},
         ],
     },
+    "system": {
+        "label": "System",
+        "hiddeable": False,
+        "items": [{"id": "settings"}],
+    },
 }
 
-TOOLBAR_SECTION_LAYOUTS = {
-    "main": [
-        "main_key_editing",
-        "slider_blend",
-        "slider_tween",
-        "main_scene_tools",
-        "selection_tools",
-        "pose_animation_section",
-        "tangent_buttons",
-        "special_tools_section",
-        "link_worldspace_section",
-        "workspace_tools",
-        "extension_tools",
-        "system",
-    ],
-    "graph": [
-        "graph_key_tools",
-        "align_tools",
-        "slider_tween",
-        "slider_blend",
-        "slider_tangent",
-        "graph_curve_tools",
-        "default_tools",
-        "tangent_buttons",
-        "system",
-    ],
+TOOLBAR_DEFAULT_SLIDER_MODES = {
+    "main": {
+        "slider_blend": ["connect_neighbors"],
+        "slider_tween": ["tweener"],
+        "slider_tangent": [],
+    },
+    "graph": {
+        "slider_blend": ["connect_neighbors"],
+        "slider_tween": ["tweener"],
+        "slider_tangent": ["blend_best_guess"],
+    },
 }
 
 
-def _item_options(item, *, exclude_keys=False):
-    ignored = {"id", "section", "widget", "shortcuts"}
-    if exclude_keys:
+def _descriptor_overrides(item, *, include_keys=True):
+    ignored = {"id", "section", "shortcuts"}
+    if not include_keys:
         ignored.add("keys")
     return {key: value for key, value in item.items() if key not in ignored}
 
@@ -1656,7 +1693,7 @@ def _apply_shortcuts(tool, item):
         tool_id = shortcut_item.get("id")
         if not tool_id:
             continue
-        variant = get_tool(tool_id, **_item_options(shortcut_item, exclude_keys=True))
+        variant = get_tool(tool_id, **_descriptor_overrides(shortcut_item, include_keys=False))
         variant["mask"] = shortcut_mask(shortcut_item.get("keys", []))
         variant.setdefault("shortcuts", [shortcut_display(variant, "Click")])
         shortcuts.append(shortcut_display(variant, shortcut_item.get("keys", [])))
@@ -1675,7 +1712,6 @@ def get_tool(tool_id, **overrides):
     tool = dict(TOOL_DEFINITIONS[tool_id])
     tool.update(overrides)
     tool.setdefault("id", tool_id)
-    tool.setdefault("key", tool_id)
     tool.setdefault("default", False)
 
     callback = tool.get("callback")
@@ -1687,44 +1723,40 @@ def get_tool(tool_id, **overrides):
     return tool
 
 
-def _resolve_section_item(item):
+def _resolve_section_item(item, toolbar_id=None):
     if isinstance(item, str):
         return item
 
-    section_ref = item.get("section") or item.get("group")
+    section_ref = item.get("section")
     if section_ref:
-        section = get_tool_section(section_ref)
+        section = get_tool_section(section_ref, toolbar_id=toolbar_id)
         if section:
             return {"type": "group", "items": section.get("items", []), "label": section.get("label")}
         return []
 
     tool_id = item.get("id")
     if tool_id:
-        return _apply_shortcuts(get_tool(tool_id, **_item_options(item)), item)
-
-    if item.get("type") == "widget":
-        tool_id = item.get("key")
-        if tool_id and tool_id in TOOL_DEFINITIONS:
-            return get_tool(tool_id, **_item_options(item))
-        return dict(item)
+        return _apply_shortcuts(get_tool(tool_id, **_descriptor_overrides(item)), item)
 
     return None
 
 
-def get_tool_section(section_id, resolve_items=True):
+def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
     section_def = TOOL_SECTION_DEFINITIONS.get(section_id)
     if not section_def:
         return None
 
     section = dict(section_def)
     section["id"] = section_id
+    if toolbar_id and section.get("type") == "slider":
+        section["default_modes"] = list(TOOLBAR_DEFAULT_SLIDER_MODES.get(toolbar_id, {}).get(section_id, []))
     if not resolve_items:
         section["items"] = list(section_def.get("items", []))
         return section
 
     resolved = []
     for item in section_def.get("items", []):
-        resolved_item = _resolve_section_item(item)
+        resolved_item = _resolve_section_item(item, toolbar_id=toolbar_id)
         if resolved_item is None:
             continue
         if isinstance(resolved_item, list):
@@ -1735,25 +1767,36 @@ def get_tool_section(section_id, resolve_items=True):
     return section
 
 
-def get_tool_tint_color(tool_key, default=None):
-    def color_to_hex(color):
-        if color is None:
-            return None
-        if hasattr(color, "base") and hasattr(color.base, "hex"):
-            return color.base.hex
-        if hasattr(color, "hex"):
-            return color.hex
-        return color
+def get_section_icon(section_id):
+    section = get_tool_section(section_id, toolbar_id="main")
+    if not section:
+        return None
 
+    def find_icon(items):
+        for item in items:
+            if item == "separator" or not isinstance(item, dict):
+                continue
+            if item.get("type") == "group":
+                icon = find_icon(item.get("items", []))
+                if icon:
+                    return icon
+                continue
+            icon = item.get("icon")
+            if icon:
+                return icon
+        return None
+
+    return find_icon(section.get("items", []))
+
+
+def get_tool_tint_color(tool_id, default=None):
     def find_tint(item, inherited_color=None):
         if item == "separator" or item is None:
             return None
-        if isinstance(item, str):
-            return inherited_color if item == tool_key else None
         if not isinstance(item, dict):
             return None
 
-        section_ref = item.get("section") or item.get("group")
+        section_ref = item.get("section")
         if section_ref:
             section = TOOL_SECTION_DEFINITIONS.get(section_ref)
             if not section:
@@ -1765,7 +1808,7 @@ def get_tool_tint_color(tool_key, default=None):
                     return color
             return None
 
-        if (item.get("id") or item.get("key")) == tool_key:
+        if item.get("id") == tool_id:
             return inherited_color
 
         for shortcut in item.get("shortcuts") or []:
@@ -1779,14 +1822,22 @@ def get_tool_tint_color(tool_key, default=None):
         for item in section.get("items", []):
             color = find_tint(item, inherited_color=section_color)
             if color is not None:
-                return color_to_hex(color)
+                return color
     return default
 
 
 def get_toolbar_sections(layout_id, resolve_items=True):
-    section_ids = TOOLBAR_SECTION_LAYOUTS.get(layout_id, [])
+    if layout_id not in {"main", "graph"}:
+        return []
+
+    section_ids = list(TOOL_SECTION_DEFINITIONS.keys())
     return [
         section
-        for section in (get_tool_section(section_id, resolve_items=resolve_items) for section_id in section_ids)
+        for section in (
+            get_tool_section(section_id, resolve_items=resolve_items, toolbar_id=layout_id)
+            for section_id in section_ids
+            if not TOOL_SECTION_DEFINITIONS[section_id].get("hotkey_only")
+            and TOOL_SECTION_DEFINITIONS[section_id].get("toolbar") is not False
+        )
         if section is not None
     ]

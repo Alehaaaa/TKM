@@ -42,7 +42,7 @@ def _ensure_builtin_commands() -> None:
         return
     try:
         _register_builtin_commands()
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return
     _BUILTINS_LOADED = True
 
@@ -53,7 +53,7 @@ def _ensure_slider_commands() -> None:
         return
     try:
         _register_slider_commands()
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return
     _SLIDERS_LOADED = True
 
@@ -64,7 +64,7 @@ def _ensure_toolbox_commands() -> None:
         return
     try:
         import TheKeyMachine.core.toolbox  # noqa: F401
-    except Exception:
+    except ImportError:
         return
     _TOOLBOX_LOADED = True
 
@@ -165,50 +165,13 @@ def _toolbar():
     return get_toolbar()
 
 
-def _owner_nudge_widget(source_widget):
-    widget = source_widget
-    while widget is not None:
-        nudge_widget = getattr(widget, "move_keyframes_intField", None)
-        if nudge_widget is not None:
-            return nudge_widget
-        try:
-            widget = widget.parentWidget()
-        except Exception:
-            return None
-    return None
-
-
-def _fallback_nudge_widget():
-    toolbar = _toolbar()
-    widget = getattr(toolbar, "move_keyframes_intField", None)
-    if widget is not None:
-        return widget
-    try:
-        from TheKeyMachine.core import customGraph
-
-        graph_toolbar = customGraph.getCustomGraphWidget()
-        return getattr(graph_toolbar, "move_keyframes_intField", None)
-    except Exception:
-        return None
-
 
 def nudge_value(default: int = 1, source_widget=None) -> int:
-    import TheKeyMachine.core.runtime_manager as runtime
-
-    widget = _owner_nudge_widget(source_widget or runtime.get_active_tool_source())
-    if widget is None:
-        widget = _fallback_nudge_widget()
-    if widget is None:
-        return default
+    import TheKeyMachine.mods.settingsMod as settings
     try:
-        value = int(widget.value())
-    except Exception:
+        return int(settings.get_setting("nudge_value", 1)) or default
+    except (ValueError, TypeError):
         return default
-    return value or default
-
-
-def _nudge_value(default: int = 1) -> int:
-    return nudge_value(default=default)
 
 
 def _toggle_animation_offset(*_args, **_kwargs):
@@ -232,9 +195,12 @@ def _toggle_selection_sets(*_args, **_kwargs):
     return None
 
 
-def _toggle_graph_toolbar(state: bool = True, *_args, **_kwargs):
+def _toggle_graph_toolbar(state=None, *_args, **_kwargs):
     import TheKeyMachine.mods.reportMod as report
     import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
+
+    if state is None:
+        state = not graphToolbarApi.get_graph_toolbar_checkbox_state()
 
     return report.safe_execute(
         graphToolbarApi.set_graph_toolbar_enabled,
@@ -310,7 +276,7 @@ def _check_for_updates(*_args, **_kwargs):
 def _import_module(module_name: str):
     try:
         return importlib.import_module(module_name)
-    except Exception:
+    except ImportError:
         return None
 
 
@@ -423,19 +389,19 @@ def _register_builtin_commands():
     register_command("link_paste", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_link"))
     register_command(
         "nudge_insert_inbetween",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "insert_inbetween", _nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "insert_inbetween", nudge_value()),
     )
     register_command(
         "nudge_remove_inbetween",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "remove_inbetween", _nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "remove_inbetween", nudge_value()),
     )
     register_command(
         "nudge_left",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", -_nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", -nudge_value()),
     )
     register_command(
         "nudge_right",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", _nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", nudge_value()),
     )
 
 

@@ -15,12 +15,12 @@ from maya import cmds
 
 try:
     from PySide6 import QtCore, QtWidgets  # type: ignore
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     from PySide2 import QtCore, QtWidgets  # type: ignore
 
 try:
     from maya.api import OpenMaya as om  # type: ignore
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     om = None
 
 
@@ -35,7 +35,7 @@ def _load_state() -> Dict[str, Any]:
             raw = cmds.optionVar(q=_OPTIONVAR_NAME)
             if isinstance(raw, str) and raw:
                 return json.loads(raw)
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
     return {"om": [], "scriptjob": []}
 
@@ -43,7 +43,7 @@ def _load_state() -> Dict[str, Any]:
 def _save_state(state: Dict[str, Any]) -> None:
     try:
         cmds.optionVar(sv=(_OPTIONVAR_NAME, json.dumps(state)))
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
 
@@ -51,7 +51,7 @@ def _clear_state() -> None:
     try:
         if cmds.optionVar(exists=_OPTIONVAR_NAME):
             cmds.optionVar(remove=_OPTIONVAR_NAME)
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
 
@@ -67,14 +67,14 @@ def cleanup_orphaned_callbacks() -> None:
         for cb_id in state.get("om", []) or []:
             try:
                 om.MMessage.removeCallback(int(cb_id))
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
     # scriptJobs
     for job_id in state.get("scriptjob", []) or []:
         try:
             cmds.scriptJob(kill=int(job_id), force=True)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
     _clear_state()
@@ -89,7 +89,7 @@ def _qt_modifiers_to_mask(modifiers) -> int:
             mask |= 4
         if modifiers & QtCore.Qt.AltModifier:
             mask |= 8
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
     return mask
 
@@ -104,12 +104,12 @@ def get_modifier_mask() -> int:
         app = QtWidgets.QApplication.instance()
         if app:
             return _qt_modifiers_to_mask(app.keyboardModifiers())
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
     try:
         return int(cmds.getModifiers())
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return 0
 
 
@@ -152,6 +152,7 @@ class RuntimeManager(QtCore.QObject):
     modifiers_changed = QtCore.Signal(bool, bool, bool)
     overshootChanged = QtCore.Signal(bool)
     eulerFilterChanged = QtCore.Signal(bool)
+    nudgeValueChanged = QtCore.Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -258,7 +259,7 @@ class RuntimeManager(QtCore.QObject):
                 job_id = cmds.scriptJob(event=(event[0], _wrapped), runOnce=bool(run_once), killWithScene=bool(kill_with_scene))
             else:
                 job_id = cmds.scriptJob(event=(event, _wrapped), runOnce=bool(run_once), killWithScene=bool(kill_with_scene))
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return None
 
         self._track_scriptjob(key, int(job_id))
@@ -282,7 +283,7 @@ class RuntimeManager(QtCore.QObject):
                 selection_list = om.MSelectionList()
                 selection_list.add(str(node))
                 mobject = selection_list.getDependNode(0)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return None
 
         def _wrapped(*args):
@@ -293,7 +294,7 @@ class RuntimeManager(QtCore.QObject):
 
         try:
             cb_id = om.MNodeMessage.addAttributeChangedCallback(mobject, _wrapped, client_data)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return None
 
         self._track_om(key, int(cb_id))
@@ -306,7 +307,7 @@ class RuntimeManager(QtCore.QObject):
             self.disconnect_callbacks(key)
         try:
             signal.connect(handler)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return False
         self._signal_connections.setdefault(key, []).append((signal, handler))
         return True
@@ -318,14 +319,14 @@ class RuntimeManager(QtCore.QObject):
         for job_id in list(self._scriptjobs.get(key, []) or []):
             try:
                 cmds.scriptJob(kill=int(job_id), force=True)
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
         self._scriptjobs.pop(key, None)
 
         for signal, handler in self._signal_connections.pop(key, []) or []:
             try:
                 signal.disconnect(handler)
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
         self._persist_state()
@@ -348,13 +349,13 @@ class RuntimeManager(QtCore.QObject):
 
         try:
             widget.destroyed.connect(_cleanup)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         if owner is not None and hasattr(owner, "destroyed"):
             try:
                 owner.destroyed.connect(lambda *_: self._safe_delete_widget(widget))
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
         return widget
@@ -374,7 +375,7 @@ class RuntimeManager(QtCore.QObject):
             self._emit("selection_changed")
             try:
                 self.selection_changed.emit()
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
         cb_id = om.MEventMessage.addEventCallback("SelectionChanged", _on_selection_changed)
@@ -388,7 +389,7 @@ class RuntimeManager(QtCore.QObject):
             self._emit("time_changed")
             try:
                 self.time_changed.emit()
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
         cb_id = om.MEventMessage.addEventCallback("timeChanged", _on_time_changed)
@@ -402,7 +403,7 @@ class RuntimeManager(QtCore.QObject):
             self._emit("undo_performed")
             try:
                 self.undo_performed.emit()
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
         cb_id = om.MEventMessage.addEventCallback("Undo", _on_undo)
@@ -416,14 +417,14 @@ class RuntimeManager(QtCore.QObject):
             self._emit("scene_opened")
             try:
                 self.scene_opened.emit()
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
         def _after_new(*_args):
             self._emit("scene_new")
             try:
                 self.scene_new.emit()
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
         cb_open = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterOpen, _after_open)
@@ -439,7 +440,7 @@ class RuntimeManager(QtCore.QObject):
             if app:
                 app.installEventFilter(self)
                 self._event_filter_installed = True
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         self._sync_enabled_ui_watchers()
 
@@ -450,7 +451,7 @@ class RuntimeManager(QtCore.QObject):
             app = QtWidgets.QApplication.instance()
             if app:
                 app.removeEventFilter(self)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         self._event_filter_installed = False
         self._reset_graph_editor_watch()
@@ -491,7 +492,7 @@ class RuntimeManager(QtCore.QObject):
         self._graph_editor_visible = False
         try:
             self._ui_watch_timer.stop()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
     def _reset_modifier_state(self) -> None:
@@ -509,7 +510,7 @@ class RuntimeManager(QtCore.QObject):
         self._emit("modifiers_changed")
         try:
             self.modifiers_changed.emit(ctrl, shift, alt)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
     def _sync_modifier_state(self, modifiers=None) -> None:
@@ -519,7 +520,7 @@ class RuntimeManager(QtCore.QObject):
             if modifiers is None:
                 app = QtWidgets.QApplication.instance()
                 modifiers = app.keyboardModifiers() if app else QtCore.Qt.NoModifier
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             modifiers = QtCore.Qt.NoModifier
 
         self._set_modifier_state(
@@ -543,7 +544,7 @@ class RuntimeManager(QtCore.QObject):
         try:
             graph_vis = cmds.getPanel(vis=True) or []
             visible = "graphEditor1" in graph_vis
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             visible = False
 
         if visible == self._graph_editor_visible:
@@ -553,7 +554,7 @@ class RuntimeManager(QtCore.QObject):
         try:
             if visible:
                 QtCore.QTimer.singleShot(0, self._emit_graph_editor_opened)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
     def _emit_graph_editor_opened(self) -> None:
@@ -562,13 +563,13 @@ class RuntimeManager(QtCore.QObject):
                 return
             self._emit("graph_editor_opened")
             self.graph_editor_opened.emit()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
     def eventFilter(self, obj, event):
         try:
             event_type = event.type()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return False
         self._handle_modifier_event(event_type, event)
         self._handle_graph_editor_event(obj, event_type)
@@ -580,7 +581,7 @@ class RuntimeManager(QtCore.QObject):
         if event_type in {QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease, QtCore.QEvent.ShortcutOverride}:
             try:
                 self._sync_modifier_state(event.modifiers())
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 self._sync_modifier_state()
             return
         if event_type in {QtCore.QEvent.ApplicationDeactivate, QtCore.QEvent.WindowDeactivate, QtCore.QEvent.FocusOut}:
@@ -603,12 +604,12 @@ class RuntimeManager(QtCore.QObject):
     def _looks_like_graph_editor(self, obj) -> bool:
         try:
             object_name = obj.objectName() or ""
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             object_name = ""
 
         try:
             window_title = obj.windowTitle() or ""
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             window_title = ""
 
         return "graphEditor1" in object_name or "Graph Editor" in window_title
@@ -619,7 +620,7 @@ class RuntimeManager(QtCore.QObject):
     def _emit(self, key: str) -> None:
         try:
             self.callback_fired.emit(key)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
     def _track_om(self, key: str, cb_id: int) -> None:
@@ -645,7 +646,7 @@ class RuntimeManager(QtCore.QObject):
             return
         try:
             om.MMessage.removeCallback(int(cb_id))
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         for key, ids in list(self._om_callbacks.items()):
             self._om_callbacks[key] = [i for i in ids if int(i) != int(cb_id)]
@@ -659,7 +660,7 @@ class RuntimeManager(QtCore.QObject):
             for cb_id in [cb_id for ids in self._om_callbacks.values() for cb_id in ids]:
                 try:
                     om.MMessage.removeCallback(int(cb_id))
-                except Exception:
+                except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                     pass
         self._om_callbacks.clear()
 
@@ -667,7 +668,7 @@ class RuntimeManager(QtCore.QObject):
         for job_id in [job_id for ids in self._scriptjobs.values() for job_id in ids]:
             try:
                 cmds.scriptJob(kill=int(job_id), force=True)
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
         self._scriptjobs.clear()
 
@@ -675,7 +676,7 @@ class RuntimeManager(QtCore.QObject):
             for signal, handler in connections:
                 try:
                     signal.disconnect(handler)
-                except Exception:
+                except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                     pass
         self._signal_connections.clear()
 
@@ -686,15 +687,15 @@ class RuntimeManager(QtCore.QObject):
             return
         try:
             widget.hide()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         try:
             widget.setParent(None)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         try:
             widget.deleteLater()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
     def _clear_managed_widgets(self) -> None:
@@ -717,10 +718,10 @@ def shutdown_runtime_manager() -> None:
     if _MANAGER is not None:
         try:
             _MANAGER.shutdown()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         try:
             _MANAGER.deleteLater()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         _MANAGER = None

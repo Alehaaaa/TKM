@@ -95,14 +95,14 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
         for tool_data in self._get_menu_items():
             self._create_orbit_tool_button(
                 tool_data=tool_data,
-                default=tool_data["key"] in default_actions,
+                default=tool_data["id"] in default_actions,
             )
         self.tools_section.updateGeometry()
 
     def _seed_orbit_visibility_settings(self):
         current_actions = set(orbitApi.load_orbit_configuration().values())
         for tool_data in self._get_menu_items():
-            action_identifier = tool_data["key"]
+            action_identifier = tool_data["id"]
             setting_key = f"pin_{action_identifier}"
             current_value = orbitApi.settings.get_setting(setting_key, None, namespace=orbitApi.ORBIT_SETTINGS_NAMESPACE)
             if current_value is None:
@@ -113,8 +113,8 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
                 )
 
     def _create_orbit_tool_button(self, tool_data, default):
-        label = tool_data.get("label") or tool_data.get("key")
-        action_identifier = tool_data["key"]
+        label = tool_data.get("label") or tool_data.get("id")
+        action_identifier = tool_data["id"]
         tooltip_text = tool_data.get("tooltip_template") or label
         description = tool_data.get("description") or tooltip_text
 

@@ -1,12 +1,15 @@
 try:
     from PySide6 import QtCore
-except Exception:
+except ImportError:
     from PySide2 import QtCore
 
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.core.runtime_manager as runtime
 from TheKeyMachine.tools import common as toolCommon
+
+
+GRAPH_TOOLBAR_ENABLED_SETTING = "graph_toolbar_enabled"
 
 
 class CustomGraphBus(QtCore.QObject):
@@ -17,7 +20,7 @@ custom_graph_bus = CustomGraphBus()
 
 
 def get_graph_toolbar_checkbox_state() -> bool:
-    return bool(settings.get_setting("graph_toolbar_enabled", True))
+    return bool(settings.get_setting(GRAPH_TOOLBAR_ENABLED_SETTING, True))
 
 
 def is_graph_toolbar_visible() -> bool:
@@ -26,21 +29,21 @@ def is_graph_toolbar_visible() -> bool:
 
         widget = customGraph.getCustomGraphWidget()
         return bool(widget and wutil.is_valid_widget(widget) and widget.isVisible())
-    except Exception:
+    except (ImportError, RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return False
 
 
 def emit_graph_toolbar_state() -> None:
     try:
         custom_graph_bus.graph_toolbar_enabled_changed.emit(get_graph_toolbar_checkbox_state())
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
 
 def sync_graph_toolbar_watch() -> None:
     try:
         runtime.get_runtime_manager().set_graph_editor_watch_enabled(get_graph_toolbar_checkbox_state())
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
 
@@ -51,7 +54,7 @@ def _disconnect_graph_toolbar_sync(callback) -> None:
         if relay_callback is callback:
             try:
                 relay.deleteLater()
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
         else:
             remaining.append((relay, relay_callback))
@@ -67,7 +70,7 @@ def bind_graph_toolbar_toggle(widget) -> None:
             if not wutil.is_valid_widget(widget):
                 _disconnect_graph_toolbar_sync(_sync)
                 return
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         if not toolCommon.set_checked_safely(widget, bool(enabled)):
@@ -75,7 +78,7 @@ def bind_graph_toolbar_toggle(widget) -> None:
 
     try:
         toolCommon.set_checked_safely(widget, get_graph_toolbar_checkbox_state())
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
     relay = toolCommon.replace_tracked_connection(
@@ -103,7 +106,8 @@ def bind_graph_toolbar_toggle(widget) -> None:
 
 
 def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
-    settings.set_setting("graph_toolbar_enabled", bool(enabled))
+    enabled = bool(enabled)
+    settings.set_setting(GRAPH_TOOLBAR_ENABLED_SETTING, enabled)
     sync_graph_toolbar_watch()
     emit_graph_toolbar_state()
     if not apply:
@@ -116,8 +120,23 @@ def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
             QtCore.QTimer.singleShot(0, customGraph.createCustomGraph)
         else:
             QtCore.QTimer.singleShot(0, customGraph.removeCustomGraph)
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         if enabled:
             customGraph.createCustomGraph()
         else:
             customGraph.removeCustomGraph()
+
+
+def shutdown_graph_toolbar_runtime() -> None:
+    """Remove the live Graph Editor toolbar without changing the saved preference."""
+    try:
+        runtime.get_runtime_manager().set_graph_editor_watch_enabled(False)
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
+
+    try:
+        from TheKeyMachine.core import customGraph
+
+        customGraph.removeCustomGraph()
+    except (ImportError, RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass

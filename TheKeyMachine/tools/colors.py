@@ -181,6 +181,28 @@ SELECTION_SET_COLOR_BY_SUFFIX = COLORS.by_suffix
 SELECTION_SET_DEFAULT_COLOR = COLORS.default_selection_set
 SELECTION_SET_COLORS_BY_FAMILY = COLORS.families
 
+TOOLBAR_GRAY = UI_COLORS.gray.hex
+TOOLBAR_GREEN = UI_COLORS.green.hex
+TOOLBAR_YELLOW = UI_COLORS.yellow.hex
+TOOLBAR_ORANGE = UI_COLORS.orange.hex
+TOOLBAR_RED = UI_COLORS.red.hex
+TOOLBAR_PURPLE = UI_COLORS.purple.hex
+
+
+def to_hex(color, default=None):
+    if color is None:
+        return default
+    if isinstance(color, str):
+        return color
+    if hasattr(color, "base") and hasattr(color.base, "hex"):
+        return color.base.hex
+    if hasattr(color, "hex"):
+        return color.hex
+    name = getattr(color, "name", None)
+    if callable(name):
+        return name()
+    return default
+
 
 gray_light = SELECTION_SET_COLOR_BY_SUFFIX["_25"]
 gray = SELECTION_SET_COLOR_BY_SUFFIX["_26"]

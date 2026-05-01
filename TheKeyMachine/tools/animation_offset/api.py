@@ -54,7 +54,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._baseline = {}
         self._last_values = {}
         self._pending_manip_plugs = set()
-        self._tint_color = toolColors.purple
+        self._tint_color = toolColors.TOOLBAR_PURPLE
 
         self._poll_timer = QtCore.QTimer(self)
         self._poll_timer.setInterval(70)

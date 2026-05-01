@@ -69,7 +69,6 @@ import TheKeyMachine.core.toolMenus as toolMenus  # type: ignore
 import TheKeyMachine.core.toolbox as toolbox  # type: ignore
 import TheKeyMachine.core.tool_widgets as toolWidgets  # type: ignore
 import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
-import TheKeyMachine.core.trigger as trigger  # type: ignore
 import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
@@ -81,11 +80,9 @@ from TheKeyMachine.tools import colors as toolColors  # type: ignore
 
 from TheKeyMachine.core import selection_targets
 
-from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import customDialogs as customDialogs  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
-import TheKeyMachine.sliders as sliders  # type: ignore
 
 from TheKeyMachine.tooltips import QFlatTooltipManager
 
@@ -102,11 +99,9 @@ mods = [
     cg,
     updater,
     style,
-    sw,
     cw,
     customDialogs,
     wutil,
-    sliders,
     toolMenus,
     toolbox,
     toolWidgets,
@@ -271,7 +266,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         try:
             runtime.shutdown_runtime_manager()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         was_anim_offset_active = self.toggleAnimOffsetButtonState
@@ -279,7 +274,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if was_anim_offset_active:
             try:
                 cmds.undoInfo(closeChunk=True)
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
         self.micro_move_controller.deactivate()
@@ -289,7 +284,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             try:
                 self.link_obj_pulse_thread.stop()
                 self.link_obj_pulse_thread.wait(500)
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
             self.link_obj_pulse_thread = None
 
@@ -298,7 +293,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             try:
                 self.shelf_painter.setParent(None)
                 self.shelf_painter.deleteLater()
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
             self.shelf_painter = None
 
@@ -356,7 +351,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, dtc=(dock_to, orient))
 
                 cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, tabPosition=["west", 0])
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
             # Update the workspace control with our kwargs (like visibleChangeCommand)
@@ -417,7 +412,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             try:
                 self.shelf_painter.setParent(None)
                 self.shelf_painter.deleteLater()
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
             self.shelf_painter = None
@@ -538,12 +533,12 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         try:
             report.uninstall_bug_exception_handler()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         try:
             runtime.shutdown_runtime_manager()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         try:
@@ -552,9 +547,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     widget.close()
                     try:
                         widget.deleteLater()
-                    except Exception:
+                    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                         pass
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         # Importa el módulo y recarga
@@ -565,14 +560,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         try:
             if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
                 cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         if isValid(self):
             try:
                 self.blockSignals(True)
                 self.close()
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
         reload(toolbar_module)
@@ -590,18 +585,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         try:
             report.uninstall_bug_exception_handler()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
-        try:
-            if graphToolbarApi.is_graph_toolbar_visible() or graphToolbarApi.get_graph_toolbar_checkbox_state():
-                graphToolbarApi.set_graph_toolbar_enabled(False)
-        except Exception:
-            pass
+        graphToolbarApi.shutdown_graph_toolbar_runtime()
 
         try:
             runtime.shutdown_runtime_manager()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         try:
@@ -610,15 +601,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     widget.close()
                     try:
                         widget.deleteLater()
-                    except Exception:
+                    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                         pass
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         try:
             if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
                 cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         try:
@@ -626,7 +617,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 self.blockSignals(True)
                 self.close()
                 self.deleteLater()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
     # ---------------------------------------- ANIMATION OFFSET ------------------------------------------------------#
@@ -676,7 +667,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidget(
             btn,
             selector_tool.get("label", "Selector"),
-            selector_tool.get("key", "selector"),
+            selector_tool.get("id", "selector"),
             default=selector_tool.get("default", True),
             tooltip_template=selector_tool.get("tooltip_template"),
             pinnable=selector_tool.get("pinnable", True),
@@ -690,13 +681,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         try:
             self._runtime_manager.selection_changed.connect(update_selector_button_text)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         update_selector_button_text()
         return btn
 
     def _create_animation_offset_widget(self, sec, item_data):
-        tool = toolbox.get_tool("animation_offset")
+        tool = toolbox.get_tool("animation_offset", **{k: v for k, v in item_data.items() if k != "id"})
         btn = cw.create_tool_button_from_data(tool)
         btn.setObjectName("anim_offset_button")
         btn.setCheckable(True)
@@ -705,13 +696,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidget(
             btn,
             tool.get("label", "Anim Offset"),
-            tool.get("key", "animation_offset"),
+            tool.get("id", "animation_offset"),
+            default=tool.get("default", True),
+            description=tool.get("description"),
             tooltip_template=tool.get("tooltip_template"),
+            pinnable=tool.get("pinnable", True),
         )
         return btn
 
     def _create_micro_move_widget(self, sec, item_data):
-        tool = toolbox.get_tool("micro_move")
+        tool = toolbox.get_tool("micro_move", **{k: v for k, v in item_data.items() if k != "id"})
         btn = cw.create_tool_button_from_data(tool)
         btn.setObjectName("micro_move_button")
         btn.setCheckable(True)
@@ -719,31 +713,66 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         sec.addWidget(
             btn,
             tool.get("label", "Micro Move"),
-            tool.get("key", "micro_move"),
+            tool.get("id", "micro_move"),
+            default=tool.get("default", True),
+            description=tool.get("description"),
             tooltip_template=tool.get("tooltip_template"),
+            pinnable=tool.get("pinnable", True),
         )
         return btn
 
     def _create_setting_toggle_widget(self, sec, item_data, spec_key):
         data = dict(item_data)
-        data["key"] = spec_key
+        data["id"] = spec_key
         return toolWidgets.create_widget_from_data(sec, data, owner=self)
 
+    def _add_default_tool_widget(self, sec, item):
+        return toolWidgets.add_tool_button(sec, item)
+
     def _create_toolbar_widget_from_data(self, sec, item):
-        widget_key = item.get("key") or item.get("id")
+        widget_key = toolWidgets.item_key(item)
         factory_name = f"_create_{widget_key}_widget"
         if hasattr(self, factory_name):
             return getattr(self, factory_name)(sec, item)
         return toolWidgets.create_widget_from_data(sec, item, owner=self)
 
-    def _add_group_items(self, sec, items):
-        group_tools = [item for item in items if not (isinstance(item, dict) and item.get("type") == "widget")]
-        if group_tools:
-            sec.addWidgetGroup(group_tools)
+    def _add_bound_tool_widget(self, sec, item, bind_fn):
+        btn = toolWidgets.add_tool_button(sec, item, overrides={"callback": None})
+        bind_fn(btn)
+        return btn
 
-        for group_item in items:
-            if isinstance(group_item, dict) and group_item.get("type") == "widget":
-                self._create_toolbar_widget_from_data(sec, group_item)
+    def _add_tool_item(self, sec, item):
+        key = toolWidgets.item_key(item)
+        handlers = {
+            "selector": self._create_selector_widget,
+            "animation_offset": self._create_animation_offset_widget,
+            "micro_move": self._create_micro_move_widget,
+            "custom_graph": lambda section, data: self._create_setting_toggle_widget(section, data, "custom_graph"),
+            "settings": self._add_settings_button,
+        }
+        handler = handlers.get(key)
+        if handler:
+            return handler(sec, item)
+        if key == "orbit":
+            self.orbit_button_widget = self._add_bound_tool_widget(sec, item, ui.bind_orbit_toolbar_button)
+            return self.orbit_button_widget
+        if key == "selection_sets":
+            return self._add_bound_tool_widget(
+                sec,
+                item,
+                lambda btn: ui.bind_selection_sets_toolbar_button(btn, controller=self.selection_sets_controller),
+            )
+        if key == "attribute_switcher":
+            return self._add_bound_tool_widget(sec, item, ui.bind_attribute_switcher_toolbar_button)
+        return self._add_default_tool_widget(sec, item)
+
+    def _add_group_items(self, sec, items):
+        return toolWidgets.add_grouped_section_items(
+            sec,
+            items,
+            add_widget_item_fn=self._create_toolbar_widget_from_data,
+            add_group_items_fn=self._add_group_items,
+        )
 
     def _create_link_tools_group(self, sec, group_data):
         self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
@@ -762,7 +791,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 try:
                     self.link_obj_pulse_thread.stop()
                     self.link_obj_pulse_thread.wait(500)
-                except Exception:
+                except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                     pass
             self.link_obj_pulse_thread = LinkObjectPulseThread(interval_seconds=0.3, parent=self)
             self.link_obj_pulse_thread.tick.connect(partial(pulse_link_obj_button, btn))
@@ -773,7 +802,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 try:
                     self.link_obj_pulse_thread.stop()
                     self.link_obj_pulse_thread.wait(500)
-                except Exception:
+                except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                     pass
                 self.link_obj_pulse_thread = None
 
@@ -791,7 +820,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         resolved_items = []
         for item in group_data["items"]:
             if isinstance(item, dict):
-                if item.get("key") == "link_autolink":
+                if toolWidgets.item_key(item) == "link_autolink":
                     item["callback"] = lambda state: toggle_auto_link_callback(state, link_btn_placeholder[0])
                     item["set_checked_fn"] = lambda: self.link_checkbox_state
             resolved_items.append(item)
@@ -812,130 +841,46 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             sec_hiddeable = section_def.get("hiddeable", True)
 
             if section_def.get("type") == "slider":
-                self._add_slider_section_from_data(section_def, new_section_fn)
+                sec = self._add_slider_section_from_data(section_def, new_section_fn)
+                if sec:
+                    sec.set_menu_identity(section_def.get("label"), toolbox.get_section_icon(section_def["id"]))
                 continue
 
             sec = new_section_fn(color=sec_color, hiddeable=sec_hiddeable)
-            resolved_section = toolbox.get_tool_section(sec_id)
-            for item in resolved_section["items"]:
-                if item == "separator":
-                    sec.addSeparator()
-                    continue
-
-                if isinstance(item, dict):
-                    if item.get("type") == "group":
-                        if item.get("label") == "Links":
-                            self._create_link_tools_group(sec, item)
-                        else:
-                            self._add_group_items(sec, item["items"])
-                        continue
-
-                    if item.get("type") == "widget":
-                        self._create_toolbar_widget_from_data(sec, item)
-                        continue
-
-                    # Special tool overrides
-                    if item.get("id") == "selector" or item.get("key") == "selector":
-                        self._create_selector_widget(sec, item)
-                        continue
-                    if item.get("key") == "animation_offset":
-                        self._create_animation_offset_widget(sec, item)
-                        continue
-                    if item.get("key") == "micro_move":
-                        self._create_micro_move_widget(sec, item)
-                        continue
-                    if item.get("key") == "orbit":
-                        self.orbit_button_widget = cw.create_tool_button_from_data(item, callback=None)
-                        sec.addWidget(self.orbit_button_widget, item["label"], item["key"])
-                        ui.bind_orbit_toolbar_button(self.orbit_button_widget)
-                        continue
-                    if item.get("key") == "selection_sets":
-                        ss_btn = cw.create_tool_button_from_data(item, callback=None)
-                        sec.addWidget(ss_btn, item["label"], item["key"])
-                        ui.bind_selection_sets_toolbar_button(ss_btn, controller=self.selection_sets_controller)
-                        continue
-                    if item.get("key") == "attribute_switcher":
-                        as_btn = cw.create_tool_button_from_data(item, callback=None)
-                        sec.addWidget(as_btn, item["label"], item["key"])
-                        ui.bind_attribute_switcher_toolbar_button(as_btn)
-                        continue
-                    if item.get("key") == "custom_graph":
-                        self._create_setting_toggle_widget(sec, item, "custom_graph")
-                        continue
-                    if item.get("key") == "settings":
-                        self._add_settings_button(sec, item)
-                        continue
-
-                    # Default tool
-                    btn = cw.create_tool_button_from_data(item)
-                    sec.addWidget(
-                        btn,
-                        item.get("label", ""),
-                        item.get("key", ""),
-                        default=item.get("default", True),
-                        pinnable=item.get("pinnable", True),
-                    )
+            sec.set_menu_identity(section_def.get("label"), toolbox.get_section_icon(sec_id))
+            resolved_section = toolbox.get_tool_section(sec_id, toolbar_id="main")
+            if sec_id == "link_tools":
+                self._create_link_tools_group(sec, {"items": resolved_section["items"]})
+                continue
+            special_keys = {
+                "selector",
+                "animation_offset",
+                "micro_move",
+                "orbit",
+                "selection_sets",
+                "attribute_switcher",
+                "custom_graph",
+                "settings",
+            }
+            if toolWidgets.section_should_use_group_menu(section_def, resolved_section["items"], special_keys=special_keys):
+                self._add_group_items(sec, resolved_section["items"])
+                continue
+            toolWidgets.add_section_items(
+                sec,
+                resolved_section["items"],
+                add_tool_item_fn=self._add_tool_item,
+                add_widget_item_fn=self._create_toolbar_widget_from_data,
+                add_group_items_fn=self._add_group_items,
+            )
 
     def _add_slider_section_from_data(self, section_def, new_section_fn):
         sec = new_section_fn()
-        sec.set_settings_namespace("main_toolbar_sliders")
-        sec.set_persist_slider_modes(False)
-
-        prefix = section_def["slider_type"]
-        color = section_def["color"]
-        modes = getattr(sliders, section_def["modes_attr"])
-        default_modes = section_def.get("default_modes", [])
-        static_default_keys = [f"{prefix}_{k}" for k in default_modes]
-
-        for m in modes:
-            if m == "separator":
-                sec.addSeparator()
-                continue
-            if not isinstance(m, dict):
-                continue
-
-            key = m["key"]
-            label = m["label"]
-            desc = m.get("description", "")
-            icon = m.get("icon", "SL")
-            is_visible = settings.get_setting(
-                f"pin_{prefix}_{key}", f"{prefix}_{key}" in static_default_keys, namespace="main_toolbar_sliders"
-            )
-
-            s = sw.QFlatSliderWidget(
-                f"bar_{prefix}_{key}",
-                min=-100,
-                max=100,
-                text=icon,
-                color=color,
-                dragCommand=lambda mode_key, v, p=prefix, session=None: trigger.execute_slider(p, mode_key, v, session=session),
-                tooltipTitle=label,
-                tooltipDescription=desc,
-            )
-            s.setModes(modes)
-            s.setCurrentMode(key)
-
-            def make_mode_setter(slider_instance):
-                def setter(new_mode, temporary=False):
-                    slider_instance.setCurrentMode(new_mode, temporary=temporary)
-                    m_info = next((item for item in modes if isinstance(item, dict) and item["key"] == new_mode), None)
-                    if m_info:
-                        slider_instance.setTooltipInfo(m_info["label"], m_info.get("description", ""))
-                    if not temporary:
-                        slider_instance.startFlash()
-
-                return setter
-
-            s.modeRequested.connect(make_mode_setter(s))
-            sec.addWidget(s, label, f"{prefix}_{key}", default=is_visible, description=desc)
-
-        sec.add_final_actions(static_default_keys)
-
-        if prefix == "blend":
-            self.blend_slider_widget = s  # Keep last as ref if needed? No, this adds all.
-            # Actually we might want a specific slider widget reference.
-        elif prefix == "tween":
-            self.tween_slider_widget = s
+        return toolWidgets.add_slider_section(
+            sec,
+            section_def,
+            namespace="main_toolbar_sliders",
+            object_prefix="bar",
+        )
 
     def _get_current_icon_alignment(self):
         alignment_name = settings.get_setting("toolbar_icon_alignment", "Center")
@@ -969,18 +914,15 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             )
 
         settings_tool = toolbox.get_tool("settings", menu=_build_settings_menu)
-        btn = cw.create_tool_button_from_data(settings_tool)
+        btn = toolWidgets.add_tool_button(sec, settings_tool)
         btn.setObjectName("settings_toolbar_button")
-        sec.addWidget(btn, settings_tool.get("label", "Settings"), settings_tool.get("key", "settings"))
-
-        def _open_menu_at_cursor():
-            toolbar_menu = _build_settings_menu(None, source_widget=btn)
-            toolbar_menu.popup(QtGui.QCursor.pos())
 
         def _on_toolbar_context_menu(pos):
-            if self.main_toolbar_widget.childAt(pos):
+            if not toolMenus.should_show_toolbar_pinning_menu(self.main_toolbar_widget, pos):
                 return
-            _open_menu_at_cursor()
+            pinning_menu = toolMenus.build_toolbar_pinning_menu(self.main_toolbar_widget, self.main_toolbar_widget)
+            if pinning_menu.actions():
+                pinning_menu.exec_(self.main_toolbar_widget.mapToGlobal(pos))
 
         self.main_toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.main_toolbar_widget.customContextMenuRequested.connect(_on_toolbar_context_menu)
@@ -998,6 +940,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_toolbar_widget = cw.QFlowContainer()
+        self.main_toolbar_widget._tkm_sections = []
         self.main_layout.addWidget(self.main_toolbar_widget)
 
         # Use QFlowLayout to allow wrapping
@@ -1011,6 +954,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 settings_namespace="main_toolbar_toolbuttons",
                 color=color,
             )
+            self.main_toolbar_widget._tkm_sections.append(sec)
             self.toolbar_layout.addWidget(sec)
             return sec
 
@@ -1030,21 +974,21 @@ def show():
 
     try:
         runtime.shutdown_runtime_manager()
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
     # Close existing UI robustly
     try:
         if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
             cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
     if _toolbar_instance and isValid(_toolbar_instance):
         try:
             _toolbar_instance.close()
             _toolbar_instance.deleteLater()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
     _toolbar_instance = toolbar()
@@ -1062,7 +1006,7 @@ def toggle():
             else:
                 cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
             return
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
     _toolbar_instance = toolbar()
     _toolbar_instance.showWindow()

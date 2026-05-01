@@ -342,7 +342,7 @@ def begin_timeline_context(
 
 
 def _default_tint_color():
-    return toolColors.gray
+    return toolColors.TOOLBAR_GRAY
 
 
 def _is_full_playback_timerange(timerange):
@@ -366,10 +366,6 @@ def _normalize_tint_color(color):
         base_variant_hex = _resolve_tint_variant_hex(color, preferred_shades=("base",))
         if base_variant_hex is not None:
             qcolor = QtGui.QColor(base_variant_hex)
-        elif hasattr(color, "base") and hasattr(color.base, "hex"):
-            qcolor = QtGui.QColor(color.base.hex)
-        elif hasattr(color, "hex"):
-            qcolor = QtGui.QColor(color.hex)
         elif isinstance(color, (int, float)):
             hue = int(color) % 360
             qcolor = QtGui.QColor.fromHsv(hue, 75, 242, default_alpha)
@@ -415,10 +411,4 @@ def _resolve_tint_variant_hex(color, preferred_shades=("base",)):
 
 
 def _color_hex(color):
-    if color is None:
-        return None
-    if hasattr(color, "base") and hasattr(color.base, "hex"):
-        return color.base.hex
-    if hasattr(color, "hex"):
-        return color.hex
-    return None
+    return toolColors.to_hex(color)

@@ -8,7 +8,7 @@ from functools import partial
 from maya import cmds, mel
 
 try:
-    from PySide6 import QtCore, QtGui
+    from PySide6 import QtCore, QtGui, QtWidgets
 
     QActionGroup = QtGui.QActionGroup
 except ImportError:
@@ -240,6 +240,57 @@ def build_main_dock_menu(toolbar):
     return toolbar.dock_menu
 
 
+def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
+    menu = cw.OpenMenuWidget(parent_widget)
+    sections = getattr(toolbar_widget, "_tkm_sections", []) or []
+    for section in sections:
+        if not wutil.is_valid_widget(section) or not getattr(section, "has_pinnable_items", lambda: False)():
+            continue
+
+        icon_path = getattr(section, "menu_icon", lambda: None)()
+        label = getattr(section, "menu_label", lambda: "Tools")()
+        section_menu = cw.MenuWidget(QtGui.QIcon(icon_path or ""), label)
+        section.populate_pinning_menu(section_menu)
+        menu.addMenu(section_menu, description="Pin tools in {}.".format(label))
+
+    return menu
+
+
+def should_show_toolbar_pinning_menu(toolbar_widget, pos):
+    """Return True only when the toolbar background owns this context click."""
+    if not wutil.is_valid_widget(toolbar_widget):
+        return False
+
+    child = toolbar_widget.childAt(pos)
+    if child is None:
+        return True
+
+    sections = {
+        section
+        for section in getattr(toolbar_widget, "_tkm_sections", []) or []
+        if wutil.is_valid_widget(section)
+    }
+    interactive_classes = (
+        QtWidgets.QAbstractButton,
+        QtWidgets.QAbstractSpinBox,
+        QtWidgets.QComboBox,
+        QtWidgets.QLineEdit,
+        QtWidgets.QSlider,
+    )
+
+    widget = child
+    while widget is not None and widget is not toolbar_widget:
+        if widget in sections:
+            return True
+        if isinstance(widget, interactive_classes):
+            return False
+        if widget.contextMenuPolicy() in (QtCore.Qt.CustomContextMenu, QtCore.Qt.ActionsContextMenu):
+            return False
+        widget = widget.parentWidget()
+
+    return child is toolbar_widget
+
+
 def add_main_help_menu(parent_menu):
     help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help")
     parent_menu.addMenu(help_menu, description="Docs, support, and community links.")
@@ -389,7 +440,6 @@ def build_graph_settings_menu(
     default_dock_position,
     move_dock_fn,
     apply_alignment_fn,
-    remove_toolbar_fn,
 ):
     menu = cw.MenuWidget(parent=parent_button)
     menu.addAction(cw.LogoAction(menu))
@@ -444,8 +494,8 @@ def build_graph_settings_menu(
     settings_menu.addAction(
         QtGui.QIcon(media.close_image),
         "Close",
-        lambda: QtCore.QTimer.singleShot(0, remove_toolbar_fn),
-        description="Close only the TKM Graph Editor toolbar.",
+        lambda: QtCore.QTimer.singleShot(0, lambda: graphToolbarApi.set_graph_toolbar_enabled(False)),
+        description="Hide the TKM Graph Editor toolbar and keep it disabled.",
     )
 
     menu.addAction(QtGui.QIcon(media.hotkeys_image), "Hotkeys", hotkeys.show_hotkeys_window, description="Manage trigger hotkeys.")

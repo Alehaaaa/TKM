@@ -110,15 +110,9 @@ def _default_pressed_color_hex():
 def _color_to_hex(color, default=None):
     if default is None:
         default = _default_pressed_color_hex()
-    if color is None:
-        return default
-    try:
-        if hasattr(color, "base") and hasattr(color.base, "hex"):
-            return str(color.base.hex)
-        if hasattr(color, "hex"):
-            return str(color.hex)
-    except Exception:
-        pass
+    resolved = toolColors.to_hex(color)
+    if resolved:
+        return str(resolved)
     try:
         qcolor = QtGui.QColor(color)
         if qcolor.isValid():
@@ -1002,7 +996,7 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
         or data.get("label")
         or toolCommon.get_tooltip_title(tooltip_template)
         or display_text
-        or data.get("key")
+        or data.get("id")
         or ""
     )
     description = data.get("description")
@@ -1127,6 +1121,8 @@ def _connect_tool_button_callback(button, callback, checkable=False, state_fn=No
 
 
 class QFlowLayout(QtWidgets.QLayout):
+    DEFAULT_SPACING = 5
+
     def __init__(self, parent=None, margin=0, Hspacing=-1, Vspacing=-1, alignment=None, **kwargs):
         super().__init__(parent)
         self._item_list = []
@@ -1151,8 +1147,14 @@ class QFlowLayout(QtWidgets.QLayout):
     def addItem(self, item):
         self._item_list.append(item)
 
+    def setSpacing(self, spacing):
+        super().setSpacing(spacing)
+        self._Hspacing = spacing
+
     def addSpacing(self, size):
-        self.addItem(QtWidgets.QSpacerItem(size, 0, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum))
+        """Use layout spacing for section gaps instead of inserting spacer items."""
+        self.setSpacing(size)
+        self.invalidate()
 
     def addStretch(self, stretch=0):
         self.addItem(QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum))
@@ -1169,6 +1171,25 @@ class QFlowLayout(QtWidgets.QLayout):
         if 0 <= index < len(self._item_list):
             return self._item_list.pop(index)
         return None
+
+    def _should_skip_item(self, item):
+        wid = item.widget()
+        if wid is None:
+            return item.isEmpty()
+        if wid.isHidden():
+            return True
+        if hasattr(wid, "_has_visible_content") and not wid._has_visible_content():
+            return True
+        return False
+
+    def _visible_items(self):
+        return [item for item in self._item_list if not self._should_skip_item(item)]
+
+    def _horizontal_spacing(self):
+        return self._Hspacing if self._Hspacing != -1 else self.DEFAULT_SPACING
+
+    def _vertical_spacing(self):
+        return self._Vspacing if self._Vspacing != -1 else self.DEFAULT_SPACING
 
     def expandingDirections(self):
         return QtCore.Qt.Orientations(0)
@@ -1188,7 +1209,7 @@ class QFlowLayout(QtWidgets.QLayout):
 
     def minimumSize(self):
         size = QtCore.QSize()
-        for item in self._item_list:
+        for item in self._visible_items():
             size = size.expandedTo(item.minimumSize())
 
         margins = self.contentsMargins()
@@ -1200,12 +1221,9 @@ class QFlowLayout(QtWidgets.QLayout):
         width = margins.left() + margins.right()
         height = margins.top() + margins.bottom()
         visible_count = 0
-        spacing_x = self._Hspacing if self._Hspacing != -1 else 5
+        spacing_x = self._horizontal_spacing()
 
-        for item in self._item_list:
-            wid = item.widget()
-            if wid is not None and wid.isHidden():
-                continue
+        for item in self._visible_items():
             item_size = item.sizeHint()
             if visible_count:
                 width += spacing_x
@@ -1226,12 +1244,13 @@ class QFlowLayout(QtWidgets.QLayout):
         current_line = []
         current_line_width = 0
 
-        space_x = self._Hspacing if self._Hspacing != -1 else 5
-        space_y = self._Vspacing if self._Vspacing != -1 else 5
+        space_x = self._horizontal_spacing()
+        space_y = self._vertical_spacing()
 
         for item in self._item_list:
-            wid = item.widget()
-            if wid is not None and wid.isHidden():
+            if self._should_skip_item(item):
+                if not test_only:
+                    item.setGeometry(QtCore.QRect())
                 continue
 
             item_size = item.sizeHint()
@@ -1612,12 +1631,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._mode_to_slot = {}  # mode_key -> slot_key (live, authoritative mapping)
         self._persist_slider_modes = True
 
-        # Tool-group action pinning support
-        # _tool_groups: widget_key -> {label, icon, menu_factory, actions: [...]}
-        self._tool_groups = {}
-        # _pinned_action_buttons: action_key -> QFlatToolButton (live instances)
-        self._pinned_action_buttons = {}
-
         if self._hiddeable:
             # Overlay button: tiny checkbox in the bottom-left
             self._overlay_btn = QtWidgets.QToolButton(self)
@@ -1642,6 +1655,39 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             """)
 
             self._overlay_btn.pressed.connect(lambda: self.open_menu(QtGui.QCursor.pos()))
+
+    def set_menu_identity(self, label=None, icon=None):
+        self._menu_label = label
+        self._menu_icon = icon
+
+    def menu_label(self):
+        return getattr(self, "_menu_label", None) or self.objectName() or "Tools"
+
+    def menu_icon(self):
+        return getattr(self, "_menu_icon", None)
+
+    def has_pinnable_items(self):
+        return bool(self._hiddeable and (self._all_modes or self._menu_metadata))
+
+    def populate_pinning_menu(self, menu):
+        self._populate_menu(menu)
+        return menu
+
+    def _has_visible_content(self):
+        for widget in self._widgets.values():
+            if widget and isValid(widget) and not widget.isHidden():
+                return True
+        return False
+
+    def _sync_section_visibility(self):
+        if not self._hiddeable:
+            return
+        should_show = self._has_visible_content()
+        if self.isVisible() != should_show:
+            self.setVisible(should_show)
+            parent_layout = self.parentWidget().layout() if self.parentWidget() else None
+            if parent_layout:
+                parent_layout.invalidate()
 
     def set_settings_namespace(self, namespace):
         self._settings_namespace = namespace
@@ -1695,7 +1741,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if self._hiddeable:
             if pinnable is not False:
                 # Avoid duplicate metadata entries for the same key
-                existing_entry = next((m for m in self._menu_metadata if m.get("key") == key), None)
+                existing_entry = next((m for m in self._menu_metadata if m.get("id") == key), None)
                 if existing_entry:
                     existing_entry.update(
                         {
@@ -1709,7 +1755,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     self._menu_metadata.append(
                         {
                             "type": "widget",
-                            "key": key,
+                            "id": key,
                             "label": label,
                             "description": description,
                             "tooltip_template": tooltip_template,
@@ -1720,6 +1766,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             else:
                 visible = default
             widget.setVisible(visible)
+            self._sync_section_visibility()
 
         # Push documentation to the widget (syncs Maya Status Bar and TKM tooltips).
         # The section label is the tool title; widget.text() is only a visual fallback
@@ -1754,29 +1801,22 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
     def addWidgetGroup(self, widgets_list, default=True):
         """
-        All-in-one: adds a widget to the section AND builds its right-click menu
-        from a descriptor list, enabling individual action pinning.
+        Add a descriptor group as regular pinnable widgets sharing one right-click menu.
 
         Parameters
         ----------
-        widget : QWidget
-            The primary button/widget.
-        label : str
-            Display label in the section's pin menu.
-        key : str
-            Unique slot key.
         widgets : list
             List of action descriptors or the string ``"separator"``.
             Each descriptor dict may contain:
               key, label, icon, callback,
              checkable (bool), set_checked_fn/set_checked (callable),
              bind_checked_fn (callable), tooltip, description.
-        default : bool
-        description : str
         """
-        default_items = [i for i in widgets_list if isinstance(i, dict) and i.get("default")]
-        if not default_items:
-            default_items = [widgets_list[0]] if widgets_list else []
+        default_items = [
+            i
+            for i in widgets_list
+            if isinstance(i, dict) and i.get("id") and i.get("pinnable", True) is not False
+        ]
 
         group_widgets = []
         for default_item in default_items:
@@ -1788,7 +1828,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 description=default_item.get("description") or "",
             )
             label = default_item.get("label", "Unknown")
-            key = default_item.get("key", "unknown")
+            key = default_item.get("id", "unknown")
             item_default = default_item.get("default", default)
 
             checkable, set_checked_fn = _setup_setting_synced_checkable(widget, default_item)
@@ -1808,46 +1848,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             )
             group_widgets.append((key, widget))
 
-        item_by_key = {item.get("key"): item for item in widgets_list if isinstance(item, dict) and item.get("key")}
+        item_by_key = {item.get("id"): item for item in widgets_list if isinstance(item, dict) and item.get("id")}
 
-        # 2. Resolve the group properties from the first default tool
         first_item = default_items[0] if default_items else {}
-        group_label = first_item.get("label", "Group")
-        group_icon_p = first_item.get("icon") or ""
 
-        # 3. Build QMenu + pinnable_actions from the descriptor list
-        pinnable_actions = []
-        for item in widgets_list:
-            if item == "separator" or not isinstance(item, dict):
-                continue
-
-            item_key = item.get("key")
-            if not item_key:
-                continue
-
-            # If the item is already a default (primary) button, we don't need it
-            # in the pinnable sub-actions list because it's already in the main menu list.
-            is_item_default = bool(item.get("default", default))
-            if is_item_default:
-                continue
-
-            if item.get("pinnable") is not False:
-                pinnable_actions.append(
-                    {
-                        "key": item_key,
-                        "label": item.get("label", ""),
-                        "icon": item.get("icon"),
-                        "callback": item.get("callback"),
-                        "checkable": item.get("checkable", False),
-                        "set_checked_fn": _checked_state_fn(item),
-                        "bind_checked_fn": item.get("bind_checked_fn"),
-                        "tooltip_template": item.get("tooltip_template") or item.get("tooltip"),
-                        "description": item.get("description"),
-                        "default": is_item_default,
-                    }
-                )
-
-        # 3. Build QMenu from the descriptor list (factory will manage visibility)
         def menu_factory(section=self, source_widget=None, widgets=widgets_list, source_items=item_by_key):
             menu = MenuWidget(source_widget)
             menu.setTearOffEnabled(True)
@@ -1858,8 +1862,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     if w == source_widget:
                         source_key = k
                         break
-                if source_key is None:
-                    source_key = source_widget.property("tkm_pinned_action_key")
 
             checkable_sync_pairs = []
             source_item = source_items.get(source_key) or {}
@@ -1874,7 +1876,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     menu.addSeparator()
                     continue
 
-                if item.get("key") == source_key:
+                if item.get("id") == source_key:
                     continue
                 act_icon_p = item.get("icon") or ""
                 cb = item.get("callback")
@@ -1908,53 +1910,15 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 menu.aboutToShow.connect(_sync)
             return menu
 
-        # 4. Register group: wires right-click + tear-off on the parent widget(s)
-        self.register_action_group(
-            [k for k, w in group_widgets],
-            group_label,
-            group_icon_p,
-            pinnable_actions,
-            menu_factory=menu_factory,
-        )
+        self.register_action_group([key for key, _widget in group_widgets], menu_factory=menu_factory)
 
         return group_widgets[0][1] if group_widgets else None
 
-    def register_action_group(self, widget_keys, group_label, group_icon, pinnable_actions, menu_factory=None):
-        """
-        Register a tool group so its sub-actions can be pinned as standalone buttons.
-
-        Parameters
-        ----------
-        widget_keys : str or list of str
-            The key(s) used when the parent button(s) were added via addWidget.
-        group_label : str
-            Display label for the group (e.g. "Pointer").
-        group_icon : str
-            Path to the group's main icon (used as fallback for actions).
-        pinnable_actions : list of dict
-            Each dict must contain:
-                key         - unique string key for this action (scoped to section)
-                label       - display label
-                icon   - path to icon (or None)
-                callback    - callable to invoke on click
-                set_checked bool (optional, default False)
-                set_checked_fn - callable() -> bool (optional, for checkable items)
-                tooltip     - str (optional)
-                description - str (optional)
-        menu_factory : callable() -> QMenu (optional)
-            Returns the live right-click menu shared by all pinned buttons in this group.
-        """
+    def register_action_group(self, widget_keys, menu_factory=None):
+        """Attach the same right-click menu factory to all widgets in a descriptor group."""
         keys_list = [widget_keys] if isinstance(widget_keys, str) else widget_keys
 
         for w_key in keys_list:
-            self._tool_groups[w_key] = {
-                "label": group_label,
-                "icon": group_icon,
-                "menu_factory": menu_factory,
-                "actions": pinnable_actions,
-            }
-
-            # Auto-wire right-click on the parent widget + enable tear-off
             if menu_factory:
                 widget = self._widgets.get(w_key)
                 if widget and isValid(widget):
@@ -1965,107 +1929,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                             m = mf(source_widget=w)
                             if m and isValid(m):
                                 m.exec_(w.mapToGlobal(pos))
-                        except Exception:
+                        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                             pass
 
-                    try:
-                        widget.customContextMenuRequested.disconnect()
-                    except Exception:
-                        pass
                     widget.customContextMenuRequested.connect(_ctx)
-
-        # Restore any previously pinned sub-actions on load
-        if keys_list:
-            group_key = keys_list[0]
-            for act_info in pinnable_actions:
-                act_key = act_info["key"]
-                if self._get_setting(f"pin_action_{act_key}", False):
-                    self._create_pinned_action_button(group_key, act_info)
-
-    def _create_pinned_action_button(self, group_key, act_info):
-        """Create and insert a pinned sub-action button into the section layout."""
-        act_key = act_info["key"]
-        # If already alive, just make sure it is visible
-        existing = self._pinned_action_buttons.get(act_key)
-        if existing and isValid(existing):
-            existing.setVisible(True)
-            return existing
-
-        group_info = self._tool_groups.get(group_key, {})
-        icon = act_info.get("icon") or group_info.get("icon") or ""
-        tooltip_template = act_info.get("tooltip_template") or act_info.get("tooltip") or act_info.get("label", "")
-        description = act_info.get("description", "")
-        callback = act_info.get("callback")
-
-        btn = create_tool_button_from_data(
-            act_info,
-            callback=None,
-            icon=icon or None,
-            tooltip_template=tooltip_template,
-            description=description,
-        )
-        checkable, set_checked_fn = _setup_setting_synced_checkable(btn, act_info)
-        _connect_tool_button_callback(btn, callback, checkable, set_checked_fn)
-
-        # Right-click: show the group's shared context menu
-        menu_factory = group_info.get("menu_factory")
-        if menu_factory:
-            btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-
-            def _show_group_menu(pos, mf=menu_factory, b=btn):
-                try:
-                    m = mf()
-                    if m and isValid(m):
-                        m.exec_(b.mapToGlobal(pos))
-                except Exception:
-                    pass
-
-            btn.customContextMenuRequested.connect(_show_group_menu)
-
-        # Tag this button for later identification
-        btn.setProperty("tkm_pinned_action_key", act_key)
-        btn.setProperty("tkm_group_key", group_key)
-
-        # Insert into layout according to the group's authored action order.
-        # Otherwise toggling pins off/on appends them in interaction order.
-        layout = self.layout()
-        group_widget = self._widgets.get(group_key)
-        insert_index = layout.count()
-        group_actions = group_info.get("actions", [])
-        action_order = {action.get("key"): index for index, action in enumerate(group_actions)}
-        current_order = action_order.get(act_key, len(action_order))
-        if group_widget and isValid(group_widget):
-            for i in range(layout.count()):
-                item = layout.itemAt(i)
-                if item and item.widget() is group_widget:
-                    insert_index = i + 1
-                    # Place before the first later sibling, or after all earlier siblings.
-                    while insert_index < layout.count():
-                        sib_item = layout.itemAt(insert_index)
-                        sib_w = sib_item.widget() if sib_item else None
-                        if not sib_w or sib_w.property("tkm_group_key") != group_key:
-                            break
-                        sibling_key = sib_w.property("tkm_pinned_action_key")
-                        sibling_order = action_order.get(sibling_key, len(action_order))
-                        if sibling_order < current_order:
-                            insert_index += 1
-                            continue
-                        break
-                    break
-
-        layout.insertWidget(insert_index, btn)
-        self._pinned_action_buttons[act_key] = btn
-        self._refresh_layout()
-        return btn
-
-    def _remove_pinned_action_button(self, act_key):
-        """Remove a pinned sub-action button from the section layout."""
-        btn = self._pinned_action_buttons.pop(act_key, None)
-        if btn and isValid(btn):
-            self.layout().removeWidget(btn)
-            btn.setParent(None)
-            btn.deleteLater()
-        self._refresh_layout()
 
     def toggle_widget(self, key, visible, save_setting=True, menu=None):
         """Toggle widget visibility and update menu/settings if needed."""
@@ -2075,6 +1942,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         if save_setting:
             self._set_setting(f"pin_{key}", visible)
+        self._sync_section_visibility()
 
         # Update the currently open menu action, keyed by mode key for mode-driven sections.
         if menu and isValid(menu):
@@ -2149,6 +2017,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             visible = slot in active_slots
             widget.setVisible(visible)
             self._set_setting(f"pin_{slot}", visible)
+        self._sync_section_visibility()
 
         # Sync check states in the currently open menu, keyed by mode key.
         if menu and isValid(menu):
@@ -2193,22 +2062,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for item in self._menu_metadata:
             if item.get("type") != "widget":
                 continue
-            key = item.get("key")
+            key = item.get("id")
             if not key:
                 continue
             self.toggle_widget(key, bool(item.get("default", True)), save_setting=True, menu=menu)
-
-        for group_key, group_info in self._tool_groups.items():
-            for act_info in group_info.get("actions", []):
-                act_key = act_info.get("key")
-                if not act_key or act_key == group_key:
-                    continue
-                should_pin = bool(act_info.get("default", False))
-                self._set_setting(f"pin_action_{act_key}", should_pin)
-                if should_pin:
-                    self._create_pinned_action_button(group_key, act_info)
-                else:
-                    self._remove_pinned_action_button(act_key)
 
         self._sync_widget_menu_actions(menu)
         self._refresh_layout()
@@ -2218,18 +2075,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for item in self._menu_metadata:
             if item.get("type") != "widget":
                 continue
-            key = item.get("key")
+            key = item.get("id")
             if not key:
                 continue
             self.toggle_widget(key, True, save_setting=True, menu=menu)
-
-        for group_key, group_info in self._tool_groups.items():
-            for act_info in group_info.get("actions", []):
-                act_key = act_info.get("key")
-                if not act_key or act_key == group_key:
-                    continue
-                self._set_setting(f"pin_action_{act_key}", True)
-                self._create_pinned_action_button(group_key, act_info)
 
         self._sync_widget_menu_actions(menu)
         self._refresh_layout()
@@ -2251,7 +2100,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for item in self._menu_metadata:
             if item.get("type") != "widget":
                 continue
-            key = item.get("key")
+            key = item.get("id")
             action = actions.get(key)
             widget = self._widgets.get(key)
             if not key or action is None or not isValid(action) or widget is None or not isValid(widget):
@@ -2259,20 +2108,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             action.blockSignals(True)
             action.setChecked(widget.isVisible())
             action.blockSignals(False)
-
-        for group_key, group_info in self._tool_groups.items():
-            for act_info in group_info.get("actions", []):
-                act_key = act_info.get("key")
-                if not act_key or act_key == group_key:
-                    continue
-                action = actions.get(act_key)
-                existing_btn = self._pinned_action_buttons.get(act_key)
-                is_pinned = bool(existing_btn and isValid(existing_btn))
-                if action is None or not isValid(action):
-                    continue
-                action.blockSignals(True)
-                action.setChecked(is_pinned)
-                action.blockSignals(False)
 
         menu.update()
         menu.repaint()
@@ -2359,7 +2194,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 if item["type"] == "separator":
                     menu.addSeparator()
                 elif item["type"] == "widget":
-                    key = item["key"]
+                    key = item["id"]
                     widget = self._widgets.get(key)
                     if widget is None or not isValid(widget):
                         continue
@@ -2373,48 +2208,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         title=item["label"],
                         tooltip_template=item.get("tooltip_template"),
                     )
-
-                    # If this widget has a registered action group, show its pinnable
-                    # sub-actions inline (separated) so the user can pin them as buttons.
-                    group_info = self._tool_groups.get(key)
-                    if group_info and group_info.get("actions"):
-                        group_icon = group_info.get("icon") or ""
-
-                        for act_info in group_info["actions"]:
-                            act_key = act_info["key"]
-                            if act_key == key:
-                                continue
-
-                            act_label = act_info.get("label", "")
-                            act_icon = act_info.get("icon") or group_icon
-                            existing_btn = self._pinned_action_buttons.get(act_key)
-                            is_pinned = bool(existing_btn and isValid(existing_btn))
-
-                            def _make_pin_handler(gk, ai, ak):
-                                def handler(checked):
-                                    if checked:
-                                        self._set_setting(f"pin_action_{ak}", True)
-                                        self._create_pinned_action_button(gk, ai)
-                                    else:
-                                        self._set_setting(f"pin_action_{ak}", False)
-                                        self._remove_pinned_action_button(ak)
-
-                                return handler
-
-                            icon = QtGui.QIcon(act_icon or "") if act_icon else QtGui.QIcon()
-                            self._add_checkable_menu_action(
-                                menu,
-                                act_key,
-                                act_label,
-                                is_pinned,
-                                _make_pin_handler(key, act_info, act_key),
-                                description=act_info.get("description") or "",
-                                title=act_label,
-                                icon=icon,
-                                tooltip_template=act_info.get("tooltip_template") or act_info.get("tooltip"),
-                            )
-                        menu.addSeparator()
-
         menu.addSeparator()
         pin_def_action = menu.addAction(QtGui.QIcon(media.dot_pins_image), "Pin Defaults")
         if self._all_modes:

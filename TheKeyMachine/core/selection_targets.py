@@ -3,7 +3,7 @@ import maya.mel as mel
 
 try:
     from maya.api import OpenMaya as om
-except Exception:
+except ImportError:
     om = None
 
 
@@ -30,7 +30,7 @@ def get_selected_objects(long=False, ordered=False, orderedSelection=None):
     try:
         selection_list = om.MGlobal.getActiveSelectionList()
         selection_strings = selection_list.getSelectionStrings()
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return _ls_selected(long=long)
 
     if not selection_strings:
@@ -38,7 +38,7 @@ def get_selected_objects(long=False, ordered=False, orderedSelection=None):
 
     try:
         return cmds.ls(selection_strings, long=long) or selection_strings
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return selection_strings
 
 
@@ -46,7 +46,7 @@ def get_selected_object_count():
     if om is not None:
         try:
             return om.MGlobal.getActiveSelectionList().length()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
     return len(_ls_selected())
 
@@ -56,7 +56,7 @@ def get_selected_time_range():
         time_slider = get_playback_slider()
         time_range = cmds.timeControl(time_slider, q=True, rangeArray=True)
         current_time = cmds.currentTime(query=True)
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return None
 
     if not time_range or len(time_range) < 2:
@@ -72,7 +72,7 @@ def get_selected_channels():
         main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
         selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
         return selected_channels or None
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return None
 
 
@@ -91,7 +91,7 @@ def _plugs_from_anim_curves(curves):
     for curve in curves or []:
         try:
             dest = cmds.listConnections("{}.output".format(curve), source=False, destination=True, plugs=True) or []
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             dest = []
         plugs.extend(plug for plug in dest if plug and "." in plug)
     return _unique(plugs)
@@ -104,7 +104,7 @@ def _anim_curves_from_plugs(plugs):
             continue
         try:
             curves.extend(cmds.listConnections(plug, source=True, destination=False, type="animCurve") or [])
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
     return _unique(curves)
 
@@ -119,7 +119,7 @@ def _attribute_plugs_from_nodes(nodes):
         for obj in nodes:
             try:
                 attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
-            except Exception:
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 attrs = []
             plugs.extend(["{}.{}".format(obj, attr) for attr in attrs])
         source = "keyable_scalar"
@@ -137,7 +137,7 @@ def _selected_object_attribute_plugs():
 def _is_anim_curve(node):
     try:
         return bool(node and cmds.objExists(node) and cmds.nodeType(node).startswith("animCurve"))
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return False
 
 
@@ -169,14 +169,14 @@ def get_graph_editor_selected_attribute_plugs():
 def get_graph_editor_outliner_items():
     try:
         return cmds.selectionConnection(GRAPH_EDITOR_OUTLINER, query=True, object=True) or []
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return []
 
 
 def get_graph_editor_selected_curves():
     try:
         selected_curves = cmds.keyframe(query=True, selected=True, name=True) or []
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         selected_curves = []
     if selected_curves:
         return selected_curves
@@ -190,7 +190,7 @@ def get_target_curves():
         return curves
     try:
         return cmds.keyframe(query=True, name=True, sl=True) or []
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return []
 
 
@@ -205,7 +205,7 @@ def _resolve_slider_targets():
 
     try:
         selected_key_curves = cmds.keyframe(query=True, selected=True, name=True) or []
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         selected_key_curves = []
     if selected_key_curves:
         return {
@@ -230,7 +230,7 @@ def _resolve_slider_targets():
 
     try:
         legacy_graph_curves = cmds.keyframe(query=True, name=True, sl=True) or []
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         legacy_graph_curves = []
     if legacy_graph_curves:
         return {
@@ -281,7 +281,7 @@ def _normalize_frames(frames):
     for frame in frames or []:
         try:
             normalized.add(int(round(frame)))
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             continue
     return sorted(normalized)
 
@@ -289,7 +289,7 @@ def _normalize_frames(frames):
 def get_graph_editor_selected_tangent_frames():
     try:
         tangent_frames = cmds.keyTangent(query=True, selected=True, timeChange=True) or []
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         tangent_frames = []
     return _normalize_frames(tangent_frames)
 
@@ -297,19 +297,19 @@ def get_graph_editor_selected_tangent_frames():
 def get_graph_editor_selected_frames(include_tangents=True):
     try:
         frames = list(cmds.keyframe(query=True, selected=True, tc=True) or [])
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         frames = []
 
     for curve in get_graph_editor_selected_curves():
         try:
             frames.extend(cmds.keyframe(curve, query=True, selected=True, timeChange=True) or [])
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             continue
 
     if include_tangents:
         try:
             frames.extend(get_graph_editor_selected_tangent_frames())
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
     return _normalize_frames(frames)
 
