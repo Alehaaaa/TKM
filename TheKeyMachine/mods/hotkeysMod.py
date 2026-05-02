@@ -20,7 +20,6 @@ import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.mediaMod as media
 from TheKeyMachine.widgets import customDialogs as cd
-from TheKeyMachine.widgets import customWidgets as cw
 from TheKeyMachine.widgets import util as wutil
 
 
@@ -182,12 +181,6 @@ def _combo_key(combo):
     if not combo:
         return ""
     return "{}|{}|{}|{}".format(combo["maya_key"], int(combo["ctrl"]), int(combo["shift"]), int(combo["alt"]))
-
-
-def _pixmap_for_icon(icon, size=18):
-    if not icon:
-        return QtGui.QPixmap()
-    return QtGui.QIcon(icon).pixmap(wutil.DPI(size), wutil.DPI(size))
 
 
 def _text_badge_pixmap(text, size=18):
@@ -418,36 +411,20 @@ def _assignment_tooltip_data(name_command, title_lookup, icon_lookup):
     description = "Hotkey Conflict.<br>If you Apply changes, it will overwrite this hotkey."
     if name_command.startswith("TKMTriggerName_"):
         command_name = name_command.replace("TKMTriggerName_", "", 1)
-        return {
-            "text": title_lookup.get(command_name, command_name),
-            "description": description,
-            "icon": icon_lookup.get(command_name),
-        }
-    return {
-        "text": str(name_command),
-        "description": description,
-        "icon": ":/mayaIcon.png",
-    }
+        return {"text": title_lookup.get(command_name, command_name), "description": description, "icon": icon_lookup.get(command_name)}
+    return {"text": str(name_command), "description": description, "icon": ":/mayaIcon.png"}
 
 
-def _native_tooltip_html(tooltip_data):
+def _status_tooltip_html(tooltip_data):
     if not tooltip_data:
         return ""
     icon = tooltip_data.get("icon")
     title = tooltip_data.get("text", "")
     description = tooltip_data.get("description", "")
-    parts = ["<table cellspacing='0' cellpadding='0'>"]
-    if icon:
-        parts.append(
-            "<tr><td style='padding:0 8px 6px 0; vertical-align:top;'><img src='{}' width='24' height='24'></td>"
-            "<td style='vertical-align:top;'><b>{}</b></td></tr>".format(icon, title)
-        )
-    else:
-        parts.append("<tr><td><b>{}</b></td></tr>".format(title))
-    if description:
-        parts.append("<tr><td colspan='2'>{}</td></tr>".format(description))
-    parts.append("</table>")
-    return "".join(parts)
+    icon_row = "<tr><td align='left'><img src='{}' width='32' height='32'></td></tr>".format(icon) if icon else ""
+    title_row = "<tr><td align='left' style='padding-top:2px;'><span style='font-size:10pt;'><b>{}</b></span></td></tr>".format(title) if title else ""
+    body_row = "<tr><td align='left' style='padding-top:10px; font-size:8pt;'>{}</td></tr>".format(description) if description else ""
+    return "<table cellspacing='0' cellpadding='0'>{}{}{}</table>".format(icon_row, title_row, body_row)
 
 
 def _tool_command_row(tool_data):
@@ -610,10 +587,10 @@ def _iter_hotkey_tool_sections():
             yield section_id, section_data
 
     for layout_id in ("main", "graph"):
-        for section_id in toolbox.TOOLBAR_SECTION_LAYOUTS.get(layout_id, []):
+        for section_data in toolbox.get_toolbar_sections(layout_id, resolve_items=False):
+            section_id = section_data.get("id")
             if section_id in seen:
                 continue
-            section_data = toolbox.TOOL_SECTION_DEFINITIONS.get(section_id)
             if not section_data or section_data.get("hotkeys") is False:
                 continue
             seen.add(section_id)
@@ -689,65 +666,127 @@ class HotkeyCaptureEdit(QtWidgets.QLineEdit):
         event.accept()
 
 
-class HotkeyStatusLabel(QtWidgets.QLabel):
-    def __init__(self, parent=None):
-        QtWidgets.QLabel.__init__(self, parent)
-        self.setAlignment(QtCore.Qt.AlignCenter)
+def _draw_native_row_focus(widget, painter, rect):
+    if not rect.isValid():
+        return
+    option = QtWidgets.QStyleOptionFocusRect()
+    option.initFrom(widget)
+    option.rect = rect.adjusted(1, 1, -1, -1)
+    option.state |= QtWidgets.QStyle.State_KeyboardFocusChange
+    option.backgroundColor = widget.palette().color(QtGui.QPalette.Highlight)
+    widget.style().drawPrimitive(QtWidgets.QStyle.PE_FrameFocusRect, option, painter, widget)
 
-    def clear_status_tooltip(self):
-        self.setToolTip("")
 
+class HotkeySelectableItemWidget(QtWidgets.QWidget):
+    clicked = QtCore.Signal()
 
-class HotkeyCommandRow(QtWidgets.QWidget):
-    comboChanged = QtCore.Signal(str, object)
-    requestSelect = QtCore.Signal(str)
-
-    def __init__(self, command_data, title_lookup, icon_lookup, row_index=0, accent_color="#5f88a8", parent=None):
+    def __init__(self, parent=None, base_color=None):
         super().__init__(parent)
-        self.command_data = command_data
-        self.title_lookup = title_lookup
-        self.icon_lookup = icon_lookup
-        self._row_index = row_index
         self._selected = False
-        self._base_bg = "#303030" if (row_index % 2 == 0) else "#292929"
-        self._accent_color = accent_color
-        self._icon = command_data.get("icon")
-        self._pressed_icon = None
+        self._base_color = QtGui.QColor(base_color) if base_color else None
+        self.setAutoFillBackground(False)
+
+    def set_selected(self, selected):
+        self._selected = bool(selected)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        if self._selected:
+            painter.fillRect(self.rect(), self.palette().color(QtGui.QPalette.Highlight))
+            _draw_native_row_focus(self, painter, self.rect())
+        elif self._base_color:
+            painter.fillRect(self.rect(), self._base_color)
+        painter.end()
+        super().paintEvent(event)
+
+    def mousePressEvent(self, event):
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+
+class HotkeySectionItemWidget(HotkeySelectableItemWidget):
+    def __init__(self, section, row_index=0, parent=None):
+        super().__init__(parent, base_color="#303030" if row_index % 2 == 0 else "#292929")
+        self.section_id = section["id"]
 
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(wutil.DPI(6), 0, wutil.DPI(10), 0)
+        layout.setSpacing(wutil.DPI(8))
 
-        self.tool_button = QtWidgets.QPushButton(command_data["title"], self)
-        self.tool_button.setCursor(QtCore.Qt.PointingHandCursor)
-        self.tool_button.setFlat(True)
-        self.tool_button.setIconSize(QtCore.QSize(wutil.DPI(20), wutil.DPI(20)))
-        self.tool_button.setMinimumHeight(wutil.DPI(24))
-        if self._icon:
-            cw.QFlatHoverableIcon.apply(self.tool_button, self._icon, highlight=False)
-            self._pressed_icon = cw.QFlatHoverableIcon._color_icon(
-                QtGui.QIcon(self._icon), self._accent_color, self.tool_button.iconSize()
-            )
+        icon_label = QtWidgets.QLabel(self)
+        icon_label.setFixedSize(wutil.DPI(43), wutil.DPI(43))
+        icon_label.setAlignment(QtCore.Qt.AlignCenter)
+        if section.get("icon"):
+            icon_label.setPixmap(QtGui.QIcon(section.get("icon")).pixmap(wutil.DPI(43), wutil.DPI(43)))
+        layout.addWidget(icon_label)
+
+        self.title_label = QtWidgets.QLabel(section["title"], self)
+        self.title_label.setObjectName("HotkeySectionTitle")
+        self.title_label.setStyleSheet("#HotkeySectionTitle{background:transparent;color:#d0d0d0;font-size:%spx;}" % wutil.DPI(11))
+        layout.addWidget(self.title_label, 1)
+        for watched in (icon_label, self.title_label):
+            watched.installEventFilter(self)
+
+    def set_selected(self, selected):
+        super().set_selected(selected)
+        self.title_label.setStyleSheet(
+            "#HotkeySectionTitle{background:transparent;color:%s;font-size:%spx;}"
+            % ("#ffffff" if selected else "#d0d0d0", wutil.DPI(11))
+        )
+
+    def eventFilter(self, watched, event):
+        if event.type() == QtCore.QEvent.MouseButtonPress:
+            self.clicked.emit()
+        return super().eventFilter(watched, event)
+
+
+class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
+    comboChanged = QtCore.Signal(str, object)
+    requestSelect = QtCore.Signal(str)
+    invokeRequested = QtCore.Signal(str)
+
+    def __init__(self, command_data, row_index=0, parent=None):
+        super().__init__(parent, base_color="#303030" if row_index % 2 == 0 else "#292929")
+        self.command_data = command_data
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(wutil.DPI(8), 0, wutil.DPI(8), 0)
+        layout.setSpacing(wutil.DPI(6))
+
+        self.icon_label = QtWidgets.QLabel(self)
+        self.icon_label.setFixedSize(wutil.DPI(24), wutil.DPI(24))
+        self.icon_label.setAlignment(QtCore.Qt.AlignCenter)
+        if command_data.get("icon"):
+            self.icon_label.setPixmap(QtGui.QIcon(command_data.get("icon")).pixmap(wutil.DPI(20), wutil.DPI(20)))
         elif command_data.get("badge_text"):
-            self.tool_button.setIcon(QtGui.QIcon(_text_badge_pixmap(command_data.get("badge_text"))))
-        self.tool_button.clicked.connect(lambda *_: trigger.invoke(self.command_name()))
-        self.tool_button.pressed.connect(self._on_tool_pressed)
-        self.tool_button.released.connect(self._on_tool_released)
-        layout.addWidget(self.tool_button, 1)
+            self.icon_label.setPixmap(_text_badge_pixmap(command_data.get("badge_text")))
+        layout.addWidget(self.icon_label)
 
-        self.status_cell = HotkeyStatusLabel(self)
-        self.status_cell.setFixedWidth(wutil.DPI(28))
-        layout.addWidget(self.status_cell)
+        self.title_label = QtWidgets.QLabel(command_data["title"], self)
+        self.title_label.setObjectName("HotkeyCommandTitle")
+        self.title_label.setStyleSheet("#HotkeyCommandTitle{background:transparent;color:#d0d0d0;font-size:%spx;}" % wutil.DPI(12))
+        layout.addWidget(self.title_label, 1)
+
+        self.status_label = QtWidgets.QLabel(self)
+        self.status_label.setObjectName("HotkeyStatusIcon")
+        self.status_label.setFixedWidth(wutil.DPI(28))
+        self.status_label.setAlignment(QtCore.Qt.AlignCenter)
+        layout.addWidget(self.status_label)
 
         self.edit = HotkeyCaptureEdit(self)
-        self.edit.setMinimumHeight(wutil.DPI(24))
-        self.edit.comboChanged.connect(lambda combo, name=command_data["command"]: self.comboChanged.emit(name, combo))
+        self.edit.setObjectName("HotkeyCaptureField")
+        self.edit.setMinimumHeight(wutil.DPI(22))
+        self.edit.setStyleSheet(
+            "#HotkeyCaptureField{background:#202020;border:none;border-radius:%spx;color:#d2d2d2;padding:%spx %spx;}"
+            "#HotkeyCaptureField:focus{border:none;}"
+            % (wutil.DPI(6), wutil.DPI(3), wutil.DPI(8))
+        )
+        self.edit.comboChanged.connect(lambda combo: self.comboChanged.emit(self.command_name(), combo))
         layout.addWidget(self.edit, 0)
 
-        self.setFixedHeight(wutil.DPI(24))
-        for watched in (self, self.tool_button, self.edit, self.status_cell):
+        for watched in (self, self.icon_label, self.title_label, self.status_label, self.edit):
             watched.installEventFilter(self)
-        self._apply_row_style()
 
     def command_name(self):
         return self.command_data["command"]
@@ -759,57 +798,38 @@ class HotkeyCommandRow(QtWidgets.QWidget):
         self.edit.setCombo(combo)
 
     def set_status(self, icon=None, tooltip="", tooltip_data=None):
-        self.status_cell.setPixmap(_pixmap_for_icon(icon, size=16) if icon else QtGui.QPixmap())
-        if tooltip_data:
-            self.status_cell.setToolTip(_native_tooltip_html(tooltip_data))
-        elif tooltip:
-            self.status_cell.setToolTip(tooltip)
-        else:
-            self.status_cell.clear_status_tooltip()
+        self.status_label.setPixmap(QtGui.QIcon(icon).pixmap(wutil.DPI(20), wutil.DPI(20)) if icon else QtGui.QPixmap())
+        self.status_label.setToolTip(_status_tooltip_html(tooltip_data) if tooltip_data else (tooltip or ""))
 
     def set_selected(self, selected):
-        self._selected = bool(selected)
-        self._apply_row_style()
-
-    def _apply_row_style(self):
-        border = "#6f8ea2" if self._selected else self._base_bg
-        row_bg = self._base_bg
-        self.setStyleSheet(
-            "QWidget{background:%s;border:1px solid %s;}"
-            "QPushButton{background:%s;border:none;color:#d0d0d0;text-align:left;padding:0 %spx;font-size:%spx;}"
-            "QPushButton:hover{color:#ffffff;}"
-            "QPushButton:pressed{color:%s;}"
-            "QLabel{background:%s;border:none;}"
-            "QLineEdit{background:#202020;border:1px solid #383838;border-radius:%spx;color:#d2d2d2;padding:%spx %spx;}"
-            "QLineEdit:focus{border:1px solid #6f8ea2;padding:%spx %spx;}"
-            % (
-                row_bg,
-                border,
-                row_bg,
-                wutil.DPI(8),
-                wutil.DPI(12),
-                self._accent_color,
-                row_bg,
-                wutil.DPI(6),
-                wutil.DPI(5),
-                wutil.DPI(10),
-                wutil.DPI(5),
-                wutil.DPI(10),
-            )
+        super().set_selected(selected)
+        self.title_label.setStyleSheet(
+            "#HotkeyCommandTitle{background:transparent;color:%s;font-size:%spx;}"
+            % ("#ffffff" if selected else "#d0d0d0", wutil.DPI(12))
         )
 
-    def _on_tool_pressed(self):
-        if self._pressed_icon is not None:
-            self.tool_button.setIcon(self._pressed_icon)
-
-    def _on_tool_released(self):
-        if self._icon:
-            self.tool_button.setIcon(QtGui.QIcon(self._icon))
+    def mouseDoubleClickEvent(self, event):
+        self.invokeRequested.emit(self.command_name())
+        super().mouseDoubleClickEvent(event)
 
     def eventFilter(self, watched, event):
         if event.type() in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.FocusIn):
             self.requestSelect.emit(self.command_name())
         return super().eventFilter(watched, event)
+
+
+class HotkeyItemList(QtWidgets.QListWidget):
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        current = self.currentItem()
+        current_widget = self.itemWidget(current) if current else None
+        if current_widget and current.isSelected():
+            return
+        if not current or not current.isSelected():
+            return
+        painter = QtGui.QPainter(self.viewport())
+        _draw_native_row_focus(self, painter, self.visualItemRect(current))
+        painter.end()
 
 
 class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
@@ -848,6 +868,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         )
 
         content_layout = QtWidgets.QGridLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setHorizontalSpacing(wutil.DPI(12))
         content_layout.setVerticalSpacing(wutil.DPI(8))
         content_layout.setColumnStretch(0, 0)
@@ -857,53 +878,42 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
         left_widget = QtWidgets.QWidget(main)
         left_layout = QtWidgets.QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
 
-        self.section_list = QtWidgets.QListWidget(left_widget)
-        self.section_list.setIconSize(QtCore.QSize(wutil.DPI(43), wutil.DPI(43)))
+        self.section_list = HotkeyItemList(left_widget)
+        self.section_list.setObjectName("HotkeySectionList")
         self.section_list.setMinimumWidth(wutil.DPI(240))
+        self.section_list.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.section_list.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        section_palette = self.section_list.palette()
+        section_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor("#5f88a8"))
+        section_palette.setColor(QtGui.QPalette.HighlightedText, QtGui.QColor("#ffffff"))
+        self.section_list.setPalette(section_palette)
         self.section_list.setStyleSheet(
-            (
-                "QListWidget{background:#2d2d2d;border:1px solid #3a3a3a;color:#d0d0d0;outline:none;}"
-                "QListWidget::item{padding:%spx %spx %spx %spx; margin:0px; border:none; background:transparent;}"
-                "QListWidget::item:selected{padding:%spx %spx %spx %spx; margin:0px; border:none; background:#5f88a8; color:#ffffff;}"
-                "QListWidget::item:selected:active{padding:%spx %spx %spx %spx;}"
-                "QListWidget::item:selected:!active{padding:%spx %spx %spx %spx;}"
-            )
-            % (
-                wutil.DPI(8),
-                wutil.DPI(12),
-                wutil.DPI(8),
-                wutil.DPI(12),
-                wutil.DPI(8),
-                wutil.DPI(12),
-                wutil.DPI(8),
-                wutil.DPI(12),
-                wutil.DPI(8),
-                wutil.DPI(12),
-                wutil.DPI(8),
-                wutil.DPI(12),
-                wutil.DPI(8),
-                wutil.DPI(12),
-                wutil.DPI(8),
-                wutil.DPI(12),
-            )
+            "#HotkeySectionList{background:#2d2d2d;border:1px solid #3a3a3a;color:#d0d0d0;}"
+            "#HotkeySectionList::item{margin:0px;padding:0px;border:none;}"
+            "#HotkeySectionList::item:selected{margin:0px;padding:0px;border:none;}"
         )
         self.section_list.currentItemChanged.connect(self._on_section_changed)
         left_layout.addWidget(self.section_list, 1)
 
         right_widget = QtWidgets.QWidget(main)
         right_layout = QtWidgets.QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
 
         self.command_stack = QtWidgets.QStackedWidget(right_widget)
-        self.command_stack.setStyleSheet("QStackedWidget{background:transparent;}")
+        self.command_stack.setObjectName("HotkeyCommandStack")
+        self.command_stack.setStyleSheet("#HotkeyCommandStack{background:transparent;}")
         right_layout.addWidget(self.command_stack, 1)
 
         self.tools_title = QtWidgets.QLabel("Tools", main)
-        self.tools_title.setStyleSheet("color:#bcbcbc;font-size:%spx;" % wutil.DPI(11))
+        self.tools_title.setObjectName("HotkeyToolsTitle")
+        self.tools_title.setStyleSheet("#HotkeyToolsTitle{color:#bcbcbc;font-size:%spx;}" % wutil.DPI(11))
         self.section_title = QtWidgets.QLabel("Hotkeys", main)
-        self.section_title.setStyleSheet("color:#bcbcbc;font-size:%spx;" % wutil.DPI(11))
+        self.section_title.setObjectName("HotkeySectionHeader")
+        self.section_title.setStyleSheet("#HotkeySectionHeader{color:#bcbcbc;font-size:%spx;}" % wutil.DPI(11))
 
         content_layout.addWidget(self.tools_title, 0, 0)
         content_layout.addWidget(self.section_title, 0, 1)
@@ -928,25 +938,39 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
     def _populate_sections(self):
         self.section_list.clear()
-        for section in self._sections:
-            item = QtWidgets.QListWidgetItem(QtGui.QIcon(section.get("icon") or ""), section["title"])
+        for row_index, section in enumerate(self._sections):
+            item = QtWidgets.QListWidgetItem()
             item.setData(QtCore.Qt.UserRole, section["id"])
-            item.setSizeHint(QtCore.QSize(0, wutil.DPI(62)))
+            item.setSizeHint(QtCore.QSize(0, wutil.DPI(43)))
             self.section_list.addItem(item)
+            widget = HotkeySectionItemWidget(section, row_index=row_index, parent=self.section_list)
+            widget.clicked.connect(lambda sid=section["id"]: self._select_section_by_id(sid))
+            self.section_list.setItemWidget(item, widget)
         if self.section_list.count():
             self.section_list.setCurrentRow(0)
 
+    def _select_section_by_id(self, section_id):
+        for index in range(self.section_list.count()):
+            item = self.section_list.item(index)
+            if item and item.data(QtCore.Qt.UserRole) == section_id:
+                self.section_list.setCurrentRow(index)
+                break
+
     def _create_command_list(self, section_id):
-        command_list = QtWidgets.QListWidget(self.command_stack)
-        command_list.setFrameShape(QtWidgets.QFrame.NoFrame)
-        command_list.setSpacing(0)
+        command_list = HotkeyItemList(self.command_stack)
+        command_list.setObjectName("HotkeyCommandList")
+        command_list.setFrameShape(QtWidgets.QFrame.StyledPanel)
         command_list.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         command_list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         command_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        command_palette = command_list.palette()
+        command_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor("#5f88a8"))
+        command_palette.setColor(QtGui.QPalette.HighlightedText, QtGui.QColor("#ffffff"))
+        command_list.setPalette(command_palette)
         command_list.setStyleSheet(
-            "QListWidget{background:#242424;border:1px solid #3a3a3a;color:#d0d0d0;outline:none;}"
-            "QListWidget::item{padding:0px;margin:0px;border:none;background:transparent;}"
-            "QListWidget::item:selected{background:transparent;border:none;}"
+            "#HotkeyCommandList{background:#242424;border:1px solid #3a3a3a;color:#d0d0d0;}"
+            "#HotkeyCommandList::item{margin:0px;padding:0px;border:none;}"
+            "#HotkeyCommandList::item:selected{margin:0px;padding:0px;border:none;background:transparent;}"
         )
         command_list.currentItemChanged.connect(
             lambda current, previous, sid=section_id: self._on_command_item_changed(sid, current, previous)
@@ -980,8 +1004,15 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         for row in view["rows"]:
             self._set_row_combo_from_draft(row)
 
+    def _clear_command_view(self, view):
+        view["list"].clear()
+        view["rows"] = []
+        view["items"] = []
+        view["built"] = False
+
     def _begin_section_build(self, section_id, commands, batched=False):
         view = self._ensure_section_view(section_id)
+        self._clear_command_view(view)
         self._pending_section_id = section_id
         self._pending_commands = list(commands)
         self._pending_row_index = 0
@@ -1003,29 +1034,30 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         command_list.blockSignals(True)
         for row_index in range(start, end):
             command = self._pending_commands[row_index]
-            row = HotkeyCommandRow(command, self._title_lookup, self._icon_lookup, row_index=row_index, parent=command_list)
-            self._set_row_combo_from_draft(row)
-            row.comboChanged.connect(self._on_row_combo_changed)
-            row.requestSelect.connect(self._select_command_by_name)
             item = QtWidgets.QListWidgetItem()
             item.setData(QtCore.Qt.UserRole, command["command"])
-            item.setSizeHint(QtCore.QSize(0, wutil.DPI(24)))
+            item.setSizeHint(QtCore.QSize(0, wutil.DPI(28)))
             command_list.addItem(item)
+
+            row = HotkeyCommandItemWidget(command, row_index=row_index, parent=command_list)
+            row.comboChanged.connect(self._on_row_combo_changed)
+            row.requestSelect.connect(self._select_command_by_name)
+            row.invokeRequested.connect(trigger.invoke)
             command_list.setItemWidget(item, row)
+            self._set_row_combo_from_draft(row)
             self._pending_view["rows"].append(row)
             self._pending_view["items"].append(item)
         command_list.blockSignals(False)
 
         self._pending_row_index = end
-        if command_list.count() and command_list.currentRow() < 0:
-            command_list.setCurrentRow(0)
-
         if self._pending_row_index < len(self._pending_commands):
             command_list.setUpdatesEnabled(True)
             self._build_timer.start(0)
             return
 
         command_list.setUpdatesEnabled(True)
+        command_list.clearSelection()
+        command_list.setCurrentRow(-1)
         self._pending_view["built"] = True
         self._refresh_statuses()
         self._pending_section_id = None
@@ -1035,6 +1067,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         self._pending_view = None
 
     def _on_section_changed(self, current, _previous):
+        self._sync_section_selection()
         if not current:
             return
         section_id = current.data(QtCore.Qt.UserRole)
@@ -1055,9 +1088,9 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         self.command_stack.setCurrentWidget(view["list"])
         if view["built"]:
             self._sync_view_from_draft(view)
-            if view["list"].count() and view["list"].currentRow() < 0:
-                view["list"].setCurrentRow(0)
             self._refresh_statuses()
+            view["list"].clearSelection()
+            view["list"].setCurrentRow(-1)
             return
         self._begin_section_build(
             section_id,
@@ -1078,13 +1111,20 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
                 view["list"].setCurrentRow(index)
                 break
 
+    def _sync_section_selection(self):
+        current = self.section_list.currentItem()
+        for index in range(self.section_list.count()):
+            item = self.section_list.item(index)
+            widget = self.section_list.itemWidget(item)
+            if widget:
+                widget.set_selected(item is current)
+
     def _on_command_item_changed(self, section_id, current, _previous):
         view = self._section_views.get(section_id)
         if not view:
             return
-        current_name = current.data(QtCore.Qt.UserRole) if current else None
         for item, row in zip(view["items"], view["rows"]):
-            row.set_selected(item.data(QtCore.Qt.UserRole) == current_name)
+            row.set_selected(item is current)
 
     def _pending_mapping(self):
         return {name: _normalize_combo(combo) for name, combo in self._draft_mapping.items() if _normalize_combo(combo)}
@@ -1098,6 +1138,11 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
     def _is_dirty(self):
         return self._pending_mapping() != self._stored_mapping
+
+    def _discard_hotkey_changes(self):
+        self._draft_mapping = dict(self._stored_mapping)
+        self._sync_view_from_draft(self._active_view() or {"rows": []})
+        self._refresh_all_view_statuses()
 
     def _refresh_statuses(self):
         pending = self._pending_mapping()
@@ -1160,7 +1205,8 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             cmds.warning("Invalid hotkey file.")
             return
         self._draft_mapping = _normalize_hotkey_mapping(data)
-        self._on_section_changed(self.section_list.currentItem(), None)
+        self._sync_view_from_draft(self._active_view() or {"rows": []})
+        self._refresh_all_view_statuses()
 
     def export_hotkeys(self):
         result = cmds.fileDialog2(fileMode=0, caption="Export Hotkeys", fileFilter="JSON Files (*.json)")
@@ -1233,23 +1279,25 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             self,
             "Unsaved hotkeys",
             title="Save hotkey changes?",
-            message="You have unsaved hotkey changes.",
+            message="You have unsaved hotkey changes. Save them, discard them, or cancel and keep editing.",
             icon=media.warning_image,
             buttons=[
-                cd.QFlatConfirmDialog.Yes,
-                cd.QFlatConfirmDialog.No,
+                cd.QFlatDialogButton("Save", positive=True, icon=media.apply_image),
+                cd.QFlatDialogButton("Discard", positive=False, icon=media.trash_image),
+                cd.QFlatDialogButton("Cancel", positive=False, icon=media.cancel_image),
             ],
-            highlight="Yes",
+            highlight="Save",
         )
         self._close_prompt_open = False
         if not result:
             return
         name = result.get("name")
-        if name == "Yes":
+        if name == "Save":
             if self.apply_hotkeys():
                 self._allow_close = True
                 self.close()
-        elif name == "No":
+        elif name == "Discard":
+            self._discard_hotkey_changes()
             self._allow_close = True
             self.close()
 

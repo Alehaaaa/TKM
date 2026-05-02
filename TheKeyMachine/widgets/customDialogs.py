@@ -75,8 +75,8 @@ class QFlatWindowMixin:
     """Shared header and footer helpers for QFlat windows."""
 
     TEXT_COLOR = "#bbbbbb"
-    WINDOW_HEADER_MARGINS = (0, 8, 0, 10)
-    WINDOW_HEADER_SPACING = 16
+    WINDOW_HEADER_MARGINS = (0, 4, 0, 6)
+    WINDOW_HEADER_SPACING = 7
     WINDOW_HEADER_ICON_SIZE = 51
     WINDOW_HEADER_TITLE_SIZE = 20
 

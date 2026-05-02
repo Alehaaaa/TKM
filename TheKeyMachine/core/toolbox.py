@@ -1111,7 +1111,7 @@ TOOL_SECTION_DEFINITIONS = {
         ],
     },
     "default_tools": {
-        "label": "default",
+        "label": "Default",
         "color": None,
         "items": [
             {
