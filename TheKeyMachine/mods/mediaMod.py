@@ -34,7 +34,7 @@ _ASSET_FILES = {
     "create_locator_image": "cube.svg",
     "align_menu_image": "magnet.svg",
     "tracer_image": "tracer.svg",
-    "default_animation_image": "eraser.svg",
+    "default_animation_image": "default.svg",
     "delete_animation_image": "delete_animation.svg",
     "match_image": "magnet.svg",
     "opposite_select_image": "opposite_select.svg",
@@ -130,6 +130,9 @@ _ASSET_FILES = {
     "tracer_blue_image": "tracer_blue.svg",
     "euler_filter_image": "euler_filter.svg",
     "sliders_overshoot_image": "sliders_overshoot.svg",
+
+    "import_image": "import.svg",
+    "export_image": "export.svg",
 }
 
 _selection_set_icon_shade_names = {

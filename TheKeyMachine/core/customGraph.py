@@ -66,18 +66,12 @@ _DOCK_OPTIONS = (
 )
 _DOCK_POSITION_IDS = {position for position, _label, _description in _DOCK_OPTIONS}
 
-_ALIGNMENT_DICT = {
-    "Left": QtCore.Qt.AlignLeft,
-    "Center": QtCore.Qt.AlignHCenter,
-    "Right": QtCore.Qt.AlignRight,
-}
-
 _GRAPH_TOOLBAR_WIDGET = None
 
 
 def _graph_toolbar_alignment():
     align_str = settings.get_setting("graph_toolbar_alignment", "Center")
-    return _ALIGNMENT_DICT.get(align_str, QtCore.Qt.AlignHCenter)
+    return toolMenus.toolbar_alignment_value(align_str)
 
 
 def _find_graph_editor_widget():

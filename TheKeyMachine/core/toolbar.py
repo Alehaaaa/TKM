@@ -884,12 +884,24 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     def _get_current_icon_alignment(self):
         alignment_name = settings.get_setting("toolbar_icon_alignment", "Center")
-        alignments = {"Left": QtCore.Qt.AlignLeft, "Center": QtCore.Qt.AlignHCenter, "Right": QtCore.Qt.AlignRight}
-        return alignments.get(alignment_name, QtCore.Qt.AlignHCenter)
+        return toolMenus.toolbar_alignment_value(alignment_name)
+
+    def set_toolbar_icon_alignment(self, alignment_name):
+        settings.set_setting("toolbar_icon_alignment", alignment_name)
+        if not wutil.is_valid_widget(self.main_toolbar_widget):
+            return
+
+        layout = self.main_toolbar_widget.layout()
+        if layout:
+            layout.setAlignment(toolMenus.toolbar_alignment_value(alignment_name))
+            layout.invalidate()
+
+        self.main_toolbar_widget.updateGeometry()
+        self.main_toolbar_widget.update()
+        self.update_height()
 
     def _add_settings_button(self, sec, item):
         show_tooltips = settings.get_setting("show_tooltips", True)
-        alignments = {"Left": QtCore.Qt.AlignLeft, "Center": QtCore.Qt.AlignHCenter, "Right": QtCore.Qt.AlignRight}
         toolbar_alignment = self._get_current_icon_alignment()
         INTERNET_CONNECTION = general.config.get("INTERNET_CONNECTION", True)
 
@@ -898,15 +910,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             QFlatTooltipManager.enabled = value
 
         def update_toolbar_icon_alignment(alignment_name):
-            settings.set_setting("toolbar_icon_alignment", alignment_name)
-            # self.buildUI()
+            self.set_toolbar_icon_alignment(alignment_name)
 
         def _build_settings_menu(_menu, source_widget=None):
             return toolMenus.build_main_settings_menu(
                 self,
                 source_widget or btn,
                 show_tooltips=show_tooltips,
-                alignments=alignments,
                 toolbar_alignment=toolbar_alignment,
                 update_show_tooltips=update_show_tooltips,
                 update_toolbar_icon_alignment=update_toolbar_icon_alignment,

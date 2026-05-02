@@ -96,7 +96,7 @@ class SelectionSetsController:
         new_setgroup_name = new_setgroup_name.strip()
 
         if not new_setgroup_name:
-            return cmds.warning("Please enter a valid set group name")
+            return wutil.make_inViewMessage("Please enter a valid set group name")
 
         new_name = f"{new_setgroup_name}_setgroup"
         if old_setgroup_name == new_name:
@@ -105,19 +105,19 @@ class SelectionSetsController:
         try:
             cmds.rename(old_setgroup_name, new_name)
         except Exception as e:
-            return cmds.warning(f"Error renaming set group: {e}")
+            return wutil.make_inViewMessage(f"Error renaming set group: {e}")
 
         cmds.evalDeferred(self.create_buttons_for_sel_sets)
 
     def rename_set(self, old_set_name, new_set_name, set_group=None, *args):
         if not new_set_name.strip():
-            return cmds.warning("Please enter a valid set name")
+            return wutil.make_inViewMessage("Please enter a valid set name")
 
         current_color_suffix = old_set_name.rsplit("_", 1)[-1]
         new_set_name_with_color = f"{new_set_name}_{current_color_suffix}"
 
         if cmds.objExists(new_set_name_with_color):
-            return cmds.warning(f"A set named '{new_set_name_with_color}' already exists. Please choose a different name")
+            return wutil.make_inViewMessage(f"A set named '{new_set_name_with_color}' already exists. Please choose a different name")
 
         cmds.evalDeferred(lambda: cmds.rename(old_set_name, new_set_name_with_color))
         cmds.evalDeferred(self.create_buttons_for_sel_sets)
@@ -125,16 +125,14 @@ class SelectionSetsController:
     def set_set_color(self, set_name, color_suffix, *args):
         set_node = cmds.ls(set_name)
         if not set_node:
-            cmds.warning(f"Set '{set_name}' does not exist")
-            return
+            return wutil.make_inViewMessage(f"Set '{set_name}' does not exist")
 
         color_suffix = color_suffix.strip("_")
         current_color_suffix = set_name.rsplit("_", 1)[-1]
         new_set_name = set_name.replace(current_color_suffix, color_suffix)
 
         if cmds.objExists(new_set_name):
-            cmds.warning(f"A set named '{new_set_name}' already exists. Please choose a different color")
-            return
+            return wutil.make_inViewMessage(f"A set named '{new_set_name}' already exists. Please choose a different color")
 
         cmds.rename(set_node, new_set_name)
 
@@ -152,7 +150,7 @@ class SelectionSetsController:
         if cmds.objExists("TheKeyMachine_SelectionSet"):
             all_sets = cmds.sets("TheKeyMachine_SelectionSet", q=True) or []
             return [s for s in all_sets if s.endswith("_setgroup")]
-        return []
+        return []   
 
     def get_selection_sets(self):
         sel_set_name = "TheKeyMachine_SelectionSet"

@@ -714,22 +714,23 @@ class QFlatTooltip(QWidget):
             )
             painter.drawPolygon(poly)
 
-    def show_around(self, widget, action_rect=None, target_rect=None):
+    def show_around(self, widget, action_rect=None, target_rect=None, target_pos=None):
         self.action_rect = action_rect
         self.target_rect = target_rect
         self.anchor_widget = widget
 
-        cursor_pos = QCursor.pos()
         ah = wutil.DPI(self.ARROW_H)
 
         if target_rect:
             self._global_anc = target_rect
+            cursor_pos = target_pos or QCursor.pos()
         elif action_rect:
             try:
                 self._global_anc = QRect(widget.mapToGlobal(action_rect.topLeft()), action_rect.size())
             except RuntimeError:
                 return
             self.target_rect = self._global_anc
+            cursor_pos = target_pos or QCursor.pos()
         else:
             try:
                 target_global = widget.mapToGlobal(QPoint(0, 0))
@@ -737,6 +738,7 @@ class QFlatTooltip(QWidget):
                 return
             self._global_anc = QRect(target_global, widget.size())
             self.target_rect = self._global_anc
+            cursor_pos = target_pos or QCursor.pos()
 
         # Calculate target_x based on cursor position, clamped to the anchor's horizontal bounds.
         # This makes the tooltip (and arrow) "grow" from exactly where the user is hovering.
@@ -790,6 +792,9 @@ class QFlatTooltipManager(object):
 
     _current_tooltip = None
     _timer = None
+    _current_source_key = None
+    _pending_source_key = None
+    _pending_target_rect = None
     enabled = True
 
     @classmethod
@@ -797,9 +802,29 @@ class QFlatTooltipManager(object):
         return (cls._current_tooltip and cls._current_tooltip.isVisible()) or (cls._timer and cls._timer.isActive())
 
     @classmethod
+    def is_current_source(cls, source_key, target_rect=None):
+        if source_key is None:
+            return False
+        if cls._current_tooltip and cls._current_tooltip.isVisible() and cls._current_source_key == source_key:
+            if target_rect is not None and getattr(cls._current_tooltip, "target_rect", None) != target_rect:
+                return False
+            return True
+        if cls._timer and cls._timer.isActive() and cls._pending_source_key == source_key:
+            if target_rect is not None and cls._pending_target_rect != target_rect:
+                return False
+            return True
+        return False
+
+    @classmethod
+    def _clear_pending(cls):
+        cls._pending_source_key = None
+        cls._pending_target_rect = None
+
+    @classmethod
     def cancel_timer(cls):
         if cls._timer:
             cls._timer.stop()
+        cls._clear_pending()
 
     @classmethod
     def hide(cls):
@@ -810,6 +835,7 @@ class QFlatTooltipManager(object):
             except Exception:
                 pass
             cls._current_tooltip = None
+        cls._current_source_key = None
 
     @classmethod
     def show(
@@ -823,12 +849,15 @@ class QFlatTooltipManager(object):
         action_rect=None,
         icon_obj=None,
         target_rect=None,
+        target_pos=None,
+        source_key=None,
         **kwargs,
     ):
         if not cls.enabled:
             return
         if cls._timer:
             cls._timer.stop()
+            cls._clear_pending()
         if anchor_widget is not None and not wutil.is_valid_widget(anchor_widget):
             return
 
@@ -836,7 +865,11 @@ class QFlatTooltipManager(object):
             icon_obj = icon
             icon = None
 
+        if callable(target_pos):
+            target_pos = target_pos()
+
         cls.hide()
+        cls._current_source_key = source_key
         cls._current_tooltip = QFlatTooltip(
             text=text,
             anchor_widget=anchor_widget,
@@ -846,11 +879,14 @@ class QFlatTooltipManager(object):
             tooltip_template=tooltip_template,
             icon_obj=icon_obj,
         )
-        cls._current_tooltip.show_around(anchor_widget, action_rect, target_rect=target_rect)
+        cls._current_tooltip.show_around(anchor_widget, action_rect, target_rect=target_rect, target_pos=target_pos)
 
     @classmethod
     def delayed_show(cls, delay=800, **kwargs):
         if not cls.enabled:
+            return
+        source_key = kwargs.get("source_key")
+        if cls.is_current_source(source_key, target_rect=kwargs.get("target_rect")):
             return
         if cls._timer and cls._timer.isActive():
             cls._timer.stop()
@@ -860,9 +896,12 @@ class QFlatTooltipManager(object):
             cls._timer.setSingleShot(True)
 
         anchor = kwargs.get("anchor_widget")
+        cls._pending_source_key = source_key
+        cls._pending_target_rect = kwargs.get("target_rect")
 
         def _safe_show():
             if anchor is not None and not wutil.is_valid_widget(anchor):
+                cls._clear_pending()
                 return
             cls.show(**kwargs)
 

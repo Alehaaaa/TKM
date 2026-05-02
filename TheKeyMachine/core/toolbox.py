@@ -355,11 +355,12 @@ TOOL_DEFINITIONS = {
         "label": "Tracer",
         "icon": media.tracer_image,
         "callback": bar.create_tracer,
+        "menu": _tool_menu_builder("build_tracer_menu"),
         "tooltip_template": helper.tracer_tooltip_text,
     },
     "default_objects_mods": {
         "type": "tool",
-        "label": "Reset to Default",
+        "label": "Default Pose",
         "icon": media.asset_path("default_animation_image"),
         "callback": keyTools.default_objects_mods,
         "tooltip_template": helper.default_values_tooltip_text,
@@ -650,7 +651,7 @@ TOOL_DEFINITIONS = {
     },
     "default_clear_all": {
         "type": "tool",
-        "label": "Clear All Saved Data",
+        "label": "Clear All Default Settings",
         "icon": media.asset_path("default_animation_image"),
         "callback": keyTools.restore_default_data,
     },
@@ -1112,7 +1113,7 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "default_tools": {
         "label": "Default",
-        "color": None,
+        "color": toolColors.TOOLBAR_GREEN,
         "items": [
             {
                 "id": "default_objects_mods",
@@ -1122,12 +1123,14 @@ TOOL_SECTION_DEFINITIONS = {
                     {"id": "default_rotations", "keys": [QtCore.Qt.Key_Control]},
                     {"id": "default_scales", "keys": [QtCore.Qt.Key_Alt]},
                     {"id": "default_trs", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+                    {"id": "default_set_defaults", "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
                 ],
             },
             {"id": "default_translations"},
             {"id": "default_rotations"},
             {"id": "default_scales"},
             {"id": "default_trs"},
+            "separator",
             {"id": "default_set_defaults"},
             {"id": "default_restore_defaults"},
             "separator",
@@ -1222,6 +1225,7 @@ TOOL_SECTION_DEFINITIONS = {
     "slider_tangent": {
         "label": "Tangent Sliders",
         "color": toolColors.TOOLBAR_ORANGE,
+        "icon": media.auto_tangent_image,
         "type": "slider",
         "slider_type": "tangent",
         "modes_attr": "TANGENT_MODES",
@@ -1390,6 +1394,7 @@ TOOL_SECTION_DEFINITIONS = {
     # --- Tangents ---
     "tangent_buttons": {
         "label": "Tangents",
+        "icon": media.auto_tangent_image,
         "color": toolColors.TOOLBAR_ORANGE,
         "items": [
             {"id": "tangent_cycle_matcher"},
@@ -1581,29 +1586,9 @@ TOOL_SECTION_DEFINITIONS = {
             {"section": "orbit_tools"},
         ],
     },
-    "slider_option_tools": {
-        "label": "Slider Options",
-        "items": [
-            {"type": "widget", "id": "overshoot_sliders", "default": True},
-        ],
-    },
-    "graph_toolbar_tools": {
-        "label": "Graph Toolbar",
-        "items": [
-            {"type": "widget", "id": "attribute_switcher_euler_filter"},
-            {"id": "custom_graph"},
-        ],
-    },
-    "custom_extension_tools": {
-        "label": "Custom Tools",
-        "items": [
-            {"id": "custom_tools"},
-            {"id": "custom_scripts"},
-        ],
-    },
     "extension_tools": {
         "label": "Extensions",
-        "toolbar": False,
+        "toolbar": True,
         "items": [
             {"type": "widget", "id": "overshoot_sliders", "default": True},
             {"type": "widget", "id": "attribute_switcher_euler_filter"},
@@ -1771,6 +1756,8 @@ def get_section_icon(section_id):
     section = get_tool_section(section_id, toolbar_id="main")
     if not section:
         return None
+    if section.get("icon"):
+        return section.get("icon")
 
     def find_icon(items):
         for item in items:

@@ -29,6 +29,24 @@ import TheKeyMachine.widgets.customWidgets as cw
 from TheKeyMachine.widgets import util as wutil
 
 
+TOOLBAR_ALIGNMENT_NAMES = ("Left", "Center", "Right")
+
+
+def toolbar_alignment_map():
+    return {
+        "Left": QtCore.Qt.AlignLeft,
+        "Center": QtCore.Qt.AlignHCenter,
+        "Right": QtCore.Qt.AlignRight,
+    }
+
+
+def toolbar_alignment_value(alignment_name):
+    return toolbar_alignment_map().get(alignment_name, QtCore.Qt.AlignHCenter)
+
+
+TOOLBAR_ALIGNMENT_LABEL = "Align %s"
+TOOLBAR_ALIGNMENT_DESC = "Align toolbar icons to the %s."
+
 def _command_callback(command, is_python):
     if is_python:
         return lambda: exec(command)
@@ -198,6 +216,56 @@ def build_cycle_matcher_menu(menu, icon=None, source_widget=None):
     _add_action("last", "Last Key")
 
 
+def build_tracer_menu(menu, source_widget=None):
+    import TheKeyMachine.mods.barMod as bar
+
+    _ = source_widget
+
+    def _tracer_is_connected():
+        try:
+            return (
+                cmds.objExists("tracer")
+                and cmds.objExists("tracerHandleShape")
+                and cmds.isConnected("tracer.points", "tracerHandleShape.points")
+            )
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return False
+
+    auto_update_action = menu.addAction(
+        QtGui.QIcon(media.tracer_image),
+        "Auto Update",
+        description="Keep the tracer connected for live updates.",
+    )
+    auto_update_action.setCheckable(True)
+
+    def _sync_auto_update_action():
+        auto_update_action.blockSignals(True)
+        auto_update_action.setChecked(_tracer_is_connected())
+        auto_update_action.blockSignals(False)
+
+    def _set_auto_update(checked):
+        bar.tracer_connected(bool(checked), update_cb=auto_update_action.setChecked)
+        _sync_auto_update_action()
+
+    _sync_auto_update_action()
+    auto_update_action.toggled.connect(_set_auto_update)
+    menu.aboutToShow.connect(_sync_auto_update_action)
+
+    menu.addSeparator()
+    menu.addAction(QtGui.QIcon(media.refresh_image), "Refresh Tracer", bar.tracer_refresh)
+    menu.addAction(QtGui.QIcon(media.tracer_show_hide_image), "Toggle Tracer", bar.tracer_show_hide)
+    menu.addAction(QtGui.QIcon(media.tracer_select_offset_image), "Select Offset Object", bar.select_tracer_offset_node)
+
+    menu.addSeparator()
+    style_menu = menu.addMenu(QtGui.QIcon(media.tracer_image), "Style")
+    style_menu.addAction(QtGui.QIcon(media.tracer_grey_image), "Tracer Style: Grey", bar.set_tracer_grey_color)
+    style_menu.addAction(QtGui.QIcon(media.tracer_red_image), "Tracer Style: Red", bar.set_tracer_red_color)
+    style_menu.addAction(QtGui.QIcon(media.tracer_blue_image), "Tracer Style: Blue", bar.set_tracer_blue_color)
+
+    menu.addSeparator()
+    menu.addAction(QtGui.QIcon(media.remove_image), "Remove Tracer", bar.remove_tracer_node)
+
+
 def sync_main_dock_menu(toolbar):
     if not wutil.is_valid_widget(getattr(toolbar, "dock_menu", None)):
         return
@@ -241,7 +309,9 @@ def build_main_dock_menu(toolbar):
 
 
 def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
-    menu = cw.OpenMenuWidget(parent_widget)
+    menu = cw.MenuWidget(parent_widget, tearoff=False)
+    menu.addAction(cw.LogoAction(menu, clickable=False))
+    
     sections = getattr(toolbar_widget, "_tkm_sections", []) or []
     for section in sections:
         if not wutil.is_valid_widget(section) or not getattr(section, "has_pinnable_items", lambda: False)():
@@ -249,11 +319,135 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
 
         icon_path = getattr(section, "menu_icon", lambda: None)()
         label = getattr(section, "menu_label", lambda: "Tools")()
-        section_menu = cw.MenuWidget(QtGui.QIcon(icon_path or ""), label)
+        section_menu = cw.OpenMenuWidget(QtGui.QIcon(icon_path or ""), label)
         section.populate_pinning_menu(section_menu)
         menu.addMenu(section_menu, description="Pin tools in {}.".format(label))
 
+    if sections:
+        _add_toolbar_pinning_footer(menu, toolbar_widget, sections)
+
     return menu
+
+
+def _toolbar_alignment_context(toolbar_widget):
+    is_graph_toolbar = toolbar_widget.objectName() == "tkm_customGraph_flowToolbar"
+    setting_key = "graph_toolbar_alignment" if is_graph_toolbar else "toolbar_icon_alignment"
+
+    def _apply_alignment(alignment_label):
+        settings.set_setting(setting_key, alignment_label)
+
+        if is_graph_toolbar:
+            try:
+                from TheKeyMachine.core import customGraph
+
+                customGraph.applyCustomGraphAlignment(alignment_label)
+            except (ImportError, RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+            return
+
+        parent = toolbar_widget.parent() if wutil.is_valid_widget(toolbar_widget) else None
+        while parent:
+            if hasattr(parent, "set_toolbar_icon_alignment"):
+                parent.set_toolbar_icon_alignment(alignment_label)
+                return
+            parent = parent.parent()
+
+        layout = toolbar_widget.layout() if wutil.is_valid_widget(toolbar_widget) else None
+        if layout:
+            layout.setAlignment(toolbar_alignment_value(alignment_label))
+            layout.invalidate()
+            toolbar_widget.updateGeometry()
+            toolbar_widget.update()
+
+        parent = toolbar_widget.parent() if wutil.is_valid_widget(toolbar_widget) else None
+        while parent:
+            if hasattr(parent, "update_height"):
+                QtCore.QTimer.singleShot(0, parent.update_height)
+                break
+            if hasattr(parent, "_update_height"):
+                QtCore.QTimer.singleShot(0, parent._update_height)
+                break
+            parent = parent.parent()
+
+    return setting_key, _apply_alignment
+
+
+def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alignment_fn):
+    from TheKeyMachine.widgets import customDialogs
+
+    menu.close()
+    clicked = customDialogs.QFlatConfirmDialog.question(
+        menu.parent(),
+        "Restore Defaults",
+        "Restore the toolbar pins and alignment to their default values?",
+        buttons=[customDialogs.QFlatConfirmDialog.Yes, customDialogs.QFlatConfirmDialog.Cancel],
+        highlight=customDialogs.QFlatConfirmDialog.Yes,
+        title="Restore toolbar defaults?",
+        icon=media.warning_image,
+    )
+    if clicked != customDialogs.QFlatConfirmDialog.Yes:
+        return
+
+    for section in sections:
+        if not wutil.is_valid_widget(section):
+            continue
+        if getattr(section, "_all_modes", None):
+            section.pin_defaults(getattr(section, "_default_keys", []))
+        else:
+            section.pin_widget_defaults()
+
+    apply_alignment_fn("Center")
+
+    if wutil.is_valid_widget(toolbar_widget):
+        layout = toolbar_widget.layout()
+        if layout:
+            layout.invalidate()
+        toolbar_widget.updateGeometry()
+        toolbar_widget.update()
+
+
+def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
+    menu.addSeparator()
+
+    setting_key, apply_alignment_fn = _toolbar_alignment_context(toolbar_widget)
+    align_group = QActionGroup(menu)
+    align_group.setExclusive(True)
+    menu._tkm_alignment_group = align_group
+    align_actions = {}
+
+    current_align = settings.get_setting(setting_key, "Center")
+
+    for alignment_label in ("Left", "Right", "Center"):
+        action = menu.addAction(
+            TOOLBAR_ALIGNMENT_LABEL % alignment_label,
+            description=TOOLBAR_ALIGNMENT_DESC % alignment_label.lower(),
+        )
+        action.setCheckable(True)
+        action.setChecked(alignment_label == current_align)
+        action.toggled.connect(
+            lambda checked=False, label=alignment_label: apply_alignment_fn(label) if checked else None
+        )
+        align_group.addAction(action)
+        align_actions[alignment_label] = action
+
+    menu._tkm_alignment_actions = align_actions
+
+    menu.addSeparator()
+    menu.addAction(
+        QtGui.QIcon(media.reload_image),
+        "Restore Defaults",
+        lambda: _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alignment_fn),
+        description="Restore toolbar pins and alignment defaults.",
+    )
+
+    graph_toolbar_action = menu.addAction(
+        QtGui.QIcon(media.customGraph_image),
+        "Graph Editor Toolbar",
+        description="Show or hide the TKM toolbar inside the Graph Editor.",
+    )
+    graph_toolbar_action.setCheckable(True)
+    graph_toolbar_action.toggled.connect(lambda state: graphToolbarApi.set_graph_toolbar_enabled(bool(state)))
+    graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
 
 
 def should_show_toolbar_pinning_menu(toolbar_widget, pos):
@@ -330,7 +524,6 @@ def add_main_preferences_menu(
     toolbar,
     parent_menu,
     show_tooltips,
-    alignments,
     toolbar_alignment,
     update_show_tooltips,
     update_toolbar_icon_alignment,
@@ -360,13 +553,16 @@ def add_main_preferences_menu(
 
     preferences_menu.addSection("Alignment")
     align_group = QActionGroup(preferences_menu)
-    for align_name, align_value in alignments.items():
-        action = preferences_menu.addAction(align_name, description="Align toolbar icons to the {}.".format(align_name.lower()))
+    for align_name, align_value in toolbar_alignment_map().items():
+        action = preferences_menu.addAction(
+            TOOLBAR_ALIGNMENT_LABEL % align_name,
+            description=TOOLBAR_ALIGNMENT_DESC % align_name.lower(),
+        )
         action.setCheckable(True)
         align_group.addAction(action)
         if align_value == toolbar_alignment:
             action.setChecked(True)
-        action.triggered.connect(lambda _checked=False, n=align_name, v=align_value: update_toolbar_icon_alignment(n, v))
+        action.triggered.connect(lambda _checked=False, n=align_name: update_toolbar_icon_alignment(n))
 
     preferences_menu.addSection("Display")
 
@@ -395,7 +591,6 @@ def build_main_settings_menu(
     toolbar,
     parent_button,
     show_tooltips,
-    alignments,
     toolbar_alignment,
     update_show_tooltips,
     update_toolbar_icon_alignment,
@@ -407,7 +602,6 @@ def build_main_settings_menu(
         toolbar,
         toolbar_menu,
         show_tooltips=show_tooltips,
-        alignments=alignments,
         toolbar_alignment=toolbar_alignment,
         update_show_tooltips=update_show_tooltips,
         update_toolbar_icon_alignment=update_toolbar_icon_alignment,
@@ -479,9 +673,11 @@ def build_graph_settings_menu(
     settings_menu.addSection("Toolbar's icons alignment")
     align_group = QActionGroup(settings_menu)
     align_actions = {
-        "Left": settings_menu.addAction("Left", description="Align icons to the left."),
-        "Center": settings_menu.addAction("Center", description="Align icons to the center."),
-        "Right": settings_menu.addAction("Right", description="Align icons to the right."),
+        label: settings_menu.addAction(
+            TOOLBAR_ALIGNMENT_LABEL % label,
+            description=TOOLBAR_ALIGNMENT_DESC % label.lower(),
+        )
+        for label in TOOLBAR_ALIGNMENT_NAMES
     }
     current_align = settings.get_setting("graph_toolbar_alignment", "Center")
     for label, action in align_actions.items():

@@ -504,7 +504,7 @@ class QFlatTooltipConfirm(QFlatDialog):
     ARROW_H = 8
 
     def __init__(self, parent=None, title="", message="", buttons=None, icon=None, tooltip_template=None, highlight=None, **kwargs):
-        tooltip_template = tooltip_template or kwargs.get("template")
+        tooltip_template = tooltip_template
         QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, **kwargs)
 
         # Tooltip-like window setup

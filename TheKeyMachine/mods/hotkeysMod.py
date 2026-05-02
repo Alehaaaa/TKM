@@ -183,7 +183,7 @@ def _combo_key(combo):
     return "{}|{}|{}|{}".format(combo["maya_key"], int(combo["ctrl"]), int(combo["shift"]), int(combo["alt"]))
 
 
-def _text_badge_pixmap(text, size=18):
+def _text_badge_qicon(text, size=18):
     pixmap = QtGui.QPixmap(wutil.DPI(size + 8), wutil.DPI(size))
     pixmap.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(pixmap)
@@ -195,7 +195,7 @@ def _text_badge_pixmap(text, size=18):
     painter.setFont(font)
     painter.drawText(pixmap.rect(), QtCore.Qt.AlignCenter, text or "")
     painter.end()
-    return pixmap
+    return QtGui.QIcon(pixmap)
 
 
 def _query_current_name_command(combo):
@@ -571,7 +571,12 @@ def _append_slider_mode_rows(section, slider_type, mode):
 
 def _build_slider_hotkey_section(section_id, section_data):
     slider_type = section_data.get("slider_type") or section_id.split("_", 1)[0]
-    section = {"id": section_id, "title": section_data.get("label", _humanize(section_id)), "icon": None, "commands": []}
+    section = {
+        "id": section_id,
+        "title": section_data.get("label", _humanize(section_id)),
+        "icon": toolbox.get_section_icon(section_id),
+        "commands": [],
+    }
     modes = _slider_modes_from_section(section_data)
     for mode in modes:
         _append_slider_mode_rows(section, slider_type, mode)
@@ -610,7 +615,7 @@ def _build_command_catalog():
             section = {
                 "id": section_id,
                 "title": section_data.get("hotkey_label") or section_data.get("label") or _humanize(section_id),
-                "icon": section_data.get("icon"),
+                "icon": toolbox.get_section_icon(section_id),
                 "commands": [],
             }
             seen = set()
@@ -639,10 +644,11 @@ class HotkeyCaptureEdit(QtWidgets.QLineEdit):
         super().__init__(parent)
         self._combo = None
         self.setPlaceholderText("Type a hotkey")
-        self.setReadOnly(True)
-        self.setMinimumWidth(wutil.DPI(170))
+        self.setReadOnly(False)
+        self.setFixedWidth(wutil.DPI(120))
         self.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.setCursor(QtCore.Qt.IBeamCursor)
+        self.setCursorPosition(0)
 
     def combo(self):
         return _normalize_combo(self._combo)
@@ -650,6 +656,7 @@ class HotkeyCaptureEdit(QtWidgets.QLineEdit):
     def setCombo(self, combo):
         self._combo = _normalize_combo(combo)
         self.setText(_combo_display(self._combo))
+        self.setCursorPosition(len(self.text()))
 
     def keyPressEvent(self, event):
         combo = _qt_key_to_combo(event)
@@ -754,19 +761,24 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         layout.setContentsMargins(wutil.DPI(8), 0, wutil.DPI(8), 0)
         layout.setSpacing(wutil.DPI(6))
 
-        self.icon_label = QtWidgets.QLabel(self)
-        self.icon_label.setFixedSize(wutil.DPI(24), wutil.DPI(24))
-        self.icon_label.setAlignment(QtCore.Qt.AlignCenter)
-        if command_data.get("icon"):
-            self.icon_label.setPixmap(QtGui.QIcon(command_data.get("icon")).pixmap(wutil.DPI(20), wutil.DPI(20)))
-        elif command_data.get("badge_text"):
-            self.icon_label.setPixmap(_text_badge_pixmap(command_data.get("badge_text")))
-        layout.addWidget(self.icon_label)
+        # self.icon_label = QtWidgets.QLabel(self)
+        # self.icon_label.setFixedSize(wutil.DPI(24), wutil.DPI(24))
+        # self.icon_label.setAlignment(QtCore.Qt.AlignCenter)
+        # layout.addWidget(self.icon_label)
 
-        self.title_label = QtWidgets.QLabel(command_data["title"], self)
-        self.title_label.setObjectName("HotkeyCommandTitle")
-        self.title_label.setStyleSheet("#HotkeyCommandTitle{background:transparent;color:#d0d0d0;font-size:%spx;}" % wutil.DPI(12))
-        layout.addWidget(self.title_label, 1)
+        self.hotkey_button = QtWidgets.QPushButton(self)
+        self.hotkey_button.setText(command_data["title"])
+        self.hotkey_button.setFlat(True)
+        # self.hotkey_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        if command_data.get("icon"):
+            self.hotkey_button.setIcon(QtGui.QIcon(command_data.get("icon")))
+        elif command_data.get("badge_text"):
+            self.hotkey_button.setIcon(_text_badge_qicon(command_data.get("badge_text")))
+        self.hotkey_button.setObjectName("HotkeyCommandTitle")
+        self.hotkey_button.setStyleSheet("#HotkeyCommandTitle{background:transparent;color:#d0d0d0;font-size:%spx;text-align:left;}" % wutil.DPI(12))
+        self.hotkey_button.setMinimumHeight(wutil.DPI(22))
+        self.hotkey_button.clicked.connect(lambda: self.invokeRequested.emit(self.command_name()))
+        layout.addWidget(self.hotkey_button, 1)
 
         self.status_label = QtWidgets.QLabel(self)
         self.status_label.setObjectName("HotkeyStatusIcon")
@@ -785,9 +797,6 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         self.edit.comboChanged.connect(lambda combo: self.comboChanged.emit(self.command_name(), combo))
         layout.addWidget(self.edit, 0)
 
-        for watched in (self, self.icon_label, self.title_label, self.status_label, self.edit):
-            watched.installEventFilter(self)
-
     def command_name(self):
         return self.command_data["command"]
 
@@ -803,19 +812,10 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
 
     def set_selected(self, selected):
         super().set_selected(selected)
-        self.title_label.setStyleSheet(
-            "#HotkeyCommandTitle{background:transparent;color:%s;font-size:%spx;}"
+        self.hotkey_button.setStyleSheet(
+            "#HotkeyCommandTitle{background:transparent;color:%s;font-size:%spx;text-align:left;}"
             % ("#ffffff" if selected else "#d0d0d0", wutil.DPI(12))
         )
-
-    def mouseDoubleClickEvent(self, event):
-        self.invokeRequested.emit(self.command_name())
-        super().mouseDoubleClickEvent(event)
-
-    def eventFilter(self, watched, event):
-        if event.type() in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.FocusIn):
-            self.requestSelect.emit(self.command_name())
-        return super().eventFilter(watched, event)
 
 
 class HotkeyItemList(QtWidgets.QListWidget):
@@ -857,7 +857,6 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
         main = QtWidgets.QWidget(self)
         main_layout = QtWidgets.QVBoxLayout(main)
-        main_layout.setContentsMargins(wutil.DPI(12), wutil.DPI(12), wutil.DPI(12), wutil.DPI(12))
         main_layout.setSpacing(wutil.DPI(8))
 
         self.addWindowHeader(
@@ -926,10 +925,10 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
         self.setBottomBar(
             buttons=[
-                cd.QFlatDialogButton("Import", callback=self.import_hotkeys, icon=media.selection_sets_import_image),
-                cd.QFlatDialogButton("Export", callback=self.export_hotkeys, icon=media.selection_sets_export_image),
-                cd.QFlatDialogButton("Clear All", callback=self.clear_hotkeys, icon=media.trash_image),
-                cd.QFlatDialogButton("Apply", callback=self.apply_hotkeys, icon=media.apply_image, highlight=True),
+                cd.QFlatDialogButton("Import Hotkeys", callback=self.import_hotkeys, icon=media.import_image),
+                cd.QFlatDialogButton("Export Hotkeys", callback=self.export_hotkeys, icon=media.export_image),
+                cd.QFlatDialogButton("Clear TKM Hotkeys", callback=self.clear_hotkeys, icon=media.trash_image),
+                cd.QFlatDialogButton("Apply", callback=self.apply_hotkeys, icon=media.apply_image),
                 cd.QFlatDialogButton("Close", callback=self.request_close, icon=media.close_image),
             ],
             closeButton=False,

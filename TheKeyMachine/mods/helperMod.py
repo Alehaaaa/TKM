@@ -337,10 +337,10 @@ tracer_tooltip_text = (
 )
 
 default_values_tooltip_text = (
-    "Reset to Default",
+    "Default Pose",
     [
-        "Reset objects or attributes to their default values.",
-        "Select channels in the Channel Box to default only specific attributes.",
+        "Reset objects, attributes or keys to their default values.",
+        "Tip: Select channels in the Channel Box to default only specific attributes.",
     ],
     media.asset_path("default_animation_image"),
 )

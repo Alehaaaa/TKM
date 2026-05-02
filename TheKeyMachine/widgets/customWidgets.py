@@ -271,7 +271,7 @@ class QFlatHoverableIcon:
 
 
 class LogoAction(QtWidgets.QWidgetAction):
-    def __init__(self, parent):
+    def __init__(self, parent, clickable=True):
         super().__init__(parent)
         self._container = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(self._container)
@@ -286,7 +286,13 @@ class LogoAction(QtWidgets.QWidgetAction):
             layout.addWidget(self.logo_label)
 
         self.setDefaultWidget(self._container)
-        self._container.mouseReleaseEvent = self._on_clicked
+        self.clickable = clickable
+        if clickable:
+            self._container.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+            self._container.mouseReleaseEvent = self._on_clicked
+
+    def isClickable(self):
+        return self.clickable
 
     def _on_clicked(self, event):
         import webbrowser
@@ -299,6 +305,7 @@ class LogoAction(QtWidgets.QWidgetAction):
 class MenuWidget(QtWidgets.QMenu):
     def __init__(self, *args, **kwargs):
         description = kwargs.pop("description", None)
+        tearoff = kwargs.pop("tearoff", True)
 
         icon = None
         new_args = []
@@ -309,7 +316,7 @@ class MenuWidget(QtWidgets.QMenu):
                 new_args.append(arg)
 
         QtWidgets.QMenu.__init__(self, *new_args, **kwargs)
-        self.setTearOffEnabled(True)
+        self.setTearOffEnabled(tearoff)
 
         if self.parent() and hasattr(self.parent(), "destroyed"):
             self.parent().destroyed.connect(self.close)
@@ -320,63 +327,135 @@ class MenuWidget(QtWidgets.QMenu):
         if description or self.title():
             HelpSystem.push(self, self.title(), description)
 
-        self.triggered.connect(self._on_action_triggered)
         self.hovered.connect(self._on_action_hovered)
-        self._last_hovered_action = None
+
+    def _ensure_action_tooltip_source_key(self, action):
+        if action is None or not isValid(action):
+            return None
+
+        source_key = action.property("tkm_tooltip_source_key") if hasattr(action, "property") else None
+        if source_key:
+            return source_key
+
+        source_key = "menu-action:{}".format(id(action))
+        action.setProperty("tkm_tooltip_source_key", source_key)
+        return source_key
+
+    def _hovered_menu_for_action(self, action):
+        if action is None or not isValid(action):
+            return None
+
+        cursor_pos = QtGui.QCursor.pos()
+        candidates = [self]
+
+        widget = QtWidgets.QApplication.widgetAt(cursor_pos)
+        while widget is not None:
+            if isinstance(widget, QtWidgets.QMenu):
+                candidates.insert(0, widget)
+            widget = widget.parentWidget()
+
+        active_popup = QtWidgets.QApplication.activePopupWidget()
+        if isinstance(active_popup, QtWidgets.QMenu):
+            candidates.insert(0, active_popup)
+
+        for widget in QtWidgets.QApplication.topLevelWidgets():
+            if isinstance(widget, QtWidgets.QMenu) and widget.geometry().contains(cursor_pos):
+                candidates.append(widget)
+
+        seen = set()
+        for menu in candidates:
+            if id(menu) in seen or not isValid(menu):
+                continue
+            seen.add(id(menu))
+            try:
+                if action not in menu.actions():
+                    continue
+                local_pos = menu.mapFromGlobal(cursor_pos)
+                action_at_cursor = menu.actionAt(local_pos)
+                geometry = menu.actionGeometry(action)
+                if action_at_cursor == action or geometry.contains(local_pos):
+                    return menu
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                continue
+
+        return self
+
+    def _action_screen_rect(self, action):
+        if action is None or not isValid(action):
+            return None, None
+
+        menu = self._hovered_menu_for_action(action)
+        if menu is None or not isValid(menu):
+            return None, None
+
+        geometry = menu.actionGeometry(action)
+        if geometry.isNull() and menu is not self:
+            menu = self
+            if not isValid(menu):
+                return None, None
+            geometry = self.actionGeometry(action)
+        if geometry.isNull():
+            return None, None
+        return QtCore.QRect(menu.mapToGlobal(geometry.topLeft()), geometry.size()), menu
 
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
         tooltip_template = kwargs.pop("tooltip_template", None)
-        tooltip_template = kwargs.pop("template", tooltip_template)
         callback = kwargs.pop("callback", None)
         label_override = kwargs.pop("label", None)
 
         res = QtWidgets.QMenu.addAction(self, *args, **kwargs)
-        # Use QAction if it was passed directly as the first arg, else the result of addAction
         action = args[0] if (len(args) > 0 and isinstance(args[0], QAction)) else res
 
         if callback:
             action.triggered.connect(callback)
 
-        # Determine the display label and help title from positional args if no override
         label = ""
         for arg in args:
             if isinstance(arg, (str, bytes)):
                 label = arg
                 break
 
-        title = label_override or toolCommon.get_tooltip_title(tooltip_template) or label or action.text()
-        resolved_description = _status_description(
-            description=description or "",
-            tooltip_template=tooltip_template,
-        )
-        if hasattr(action, "setProperty"):
-            action.setProperty("tkm_tooltip_template", tooltip_template)
-        if tooltip_template and hasattr(action, "setToolTip"):
-            action.setToolTip(str(tooltip_template))
-        HelpSystem.push(action, title, resolved_description)
+        if tooltip_template:
+            title = label_override or toolCommon.get_tooltip_title(tooltip_template) or label or action.text()
+            resolved_description = _status_description(
+                description=description or "",
+                tooltip_template=tooltip_template,
+            )
+            if hasattr(action, "setProperty"):
+                action.setProperty("tkm_tooltip_template", tooltip_template)
+                self._ensure_action_tooltip_source_key(action)
+            if tooltip_template and hasattr(action, "setToolTip"):
+                action.setToolTip(str(tooltip_template))
+            HelpSystem.push(action, title, resolved_description)
         return action
 
     def addMenu(self, *args, **kwargs):
         description = kwargs.pop("description", None)
         item = QtWidgets.QMenu.addMenu(self, *args, **kwargs)
-
-        # item can be QMenu or QAction depending on the overload
         action = item.menuAction() if hasattr(item, "menuAction") else item
         label = action.text()
+        if hasattr(action, "setProperty"):
+            self._ensure_action_tooltip_source_key(action)
 
         HelpSystem.push(action, label, description)
         return item
 
     def _on_action_hovered(self, action):
-        if action is None or self.actionGeometry(action).isNull():
+        if action is None or not isValid(action):
             return
 
-        if action == self._last_hovered_action and QFlatTooltipManager.is_active():
+        target_rect, anchor_menu = self._action_screen_rect(action)
+        if target_rect is None or target_rect.isNull() or anchor_menu is None:
+            return
+
+        source_key = self._ensure_action_tooltip_source_key(action)
+        if not source_key:
+            return
+        if QFlatTooltipManager.is_current_source(source_key, target_rect=target_rect):
             return
 
         QFlatTooltipManager.hide()
-        self._last_hovered_action = action
 
         # Force push to Maya channels
         title = action.property("tkm_title") or action.text()
@@ -388,26 +467,36 @@ class MenuWidget(QtWidgets.QMenu):
         if QFlatTooltipManager.enabled:
             display_template = tooltip_template or ((title, [desc], None) if desc else title)
 
-            geometry = self.actionGeometry(action)
-            target_rect = QtCore.QRect(self.mapToGlobal(geometry.topLeft()), geometry.size())
             icon = action.icon() if not action.icon().isNull() else None
             QFlatTooltipManager.delayed_show(
-                text=title, anchor_widget=self, target_rect=target_rect, description=desc, tooltip_template=display_template, icon_obj=icon
+                text=title,
+                anchor_widget=anchor_menu,
+                target_rect=target_rect,
+                target_pos=QtGui.QCursor.pos,
+                description=desc,
+                tooltip_template=display_template,
+                icon_obj=icon,
+                source_key=source_key,
             )
 
     def hideEvent(self, event):
-        self._last_hovered_action = None
         QFlatTooltipManager.hide()
         QtWidgets.QMenu.hideEvent(self, event)
 
     def leaveEvent(self, event):
-        self._last_hovered_action = None
         QFlatTooltipManager.cancel_timer()
         QtWidgets.QMenu.leaveEvent(self, event)
 
-    def _on_action_triggered(self, action):
+    def mouseReleaseEvent(self, e):
+        action = self.actionAt(e.pos())
         if isinstance(action, QtWidgets.QWidgetAction):
+            if hasattr(action, "isClickable") and not action.isClickable():
+                e.accept()
+                return
+        if action and action.isEnabled():
+            action.trigger()
             return
+        QtWidgets.QMenu.mouseReleaseEvent(self, e)
 
 
 class OpenMenuWidget(MenuWidget):
@@ -417,6 +506,9 @@ class OpenMenuWidget(MenuWidget):
 
     def mouseReleaseEvent(self, e):
         action = self.actionAt(e.pos())
+        if isinstance(action, QtWidgets.QWidgetAction):
+            e.accept()
+            return
         if action and action.isEnabled():
             action.trigger()
             return
@@ -468,8 +560,11 @@ class TooltipMixin:
 
         if QFlatTooltipManager.enabled and getattr(self, "_has_tooltip", False):
             if data.get("text") or data.get("description") or data.get("tooltip_template"):
+                source_key = "widget:{}".format(id(self))
+                if QFlatTooltipManager.is_current_source(source_key):
+                    return
                 # Pass the template directly to the tooltip manager
-                QFlatTooltipManager.delayed_show(anchor_widget=self, **data)
+                QFlatTooltipManager.delayed_show(anchor_widget=self, source_key=source_key, **data)
 
     def leaveEvent(self, event: QtCore.QEvent):
         QFlatTooltipManager.cancel_timer()

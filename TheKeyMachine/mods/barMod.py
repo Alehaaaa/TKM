@@ -1670,7 +1670,8 @@ def tracer_connected(connected=False, update_cb=None, *args):
 
 
 def tracer_update_checkbox(value):
-    cmds.menuItem("tracer_checkbox_menuItem", e=True, checkBox=value)
+    if cmds.menuItem("tracer_checkbox_menuItem", exists=True):
+        cmds.menuItem("tracer_checkbox_menuItem", e=True, checkBox=value)
 
 
 def tracer_refresh(*args):
@@ -3042,8 +3043,7 @@ def bake_animation_custom_window(*args):
         try:
             bake_interval = float(value)
         except ValueError:
-            cmds.warning("Please enter a valid number for bake interval")
-            return
+            return wutil.make_inViewMessage("Please enter a valid number for bake interval.")
 
         keyTools.bake_animation(bake_interval=bake_interval, window=dialog)
         dialog.close()
