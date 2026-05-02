@@ -256,6 +256,16 @@ orbit_tooltip_text = (
     media.orbit_ui_image,
 )
 
+donate_tooltip_text = (
+    "Donate",
+    [
+        "Support the development of TheKeyMachine.",
+        "The KeyMachine is free to use and always will be.",
+        "Any support is greatly appreciated!",
+    ],
+    media.donate_image,
+)
+
 attribute_switcher_tooltip_text = (
     "Attribute Switcher",
     [

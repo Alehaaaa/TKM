@@ -58,6 +58,11 @@ python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 SHARE_KEYS_MODE_SETTING = "share_keys_mode"
 SHARE_KEYS_MODE_PRESERVE_TANGENT = "preserve_tangent_type"
 SHARE_KEYS_MODE_PRESERVE_SHAPE = "preserve_anim_curve_shape"
+BAKE_TANGENT_MODE_SETTING = "bake_tangent_mode"
+BAKE_TANGENT_MODE_STEP = "step_tangent"
+BAKE_TANGENT_MODE_KEEP_TYPE = "keep_tangent_type"
+BAKE_TANGENT_MODE_KEEP_SHAPE = "keep_animation_curve_shapes"
+BAKE_TANGENT_MODES = (BAKE_TANGENT_MODE_STEP, BAKE_TANGENT_MODE_KEEP_TYPE, BAKE_TANGENT_MODE_KEEP_SHAPE)
 
 BAKE_UNDO_HELP = {
     1: ("Bake on Ones", helper.bake_animation_1_tooltip_text),
@@ -243,6 +248,63 @@ def set_share_keys_mode(mode):
     if mode not in (SHARE_KEYS_MODE_PRESERVE_TANGENT, SHARE_KEYS_MODE_PRESERVE_SHAPE):
         mode = SHARE_KEYS_MODE_PRESERVE_TANGENT
     settings.set_setting(SHARE_KEYS_MODE_SETTING, mode)
+
+
+def get_bake_tangent_mode():
+    mode = settings.get_setting(BAKE_TANGENT_MODE_SETTING, BAKE_TANGENT_MODE_STEP)
+    return mode if mode in BAKE_TANGENT_MODES else BAKE_TANGENT_MODE_STEP
+
+
+def set_bake_tangent_mode(mode):
+    if mode not in BAKE_TANGENT_MODES:
+        mode = BAKE_TANGENT_MODE_STEP
+    settings.set_setting(BAKE_TANGENT_MODE_SETTING, mode)
+
+
+def _most_common_tangent_type(values):
+    values = [value for value in (values or []) if value]
+    if not values:
+        return None
+    return Counter(values).most_common(1)[0][0]
+
+
+def _unique(items):
+    return list(dict.fromkeys(items or []))
+
+
+def _anim_curves_for_objects(objects):
+    curves = []
+    for obj in objects or []:
+        curves.extend(cmds.listConnections(obj, type="animCurve", connections=False, plugs=False) or [])
+    return _unique(curves)
+
+
+def _set_missing_keys(curves, frames, insert=False):
+    for curve in _unique(curves):
+        for frame in frames:
+            if cmds.keyframe(curve, query=True, time=(frame, frame)):
+                continue
+            if insert:
+                cmds.setKeyframe(curve, time=(frame,), insert=True)
+            else:
+                cmds.setKeyframe(curve, time=(frame,))
+
+
+def _set_keys_on_frames(curves, frames):
+    for curve in _unique(curves):
+        for frame in frames:
+            cmds.setKeyframe(curve, time=(frame,))
+
+
+def _apply_step_tangents(curves, time_range):
+    for curve in _unique(curves):
+        cmds.keyTangent(
+            curve,
+            edit=True,
+            time=time_range,
+            inTangentType="stepnext",
+            outTangentType="step",
+        )
 
 
 # Estas dos funciones la idea era usarlas para hacer overlap
@@ -544,6 +606,43 @@ def share_keys(*args):
             tint_session.finish()
 
 
+def _frames_from_last_selected(time_context=None):
+    selection = selection_targets.get_selected_objects(orderedSelection=True, long=True)
+    if len(selection) < 2:
+        wutil.make_inViewMessage("Select targets, then the source object last")
+        return None, [], []
+
+    source = selection[-1]
+    targets = selection[:-1]
+    query_kwargs = {"query": True, "timeChange": True}
+    if time_context and time_context.mode != "all_animation":
+        query_kwargs["time"] = time_context.timerange
+    frames = cmds.keyframe(source, **query_kwargs) or []
+    frames = sorted({int(frame) if int(frame) == frame else frame for frame in frames})
+    if not frames:
+        wutil.make_inViewMessage("Last selected object has no keys")
+        return source, targets, []
+    return source, targets, frames
+
+
+def share_keys_from_last_selected(*args):
+    time_context = get_working_time_context(default_mode="all_animation")
+    _source, targets, frames = _frames_from_last_selected(time_context)
+    if not frames:
+        return
+
+    keep_curve_shape = get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE
+    tint_session = _begin_timeline_tint((int(frames[0]), int(frames[-1])), "share_keys")
+    try:
+        toolCommon.open_undo_chunk(tool_id="share_keys", tooltip_template=helper.share_keys_tooltip_text)
+        for target in targets:
+            _set_missing_keys(_anim_curves_for_objects([target]), frames, insert=keep_curve_shape)
+    finally:
+        toolCommon.close_undo_chunk()
+        if tint_session:
+            tint_session.finish()
+
+
 # ______________________________________ ReBlock Move
 
 
@@ -688,6 +787,23 @@ def bake_animation(bake_interval=1, window=None):
 
         time_context = target_info["time_context"]
         start_frame, end_frame = time_context.timerange
+        bake_tangent_mode = get_bake_tangent_mode()
+        curves_to_update = _unique(target_info["selected_curves"])
+        if not curves_to_update:
+            curves_to_update = _anim_curves_for_objects(selected_objects)
+
+        tangent_types_by_curve = {}
+        if bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_TYPE:
+            for curve in curves_to_update:
+                in_tangent = _most_common_tangent_type(
+                    cmds.keyTangent(curve, query=True, time=(start_frame, end_frame), inTangentType=True)
+                )
+                out_tangent = _most_common_tangent_type(
+                    cmds.keyTangent(curve, query=True, time=(start_frame, end_frame), outTangentType=True)
+                )
+                if in_tangent or out_tangent:
+                    tangent_types_by_curve[curve] = (in_tangent, out_tangent)
+
         tint_session = _begin_timeline_tint(
             timerange=time_context.timerange,
             key=tool_key,
@@ -699,7 +815,7 @@ def bake_animation(bake_interval=1, window=None):
             time=(start_frame, end_frame),
             sampleBy=bake_interval,
             preserveOutsideKeys=True,
-            sparseAnimCurveBake=False,
+            sparseAnimCurveBake=bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_SHAPE,
             removeBakedAttributeFromLayer=False,
             bakeOnOverrideLayer=False,
             controlPoints=False,
@@ -709,21 +825,17 @@ def bake_animation(bake_interval=1, window=None):
             bake_kwargs["attribute"] = selected_channels
         cmds.bakeResults(selected_objects, **bake_kwargs)
 
-        # Cambiar las tangentes de las claves a stepped.
-        curves_to_update = list(dict.fromkeys(target_info["selected_curves"]))
-        if not curves_to_update:
-            for obj in selected_objects:
-                anim_curves = list(set(cmds.listConnections(obj, type="animCurve") or []))
-                curves_to_update.extend(anim_curves)
-
-        for curve in curves_to_update:
-            cmds.keyTangent(
-                curve,
-                edit=True,
-                time=(start_frame, end_frame),
-                inTangentType="stepnext",
-                outTangentType="step",
-            )
+        if bake_tangent_mode == BAKE_TANGENT_MODE_STEP:
+            _apply_step_tangents(curves_to_update, (start_frame, end_frame))
+        elif bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_TYPE:
+            for curve, (in_tangent, out_tangent) in tangent_types_by_curve.items():
+                tangent_kwargs = {}
+                if in_tangent:
+                    tangent_kwargs["inTangentType"] = in_tangent
+                if out_tangent:
+                    tangent_kwargs["outTangentType"] = out_tangent
+                if tangent_kwargs:
+                    cmds.keyTangent(curve, edit=True, time=(start_frame, end_frame), **tangent_kwargs)
 
     except Exception as e:
         cmds.warning("An error occurred: {}".format(e))
@@ -736,6 +848,27 @@ def bake_animation(bake_interval=1, window=None):
 
     if window:
         window.close()
+
+
+def bake_animation_from_last_selected(*args):
+    time_context = get_working_time_context(default_mode="all_animation")
+    _source, targets, frames = _frames_from_last_selected(time_context)
+    if not frames:
+        return
+
+    tint_session = _begin_timeline_tint((int(frames[0]), int(frames[-1])), "bake_animation_1")
+    try:
+        toolCommon.open_undo_chunk(title="Bake From Last Selected", tooltip_template=helper.bake_animation_1_tooltip_text)
+        for target in targets:
+            curves = _anim_curves_for_objects([target])
+            _set_keys_on_frames(curves, frames)
+
+            if get_bake_tangent_mode() == BAKE_TANGENT_MODE_STEP:
+                _apply_step_tangents(curves, (frames[0], frames[-1]))
+    finally:
+        toolCommon.close_undo_chunk()
+        if tint_session:
+            tint_session.finish()
 
 
 def bake_animation_1(*args):
@@ -860,6 +993,73 @@ def insert_inbetween(count=1, *args):
 
 def remove_inbetween(count=1, *args):
     _relative_timechange(-count)
+
+
+def _scene_anim_curves():
+    curves = []
+    for curve_type in ("animCurveTL", "animCurveTA", "animCurveTT", "animCurveTU"):
+        curves.extend(cmds.ls(type=curve_type) or [])
+    return _unique(curves)
+
+
+def _target_anim_curves():
+    target_info = resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
+    curves = _unique(target_info.get("selected_curves"))
+    if curves:
+        return curves
+    return _anim_curves_for_objects(target_info.get("target_objects"))
+
+
+def nudge_all_keys(offset, *args):
+    curves = _target_anim_curves()
+    if not curves:
+        return wutil.make_inViewMessage("No animation curves found")
+    offset = int(offset)
+    if not offset:
+        return
+    toolCommon.open_undo_chunk(
+        title="Nudge Keys Right" if offset > 0 else "Nudge Keys Left",
+        tooltip_template=helper.nudge_keyright_b_widget_tooltip_text if offset > 0 else helper.nudge_keyleft_b_widget_tooltip_text,
+    )
+    try:
+        cmds.keyframe(curves, edit=True, relative=True, includeUpperBound=True, option="over", timeChange=offset)
+    finally:
+        toolCommon.close_undo_chunk()
+
+
+def nudge_scene_keys(offset, *args):
+    curves = _scene_anim_curves()
+    if not curves:
+        return wutil.make_inViewMessage("No anim curves found")
+    offset = int(offset)
+    if not offset:
+        return
+    toolCommon.open_undo_chunk(
+        title="Nudge Scene Keys Right" if offset > 0 else "Nudge Scene Keys Left",
+        tooltip_template=helper.nudge_keyright_b_widget_tooltip_text if offset > 0 else helper.nudge_keyleft_b_widget_tooltip_text,
+    )
+    try:
+        cmds.keyframe(curves, edit=True, relative=True, includeUpperBound=True, option="over", timeChange=offset)
+    finally:
+        toolCommon.close_undo_chunk()
+
+
+def inbetween_scene(count=1, *args):
+    curves = _scene_anim_curves()
+    if not curves:
+        return wutil.make_inViewMessage("No anim curves found")
+    count = int(count)
+    if not count:
+        return
+    current = cmds.currentTime(q=True)
+    toolCommon.open_undo_chunk(
+        title="Insert Inbetween Scene" if count > 0 else "Remove Inbetween Scene",
+        tooltip_template=helper.insert_inbetween_b_widget_tooltip_text if count > 0 else helper.remove_inbetween_b_widget_tooltip_text,
+    )
+    try:
+        cmds.keyframe(curves, edit=True, time=("{}:".format(current + 1),), relative=True, timeChange=count, option="over")
+    finally:
+        toolCommon.close_undo_chunk()
 
 
 def _relative_timechange(count):

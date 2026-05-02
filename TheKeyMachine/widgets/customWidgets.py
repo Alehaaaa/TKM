@@ -1138,7 +1138,7 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
                 built_menu = setup_fn(menu, source_widget=widget)
             except TypeError:
                 built_menu = setup_fn(menu)
-            if built_menu is not None:
+            if built_menu is not None and built_menu is not False:
                 menu = built_menu
             if menu.actions():
                 menu.exec_(widget.mapToGlobal(pos))
@@ -1961,39 +1961,41 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             checkable_sync_pairs = []
             source_item = source_items.get(source_key) or {}
             setup_fn = source_item.get("menu") or first_item.get("menu")
+            replace_group_actions = False
             if callable(setup_fn):
                 try:
-                    setup_fn(menu, source_widget=source_widget)
+                    replace_group_actions = setup_fn(menu, source_widget=source_widget) is False
                 except TypeError:
-                    setup_fn(menu)
-            for item in widgets:
-                if item == "separator":
-                    menu.addSeparator()
-                    continue
+                    replace_group_actions = setup_fn(menu) is False
+            if not replace_group_actions:
+                for item in widgets:
+                    if item == "separator":
+                        menu.addSeparator()
+                        continue
 
-                if item.get("id") == source_key:
-                    continue
-                act_icon_p = item.get("icon") or ""
-                cb = item.get("callback")
-                checkable = item.get("checkable", False)
+                    if item.get("id") == source_key:
+                        continue
+                    act_icon_p = item.get("icon") or ""
+                    cb = item.get("callback")
+                    checkable = item.get("checkable", False)
 
-                # Use raw label for display, but full tooltip for documentation
-                display_label = item.get("label", "")
-                full_tooltip = item.get("tooltip_template") or item.get("tooltip") or display_label
-                full_desc = item.get("description") or ""
+                    # Use raw label for display, but full tooltip for documentation
+                    display_label = item.get("label", "")
+                    full_tooltip = item.get("tooltip_template") or item.get("tooltip") or display_label
+                    full_desc = item.get("description") or ""
 
-                if checkable:
-                    action = menu.addAction(QtGui.QIcon(act_icon_p), display_label, template=full_tooltip, description=full_desc)
-                    _checkable, is_checked_f = _setup_setting_synced_checkable(action, item)
-                    if is_checked_f:
-                        checkable_sync_pairs.append((action, is_checked_f))
-                    if cb:
-                        action.triggered.connect(cb)
-                else:
-                    if cb:
-                        menu.addAction(QtGui.QIcon(act_icon_p), display_label, cb, tooltip_template=full_tooltip, description=full_desc)
+                    if checkable:
+                        action = menu.addAction(QtGui.QIcon(act_icon_p), display_label, template=full_tooltip, description=full_desc)
+                        _checkable, is_checked_f = _setup_setting_synced_checkable(action, item)
+                        if is_checked_f:
+                            checkable_sync_pairs.append((action, is_checked_f))
+                        if cb:
+                            action.triggered.connect(cb)
                     else:
-                        menu.addAction(QtGui.QIcon(act_icon_p), display_label, tooltip_template=full_tooltip, description=full_desc)
+                        if cb:
+                            menu.addAction(QtGui.QIcon(act_icon_p), display_label, cb, tooltip_template=full_tooltip, description=full_desc)
+                        else:
+                            menu.addAction(QtGui.QIcon(act_icon_p), display_label, tooltip_template=full_tooltip, description=full_desc)
 
             if checkable_sync_pairs:
 

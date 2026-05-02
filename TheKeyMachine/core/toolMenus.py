@@ -47,6 +47,47 @@ def toolbar_alignment_value(alignment_name):
 TOOLBAR_ALIGNMENT_LABEL = "Align %s"
 TOOLBAR_ALIGNMENT_DESC = "Align toolbar icons to the %s."
 
+
+def _source_tool_key(source_widget):
+    return getattr(source_widget, "_section_key", None) if source_widget else None
+
+
+def _add_toolbox_action(menu, tool_id):
+    from TheKeyMachine.core import toolbox
+
+    tool = toolbox.get_tool(tool_id)
+    menu.addAction(
+        QtGui.QIcon(tool.get("icon") or ""),
+        tool.get("label", tool_id),
+        callback=tool.get("callback"),
+        tooltip_template=tool.get("tooltip_template"),
+        description=tool.get("description") or "",
+    )
+
+
+def _add_toolbox_actions(menu, items, source_widget=None):
+    source_key = _source_tool_key(source_widget)
+    for item in items:
+        if item == "separator":
+            menu.addSeparator()
+        elif item != source_key:
+            _add_toolbox_action(menu, item)
+
+
+def _add_exclusive_setting_actions(menu, specs, current_value, setter, group_attr=None):
+    group = QActionGroup(menu)
+    group.setExclusive(True)
+    if group_attr:
+        setattr(menu, group_attr, group)
+
+    for label, value, description in specs:
+        action = menu.addAction(label, description=description)
+        action.setCheckable(True)
+        action.setChecked(value == current_value)
+        action.toggled.connect(lambda checked=False, v=value: setter(v) if checked else None)
+        group.addAction(action)
+    return group
+
 def _command_callback(command, is_python):
     if is_python:
         return lambda: exec(command)
@@ -136,23 +177,67 @@ def build_extra_graph_tools_menu(menu, source_widget=None):
 
 
 def build_share_keys_menu(menu, source_widget=None):
-    _ = source_widget
-    action_group = QActionGroup(menu)
-    action_group.setExclusive(True)
-
-    preserve_tangent_action = menu.addAction("Preserve Tangent Type")
-    preserve_tangent_action.setCheckable(True)
-    preserve_tangent_action.setChecked(keyTools.get_share_keys_mode() == keyTools.SHARE_KEYS_MODE_PRESERVE_TANGENT)
-    preserve_tangent_action.triggered.connect(lambda checked=False: keyTools.set_share_keys_mode(keyTools.SHARE_KEYS_MODE_PRESERVE_TANGENT))
-    action_group.addAction(preserve_tangent_action)
-
-    preserve_shape_action = menu.addAction("Preserve Anim Curve Shape")
-    preserve_shape_action.setCheckable(True)
-    preserve_shape_action.setChecked(keyTools.get_share_keys_mode() == keyTools.SHARE_KEYS_MODE_PRESERVE_SHAPE)
-    preserve_shape_action.triggered.connect(lambda checked=False: keyTools.set_share_keys_mode(keyTools.SHARE_KEYS_MODE_PRESERVE_SHAPE))
-    action_group.addAction(preserve_shape_action)
-
+    _add_exclusive_setting_actions(
+        menu,
+        (
+            (
+                "Keep Tangent Type",
+                keyTools.SHARE_KEYS_MODE_PRESERVE_TANGENT,
+                "Add missing keys without changing tangent type.",
+            ),
+            (
+                "Keep Anim Curve Shape",
+                keyTools.SHARE_KEYS_MODE_PRESERVE_SHAPE,
+                "Insert missing keys while preserving animation curve shape.",
+            ),
+        ),
+        keyTools.get_share_keys_mode(),
+        keyTools.set_share_keys_mode,
+    )
     menu.addSeparator()
+    _add_toolbox_actions(menu, ("share_keys", "reblock", "separator", "share_keys_from_last_selected"), source_widget)
+    return False
+
+
+def build_bake_menu(menu, source_widget=None):
+    _add_exclusive_setting_actions(
+        menu,
+        (
+            (
+                "Bake To Step Tangent",
+                keyTools.BAKE_TANGENT_MODE_STEP,
+                "Bake keys, then turn baked tangents to stepped.",
+            ),
+            (
+                "Keep Tangent Type",
+                keyTools.BAKE_TANGENT_MODE_KEEP_TYPE,
+                "Bake keys without forcing the baked keys to stepped tangents.",
+            ),
+            (
+                "Keep Animation Curve Shapes",
+                keyTools.BAKE_TANGENT_MODE_KEEP_SHAPE,
+                "Bake while preserving animation curve shapes where Maya can do so.",
+            ),
+        ),
+        keyTools.get_bake_tangent_mode(),
+        keyTools.set_bake_tangent_mode,
+        group_attr="_tkm_bake_tangent_group",
+    )
+    menu.addSeparator()
+    _add_toolbox_actions(
+        menu,
+        (
+            "bake_animation_1",
+            "bake_animation_2",
+            "bake_animation_3",
+            "bake_animation_4",
+            "bake_animation_custom",
+            "separator",
+            "bake_animation_from_last_selected",
+        ),
+        source_widget,
+    )
+    return False
 
 
 def build_tangent_menu(menu, tangent_type, tangent_label, icon=None, source_widget=None, maya_default_tangent=False):
@@ -264,6 +349,28 @@ def build_tracer_menu(menu, source_widget=None):
 
     menu.addSeparator()
     menu.addAction(QtGui.QIcon(media.remove_image), "Remove Tracer", bar.remove_tracer_node)
+
+
+def _build_nudge_menu(menu, direction):
+    tool_ids = (
+        ("nudge_left_all_keys", "nudge_left_scene", "nudge_remove_inbetween", "nudge_remove_inbetween_scene")
+        if direction == "left"
+        else ("nudge_right_all_keys", "nudge_right_scene", "nudge_insert_inbetween", "nudge_insert_inbetween_scene")
+    )
+    _add_toolbox_actions(menu, tool_ids[:2])
+    menu.addSeparator()
+    _add_toolbox_actions(menu, tool_ids[2:])
+    return False
+
+
+def build_nudge_left_menu(menu, source_widget=None):
+    _ = source_widget
+    return _build_nudge_menu(menu, "left")
+
+
+def build_nudge_right_menu(menu, source_widget=None):
+    _ = source_widget
+    return _build_nudge_menu(menu, "right")
 
 
 def sync_main_dock_menu(toolbar):
@@ -488,8 +595,9 @@ def should_show_toolbar_pinning_menu(toolbar_widget, pos):
 def add_main_help_menu(parent_menu):
     help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help")
     parent_menu.addMenu(help_menu, description="Docs, support, and community links.")
-    help_menu.addAction(QtGui.QIcon(media.report_a_bug_image), "Report a Bug", ui.bug_report_window, description="Send a bug report.")
+    _add_toolbox_actions(help_menu, ("bug_report_window",))
     help_menu.addSeparator()
+
     help_menu.addAction(
         QtGui.QIcon(media.discord_image),
         "Discord",
@@ -616,6 +724,8 @@ def build_main_settings_menu(
     add_main_system_menu(toolbar, toolbar_menu)
     toolbar_menu.addSeparator()
     add_main_help_menu(toolbar_menu)
+    
+    _add_toolbox_actions(toolbar_menu, ("donate_window",))
     if internet_connection:
         toolbar_menu.addAction(
             QtGui.QIcon(media.check_updates_image),

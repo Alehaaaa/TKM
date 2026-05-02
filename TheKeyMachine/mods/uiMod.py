@@ -157,17 +157,6 @@ def filterMode_sync_off():
     mel.eval(filterMode_sync_off_code)
 
 
-def customGraph_filter_mods(*args):
-    # Get the current state of the modifiers
-    mods = runtime.get_modifier_mask()
-    shift_pressed = bool(mods & 1)
-
-    if shift_pressed:
-        filterMode_sync_off()
-    else:
-        filterMode_sync_on()
-
-
 # ---------------------------------------------------- STARTUP SCRIPT ----------------------------------------------------------------------------
 
 

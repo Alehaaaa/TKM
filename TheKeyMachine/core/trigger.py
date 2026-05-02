@@ -387,6 +387,11 @@ def _register_builtin_commands():
     register_command("paste_animation_to", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_animation_to"))
     register_command("link_copy", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_link"))
     register_command("link_paste", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_link"))
+    register_command("share_keys_from_last_selected", _make_module_command("TheKeyMachine.mods.keyToolsMod", "share_keys_from_last_selected"))
+    register_command(
+        "bake_animation_from_last_selected",
+        _make_module_command("TheKeyMachine.mods.keyToolsMod", "bake_animation_from_last_selected"),
+    )
     register_command(
         "nudge_insert_inbetween",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "insert_inbetween", nudge_value()),
@@ -402,6 +407,30 @@ def _register_builtin_commands():
     register_command(
         "nudge_right",
         lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", nudge_value()),
+    )
+    register_command(
+        "nudge_left_all_keys",
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_all_keys", -nudge_value()),
+    )
+    register_command(
+        "nudge_left_scene",
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_scene_keys", -nudge_value()),
+    )
+    register_command(
+        "nudge_right_all_keys",
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_all_keys", nudge_value()),
+    )
+    register_command(
+        "nudge_right_scene",
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_scene_keys", nudge_value()),
+    )
+    register_command(
+        "nudge_insert_inbetween_scene",
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "inbetween_scene", nudge_value()),
+    )
+    register_command(
+        "nudge_remove_inbetween_scene",
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "inbetween_scene", -nudge_value()),
     )
 
 

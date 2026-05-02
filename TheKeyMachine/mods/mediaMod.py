@@ -133,6 +133,7 @@ _ASSET_FILES = {
 
     "import_image": "import.svg",
     "export_image": "export.svg",
+    "donate_image": "donate.svg"
 }
 
 _selection_set_icon_shade_names = {

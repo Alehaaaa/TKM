@@ -79,7 +79,9 @@ TOOL_DEFINITIONS = {
     "donate_window": {
         "type": "tool",
         "label": "Donate",
-        "icon": media.stripe_image,
+        "icon": media.donate_image,
+        "tooltip_template": helper.donate_tooltip_text,
+        "callback": trigger._open_donate_window,
     },
     "bug_report_window": {
         "type": "tool",
@@ -120,6 +122,15 @@ TOOL_DEFINITIONS = {
         "menu": _tool_menu_builder("build_share_keys_menu"),
         "tooltip_template": helper.share_keys_tooltip_text,
     },
+    "share_keys_from_last_selected": {
+        "type": "tool",
+        "label": "Share Keys From Last Selected",
+        "text": "sK",
+        "icon": media.share_keys_image,
+        "callback": keyTools.share_keys_from_last_selected,
+        "tooltip_template": helper.share_keys_tooltip_text,
+        "default": False,
+    },
     "reblock": {
         "type": "tool",
         "label": "reBlock",
@@ -136,12 +147,22 @@ TOOL_DEFINITIONS = {
         "callback": bar.bake_animation_custom_window,
         "tooltip_template": helper.bake_animation_custom_tooltip_text,
     },
+    "bake_animation_from_last_selected": {
+        "type": "tool",
+        "label": "Bake From Last Selected",
+        "text": "BA",
+        "icon": media.bake_animation_1_image,
+        "callback": keyTools.bake_animation_from_last_selected,
+        "tooltip_template": helper.bake_animation_1_tooltip_text,
+        "default": False,
+    },
     "bake_animation_1": {
         "type": "tool",
         "label": "Bake on Ones",
         "text": "BA",
         "icon": media.bake_animation_1_image,
         "callback": keyTools.bake_animation_1,
+        "menu": _tool_menu_builder("build_bake_menu"),
         "tooltip_template": helper.bake_animation_1_tooltip_text,
     },
     "bake_animation_2": {
@@ -256,6 +277,7 @@ TOOL_DEFINITIONS = {
         "label": "Nudge Left",
         "icon": media.nudge_left_image,
         "callback": trigger.make_command_callback("nudge_left"),
+        "menu": _tool_menu_builder("build_nudge_left_menu"),
         "tooltip_template": helper.nudge_keyleft_b_widget_tooltip_text,
     },
     "nudge_right": {
@@ -263,6 +285,7 @@ TOOL_DEFINITIONS = {
         "label": "Nudge Right",
         "icon": media.nudge_right_image,
         "callback": trigger.make_command_callback("nudge_right"),
+        "menu": _tool_menu_builder("build_nudge_right_menu"),
         "tooltip_template": helper.nudge_keyright_b_widget_tooltip_text,
     },
     "nudge_remove_inbetween": {
@@ -272,12 +295,60 @@ TOOL_DEFINITIONS = {
         "callback": trigger.make_command_callback("nudge_remove_inbetween"),
         "tooltip_template": helper.remove_inbetween_b_widget_tooltip_text,
     },
+    "nudge_left_all_keys": {
+        "type": "tool",
+        "label": "Nudge Left All Keys",
+        "icon": media.nudge_left_image,
+        "callback": trigger.make_command_callback("nudge_left_all_keys"),
+        "tooltip_template": helper.nudge_keyleft_b_widget_tooltip_text,
+        "default": False,
+    },
+    "nudge_left_scene": {
+        "type": "tool",
+        "label": "Nudge Left Scene",
+        "icon": media.nudge_left_image,
+        "callback": trigger.make_command_callback("nudge_left_scene"),
+        "tooltip_template": helper.nudge_keyleft_b_widget_tooltip_text,
+        "default": False,
+    },
+    "nudge_right_all_keys": {
+        "type": "tool",
+        "label": "Nudge Right All Keys",
+        "icon": media.nudge_right_image,
+        "callback": trigger.make_command_callback("nudge_right_all_keys"),
+        "tooltip_template": helper.nudge_keyright_b_widget_tooltip_text,
+        "default": False,
+    },
+    "nudge_right_scene": {
+        "type": "tool",
+        "label": "Nudge Right Scene",
+        "icon": media.nudge_right_image,
+        "callback": trigger.make_command_callback("nudge_right_scene"),
+        "tooltip_template": helper.nudge_keyright_b_widget_tooltip_text,
+        "default": False,
+    },
     "nudge_insert_inbetween": {
         "type": "tool",
         "label": "Insert Inbetween",
         "icon": media.insert_inbetween_image,
         "callback": trigger.make_command_callback("nudge_insert_inbetween"),
         "tooltip_template": helper.insert_inbetween_b_widget_tooltip_text,
+    },
+    "nudge_insert_inbetween_scene": {
+        "type": "tool",
+        "label": "Insert Inbetween Scene",
+        "icon": media.insert_inbetween_image,
+        "callback": trigger.make_command_callback("nudge_insert_inbetween_scene"),
+        "tooltip_template": helper.insert_inbetween_b_widget_tooltip_text,
+        "default": False,
+    },
+    "nudge_remove_inbetween_scene": {
+        "type": "tool",
+        "label": "Remove Inbetween Scene",
+        "icon": media.remove_inbetween_image,
+        "callback": trigger.make_command_callback("nudge_remove_inbetween_scene"),
+        "tooltip_template": helper.remove_inbetween_b_widget_tooltip_text,
+        "default": False,
     },
     "nudge_value": {
         "type": "widget",
@@ -868,11 +939,18 @@ TOOL_DEFINITIONS = {
         "callback": keyTools.toggleLock,
         "tooltip_template": helper.graph_lock_tooltip_text,
     },
-    "graph_filter": {
+    "enable_graph_filter": {
         "type": "tool",
-        "label": "Filter",
-        "text": "Fi",
-        "callback": ui.customGraph_filter_mods,
+        "label": "Enable Filter",
+        "text": "EnF",
+        "callback": ui.filterMode_sync_on,
+        "tooltip_template": helper.graph_filter_tooltip_text,
+    },
+    "disable_graph_filter": {
+        "type": "tool",
+        "label": "Disable Filter",
+        "text": "DiF",
+        "callback": ui.filterMode_sync_off,
         "tooltip_template": helper.graph_filter_tooltip_text,
     },
     "default_translations": {
@@ -1037,7 +1115,6 @@ TOOL_DEFINITIONS = {
         "tooltip_template": helper.plateau_tangent_tooltip_text,
     },
 }
-
 TOOL_SECTION_DEFINITIONS = {
     # --- Hotkey/System Tools ---
     "window_tools": {
@@ -1108,6 +1185,12 @@ TOOL_SECTION_DEFINITIONS = {
                 "shortcuts": [{"id": "nudge_insert_inbetween", "keys": [QtCore.Qt.Key_Shift]}],
             },
             {"id": "nudge_insert_inbetween"},
+            {"id": "nudge_left_all_keys", "default": False},
+            {"id": "nudge_left_scene", "default": False},
+            {"id": "nudge_right_all_keys", "default": False},
+            {"id": "nudge_right_scene", "default": False},
+            {"id": "nudge_insert_inbetween_scene", "default": False},
+            {"id": "nudge_remove_inbetween_scene", "default": False},
             {"type": "widget", "id": "nudge_value", "default": True},
         ],
     },
@@ -1157,6 +1240,8 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "bake_animation_3"},
             {"id": "bake_animation_4"},
             {"id": "bake_animation_custom"},
+            "separator",
+            {"id": "bake_animation_from_last_selected", "default": False},
         ],
     },
     "key_sync_tools": {
@@ -1169,6 +1254,8 @@ TOOL_SECTION_DEFINITIONS = {
                 "shortcuts": [{"id": "reblock", "keys": [QtCore.Qt.Key_Shift]}],
             },
             {"id": "reblock"},
+            "separator",
+            {"id": "share_keys_from_last_selected", "default": False},
         ],
     },
     "key_selection_tools": {
@@ -1578,14 +1665,6 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "tracer_remove"},
         ],
     },
-    "workspace_tools": {
-        "label": "Workspaces",
-        "toolbar": False,
-        "items": [
-            {"section": "selection_set_tools"},
-            {"section": "orbit_tools"},
-        ],
-    },
     "extension_tools": {
         "label": "Extensions",
         "toolbar": True,
@@ -1599,28 +1678,22 @@ TOOL_SECTION_DEFINITIONS = {
         ],
     },
     # --- Graph Editor Specific ---
-    "graph_key_tools": {
-        "label": "Graph Key Tools",
+    "graph_tools": {
+        "label": "Graph Editor Tools",
         "items": [
-            {
-                "id": "delete_all_animation",
-                "default": True,
-                "shortcuts": [{"id": "delete_static_animation", "keys": [QtCore.Qt.Key_Shift]}],
-            },
-            {"id": "reblock"},
             {"id": "flip"},
             {"id": "snap"},
             {"id": "overlap"},
             {"id": "extra_graph_tools", "default": True},
-        ],
-    },
-    "graph_curve_tools": {
-        "label": "Graph Curve Tools",
-        "items": [
             {"id": "graph_isolate_curves", "default": True},
             {"id": "graph_toggle_mute", "default": True},
             {"id": "graph_toggle_lock", "default": True},
-            {"id": "graph_filter", "default": True},
+            {
+                "id": "enable_graph_filter",
+                "shortcuts": [
+                    {"id": "disable_graph_filter", "keys": [QtCore.Qt.Key_Control]},
+                ],
+            },
         ],
     },
     "system": {
