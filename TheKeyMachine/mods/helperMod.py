@@ -21,10 +21,10 @@ import os
 
 import TheKeyMachine.mods.mediaMod as media
 from TheKeyMachine.mods.generalMod import config
-from TheKeyMachine.tooltips.tooltip import separator, tooltip_media, tool_tooltip
+from TheKeyMachine.mods.tooltipsMod import separator, tooltip_media, tool_tooltip
 
 INSTALL_PATH = config["INSTALL_PATH"]
-TOOLTIPS_MOVIES_PATH = os.path.join(INSTALL_PATH, "TheKeyMachine", "tooltips", "movies")
+TOOLTIPS_MOVIES_PATH = os.path.join(INSTALL_PATH, "TheKeyMachine", "data", "movies")
 
 
 # ----------------------------------------------  TOOLTIPS  --------------------------------------------------------
@@ -41,13 +41,14 @@ movie = _TooltipMovieLibrary()
 # -------- KeyBox
 
 
-nudge_keyleft_b_widget_tooltip_text = (
+nudge_left_tooltip_text = (
     "Nudge Keys Left",
-    ["Nudge the selected keyframes by the number of frames specified in the central box."],
+    ["Nudge the current keyframes or tangents by the number of frames specified in the central box.",
+    movie.nudge],
 )
 
 
-remove_inbetween_b_widget_tooltip_text = (
+remove_inbetween_tooltip_text = (
     "Remove Inbetween",
     ["Remove inbetweens using the current nudge step value."],
 )
@@ -58,15 +59,16 @@ move_keyframes_intField_widget_tooltip_text = (
     ["Set the number of frames to move when using the Nudge tool."],
 )
 
-insert_inbetween_b_widget_tooltip_text = (
+insert_inbetween_tooltip_text = (
     "Insert Inbetween",
     ["Add inbetweens using the current nudge step value.."],
 )
 
 
-nudge_keyright_b_widget_tooltip_text = (
+nudge_right_tooltip_text = (
     "Nudge Keys Right",
-    ["Nudge the selected keyframes by the number of frames specified in the central box."],
+    ["Nudge the current keyframes or tangents by the number of frames specified in the central box.",
+    movie.nudge],
 )
 
 
@@ -185,9 +187,9 @@ reblock_move_tooltip_text = (
     [
         "reBlock helps you place animation keys back onto the intended main poses.",
         "Useful when timing adjustments have left channels keyed on inconsistent frames.",
-        "Select the objects and run the tool.",
+        movie.reblock
     ],
-    media.reblock_keys_image,
+    media.reblock_image,
 )
 
 bake_animation_4_tooltip_text = (
@@ -234,7 +236,7 @@ gimbal_fixer_tooltip_text = (
         "Change rotation order without changing the visible animation result.",
         "Useful when a control is suffering from gimbal lock and needs a safer rotate order.",
     ],
-    media.reblock_keys_image,
+    media.reblock_image,
 )
 
 share_keys_tooltip_text = (
@@ -242,7 +244,9 @@ share_keys_tooltip_text = (
     [
         "Share keyframe times across the selected channels or objects.",
         "Useful for aligning blocking keys across controls while preserving their values.",
-        "If a time range is active, the operation is limited to that range.",
+        movie.share_keys,
+        separator,
+        "Tip: Select a range in the time slider to limit the operation to that range.",
     ],
     media.share_keys_image,
 )
@@ -310,9 +314,25 @@ depth_mover_tooltip_text = (
 isolate_tooltip_text = (
     "Isolate",
     [
-        "Isolate an entire rig or object hierarchy from a single selected control.",
+        "Isolate a character or asset by simply selecting a control.",
         "Useful for working on one or more characters without scene clutter.",
-        "Right-click for bookmarks and additional isolate options.",
+        "You can isolate several characters at once by selecting multiple controls from different characters or assets.",
+        movie.isolate,
+        separator,
+        "Tip: If your characters or assets are within a node, for example, all characters are inside a group called \"characters\", use the \"Down one level\" option in the dropdown menu."
+    ],
+    media.isolate_image,
+)
+
+
+ibookmarks_window_tooltip_text = (
+    "Isolate Bookmarks",
+    [
+        "Save groups of isolates so that you can quickly change what you see in a viewport."
+        "This is ideal when you have multiple characters interacting with multiple elements.",
+        movie.isolate,
+        separator,
+        "All bookmarks appear in the dropdown menu of the \"Isolate\" button."
     ],
     media.isolate_image,
 )
@@ -330,9 +350,14 @@ createLocator_tooltip_text = (
 align_tooltip_text = (
     "Align",
     [
-        "Align one object to another.",
-        "Select the driven object first, then the source object.",
-        "If a time range is active, alignment can be applied across that range.",
+        "This tool allows aligning one object with another.",
+        "By default, this tool aligns in all modes.",
+        movie.align_objects,
+        separator,
+        "When you select a range on the Time Slider, the alignment is carried out over that range.",
+        movie.align_objects_range,
+        separator,
+        "Tip: Right-click to access the alignment options.",
     ],
     media.match_image,
 )
@@ -340,16 +365,39 @@ align_tooltip_text = (
 tracer_tooltip_text = (
     "Tracer",
     [
-        "Create a motion trail for the selected object.",
-        "The tracer can be refreshed, shown or hidden, and reused without rebuilding it each time.",
+        "Draw a trace for the path of a moving object.",
+        "When the tracer is deactivated, there are no ongoing calculations.",
+        movie.tracer,
+        separator,
+        "Tip: Use \"Refresh Tracer\" to update the motion trail without having to activate it.",
     ],
     media.tracer_image,
+)
+
+tracer_refresh_tooltip_text = (
+    "Refresh Tracer",
+    ["Refresh the current tracer without rebuilding the setup."],
+    media.refresh_image,
+)
+
+tracer_toggle_tooltip_text = (
+    "Toggle Tracer",
+    ["Show or hide the existing tracer display."],
+    media.tracer_show_hide_image,
+)
+
+tracer_remove_tooltip_text = (
+    "Remove Tracer",
+    ["Remove the active tracer setup from the scene."],
+    media.remove_image,
 )
 
 default_values_tooltip_text = (
     "Default Pose",
     [
         "Reset objects, attributes or keys to their default values.",
+        movie.default_values,
+        separator,
         "Tip: Select channels in the Channel Box to default only specific attributes.",
     ],
     media.asset_path("default_animation_image"),
@@ -447,6 +495,9 @@ select_hierarchy_tooltip_text = (
     [
         "Select the descending hierarchy from the current selection.",
         "Useful for FK chains, finger sets, and grouped rig controls.",
+        movie.select_hierarchy,
+        separator,
+        "Note: This tool may fail on certain occasions since some rigs are not created following standards.",
     ],
     media.select_hierarchy_image,
 )
@@ -464,26 +515,39 @@ animation_offset_tooltip_text = (
 )
 
 link_objects_tooltip_text = (
-    "Link Objects",
+    "Copy Link Position",
     [
-        "Save and restore parent-style relationships without creating constraints.",
-        "Useful for quick object linking, relinking, and lightweight follow setups.",
-        "Right-click for copy, paste, and auto-link options.",
+        "Save the relationship between several objects and apply it back when needed."
+        "Link objects is like using parent constraints without constraints.",
+        movie.link_objects,
+        separator,
+        "Relationships are saved, so they can be used across different Maya sessions.",
+        "Tip: Use the \"Auto Link\" option to update the object relationship in real-time."
     ],
     media.link_objects_image,
 )
 
-copy_link_tooltip_text = (
-    "Copy Link Position",
-    ["Save the current relative relationship from the selected objects."],
+paste_link_tooltip_text = (
+    "Paste Link Position",
+    ["Apply the saved link relationship to the current selection."],
+    media.link_objects_paste_image,
+)
+
+auto_link_tooltip_text = (
+    "Auto Link Position",
+    ["Toggle automatic pasting of link relationships.", movie.link_objects_auto_link],
     media.link_objects_copy_image,
 )
 
 follow_cam_tooltip_text = (
     "Follow Cam",
     [
-        "Create a camera that follows the selected object.",
-        "Useful for editing moving animation while keeping the subject visually stable in frame.",
+        "FollowCam creates a camera that will follow the selected object.",
+        "By default, FollowCam tracks both translations and rotations.",
+        "It's useful when you need to make changes to the animation of an object that is moving, this way the object will remain static in the camera's view.",
+        movie.follow_cam,
+        separator,
+        "Tip: Right-click on the tool icon to create FollowCam for translations only or for rotations only.",
     ],
     media.follow_cam_image,
 )
@@ -515,8 +579,13 @@ paste_worldspace_animation_tooltip_text = tool_tooltip(
 temp_pivot_tooltip_text = (
     "Temp Pivot",
     [
-        "Create temporary pivots without changing the original pivot or adding constraints.",
-        "Useful for one-off rotations, arcs, and posing adjustments.",
+        "Create temporary pivots without adding constraints.",
+        movie.temp_pivot,
+        separator,
+        "Temp pivots can be applied to multiple objects at once and are destroyed when selection is changed.",
+        movie.temp_pivot_chain,
+        separator,
+        "Tip: Useful for swinging bodies animation, arcs, posing...",
     ],
     media.temp_pivot_image,
 )
@@ -555,11 +624,14 @@ insert_inbetween_tooltip_text = (
 
 delete_static_animation_tooltip_text = (
     "Delete Static Keys",
-    ["Flatten the selected curve so it holds the value of its first selected key.", movie.delete_all_animation_static],
+    [
+        "These are the curves that have keys but where all the key values are the same, meaning there is no movement.",
+        movie.delete_all_animation_static,
+    ],
     media.delete_animation_image,
 )
 
-match_keys_tooltip_text = (
+graph_match_keys_tooltip_text = (
     "Match",
     ["Match one selected curve to another so both curves share the same values."],
     media.match_image,
@@ -567,18 +639,33 @@ match_keys_tooltip_text = (
 
 flip_tooltip_text = (
     "Flip",
-    ["Invert the selected curve values vertically."],
+    [
+        "Invert the selected curve values vertically.",
+        movie.flip,
+    ],
     media.asset_path("flip_curve_image"),
 )
 
 snap_tooltip_text = (
     "Snap",
-    ["Snap selected sub-frame keys to the nearest whole frame."],
+    [
+        "Snap selected sub-frame keys to the nearest whole frame.",
+        "It doesn't just reposition the keyframes, it creates them on the nearest frame and removes all the keyframes that are off a frame.",
+        "This way, the existing animation remains intact.",
+        movie.snap,
+        separator,
+        "Note: Maya fails to apply snap and reports an error, whereas TKM applies the snap without any issues.",
+    ],
+    media.snap_image,
 )
 
 overlap_tooltip_text = (
     "Overlap",
-    ["Offset the selected curves to create overlapping motion."],
+    [
+        "Offset the selected curves to create overlapping motion.",
+        movie.overlap,
+    ],
+    media.overlap_image,
 )
 
 align_translation_tooltip_text = (
@@ -597,24 +684,6 @@ align_scale_tooltip_text = (
     "Align Scale",
     ["Match only scale from the driver object to the target object."],
     media.align_menu_image,
-)
-
-tracer_refresh_tooltip_text = (
-    "Refresh Tracer",
-    ["Refresh the current tracer without rebuilding the setup."],
-    media.refresh_image,
-)
-
-tracer_toggle_tooltip_text = (
-    "Toggle Tracer",
-    ["Show or hide the existing tracer display."],
-    media.tracer_show_hide_image,
-)
-
-tracer_remove_tooltip_text = (
-    "Remove Tracer",
-    ["Remove the active tracer setup from the scene."],
-    media.remove_image,
 )
 
 default_translations_tooltip_text = (
@@ -706,26 +775,23 @@ remove_follow_cam_tooltip_text = (
     media.remove_image,
 )
 
-paste_link_tooltip_text = (
-    "Paste Link Position",
-    ["Apply the saved link relationship to the current selection."],
-    media.link_objects_paste_image,
-)
-
 graph_isolate_curves_tooltip_text = (
     "Isolate Curves",
-    ["Show only the selected curves in the Graph Editor."],
+    ["Show only the selected curves in the Graph Editor.",
+    movie.isolate_curves],
     media.isolate_image,
 )
 
 graph_mute_tooltip_text = (
     "Mute Curves",
-    ["Toggle mute on the selected curves."],
+    ["Toggle mute on the selected curves.",
+    movie.mute_curves],
 )
 
 graph_lock_tooltip_text = (
     "Lock Curves",
-    ["Toggle lock on the selected curves."],
+    ["Toggle lock on the selected curves.",
+    movie.lock_curves],
 )
 
 graph_filter_tooltip_text = (

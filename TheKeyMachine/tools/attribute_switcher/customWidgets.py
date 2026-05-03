@@ -66,8 +66,8 @@ except ImportError:
     )
     from PySide2.QtCore import Qt, QPointF, QPoint, QTimer, QSize
 
-import TheKeyMachine.core.runtime_manager as runtime
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.core.runtimeManager as runtime
+import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
 from TheKeyMachine.tools.attribute_switcher.common import (
@@ -924,7 +924,7 @@ class SetupTargetsDialog(FloatingWidget):
         )
 
     def _add_target(self):
-        for obj in selection_targets.get_selected_objects():
+        for obj in selectionMod.get_selected_objects():
             self.targets_list.add_target(obj)
 
     def _create_layouts(self):
@@ -1185,7 +1185,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         setattr(self, setting, state)
 
         if setting == "euler_filter":
-            import TheKeyMachine.core.runtime_manager as runtime
+            import TheKeyMachine.core.runtimeManager as runtime
 
             runtime.get_runtime_manager().eulerFilterChanged.emit(bool(state))
 
@@ -1233,7 +1233,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
     def _get_selected_nodes(self, long=False):
         """Returns the current Maya selection."""
-        return selection_targets.get_selected_objects(long=long)
+        return selectionMod.get_selected_objects(long=long)
 
     def _fetch_attribute_data(self):
         """Analyzes active selection for compatible space-switch attributes and returns structured data."""
@@ -1643,20 +1643,21 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         target_attrs = options_and_objects[enum_value]["attrs"]
         enum_index = options_and_objects[enum_value].get("index", enum_value)
 
-        toolCommon.open_undo_chunk(tool_id="attribute_switcher")
-        cmds.refresh(suspend=True)
-        self._disconnect_runtime_manager()
-
-        # Save temporary keys
-        temp_keyframes = {}
-
-        timeline_selection = cmds.timeControl("timeControl1", q=True, rv=True)
-        current_frames = cmds.timeControl("timeControl1", q=True, ra=True)
-
-        keyframes = self._collect_keyframes(targets, all_frames_setting, timeline_selection, current_frames)
-        sorted_targets = sorted(targets, key=lambda x: x.count("|"), reverse=True)
-
+        chunk_opened = False
         try:
+            chunk_opened = toolCommon.open_undo_chunk()
+            cmds.refresh(suspend=True)
+            self._disconnect_runtime_manager()
+
+            # Save temporary keys
+            temp_keyframes = {}
+
+            timeline_selection = cmds.timeControl("timeControl1", q=True, rv=True)
+            current_frames = cmds.timeControl("timeControl1", q=True, ra=True)
+
+            keyframes = self._collect_keyframes(targets, all_frames_setting, timeline_selection, current_frames)
+            sorted_targets = sorted(targets, key=lambda x: x.count("|"), reverse=True)
+
             if sorted_targets:
                 # Case 1: dict - multiple frames
                 if isinstance(keyframes, dict) and keyframes:
@@ -1696,7 +1697,8 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
             self._connect_runtime_manager()
             self.refresh(force=True)
-            toolCommon.close_undo_chunk()
+            if chunk_opened:
+                toolCommon.close_undo_chunk()
 
         cmds.showWindow("MayaWindow")
 

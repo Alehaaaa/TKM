@@ -20,10 +20,10 @@ import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.sliders import api as slider_api
-import TheKeyMachine.core.runtime_manager as runtime
+import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import colors as toolColors
 
-from TheKeyMachine.tooltips import QFlatTooltipManager, format_tooltip_shortcut
+from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager, format_tooltip_shortcut
 
 importlib.reload(ui)
 importlib.reload(report)

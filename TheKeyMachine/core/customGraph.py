@@ -40,7 +40,7 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
 import TheKeyMachine.core.toolMenus as toolMenus
 import TheKeyMachine.core.toolbox as toolbox
-import TheKeyMachine.core.tool_widgets as toolWidgets
+import TheKeyMachine.core.toolWidgets as toolWidgets
 
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore

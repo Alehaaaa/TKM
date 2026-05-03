@@ -37,12 +37,11 @@ except ImportError:
 
 import json
 import os
-import sys
 import math
 import re
 from collections import Counter
 
-import TheKeyMachine.core.runtime_manager as runtime
+import TheKeyMachine.core.runtimeManager as runtime
 
 
 import TheKeyMachine.widgets.util as wutil
@@ -51,10 +50,9 @@ import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.mods.selectionMod as selectionMod
 
 
-python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 SHARE_KEYS_MODE_SETTING = "share_keys_mode"
 SHARE_KEYS_MODE_PRESERVE_TANGENT = "preserve_tangent_type"
 SHARE_KEYS_MODE_PRESERVE_SHAPE = "preserve_anim_curve_shape"
@@ -77,45 +75,8 @@ BAKE_UNDO_HELP = {
 
 def clear_timeslider_selection():
     # fix temporal para limpiar el timeslider
-    selection = selection_targets.get_selected_objects()
+    selection = selectionMod.get_selected_objects()
     cmds.select(selection)
-
-
-def get_time_range_selected():
-    aTimeSlider = selection_targets.get_playback_slider()
-    timeRange = cmds.timeControl(aTimeSlider, q=True, rangeArray=True)
-
-    # Verificar que el rango de tiempo seleccionado no esta vacío
-    if timeRange[0] == timeRange[1]:
-        return None
-
-    return timeRange
-
-
-# Esta es una version nueva que evalua correctamente si es un rango o no. Dejo la otra porque se usa en algunos sitios. Hay que limpiar.
-def get_selected_time_range():
-    time_range = selection_targets.get_selected_time_slider_range()
-    if not time_range:
-        return None
-    return [time_range[0], time_range[1]]
-
-
-def get_graph_editor_selected_keyframes():
-    anim_curves = cmds.keyframe(q=True, selected=True, name=True)
-    if not anim_curves:
-        return []
-
-    selected_frames = set(selection_targets.get_graph_editor_selected_frames())
-    keyframes = []
-    for curve in anim_curves:
-        curve_frames = cmds.keyframe(curve, q=True, selected=True) or []
-        keyframes.extend((curve, frame) for frame in curve_frames if int(frame) in selected_frames)
-
-    return keyframes
-
-
-def get_working_time_context(default_mode="all_animation"):
-    return timelineWidgets.resolve_time_context(default_mode=default_mode)
 
 
 def _begin_timeline_context_tint(default_mode, key, owner=None, color=None):
@@ -156,42 +117,10 @@ def _get_default_value_for_attribute(obj, attr, data):
     return None
 
 
-def getSelectedCurves():
-    curveNames = []
-
-    # get the current selection list
-    selectionList = om.MSelectionList()
-    om.MGlobal.getActiveSelectionList(selectionList)
-
-    # filter through the anim curves
-    listIter = om.MItSelectionList(selectionList, om.MFn.kAnimCurve)
-    while not listIter.isDone():
-        # Retrieve current item's MObject
-        mobj = om.MObject()
-        listIter.getDependNode(mobj)
-
-        # Convert MObject to MFnDependencyNode
-        depNodeFn = om.MFnDependencyNode(mobj)
-        curveName = depNodeFn.name()
-
-        curveNames.append(curveName)
-        listIter.next()
-
-    return curveNames
-
-
-def get_selected_channels():
-    # Obtén el nombre del Channel Box principal
-    main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
-    selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
-
-    return selected_channels
-
-
 def resolve_tool_targets(default_mode="all_animation", ordered_selection=False, long_names=True):
-    target_plugs, source, _time_range, has_graph_keys = selection_targets.resolve_target_attribute_plugs()
-    time_context = get_working_time_context(default_mode=default_mode)
-    selected_keyframes = get_graph_editor_selected_keyframes() if has_graph_keys else []
+    target_plugs, source, _time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
+    time_context = timelineWidgets.resolve_time_context(default_mode=default_mode)
+    selected_keyframes = selectionMod.get_graph_editor_selected_keyframes() if has_graph_keys else []
 
     target_objects = []
     seen_objects = set()
@@ -205,7 +134,7 @@ def resolve_tool_targets(default_mode="all_animation", ordered_selection=False, 
         target_objects.append(obj)
 
     if not target_objects:
-        target_objects = selection_targets.get_selected_objects(orderedSelection=ordered_selection, long=long_names)
+        target_objects = selectionMod.get_selected_objects(orderedSelection=ordered_selection, long=long_names)
 
     selected_channels = []
     seen_channels = set()
@@ -336,7 +265,7 @@ def find_all_roots_in_selection():
     """
     Identifica todos los nodos raíces en la selección.
     """
-    selection = selection_targets.get_selected_objects()
+    selection = selectionMod.get_selected_objects()
     root_nodes = []
 
     while selection:
@@ -382,7 +311,7 @@ def load_relative_data():
 def copy_link(*args):
     matrix_file_path = general.get_copy_link_data_file()
 
-    seleccion = selection_targets.get_selected_objects()
+    seleccion = selectionMod.get_selected_objects()
     if len(seleccion) < 2:
         return wutil.make_inViewMessage("Select at least 2 objects")
 
@@ -458,9 +387,6 @@ def paste_link(*args):
             else:
                 cmds.warning(f"Could not save relative matrix for {follow_obj}")
 
-
-# Esta version esta simplificada y no mira si hay un rango seleccionado, de esta forma el callback
-# es más rápido y actualiza sin dar problemas al rotar o mover el objeto
 
 
 def paste_link_callback():
@@ -584,9 +510,9 @@ def share_keys(*args):
     tint_session = _begin_timeline_tint((int(shared_frames[0]), int(shared_frames[-1])), "share_keys")
     preserve_curve_shape = get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE
 
+    chunk_opened = False
     try:
-        toolCommon.open_undo_chunk(tool_id="share_keys", tooltip_template=helper.share_keys_tooltip_text)
-        chunk_opened = True
+        chunk_opened = toolCommon.open_undo_chunk()
         for objeto in objetos:
             for plug, existing_frames in object_plug_frames.get(objeto, {}).items():
                 node_name, attribute_name = plug.split(".", 1)
@@ -607,7 +533,7 @@ def share_keys(*args):
 
 
 def _frames_from_last_selected(time_context=None):
-    selection = selection_targets.get_selected_objects(orderedSelection=True, long=True)
+    selection = selectionMod.get_selected_objects(orderedSelection=True, long=True)
     if len(selection) < 2:
         wutil.make_inViewMessage("Select targets, then the source object last")
         return None, [], []
@@ -626,19 +552,21 @@ def _frames_from_last_selected(time_context=None):
 
 
 def share_keys_from_last_selected(*args):
-    time_context = get_working_time_context(default_mode="all_animation")
+    time_context = timelineWidgets.resolve_time_context(default_mode="all_animation")
     _source, targets, frames = _frames_from_last_selected(time_context)
     if not frames:
         return
 
     keep_curve_shape = get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE
     tint_session = _begin_timeline_tint((int(frames[0]), int(frames[-1])), "share_keys")
+    chunk_opened = False
     try:
-        toolCommon.open_undo_chunk(tool_id="share_keys", tooltip_template=helper.share_keys_tooltip_text)
+        chunk_opened = toolCommon.open_undo_chunk()
         for target in targets:
             _set_missing_keys(_anim_curves_for_objects([target]), frames, insert=keep_curve_shape)
     finally:
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
         if tint_session:
             tint_session.finish()
 
@@ -648,7 +576,7 @@ def share_keys_from_last_selected(*args):
 
 def reblock_move(*args):
     # Obtener la lista de objetos seleccionados
-    objetos = selection_targets.get_selected_objects(long=True)  # Usar nombres largos para mayor precisión
+    objetos = selectionMod.get_selected_objects(long=True)  # Usar nombres largos para mayor precisión
 
     # Verificar que haya al menos un objeto seleccionado
     if len(objetos) < 1:
@@ -737,7 +665,7 @@ def reblock_move(*args):
 
 def reblock_insert(*args):
     # Obtener la lista de objetos actualmente seleccionados en la escena
-    objetos = selection_targets.get_selected_objects()
+    objetos = selectionMod.get_selected_objects()
 
     # Verificar que haya al menos dos objetos seleccionados
     if len(objetos) < 2:
@@ -774,7 +702,8 @@ def reblock_insert(*args):
 def bake_animation(bake_interval=1, window=None):
     bake_title, bake_tooltip = BAKE_UNDO_HELP.get(bake_interval, ("Bake Animation", helper.bake_animation_custom_tooltip_text))
     tool_key = "bake_animation_{}".format(bake_interval) if bake_interval in BAKE_UNDO_HELP else "bake_animation_custom"
-    toolCommon.open_undo_chunk(title=bake_title, tooltip_template=bake_tooltip)
+    
+    chunk_opened = toolCommon.open_undo_chunk()
     tint_session = None
 
     try:
@@ -844,21 +773,23 @@ def bake_animation(bake_interval=1, window=None):
         if tint_session:
             tint_session.finish()
         # Cerrar el chunk de undo
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
 
     if window:
         window.close()
 
 
 def bake_animation_from_last_selected(*args):
-    time_context = get_working_time_context(default_mode="all_animation")
+    time_context = timelineWidgets.resolve_time_context(default_mode="all_animation")
     _source, targets, frames = _frames_from_last_selected(time_context)
     if not frames:
         return
 
     tint_session = _begin_timeline_tint((int(frames[0]), int(frames[-1])), "bake_animation_1")
+    chunk_opened = False
     try:
-        toolCommon.open_undo_chunk(title="Bake From Last Selected", tooltip_template=helper.bake_animation_1_tooltip_text)
+        chunk_opened = toolCommon.open_undo_chunk()
         for target in targets:
             curves = _anim_curves_for_objects([target])
             _set_keys_on_frames(curves, frames)
@@ -866,7 +797,8 @@ def bake_animation_from_last_selected(*args):
             if get_bake_tangent_mode() == BAKE_TANGENT_MODE_STEP:
                 _apply_step_tangents(curves, (frames[0], frames[-1]))
     finally:
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
         if tint_session:
             tint_session.finish()
 
@@ -892,7 +824,7 @@ def bake_animation_4(*args):
 
 def delete_keyframes_before_current_time():
     # Obtén los objetos seleccionados
-    selected = selection_targets.get_selected_objects()
+    selected = selectionMod.get_selected_objects()
 
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
@@ -915,7 +847,7 @@ def delete_keyframes_before_current_time():
 
 def delete_keyframes_after_current_time():
     # Obtén los objetos seleccionados
-    selected = selection_targets.get_selected_objects()
+    selected = selectionMod.get_selected_objects()
 
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
@@ -1017,14 +949,12 @@ def nudge_all_keys(offset, *args):
     offset = int(offset)
     if not offset:
         return
-    toolCommon.open_undo_chunk(
-        title="Nudge Keys Right" if offset > 0 else "Nudge Keys Left",
-        tooltip_template=helper.nudge_keyright_b_widget_tooltip_text if offset > 0 else helper.nudge_keyleft_b_widget_tooltip_text,
-    )
+    chunk_opened = toolCommon.open_undo_chunk()
     try:
         cmds.keyframe(curves, edit=True, relative=True, includeUpperBound=True, option="over", timeChange=offset)
     finally:
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
 
 
 def nudge_scene_keys(offset, *args):
@@ -1034,14 +964,12 @@ def nudge_scene_keys(offset, *args):
     offset = int(offset)
     if not offset:
         return
-    toolCommon.open_undo_chunk(
-        title="Nudge Scene Keys Right" if offset > 0 else "Nudge Scene Keys Left",
-        tooltip_template=helper.nudge_keyright_b_widget_tooltip_text if offset > 0 else helper.nudge_keyleft_b_widget_tooltip_text,
-    )
+    chunk_opened = toolCommon.open_undo_chunk()
     try:
         cmds.keyframe(curves, edit=True, relative=True, includeUpperBound=True, option="over", timeChange=offset)
     finally:
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
 
 
 def inbetween_scene(count=1, *args):
@@ -1052,14 +980,12 @@ def inbetween_scene(count=1, *args):
     if not count:
         return
     current = cmds.currentTime(q=True)
-    toolCommon.open_undo_chunk(
-        title="Insert Inbetween Scene" if count > 0 else "Remove Inbetween Scene",
-        tooltip_template=helper.insert_inbetween_b_widget_tooltip_text if count > 0 else helper.remove_inbetween_b_widget_tooltip_text,
-    )
+    chunk_opened = toolCommon.open_undo_chunk()
     try:
         cmds.keyframe(curves, edit=True, time=("{}:".format(current + 1),), relative=True, timeChange=count, option="over")
     finally:
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
 
 
 def _relative_timechange(count):
@@ -1090,10 +1016,7 @@ def move_keyframes_in_range(*args):
     has_range = time_context.mode == "time_slider_range"
     start_frame, end_frame = time_context.timerange
 
-    toolCommon.open_undo_chunk(
-        title="Nudge Keys Right" if offset > 0 else "Nudge Keys Left",
-        tooltip_template=helper.nudge_keyright_b_widget_tooltip_text if offset > 0 else helper.nudge_keyleft_b_widget_tooltip_text,
-    )
+    chunk_opened = toolCommon.open_undo_chunk()
     try:
         if target_info["has_graph_keys"]:
             cmds.keyframe(edit=True, animation="keys", relative=True, includeUpperBound=True, option="over", timeChange=offset)
@@ -1164,7 +1087,8 @@ def move_keyframes_in_range(*args):
         for source_time, plugs in grouped_source_times.items():
             cmds.keyframe(plugs, edit=True, absolute=True, option="over", time=(source_time, source_time), timeChange=current_time)
     finally:
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
 
 
 # _____________________________________________________ Key Tools  Customgraph _______________________________________________________________#
@@ -1172,7 +1096,7 @@ def move_keyframes_in_range(*args):
 
 def deleteStaticCurves():
     # Obtener los objetos seleccionados con sus nombres completos una sola vez
-    selected_objects = selection_targets.get_selected_objects(long=True)
+    selected_objects = selectionMod.get_selected_objects(long=True)
 
     # También incluir las formas de los objetos seleccionados
     selected_shapes = []
@@ -1201,7 +1125,7 @@ def deleteStaticCurves():
 
 def snapKeyframes():
     # Obtén la selección actual
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
 
     for obj in selected_objects:
         if not cmds.attributeQuery("translateX", node=obj, exists=True):
@@ -1283,7 +1207,7 @@ def shareKeys():
                         cmds.setKeyframe(curve, time=time, value=frame_value)
 
 
-def match_keys():
+def graph_match_keys():
     # Obtener las curvas seleccionadas
     selected_curves = cmds.keyframe(selected=True, query=True, name=True)
 
@@ -1366,28 +1290,17 @@ def flipFromKeyframe():
 # ------------------------------ OVERLAP
 
 
-def mod_overlap_animation(*args):
-    # Get the current state of the modifiers
-    mods = runtime.get_modifier_mask()
-    shift_pressed = bool(mods & 1)
-
-    if shift_pressed:
-        overlap_backward()
-    else:
-        overlap_forward()
-
-
 def overlap_forward(*args):
     frames_to_move = 1
 
     # Obtén el orden de los objetos seleccionados
-    selected_objects_order = selection_targets.get_selected_objects(orderedSelection=True, long=True)
+    selected_objects_order = selectionMod.get_selected_objects(orderedSelection=True, long=True)
     # Intenta obtener las curvas seleccionadas del Graph Editor
-    selected_anim_curves = getSelectedCurves()
+    selected_anim_curves = selectionMod.get_graph_editor_selected_curves()
 
     # Si no hay curvas seleccionadas en el Graph Editor, obtén las curvas de los canales seleccionados
     if not selected_anim_curves:
-        selected_channels = get_selected_channels()
+        selected_channels = selectionMod.get_selected_channels()
 
         # Si no hay canales seleccionados, muestra un mensaje al usuario y termina la ejecución
         if not selected_channels:
@@ -1414,14 +1327,14 @@ def overlap_backward(*args):
     frames_to_move = -1
 
     # Obtén el orden de los objetos seleccionados
-    selected_objects_order = selection_targets.get_selected_objects(orderedSelection=True, long=True)
+    selected_objects_order = selectionMod.get_selected_objects(orderedSelection=True, long=True)
 
     # Intenta obtener las curvas seleccionadas del Graph Editor
-    selected_anim_curves = getSelectedCurves()
+    selected_anim_curves = selectionMod.get_graph_editor_selected_curves()
 
     # Si no hay curvas seleccionadas en el Graph Editor, obtén las curvas de los canales seleccionados
     if not selected_anim_curves:
-        selected_channels = get_selected_channels()
+        selected_channels = selectionMod.get_selected_channels()
 
         # Si no hay canales seleccionados, muestra un mensaje al usuario y termina la ejecución
         if not selected_channels:
@@ -1449,18 +1362,18 @@ def overlap_backward(*args):
 
 def isolateCurve():
     # Obtén las curvas seleccionadas en el Graph Editor
-    selected_objects = selection_targets.get_graph_editor_outliner_items()
+    selected_objects = selectionMod.get_graph_editor_outliner_items()
 
     if not selected_objects:
         cmds.warning("There are not selected curves in Graph Editor")
     else:
         for s in selected_objects:
-            mel.eval("isolateAnimCurve true {} {};".format(selection_targets.GRAPH_EDITOR_OUTLINER, selection_targets.GRAPH_EDITOR))
+            mel.eval("isolateAnimCurve true {} {};".format(selectionMod.GRAPH_EDITOR_OUTLINER, selectionMod.GRAPH_EDITOR))
 
 
 def toggleMute():
     # Obtener las curvas seleccionadas en el Graph Editor
-    selected_curves = selection_targets.get_graph_editor_outliner_items()
+    selected_curves = selectionMod.get_graph_editor_outliner_items()
 
     if selected_curves:
         for curve in selected_curves:
@@ -1480,7 +1393,7 @@ def toggleMute():
 
 def toggleLock():
     # Obtén las curvas seleccionadas en el Graph Editor
-    selected_objects = selection_targets.get_graph_editor_outliner_items()
+    selected_objects = selectionMod.get_graph_editor_outliner_items()
 
     # Si no hay objetos seleccionados, lanza un error
     if not selected_objects:
@@ -1510,23 +1423,9 @@ def toggleLock():
 # _____________________________________________________ Resets _______________________________________________________________#
 
 
-def default_objects_mods(*args):
-    # Get the current state of the modifiers
-    mods = runtime.get_modifier_mask()
-    shift_pressed = bool(mods & 1)
-    ctrl_pressed = bool(mods & 4)
-
-    if shift_pressed:
-        default_object_values(default_translations=True)
-    elif ctrl_pressed:
-        default_object_values(default_rotations=True)
-    else:
-        default_object_values()
-
-
 def save_default_values(*args):
     # Obtener objetos seleccionados
-    objetos_seleccionados = selection_targets.get_selected_objects(long=True)
+    objetos_seleccionados = selectionMod.get_selected_objects(long=True)
 
     json_file_path = general.get_set_default_data_file()
 
@@ -1592,7 +1491,7 @@ def remove_default_values_for_selected_object(*args):
         return wutil.make_inViewMessage("No default values found to remove")
 
     # Obtener objetos seleccionados
-    objetos_seleccionados = selection_targets.get_selected_objects(long=True)
+    objetos_seleccionados = selectionMod.get_selected_objects(long=True)
 
     for obj in objetos_seleccionados:
         # Extraer el namespace y el nombre corto del objeto
@@ -1637,11 +1536,7 @@ def default_object_values(default_translations=False, default_rotations=False, d
         title = None
         tooltip_template = helper.default_values_tooltip_text
 
-    toolCommon.open_undo_chunk(
-        tool_id="default_objects_mods",
-        title=title,
-        tooltip_template=tooltip_template,
-    )
+    chunk_opened = toolCommon.open_undo_chunk()
     tint_session = None
     selected_objects = []
 
@@ -1657,7 +1552,7 @@ def default_object_values(default_translations=False, default_rotations=False, d
 
         target_info = resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=True)
         time_context = target_info["time_context"]
-        tint_session = _begin_timeline_context_tint("current_frame", "default_objects_mods")
+        tint_session = _begin_timeline_context_tint("current_frame", "default_object_values")
 
         selected_objects = target_info["target_objects"]
         target_plugs = target_info["target_plugs"]
@@ -1743,7 +1638,8 @@ def default_object_values(default_translations=False, default_rotations=False, d
             cmds.select(selected_objects, replace=True)
         else:
             cmds.select(clear=True)
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
 
 
 def get_default_value(node):
@@ -1769,7 +1665,7 @@ def get_default_value(node):
 
 
 def get_default_value_main():
-    selected_curves = selection_targets.get_graph_editor_outliner_items()
+    selected_curves = selectionMod.get_graph_editor_outliner_items()
 
     if selected_curves:
         for curve in selected_curves:
@@ -1786,7 +1682,7 @@ def get_default_value_main():
 
 def get_namespace_from_selection(*args):
     # Obtener el namespace del objeto seleccionado (si existe)
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
     if selected_objects:
         object_name = selected_objects[0]
         if ":" in object_name:
@@ -1819,7 +1715,7 @@ def select_objects_from_selected_curves(*args):
 
     if selected_objects:
         cmds.selectKey(selected_curves, add=True)  # Seleccionar las claves en el Graph Editor
-        mel.eval("isolateAnimCurve true {} {};".format(selection_targets.GRAPH_EDITOR_OUTLINER, selection_targets.GRAPH_EDITOR))
+        mel.eval("isolateAnimCurve true {} {};".format(selectionMod.GRAPH_EDITOR_OUTLINER, selectionMod.GRAPH_EDITOR))
         cmds.select(list(selected_objects), replace=True)  # Seleccionar los objetos en la vista 3D
 
 
@@ -1874,21 +1770,10 @@ def find_opposite_name(name):
 
 # ___________________________ SELECT OPPOSITE _____________________________________
 
-
-def selectOppositeHandler(*args):
-    mods = runtime.get_modifier_mask()
-    shift_pressed = bool(mods & 1)
-
-    if shift_pressed:
-        addSelectOpposite(args)
-    else:
-        selectOpposite(args)
-
-
 def selectOpposite(*args):
     global MIRROR_PATTERNS
 
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
     opposite_controls = []
 
     for obj in selected_objects:
@@ -1903,7 +1788,7 @@ def selectOpposite(*args):
 def addSelectOpposite(*args):
     global MIRROR_PATTERNS
 
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
     opposite_controls = []
 
     for obj in selected_objects:
@@ -1919,7 +1804,7 @@ def addSelectOpposite(*args):
 
 
 def copyOpposite(*args):
-    toolCommon.open_undo_chunk(tool_id="opposite_copy")
+    chunk_opened = toolCommon.open_undo_chunk()
 
     try:
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
@@ -1948,7 +1833,7 @@ def copyOpposite(*args):
                     return attr.replace(from_pattern, to_pattern)
             return attr
 
-        selected_objects = selection_targets.get_selected_objects()
+        selected_objects = selectionMod.get_selected_objects()
 
         for obj in selected_objects:
             opposite_obj = find_opposite_name(obj)
@@ -1976,7 +1861,8 @@ def copyOpposite(*args):
     except Exception as e:
         cmds.warning("Error during copy: {}".format(str(e)))
     finally:
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
 
 
 # ________________________________________________________________ MIRROR _______________________________________________________________________ #
@@ -1992,7 +1878,7 @@ def load_exceptions():
 
 
 def mirror(*args):
-    toolCommon.open_undo_chunk(tool_id="mirror")
+    chunk_opened = toolCommon.open_undo_chunk()
 
     try:
         global MIRROR_PATTERNS
@@ -2088,7 +1974,7 @@ def mirror(*args):
                     cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
 
         def mirror_controls():
-            selected_controls = selection_targets.get_selected_objects()
+            selected_controls = selectionMod.get_selected_objects()
 
             if not selected_controls:
                 return wutil.make_inViewMessage("Select at least one object")
@@ -2115,7 +2001,8 @@ def mirror(*args):
     except Exception as e:
         cmds.warning("Error during mirroring: {}".format(str(e)))
     finally:
-        toolCommon.close_undo_chunk()
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
 
 
 # ------------------------------- mirror to opposite
@@ -2209,7 +2096,7 @@ def mirror_to_opposite(*args):
                 cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
 
     def mirror_controls():
-        selected_controls = selection_targets.get_selected_objects()
+        selected_controls = selectionMod.get_selected_objects()
 
         if not selected_controls:
             return wutil.make_inViewMessage("Select at least one object")
@@ -2239,11 +2126,6 @@ def mirror_to_opposite(*args):
 
 
 def add_mirror_invert_exception(*args):
-    def get_selected_channels():
-        main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
-        selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
-        return selected_channels
-
     def get_long_name(obj, short_name):
         """Obtiene el nombre largo del atributo a partir de su nombre corto."""
         return cmds.attributeQuery(short_name, node=obj, longName=True)
@@ -2274,8 +2156,8 @@ def add_mirror_invert_exception(*args):
 
     def create_mirror_exception():
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = selection_targets.get_selected_objects()
-        selected_channels = get_selected_channels()
+        selected_controls = selectionMod.get_selected_objects()
+        selected_channels = selectionMod.get_selected_channels()
 
         if selected_controls and selected_channels:
             add_exceptions_to_json(selected_controls, selected_channels, mirror_exceptions_file_path)
@@ -2287,11 +2169,6 @@ def add_mirror_invert_exception(*args):
 
 
 def add_mirror_keep_exception(*args):
-    def get_selected_channels():
-        main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
-        selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
-        return selected_channels
-
     def get_long_name(obj, short_name):
         """Obtiene el nombre largo del atributo a partir de su nombre corto."""
         return cmds.attributeQuery(short_name, node=obj, longName=True)
@@ -2322,8 +2199,8 @@ def add_mirror_keep_exception(*args):
 
     def create_mirror_exception():
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = selection_targets.get_selected_objects()
-        selected_channels = get_selected_channels()
+        selected_controls = selectionMod.get_selected_objects()
+        selected_channels = selectionMod.get_selected_channels()
 
         if selected_controls and selected_channels:
             add_exceptions_to_json(selected_controls, selected_channels, mirror_exceptions_file_path)
@@ -2338,11 +2215,6 @@ def add_mirror_keep_exception(*args):
 
 
 def remove_mirror_invert_exception(*args):
-    def get_selected_channels():
-        main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
-        selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
-        return selected_channels
-
     def get_long_name(obj, short_name):
         """Obtiene el nombre largo del atributo a partir de su nombre corto."""
         return cmds.attributeQuery(short_name, node=obj, longName=True)
@@ -2371,8 +2243,8 @@ def remove_mirror_invert_exception(*args):
 
     def remove_mirror_exceptions():
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = selection_targets.get_selected_objects()
-        selected_channels = get_selected_channels()
+        selected_controls = selectionMod.get_selected_objects()
+        selected_channels = selectionMod.get_selected_channels()
 
         if selected_controls and selected_channels:
             remove_exceptions_from_json(selected_controls, selected_channels, mirror_exceptions_file_path)
@@ -2405,12 +2277,12 @@ def copy_animation(*args):
         with open(json_file_path, "w") as json_file:
             json.dump(animation_data, json_file, indent=4)
 
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
 
     if not selected_objects:
         return
 
-    time_context = get_working_time_context(default_mode="all_animation")
+    time_context = timelineWidgets.resolve_time_context(default_mode="all_animation")
     animation_data = {}
     tint_session = None
 
@@ -2496,7 +2368,7 @@ def paste_animation(*args):
         return timelineWidgets.get_animation_data_timerange(animation_data)
 
     # Obtener los objetos seleccionados
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
 
     if not selected_objects:
         return
@@ -2544,7 +2416,7 @@ def paste_insert_animation(*args):
                             cmds.setKeyframe(control, time=adjusted_frame, attribute=channel, value=value)
 
     # Obtener los objetos seleccionados y el tiempo actual
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
     current_time = cmds.currentTime(query=True)
 
     if not selected_objects:
@@ -2636,7 +2508,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             return json.load(f)
 
     # Destinos: selección actual
-    targets = selection_targets.get_selected_objects()
+    targets = selectionMod.get_selected_objects()
     if not targets:
         return wutil.make_inViewMessage("Select at least one destination control")
 
@@ -2762,7 +2634,7 @@ def copy_pose(*args):
         with open(json_file_path, "w") as json_file:
             json.dump(pose_data, json_file, indent=4)
 
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
 
     if not selected_objects:
         return
@@ -2845,7 +2717,7 @@ def paste_pose(*args):
                             report.report_detected_exception(e, context="paste pose attribute set")
 
     # Obtener los objetos seleccionados
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
 
     if not selected_objects:
         return
@@ -2887,7 +2759,7 @@ def _copy_curve_key_state(curve, source_time, target_time):
 
 
 def match_curve_cycle(*args, target_key="last"):
-    curveNames = getSelectedCurves()
+    curveNames = selectionMod.get_graph_editor_selected_curves()
 
     for curve in curveNames:
         firstKeyTime = cmds.findKeyframe(curve, which="first")

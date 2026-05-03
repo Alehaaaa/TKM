@@ -2,7 +2,7 @@
 TheKeyMachine Sliders Module: A unified system for managing Tween, Blend, and Curve sliders.
 """
 
-from TheKeyMachine.tooltips import parse_tt
+from TheKeyMachine.mods.tooltipsMod import parse_tt
 from .manager import TWEEN_MODES, BLEND_MODES, TANGENT_MODES
 
 

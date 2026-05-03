@@ -12,8 +12,8 @@ import TheKeyMachine.mods.keyToolsMod as keyTools  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
 import TheKeyMachine.mods.updater as updater  # type: ignore
 import TheKeyMachine.core.trigger as trigger  # type: ignore
-import TheKeyMachine.core.selection_targets as selection_targets  # type: ignore
-import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
+import TheKeyMachine.mods.selectionMod as selectionMod  # type: ignore
+import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
 import TheKeyMachine.core.toolMenus as toolMenus  # type: ignore
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
@@ -25,32 +25,34 @@ import TheKeyMachine.sliders as sliders  # type: ignore
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
-from TheKeyMachine.tooltips import QFlatTooltipManager
+from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
 try:
-    from PySide6 import QtCore, QtGui  # type: ignore
+    from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
+    from shiboken6 import isValid  # type: ignore
 except ImportError:
-    from PySide2 import QtCore, QtGui  # type: ignore
+    from PySide2 import QtCore, QtGui, QtWidgets  # type: ignore
+    from shiboken2 import isValid  # type: ignore
 
 
 MAIN_SPECIAL_TOOL_KEYS = {
-    "selector",
     "animation_offset",
     "micro_move",
     "orbit",
     "selection_sets",
     "attribute_switcher",
     "custom_graph",
+    "selector",
     "settings",
 }
 
 GRAPH_SPECIAL_TOOL_KEYS = {
-    "settings",
-    "custom_graph",
-    "attribute_switcher",
-    "selection_sets",
     "orbit",
+    "selection_sets",
+    "attribute_switcher",
+    "custom_graph",
     "selector",
+    "settings",
 }
 
 
@@ -116,24 +118,48 @@ def bind_setting_toggle(widget, spec):
     widget.setCheckable(True)
     sync_setting_toggle(widget, spec)
 
-    def _sync(_enabled=None, w=widget, s=spec):
-        if w is None or not wutil.is_valid_widget(w):
-            return
-        toolCommon.set_checked_safely(w, s["get_checked"]())
-
     signal = spec.get("changed_signal")
     if signal is not None:
-        toolCommon.replace_tracked_connection(
-            widget,
-            "_tkm_setting_toggle_sync_relay",
-            signal,
-            _sync,
-            parent=widget,
-        )
+        def _sync_setting_toggle(*_args, target=widget, toggle_spec=spec):
+            sync_setting_toggle(target, toggle_spec)
+
+        signal.connect(_sync_setting_toggle)
+        _retain_setting_toggle_slot(widget, _sync_setting_toggle)
+        destroyed = getattr(widget, "destroyed", None)
+        if destroyed is not None:
+            def _disconnect_sync(*_args, source_signal=signal, source_slot=_sync_setting_toggle):
+                _disconnect_setting_toggle_signal(source_signal, source_slot)
+
+            destroyed.connect(_disconnect_sync)
+            _retain_setting_toggle_slot(widget, _disconnect_sync)
 
 
 def sync_setting_toggle(widget, spec):
-    toolCommon.set_checked_safely(widget, spec["get_checked"]())
+    if not _is_valid_setting_toggle_target(widget):
+        return False
+    return toolCommon.set_checked_safely(widget, spec["get_checked"]())
+
+
+def _is_valid_setting_toggle_target(widget):
+    if widget is None:
+        return False
+    try:
+        return bool(isValid(widget))
+    except Exception:
+        return False
+
+
+def _disconnect_setting_toggle_signal(signal, slot):
+    try:
+        signal.disconnect(slot)
+    except Exception:
+        pass
+
+
+def _retain_setting_toggle_slot(widget, slot):
+    slots = getattr(widget, "_tkm_setting_toggle_slots", [])
+    slots.append(slot)
+    widget._tkm_setting_toggle_slots = slots
 
 
 def add_tool_button(section, item_data, *, overrides=None):
@@ -168,11 +194,7 @@ def add_selector_button(section, item_data):
     if callback:
 
         def _clicked_cb(*_args, cb=callback, b=btn):
-            runtime.set_active_tool_source(b)
-            try:
-                return b.triggerToolCallback(cb)
-            finally:
-                runtime.clear_active_tool_source(b)
+            return b.triggerToolCallback(cb)
 
         btn.clicked.connect(_clicked_cb)
 
@@ -189,7 +211,7 @@ def add_selector_button(section, item_data):
     def update_selector_button_text(*_args, button=btn):
         if not wutil.is_valid_widget(button):
             return
-        button.setCount(selection_targets.get_selected_object_count())
+        button.setCount(selectionMod.get_selected_object_count())
 
     toolCommon.replace_tracked_connection(
         btn,

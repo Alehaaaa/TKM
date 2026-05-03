@@ -5,7 +5,7 @@ except ImportError:
 
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.settingsMod as settings
-import TheKeyMachine.core.runtime_manager as runtime
+import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools.attribute_switcher.common import (

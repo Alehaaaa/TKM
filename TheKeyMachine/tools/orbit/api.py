@@ -58,9 +58,9 @@ def _set_orbit_stays_on_top(enabled):
 
 ORBIT_ACTIONS = (
     "isolate_master",
-    "align_selected_objects",
+    "align_objects",
     "create_tracer",
-    "default_objects_mods",
+    "default_object_values",
     "delete_all_animation",
     "select_opposite",
     "opposite_copy",
@@ -82,7 +82,7 @@ ORBIT_ACTION_MIGRATIONS = {
 }
 
 DEFAULT_ORBIT_ACTIONS = (
-    "default_objects_mods",
+    "default_object_values",
     "delete_all_animation",
     "select_opposite",
     "opposite_copy",
@@ -124,8 +124,7 @@ def execute_action(action_identifier):
 
     chunk_opened = False
     try:
-        toolCommon.open_undo_chunk(tool_id=action_identifier)
-        chunk_opened = True
+        chunk_opened = toolCommon.open_undo_chunk()
         trigger.invoke(action_identifier)
     finally:
         if chunk_opened:

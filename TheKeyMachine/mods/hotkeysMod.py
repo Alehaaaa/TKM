@@ -14,12 +14,12 @@ try:
 except ImportError:
     from PySide2 import QtCore, QtGui, QtWidgets # type: ignore
 
-import TheKeyMachine.core.runtime_manager as runtime
+import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.core.toolbox as toolbox
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.mediaMod as media
-from TheKeyMachine.tooltips import QFlatTooltipManager
+from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 from TheKeyMachine.widgets import customDialogs as cd
 from TheKeyMachine.widgets.customWidgets import QFlatHoverableIcon
 from TheKeyMachine.widgets import util as wutil

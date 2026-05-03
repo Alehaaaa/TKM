@@ -34,7 +34,7 @@ def reload():
         pass
 
     try:
-        import TheKeyMachine.core.runtime_manager as runtime
+        import TheKeyMachine.core.runtimeManager as runtime
 
         runtime.shutdown_runtime_manager()
     except Exception:

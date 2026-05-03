@@ -35,7 +35,7 @@ except ImportError:
     pass
 
 
-import TheKeyMachine.core.runtime_manager as runtime
+import TheKeyMachine.core.runtimeManager as runtime
 import os
 import platform
 import shutil
@@ -46,7 +46,7 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.mods.updater as updater
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.tools.colors as toolColors
 import TheKeyMachine.tools.orbit.api as orbitApi
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
@@ -134,7 +134,7 @@ global proc syncChannelBoxFcurveEd()
     }}
 }}
 syncChannelBoxFcurveEd();
-""".format(graph_editor_outliner=selection_targets.GRAPH_EDITOR_OUTLINER)
+""".format(graph_editor_outliner=selectionMod.GRAPH_EDITOR_OUTLINER)
 
 filterMode_sync_off_code = """
 

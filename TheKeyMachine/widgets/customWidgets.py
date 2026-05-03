@@ -1,9 +1,9 @@
-from TheKeyMachine.tooltips import QFlatTooltipManager
 from functools import partial
 
+from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
-import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
+import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
 from TheKeyMachine.tools import colors as toolColors  # type: ignore
 from TheKeyMachine.tools import common as toolCommon  # type: ignore
 
@@ -67,21 +67,6 @@ def _push_help(widget, data):
             tooltip_template=data.get("tooltip_template"),
         ),
     )
-
-
-def _tool_chunk_name(widget, variant=None):
-    title = None
-    description = None
-    if variant:
-        title = variant.get("status_title") or variant.get("text")
-        description = variant.get("status_description")
-    if not title:
-        base = getattr(widget, "_base_state", {}) or {}
-        title = base.get("status_title") or base.get("text")
-        description = description or base.get("status_description")
-    if not title:
-        title = getattr(widget, "_section_key", None) or widget.objectName() or "tool"
-    return toolCommon.make_undo_chunk_name(title=title, description=description)
 
 
 def get_widget_tint_color(widget, default=None):
@@ -333,12 +318,18 @@ class MenuWidget(QtWidgets.QMenu):
         if action is None or not isValid(action):
             return None
 
-        source_key = action.property("tkm_tooltip_source_key") if hasattr(action, "property") else None
+        try:
+            source_key = action.property("tkm_tooltip_source_key") if hasattr(action, "property") else None
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return None
         if source_key:
             return source_key
 
         source_key = "menu-action:{}".format(id(action))
-        action.setProperty("tkm_tooltip_source_key", source_key)
+        try:
+            action.setProperty("tkm_tooltip_source_key", source_key)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return None
         return source_key
 
     def _hovered_menu_for_action(self, action):
@@ -388,12 +379,23 @@ class MenuWidget(QtWidgets.QMenu):
         if menu is None or not isValid(menu):
             return None, None
 
-        geometry = menu.actionGeometry(action)
+        try:
+            if action not in menu.actions():
+                return None, None
+            geometry = menu.actionGeometry(action)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return None, None
+
         if geometry.isNull() and menu is not self:
             menu = self
             if not isValid(menu):
                 return None, None
-            geometry = self.actionGeometry(action)
+            try:
+                if action not in self.actions():
+                    return None, None
+                geometry = self.actionGeometry(action)
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                return None, None
         if geometry.isNull():
             return None, None
         return QtCore.QRect(menu.mapToGlobal(geometry.topLeft()), geometry.size()), menu
@@ -403,9 +405,13 @@ class MenuWidget(QtWidgets.QMenu):
         tooltip_template = kwargs.pop("tooltip_template", None)
         callback = kwargs.pop("callback", None)
         label_override = kwargs.pop("label", None)
+        keep_open = kwargs.pop("open", False)
 
         res = QtWidgets.QMenu.addAction(self, *args, **kwargs)
         action = args[0] if (len(args) > 0 and isinstance(args[0], QAction)) else res
+
+        if keep_open and hasattr(action, "setProperty"):
+            action.setProperty("tkm_keep_menu_open", True)
 
         if callback:
             action.triggered.connect(callback)
@@ -416,12 +422,12 @@ class MenuWidget(QtWidgets.QMenu):
                 label = arg
                 break
 
-        if tooltip_template:
-            title = label_override or toolCommon.get_tooltip_title(tooltip_template) or label or action.text()
-            resolved_description = _status_description(
-                description=description or "",
-                tooltip_template=tooltip_template,
-            )
+        title = label_override or toolCommon.get_tooltip_title(tooltip_template) or label or action.text()
+        resolved_description = _status_description(
+            description=description or "",
+            tooltip_template=tooltip_template,
+        )
+        if title or resolved_description or tooltip_template:
             if hasattr(action, "setProperty"):
                 action.setProperty("tkm_tooltip_template", tooltip_template)
                 self._ensure_action_tooltip_source_key(action)
@@ -457,10 +463,14 @@ class MenuWidget(QtWidgets.QMenu):
 
         QFlatTooltipManager.hide()
 
+        try:
+            title = action.property("tkm_title") or action.text()
+            desc = action.property("tkm_description") or ""
+            tooltip_template = action.property("tkm_tooltip_template") or None
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return
+
         # Force push to Maya channels
-        title = action.property("tkm_title") or action.text()
-        desc = action.property("tkm_description") or ""
-        tooltip_template = action.property("tkm_tooltip_template") or None
         HelpSystem.push(action, title, desc)
 
         # Floating Tooltip
@@ -493,9 +503,6 @@ class MenuWidget(QtWidgets.QMenu):
             if hasattr(action, "isClickable") and not action.isClickable():
                 e.accept()
                 return
-        if action and action.isEnabled():
-            action.trigger()
-            return
         QtWidgets.QMenu.mouseReleaseEvent(self, e)
 
 
@@ -506,13 +513,17 @@ class OpenMenuWidget(MenuWidget):
 
     def mouseReleaseEvent(self, e):
         action = self.actionAt(e.pos())
-        if isinstance(action, QtWidgets.QWidgetAction):
+        keep_open = False
+        if action and hasattr(action, "property"):
+            try:
+                keep_open = bool(action.property("tkm_keep_menu_open"))
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                keep_open = False
+        if action and action.isEnabled() and (action.isCheckable() or keep_open):
+            action.trigger()
             e.accept()
             return
-        if action and action.isEnabled():
-            action.trigger()
-            return
-        MenuWidget.mouseReleaseEvent(self, e)
+        QtWidgets.QMenu.mouseReleaseEvent(self, e)
 
 
 class TooltipMixin:
@@ -895,8 +906,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         callback = variant.get("callback") if variant else None
         chunk_opened = False
         try:
-            toolCommon.open_named_undo_chunk(_tool_chunk_name(self, variant))
-            chunk_opened = True
+            chunk_opened = toolCommon.open_undo_chunk()
             if callback:
                 return callback(*args, **kwargs)
             if base_callback:
@@ -966,7 +976,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 "status_title": self._base_state.get("status_title"),
                 "status_description": self._base_state.get("status_description"),
             }
-        tooltip_template = variant.get("tooltip_template", variant.get("text", self._base_state.get("text")))
+        tooltip_template = variant.get("tooltip_template")
         return {
             "text": variant.get("text", self._base_state.get("text")),
             "description": variant.get("description", ""),
@@ -1133,7 +1143,7 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
         btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
         def _show_tool_menu(pos, setup_fn=menu, widget=btn):
-            menu = MenuWidget(widget)
+            menu = OpenMenuWidget(widget)
             try:
                 built_menu = setup_fn(menu, source_widget=widget)
             except TypeError:
@@ -1187,30 +1197,20 @@ def _connect_tool_button_callback(button, callback, checkable=False, state_fn=No
         return
 
     if checkable:
-
         def _checked_cb(*args, cb=callback, b=button, fn=state_fn):
             checked = bool(args[0]) if args else b.isChecked()
-            runtime.set_active_tool_source(b)
+            b.triggerToolCallback(cb, checked)
             try:
-                b.triggerToolCallback(cb, checked)
-                try:
-                    valid = isValid(b)
-                except Exception:
-                    valid = False
-                if valid:
-                    _sync_checked_from_setting(b, fn)
-            finally:
-                runtime.clear_active_tool_source(b)
+                valid = isValid(b)
+            except Exception:
+                valid = False
+            if valid:
+                _sync_checked_from_setting(b, fn)
 
-        button.clicked.connect(_checked_cb)
-        return
+        return button.clicked.connect(_checked_cb)
 
     def _clicked_cb(*_args, cb=callback, b=button):
-        runtime.set_active_tool_source(b)
-        try:
-            return b.triggerToolCallback(cb)
-        finally:
-            runtime.clear_active_tool_source(b)
+        return b.triggerToolCallback(cb)
 
     button.clicked.connect(_clicked_cb)
 
@@ -1863,9 +1863,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             widget.setVisible(visible)
             self._sync_section_visibility()
 
-        # Push documentation to the widget (syncs Maya Status Bar and TKM tooltips).
-        # The section label is the tool title; widget.text() is only a visual fallback
-        # for missing icons and must not become the status/tooltip title.
         if hasattr(widget, "setToolTipData"):
             d = description
             tt = tooltip_template
@@ -1919,7 +1916,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 default_item,
                 callback=None,
                 menu=None,
-                tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or default_item.get("label"),
+                tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip"),
                 description=default_item.get("description") or "",
             )
             label = default_item.get("label", "Unknown")
@@ -1938,7 +1935,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 key,
                 default=item_default,
                 description=default_item.get("description"),
-                tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip") or label,
+                tooltip_template=default_item.get("tooltip_template") or default_item.get("tooltip"),
                 pinnable=default_item.get("pinnable", True),
             )
             group_widgets.append((key, widget))
@@ -1948,7 +1945,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         first_item = default_items[0] if default_items else {}
 
         def menu_factory(section=self, source_widget=None, widgets=widgets_list, source_items=item_by_key):
-            menu = MenuWidget(source_widget)
+            menu = OpenMenuWidget(source_widget)
             menu.setTearOffEnabled(True)
 
             source_key = None
@@ -1981,11 +1978,11 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                     # Use raw label for display, but full tooltip for documentation
                     display_label = item.get("label", "")
-                    full_tooltip = item.get("tooltip_template") or item.get("tooltip") or display_label
+                    full_tooltip = item.get("tooltip_template") or item.get("tooltip")
                     full_desc = item.get("description") or ""
 
                     if checkable:
-                        action = menu.addAction(QtGui.QIcon(act_icon_p), display_label, template=full_tooltip, description=full_desc)
+                        action = menu.addAction(QtGui.QIcon(act_icon_p), display_label, tooltip_template=full_tooltip, description=full_desc)
                         _checkable, is_checked_f = _setup_setting_synced_checkable(action, item)
                         if is_checked_f:
                             checkable_sync_pairs.append((action, is_checked_f))
@@ -2306,12 +2303,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         tooltip_template=item.get("tooltip_template"),
                     )
         menu.addSeparator()
-        pin_def_action = menu.addAction(QtGui.QIcon(media.dot_pins_image), "Pin Defaults")
+        pin_def_action = menu.addAction(QtGui.QIcon(media.dot_pins_image), "Pin Defaults", open=True)
         if self._all_modes:
             pin_def_action.triggered.connect(lambda: self.pin_defaults(self._default_keys, menu=menu))
         else:
             pin_def_action.triggered.connect(lambda: self.pin_widget_defaults(menu=menu))
-        pin_all_action = menu.addAction(QtGui.QIcon(media.dot_pins_image), "Pin All")
+        pin_all_action = menu.addAction(QtGui.QIcon(media.dot_pins_image), "Pin All", open=True)
         if self._all_modes:
             pin_all_action.triggered.connect(lambda: self.pin_all(menu=menu))
         else:

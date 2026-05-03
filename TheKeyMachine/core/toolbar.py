@@ -56,8 +56,6 @@ import TheKeyMachine.mods.generalMod as general  # type: ignore
 import TheKeyMachine.mods.uiMod as ui  # type: ignore
 import TheKeyMachine.mods.reportMod as report  # type: ignore
 import TheKeyMachine.mods.keyToolsMod as keyTools  # type: ignore
-
-# import TheKeyMachine.mods.selSetsMod as selSets  # type: ignore
 import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.mediaMod as media  # type: ignore
 import TheKeyMachine.mods.styleMod as style  # type: ignore
@@ -67,8 +65,8 @@ import TheKeyMachine.core.customGraph as cg  # type: ignore
 import TheKeyMachine.mods.updater as updater  # type: ignore
 import TheKeyMachine.core.toolMenus as toolMenus  # type: ignore
 import TheKeyMachine.core.toolbox as toolbox  # type: ignore
-import TheKeyMachine.core.tool_widgets as toolWidgets  # type: ignore
-import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
+import TheKeyMachine.core.toolWidgets as toolWidgets  # type: ignore
+import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
 import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
@@ -81,8 +79,6 @@ from TheKeyMachine.tools import colors as toolColors  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import customDialogs as customDialogs  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
-
-from TheKeyMachine.tooltips import QFlatTooltipManager
 
 
 mods = [

@@ -23,7 +23,7 @@ import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.updater as updater
-import TheKeyMachine.core.tool_widgets as toolWidgets
+import TheKeyMachine.core.toolWidgets as toolWidgets
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
 import TheKeyMachine.widgets.customWidgets as cw
 from TheKeyMachine.widgets import util as wutil
@@ -56,13 +56,19 @@ def _add_toolbox_action(menu, tool_id):
     from TheKeyMachine.core import toolbox
 
     tool = toolbox.get_tool(tool_id)
-    menu.addAction(
+    action = menu.addAction(
         QtGui.QIcon(tool.get("icon") or ""),
-        tool.get("label", tool_id),
-        callback=tool.get("callback"),
+        tool.get("menu_label") or tool.get("label", tool_id),
+        callback=None if tool.get("setting_toggle") else tool.get("callback"),
         tooltip_template=tool.get("tooltip_template"),
         description=tool.get("description") or "",
     )
+    if tool.get("setting_toggle"):
+        spec = toolWidgets.setting_toggle_specs().get(tool_id)
+        if spec:
+            action.toggled.connect(spec["set_checked"])
+            toolWidgets.bind_setting_toggle(action, spec)
+    return action
 
 
 def _add_toolbox_actions(menu, items, source_widget=None):
@@ -172,8 +178,22 @@ def build_custom_scripts_menu(menu, source_widget=None):
     )
 
 
-def build_extra_graph_tools_menu(menu, source_widget=None):
-    menu.addAction("Select object from selected curve", callback=lambda: keyTools.select_objects_from_selected_curves())
+def build_graph_extra_tools_menu(menu, source_widget=None):
+    _add_toolbox_actions(
+        menu,
+        (
+            "graph_select_object_from_curve",
+            "graph_isolate_curves",
+            "separator",
+            "graph_flip",
+            "graph_overlap_forward",
+            "graph_overlap_backward",
+            "separator",
+            "graph_toggle_mute",
+            "graph_toggle_lock",
+        ),
+        source_widget,
+    )
 
 
 def build_share_keys_menu(menu, source_widget=None):
@@ -425,7 +445,7 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
             continue
 
         icon_path = getattr(section, "menu_icon", lambda: None)()
-        label = getattr(section, "menu_label", lambda: "Tools")()
+        label = getattr(section, "menu_label", lambda: "Tools")().replace("&", "&&")
         section_menu = cw.OpenMenuWidget(QtGui.QIcon(icon_path or ""), label)
         section.populate_pinning_menu(section_menu)
         menu.addMenu(section_menu, description="Pin tools in {}.".format(label))
@@ -592,7 +612,7 @@ def should_show_toolbar_pinning_menu(toolbar_widget, pos):
     return child is toolbar_widget
 
 
-def add_main_help_menu(parent_menu):
+def add_other_sources_help_menu(parent_menu):
     help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help")
     parent_menu.addMenu(help_menu, description="Docs, support, and community links.")
     _add_toolbox_actions(help_menu, ("bug_report_window",))
@@ -638,8 +658,6 @@ def add_main_preferences_menu(
 ):
     preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(media.settings_image), "Preferences")
     parent_menu.addMenu(preferences_menu, description="General toolbar options.")
-    setting_toggles = toolWidgets.setting_toggle_specs()
-
     preferences_menu.addSection("Startup")
     preferences_menu.addAction(
         QtGui.QIcon(media.asset_path("tool_icon")),
@@ -673,25 +691,7 @@ def add_main_preferences_menu(
         action.triggered.connect(lambda _checked=False, n=align_name: update_toolbar_icon_alignment(n))
 
     preferences_menu.addSection("Display")
-
-    display_actions = []
-    for spec_key in ("overshoot_sliders", "attribute_switcher_euler_filter", "custom_graph"):
-        spec = setting_toggles[spec_key]
-        action = preferences_menu.addAction(
-            QtGui.QIcon(spec.get("icon") or ""),
-            spec["menu_label"],
-            description=spec.get("description", ""),
-        )
-        action.toggled.connect(spec["set_checked"])
-        toolWidgets.bind_setting_toggle(action, spec)
-        display_actions.append((action, spec))
-
-    def _sync_display_actions():
-        for action, spec in display_actions:
-            toolWidgets.sync_setting_toggle(action, spec)
-
-    parent_menu.aboutToShow.connect(_sync_display_actions)
-    preferences_menu.aboutToShow.connect(_sync_display_actions)
+    _add_toolbox_actions(preferences_menu, ("overshoot_sliders", "attribute_switcher_euler_filter", "custom_graph"))
     return preferences_menu
 
 
@@ -723,7 +723,7 @@ def build_main_settings_menu(
     toolbar_menu.addMenu(build_main_dock_menu(toolbar), description="Move the toolbar to a different Maya area.")
     add_main_system_menu(toolbar, toolbar_menu)
     toolbar_menu.addSeparator()
-    add_main_help_menu(toolbar_menu)
+    add_other_sources_help_menu(toolbar_menu)
     
     _add_toolbox_actions(toolbar_menu, ("donate_window",))
     if internet_connection:
@@ -806,27 +806,7 @@ def build_graph_settings_menu(
 
     menu.addAction(QtGui.QIcon(media.hotkeys_image), "Hotkeys", hotkeys.show_hotkeys_window, description="Manage trigger hotkeys.")
     menu.addSeparator()
-
-    help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help", description="Resources for help and learning.")
-    menu.addMenu(help_menu)
-    help_menu.addAction(
-        QtGui.QIcon(media.discord_image),
-        "Discord Community",
-        lambda: general.open_url("https://discord.gg/G2J5yyjz"),
-        description="Join the community for support.",
-    )
-    help_menu.addAction(
-        QtGui.QIcon(media.help_menu_image),
-        "Knowledge base",
-        lambda: general.open_url("https://thekeymachine.gitbook.io/base"),
-        description="Read the official documentation.",
-    )
-    help_menu.addAction(
-        QtGui.QIcon(media.youtube_image),
-        "Youtube channel",
-        lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"),
-        description="Watch tutorials.",
-    )
+    add_other_sources_help_menu(menu)
 
     menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
     return menu

@@ -111,7 +111,7 @@ def resolve_status_metadata(title="", description="", tooltip_template=None, sta
     )
     resolved_description = status_description
     if resolved_description is None:
-        resolved_description = get_tooltip_summary(tooltip_template) or description or ""
+        resolved_description = description or get_tooltip_summary(tooltip_template) or ""
     return resolved_title, resolved_description
 
 
@@ -179,20 +179,12 @@ def make_undo_chunk_name(tool_id=None, title=None, description="", tooltip_templ
     return format_tool_label(resolved_title, resolved_description)
 
 
-def open_undo_chunk(tool_id=None, title=None, description="", tooltip_template=None):
-    return open_named_undo_chunk(
-        make_undo_chunk_name(
-            tool_id=tool_id,
-            title=title,
-            description=description,
-            tooltip_template=tooltip_template,
-        )
-    )
-
-
-def open_named_undo_chunk(chunk_name):
+def open_undo_chunk(chunk_name=None):
+    kargs = {}
+    if chunk_name:
+        kargs = {"chunkName": chunk_name}
     try:
-        cmds.undoInfo(openChunk=True, chunkName=chunk_name)
+        cmds.undoInfo(openChunk=True, **kargs)
         return True
     except Exception:
         return False

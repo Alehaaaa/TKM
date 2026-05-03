@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.mods.selectionMod as selectionMod
 
 
 @dataclass
@@ -143,7 +143,7 @@ def _ensure_key_between_neighbors(plug, curr):
 
 def resolve_keyframe_targets():
     """Unified entry for resolving attribute plugs and affected times."""
-    plugs, _src, time_range, has_graph_keys = selection_targets.resolve_target_attribute_plugs()
+    plugs, _src, time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
     if not plugs:
         return {}, time_range
 
@@ -151,7 +151,7 @@ def resolve_keyframe_targets():
     affected = {}
     tangent_fs = set()
     if has_graph_keys:
-        tangent_fs = set(float(f) for f in selection_targets.get_graph_editor_selected_tangent_frames())
+        tangent_fs = set(float(f) for f in selectionMod.get_graph_editor_selected_tangent_frames())
 
     for plug in plugs:
         if has_graph_keys:
@@ -170,7 +170,7 @@ def resolve_keyframe_targets():
 
 def resolve_curve_targets():
     """Unified entry for resolving whole curves and affected times."""
-    curves, _src, time_range, has_graph_keys = selection_targets.resolve_target_curves()
+    curves, _src, time_range, has_graph_keys = selectionMod.resolve_target_curves()
     if not curves:
         return [], {}, time_range, has_graph_keys
 

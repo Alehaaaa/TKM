@@ -30,9 +30,9 @@ except ImportError:
     QRegularExpression = QRegExp
     QRegularExpressionValidator = QRegExpValidator
 
-from TheKeyMachine.core.selection_targets import get_selected_objects
+from TheKeyMachine.mods.selectionMod import get_selected_objects
 from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
-from TheKeyMachine.tooltips.tooltip import QFlatTooltipManager
+from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
 import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.generalMod as general
@@ -1114,7 +1114,7 @@ class QFlatSelectorDialog(QFlatToolBarPopupDialog):
 
         # Auto-refresh with Maya selection changes (no manual reload button).
         try:
-            import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
+            import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
 
             runtime.get_runtime_manager().selection_changed.connect(self._schedule_reload)
         except Exception:

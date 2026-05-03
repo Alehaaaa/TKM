@@ -9,8 +9,8 @@ try:
 except ImportError:
     from PySide2 import QtWidgets, QtCore
 
-import TheKeyMachine.core.runtime_manager as runtime
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.core.runtimeManager as runtime
+import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools.selection_sets import api as selectionSetsApi
 from TheKeyMachine.widgets import util as wutil
 
@@ -194,7 +194,7 @@ class SelectionSetsController:
 
     def find_matching_selection_set(self, selection=None):
         if selection is None:
-            selection = selection_targets.get_selected_objects()
+            selection = selectionMod.get_selected_objects()
         return self._find_matching_selection_set(selection)
 
     def show_matching_selection_set_message(self, set_name):
@@ -209,7 +209,7 @@ class SelectionSetsController:
         return sel_set_name
 
     def create_new_set_and_update_buttons(self, color_suffix, set_name_field, *args):
-        selection = selection_targets.get_selected_objects()
+        selection = selectionMod.get_selected_objects()
         if not selection:
             wutil.make_inViewMessage("Select something first")
             return False
@@ -234,8 +234,8 @@ class SelectionSetsController:
         new_set = cmds.sets(name=new_set_name, empty=True)
         cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
 
-        if selection_targets.get_selected_objects():
-            cmds.sets(selection_targets.get_selected_objects(), add=new_set)
+        if selectionMod.get_selected_objects():
+            cmds.sets(selectionMod.get_selected_objects(), add=new_set)
 
         cmds.sets(new_set, add=sel_set_name)
         self.create_buttons_for_sel_sets()
@@ -256,7 +256,7 @@ class SelectionSetsController:
                 cmds.select(set_name)
 
     def add_selection_to_set(self, set_name, *args):
-        selection = selection_targets.get_selected_objects()
+        selection = selectionMod.get_selected_objects()
         if not selection:
             return wutil.make_inViewMessage("No selection to add")
         if not cmds.objExists(set_name):
@@ -264,7 +264,7 @@ class SelectionSetsController:
         cmds.sets(selection, add=set_name)
 
     def remove_selection_from_set(self, set_name, *args):
-        selection = selection_targets.get_selected_objects()
+        selection = selectionMod.get_selected_objects()
         if not selection:
             return wutil.make_inViewMessage("No selection to remove")
         if not cmds.objExists(set_name):
@@ -272,7 +272,7 @@ class SelectionSetsController:
         cmds.sets(selection, remove=set_name)
 
     def update_selection_to_set(self, set_name, *args):
-        selection = selection_targets.get_selected_objects()
+        selection = selectionMod.get_selected_objects()
         if not selection:
             return wutil.make_inViewMessage("No selection to update")
         if not cmds.objExists(set_name):

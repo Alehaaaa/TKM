@@ -22,7 +22,7 @@ import json
 import subprocess
 import os
 import sys
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.mods.selectionMod as selectionMod
 
 
 def load_config():
@@ -171,7 +171,7 @@ def get_copy_worldspace_single_frame_data_folder():
 
 def create_TheKeyMachine_node():
     # Guardar la selección inicial
-    initial_selection = selection_targets.get_selected_objects()
+    initial_selection = selectionMod.get_selected_objects()
 
     tkm_version = get_thekeymachine_version()
     tkm_stage = get_thekeymachine_stage_version()
@@ -204,7 +204,7 @@ def create_TheKeyMachine_node():
 
 def create_ibookmarks_node():
     # Guardar la selección inicial
-    initial_selection = selection_targets.get_selected_objects()
+    initial_selection = selectionMod.get_selected_objects()
 
     if not cmds.objExists("iBookmarks"):
         node = cmds.createNode("transform", name="iBookmarks")

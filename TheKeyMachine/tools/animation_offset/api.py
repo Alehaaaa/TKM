@@ -7,8 +7,8 @@ except Exception:
     from PySide2 import QtCore, QtWidgets
     from shiboken2 import isValid
 
-import TheKeyMachine.core.runtime_manager as runtime
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.core.runtimeManager as runtime
+import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.mods.mediaMod as media
 from TheKeyMachine.tools import colors as toolColors
 from TheKeyMachine.tools import common as toolCommon
@@ -59,12 +59,14 @@ class AnimationOffsetController(QtCore.QObject):
         self._poll_timer = QtCore.QTimer(self)
         self._poll_timer.setInterval(70)
         self._poll_timer.timeout.connect(self._poll)
+        
+        self._chunk_opened = False
 
     def is_enabled(self):
         return self._enabled
 
     def _selection(self):
-        return selection_targets.get_selected_objects(long=True)
+        return selectionMod.get_selected_objects(long=True)
 
     def _selection_signature_value(self, selection=None):
         if selection is None:
@@ -75,10 +77,10 @@ class AnimationOffsetController(QtCore.QObject):
         return int(cmds.currentTime(query=True))
 
     def _resolve_locked_time_range(self):
-        graph_range = selection_targets.get_graph_editor_selected_range()
+        graph_range = selectionMod.get_graph_editor_selected_range()
         if graph_range:
             return graph_range
-        selected_range = selection_targets.get_selected_time_slider_range()
+        selected_range = selectionMod.get_selected_time_slider_range()
         if selected_range:
             return selected_range
         return timelineWidgets.get_playback_range()
@@ -447,7 +449,7 @@ class AnimationOffsetController(QtCore.QObject):
         locked_range = self._resolve_locked_time_range()
         if locked_range:
             self._time_range = locked_range
-        cmds.select(selection_targets.get_selected_objects())
+        cmds.select(selectionMod.get_selected_objects())
         self._connect_runtime_manager()
         self._resnapshot(update_range=self._time_range is None)
         timelineWidgets.show_timeline_tint(
@@ -495,11 +497,12 @@ class AnimationOffsetController(QtCore.QObject):
             button_widget.blockSignals(False)
 
         if checked:
-            toolCommon.open_undo_chunk(tool_id="animation_offset")
+            self._chunk_opened = toolCommon.open_undo_chunk()
             self.activate()
         else:
             self.deactivate()
             try:
-                toolCommon.close_undo_chunk()
+                if self._chunk_opened:
+                    toolCommon.close_undo_chunk()
             except Exception:
                 pass

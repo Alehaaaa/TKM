@@ -7,8 +7,8 @@ try:
 except ImportError:
     from PySide2 import QtCore, QtGui, QtWidgets # type: ignore
 
-import TheKeyMachine.core.runtime_manager as runtime
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.core.runtimeManager as runtime
+import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import colors as toolColors
 from TheKeyMachine.widgets import util as wutil
 
@@ -62,7 +62,7 @@ def get_animation_data_timerange(animation_data, frame_key="keyframes"):
 
 
 def resolve_time_context(default_mode="all_animation"):
-    graph_editor_frames = selection_targets.get_graph_editor_selected_frames()
+    graph_editor_frames = selectionMod.get_graph_editor_selected_frames()
     if graph_editor_frames:
         return TimeContext(
             mode="graph_editor_keys",
@@ -71,7 +71,7 @@ def resolve_time_context(default_mode="all_animation"):
             frames=tuple(graph_editor_frames),
         )
 
-    time_slider_range = selection_targets.get_selected_time_slider_range()
+    time_slider_range = selectionMod.get_selected_time_slider_range()
     if time_slider_range:
         return TimeContext(
             mode="time_slider_range",
@@ -140,7 +140,7 @@ class TimelineTint(QtWidgets.QWidget):
 
     @classmethod
     def get_timeline_widget(cls, full_width=False):
-        timeline_name = selection_targets.get_playback_slider()
+        timeline_name = selectionMod.get_playback_slider()
         ptr = omui.MQtUtil.findControl(timeline_name) or omui.MQtUtil.findLayout(timeline_name) or omui.MQtUtil.findMenuItem(timeline_name)
         if ptr:
             widget = wutil.get_maya_qt(ptr, QtWidgets.QWidget)

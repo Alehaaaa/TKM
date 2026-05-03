@@ -2,7 +2,7 @@ import re
 
 from maya import cmds
 
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.mediaMod as media
@@ -33,7 +33,7 @@ def update_bookmark_list(list_widget, *_args):
 
 
 def create_bookmark(list_widget, *_args):
-    current_selection = selection_targets.get_selected_objects()
+    current_selection = selectionMod.get_selected_objects()
     if not current_selection:
         return
 
@@ -91,7 +91,7 @@ def remove_bookmark(list_widget, *_args):
 
 
 def isolate_bookmark(list_widget=None, bookmark_name=None, *_args):
-    current_selection = selection_targets.get_selected_objects(long=True)
+    current_selection = selectionMod.get_selected_objects(long=True)
 
     if not bookmark_name and list_widget:
         item = cmds.textScrollList(list_widget, query=True, selectItem=True)
@@ -124,7 +124,7 @@ def isolate_bookmark(list_widget=None, bookmark_name=None, *_args):
     if cmds.getPanel(typeOf=current_panel) != "modelPanel":
         current_panel = cmds.playblast(activeEditor=True)
     if cmds.getPanel(typeOf=current_panel) != "modelPanel":
-        return wutil.inViewMessage("Focus on a camera or viewport")
+        return wutil.make_inViewMessage("Focus on a camera or viewport")
 
     current_state = cmds.isolateSelect(current_panel, query=True, state=True)
     cmds.select(selected_objects)
@@ -177,7 +177,7 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
 
 
 def create_ibookmarks_window(*_args):
-    original_selection = selection_targets.get_selected_objects()
+    original_selection = selectionMod.get_selected_objects()
 
     if cmds.window(WINDOW_NAME, exists=True):
         cmds.deleteUI(WINDOW_NAME)

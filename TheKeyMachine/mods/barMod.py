@@ -33,9 +33,6 @@ import sys
 import math
 import importlib
 
-import TheKeyMachine.core.runtime_manager as runtime
-
-
 # ----------------------------------------------------------------------
 
 
@@ -47,79 +44,15 @@ import TheKeyMachine.widgets.customDialogs as customDialogs
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as wutil
-from TheKeyMachine.core import selection_targets
+import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import common as toolCommon
 
-
-python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 
 # -------------------------------------------------------------------------
 
 
 global down_one_level
 down_one_level_var = False
-TEMP_PIVOT_RUNTIME_KEY = "temp_pivot_auto_link"
-MICRO_MOVE_HELPERS_GROUP = "tkm_microMove_helpers"
-
-
-def _build_micro_cursor(image_name):
-    image_path = media.getImage(image_name)
-    pixmap = QtGui.QPixmap(image_path) if image_path else QtGui.QPixmap()
-    if pixmap.isNull():
-        return None
-    return QtGui.QCursor(
-        pixmap.scaled(33, 33, QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation),
-        3,
-        3,
-    )
-
-
-_MICRO_CURSOR_OPEN = _build_micro_cursor("micro_manipulator_open.png")
-_MICRO_CURSOR_PINCHED = _build_micro_cursor("micro_manipulator.png")
-
-
-def _clear_micro_cursor():
-    app = QtWidgets.QApplication.instance()
-    if not app:
-        return
-    try:
-        while app.overrideCursor() is not None:
-            app.restoreOverrideCursor()
-    except Exception:
-        try:
-            app.restoreOverrideCursor()
-        except Exception:
-            pass
-
-
-def _set_micro_cursor(pinched=False):
-    cursor = _MICRO_CURSOR_PINCHED if pinched else _MICRO_CURSOR_OPEN
-    if cursor is None:
-        return
-    _clear_micro_cursor()
-    try:
-        QtWidgets.QApplication.setOverrideCursor(cursor)
-    except Exception:
-        pass
-
-
-def _ensure_micro_move_helpers_group():
-    if not cmds.objExists("TheKeyMachine"):
-        general.create_TheKeyMachine_node()
-
-    if not cmds.objExists(MICRO_MOVE_HELPERS_GROUP):
-        group = cmds.createNode("transform", name=MICRO_MOVE_HELPERS_GROUP)
-    else:
-        group = MICRO_MOVE_HELPERS_GROUP
-
-    try:
-        current_parent = cmds.listRelatives(group, parent=True, fullPath=False) or []
-        if not current_parent or current_parent[0] != "TheKeyMachine":
-            cmds.parent(group, "TheKeyMachine")
-    except Exception:
-        pass
-
-    return group
 
 
 def _active_tint_color(key=None, default=None):
@@ -146,10 +79,6 @@ def openCustomGraph():
 
     importlib.reload(TheKeyMachine.core.customGraph)
     TheKeyMachine.core.customGraph.openCustomGraph()
-
-
-def mod_delete_animation(*args):
-    delete_animation()
 
 
 def delete_animation():
@@ -196,7 +125,7 @@ def delete_animation():
 
 
 def createLocator():
-    selection = selection_targets.get_selected_objects()
+    selection = selectionMod.get_selected_objects()
     if selection:
         # Verificar si el grupo 'TheKeyMachine' existe, si no, crearlo
         if not cmds.objExists("TheKeyMachine"):
@@ -247,44 +176,6 @@ def deleteTempLocators(*args):
 
 
 # ___________________________ Set Tangets _______________________________________
-
-
-def getSelectedCurves():
-    curveNames = []
-
-    # get the current selection list
-    selectionList = om.MSelectionList()
-    om.MGlobal.getActiveSelectionList(selectionList)
-
-    # filter through the anim curves
-    listIter = om.MItSelectionList(selectionList, om.MFn.kAnimCurve)
-    while not listIter.isDone():
-        # Retrieve current item's MObject
-        mobj = om.MObject()
-        listIter.getDependNode(mobj)
-
-        # Convert MObject to MFnDependencyNode
-        depNodeFn = om.MFnDependencyNode(mobj)
-        curveName = depNodeFn.name()
-
-        curveNames.append(curveName)
-        listIter.next()
-
-    return curveNames
-
-
-def get_graph_editor_selected_keyframes():
-    anim_curves = cmds.keyframe(q=True, selected=True, name=True)
-    if not anim_curves:
-        return []
-
-    selected_frames = set(selection_targets.get_graph_editor_selected_frames())
-    keyframes = []
-    for curve in anim_curves:
-        curve_frames = cmds.keyframe(curve, q=True, selected=True) or []
-        keyframes.extend((curve, frame) for frame in curve_frames if int(frame) in selected_frames)
-
-    return keyframes
 
 
 def _set_tangent_on_target(target, tangent_type, time_range, handle_mode="both"):
@@ -351,8 +242,8 @@ def _collect_target_curves(target_info):
 
 
 def _resolve_tangent_target_info():
-    target_objects = selection_targets.get_selected_objects(orderedSelection=True, long=False)
-    selected_channels = selection_targets.get_selected_channels() or []
+    target_objects = selectionMod.get_selected_objects(orderedSelection=True, long=False)
+    selected_channels = selectionMod.get_selected_channels() or []
 
     target_plugs = []
     selected_curves = []
@@ -428,7 +319,7 @@ def _collect_tangent_targets(key_scope="selection"):
 
     selected_keyframes = []
     if key_scope != "all" and time_context.mode == "graph_editor_keys":
-        selected_keyframes = get_graph_editor_selected_keyframes()
+        selected_keyframes = selectionMod.get_graph_editor_selected_keyframes()
 
     if selected_keyframes:
         frames_by_curve = {}
@@ -478,7 +369,7 @@ def setTangent(tangent_type, handle_mode="both", key_scope="selection", tint_col
 
 def align_selected_objects(*args, pos=True, rot=True, scl=False):
     # Obtener los objetos seleccionados
-    sel = selection_targets.get_selected_objects()
+    sel = selectionMod.get_selected_objects()
 
     # Asegurarse de que hay al menos dos objetos seleccionados
     if len(sel) < 2:
@@ -496,7 +387,7 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False):
 
     try:
         # Obtener el rango de tiempo seleccionado
-        time_range = keyTools.get_time_range_selected()
+        time_range = selectionMod.get_selected_time_slider_range()
 
         # Crear una barra de progreso
         gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
@@ -537,10 +428,6 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False):
         cmds.refresh(suspend=False)
 
 
-def align_range(*args):
-    align_selected_objects(*args)
-
-
 # ___________________________ iso Rig _____________________________________
 
 
@@ -576,10 +463,10 @@ def isolate_master():
     down_one_level = down_one_level_var
 
     # Guardar la selección actual
-    current_selection = selection_targets.get_selected_objects()
+    current_selection = selectionMod.get_selected_objects()
 
     # Obtener los objetos actualmente seleccionados
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
     currentPanel = cmds.getPanel(wf=True)
     if not currentPanel or cmds.getPanel(typeOf=currentPanel) != "modelPanel":
         visible_model_panels = cmds.getPanel(visiblePanels=True) or []
@@ -761,277 +648,14 @@ def select_curves_with_ctrl(obj):
 
 def selectHierarchy():
     # Obtener la selección actual
-    selection = selection_targets.get_selected_objects()
+    selection = selectionMod.get_selected_objects()
 
     if selection:
         for obj in selection:
             select_curves_with_ctrl(obj)
 
 
-# ---------------------------------------------------  TEMP PIVOT ------------------------------------------------------#
-
-
-def create_temp_pivot(use_saved_position=False, *args):
-    seleccion = selection_targets.get_selected_objects()
-
-    if not seleccion:
-        return
-
-    if cmds.objExists("tkm_temp_pivot"):
-        cmds.warning("Temp Pivot already exists. Please unselect the current object to remove it")
-        return
-
-    def get_temp_pivot_relation():
-        temp_pivot_tooltip = helper.temp_pivot_last_tooltip_text if use_saved_position else helper.temp_pivot_tooltip_text
-        toolCommon.open_undo_chunk(tool_id="temp_pivot", tooltip_template=temp_pivot_tooltip)
-
-        matrix_file_path = general.get_temp_pivot_data_file()
-
-        seleccion = selection_targets.get_selected_objects()
-
-        if not seleccion:
-            return wutil.make_inViewMessage("Select at least one object")
-
-        general.create_TheKeyMachine_node()
-
-        # 1. Crear el nodo transform
-        toolCommon.open_undo_chunk(tool_id="temp_pivot", tooltip_template=temp_pivot_tooltip)
-        temp_pivot_obj = cmds.createNode("transform", name="tkm_temp_pivot")
-        cmds.parent("tkm_temp_pivot", "TheKeyMachine")
-
-        if use_saved_position:
-            if os.path.exists(matrix_file_path):
-                with open(matrix_file_path, "r") as f:
-                    data = json.load(f)
-                saved_position = data.get("tkm_temp_pivot_position", [0, 0, 0])
-                saved_rotation = data.get("tkm_temp_pivot_rotation", [0, 0, 0])
-
-                cmds.setAttr(f"{temp_pivot_obj}.translateX", saved_position[0])
-                cmds.setAttr(f"{temp_pivot_obj}.translateY", saved_position[1])
-                cmds.setAttr(f"{temp_pivot_obj}.translateZ", saved_position[2])
-
-                cmds.setAttr(f"{temp_pivot_obj}.rotateX", saved_rotation[0])
-                cmds.setAttr(f"{temp_pivot_obj}.rotateY", saved_rotation[1])
-                cmds.setAttr(f"{temp_pivot_obj}.rotateZ", saved_rotation[2])
-            else:
-                cmds.warning("Saved temp pivot data not found!")
-        else:
-            # Calcula la posición basada en la selección
-            total_x, total_y, total_z = 0, 0, 0
-            for obj in seleccion:
-                pos = cmds.xform(obj, query=True, translation=True, worldSpace=True)
-                total_x += pos[0]
-                total_y += pos[1]
-                total_z += pos[2]
-
-            num_objs = len(seleccion)
-            mid_x = total_x / num_objs
-            mid_y = total_y / num_objs
-            mid_z = total_z / num_objs
-
-            # Establecer la posición de tkm_temp_pivot en el punto medio
-            cmds.setAttr(f"{temp_pivot_obj}.translateX", mid_x)
-            cmds.setAttr(f"{temp_pivot_obj}.translateY", mid_y)
-            cmds.setAttr(f"{temp_pivot_obj}.translateZ", mid_z)
-
-        follow_objs = seleccion  # Todos los objetos seleccionados serán follow_objs
-        save_dict = {"temp_pivot_obj": temp_pivot_obj, "follow_temp_pivot_objs": {}}
-
-        for follow_obj in follow_objs:
-            main_matrix = cmds.xform(temp_pivot_obj, query=True, matrix=True, worldSpace=True)
-            follow_matrix = cmds.xform(follow_obj, query=True, matrix=True, worldSpace=True)
-
-            main_mmatrix = om.MMatrix(main_matrix)
-            follow_mmatrix = om.MMatrix(follow_matrix)
-
-            relative_matrix = follow_mmatrix * main_mmatrix.inverse()
-
-            # Guardar la matriz relativa en el diccionario
-            save_dict["follow_temp_pivot_objs"][follow_obj] = [relative_matrix.getElement(i, j) for i in range(4) for j in range(4)]
-
-        # Guardar el diccionario en un archivo JSON
-        matrix_file_folder = general.get_temp_pivot_data_folder()
-        os.makedirs(matrix_file_folder, exist_ok=True)
-        with open(matrix_file_path, "w") as f:
-            json.dump(save_dict, f)
-
-        cmds.select(temp_pivot_obj)
-        get_c_Ctx = cmds.currentCtx()
-
-        if get_c_Ctx == "selectSuperContext":
-            cmds.setToolTo("moveSuperContext")
-        cmds.select(temp_pivot_obj)
-        cmds.ctxEditMode()
-
-    def load_temp_pivot_data():
-        global temp_pivot_relative_data
-
-        # Rutas
-
-        matrix_file_path = general.get_temp_pivot_data_file()
-
-        # Verificar si el archivo existe
-        if not os.path.exists(matrix_file_path):
-            cmds.warning("Error, need temp pivot data first")
-            return
-
-        # Leer el diccionario del archivo JSON
-        with open(matrix_file_path, "r") as f:
-            temp_pivot_relative_data = json.load(f)
-
-    def set_temp_pivot_relation():
-        global temp_pivot_relative_data
-
-        temp_pivot_obj = temp_pivot_relative_data.get("temp_pivot_obj")
-        follow_temp_pivot_objs = temp_pivot_relative_data.get("follow_temp_pivot_objs", {})
-
-        seleccion = selection_targets.get_selected_objects()
-        if not seleccion:
-            return wutil.make_inViewMessage("Select at least one object")
-
-        if temp_pivot_obj in seleccion:
-            follow_objs = list(follow_temp_pivot_objs.keys())
-        else:
-            follow_objs = seleccion
-
-        for follow_obj in follow_objs:
-            if follow_obj in follow_temp_pivot_objs:
-                relative_matrix_list = follow_temp_pivot_objs[follow_obj]
-                relative_matrix = om.MMatrix()
-                for i in range(4):
-                    for j in range(4):
-                        relative_matrix.setElement(i, j, relative_matrix_list[i * 4 + j])
-
-                main_matrix = cmds.xform(temp_pivot_obj, query=True, matrix=True, worldSpace=True)
-                main_mmatrix = om.MMatrix(main_matrix)
-
-                new_follow_matrix = relative_matrix * main_mmatrix
-                new_follow_matrix_list = [new_follow_matrix.getElement(i, j) for i in range(4) for j in range(4)]
-
-                cmds.xform(follow_obj, matrix=new_follow_matrix_list, worldSpace=True)
-
-            else:
-                cmds.warning(f"There is not temp pivot data for {follow_obj}")
-
-    get_temp_pivot_relation()
-
-    def add_callbacks_link():
-        global process_callback
-
-        process_callback = True
-        manager = runtime.get_runtime_manager()
-        manager.disconnect_callbacks(TEMP_PIVOT_RUNTIME_KEY)
-
-        temp_pivot_obj_name = "tkm_temp_pivot"
-        attribute_cb = manager.add_node_attribute_changed_callback(
-            temp_pivot_obj_name, attribute_callback_function, key=TEMP_PIVOT_RUNTIME_KEY
-        )
-        time_cb = manager.connect_signal(manager.time_changed, time_callback_function, key=TEMP_PIVOT_RUNTIME_KEY, unique=False)
-        if attribute_cb is None or not time_cb:
-            manager.disconnect_callbacks(TEMP_PIVOT_RUNTIME_KEY)
-            raise RuntimeError("Could not register temp pivot callbacks")
-
-    def remove_callbacks_link():
-        try:
-            runtime.get_runtime_manager().disconnect_callbacks(TEMP_PIVOT_RUNTIME_KEY)
-        except Exception as e:
-            import TheKeyMachine.mods.reportMod as report
-
-            report.report_detected_exception(e, context="temp pivot callback cleanup")
-
-    def attribute_callback_function(msg, plug, otherPlug, clientData):
-        global process_callback
-
-        if not process_callback:
-            return
-
-        if msg & om.MNodeMessage.kAttributeSet:
-            process_callback = False
-            set_temp_pivot_relation()
-            process_callback = True
-
-    def time_callback_function(clientData):
-        global process_callback
-        if not process_callback:
-            return
-        process_callback = False
-        set_temp_pivot_relation()  # Llamada a tu función set_matrix
-        process_callback = True
-
-    load_temp_pivot_data()
-    add_callbacks_link()
-
-    def update_temp_pivot_transform_in_file(position, rotation):
-        matrix_file_path = general.get_temp_pivot_data_file()
-
-        # Cargar datos actuales
-        with open(matrix_file_path, "r") as f:
-            data = json.load(f)
-
-        # Actualizar la posición de "tkm_temp_pivot"
-        data["tkm_temp_pivot_position"] = position
-        data["tkm_temp_pivot_rotation"] = rotation
-
-        # Guardar datos actualizados
-        with open(matrix_file_path, "w") as f:
-            json.dump(data, f)
-
-    def temp_pivot_scriptJob_SelectionChanged():
-        if not cmds.objExists("tkm_temp_pivot"):
-            return
-        else:
-            # Crear un locator y hacer matchTransform a tkm_temp_pivot
-            locator = cmds.spaceLocator()[0]
-            cmds.matchTransform(locator, "tkm_temp_pivot")
-
-            # Obtener la posición y rotación del locator
-            position = cmds.xform(locator, query=True, translation=True, worldSpace=True)
-            rotation = cmds.xform(locator, query=True, rotation=True, worldSpace=True)
-
-            # Guardar la posición y rotación en el archivo
-            update_temp_pivot_transform_in_file(position, rotation)
-
-            # Remover los callbacks y eliminar los objetos
-            remove_callbacks_link()
-            cmds.delete("tkm_temp_pivot")
-            cmds.delete(locator)
-
-            toolCommon.close_undo_chunk()
-            toolCommon.close_undo_chunk()
-
-    import TheKeyMachine.core.runtime_manager as runtime  # type: ignore
-
-    cb_id = runtime.get_runtime_manager().add_maya_event_callback(
-        "SelectionChanged",
-        temp_pivot_scriptJob_SelectionChanged,
-        key="temp_pivot_selection_changed",
-        one_shot=True,
-    )
-    if cb_id is None:
-        raise RuntimeError("TKM RuntimeManager failed to register temp pivot SelectionChanged callback")
-
-
 # ---------------------------------------------------  COPY/PASTE WORLDSPACE ANIMATION  ------------------------------------------------------#
-
-
-def mod_worldspace_copy_animation(*args):
-    # Get the current state of the modifiers
-    mods = runtime.get_modifier_mask()
-    shift_pressed = bool(mods & 1)
-
-    if shift_pressed:
-        color_worldspace_paste_animation()
-    else:
-        color_worldspace_copy_animation()
-
-
-def color_worldspace_copy_animation(*args):
-    cmds.evalDeferred(worldspace_copy_animation)
-
-
-def color_worldspace_paste_animation(*args):
-    cmds.evalDeferred(worldspace_paste_animation)
-
 
 def worldspace_copy_animation(*args):
     target_info = keyTools.resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=False)
@@ -1228,7 +852,7 @@ def copy_range_worldspace_animation(*args):
 
 
 def copy_worldspace_single_frame(*args):
-    selected_objects = selection_targets.get_selected_objects(orderedSelection=True)
+    selected_objects = selectionMod.get_selected_objects(orderedSelection=True)
     if not selected_objects:
         return
 
@@ -1272,18 +896,13 @@ def paste_worldspace_single_frame(*args):
     chunk_opened = False
     tint_session = None
     try:
-        toolCommon.open_undo_chunk(tool_id="paste_worldspace_single_frame")
-        chunk_opened = True
-    except Exception:
-        pass
+        chunk_opened = toolCommon.open_undo_chunk()
 
-    # Rutas
-    worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
+        # Rutas
+        worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
 
-    try:
         if not os.path.exists(worldspace_anim_data_file):
-            cmds.warning("No World Space data found")
-            return
+            return cmds.warning("No World Space data found")
 
         with open(worldspace_anim_data_file, "r") as json_file:
             payload = json.load(json_file)
@@ -1312,7 +931,7 @@ def paste_worldspace_single_frame(*args):
                 key="ws_paste_frame",
             )
 
-        target_objects = selection_targets.get_selected_objects(orderedSelection=True)
+        target_objects = selectionMod.get_selected_objects(orderedSelection=True)
 
         # No selection: paste back to the originally copied objects (if they still exist)
         if not target_objects:
@@ -1368,86 +987,15 @@ def paste_worldspace_single_frame(*args):
                 pass
 
 
-# def worldspace_paste_animation(*args):
-#     original_time = cmds.currentTime(query=True)
-
-#     # Rutas
-#     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
-
-#     if not os.path.exists(worldspace_anim_data_file):
-#         return wutil.make_inViewMessage("No World Space animation data found")
-
-#     with open(worldspace_anim_data_file, "r") as json_file:
-#         payload = json.load(json_file)
-
-#     # Filtrar solo objetos existentes en la escena
-#     if isinstance(payload, dict) and "data" in payload:
-#         animation_data = payload.get("data") or {}
-#     else:
-#         animation_data = payload or {}
-#     existing_objects = {obj: data for obj, data in animation_data.items() if cmds.objExists(obj)}
-
-#     if not existing_objects:
-#         cmds.warning("Objects not found in the scene. Animation paste aborted")
-#         return
-
-#     # Eliminar animación previa de los objetos existentes
-#     for obj in existing_objects.keys():
-#         cmds.cutKey(obj, attribute=["tx", "ty", "tz", "rx", "ry", "rz"])
-
-#     # Obtener todos los frames únicos donde hay animación
-#     all_frames = sorted(set(frame for obj_data in existing_objects.values() for frame in obj_data.keys()), key=int)
-
-#     # Suspender la actualización de la vista
-#     cmds.refresh(suspend=True)
-
-#     # Crear barra de progreso
-#     gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
-#     cmds.progressBar(
-#         gMainProgressBar,
-#         edit=True,
-#         beginProgress=True,
-#         isInterruptable=True,
-#         status="Pasting World Space animation...",
-#         maxValue=len(all_frames),
-#     )
-
-#     try:
-#         for frame in all_frames:
-#             cmds.progressBar(gMainProgressBar, edit=True, step=1)
-#             if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
-#                 break
-
-#             cmds.currentTime(frame)
-#             for obj, obj_data in existing_objects.items():
-#                 if frame in obj_data:
-#                     values = obj_data[frame]
-#                     cmds.xform(obj, translation=values[:3], worldSpace=True)
-#                     cmds.xform(obj, rotation=values[3:], worldSpace=True)
-#                     cmds.setKeyframe(obj)
-
-#     finally:
-#         cmds.filterCurve(list(existing_objects.keys()))  # Filtrar solo los objetos válidos
-#         cmds.refresh(suspend=False)
-#         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
-#         cmds.currentTime(original_time)
-#         pass
-
-
-# Override: selection-aware World Space animation paste
 def worldspace_paste_animation(*args):
     chunk_opened = False
     tint_session = None
-    try:
-        toolCommon.open_undo_chunk(title="Paste World Space Animation", tooltip_template=helper.paste_worldspace_animation_tooltip_text)
-        chunk_opened = True
-    except Exception:
-        pass
 
     original_time = cmds.currentTime(query=True)
-
     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
+
     try:
+        chunk_opened = toolCommon.open_undo_chunk()
         if not os.path.exists(worldspace_anim_data_file):
             return wutil.make_inViewMessage("No World Space animation data found")
 
@@ -1467,7 +1015,7 @@ def worldspace_paste_animation(*args):
         if not ordered_sources:
             return wutil.make_inViewMessage("No World Space animation data found")
 
-        target_objects = selection_targets.get_selected_objects(orderedSelection=True)
+        target_objects = selectionMod.get_selected_objects(orderedSelection=True)
 
         # No selection: paste back to the originally copied objects (if they still exist)
         if not target_objects:
@@ -1573,27 +1121,8 @@ def worldspace_paste_animation(*args):
 
 # ____________________________________ Tracer _______________________________________________
 
-
-def mod_tracer(*args):
-    # Get the current state of the modifiers
-    mods = runtime.get_modifier_mask()
-
-    shift_pressed = bool(mods & 1)
-    ctrl_pressed = bool(mods & 4)
-    alt_pressed = bool(mods & 8)
-
-    if shift_pressed:
-        tracer_refresh()
-    elif ctrl_pressed and not alt_pressed:
-        tracer_show_hide()
-    elif ctrl_pressed and alt_pressed:
-        remove_tracer_node()
-    else:
-        create_tracer()
-
-
 def create_tracer(*args):
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
 
     # Verificar si hay exactamente un objeto seleccionado.
     if len(selected_objects) != 1:
@@ -1607,7 +1136,7 @@ def create_tracer(*args):
     if cmds.objExists("TKM_Tracer"):
         cmds.delete("TKM_Tracer")
 
-    selected_objects_start = selection_targets.get_selected_objects()
+    selected_objects_start = selectionMod.get_selected_objects()
     cmds.createNode("transform", name="TKM_Tracer")
     cmds.parent("TKM_Tracer", "TheKeyMachine")
 
@@ -1617,7 +1146,7 @@ def create_tracer(*args):
 
     cmds.select(selected_objects_start)
 
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
 
     if not selected_objects:
         return wutil.make_inViewMessage("Select an object to trace")
@@ -1723,7 +1252,7 @@ def create_follow_cam(translation=True, rotation=True, *args):
     global followCam_original_camera
 
     # Obtén el objeto seleccionado en la escena
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
 
     # Verifica si existe el grupo "TheKeyMachine"
     if not cmds.objExists("TheKeyMachine"):
@@ -1806,7 +1335,7 @@ def remove_followCam(*args):
 
 def selector_window(*args):
     # Check if anything is selected first
-    if not selection_targets.get_selected_objects():
+    if not selectionMod.get_selected_objects():
         return
 
     # Search for an existing instance of the selector window
@@ -1829,7 +1358,7 @@ def select_objects_from_list(list_name, *args):
 
 
 def reload_selected_objects(list_name, *args):
-    selected_objects = selection_targets.get_selected_objects()
+    selected_objects = selectionMod.get_selected_objects()
     sorted_objects = sorted(selected_objects)
 
     # Borrar los elementos actuales en la lista
@@ -1856,7 +1385,7 @@ def select_rig_controls(*args):
                 curves += find_curves(child)
         return curves
 
-    selected = selection_targets.get_selected_objects(long=True)
+    selected = selectionMod.get_selected_objects(long=True)
 
     if not selected:
         return
@@ -1955,7 +1484,7 @@ def select_rig_controls_animated(*args):
         cache[node] = False
         return False
 
-    selected = selection_targets.get_selected_objects(long=True)
+    selected = selectionMod.get_selected_objects(long=True)
 
     if not selected:
         return
@@ -2061,7 +1590,7 @@ class MouseDragger(object):
 
     def onPress(self):
         self.anchorPoint = cmds.draggerContext(self.draggerContext, query=True, anchorPoint=True)
-        toolCommon.open_undo_chunk(title="Depth Mover", tooltip_template=helper.depth_mover_tooltip_text)
+        self.chunk_opened = toolCommon.open_undo_chunk()
 
     def onDrag(self):
         dragPoint = cmds.draggerContext(self.draggerContext, query=True, dragPoint=True)
@@ -2071,8 +1600,9 @@ class MouseDragger(object):
         cmds.refresh()
 
     def onRelease(self):
-        toolCommon.close_undo_chunk()
         cmds.setToolTo("selectSuperContext")
+        if self.chunk_opened:
+            toolCommon.close_undo_chunk()
 
     def performDrag(self):
         pass
@@ -2090,7 +1620,7 @@ class DepthControlDragger(MouseDragger):
             om.MGlobal.displayWarning("No camera found.")
             return
 
-        sel = selection_targets.get_selected_objects()
+        sel = selectionMod.get_selected_objects()
         if not sel:
             om.MGlobal.displayWarning("Please select an object.")
             return
@@ -2125,11 +1655,13 @@ ROTATE_ORDERS = ["xyz", "yzx", "zxy", "xzy", "yxz", "zyx"]
 
 
 class UndoSetup:
+    chunk_opened = False
     def __enter__(self):
-        toolCommon.open_undo_chunk(title="Gimbal Fixer", tooltip_template=helper.gimbal_fixer_tooltip_text)
+        self.chunk_opened = toolCommon.open_undo_chunk()
 
     def __exit__(self, *args):
-        toolCommon.close_undo_chunk()
+        if self.chunk_opened:
+            toolCommon.close_undo_chunk()
 
 
 class StopRefresh:
@@ -2146,14 +1678,14 @@ def gimbal_fixer_window(*args):
 
     main_window = gimbal_fixer_build()
 
-    if selection_targets.get_selected_objects():  # Verifica si hay una selección
+    if selectionMod.get_selected_objects():  # Verifica si hay una selección
         update_rotation_order(main_window)  # Ejecuta el botón "Reload"
     else:
         wutil.make_inViewMessage("Select a control and reload")
 
 
 def update_rotation_order(window):
-    sel = selection_targets.get_selected_objects()
+    sel = selectionMod.get_selected_objects()
     if not sel:
         return wutil.make_inViewMessage("Select a control")
 
@@ -2262,7 +1794,7 @@ def convert_rotation_order(rot_order="zxy"):
         om.MGlobal.displayWarning("Wrong rotation order " + str(rot_order))
         return
 
-    sel = selection_targets.get_selected_objects()
+    sel = selectionMod.get_selected_objects()
 
     if not sel:
         om.MGlobal.displayWarning("Please select a control.")
@@ -2641,398 +2173,6 @@ def gimbal_fixer_build():
 
     window.show()
     return window
-
-
-# _________________________________ MICRO MOVE ________________________________________________________
-
-
-micro_move_selected_objects = []
-micro_move_callback_ids = []
-micro_move_drivers = []
-micro_move_animation_data = {}
-
-
-def micro_move_copy_animation(object_name, attributes):
-    global micro_move_animation_data
-
-    if object_name not in micro_move_animation_data:
-        micro_move_animation_data[object_name] = {}  # Inicializar un diccionario vacío para el objeto
-
-    for attribute in attributes:
-        keyframes = cmds.keyframe(object_name, attribute=attribute, query=True, timeChange=True)
-        if keyframes:
-            micro_move_animation_data[object_name][attribute] = {}
-            for frame in keyframes:
-                value = cmds.getAttr("{}.{}".format(object_name, attribute), time=frame)
-                micro_move_animation_data[object_name][attribute][frame] = value
-        else:
-            pass
-
-
-def micro_move_paste_animation(object_name):
-    global micro_move_animation_data
-
-    # Verificar si el objeto tiene datos de animación guardados
-    if object_name in micro_move_animation_data:
-        for attribute, frames in micro_move_animation_data[object_name].items():
-            for frame, value in frames.items():
-                # Establecer el valor del atributo en el frame específico
-                cmds.setKeyframe(object_name, attribute=attribute, time=(frame,), value=value)
-    else:
-        pass
-
-
-def micro_move_attribute_callback_function(msg, plug, other_plug, client_data):
-    if msg & om.MNodeMessage.kAttributeSet:
-        driver_name = client_data
-        attr_name = plug.partialName()
-        duplicated_name = f"{driver_name.replace('_driver', '_connect')}.{attr_name}"
-        driver_value = cmds.getAttr(plug.name())
-
-        if isinstance(driver_value, list) or isinstance(driver_value, tuple):
-            modified_values = [value / 6 for value in driver_value[0]]
-            cmds.setAttr(duplicated_name, *modified_values, type="double3")
-        else:
-            cmds.setAttr(duplicated_name, driver_value / 6)
-
-
-def add_micro_move_callback(object_name):
-    selection_list = om.MSelectionList()
-    selection_list.add(object_name)
-    mobject = om.MObject()
-    selection_list.getDependNode(0, mobject)
-
-    callback_id = om.MNodeMessage.addAttributeChangedCallback(mobject, micro_move_attribute_callback_function, object_name)
-    micro_move_callback_ids.append(callback_id)
-
-
-def micro_move_pre_drag(*args):
-    global micro_move_selected_objects, micro_move_drivers
-
-    toolCommon.open_undo_chunk(tool_id="micro_move")
-    _set_micro_cursor(pinched=True)
-
-    micro_move_selected_objects = selection_targets.get_selected_objects()
-    if not micro_move_selected_objects:
-        raise Exception("Please select an object")
-    original_selection = list(micro_move_selected_objects)
-
-    transform_attrs = ["translateX", "translateY", "translateZ"]
-    helpers_group = _ensure_micro_move_helpers_group()
-
-    for selected in micro_move_selected_objects:
-        for attr in transform_attrs:
-            micro_move_copy_animation(selected, transform_attrs)
-
-    for selected in micro_move_selected_objects:
-        duplicated = cmds.duplicate(selected, name=f"{selected}_connect", parentOnly=True)[0]
-        driver = cmds.duplicate(selected, name=f"{selected}_driver", parentOnly=True)[0]
-        try:
-            cmds.parent(duplicated, helpers_group)
-        except Exception:
-            pass
-        try:
-            cmds.parent(driver, helpers_group)
-        except Exception:
-            pass
-        micro_move_drivers.append(driver)
-
-        # Desactivar los límites de transformación para el driver
-        for attr in transform_attrs:
-            cmds.transformLimits(driver, e=True, tx=(0, 0), etx=(False, False))
-            cmds.transformLimits(driver, e=True, ty=(0, 0), ety=(False, False))
-            cmds.transformLimits(driver, e=True, tz=(0, 0), etz=(False, False))
-
-        for attr in transform_attrs:
-            if not cmds.getAttr(f"{selected}.{attr}", lock=True):
-                original_value = cmds.getAttr(f"{selected}.{attr}")
-                new_value = original_value * 6
-                cmds.setAttr(f"{driver}.{attr}", new_value)
-
-        for attr in transform_attrs:
-            if cmds.getAttr(f"{selected}.{attr}", se=True):  # se = settable
-                cmds.connectAttr(f"{duplicated}.{attr}", f"{selected}.{attr}", force=True)
-
-        add_micro_move_callback(driver)
-
-    if original_selection:
-        cmds.select(original_selection, replace=True)
-    micro_move_drivers.clear()
-
-
-def micro_move_post_drag():
-    global micro_move_selected_objects, micro_move_animation_data
-    _set_micro_cursor(pinched=False)
-
-    for selected in micro_move_selected_objects:
-        duplicate_name = f"{selected}_connect"
-        if cmds.objExists(duplicate_name):
-            translate_values = {}
-            for attr in ["translateX", "translateY", "translateZ"]:
-                # Verificar si el atributo es settable antes de intentar leerlo
-                if cmds.getAttr(f"{duplicate_name}.{attr}", se=True):
-                    translate_values[attr] = cmds.getAttr(f"{duplicate_name}.{attr}")
-            cmds.delete(duplicate_name)
-        else:
-            translate_values = {"translateX": 0, "translateY": 0, "translateZ": 0}
-            cmds.delete(duplicate_name)
-
-        driver_name = f"{selected}_driver"
-        if cmds.objExists(driver_name):
-            cmds.delete(driver_name)
-
-        # current_frame = cmds.currentTime(query=True)
-        micro_move_paste_animation(selected)
-
-        for attr, value in translate_values.items():
-            # Nuevamente verificar si el atributo es settable antes de intentar modificarlo
-            if cmds.getAttr(f"{selected}.{attr}", se=True):
-                cmds.setAttr(f"{selected}.{attr}", value)
-
-    remove_micro_move_callbacks()
-    micro_move_animation_data.clear()
-    if micro_move_selected_objects:
-        cmds.select(micro_move_selected_objects)
-
-    toolCommon.close_undo_chunk()
-
-
-def remove_micro_move_callbacks():
-    global micro_move_callback_ids
-    for id in micro_move_callback_ids:
-        om.MMessage.removeCallback(id)
-    micro_move_callback_ids = []
-
-
-def micro_move_post_drag_deferred(*args):
-    cmds.evalDeferred(micro_move_post_drag)
-
-
-# _________________________________ MICRO ROTATE ________________________________________________________
-
-
-micro_rotate_callback_ids = []  # Lista para almacenar los IDs de los callbacks
-micro_rotate_selected_objects = []
-micro_rotate_drivers = []
-micro_rotate_connects = []
-micro_rotate_animation_data = {}
-
-
-def micro_rotate_copy_animation(object_name, attributes):
-    global micro_rotate_animation_data
-
-    if object_name not in micro_rotate_animation_data:
-        micro_rotate_animation_data[object_name] = {}  # Inicializar un diccionario vacío para el objeto
-
-    for attribute in attributes:
-        keyframes = cmds.keyframe(object_name, attribute=attribute, query=True, timeChange=True)
-        if keyframes:
-            micro_rotate_animation_data[object_name][attribute] = {}
-            for frame in keyframes:
-                value = cmds.getAttr("{}.{}".format(object_name, attribute), time=frame)
-                micro_rotate_animation_data[object_name][attribute][frame] = value
-        else:
-            pass
-
-
-def micro_rotate_paste_animation(object_name):
-    global micro_rotate_animation_data
-
-    # Verificar si el objeto tiene datos de animación guardados
-    if object_name in micro_rotate_animation_data:
-        for attribute, frames in micro_rotate_animation_data[object_name].items():
-            for frame, value in frames.items():
-                # Establecer el valor del atributo en el frame específico
-                cmds.setKeyframe(object_name, attribute=attribute, time=(frame,), value=value)
-    else:
-        pass
-
-
-def micro_rotate_pack_funtion():
-    global micro_rotate_selected_objects, micro_rotate_drivers, micro_rotate_connects
-
-    def add_micro_rotate_callback(source_object, target_object):
-        selection_list = om.MSelectionList()
-        selection_list.add(source_object)
-        mobject = om.MObject()
-        selection_list.getDependNode(0, mobject)
-
-        def add_micro_rotate_dirty_callback(mobject, plug, client_data):
-            if plug.partialName() in ("r", "rx", "ry", "rz"):
-                rotation = cmds.getAttr(f"{source_object}.rotate")[0]  # Devuelve una tupla
-                half_rotation = [value / 6 for value in rotation]
-                cmds.rotate(half_rotation[0], half_rotation[1], half_rotation[2], target_object, absolute=True)
-
-        callback_id = om.MNodeMessage.addNodeDirtyPlugCallback(mobject, add_micro_rotate_dirty_callback, None)
-        micro_rotate_callback_ids.append(callback_id)
-
-    def remove_micro_rotate_callbacks():
-        global micro_rotate_callback_ids
-        for id in micro_rotate_callback_ids:
-            om.MMessage.removeCallback(id)
-        micro_rotate_callback_ids = []  # Limpiar la lista después de eliminar los callbacks
-
-    micro_rotate_selected_objects = selection_targets.get_selected_objects()
-    original_selection = list(micro_rotate_selected_objects)
-    helpers_group = _ensure_micro_move_helpers_group()
-
-    transform_attrs = ["rotateX", "rotateY", "rotateZ"]
-    for selected in micro_rotate_selected_objects:
-        for attr in transform_attrs:
-            micro_rotate_copy_animation(selected, transform_attrs)
-
-    for selected in micro_rotate_selected_objects:
-        connect = cmds.duplicate(selected, name=f"{selected}_connect", parentOnly=True)[0]
-        driver = cmds.duplicate(selected, name=f"{selected}_driver", parentOnly=True)[0]
-        try:
-            cmds.parent(connect, helpers_group)
-        except Exception:
-            pass
-        try:
-            cmds.parent(driver, helpers_group)
-        except Exception:
-            pass
-        micro_rotate_drivers.append(driver)
-
-        # Desactivar los límites de transformación para el driver
-        for attr in transform_attrs:
-            cmds.transformLimits(driver, e=True, rx=(0, 0), erx=(False, False))
-            cmds.transformLimits(driver, e=True, ry=(0, 0), ery=(False, False))
-            cmds.transformLimits(driver, e=True, rz=(0, 0), erz=(False, False))
-
-        transform_attrs = ["rotateX", "rotateY", "rotateZ"]
-        for attr in transform_attrs:
-            if not cmds.getAttr(f"{selected}.{attr}", lock=True):
-                original_value = cmds.getAttr(f"{selected}.{attr}")
-                new_value = original_value * 6
-                cmds.setAttr(f"{driver}.{attr}", new_value)
-
-        # Conectar los canales visibles y keyables
-        for attr in transform_attrs:
-            if cmds.getAttr(f"{selected}.{attr}", se=True):  # se = settable
-                try:
-                    cmds.connectAttr(f"{connect}.{attr}", f"{selected}.{attr}", force=True)
-                except RuntimeError as e:
-                    print(f"Unable to connect {attr} from {connect} to {selected}: {e}")
-
-        add_micro_rotate_callback(driver, connect)
-
-    if original_selection:
-        cmds.select(original_selection, replace=True)
-    micro_rotate_drivers.clear()
-
-
-def micro_rotate_pre_drag(*args):
-    toolCommon.open_undo_chunk(title="Micro Rotate", tooltip_template=helper.micro_move_tooltip_text)
-    _set_micro_cursor(pinched=True)
-    micro_rotate_pack_funtion()
-
-
-def micro_rotate_post_deferred():
-    global micro_rotate_selected_objects, micro_rotate_animation_data
-    _set_micro_cursor(pinched=False)
-
-    for selected in micro_rotate_selected_objects:
-        duplicate_name = f"{selected}_connect"
-        driver_name = f"{selected}_driver"
-
-        if cmds.objExists(duplicate_name):
-            rotate_values = {}
-            for attr in ["rotateX", "rotateY", "rotateZ"]:
-                # Verificar si el atributo es settable antes de intentar leerlo
-                if cmds.getAttr(f"{duplicate_name}.{attr}", se=True):
-                    rotate_values[attr] = cmds.getAttr(f"{duplicate_name}.{attr}")
-            cmds.delete(duplicate_name)
-        else:
-            rotate_values = {"rotateX": 0, "rotateY": 0, "rotateZ": 0}
-            cmds.delete(duplicate_name)
-
-        if cmds.objExists(duplicate_name):
-            cmds.delete(duplicate_name)
-        if cmds.objExists(driver_name):
-            cmds.delete(driver_name)
-
-        # current_frame = cmds.currentTime(query=True)
-        micro_rotate_paste_animation(selected)
-
-        for attr, value in rotate_values.items():
-            # Nuevamente verificar si el atributo es settable antes de intentar modificarlo
-            if cmds.getAttr(f"{selected}.{attr}", se=True):
-                cmds.setAttr(f"{selected}.{attr}", value)
-
-    remove_micro_rotate_callbacks()
-    micro_rotate_animation_data.clear()
-    toolCommon.close_undo_chunk()
-    if micro_rotate_selected_objects:
-        cmds.select(micro_rotate_selected_objects)
-
-
-def remove_micro_rotate_callbacks():
-    global micro_rotate_callback_ids
-    for id in micro_rotate_callback_ids:
-        om.MMessage.removeCallback(id)
-    micro_rotate_callback_ids = []
-
-
-def micro_rotate_post_drag(*args):
-    cmds.evalDeferred(micro_rotate_post_deferred)
-
-
-# _______________________________________________ MICRO MOVE CALL __________________________________________________
-
-
-def activate_micro_move(*args):
-    current_context = cmds.currentCtx()
-    microMoveContext = "microMoveCtx"
-    microRotateContext = "microRotateCtx"
-    _ensure_micro_move_helpers_group()
-
-    if cmds.contextInfo("dummyCtx", exists=True):
-        if cmds.contextInfo(microRotateContext, exists=True):
-            cmds.deleteUI(microRotateContext, toolContext=True)
-
-        if cmds.contextInfo(microMoveContext, exists=True):
-            cmds.deleteUI(microMoveContext, toolContext=True)
-
-        if cmds.contextInfo("dummyCtx", exists=True):
-            cmds.deleteUI("dummyCtx", toolContext=True)
-
-        cmds.setToolTo("moveSuperContext")
-        _clear_micro_cursor()
-
-    else:
-        if current_context == "RotateSuperContext":
-            if cmds.contextInfo(microRotateContext, exists=True):
-                cmds.setToolTo(microRotateContext)
-                _set_micro_cursor(pinched=False)
-            else:
-                cmds.manipRotateContext(microRotateContext)
-                # 0 object, 1 world, 2 gimbal
-                cmds.manipRotateContext(
-                    microRotateContext,
-                    e=True,
-                    preDragCommand=(micro_rotate_pre_drag, "transform"),
-                    postDragCommand=(micro_rotate_post_drag, "transform"),
-                    mode=2,
-                )
-                cmds.setToolTo(microRotateContext)
-                _set_micro_cursor(pinched=False)
-
-        elif current_context == "moveSuperContext":
-            if cmds.contextInfo(microMoveContext, exists=True):
-                cmds.setToolTo(microMoveContext)
-                _set_micro_cursor(pinched=False)
-            else:
-                cmds.manipMoveContext(microMoveContext)
-                cmds.manipMoveContext(
-                    microMoveContext,
-                    e=True,
-                    preDragCommand=(micro_move_pre_drag, "transform"),
-                    postDragCommand=(micro_move_post_drag_deferred, "transform"),
-                    mode=0,
-                )
-                cmds.setToolTo(microMoveContext)
-                _set_micro_cursor(pinched=False)
 
 
 # _______________________________________________ BAKE CUSTOM INTERVAL __________________________________________________

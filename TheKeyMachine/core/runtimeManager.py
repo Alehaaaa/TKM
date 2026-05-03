@@ -26,7 +26,6 @@ except ImportError:  # pragma: no cover
 
 _OPTIONVAR_NAME = "TKM_RuntimeManager"
 _MANAGER: Optional["RuntimeManager"] = None
-_ACTIVE_TOOL_SOURCE = None
 
 
 def _load_state() -> Dict[str, Any]:
@@ -120,21 +119,6 @@ def get_modifier_state() -> Dict[str, bool]:
         "shift": bool(mask & 1),
         "alt": bool(mask & 8),
     }
-
-
-def set_active_tool_source(widget) -> None:
-    global _ACTIVE_TOOL_SOURCE
-    _ACTIVE_TOOL_SOURCE = widget
-
-
-def clear_active_tool_source(widget=None) -> None:
-    global _ACTIVE_TOOL_SOURCE
-    if widget is None or _ACTIVE_TOOL_SOURCE is widget:
-        _ACTIVE_TOOL_SOURCE = None
-
-
-def get_active_tool_source():
-    return _ACTIVE_TOOL_SOURCE
 
 
 class RuntimeManager(QtCore.QObject):

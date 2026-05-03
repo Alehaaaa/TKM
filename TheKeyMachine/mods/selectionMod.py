@@ -184,6 +184,23 @@ def get_graph_editor_selected_curves():
     return curves
 
 
+def get_graph_editor_selected_keyframes():
+    anim_curves = get_graph_editor_selected_curves()
+    if not anim_curves:
+        return []
+
+    selected_frames = set(get_graph_editor_selected_frames())
+    keyframes = []
+    for curve in anim_curves:
+        try:
+            curve_frames = cmds.keyframe(curve, query=True, selected=True) or []
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            curve_frames = []
+        keyframes.extend((curve, frame) for frame in curve_frames if int(frame) in selected_frames)
+
+    return keyframes
+
+
 def get_target_curves():
     _plugs, curves = _resolve_graph_outliner_items(get_graph_editor_outliner_items())
     if curves:

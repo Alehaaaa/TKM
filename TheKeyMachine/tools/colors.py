@@ -93,7 +93,7 @@ def _make_ui_palette():
         green=_color("green", "#4fb697"),
         blue=_color("blue", "#58e1ff"),
         red=_color("red", "#AD4D4E"),
-        purple=_color("purple", "#8190B8"),
+        purple=_color("purple", "#8C6D9F"),
     )
 
 

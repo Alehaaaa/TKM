@@ -5,7 +5,7 @@ except ImportError:
 
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.widgets.util as wutil
-import TheKeyMachine.core.runtime_manager as runtime
+import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
 
 

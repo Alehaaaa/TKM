@@ -212,7 +212,7 @@ def _toggle_graph_toolbar(state=None, *_args, **_kwargs):
 
 def _toggle_sliders_overshoot(*_args, **_kwargs):
     import TheKeyMachine.mods.settingsMod as settings
-    import TheKeyMachine.core.runtime_manager as runtime
+    import TheKeyMachine.core.runtimeManager as runtime
 
     state = not bool(settings.get_setting("sliders_overshoot", False))
     settings.set_setting("sliders_overshoot", state)
@@ -343,19 +343,19 @@ def _register_builtin_commands():
     register_command("select_rig_controls_animated", _make_module_command("TheKeyMachine.mods.barMod", "select_rig_controls_animated"))
     register_command("select_hierarchy", _make_module_command("TheKeyMachine.mods.barMod", "selectHierarchy"))
     register_command("align_selected_objects", _make_module_command("TheKeyMachine.mods.barMod", "align_selected_objects"))
-    register_command("create_tracer", _make_module_command("TheKeyMachine.mods.barMod", "mod_tracer"))
+    register_command("create_tracer", _make_module_command("TheKeyMachine.mods.barMod", "create_tracer"))
     register_command("tracer_refresh", _make_module_command("TheKeyMachine.mods.barMod", "tracer_refresh"))
-    register_command("delete_all_animation", _make_module_command("TheKeyMachine.mods.barMod", "mod_delete_animation"))
+    register_command("delete_all_animation", _make_module_command("TheKeyMachine.mods.barMod", "delete_animation"))
     register_command("ws_copy_frame", _make_module_command("TheKeyMachine.mods.barMod", "copy_worldspace_single_frame"))
     register_command("ws_paste_frame", _make_module_command("TheKeyMachine.mods.barMod", "paste_worldspace_single_frame"))
     register_command(
         "ws_copy_range", _make_module_command("TheKeyMachine.mods.barMod", "copy_range_worldspace_animation")
     )
-    register_command("ws_paste", _make_module_command("TheKeyMachine.mods.barMod", "color_worldspace_paste_animation"))
-    register_command("temp_pivot", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", False))
-    register_command("temp_pivot_last", _make_module_command("TheKeyMachine.mods.barMod", "create_temp_pivot", True))
+    register_command("ws_paste", _make_module_command("TheKeyMachine.mods.barMod", "worldspace_paste_animation"))
+    register_command("temp_pivot", _make_module_command("TheKeyMachine.tools.temp_pivot.api", "create_temp_pivot"))
+    register_command("temp_pivot_last", _make_module_command("TheKeyMachine.tools.temp_pivot.api", "create_temp_pivot"))
     register_command("follow_cam", _make_module_command("TheKeyMachine.mods.barMod", "create_follow_cam", translation=True, rotation=True))
-    register_command("default_objects_mods", _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_objects_mods"))
+    register_command("default_object_values", _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_object_values"))
     register_command(
         "default_translations",
         _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_object_values", default_translations=True),

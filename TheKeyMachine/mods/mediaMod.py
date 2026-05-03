@@ -47,7 +47,7 @@ _ASSET_FILES = {
     "paste_opposite_animation_image": "paste_opposite_animation.svg",
     "copy_pose_image": "copy_pose.svg",
     "paste_pose_image": "paste_pose.svg",
-    "reblock_keys_image": "reblock.svg",
+    "reblock_image": "reblock.svg",
     "share_keys_image": "share_keys.svg",
     "bake_animation_custom_image": "bake_animation_custom.svg",
     "bake_animation_1_image": "bake_animation_1.svg",
@@ -130,6 +130,7 @@ _ASSET_FILES = {
     "tracer_blue_image": "tracer_blue.svg",
     "euler_filter_image": "euler_filter.svg",
     "sliders_overshoot_image": "sliders_overshoot.svg",
+    "snap": "snap.svg",
 
     "import_image": "import.svg",
     "export_image": "export.svg",
