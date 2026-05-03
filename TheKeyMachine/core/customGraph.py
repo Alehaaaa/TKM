@@ -217,74 +217,6 @@ def ensureCustomGraph():
     return getCustomGraphWidget()
 
 
-def _add_graph_slider_section_from_data(section_def, new_section_fn):
-    sec = new_section_fn(color=section_def.get("color"))
-    return toolWidgets.add_slider_section(
-        sec,
-        section_def,
-        namespace="graph_toolbar_sliders",
-        object_prefix="graph",
-    )
-
-
-def _add_graph_section_items(sec, items, graph_settings_menu_fn, toolbar_widget=None):
-    def add_tool_item(section, item):
-        overrides = {"menu": graph_settings_menu_fn} if toolWidgets.item_key(item) == "settings" else None
-        return toolWidgets.add_tool_button(section, item, overrides=overrides)
-
-    def add_widget_item(section, item):
-        return toolWidgets.create_widget_from_data(section, item, owner=toolbar_widget)
-
-    toolWidgets.add_section_items(
-        sec,
-        items,
-        add_tool_item_fn=add_tool_item,
-        add_widget_item_fn=add_widget_item,
-        add_group_items_fn=lambda section, group_items: _add_graph_group(
-            section,
-            group_items,
-            graph_settings_menu_fn,
-            toolbar_widget=toolbar_widget,
-        ),
-    )
-
-
-def _add_graph_group(sec, items, graph_settings_menu_fn, toolbar_widget=None):
-    return toolWidgets.add_grouped_section_items(
-        sec,
-        items,
-        add_widget_item_fn=lambda section, item: toolWidgets.create_widget_from_data(section, item, owner=toolbar_widget),
-        add_group_items_fn=lambda section, group_items: _add_graph_group(
-            section,
-            group_items,
-            graph_settings_menu_fn,
-            toolbar_widget=toolbar_widget,
-        ),
-    )
-
-
-def _populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn, toolbar_widget=None):
-    sections = toolbox.get_toolbar_sections("graph", resolve_items=False)
-    for section_def in sections:
-        if section_def.get("type") == "slider":
-            sec = _add_graph_slider_section_from_data(section_def, new_section_fn)
-            if sec:
-                sec.set_menu_identity(section_def.get("label"), toolbox.get_section_icon(section_def["id"]))
-            continue
-
-        sec = new_section_fn(
-            color=section_def.get("color"),
-            hiddeable=section_def.get("hiddeable", True),
-        )
-        sec.set_menu_identity(section_def.get("label"), toolbox.get_section_icon(section_def["id"]))
-        resolved_section = toolbox.get_tool_section(section_def["id"], toolbar_id="graph")
-        special_keys = {"settings", "custom_graph", "attribute_switcher", "selection_sets", "orbit"}
-        if toolWidgets.section_should_use_group_menu(section_def, resolved_section["items"], special_keys=special_keys):
-            _add_graph_group(sec, resolved_section["items"], graph_settings_menu_fn, toolbar_widget=toolbar_widget)
-            continue
-        _add_graph_section_items(sec, resolved_section["items"], graph_settings_menu_fn, toolbar_widget=toolbar_widget)
-
-
 def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs):
     global _GRAPH_TOOLBAR_WIDGET
 
@@ -341,17 +273,8 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
             apply_alignment_fn=applyCustomGraphAlignment,
         )
 
-    _populate_graph_toolbar_from_layout(new_section, _build_graph_settings_menu, toolbar_widget=flow_qw)
-
-    def _on_toolbar_context_menu(pos):
-        if not toolMenus.should_show_toolbar_pinning_menu(flow_qw, pos):
-            return
-        pinning_menu = toolMenus.build_toolbar_pinning_menu(flow_qw, flow_qw)
-        if pinning_menu.actions():
-            pinning_menu.exec_(flow_qw.mapToGlobal(pos))
-
-    flow_qw.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-    flow_qw.customContextMenuRequested.connect(_on_toolbar_context_menu)
+    toolWidgets.populate_graph_toolbar_from_layout(new_section, _build_graph_settings_menu, toolbar_widget=flow_qw)
+    toolWidgets.bind_toolbar_pinning_context(flow_qw)
 
     _place_graph_toolbar_widget(flow_qw, graph_qw=graph_qw)
     QtCore.QTimer.singleShot(50, flow_qw._update_height)
