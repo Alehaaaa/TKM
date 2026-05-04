@@ -39,7 +39,7 @@ import importlib
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 import TheKeyMachine.widgets.customDialogs as customDialogs
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.widgets.timeline as timelineWidgets

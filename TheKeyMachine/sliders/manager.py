@@ -5,7 +5,7 @@ Slider mode metadata and dispatch dictionaries.
 """
 
 import TheKeyMachine.mods.helperMod as helper
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 
 try:
     from PySide6 import QtCore
@@ -22,70 +22,70 @@ TANGENT_MODES = [
     {
         "label": "Blend to Best Guess Tangent",
         "key": "blend_best_guess",
-        "icon": media.asset_path("auto_tangent_image"),
+        "icon": icons.tangent_auto,
         "shortcut": [CTRL, ALT],
         "description": "Blends the selected tangents toward a 'best guess' smooth orientation based on neighbors.",
     },
     {
         "label": "Blend to Polished Tangent",
         "key": "blend_polished",
-        "icon": media.asset_path("spline_tangent_image"),
+        "icon": icons.tangent_spline,
         "shortcut": [CTRL],
         "description": "Blends tangents toward a manual 'polished' curve look.",
     },
     {
         "label": "Blend to Flow Tangent",
         "key": "blend_flow",
-        "icon": media.asset_path("flat_tangent_image"),
+        "icon": icons.tangent_flat,
         "shortcut": [SHIFT],
         "description": "Adjusts tangents to create a natural flow between keyframes.",
     },
     {
         "label": "Blend to Bounce Tangent",
         "key": "blend_bounce",
-        "icon": media.asset_path("bouncy_tangent_image"),
+        "icon": icons.tangent_bouncy,
         "shortcut": [ALT],
         "description": "Sets tangents to create a sharp 'bounce' effect at the keyframe.",
     },
     {
         "label": "Blend to Auto Tangent",
         "key": "blend_auto",
-        "icon": media.asset_path("auto_tangent_image"),
+        "icon": icons.tangent_auto,
         "shortcut": [CTRL, SHIFT],
         "description": "Blends toward the standard Maya 'Auto' tangent type.",
     },
     {
         "label": "Blend to Spline Tangent",
         "key": "blend_spline",
-        "icon": media.asset_path("spline_tangent_image"),
+        "icon": icons.tangent_spline,
         "shortcut": [ALT, SHIFT],
         "description": "Blends toward the standard Maya 'Spline' tangent type.",
     },
     {
         "label": "Blend to Clamped Tangent",
         "key": "blend_clamped",
-        "icon": media.asset_path("clamped_tangent_image"),
+        "icon": icons.tangent_clamped,
         "shortcut": [SHIFT, MID],
         "description": "Blends toward the standard Maya 'Clamped' tangent type.",
     },
     {
         "label": "Blend to Linear Tangent",
         "key": "blend_linear",
-        "icon": media.asset_path("linear_tangent_image"),
+        "icon": icons.tangent_linear,
         "shortcut": [CTRL, MID],
         "description": "Blends toward the standard Maya 'Linear' tangent type.",
     },
     {
         "label": "Blend to Flat Tangent",
         "key": "blend_flat",
-        "icon": media.asset_path("flat_tangent_image"),
+        "icon": icons.tangent_flat,
         "shortcut": [CTRL, ALT, SHIFT],
         "description": "Blends toward the standard Maya 'Flat' tangent type.",
     },
     {
         "label": "Blend to Plateau Tangent",
         "key": "blend_plateau",
-        "icon": media.asset_path("plateau_tangent_image"),
+        "icon": icons.tangent_plateau,
         "shortcut": [ALT, MID],
         "description": "Blends toward the standard Maya 'Plateau' tangent type.",
     },

@@ -17,25 +17,11 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-import os
-
-import TheKeyMachine.mods.mediaMod as media
-from TheKeyMachine.mods.generalMod import config
-from TheKeyMachine.mods.tooltipsMod import separator, tooltip_media, tool_tooltip
-
-INSTALL_PATH = config["INSTALL_PATH"]
-TOOLTIPS_MOVIES_PATH = os.path.join(INSTALL_PATH, "TheKeyMachine", "data", "movies")
+from TheKeyMachine.data import icons, movies as movie
+from TheKeyMachine.mods.tooltipsMod import separator, tool_tooltip
 
 
 # ----------------------------------------------  TOOLTIPS  --------------------------------------------------------
-
-
-class _TooltipMovieLibrary:
-    def __getattr__(self, name):
-        return tooltip_media(os.path.join(TOOLTIPS_MOVIES_PATH, f"{name}.gif"))
-
-
-movie = _TooltipMovieLibrary()
 
 
 # -------- KeyBox
@@ -140,43 +126,43 @@ tweener_world_space_tooltip_text = (
 auto_tangent_tooltip_text = (
     "Auto Tangent",
     ["Set the tangents of the selected keyframes to Auto."],
-    media.auto_tangent_image,
+    icons.tangent_auto,
 )
 
 spline_tangent_tooltip_text = (
     "Spline Tangent",
     ["Set the tangents of the selected keyframes to Spline."],
-    media.spline_tangent_image,
+    icons.tangent_spline,
 )
 
 clamped_tangent_tooltip_text = (
     "Clamped Tangent",
     ["Set the tangents of the selected keyframes to Clamped."],
-    media.clamped_tangent_image,
+    icons.tangent_clamped,
 )
 
 linear_tangent_tooltip_text = (
     "Linear Tangent",
     ["Set the tangents of the selected keyframes to Linear."],
-    media.linear_tangent_image,
+    icons.tangent_linear,
 )
 
 flat_tangent_tooltip_text = (
     "Flat Tangent",
     ["Set the tangents of the selected keyframes to Flat."],
-    media.flat_tangent_image,
+    icons.tangent_flat,
 )
 
 step_tangent_tooltip_text = (
     "Step Tangent",
     ["Set the tangents of the selected keyframes to Stepped."],
-    media.step_tangent_image,
+    icons.tangent_step,
 )
 
 plateau_tangent_tooltip_text = (
     "Plateau Tangent",
     ["Set the tangents of the selected keyframes to Plateau."],
-    media.plateau_tangent_image,
+    icons.tangent_plateau,
 )
 
 
@@ -189,7 +175,7 @@ reblock_move_tooltip_text = (
         "Useful when timing adjustments have left channels keyed on inconsistent frames.",
         movie.reblock
     ],
-    media.reblock_image,
+    icons.reblock,
 )
 
 bake_animation_4_tooltip_text = (
@@ -198,7 +184,7 @@ bake_animation_4_tooltip_text = (
         "Bake the selected animation using 4-frame steps.",
         "Useful for stepped blocking passes or reducing key density while keeping pose timing readable.",
     ],
-    media.bake_animation_3_image,
+    icons.bake_animation_3,
 )
 
 
@@ -208,25 +194,25 @@ bake_animation_custom_tooltip_text = (
         "Bake the selected animation using a custom frame interval.",
         "Useful for stepped blocking passes or custom sampling density.",
     ],
-    media.bake_animation_custom_image,
+    icons.bake_animation_custom,
 )
 
 bake_animation_1_tooltip_text = (
     "Bake on Ones",
     ["Bake the selected animation on every frame."],
-    media.bake_animation_1_image,
+    icons.bake_animation_1,
 )
 
 bake_animation_2_tooltip_text = (
     "Bake on Twos",
     ["Bake the selected animation every two frames."],
-    media.bake_animation_2_image,
+    icons.bake_animation_2,
 )
 
 bake_animation_3_tooltip_text = (
     "Bake on Threes",
     ["Bake the selected animation every three frames."],
-    media.bake_animation_3_image,
+    icons.bake_animation_3,
 )
 
 
@@ -236,7 +222,7 @@ gimbal_fixer_tooltip_text = (
         "Change rotation order without changing the visible animation result.",
         "Useful when a control is suffering from gimbal lock and needs a safer rotate order.",
     ],
-    media.reblock_image,
+    icons.reblock,
 )
 
 share_keys_tooltip_text = (
@@ -248,7 +234,7 @@ share_keys_tooltip_text = (
         separator,
         "Tip: Select a range in the time slider to limit the operation to that range.",
     ],
-    media.share_keys_image,
+    icons.share_keys,
 )
 
 orbit_tooltip_text = (
@@ -257,7 +243,7 @@ orbit_tooltip_text = (
         "Open the floating quick-access panel for your most-used animation tools.",
         "Configure which actions appear in it and keep it close to the main toolbar while animating.",
     ],
-    media.orbit_ui_image,
+    icons.orbit_ui,
 )
 
 donate_tooltip_text = (
@@ -267,7 +253,7 @@ donate_tooltip_text = (
         "The KeyMachine is free to use and always will be.",
         "Any support is greatly appreciated!",
     ],
-    media.donate_image,
+    icons.donate,
 )
 
 attribute_switcher_tooltip_text = (
@@ -276,7 +262,7 @@ attribute_switcher_tooltip_text = (
         "Open the floating Attribute Switcher for the current selection.",
         "Useful for switch attributes, rotate-order changes, and current-frame or all-keys switching.",
     ],
-    media.attribute_switcher_image,
+    icons.attribute_switcher,
 )
 
 
@@ -289,7 +275,7 @@ select_rig_controls_tooltip_text = (
         "Will select all the controls of a rig hierarchy.",
         "Only NURBS-curve controls are included.",
     ],
-    media.select_rig_controls_image,
+    icons.select_rig_controls,
 )
 
 select_rig_controls_animated_tooltip_text = (
@@ -298,13 +284,13 @@ select_rig_controls_animated_tooltip_text = (
         "Select only rig controls that currently have animation.",
         "Only NURBS-curve controls are included.",
     ],
-    media.select_rig_controls_animated_image,
+    icons.select_rig_controls_animated,
 )
 
 depth_mover_tooltip_text = (
     "Depth Mover",
     ["Adjust object depth without changing its apparent camera-space framing."],
-    media.depth_mover_image,
+    icons.depth_mover,
 )
 
 
@@ -321,7 +307,7 @@ isolate_tooltip_text = (
         separator,
         "Tip: If your characters or assets are within a node, for example, all characters are inside a group called \"characters\", use the \"Down one level\" option in the dropdown menu."
     ],
-    media.isolate_image,
+    icons.isolate,
 )
 
 
@@ -334,7 +320,7 @@ ibookmarks_window_tooltip_text = (
         separator,
         "All bookmarks appear in the dropdown menu of the \"Isolate\" button."
     ],
-    media.isolate_image,
+    icons.isolate,
 )
 
 
@@ -344,7 +330,7 @@ createLocator_tooltip_text = (
         "Create temporary locators from the current selection.",
         "Useful for marking positions or building quick references during blocking and cleanup.",
     ],
-    media.create_locator_image,
+    icons.cube,
 )
 
 align_tooltip_text = (
@@ -359,7 +345,7 @@ align_tooltip_text = (
         separator,
         "Tip: Right-click to access the alignment options.",
     ],
-    media.match_image,
+    icons.magnet,
 )
 
 tracer_tooltip_text = (
@@ -371,25 +357,25 @@ tracer_tooltip_text = (
         separator,
         "Tip: Use \"Refresh Tracer\" to update the motion trail without having to activate it.",
     ],
-    media.tracer_image,
+    icons.tracer,
 )
 
 tracer_refresh_tooltip_text = (
     "Refresh Tracer",
     ["Refresh the current tracer without rebuilding the setup."],
-    media.refresh_image,
+    icons.refresh,
 )
 
 tracer_toggle_tooltip_text = (
     "Toggle Tracer",
     ["Show or hide the existing tracer display."],
-    media.tracer_show_hide_image,
+    icons.tracer_show_hide,
 )
 
 tracer_remove_tooltip_text = (
     "Remove Tracer",
     ["Remove the active tracer setup from the scene."],
-    media.remove_image,
+    icons.remove,
 )
 
 default_values_tooltip_text = (
@@ -400,7 +386,7 @@ default_values_tooltip_text = (
         separator,
         "Tip: Select channels in the Channel Box to default only specific attributes.",
     ],
-    media.asset_path("default_animation_image"),
+    icons.default,
 )
 
 delete_animation_tooltip_text = (
@@ -413,7 +399,7 @@ delete_animation_tooltip_text = (
         "Tip: You can select a time range to delete keys only inside that range.",
         movie.delete_all_animation_selection,
     ],
-    media.delete_animation_image,
+    icons.delete_animation,
 )
 
 
@@ -423,13 +409,13 @@ opposite_select_tooltip_text = (
         "Select the opposite-side control for the current rig selection.",
         "Works with one or more selected controls.",
     ],
-    media.opposite_select_image,
+    icons.opposite_select,
 )
 
 opposite_add_tooltip_text = (
     "Add Opposite",
     ["Add the opposite-side control to the current selection."],
-    media.opposite_select_image,
+    icons.opposite_select,
 )
 
 opposite_copy_tooltip_text = (
@@ -438,7 +424,7 @@ opposite_copy_tooltip_text = (
         "Copy current values from the selected controls to their opposite-side controls.",
         "Mirror exceptions affect how opposite mapping is resolved.",
     ],
-    media.opposite_copy_image,
+    icons.opposite_copy,
 )
 
 mirror_tooltip_text = (
@@ -447,7 +433,7 @@ mirror_tooltip_text = (
         "Mirror the selected controls to their opposite-side equivalents.",
         "Mirror exceptions can be configured per rig and are saved for reuse.",
     ],
-    media.mirror_image,
+    icons.mirror,
 )
 
 copy_animation_tooltip_text = (
@@ -456,19 +442,19 @@ copy_animation_tooltip_text = (
         "Copy animation from the selected objects or controls.",
         "The copied data is stored on disk so it can be pasted in another Maya session.",
     ],
-    media.copy_animation_image,
+    icons.copy_animation,
 )
 
 paste_animation_tooltip_text = (
     "Paste Animation",
     ["Paste the saved animation onto the current selection."],
-    media.paste_animation_image,
+    icons.paste_animation,
 )
 
 paste_insert_animation_tooltip_text = (
     "Paste Insert Animation",
     ["Insert the saved animation while preserving surrounding timing."],
-    media.paste_insert_animation_image,
+    icons.paste_insert_animation,
 )
 
 copy_pose_tooltip_text = (
@@ -477,7 +463,7 @@ copy_pose_tooltip_text = (
         "Copy the current pose from the selected controls.",
         "The pose can be pasted later in the same scene or another Maya session.",
     ],
-    media.copy_pose_image,
+    icons.copy_pose,
 )
 
 
@@ -487,7 +473,7 @@ selector_tooltip_text = (
         "Open a window showing the current selection as an easy-to-manage list.",
         "Useful for large control sets, quick re-selection, and grouped picks.",
     ],
-    media.selector_image,
+    icons.selector,
 )
 
 select_hierarchy_tooltip_text = (
@@ -499,7 +485,7 @@ select_hierarchy_tooltip_text = (
         separator,
         "Note: This tool may fail on certain occasions since some rigs are not created following standards.",
     ],
-    media.select_hierarchy_image,
+    icons.select_hierarchy,
 )
 
 animation_offset_tooltip_text = (
@@ -511,7 +497,7 @@ animation_offset_tooltip_text = (
         separator,
         "Tip: You can select a time range to offset only inside that range.",
     ],
-    media.animation_offset_image,
+    icons.animation_offset,
 )
 
 link_objects_tooltip_text = (
@@ -524,19 +510,19 @@ link_objects_tooltip_text = (
         "Relationships are saved, so they can be used across different Maya sessions.",
         "Tip: Use the \"Auto Link\" option to update the object relationship in real-time."
     ],
-    media.link_objects_image,
+    icons.link_relative,
 )
 
 paste_link_tooltip_text = (
     "Paste Link Position",
     ["Apply the saved link relationship to the current selection."],
-    media.link_objects_paste_image,
+    icons.link_relative_paste,
 )
 
 auto_link_tooltip_text = (
     "Auto Link Position",
     ["Toggle automatic pasting of link relationships.", movie.link_objects_auto_link],
-    media.link_objects_copy_image,
+    icons.link_relative_copy,
 )
 
 follow_cam_tooltip_text = (
@@ -549,31 +535,31 @@ follow_cam_tooltip_text = (
         separator,
         "Tip: Right-click on the tool icon to create FollowCam for translations only or for rotations only.",
     ],
-    media.follow_cam_image,
+    icons.camera,
 )
 
 copy_worldspace_tooltip_text = tool_tooltip(
     "Copy World Space",
     ["Copy the world-space transform of the current selection at the current frame."],
-    media.worldspace_copy_frame_image,
+    icons.worldspace_copy_frame,
 )
 
 copy_worldspace_range_tooltip_text = tool_tooltip(
     "Copy World Space - Selected Range",
     ["Copy world-space transforms across the selected time range or full animation."],
-    media.worldspace_copy_animation_image,
+    icons.worldspace_copy_animation,
 )
 
 paste_worldspace_tooltip_text = tool_tooltip(
     "Paste World Space",
     ["Paste the saved world-space transform onto the current frame."],
-    media.worldspace_paste_frame_image,
+    icons.worldspace_paste_frame,
 )
 
 paste_worldspace_animation_tooltip_text = tool_tooltip(
     "Paste World Space - All Animation",
     ["Paste saved world-space transforms across a selected range or the full animation."],
-    media.worldspace_paste_animation_image,
+    icons.worldspace_paste_animation,
 )
 
 temp_pivot_tooltip_text = (
@@ -587,7 +573,7 @@ temp_pivot_tooltip_text = (
         separator,
         "Tip: Useful for swinging bodies animation, arcs, posing...",
     ],
-    media.temp_pivot_image,
+    icons.temp_pivot,
 )
 
 
@@ -598,7 +584,7 @@ micro_move_tooltip_text = (
         "Especially useful for facial work and fine control tweaks.",
         "Works with rotations in Gimbal mode and translations in Local or World mode.",
     ],
-    media.ruler_image,
+    icons.ruler,
 )
 
 temp_pivot_last_tooltip_text = (
@@ -607,19 +593,19 @@ temp_pivot_last_tooltip_text = (
         "Recreate the most recently used Temp Pivot setup on the current selection.",
         "Useful when repeating the same pivot placement across several controls.",
     ],
-    media.temp_pivot_use_last_image,
+    icons.temp_pivot_use_last,
 )
 
 remove_inbetween_tooltip_text = (
     "Remove Inbetween",
     ["Remove inbetweens using the current nudge step value."],
-    media.remove_inbetween_image,
+    icons.nudge_remove_inbetween,
 )
 
 insert_inbetween_tooltip_text = (
     "Insert Inbetween",
     ["Insert inbetweens using the current nudge step value."],
-    media.insert_inbetween_image,
+    icons.nudge_insert_inbetween,
 )
 
 delete_static_animation_tooltip_text = (
@@ -628,13 +614,13 @@ delete_static_animation_tooltip_text = (
         "These are the curves that have keys but where all the key values are the same, meaning there is no movement.",
         movie.delete_all_animation_static,
     ],
-    media.delete_animation_image,
+    icons.delete_animation,
 )
 
 graph_match_keys_tooltip_text = (
     "Match",
     ["Match one selected curve to another so both curves share the same values."],
-    media.match_image,
+    icons.magnet,
 )
 
 flip_tooltip_text = (
@@ -643,7 +629,7 @@ flip_tooltip_text = (
         "Invert the selected curve values vertically.",
         movie.flip,
     ],
-    media.asset_path("flip_curve_image"),
+    icons.flip_curve,
 )
 
 snap_tooltip_text = (
@@ -656,7 +642,7 @@ snap_tooltip_text = (
         separator,
         "Note: Maya fails to apply snap and reports an error, whereas TKM applies the snap without any issues.",
     ],
-    media.snap_image,
+    icons.snap,
 )
 
 overlap_tooltip_text = (
@@ -665,79 +651,79 @@ overlap_tooltip_text = (
         "Offset the selected curves to create overlapping motion.",
         movie.overlap,
     ],
-    media.overlap_image,
+    icons.overlap,
 )
 
 align_translation_tooltip_text = (
     "Align Translation",
     ["Match only translation from the driver object to the target object."],
-    media.align_menu_image,
+    icons.magnet,
 )
 
 align_rotation_tooltip_text = (
     "Align Rotation",
     ["Match only rotation from the driver object to the target object."],
-    media.align_menu_image,
+    icons.magnet,
 )
 
 align_scale_tooltip_text = (
     "Align Scale",
     ["Match only scale from the driver object to the target object."],
-    media.align_menu_image,
+    icons.magnet,
 )
 
 default_translations_tooltip_text = (
     "Reset Translation",
     ["Reset only translation values on the current selection."],
-    media.asset_path("default_animation_image"),
+    icons.default,
 )
 
 default_rotations_tooltip_text = (
     "Reset Rotation",
     ["Reset only rotation values on the current selection."],
-    media.asset_path("default_animation_image"),
+    icons.default,
 )
 
 default_scales_tooltip_text = (
     "Reset Scales",
     ["Reset only scale values on the current selection."],
-    media.asset_path("default_animation_image"),
+    icons.default,
 )
 
 default_trs_tooltip_text = (
     "Reset Translation Rotation Scale",
     ["Reset translation, rotation, and scale values on the current selection."],
-    media.asset_path("default_animation_image"),
+    icons.default,
 )
 
 quick_export_selection_sets_tooltip_text = (
     "Quick Export",
     ["Export selection sets to the shared quick file, overwriting the previous quick-export data."],
-    media.selection_sets_export_image,
+    icons.selection_sets_export,
 )
 
 quick_import_selection_sets_tooltip_text = (
     "Quick Import",
     ["Import selection sets from the shared quick file."],
-    media.selection_sets_import_image,
+    icons.selection_sets_import,
 )
 
 export_selection_sets_tooltip_text = (
     "Export Selection Sets",
     ["Export selection sets to a chosen file."],
-    media.selection_sets_export_image,
+    icons.selection_sets_export,
 )
 
 import_selection_sets_tooltip_text = (
     "Import Selection Sets",
     ["Import selection sets from a chosen file."],
-    media.selection_sets_import_image,
+    icons.selection_sets_import,
 )
 
 clear_selection_sets_tooltip_text = (
     "Clear All Selection Sets",
     ["Delete every saved selection set in the current scene."],
-    media.trash_image,
+    icons.trash,
 )
 
 extra_tools_tooltip_text = (
@@ -748,38 +734,38 @@ extra_tools_tooltip_text = (
 paste_pose_tooltip_text = (
     "Paste Pose",
     ["Paste the saved pose onto the current selection."],
-    media.paste_pose_image,
+    icons.paste_pose,
 )
 
 paste_opposite_animation_tooltip_text = (
     "Paste Opposite Animation",
     ["Paste the saved animation onto the opposite-side controls."],
-    media.paste_opposite_animation_image,
+    icons.paste_opposite_animation,
 )
 
 follow_translation_tooltip_text = (
     "Follow Translation",
     ["Create a Follow Cam that inherits only translation from the selected object."],
-    media.follow_cam_image,
+    icons.camera,
 )
 
 follow_rotation_tooltip_text = (
     "Follow Rotation",
     ["Create a Follow Cam that inherits only rotation from the selected object."],
-    media.follow_cam_image,
+    icons.camera,
 )
 
 remove_follow_cam_tooltip_text = (
     "Remove Follow Cam",
     ["Remove the current Follow Cam setup."],
-    media.remove_image,
+    icons.remove,
 )
 
 graph_isolate_curves_tooltip_text = (
     "Isolate Curves",
     ["Show only the selected curves in the Graph Editor.",
     movie.isolate_curves],
-    media.isolate_image,
+    icons.isolate,
 )
 
 graph_mute_tooltip_text = (
@@ -805,19 +791,19 @@ graph_filter_tooltip_text = (
 graph_default_tooltip_text = (
     "Reset Curves",
     ["Reset the selected curves to their default values."],
-    media.asset_path("default_animation_image"),
+    icons.default,
 )
 
 tangent_cycle_matcher_tooltip_text = (
     "Cycle Matcher",
     ["Match the selected curve ends for cleaner cyclic animation."],
-    media.match_curve_cycle_image,
+    icons.match_curve_cycle,
 )
 
 tangent_bouncy_tooltip_text = (
     "Bouncy Tangent",
     ["Set the selected curves to a bouncy tangent style."],
-    media.bouncy_tangent_image,
+    icons.tangent_bouncy,
 )
 
 
@@ -827,7 +813,7 @@ selection_sets_tooltip_text = (
         "Save and recall useful selections from a floating panel.",
         "Use color-coded sets to organize character picks, shot-specific groups, and quick imports or exports.",
     ],
-    media.selection_sets_image,
+    icons.selection_sets,
 )
 
 customGraph_tooltip_text = (
@@ -836,7 +822,7 @@ customGraph_tooltip_text = (
         "Toggle the automatic TKM toolbar inside Maya's Graph Editor.",
         "This button manages the saved preference only; it does not open the Graph Editor itself.",
     ],
-    media.customGraph_image,
+    icons.customGraph,
 )
 
 custom_tools_tooltip_text = (
@@ -845,7 +831,7 @@ custom_tools_tooltip_text = (
         "Open your custom pipeline tool shortcuts from a single menu.",
         "Configure these entries carefully to avoid broken tool definitions.",
     ],
-    media.custom_tools_image,
+    icons.tools_folder,
 )
 
 custom_scripts_tooltip_text = (
@@ -854,5 +840,5 @@ custom_scripts_tooltip_text = (
         "Open your personal and third-party script shortcuts from one menu.",
         "Useful when you want quick access without relying on Maya shelves.",
     ],
-    media.custom_scripts_image,
+    icons.scripts_folder,
 )

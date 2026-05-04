@@ -18,10 +18,9 @@ import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.core.toolbox as toolbox
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 from TheKeyMachine.widgets import customDialogs as cd
-from TheKeyMachine.widgets.customWidgets import QFlatHoverableIcon
 from TheKeyMachine.widgets import util as wutil
 
 
@@ -788,11 +787,11 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         self.hotkey_button.setFlat(True)
         self.hotkey_button.setIconSize(QtCore.QSize(wutil.DPI(20), wutil.DPI(20)))
         if command_data.get("icon"):
-            QFlatHoverableIcon.apply(self.hotkey_button, command_data.get("icon"))
+            icons.QHoverableIcon.apply(self.hotkey_button, command_data.get("icon"))
         elif command_data.get("badge_text"):
             badge_icon = _text_badge_qicon(command_data.get("badge_text"))
             self.hotkey_button._icon_normal = badge_icon
-            self.hotkey_button._icon_hover = QFlatHoverableIcon._generate_hover_icon(
+            self.hotkey_button._icon_hover = icons.QHoverableIcon.hover_icon(
                 badge_icon, self.hotkey_button.iconSize(), 80
             )
             self.hotkey_button.setIcon(badge_icon)
@@ -959,7 +958,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
         self.addWindowHeader(
             parentLayout=main_layout,
-            icon=media.hotkeys_image,
+            icon=icons.hotkeys,
             text="Hotkeys",
             textColor="#d8d8d8",
         )
@@ -1023,11 +1022,11 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
         self.setBottomBar(
             buttons=[
-                cd.QFlatDialogButton("Import Hotkeys", callback=self.import_hotkeys, icon=media.import_image),
-                cd.QFlatDialogButton("Export Hotkeys", callback=self.export_hotkeys, icon=media.export_image),
-                cd.QFlatDialogButton("Clear TKM Hotkeys", callback=self.clear_hotkeys, icon=media.trash_image),
-                cd.QFlatDialogButton("Apply", callback=self.apply_hotkeys, icon=media.apply_image),
-                cd.QFlatDialogButton("Close", callback=self.request_close, icon=media.close_image),
+                cd.QFlatDialogButton("Import Hotkeys", callback=self.import_hotkeys, icon=icons.get('import')),
+                cd.QFlatDialogButton("Export Hotkeys", callback=self.export_hotkeys, icon=icons.get('export')),
+                cd.QFlatDialogButton("Clear TKM Hotkeys", callback=self.clear_hotkeys, icon=icons.trash),
+                cd.QFlatDialogButton("Apply", callback=self.apply_hotkeys, icon=icons.apply),
+                cd.QFlatDialogButton("Close", callback=self.request_close, icon=icons.close),
             ],
             closeButton=False,
             highlight="Apply",
@@ -1283,12 +1282,12 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             if len(duplicate_names) > 1 and row.edit.hasFocus():
                 others = [self._title_lookup.get(name, name) for name in duplicate_names if name != row.command_name()]
                 row.set_status(
-                    media.warning_image,
+                    icons.warning,
                     "Also used by {}".format(", ".join(others)),
                     tooltip_data={
                         "text": ", ".join(others),
                         "description": "Draft Conflict.<br>This combination is used by multiple tools in your current changes.",
-                        "icon": media.warning_image,
+                        "icon": icons.warning,
                     },
                 )
                 continue
@@ -1296,7 +1295,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             # --- 2. APPLIED STATUS (TKM) ---
             applied_combo = maya_hotkeys.get(row.command_name())
             if applied_combo and _combo_key(applied_combo) == ckey:
-                row.set_status(media.success_image, "Hotkey applied and active.")
+                row.set_status(icons.success, "Hotkey applied and active.")
                 continue
 
             # --- 3. EXTERNAL CONFLICT (Maya/Other) ---
@@ -1306,7 +1305,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
             if current_assignment:
                 row.set_status(
-                    media.warning_image,
+                    icons.warning,
                     "Assigned to {}".format(_tooltip_for_assignment(current_assignment, self._title_lookup)),
                     tooltip_data=_assignment_tooltip_data(current_assignment, self._title_lookup, self._icon_lookup),
                 )
@@ -1436,11 +1435,11 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             "Unsaved hotkeys",
             title="Save hotkey changes?",
             message="You have unsaved hotkey changes. Save them, discard them, or cancel and keep editing.",
-            icon=media.warning_image,
+            icon=icons.warning,
             buttons=[
-                cd.QFlatDialogButton("Save", positive=True, icon=media.apply_image),
-                cd.QFlatDialogButton("Discard", positive=False, icon=media.trash_image),
-                cd.QFlatDialogButton("Cancel", positive=False, icon=media.cancel_image),
+                cd.QFlatDialogButton("Save", positive=True, icon=icons.apply),
+                cd.QFlatDialogButton("Discard", positive=False, icon=icons.trash),
+                cd.QFlatDialogButton("Cancel", positive=False, icon=icons.cancel),
             ],
             highlight="Save",
         )

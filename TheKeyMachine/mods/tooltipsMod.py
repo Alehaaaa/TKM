@@ -16,8 +16,6 @@ try:
         QColor,
         QPixmap,
         QPainter,
-        QPainterPath,
-        QRegion,
         QPolygonF,
         QCursor,
         QGuiApplication,
@@ -32,7 +30,6 @@ try:
         QPointF,
         QTimer,
         QRect,
-        QRectF,
     )
     try:
         from PySide6.QtSvg import QSvgRenderer  # type: ignore
@@ -53,8 +50,6 @@ except ImportError:
         QColor,
         QPixmap,
         QPainter,
-        QPainterPath,
-        QRegion,
         QPolygonF,
         QCursor,
         QGuiApplication,
@@ -69,7 +64,6 @@ except ImportError:
         QPointF,
         QTimer,
         QRect,
-        QRectF,
     )
     try:
         from PySide2.QtSvg import QSvgRenderer  # type: ignore
@@ -77,6 +71,7 @@ except ImportError:
         QSvgRenderer = None  # type: ignore
 
 from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.data.movies import TooltipMedia, TooltipMovieWidget
 
 
 IS_MAC = sys.platform == "darwin"
@@ -114,20 +109,7 @@ def _string_body_lines(raw):
     return tuple(lines)
 
 
-class TooltipMedia:
-    def __init__(self, path):
-        self.path = str(path)
-
-
-class _TooltipSeparator:
-    pass
-
-
-separator = _TooltipSeparator()
-
-
-def tooltip_media(path):
-    return TooltipMedia(path)
+separator = object()
 
 
 def tooltip_body(*paragraphs):
@@ -207,122 +189,6 @@ def format_tooltip_shortcut(keys_list, include_click_suffix=False):
     if include_click_suffix:
         return result + "+Click"
     return result
-
-
-class TooltipMovieLabel(QLabel):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._movie = None
-        self._display_size = None
-        self.setAlignment(Qt.AlignCenter)
-
-    def set_tooltip_movie(self, movie, display_size=None):
-        self._movie = movie
-        self._display_size = display_size if display_size and display_size.isValid() else None
-        if self._display_size is not None:
-            self.setFixedSize(self._display_size)
-        elif movie is not None:
-            frame_rect = movie.frameRect()
-            if frame_rect.isValid():
-                self.setFixedSize(frame_rect.size())
-        if movie is not None:
-            movie.frameChanged.connect(self._update_frame)
-            self._update_frame()
-
-    def _update_frame(self, *_):
-        if self._movie is None:
-            return
-        frame = self._movie.currentPixmap()
-        if frame.isNull():
-            return
-        if self._display_size is not None and frame.size() != self._display_size:
-            frame = frame.scaled(self._display_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.setPixmap(frame)
-
-
-class TooltipMovieWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._movie = None
-        self._display_size = None
-        self._corner_radius = wutil.DPI(10)
-
-        self._movie_label = TooltipMovieLabel(self)
-        self._progress_track = QFrame(self._movie_label)
-        self._progress_fill = QFrame(self._progress_track)
-
-        self.setObjectName("tooltip_movie_widget")
-        self.setStyleSheet(
-            "#tooltip_movie_widget { background: transparent; border: none; border-radius: %dpx; }" % self._corner_radius
-        )
-        self._movie_label.setStyleSheet("background: transparent; border: none;")
-        self._progress_track.setStyleSheet("background: transparent; border: none;")
-        self._progress_fill.setStyleSheet("background-color: rgba(192, 192, 192, 0.5); border: none;")
-        self._progress_track.setFixedHeight(wutil.DPI(2))
-        self._progress_fill.setFixedHeight(wutil.DPI(2))
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(self._movie_label)
-
-    def set_tooltip_movie(self, movie, display_size=None):
-        self._movie = movie
-        self._display_size = display_size if display_size and display_size.isValid() else None
-        self._movie_label.set_tooltip_movie(movie, display_size=display_size)
-        if self._display_size is not None:
-            self.setFixedWidth(self._display_size.width())
-        else:
-            self.setMinimumWidth(self._movie_label.width())
-        if movie is not None:
-            movie.frameChanged.connect(self._update_progress)
-            self._update_progress()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._apply_rounded_mask()
-        self._layout_overlay()
-        self._update_progress()
-
-    def _apply_rounded_mask(self):
-        rect = self.rect()
-        if not rect.isValid():
-            return
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(rect), self._corner_radius, self._corner_radius)
-        region = QRegion(path.toFillPolygon().toPolygon())
-        self.setMask(region)
-        self._movie_label.setMask(region.translated(-self._movie_label.x(), -self._movie_label.y()))
-
-    def _layout_overlay(self):
-        track_height = self._progress_track.height()
-        self._progress_track.setGeometry(
-            0,
-            max(0, self._movie_label.height() - track_height),
-            self._movie_label.width(),
-            track_height,
-        )
-        self._progress_track.raise_()
-        self._progress_fill.raise_()
-
-    def _update_progress(self, *_):
-        if self._movie is None:
-            self._progress_fill.setFixedWidth(0)
-            return
-
-        track_width = max(0, self._progress_track.width())
-        if track_width <= 0:
-            self._progress_fill.setFixedWidth(0)
-            return
-
-        frame_count = self._movie.frameCount()
-        current_frame = self._movie.currentFrameNumber()
-        if frame_count and frame_count > 1 and current_frame >= 0:
-            progress = float(current_frame) / float(frame_count - 1)
-        else:
-            progress = 0.0
-        fill_width = max(0, min(track_width, int(round(track_width * progress))))
-        self._progress_fill.setGeometry(0, 0, fill_width, self._progress_track.height())
 
 
 class QFlatTooltip(QWidget):
@@ -794,7 +660,6 @@ class QFlatTooltipManager(object):
     _timer = None
     _current_source_key = None
     _pending_source_key = None
-    _pending_target_rect = None
     enabled = True
 
     @classmethod
@@ -802,23 +667,18 @@ class QFlatTooltipManager(object):
         return (cls._current_tooltip and cls._current_tooltip.isVisible()) or (cls._timer and cls._timer.isActive())
 
     @classmethod
-    def is_current_source(cls, source_key, target_rect=None):
+    def is_current_source(cls, source_key):
         if source_key is None:
             return False
         if cls._current_tooltip and cls._current_tooltip.isVisible() and cls._current_source_key == source_key:
-            if target_rect is not None and getattr(cls._current_tooltip, "target_rect", None) != target_rect:
-                return False
             return True
         if cls._timer and cls._timer.isActive() and cls._pending_source_key == source_key:
-            if target_rect is not None and cls._pending_target_rect != target_rect:
-                return False
             return True
         return False
 
     @classmethod
     def _clear_pending(cls):
         cls._pending_source_key = None
-        cls._pending_target_rect = None
 
     @classmethod
     def cancel_timer(cls):
@@ -886,7 +746,7 @@ class QFlatTooltipManager(object):
         if not cls.enabled:
             return
         source_key = kwargs.get("source_key")
-        if cls.is_current_source(source_key, target_rect=kwargs.get("target_rect")):
+        if cls.is_current_source(source_key):
             return
         if cls._timer and cls._timer.isActive():
             cls._timer.stop()
@@ -897,7 +757,6 @@ class QFlatTooltipManager(object):
 
         anchor = kwargs.get("anchor_widget")
         cls._pending_source_key = source_key
-        cls._pending_target_rect = kwargs.get("target_rect")
 
         def _safe_show():
             if anchor is not None and not wutil.is_valid_widget(anchor):

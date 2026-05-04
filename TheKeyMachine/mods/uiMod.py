@@ -35,14 +35,12 @@ except ImportError:
     pass
 
 
-import TheKeyMachine.core.runtimeManager as runtime
 import os
 import platform
 import shutil
 
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.keyToolsMod as keyTools
-import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.mods.updater as updater
@@ -58,7 +56,6 @@ from TheKeyMachine.mods import settingsMod as settings
 mods = [
     general,
     keyTools,
-    media,
     bar,
     customDialogs,
     cw,

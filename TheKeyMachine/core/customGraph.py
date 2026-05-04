@@ -36,7 +36,6 @@ import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.selSetsMod as selSets
-import TheKeyMachine.mods.mediaMod as media
 import TheKeyMachine.mods.styleMod as style
 import TheKeyMachine.core.toolMenus as toolMenus
 import TheKeyMachine.core.toolbox as toolbox
@@ -48,7 +47,7 @@ import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 
-mods = [general, ui, keyTools, selSets, media, style, cw, helper, toolMenus, toolbox, toolWidgets]
+mods = [general, ui, keyTools, selSets, style, cw, helper, toolMenus, toolbox, toolWidgets]
 
 for m in mods:
     importlib.reload(m)
@@ -56,6 +55,7 @@ for m in mods:
 
 _GRAPH_TOOLBAR_OBJECT = "tkm_customGraph_flowToolbar"
 _GRAPH_TOOLBAR_DOCK_SETTING = "graph_toolbar_dock_position"
+
 _DOCK_BOTTOM_GRAPH = "bottom_graph_editor"
 _DOCK_TOP_GRAPH = "top_graph_editor"
 _DOCK_BOTTOM_MENU = "bottom_menu"

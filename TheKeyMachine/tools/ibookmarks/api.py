@@ -5,7 +5,7 @@ from maya import cmds
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import util as wutil
 
 
@@ -153,7 +153,7 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
             cmds.menuItem(
                 l=text,
                 parent=popup_menu,
-                image=media.asset_path("dot_grey_image"),
+                image=icons.dot_gray,
                 c=lambda x, text=text: isolate_bookmark(bookmark_name=text),
             )
         cmds.menuItem(divider=True, parent=popup_menu)
@@ -162,7 +162,7 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
         l="Bookmarks",
         c=lambda x: create_ibookmarks_window(),
         annotation="Open isolate bookmarks window",
-        image=media.asset_path("ibookmarks_menu_image"),
+        image=icons.ibookmarks_menu,
         parent=popup_menu,
     )
     cmds.menuItem(divider=True, parent=popup_menu)

@@ -89,7 +89,7 @@ from TheKeyMachine.tools.attribute_switcher.common import (
     ATTRIBUTE_SWITCHER_GLOBE_IMAGE,
     UI_COLOR,
 )
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import customDialogs as cd
 from TheKeyMachine.widgets import customWidgets as cw
 from TheKeyMachine.widgets import timeline as timelineWidgets
@@ -918,7 +918,7 @@ class SetupTargetsDialog(FloatingWidget):
         self.objects_dict = objects_dict
         self._create_layouts()
         self.setBottomBar(
-            [cd.QFlatDialogButton("Add", callback=self._add_target, icon=media.add_image, highlight=True)],
+            [cd.QFlatDialogButton("Add", callback=self._add_target, icon=icons.add, highlight=True)],
             closeButton=True,
             spacing=wutil.DPI(2),
         )
@@ -973,7 +973,7 @@ class TargetItemWidget(QWidget):
 
         label = QLabel(name.split(":")[-1])
         close_btn = QPushButton()
-        cw.QFlatHoverableIcon.apply(close_btn, media.close_image)
+        icons.QHoverableIcon.apply(close_btn, icons.close)
 
         close_btn.setIconSize(QSize(15, 15))
         close_btn.setFixedSize(15, 15)

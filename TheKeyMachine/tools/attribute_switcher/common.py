@@ -3,7 +3,7 @@ import math
 from maya import cmds
 from maya import OpenMaya as om
 
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 from TheKeyMachine.tools import colors as toolColors
 
 
@@ -29,7 +29,7 @@ COLOR_TEXT_MAIN = UI_COLOR.darker_gray.hex
 COLOR_TEXT_SECONDARY = UI_COLOR.dark_white.hex
 COLOR_BLEND_MULTI = ACCENT_DARK_COLOR.hover.hex
 
-ATTRIBUTE_SWITCHER_GLOBE_IMAGE = media.globe_image
+ATTRIBUTE_SWITCHER_GLOBE_IMAGE = icons.globe
 
 
 class GimbalAnalyzer:

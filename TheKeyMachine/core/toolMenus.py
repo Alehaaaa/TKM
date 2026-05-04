@@ -4,6 +4,7 @@ except ImportError:
     from imp import reload
 
 from functools import partial
+import os
 
 from maya import cmds, mel
 
@@ -19,7 +20,7 @@ except ImportError:
 import TheKeyMachine.mods.hotkeysMod as hotkeys
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.keyToolsMod as keyTools
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.updater as updater
@@ -101,14 +102,8 @@ def _command_callback(command, is_python):
 
 
 def _resolve_dot_image(image):
-    dot_images = {
-        "dot_green.png": media.dot_green_image,
-        "dot_blue.png": media.dot_blue_image,
-        "dot_red.png": media.dot_red_image,
-        "dot_grey.png": media.dot_grey_image,
-        "dot_yellow.png": media.dot_yellow_image,
-    }
-    return dot_images.get(image, image)
+    name = os.path.splitext(image or "")[0]
+    return icons.get(name, icons.path(image))
 
 
 def _populate_connect_menu(menu, module, order_attr, id_prefix, config_folder, config_file):
@@ -146,7 +141,7 @@ def _populate_connect_menu(menu, module, order_attr, id_prefix, config_folder, c
 
     menu.addSeparator()
     menu.addAction(
-        QtGui.QIcon(media.settings_image),
+        QtGui.QIcon(icons.settings),
         "Open config file",
         callback=lambda: general.open_file(config_folder, config_file),
     )
@@ -337,7 +332,7 @@ def build_tracer_menu(menu, source_widget=None):
             return False
 
     auto_update_action = menu.addAction(
-        QtGui.QIcon(media.tracer_image),
+        QtGui.QIcon(icons.tracer),
         "Auto Update",
         description="Keep the tracer connected for live updates.",
     )
@@ -357,18 +352,18 @@ def build_tracer_menu(menu, source_widget=None):
     menu.aboutToShow.connect(_sync_auto_update_action)
 
     menu.addSeparator()
-    menu.addAction(QtGui.QIcon(media.refresh_image), "Refresh Tracer", bar.tracer_refresh)
-    menu.addAction(QtGui.QIcon(media.tracer_show_hide_image), "Toggle Tracer", bar.tracer_show_hide)
-    menu.addAction(QtGui.QIcon(media.tracer_select_offset_image), "Select Offset Object", bar.select_tracer_offset_node)
+    menu.addAction(QtGui.QIcon(icons.refresh), "Refresh Tracer", bar.tracer_refresh)
+    menu.addAction(QtGui.QIcon(icons.tracer_show_hide), "Toggle Tracer", bar.tracer_show_hide)
+    menu.addAction(QtGui.QIcon(icons.tracer_select_offset), "Select Offset Object", bar.select_tracer_offset_node)
 
     menu.addSeparator()
-    style_menu = menu.addMenu(QtGui.QIcon(media.tracer_image), "Style")
-    style_menu.addAction(QtGui.QIcon(media.tracer_grey_image), "Tracer Style: Grey", bar.set_tracer_grey_color)
-    style_menu.addAction(QtGui.QIcon(media.tracer_red_image), "Tracer Style: Red", bar.set_tracer_red_color)
-    style_menu.addAction(QtGui.QIcon(media.tracer_blue_image), "Tracer Style: Blue", bar.set_tracer_blue_color)
+    style_menu = menu.addMenu(QtGui.QIcon(icons.tracer), "Style")
+    style_menu.addAction(QtGui.QIcon(icons.tracer_grey), "Tracer Style: Grey", bar.set_tracer_grey_color)
+    style_menu.addAction(QtGui.QIcon(icons.tracer_red), "Tracer Style: Red", bar.set_tracer_red_color)
+    style_menu.addAction(QtGui.QIcon(icons.tracer_blue), "Tracer Style: Blue", bar.set_tracer_blue_color)
 
     menu.addSeparator()
-    menu.addAction(QtGui.QIcon(media.remove_image), "Remove Tracer", bar.remove_tracer_node)
+    menu.addAction(QtGui.QIcon(icons.remove), "Remove Tracer", bar.remove_tracer_node)
 
 
 def _build_nudge_menu(menu, direction):
@@ -407,7 +402,7 @@ def sync_main_dock_menu(toolbar):
 
 
 def build_main_dock_menu(toolbar):
-    toolbar.dock_menu = cw.MenuWidget(QtGui.QIcon(media.dock_image), "Dock", description="Move the toolbar to a different Maya area.")
+    toolbar.dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the toolbar to a different Maya area.")
 
     toolbar.pos_ac_group = QActionGroup(toolbar)
     for orient, name in toolbar.docking_orients.items():
@@ -510,7 +505,7 @@ def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alig
         buttons=[customDialogs.QFlatConfirmDialog.Yes, customDialogs.QFlatConfirmDialog.Cancel],
         highlight=customDialogs.QFlatConfirmDialog.Yes,
         title="Restore toolbar defaults?",
-        icon=media.warning_image,
+        icon=icons.warning,
     )
     if clicked != customDialogs.QFlatConfirmDialog.Yes:
         return
@@ -561,14 +556,14 @@ def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
 
     menu.addSeparator()
     menu.addAction(
-        QtGui.QIcon(media.reload_image),
+        QtGui.QIcon(icons.reload),
         "Restore Defaults",
         lambda: _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alignment_fn),
         description="Restore toolbar pins and alignment defaults.",
     )
 
     graph_toolbar_action = menu.addAction(
-        QtGui.QIcon(media.customGraph_image),
+        QtGui.QIcon(icons.customGraph),
         "Graph Editor Toolbar",
         description="Show or hide the TKM toolbar inside the Graph Editor.",
     )
@@ -613,25 +608,25 @@ def should_show_toolbar_pinning_menu(toolbar_widget, pos):
 
 
 def add_other_sources_help_menu(parent_menu):
-    help_menu = cw.MenuWidget(QtGui.QIcon(media.help_menu_image), "Help")
+    help_menu = cw.MenuWidget(QtGui.QIcon(icons.help), "Help")
     parent_menu.addMenu(help_menu, description="Docs, support, and community links.")
     _add_toolbox_actions(help_menu, ("bug_report_window",))
     help_menu.addSeparator()
 
     help_menu.addAction(
-        QtGui.QIcon(media.discord_image),
+        QtGui.QIcon(icons.discord),
         "Discord",
         lambda: general.open_url("https://discord.gg/G2J5yyjz"),
         description="Open the community server.",
     )
     help_menu.addAction(
-        QtGui.QIcon(media.help_menu_image),
+        QtGui.QIcon(icons.help),
         "Documentation",
         lambda: general.open_url("https://thekeymachine.gitbook.io/base"),
         description="Open the docs.",
     )
     help_menu.addAction(
-        QtGui.QIcon(media.youtube_image),
+        QtGui.QIcon(icons.youtube),
         "YouTube",
         lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"),
         description="Watch tutorials and demos.",
@@ -640,11 +635,11 @@ def add_other_sources_help_menu(parent_menu):
 
 
 def add_main_system_menu(toolbar, parent_menu):
-    system_menu = cw.MenuWidget(QtGui.QIcon(media.system_image), "System")
+    system_menu = cw.MenuWidget(QtGui.QIcon(icons.system), "System")
     parent_menu.addMenu(system_menu, description="Maintenance actions.")
-    system_menu.addAction(QtGui.QIcon(media.reload_image), "Reload", toolbar.reload, description="Refresh the TKM interface.")
-    system_menu.addAction(QtGui.QIcon(media.close_image), "Unload", toolbar.unload, description="Close TheKeyMachine and remove callbacks.")
-    system_menu.addAction(QtGui.QIcon(media.remove_image), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
+    system_menu.addAction(QtGui.QIcon(icons.reload), "Reload", toolbar.reload, description="Refresh the TKM interface.")
+    system_menu.addAction(QtGui.QIcon(icons.close), "Unload", toolbar.unload, description="Close TheKeyMachine and remove callbacks.")
+    system_menu.addAction(QtGui.QIcon(icons.remove), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
     return system_menu
 
 
@@ -656,11 +651,11 @@ def add_main_preferences_menu(
     update_show_tooltips,
     update_toolbar_icon_alignment,
 ):
-    preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(media.settings_image), "Preferences")
+    preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(icons.settings), "Preferences")
     parent_menu.addMenu(preferences_menu, description="General toolbar options.")
     preferences_menu.addSection("Startup")
     preferences_menu.addAction(
-        QtGui.QIcon(media.asset_path("tool_icon")),
+        QtGui.QIcon(icons.TheKeyMachine_icon),
         "Create a Shelf Button",
         toolbar.create_shelf_icon,
         description="Add a shelf button for showing or hiding the toolbar.",
@@ -715,7 +710,7 @@ def build_main_settings_menu(
         update_toolbar_icon_alignment=update_toolbar_icon_alignment,
     )
     toolbar_menu.addAction(
-        QtGui.QIcon(media.hotkeys_image),
+        QtGui.QIcon(icons.hotkeys),
         "Hotkeys",
         hotkeys.show_hotkeys_window,
         description="Edit keyboard shortcuts for TheKeyMachine tools.",
@@ -728,12 +723,12 @@ def build_main_settings_menu(
     _add_toolbox_actions(toolbar_menu, ("donate_window",))
     if internet_connection:
         toolbar_menu.addAction(
-            QtGui.QIcon(media.check_updates_image),
+            QtGui.QIcon(icons.check_updates),
             "Check for updates",
             lambda: updater.check_for_updates(parent_button, force=True),
             description="Look for a new version.",
         )
-    toolbar_menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
+    toolbar_menu.addAction(QtGui.QIcon(icons.about), "About", ui.about_window, description="Show version info and credits.")
     return toolbar_menu
 
 
@@ -748,12 +743,12 @@ def build_graph_settings_menu(
     menu = cw.MenuWidget(parent=parent_button)
     menu.addAction(cw.LogoAction(menu))
 
-    settings_menu = cw.MenuWidget(QtGui.QIcon(media.settings_image), "Settings", description="Tool configuration and preferences.")
+    settings_menu = cw.MenuWidget(QtGui.QIcon(icons.settings), "Settings", description="Tool configuration and preferences.")
     menu.addMenu(settings_menu)
 
     settings_menu.addSection("Graph toolbar")
     graph_toolbar_action = settings_menu.addAction(
-        QtGui.QIcon(media.customGraph_image),
+        QtGui.QIcon(icons.customGraph),
         "Graph Editor Toolbar",
         description="Show or hide the TKM toolbar inside the Graph Editor.",
     )
@@ -761,7 +756,7 @@ def build_graph_settings_menu(
     graph_toolbar_action.toggled.connect(lambda state: graphToolbarApi.set_graph_toolbar_enabled(bool(state)))
     graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
 
-    dock_menu = cw.MenuWidget(QtGui.QIcon(media.dock_image), "Dock", description="Move the Graph Editor toolbar.")
+    dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the Graph Editor toolbar.")
     menu.addMenu(dock_menu)
     dock_group = QActionGroup(dock_menu)
     dock_group.setExclusive(True)
@@ -798,15 +793,15 @@ def build_graph_settings_menu(
 
     settings_menu.addSection("General")
     settings_menu.addAction(
-        QtGui.QIcon(media.close_image),
+        QtGui.QIcon(icons.close),
         "Close",
         lambda: QtCore.QTimer.singleShot(0, lambda: graphToolbarApi.set_graph_toolbar_enabled(False)),
         description="Hide the TKM Graph Editor toolbar and keep it disabled.",
     )
 
-    menu.addAction(QtGui.QIcon(media.hotkeys_image), "Hotkeys", hotkeys.show_hotkeys_window, description="Manage trigger hotkeys.")
+    menu.addAction(QtGui.QIcon(icons.hotkeys), "Hotkeys", hotkeys.show_hotkeys_window, description="Manage trigger hotkeys.")
     menu.addSeparator()
     add_other_sources_help_menu(menu)
 
-    menu.addAction(QtGui.QIcon(media.about_image), "About", ui.about_window, description="Show version info and credits.")
+    menu.addAction(QtGui.QIcon(icons.about), "About", ui.about_window, description="Show version info and credits.")
     return menu

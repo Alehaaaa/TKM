@@ -57,7 +57,7 @@ import TheKeyMachine.mods.uiMod as ui  # type: ignore
 import TheKeyMachine.mods.reportMod as report  # type: ignore
 import TheKeyMachine.mods.keyToolsMod as keyTools  # type: ignore
 import TheKeyMachine.mods.helperMod as helper  # type: ignore
-import TheKeyMachine.mods.mediaMod as media  # type: ignore
+from TheKeyMachine.data import icons
 import TheKeyMachine.mods.styleMod as style  # type: ignore
 import TheKeyMachine.mods.barMod as bar  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
@@ -87,7 +87,6 @@ mods = [
     report,
     keyTools,
     helper,
-    media,
     bar,
     settings,
     cg,
@@ -495,7 +494,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def create_shelf_icon(self, *args):
         button_name = "TheKeyMachine"
         command = "import TheKeyMachine;TheKeyMachine.toggle()"
-        icon = media.asset_path("tool_icon")
+        icon = icons.TheKeyMachine_icon
         icon = os.path.normpath(icon)
         current_shelf_tab = cmds.tabLayout("ShelfLayout", query=True, selectTab=True)
 

@@ -7,7 +7,7 @@ except ImportError:
     from PySide6 import QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import colors as toolColors
@@ -289,7 +289,7 @@ def build_selection_sets_context_menu(parent=None, controller=None):
     menu = cw.OpenMenuWidget(parent)
 
     auto_transparency_action = menu.addAction(
-        QtGui.QIcon(media.selection_sets_image),
+        QtGui.QIcon(icons.selection_sets),
         "Auto Transparency",
         description="Make the floating Selection Sets palette translucent when the cursor is not over it.",
     )
@@ -300,32 +300,32 @@ def build_selection_sets_context_menu(parent=None, controller=None):
     menu.addSeparator()
 
     menu.addAction(
-        QtGui.QIcon(media.selection_sets_import_image),
+        QtGui.QIcon(icons.selection_sets_import),
         "Quick Import",
         description="Import selection sets from the shared quick file.",
     ).triggered.connect(lambda *_: controller and controller.import_sets(_selection_sets_quick_file()))
 
     menu.addAction(
-        QtGui.QIcon(media.selection_sets_export_image),
+        QtGui.QIcon(icons.selection_sets_export),
         "Quick Export",
         description="Export selection sets to the shared quick file, overwriting it.",
     ).triggered.connect(lambda *_: controller and controller.export_sets(_selection_sets_quick_file()))
 
     menu.addAction(
-        QtGui.QIcon(media.selection_sets_import_image),
+        QtGui.QIcon(icons.selection_sets_import),
         "Import",
         description="Import selection sets from a chosen file.",
     ).triggered.connect(lambda *_: controller and controller.import_sets())
 
     menu.addAction(
-        QtGui.QIcon(media.selection_sets_export_image),
+        QtGui.QIcon(icons.selection_sets_export),
         "Export",
         description="Export selection sets to a chosen file.",
     ).triggered.connect(lambda *_: controller and controller.export_sets())
 
     menu.addSeparator()
     menu.addAction(
-        QtGui.QIcon(media.trash_image),
+        QtGui.QIcon(icons.trash),
         "Clear All Select Sets",
         description="Delete every selection set in the current scene.",
     ).triggered.connect(lambda *_: clear_all_selection_sets(controller=controller, parent=parent, menu=menu))
@@ -333,7 +333,7 @@ def build_selection_sets_context_menu(parent=None, controller=None):
     menu.addSeparator()
 
     stays_on_top_action = menu.addAction(
-        QtGui.QIcon(media.settings_image),
+        QtGui.QIcon(icons.settings),
         "Stay on Top",
         description="Keep the floating Selection Sets palette above other Maya windows.",
     )
@@ -342,7 +342,7 @@ def build_selection_sets_context_menu(parent=None, controller=None):
     stays_on_top_action.triggered.connect(_set_selection_sets_stays_on_top)
 
     menu.addAction(
-        QtGui.QIcon(media.selection_sets_reload_image),
+        QtGui.QIcon(icons.selection_sets_reload),
         "Restore Position",
         description="Reset the floating Selection Sets palette to its default position above the Selection Sets toolbar button.",
     ).triggered.connect(lambda *_: restore_selection_sets_default_position(controller=controller))

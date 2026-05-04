@@ -9,7 +9,7 @@ build the same controls from the same definitions.
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.generalMod as general  # type: ignore
 import TheKeyMachine.mods.keyToolsMod as keyTools  # type: ignore
-import TheKeyMachine.mods.mediaMod as media  # type: ignore
+from TheKeyMachine.data import icons
 import TheKeyMachine.mods.updater as updater  # type: ignore
 import TheKeyMachine.core.trigger as trigger  # type: ignore
 import TheKeyMachine.mods.selectionMod as selectionMod  # type: ignore
@@ -587,7 +587,7 @@ def add_link_tools_group(section, group_data, owner):
         if not wutil.is_valid_widget(owner):
             return
         owner.link_obj_toggle_state = not owner.link_obj_toggle_state
-        new_image = media.link_objects_on_image if owner.link_obj_toggle_state else media.link_objects_image
+        new_image = icons.link_relative_on if owner.link_obj_toggle_state else icons.link_relative
         btn.setIcon(QtGui.QIcon(new_image))
 
     def start_link_obj_pulse(btn):
@@ -619,7 +619,7 @@ def add_link_tools_group(section, group_data, owner):
         else:
             stop_link_obj_pulse()
             keyTools.remove_link_obj_callbacks()
-            QtCore.QTimer.singleShot(800, lambda: btn.setIcon(QtGui.QIcon(media.link_objects_image)))
+            QtCore.QTimer.singleShot(800, lambda: btn.setIcon(QtGui.QIcon(icons.link_relative)))
 
     resolved_items = []
     for item in group_data["items"]:

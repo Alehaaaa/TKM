@@ -34,7 +34,7 @@ from TheKeyMachine.mods.selectionMod import get_selected_objects
 from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.widgets.customWidgets as cw
 
@@ -201,12 +201,12 @@ class QFlatWindowMixin:
 
 class QFlatDialog(QFlatWindowMixin, QtWidgets.QDialog):
     # Button Preconfigurations
-    Yes = QFlatDialogButton("Yes", positive=True, icon=media.apply_image)
-    Ok = QFlatDialogButton("Ok", positive=True, icon=media.apply_image)
+    Yes = QFlatDialogButton("Yes", positive=True, icon=icons.apply)
+    Ok = QFlatDialogButton("Ok", positive=True, icon=icons.apply)
 
-    No = QFlatDialogButton("No", positive=False, icon=media.cancel_image)
-    Cancel = QFlatDialogButton("Cancel", positive=False, icon=media.cancel_image)
-    Close = QFlatDialogButton("Close", positive=False, icon=media.close_image)
+    No = QFlatDialogButton("No", positive=False, icon=icons.cancel)
+    Cancel = QFlatDialogButton("Cancel", positive=False, icon=icons.cancel)
+    Close = QFlatDialogButton("Close", positive=False, icon=icons.close)
 
     CustomButton = QFlatDialogButton
 
@@ -952,7 +952,7 @@ class QFlatCloseableFloatingWidget(QFlatFloatingWidget):
         self.close_button = QtWidgets.QToolButton()
         self.close_button.setAutoRaise(True)
         self.close_button.setCursor(QtCore.Qt.PointingHandCursor)
-        self.close_button.setIcon(QtGui.QIcon(media.close_image))
+        self.close_button.setIcon(QtGui.QIcon(icons.close))
         self.close_button.setIconSize(QtCore.QSize(DPI(18), DPI(18)))
         # Orbit (and other floating tools) expect a compact close button.
         self.close_button.setFixedSize(DPI(20), DPI(20))
@@ -1090,7 +1090,7 @@ class QFlatSelectorDialog(QFlatToolBarPopupDialog):
 
     def __init__(self, parent=None):
         self.title = "Selector"
-        self.icon = media.selector_image
+        self.icon = icons.selector
         super().__init__(parent=parent)
         self.title_label.setText("0")
 
@@ -1226,7 +1226,7 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
 
         self.addWindowHeader(
             parentLayout=content_layout,
-            icon=media.report_a_bug_image,
+            icon=icons.bug,
             textColor="#CA6161",
         )
 
@@ -1300,7 +1300,7 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
 
         self.root_layout.addWidget(content_widget, 1)
 
-        send_cfg = QFlatDialogButton("Send bug", highlight=True, icon=media.apply_image)
+        send_cfg = QFlatDialogButton("Send bug", highlight=True, icon=icons.apply)
         send_cfg["callback"] = self._on_send_clicked
         self.setBottomBar([send_cfg], closeButton=True, highlight="Send bug")
         self._send_button = self._find_button("Send bug")
@@ -1454,7 +1454,7 @@ class TKMAboutDialog(QFlatDialog):
         # Logo
         logo_label = QtWidgets.QLabel()
         logo_label.setAlignment(QtCore.Qt.AlignCenter)
-        logo_pixmap = QtGui.QPixmap(media.TheKeyMachine_logo_250_image)
+        logo_pixmap = QtGui.QPixmap(icons.TheKeyMachine_logo_250)
         logo_label.setPixmap(logo_pixmap)
         content_layout.addWidget(logo_label)
 
@@ -1569,7 +1569,7 @@ class QFlatNumberInput(QFlatToolBarPopupDialog):
         parent=None,
     ):
         self.title = "Bake Custom Interval"
-        self.icon = media.bake_animation_custom_image
+        self.icon = icons.bake_animation_custom
         self.start_value = 1.0
 
         self.COLOR_BG_TRACK = self.DARK_BG_COLOR
@@ -1597,7 +1597,7 @@ class QFlatNumberInput(QFlatToolBarPopupDialog):
 
         bake_button = QFlatDialogButton(
             "Bake",
-            icon=media.apply_image,
+            icon=icons.apply,
             callback=self._on_accept,
             highlight=True,
         )

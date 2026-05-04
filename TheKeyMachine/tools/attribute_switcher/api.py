@@ -3,7 +3,7 @@ try:
 except ImportError:
     from PySide6 import QtCore, QtGui, QtWidgets
 
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
@@ -177,7 +177,7 @@ def build_attribute_switcher_context_menu(parent=None):
     menu = widgets.OpenMenuWidget(parent)
 
     stays_on_top_action = menu.addAction(
-        QtGui.QIcon(media.settings_image),
+        QtGui.QIcon(icons.settings),
         "Stay on Top",
         description="Keep the floating Attribute Switcher window above other Maya windows.",
     )
@@ -186,7 +186,7 @@ def build_attribute_switcher_context_menu(parent=None):
     stays_on_top_action.triggered.connect(_set_attribute_switcher_stays_on_top)
 
     restore_position_action = menu.addAction(
-        QtGui.QIcon(media.attribute_switcher_image),
+        QtGui.QIcon(icons.attribute_switcher),
         "Restore Position",
         description="Reset the Attribute Switcher position above its toolbar button.",
     )

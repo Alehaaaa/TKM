@@ -21,6 +21,7 @@ import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.sliders import api as slider_api
 import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.data import icons
 from TheKeyMachine.tools import colors as toolColors
 
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager, format_tooltip_shortcut
@@ -523,7 +524,7 @@ QSlider::handle:horizontal {{
                 icon_rect = QRect(0, 0, icon_size, icon_size)
                 icon_rect.moveCenter(hrect.center())
                 if handle_highlighted:
-                    qicon = cw.QFlatHoverableIcon._color_icon(qicon, main_color, icon_rect.size())
+                    qicon = icons.QHoverableIcon.color_icon(qicon, main_color, icon_rect.size())
                 qicon.paint(p, icon_rect, Qt.AlignCenter)
         else:
             p.setFont(self._text_font)

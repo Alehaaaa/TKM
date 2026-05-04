@@ -10,7 +10,7 @@ except Exception:
 
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import common as toolCommon
 
@@ -29,7 +29,7 @@ micro_rotate_animation_data = {}
 
 
 def _build_micro_cursor(image_name):
-    image_path = media.getImage(image_name)
+    image_path = icons.path(image_name)
     pixmap = QtGui.QPixmap(image_path) if image_path else QtGui.QPixmap()
     if pixmap.isNull():
         return None

@@ -2,7 +2,7 @@ from functools import partial
 
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
-import TheKeyMachine.mods.mediaMod as media  # type: ignore
+from TheKeyMachine.data import icons
 import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
 from TheKeyMachine.tools import colors as toolColors  # type: ignore
 from TheKeyMachine.tools import common as toolCommon  # type: ignore
@@ -141,7 +141,8 @@ class HelpSystem:
 
         status = f"{c_title} - {c_desc}" if (c_title and c_desc) else (c_title or c_desc)
 
-        if hasattr(widget_or_action, "setStatusTip"):
+        is_action = isinstance(widget_or_action, QAction)
+        if hasattr(widget_or_action, "setStatusTip") and not is_action:
             widget_or_action.setStatusTip(status)
             try:
                 status_event = QtGui.QStatusTipEvent(status)
@@ -154,116 +155,24 @@ class HelpSystem:
             widget_or_action.setProperty("tkm_description", raw_desc)
             widget_or_action.setProperty("description", raw_desc)
 
-        # 3. If it's an action, also try to push to its parent menu's status bar
-        if isinstance(widget_or_action, QAction) and widget_or_action.parent():
-            p = widget_or_action.parent()
-            if hasattr(p, "setStatusTip"):
-                p.setStatusTip(status)
-                try:
-                    status_event = QtGui.QStatusTipEvent(status)
-                    QtWidgets.QApplication.sendEvent(p, status_event)
-                except Exception:
-                    pass
-
-
-class QFlatHoverableIcon:
-    HIGHLIGHT_HEX = "#282828"
-
-    @staticmethod
-    def apply(btn, icon, highlight=False, brighten_amount=80):
-        if not icon:
-            return
-
-        base_icon = QtGui.QIcon(icon)
-        icon_size = btn.iconSize()
-
-        if highlight:
-            btn._icon_normal = QFlatHoverableIcon._color_icon(base_icon, QFlatHoverableIcon.HIGHLIGHT_HEX, icon_size)
-        else:
-            btn._icon_normal = base_icon
-
-        # For hover, we create a brightened version WITH a 2px glow effect
-        btn._icon_hover = QFlatHoverableIcon._generate_hover_icon(btn._icon_normal, icon_size, brighten_amount)
-        btn.setIcon(btn._icon_normal)
-
-    @staticmethod
-    def _color_icon(icon: QtGui.QIcon, color: QtGui.QColor, size: QtCore.QSize) -> QtGui.QIcon:
-        if isinstance(color, (str, bytes)):
-            color = QtGui.QColor(color)
-
-        pix = icon.pixmap(size)
-        img = pix.toImage()
-        for x in range(img.width()):
-            for y in range(img.height()):
-                c = img.pixelColor(x, y)
-                if c.alpha() > 0:
-                    img.setPixelColor(x, y, QtGui.QColor(color.red(), color.green(), color.blue(), c.alpha()))
-
-        return QtGui.QIcon(QtGui.QPixmap.fromImage(img))
-
-    @staticmethod
-    def _generate_hover_icon(icon: QtGui.QIcon, size: QtCore.QSize, brighten: int) -> QtGui.QIcon:
-        # 1. Get the original pixmap and create a brightened version for the "top" part
-        pix = icon.pixmap(size)
-        img = pix.toImage().convertToFormat(QtGui.QImage.Format_ARGB32)
-
-        # Slightly brighten the primary icon so it's the brightest part
-        bright_img = img.copy()
-        for x in range(bright_img.width()):
-            for y in range(bright_img.height()):
-                c = bright_img.pixelColor(x, y)
-                if c.alpha() > 0:
-                    bright_img.setPixelColor(
-                        x,
-                        y,
-                        QtGui.QColor(
-                            min(c.red() + 40, 255),
-                            min(c.green() + 40, 255),
-                            min(c.blue() + 40, 255),
-                            c.alpha(),
-                        ),
-                    )
-        bright_pix = QtGui.QPixmap.fromImage(bright_img)
-
-        # 2. Add very subtle 1px glow effect behind it
-        out_pix = QtGui.QPixmap(size)
-        out_pix.fill(QtCore.Qt.transparent)
-
-        painter = QtGui.QPainter(out_pix)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
-
-        # Create a white "glow silhouette" (softer)
-        glow_img = img.copy()
-        for x in range(glow_img.width()):
-            for y in range(glow_img.height()):
-                c = glow_img.pixelColor(x, y)
-                if c.alpha() > 0:
-                    # Softer white glow (alpha 5)
-                    glow_img.setPixelColor(x, y, QtGui.QColor(255, 255, 255, 5))
-
-        glow_pix = QtGui.QPixmap.fromImage(glow_img)
-
-        # Draw silhouette at tight 1px offsets (this creates the 1px border)
-        for dx, dy in [(-1, -1), (1, 1), (-1, 1), (1, -1), (0, -1), (0, 1), (-1, 0), (1, 0)]:
-            painter.drawPixmap(dx, dy, glow_pix)
-
-        # Draw the brightened icon on top (centered)
-        painter.drawPixmap(0, 0, bright_pix)
-        painter.end()
-
-        return QtGui.QIcon(out_pix)
+        # Maya 2023's embedded Qt can crash in QAction::showStatusText while
+        # hovering menus if custom menu actions push native status-tip events.
+        # Keep TKM metadata for our own tooltip UI, but leave menu QAction
+        # status text to Qt's default empty state.
 
 
 class LogoAction(QtWidgets.QWidgetAction):
     def __init__(self, parent, clickable=True):
         super().__init__(parent)
-        self._container = QtWidgets.QWidget()
+        self.setStatusTip("")
+        self.setToolTip("")
+
+        self._container = QtWidgets.QWidget(parent)
         layout = QtWidgets.QVBoxLayout(self._container)
         layout.setContentsMargins(0, 10, 0, 10)
         layout.setSpacing(0)
 
-        logo_pix = QtGui.QPixmap(media.TheKeyMachine_logo_250_image)
+        logo_pix = QtGui.QPixmap(icons.TheKeyMachine_logo_250)
         if not logo_pix.isNull():
             self.logo_label = QtWidgets.QLabel()
             self.logo_label.setPixmap(logo_pix.scaledToHeight(DPI(60), QtCore.Qt.SmoothTransformation))
@@ -314,91 +223,41 @@ class MenuWidget(QtWidgets.QMenu):
 
         self.hovered.connect(self._on_action_hovered)
 
-    def _ensure_action_tooltip_source_key(self, action):
-        if action is None or not isValid(action):
+    def _action_tooltip_key(self, action):
+        if action is None or not isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
             return None
-
         try:
-            source_key = action.property("tkm_tooltip_source_key") if hasattr(action, "property") else None
+            key = action.property("tkm_tooltip_source_key")
+            if not key:
+                key = "menu-action:{}".format(id(action))
+                action.setProperty("tkm_tooltip_source_key", key)
+            return key
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return None
-        if source_key:
-            return source_key
 
-        source_key = "menu-action:{}".format(id(action))
+    @staticmethod
+    def _clear_native_action_tips(action):
         try:
-            action.setProperty("tkm_tooltip_source_key", source_key)
+            action.setStatusTip("")
+            action.setToolTip("")
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            return None
-        return source_key
+            pass
 
-    def _hovered_menu_for_action(self, action):
+    def _set_action_help(self, action, title, description="", tooltip_template=None):
         if action is None or not isValid(action):
-            return None
+            return
+        if isinstance(action, QtWidgets.QWidgetAction):
+            self._clear_native_action_tips(action)
+            return
+        if hasattr(action, "setProperty"):
+            action.setProperty("tkm_tooltip_template", tooltip_template)
+            self._action_tooltip_key(action)
+        HelpSystem.push(action, title, description)
+        self._clear_native_action_tips(action)
 
-        cursor_pos = QtGui.QCursor.pos()
-        candidates = [self]
-
-        widget = QtWidgets.QApplication.widgetAt(cursor_pos)
-        while widget is not None:
-            if isinstance(widget, QtWidgets.QMenu):
-                candidates.insert(0, widget)
-            widget = widget.parentWidget()
-
-        active_popup = QtWidgets.QApplication.activePopupWidget()
-        if isinstance(active_popup, QtWidgets.QMenu):
-            candidates.insert(0, active_popup)
-
-        for widget in QtWidgets.QApplication.topLevelWidgets():
-            if isinstance(widget, QtWidgets.QMenu) and widget.geometry().contains(cursor_pos):
-                candidates.append(widget)
-
-        seen = set()
-        for menu in candidates:
-            if id(menu) in seen or not isValid(menu):
-                continue
-            seen.add(id(menu))
-            try:
-                if action not in menu.actions():
-                    continue
-                local_pos = menu.mapFromGlobal(cursor_pos)
-                action_at_cursor = menu.actionAt(local_pos)
-                geometry = menu.actionGeometry(action)
-                if action_at_cursor == action or geometry.contains(local_pos):
-                    return menu
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                continue
-
-        return self
-
-    def _action_screen_rect(self, action):
-        if action is None or not isValid(action):
-            return None, None
-
-        menu = self._hovered_menu_for_action(action)
-        if menu is None or not isValid(menu):
-            return None, None
-
-        try:
-            if action not in menu.actions():
-                return None, None
-            geometry = menu.actionGeometry(action)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            return None, None
-
-        if geometry.isNull() and menu is not self:
-            menu = self
-            if not isValid(menu):
-                return None, None
-            try:
-                if action not in self.actions():
-                    return None, None
-                geometry = self.actionGeometry(action)
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                return None, None
-        if geometry.isNull():
-            return None, None
-        return QtCore.QRect(menu.mapToGlobal(geometry.topLeft()), geometry.size()), menu
+    @staticmethod
+    def _cursor_target_rect(pos=None):
+        return QtCore.QRect(pos or QtGui.QCursor.pos(), QtCore.QSize(1, 1))
 
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
@@ -428,40 +287,30 @@ class MenuWidget(QtWidgets.QMenu):
             tooltip_template=tooltip_template,
         )
         if title or resolved_description or tooltip_template:
-            if hasattr(action, "setProperty"):
-                action.setProperty("tkm_tooltip_template", tooltip_template)
-                self._ensure_action_tooltip_source_key(action)
-            if tooltip_template and hasattr(action, "setToolTip"):
-                action.setToolTip(str(tooltip_template))
-            HelpSystem.push(action, title, resolved_description)
+            self._set_action_help(action, title, resolved_description, tooltip_template)
+        else:
+            self._clear_native_action_tips(action)
         return action
 
     def addMenu(self, *args, **kwargs):
         description = kwargs.pop("description", None)
         item = QtWidgets.QMenu.addMenu(self, *args, **kwargs)
         action = item.menuAction() if hasattr(item, "menuAction") else item
-        label = action.text()
-        if hasattr(action, "setProperty"):
-            self._ensure_action_tooltip_source_key(action)
 
-        HelpSystem.push(action, label, description)
+        label = action.text()
+        self._set_action_help(action, label, description)
         return item
 
     def _on_action_hovered(self, action):
-        if action is None or not isValid(action):
+        if action is None or not isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
+            QFlatTooltipManager.cancel_timer()
             return
 
-        target_rect, anchor_menu = self._action_screen_rect(action)
-        if target_rect is None or target_rect.isNull() or anchor_menu is None:
-            return
-
-        source_key = self._ensure_action_tooltip_source_key(action)
+        source_key = self._action_tooltip_key(action)
         if not source_key:
             return
-        if QFlatTooltipManager.is_current_source(source_key, target_rect=target_rect):
+        if QFlatTooltipManager.is_current_source(source_key):
             return
-
-        QFlatTooltipManager.hide()
 
         try:
             title = action.property("tkm_title") or action.text()
@@ -470,19 +319,20 @@ class MenuWidget(QtWidgets.QMenu):
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return
 
-        # Force push to Maya channels
-        HelpSystem.push(action, title, desc)
+        if not (title or desc or tooltip_template):
+            QFlatTooltipManager.cancel_timer()
+            return
 
-        # Floating Tooltip
         if QFlatTooltipManager.enabled:
             display_template = tooltip_template or ((title, [desc], None) if desc else title)
 
+            cursor_pos = QtGui.QCursor.pos()
             icon = action.icon() if not action.icon().isNull() else None
             QFlatTooltipManager.delayed_show(
                 text=title,
-                anchor_widget=anchor_menu,
-                target_rect=target_rect,
-                target_pos=QtGui.QCursor.pos,
+                anchor_widget=self,
+                target_rect=self._cursor_target_rect(cursor_pos),
+                target_pos=cursor_pos,
                 description=desc,
                 tooltip_template=display_template,
                 icon_obj=icon,
@@ -639,7 +489,7 @@ class QFlatButton(QtWidgets.QPushButton):
         # Consistent Icon Size
         self.setIconSize(QtCore.QSize(DPI(19), DPI(19)))
         if icon:
-            QFlatHoverableIcon.apply(self, icon, highlight=highlight)
+            icons.QHoverableIcon.apply(self, icon, highlight=highlight)
 
         v_padding = 2  # Tight padding since height is fixed
 
@@ -920,7 +770,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
 
     def _apply_icon_visual(self, icon):
         if isinstance(icon, (str, bytes)):
-            QFlatHoverableIcon.apply(self, str(icon), highlight=self._highlight)
+            icons.QHoverableIcon.apply(self, str(icon), highlight=self._highlight)
         elif icon:
             super().setIcon(icon)
 
@@ -2303,12 +2153,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         tooltip_template=item.get("tooltip_template"),
                     )
         menu.addSeparator()
-        pin_def_action = menu.addAction(QtGui.QIcon(media.dot_pins_image), "Pin Defaults", open=True)
+        pin_def_action = menu.addAction(QtGui.QIcon(icons.dot_round), "Pin Defaults", open=True)
         if self._all_modes:
             pin_def_action.triggered.connect(lambda: self.pin_defaults(self._default_keys, menu=menu))
         else:
             pin_def_action.triggered.connect(lambda: self.pin_widget_defaults(menu=menu))
-        pin_all_action = menu.addAction(QtGui.QIcon(media.dot_pins_image), "Pin All", open=True)
+        pin_all_action = menu.addAction(QtGui.QIcon(icons.dot_round), "Pin All", open=True)
         if self._all_modes:
             pin_all_action.triggered.connect(lambda: self.pin_all(menu=menu))
         else:

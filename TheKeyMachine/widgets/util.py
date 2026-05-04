@@ -10,7 +10,7 @@ except ImportError:
     from PySide2 import QtWidgets
     from PySide2.QtWidgets import QMainWindow
 
-from TheKeyMachine.mods import mediaMod as media
+from TheKeyMachine.data import icons
 
 def DPI(val):
     return omui.MQtUtil.dpiScale(val)
@@ -89,9 +89,9 @@ def check_visible_layout(layout):
 def make_inViewMessage(message, icon=None):
 
     if not icon:
-        icon = media.asset_path("tool_icon")
+        icon = icons.TheKeyMachine_icon
     else:
-        icon = media.asset_path(icon, media.getImage(icon))
+        icon = icons.get(icon, icons.path(icon))
     if not icon:
         icon = ""
 

@@ -9,7 +9,7 @@ except Exception:
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 from TheKeyMachine.tools import colors as toolColors
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.timeline as timelineWidgets
@@ -459,7 +459,7 @@ class AnimationOffsetController(QtCore.QObject):
             owner=self._owner,
             key=self._tint_key,
             center_line=True,
-            icon=media.animation_offset_image,
+            icon=icons.animation_offset,
             icon_scale=1.15,
         )
         self._poll_timer.start()

@@ -100,7 +100,7 @@ def get_thekeymachine_codename():
 
 
 def get_tkm_node_image():
-    return os.path.join(INSTALL_PATH, "TheKeyMachine", "data", "img", "tkm_node.png")
+    return os.path.join(INSTALL_PATH, "TheKeyMachine", "data", "icons", "tkm_node.png")
 
 
 def get_tool_data_path(tool_name, filename=None):

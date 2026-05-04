@@ -6,7 +6,7 @@ except ImportError:
     from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
 
 import TheKeyMachine.core.trigger as trigger
-import TheKeyMachine.mods.mediaMod as media
+from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools import common as toolCommon
@@ -263,7 +263,7 @@ def build_orbit_context_menu(parent=None):
     menu = cw.OpenMenuWidget(parent)
 
     auto_transparency_action = menu.addAction(
-        QtGui.QIcon(media.orbit_ui_image),
+        QtGui.QIcon(icons.orbit_ui),
         "Auto Transparency",
         description="Make the floating Orbit tool palette translucent when the cursor is not over it.",
     )
@@ -274,7 +274,7 @@ def build_orbit_context_menu(parent=None):
     menu.addSeparator()
 
     stays_on_top_action = menu.addAction(
-        QtGui.QIcon(media.settings_image),
+        QtGui.QIcon(icons.settings),
         "Stay on Top",
         description="Keep the floating Orbit tool palette above other Maya windows.",
     )
@@ -283,7 +283,7 @@ def build_orbit_context_menu(parent=None):
     stays_on_top_action.triggered.connect(_set_orbit_stays_on_top)
 
     restore_position_action = menu.addAction(
-        QtGui.QIcon(media.orbit_ui_image),
+        QtGui.QIcon(icons.orbit_ui),
         "Restore Position",
         description="Reset the floating Orbit tool palette to its default position above the Orbit toolbar button.",
     )
