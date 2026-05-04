@@ -146,15 +146,10 @@ def exists(name: str) -> bool:
     return get(name) is not None
 
 
-_selection_set_icon_shade_names = {
-    "light": "Light",
-    "base": "",
-    "dark": "Dark",
-}
-
-
 def _selection_set_icon_filename(color):
-    shade = _selection_set_icon_shade_names.get(color.shade, "")
+    if color.shade and color.shade != "base":
+        shade = color.shade.capitalize()
+    else: shade = ""
     return "_{}{}_set.svg".format(color.family, shade)
 
 
