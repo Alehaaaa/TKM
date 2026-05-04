@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import ClassVar, Optional
 import os
 import importlib
 import traceback
@@ -247,6 +247,23 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 class SliderHandle(cw.TooltipMixin, QSlider):
     """Horizontal slider that only drags when grabbing the handle."""
 
+    PERCENT_SCALE: ClassVar[int] = 1000
+
+    DEFAULT_WIDTH: ClassVar[int] = 200
+    DEFAULT_HEIGHT: ClassVar[int] = 24
+    THIN_GROOVE_HEIGHT: ClassVar[int] = 10
+    HANDLE_SIZE: ClassVar[int] = 24
+    HANDLE_RADIUS: ClassVar[int] = 5
+
+    VALUE_FONT_SIZE: ClassVar[int] = 14
+    TEXT_FONT_SIZE: ClassVar[int] = 11
+    VALUE_HANDLE_PADDING: ClassVar[int] = 10
+    VALUE_EDGE_PADDING: ClassVar[int] = 14
+
+    WHEEL_DELTA_STEP: ClassVar[float] = 15.0
+    WHEEL_ACCELERATION_STEP: ClassVar[float] = 0.2
+    WHEEL_ACCELERATION_LIMIT: ClassVar[float] = 8.0
+
     started = Signal()
     moved = Signal(float)
     finished = Signal()
@@ -263,11 +280,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         # theme/state
         self._color = color
         self._text = text
-        self._thin_h = wutil.DPI(10)
-        self._handle = wutil.DPI(24)
-        self._handle_radius = wutil.DPI(5)
-        self._padding_lr = 0
-        self._pressOffset: Optional[int | bool] = None
+        self._press_offset: Optional[int | bool] = None
         self._hover = False
         self._handle_hover = False
         self._tooltip_title = ""
@@ -279,13 +292,13 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
         # fonts
         self._value_font = QFont()
-        self._value_font.setPointSize(wutil.DPI(14))
+        self._value_font.setPointSize(wutil.DPI(self.VALUE_FONT_SIZE))
         self._text_font = QFont()
-        self._text_font.setPixelSize(int(wutil.DPI(11)))
+        self._text_font.setPixelSize(int(wutil.DPI(self.TEXT_FONT_SIZE)))
 
         # size
-        self.setFixedWidth(wutil.DPI(200))
-        self.setFixedHeight(wutil.DPI(24))
+        self.setFixedWidth(wutil.DPI(self.DEFAULT_WIDTH))
+        self.setFixedHeight(wutil.DPI(self.DEFAULT_HEIGHT))
 
         self._apply_stylesheet(thick=False)
 
@@ -305,7 +318,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._hover = False
         self._handle_hover = False
 
-        if self._pressOffset is not None and not self.isSliderDown():
+        if self._press_offset is not None and not self.isSliderDown():
             self._reset()
 
         self.update()
@@ -323,14 +336,14 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
     # --- public helpers ---------------------------------------------------------
     def handle_size(self) -> int:
-        return self._handle
+        return wutil.DPI(self.HANDLE_SIZE)
 
     def percent(self) -> float:
         # internal units = thousandths of a percent
-        return round(self.value() / 1000.0, 3)
+        return round(self.value() / float(self.PERCENT_SCALE), 3)
 
     def set_range(self, min_v: int, max_v: int):
-        self.setRange(int(min_v * 1000), int(max_v * 1000))
+        self.setRange(int(min_v * self.PERCENT_SCALE), int(max_v * self.PERCENT_SCALE))
 
     def apply_wheel_delta(self, delta_units: int):
         """Centralized wheel logic for slider."""
@@ -342,8 +355,8 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._wheel_count += 1
 
         # Multiplier: grows steadily with each notch
-        multiplier = 1.0 + min(self._wheel_count * 0.2, 8.0)
-        inc = int(delta_units / 15.0 * multiplier) * 1000
+        multiplier = 1.0 + min(self._wheel_count * self.WHEEL_ACCELERATION_STEP, self.WHEEL_ACCELERATION_LIMIT)
+        inc = int(delta_units / self.WHEEL_DELTA_STEP * multiplier) * self.PERCENT_SCALE
 
         if not inc:
             return
@@ -356,14 +369,14 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self.setValue(self.value() - inc)
         self.moved.emit(self.percent())
 
-        self._pressOffset = True
+        self._press_offset = True
 
     # --- internals --------------------------------------------------------------
     def _reset(self):
         self.finished.emit()
 
         with ResetWithoutEmit(self):
-            self._pressOffset = None
+            self._press_offset = None
             self._apply_stylesheet(thick=False)
 
         self._wheel_count = 0
@@ -371,8 +384,9 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self.update()
 
     def _apply_stylesheet(self, *, thick: bool):
-        h = self._handle
-        gh = h if thick else self._thin_h
+        h = self.handle_size()
+        radius = wutil.DPI(self.HANDLE_RADIUS)
+        gh = h if thick else wutil.DPI(self.THIN_GROOVE_HEIGHT)
         mt = mb = 0
         if not thick:
             mt = mb = -int((h - gh) / 2)
@@ -387,7 +401,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 QSlider::groove:horizontal {{
     background: {UI_COLORS.dark_gray.hex};
     height: {gh}px;
-    border-radius: {self._handle_radius}px;
+    border-radius: {radius}px;
     margin: 0;
 }}
 QSlider::handle:horizontal {{
@@ -396,14 +410,17 @@ QSlider::handle:horizontal {{
     margin-top: {mt}px;
     margin-bottom: {mb}px;
     border: {handle_border};
-    border-radius: {self._handle_radius}px;
+    border-radius: {radius}px;
     background: {handle_bg};
 }}
 """
         )
 
     def _is_active(self) -> bool:
-        return self.isSliderDown() or (self._pressOffset is not None)
+        return self.isSliderDown() or (self._press_offset is not None)
+
+    def _is_wheel_session(self) -> bool:
+        return self._press_offset is True
 
     def _groove_rect(self) -> QRect:
         opt = QStyleOptionSlider()
@@ -424,8 +441,8 @@ QSlider::handle:horizontal {{
             hrect = self._handle_hit_rect()
             if hrect.contains(e.pos()):
                 self._apply_stylesheet(thick=True)
-                self._pressOffset = e.pos().x() - hrect.x()
-                self._dragged = False
+                self._press_offset = e.pos().x() - hrect.x()
+                self._has_dragged = False
                 self.setSliderDown(True)
                 self.started.emit()
                 e.accept()
@@ -452,14 +469,14 @@ QSlider::handle:horizontal {{
             else:
                 QFlatTooltipManager.cancel_timer()
 
-        if self.isSliderDown() and self._pressOffset is not None and self._pressOffset is not True:
+        if self.isSliderDown() and self._press_offset is not None and not self._is_wheel_session():
             # Re-calculate track width based on style geometry
             groove_rect = self._groove_rect()
             handle_rect = self._handle_rect()
             track_left = groove_rect.left()
             track_w = groove_rect.width() - handle_rect.width()
 
-            desired_left = e.pos().x() - int(self._pressOffset)
+            desired_left = e.pos().x() - int(self._press_offset)
             if track_w > 0:
                 desired_left = max(track_left, min(track_left + track_w, desired_left))
                 ratio = (desired_left - track_left) / track_w
@@ -467,7 +484,7 @@ QSlider::handle:horizontal {{
                 ratio = 0.0
             rng = float(self.maximum() - self.minimum())
             self.setSliderPosition(int(round(self.minimum() + ratio * rng)))
-            self._dragged = True
+            self._has_dragged = True
             self.moved.emit(self.percent())
             e.accept()
             return
@@ -480,7 +497,7 @@ QSlider::handle:horizontal {{
             self.finished.emit()
 
             self._reset()
-            self._pressOffset = None
+            self._press_offset = None
             return e.accept()
         super().mouseReleaseEvent(e)
 
@@ -509,7 +526,7 @@ QSlider::handle:horizontal {{
         p.setRenderHint(QPainter.Antialiasing)
 
         base_color = QColor(self._color)
-        handle_highlighted = getattr(self, "_handle_hover", False) or bool(self._pressOffset)
+        handle_highlighted = getattr(self, "_handle_hover", False) or bool(self._press_offset)
         if handle_highlighted:
             main_color = QColor(
                 min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
@@ -552,15 +569,15 @@ QSlider::handle:horizontal {{
             p.setBrush(main_color)
             p.drawPath(path)
 
-        if not self._pressOffset:
+        if not self._press_offset:
             p.end()
             return
 
         # live % display while dragging/wheeling
         cx = hrect.center().x()
         mid = self.width() // 2
-        pad = wutil.DPI(10)  # slightly more padding from handle
-        edge_pad = wutil.DPI(14)  # padding from the widget edges
+        pad = wutil.DPI(self.VALUE_HANDLE_PADDING)
+        edge_pad = wutil.DPI(self.VALUE_EDGE_PADDING)
 
         if cx < mid:
             # Handle is on the left half, draw text in the right half space
@@ -576,7 +593,7 @@ QSlider::handle:horizontal {{
 
         p.setFont(self._value_font)
         p.setPen(QColor(SLIDER_VALUE_TEXT_HEX))
-        p.drawText(text_rect, align, f"{self.value() / 1000.0:.2f}")
+        p.drawText(text_rect, align, f"{self.value() / float(self.PERCENT_SCALE):.2f}")
         p.end()
 
 
@@ -655,7 +672,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             ov.setAttribute(Qt.WA_StyledBackground, False)
             ov.setMouseTracking(True)
             ov.setVisible(True)
-            ov.setFixedHeight(self._slider._handle)
+            ov.setFixedHeight(self._slider.handle_size())
             ov.installEventFilter(self)
 
         # layouts inside overlays
@@ -1053,7 +1070,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if not s:
             return
         grect = s._groove_rect()
-        h = s._handle
+        h = s.handle_size()
 
         side_w = max(0, (grect.width() - h) // 2)
         sx, sy = s.pos().x(), s.pos().y()
@@ -1094,6 +1111,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def _on_drag_started(self):
         QFlatTooltipManager.hide()
+        self._begin_active_session(open_undo=True)
 
         self.dragStarted.emit()
 
@@ -1105,7 +1123,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._run_dragCommand(percent)
 
     def _on_drag_finished(self):
-        if not getattr(self._slider, "_dragged", True):
+        if not getattr(self._slider, "_has_dragged", True):
             # Pure click-and-release with no drag movement
             self.valueSet.emit(0.0)
             self._run_dragCommand(0.0)
@@ -1129,21 +1147,36 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._sliderSession.finish()
             self._sliderSession = None
 
-    def _run_dragCommand(self, value: float):
-        if self._dragCommand is None:
-            return
-
+    def _begin_active_session(self, *, open_undo: bool = False):
         mode = self.currentMode()
         if mode is None:
-            return
+            return None
 
         if self._sliderSession is None:
             self._sliderSession = slider_api.create_session(mode.key)
         elif self._sliderSession.mode != mode.key:
-            self._sliderSession.switch_mode(mode.key)
+            self._sliderSession.switch_mode(
+                mode.key,
+                title=mode.label,
+                description=mode.description,
+                tooltip_template=getattr(mode, "tooltip_template", None),
+            )
+
+        if open_undo:
+            self._sliderSession.ensure_undo_open()
+
+        return self._sliderSession
+
+    def _run_dragCommand(self, value: float):
+        if self._dragCommand is None:
+            return
+
+        session = self._begin_active_session(open_undo=True)
+        if session is None:
+            return
 
         try:
-            self._dragCommand(mode.key, value, session=self._sliderSession)
+            self._dragCommand(session.mode, value, session=session)
         except Exception as exc:
             self._on_drag_error(exc)
 
@@ -1179,7 +1212,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._disconnect_modifier_watch()
         self.resetDefaultMode()
         # Finalize the interaction if we were wheeling when the mouse leaves the widget
-        if self._slider and self._slider._pressOffset is not None and not self._slider.isSliderDown():
+        if self._slider and self._slider._is_active() and not self._slider.isSliderDown():
             self._slider._reset()
         super().leaveEvent(e)
 

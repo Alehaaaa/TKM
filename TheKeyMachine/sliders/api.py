@@ -93,7 +93,9 @@ def _resolve_session(mode, session):
 
 def start_dragging(mode):
     """Public entry to start a drag session."""
-    return create_session(mode)
+    session = create_session(mode)
+    session.ensure_undo_open()
+    return session
 
 
 def stop_dragging(session=None):
