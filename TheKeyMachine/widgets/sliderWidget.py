@@ -77,19 +77,11 @@ class ResetWithoutEmit:
 
 
 """
-QFlatSliderWidget — COLOR-faithful, single-file recreation (no picks)
+QFlatSliderWidget
 ===============================================================
 
-Self-contained slider that mimics the original AnimBot/COLOR style but
-behaves like a tweenmachine: a centered horizontal scrub from -100..+100.
-No A/B picks. Context menu on right-click (hook point kept).
-
-What's new (same behavior, nicer structure):
-- Wheel works from anywhere inside QFlatSliderWidget (buttons/overlays/empty).
-- Centralized wheel logic via apply_wheel_delta().
-- Clearer separation of responsibilities & comments.
-
-PySide6 or PySide2 (Maya 2017+). No external COLOR import.
+Self-contained slider with a centered horizontal scrub from -100..+100.
+No A/B picks. Context menu on right-click.
 """
 
 
