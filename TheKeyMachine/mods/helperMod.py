@@ -587,29 +587,44 @@ micro_move_tooltip_text = (
     icons.ruler,
 )
 
-temp_pivot_last_tooltip_text = (
-    "Use Last Pivot",
+temp_pivot_last_object_tooltip_text = (
+    "Temp Pivot to Last Object",
     [
-        "Recreate the most recently used Temp Pivot setup on the current selection.",
-        "Useful when repeating the same pivot placement across several controls.",
+        "Create a Temp Pivot aligned to the last selected object's transform.",
     ],
-    icons.temp_pivot_use_last,
+    icons.temp_pivot,
 )
 
 temp_pivot_centered_tooltip_text = (
-    "Centered Temp Pivot",
+    "Temp Pivot Centered",
     [
         "Create a Temp Pivot at the average world transform position of the selected objects.",
     ],
     icons.temp_pivot,
 )
 
+temp_pivot_worldspace_tooltip_text = (
+    "Temp Pivot WorldSpace",
+    [
+        "Create a Temp Pivot that stays at its creation position when time changes.",
+    ],
+    icons.globe,
+)
+
 temp_pivot_edit_tooltip_text = (
-    "Edit Pivot",
+    "Edit Temp Pivot",
     [
         "Enter Maya edit-pivot manipulator mode for the current Temp Pivot.",
     ],
     icons.temp_pivot,
+)
+
+temp_pivot_reset_tooltip_text = (
+    "Reset Temp Pivot",
+    [
+        "Return the active Temp Pivot to the placement mode used when it was created.",
+    ],
+    icons.refresh,
 )
 
 remove_inbetween_tooltip_text = (
