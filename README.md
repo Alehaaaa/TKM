@@ -1,20 +1,22 @@
-<img width="269px" src="./TheKeyMachine/data/img/tkm_logo_small.png" />
+<p align="center">
+  <img width="269px" align="center" src="./TheKeyMachine/data/icons/TheKeyMachine_logo_500.png" alt="TheKeyMachine Logo" />
+</p>
 
-# TheKeyMachine
+# TheKeyMachine, animation toolbar
 
 ![Version](https://img.shields.io/badge/version-0.1.87-blue.svg)
 
 TheKeyMachine (TKM) is an open source Maya animation toolset built for faster key editing, cleaner selection workflows, smarter copy/paste utilities, floating tools, and timeline-aware operations.
 
-It is designed for 3D animators working in Autodesk Maya and currently supports Maya 2022, 2023, 2024, and 2025 on Windows, Linux, and macOS.
+It is designed for 3D animators working in Autodesk Maya and supports Maya 2022 and up on Windows, Linux, and macOS.
 
-TKM is developed by <b>Rodrigo Torres</b> (<a href="https://www.rodritorres.com">rodritorres.com</a>).
+TKM was developed by <b>Rodrigo Torres</b> (<a href="https://www.rodritorres.com">rodritorres.com</a>).
 
-This version is modified by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.io">alehaaaa.github.io</a>), currently working at <b>Framestore</b>.
+This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.io">alehaaaa.github.io</a>), currently working at <b>Framestore</b>.
 
 <a href="https://www.thekeymachine.xyz">thekeymachine.xyz</a>
 
-<img src="./TheKeyMachine/data/img/toolbar_example.png" />
+<img src="./TheKeyMachine/data/icons/toolbar_example.png" />
 
 ## Main Tool Areas
 
@@ -96,6 +98,4 @@ Dedicated modules live under `TheKeyMachine/tools/` for:
 - `orbit`
 - `selection_sets`
 
-This keeps major tool logic separated from the main toolbar assembly.
-
-<img width="200px" src="./TheKeyMachine/data/img/install_example.png" />
+<img width="200px" src="./TheKeyMachine/data/icons/install_example.png" />
