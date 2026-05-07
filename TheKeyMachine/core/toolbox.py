@@ -235,12 +235,28 @@ TOOL_DEFINITIONS = {
     # ---------------------------------------------------------------  TEMP PIVOT --------------------------------------------------------------
 
     "temp_pivot": {
-        "type": "tool",
+        "type": "check",
         "label": "Temp Pivot",
         "text": "TP",
         "icon": icons.temp_pivot,
-        "callback": tempPivotApi.create_temp_pivot,
+        "callback": tempPivotApi.toggle_temp_pivot,
+        "set_checked_fn": tempPivotApi.is_temp_pivot_active,
+        "bind_checked_fn": tempPivotApi.bind_temp_pivot_toolbar_button,
         "tooltip_template": helper.temp_pivot_tooltip_text,
+    },
+    "temp_pivot_centered": {
+        "type": "tool",
+        "label": "Centered Temp Pivot",
+        "icon": icons.temp_pivot,
+        "callback": tempPivotApi.create_centered_temp_pivot,
+        "tooltip_template": helper.temp_pivot_centered_tooltip_text,
+    },
+    "temp_pivot_edit": {
+        "type": "tool",
+        "label": "Edit Pivot",
+        "icon": icons.temp_pivot,
+        "callback": tempPivotApi.edit_temp_pivot,
+        "tooltip_template": helper.temp_pivot_edit_tooltip_text,
     },
     "temp_pivot_last": {
         "type": "tool",
@@ -1563,9 +1579,15 @@ TOOL_SECTION_DEFINITIONS = {
             {
                 "id": "temp_pivot",
                 "default": True,
-                "shortcuts": [{"id": "temp_pivot_last", "keys": [QtCore.Qt.Key_Shift]}],
+                "shortcuts": [
+                    {"id": "temp_pivot_last", "keys": [QtCore.Qt.Key_Shift]},
+                    {"id": "temp_pivot_centered", "keys": [QtCore.Qt.Key_Control]},
+                ],
             },
+            {"id": "temp_pivot_centered"},
             {"id": "temp_pivot_last"},
+            "separator",
+            {"id": "temp_pivot_edit"},
             "separator",
             {"id": "temp_pivot_help"},
         ],

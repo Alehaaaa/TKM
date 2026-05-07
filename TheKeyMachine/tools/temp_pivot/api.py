@@ -161,6 +161,13 @@ def _set_vector_attr(node, attr, value):
         pass
 
 
+def _emit_temp_pivot_state_changed():
+    try:
+        runtime.get_runtime_manager().callback_fired.emit(RUNTIME_KEY)
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
+
+
 def _capture_pivot_attrs(pivot):
     return {attr: _get_vector_attr(pivot, attr) for attr in PIVOT_ATTRS}
 
@@ -197,6 +204,23 @@ def _clear_pivot_transform(pivot):
 
 def _place_pivot_at_last_selected(pivot, selection):
     cmds.xform(pivot, matrix=_matrix_list(_object_pivot_space_matrix(selection[-1])), worldSpace=True)
+
+
+def _selection_transform_center(selection):
+    positions = []
+    for node in selection:
+        matrix_values = _matrix(node)
+        positions.append([matrix_values[12], matrix_values[13], matrix_values[14]])
+    count = float(len(positions) or 1)
+    return [
+        sum(position[index] for position in positions) / count
+        for index in range(3)
+    ]
+
+
+def _place_pivot_at_selection_center(pivot, selection):
+    matrix_value = _set_matrix_translation(_object_pivot_space_matrix(selection[-1]), _selection_transform_center(selection))
+    cmds.xform(pivot, matrix=_matrix_list(matrix_value), worldSpace=True)
 
 
 def _driver_matrix(pivot):
@@ -333,6 +357,16 @@ def _end_session(restore_selection=True):
             _restore_original_selection()
     finally:
         _session["suppress"] = False
+        _emit_temp_pivot_state_changed()
+
+
+def is_temp_pivot_active():
+    return bool(_session.get("active") and cmds.objExists(TEMP_PIVOT_NODE))
+
+
+def end_temp_pivot(*args):
+    if is_temp_pivot_active():
+        _end_session(restore_selection=True)
 
 
 def _on_selection_changed(*args):
@@ -372,7 +406,22 @@ def _select_pivot_for_transform(pivot):
         cmds.setToolTo("moveSuperContext")
 
 
-def create_temp_pivot(use_saved_position=False, *args):
+def edit_temp_pivot(*args):
+    if is_temp_pivot_active():
+        _enter_pivot_edit_mode(TEMP_PIVOT_NODE)
+        return
+    if cmds.currentCtx() == "selectSuperContext":
+        cmds.setToolTo("moveSuperContext")
+    try:
+        cmds.ctxEditMode()
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
+
+
+def create_temp_pivot(use_saved_position=False, centered=False, *args):
+    if is_temp_pivot_active():
+        _end_session(restore_selection=True)
+
     selection = selectionMod.get_selected_objects(long=True, ordered=True)
     selection = [node for node in selection if cmds.objExists(node) and node != TEMP_PIVOT_NODE]
     if not selection:
@@ -388,7 +437,9 @@ def create_temp_pivot(use_saved_position=False, *args):
         pivot = _ensure_pivot_node()
         _session["suppress"] = True
         _clear_pivot_transform(pivot)
-        if not _apply_saved_offset(pivot, selection, saved_entry):
+        if centered:
+            _place_pivot_at_selection_center(pivot, selection)
+        elif not _apply_saved_offset(pivot, selection, saved_entry):
             _place_pivot_at_last_selected(pivot, selection)
         _session["suppress"] = False
 
@@ -407,6 +458,7 @@ def create_temp_pivot(use_saved_position=False, *args):
             _select_pivot_for_transform(pivot)
         else:
             _enter_pivot_edit_mode(pivot)
+        _emit_temp_pivot_state_changed()
 
     except Exception as exc:
         try:
@@ -419,3 +471,37 @@ def create_temp_pivot(use_saved_position=False, *args):
     finally:
         if open_chunk:
             toolCommon.close_undo_chunk(open_chunk)
+
+
+def create_centered_temp_pivot(*args):
+    return create_temp_pivot(centered=True, *args)
+
+
+def toggle_temp_pivot(checked=None, *args):
+    if checked is False:
+        end_temp_pivot()
+        return
+    if is_temp_pivot_active():
+        end_temp_pivot()
+        return
+    return create_temp_pivot(*args)
+
+
+def bind_temp_pivot_toolbar_button(widget):
+    if widget is None:
+        return
+
+    def _sync_from_runtime(key=None):
+        if key not in (None, RUNTIME_KEY, "selection_changed"):
+            return
+        toolCommon.set_checked_safely(widget, is_temp_pivot_active())
+
+    _sync_from_runtime()
+    manager = runtime.get_runtime_manager()
+    toolCommon.replace_tracked_connection(
+        widget,
+        "_tkm_temp_pivot_state_sync",
+        manager.callback_fired,
+        _sync_from_runtime,
+        parent=widget,
+    )

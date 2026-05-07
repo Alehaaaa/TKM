@@ -596,6 +596,22 @@ temp_pivot_last_tooltip_text = (
     icons.temp_pivot_use_last,
 )
 
+temp_pivot_centered_tooltip_text = (
+    "Centered Temp Pivot",
+    [
+        "Create a Temp Pivot at the average world transform position of the selected objects.",
+    ],
+    icons.temp_pivot,
+)
+
+temp_pivot_edit_tooltip_text = (
+    "Edit Pivot",
+    [
+        "Enter Maya edit-pivot manipulator mode for the current Temp Pivot.",
+    ],
+    icons.temp_pivot,
+)
+
 remove_inbetween_tooltip_text = (
     "Remove Inbetween",
     ["Remove inbetweens using the current nudge step value."],
