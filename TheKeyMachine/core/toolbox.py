@@ -236,7 +236,7 @@ TOOL_DEFINITIONS = {
 
     "temp_pivot": {
         "type": "check",
-        "label": "Temp Pivot to Last Object",
+        "label": "Temp Pivot",
         "text": "TP",
         "icon": icons.temp_pivot,
         "callback": tempPivotApi.toggle_temp_pivot,

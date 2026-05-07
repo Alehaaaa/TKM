@@ -19,6 +19,7 @@ TEMP_PIVOT_NODE = "tkm_temp_pivot"
 RUNTIME_KEY = "temp_pivot"
 TIME_SLIDER_CONNECTION = "tkm_temp_pivot_time_slider_connection"
 DATA_OFFSETS_KEY = "offsets"
+PLACEMENT_ORIGINAL = "original"
 PLACEMENT_LAST_OBJECT = "last_object"
 PLACEMENT_CENTERED = "centered"
 PLACEMENT_WORLDSPACE = "worldspace"
@@ -52,7 +53,7 @@ _session = {
     "active": False,
     "selection": [],
     "relative_matrices": {},
-    "placement_mode": PLACEMENT_LAST_OBJECT,
+    "placement_mode": PLACEMENT_ORIGINAL,
     "worldspace_matrix": None,
     "worldspace_origin_matrix": None,
     "previous_time_slider_connection": None,
@@ -90,6 +91,14 @@ def _save_data(data):
 
 def _existing_nodes(nodes):
     return [node for node in nodes or [] if cmds.objExists(node)]
+
+
+def _driven_selection(selection=None, placement_mode=None):
+    selection = list(selection if selection is not None else _session.get("selection") or [])
+    placement_mode = placement_mode or _session.get("placement_mode") or PLACEMENT_ORIGINAL
+    if placement_mode == PLACEMENT_LAST_OBJECT and len(selection) > 1:
+        return selection[:-1]
+    return selection
 
 
 def _matrix(node):
@@ -200,7 +209,7 @@ def _clear_time_slider_connection():
 
 
 def _sync_time_slider_to_original_selection():
-    selection = _existing_nodes(_session.get("selection") or [])
+    selection = _existing_nodes(_driven_selection())
     if not selection:
         return
 
@@ -267,12 +276,12 @@ def _selection_transform_center(selection):
 
 
 def _place_pivot_for_current_preference(pivot, selection, placement_mode=None):
-    placement_mode = placement_mode or _session.get("placement_mode") or PLACEMENT_LAST_OBJECT
+    placement_mode = placement_mode or _session.get("placement_mode") or PLACEMENT_ORIGINAL
     cmds.xform(pivot, matrix=_matrix_list(_origin_pivot_matrix(selection, placement_mode)), worldSpace=True)
 
 
 def _origin_pivot_matrix(selection, placement_mode=None):
-    placement_mode = placement_mode or _session.get("placement_mode") or PLACEMENT_LAST_OBJECT
+    placement_mode = placement_mode or _session.get("placement_mode") or PLACEMENT_ORIGINAL
     if placement_mode == PLACEMENT_WORLDSPACE:
         matrix_values = _coerce_matrix_values(_session.get("worldspace_origin_matrix") or _session.get("worldspace_matrix"))
         if matrix_values:
@@ -285,7 +294,7 @@ def _origin_pivot_matrix(selection, placement_mode=None):
 def _session_offset_key(selection, placement_mode=None):
     return json.dumps(
         {
-            "placement_mode": placement_mode or _session.get("placement_mode") or PLACEMENT_LAST_OBJECT,
+            "placement_mode": placement_mode or _session.get("placement_mode") or PLACEMENT_ORIGINAL,
             "selection": list(selection or []),
         },
         sort_keys=True,
@@ -307,7 +316,7 @@ def _save_session_offset():
     selection = _existing_nodes(_session.get("selection") or [])
     if not selection:
         return
-    placement_mode = _session.get("placement_mode") or PLACEMENT_LAST_OBJECT
+    placement_mode = _session.get("placement_mode") or PLACEMENT_ORIGINAL
     origin_matrix = _origin_pivot_matrix(selection, placement_mode)
     key = _session_offset_key(selection, placement_mode)
     offset_values = _matrix_list(_driver_matrix(TEMP_PIVOT_NODE) * origin_matrix.inverse())
@@ -326,7 +335,7 @@ def _save_session_offset():
 
 
 def _apply_session_offset(pivot, selection, placement_mode=None):
-    placement_mode = placement_mode or _session.get("placement_mode") or PLACEMENT_LAST_OBJECT
+    placement_mode = placement_mode or _session.get("placement_mode") or PLACEMENT_ORIGINAL
     key = _session_offset_key(selection, placement_mode)
     offset_values = _coerce_matrix_values(_session_offsets.get(key))
     if not offset_values:
@@ -389,7 +398,7 @@ def _is_pivot_edit_attr(attr):
 def _refresh_relative_matrices():
     if not _session["active"] or not cmds.objExists(TEMP_PIVOT_NODE):
         return
-    selection = _existing_nodes(_session.get("selection") or [])
+    selection = _existing_nodes(_driven_selection())
     if not selection:
         return
     _session["relative_matrices"] = _relative_matrices(TEMP_PIVOT_NODE, selection)
@@ -419,7 +428,7 @@ def _reset_session_state(selection=None):
             "active": False,
             "selection": list(selection or []),
             "relative_matrices": {},
-            "placement_mode": PLACEMENT_LAST_OBJECT,
+            "placement_mode": PLACEMENT_ORIGINAL,
             "worldspace_matrix": None,
             "worldspace_origin_matrix": None,
             "previous_time_slider_connection": None,
@@ -487,7 +496,7 @@ def _reset_pivot_to_current_preference(select_pivot=False, clear_pivot_edits=Fal
         )
     finally:
         _session["suppress"] = False
-    _session["relative_matrices"] = _relative_matrices(TEMP_PIVOT_NODE, selection)
+    _session["relative_matrices"] = _relative_matrices(TEMP_PIVOT_NODE, _driven_selection(selection))
     _sync_time_slider_to_original_selection()
     if select_pivot:
         _select_pivot_for_transform(TEMP_PIVOT_NODE)
@@ -502,7 +511,7 @@ def _refresh_after_time_change():
         if not selection:
             _end_session(restore_selection=True)
             return
-        _session["relative_matrices"] = _relative_matrices(TEMP_PIVOT_NODE, selection)
+        _session["relative_matrices"] = _relative_matrices(TEMP_PIVOT_NODE, _driven_selection(selection))
         _sync_time_slider_to_original_selection()
         return
     _reset_pivot_to_current_preference(select_pivot=False)
@@ -558,7 +567,7 @@ def edit_temp_pivot(*args):
         pass
 
 
-def create_temp_pivot(*args, centered=False, worldspace=False):
+def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False):
     if is_temp_pivot_active():
         _end_session(restore_selection=True)
 
@@ -575,8 +584,10 @@ def create_temp_pivot(*args, centered=False, worldspace=False):
             placement_mode = PLACEMENT_WORLDSPACE
         elif centered:
             placement_mode = PLACEMENT_CENTERED
-        else:
+        elif last_object:
             placement_mode = PLACEMENT_LAST_OBJECT
+        else:
+            placement_mode = PLACEMENT_ORIGINAL
 
         pivot = _ensure_pivot_node()
         _session["suppress"] = True
@@ -598,7 +609,7 @@ def create_temp_pivot(*args, centered=False, worldspace=False):
             {
                 "active": True,
                 "selection": list(selection),
-                "relative_matrices": _relative_matrices(pivot, selection),
+                "relative_matrices": _relative_matrices(pivot, _driven_selection(selection, placement_mode)),
                 "placement_mode": placement_mode,
                 "worldspace_matrix": _matrix(pivot) if placement_mode == PLACEMENT_WORLDSPACE else None,
                 "worldspace_origin_matrix": origin_matrix if placement_mode == PLACEMENT_WORLDSPACE else None,
@@ -634,7 +645,7 @@ def create_centered_temp_pivot(*args):
 
 
 def create_last_object_temp_pivot(*args):
-    return create_temp_pivot(*args)
+    return create_temp_pivot(*args, last_object=True)
 
 
 def create_worldspace_temp_pivot(*args):
