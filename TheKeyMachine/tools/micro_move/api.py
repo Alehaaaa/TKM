@@ -433,6 +433,8 @@ def activate_micro_move(*args):
 
 
 class MicroMoveController(QtCore.QObject):
+    stateChanged = QtCore.Signal(bool)
+
     def __init__(self, owner):
         super().__init__(owner)
         self._owner = owner
@@ -453,6 +455,7 @@ class MicroMoveController(QtCore.QObject):
         self._enabled = toolCommon.open_undo_chunk()
         activate_micro_move()
         self._timer.start()
+        self.stateChanged.emit(self.is_enabled())
 
     def deactivate(self):
         self._enabled = False
@@ -470,17 +473,13 @@ class MicroMoveController(QtCore.QObject):
             toolCommon.close_undo_chunk()
         except Exception:
             pass
+        self.stateChanged.emit(False)
 
     def toggle(self, checked=None, button_widget=None):
         if checked is None:
             checked = not self._enabled
 
         checked = bool(checked)
-
-        if button_widget and isValid(button_widget):
-            button_widget.blockSignals(True)
-            button_widget.setChecked(checked)
-            button_widget.blockSignals(False)
 
         if checked:
             self.activate()

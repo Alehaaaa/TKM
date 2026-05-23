@@ -42,6 +42,13 @@ def get_selected_objects(long=False, ordered=False, orderedSelection=None):
         return selection_strings
 
 
+def get_valid_selected_objects(long=False, ordered=False, orderedSelection=None):
+    raw = get_selected_objects(long=long, ordered=ordered, orderedSelection=orderedSelection)
+    if not raw:
+        return []
+    curves = set(cmds.ls(raw, type="animCurve", long=long) or [])
+    return [x for x in raw if x not in curves]
+
 def get_selected_object_count():
     if om is not None:
         try:

@@ -26,6 +26,7 @@ import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.core.toolWidgets as toolWidgets
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
+from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.customWidgets as cw
 from TheKeyMachine.widgets import util as wutil
 
@@ -67,8 +68,12 @@ def _add_toolbox_action(menu, tool_id):
     if tool.get("setting_toggle"):
         spec = toolWidgets.setting_toggle_specs().get(tool_id)
         if spec:
-            action.toggled.connect(spec["set_checked"])
-            toolWidgets.bind_setting_toggle(action, spec)
+            toolCommon.connect_checkable_action(
+                action,
+                getter=spec["get_checked"],
+                setter=spec["set_checked"],
+                signal=spec.get("changed_signal"),
+            )
     return action
 
 
@@ -567,9 +572,12 @@ def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
         "Graph Editor Toolbar",
         description="Show or hide the TKM toolbar inside the Graph Editor.",
     )
-    graph_toolbar_action.setCheckable(True)
-    graph_toolbar_action.toggled.connect(lambda state: graphToolbarApi.set_graph_toolbar_enabled(bool(state)))
-    graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
+    toolCommon.connect_checkable_action(
+        graph_toolbar_action,
+        getter=graphToolbarApi.get_graph_toolbar_checkbox_state,
+        setter=lambda state: graphToolbarApi.set_graph_toolbar_enabled(bool(state)),
+        signal=graphToolbarApi.custom_graph_bus.graph_toolbar_enabled_changed,
+    )
 
 
 def should_show_toolbar_pinning_menu(toolbar_widget, pos):
@@ -752,9 +760,12 @@ def build_graph_settings_menu(
         "Graph Editor Toolbar",
         description="Show or hide the TKM toolbar inside the Graph Editor.",
     )
-    graph_toolbar_action.setCheckable(True)
-    graph_toolbar_action.toggled.connect(lambda state: graphToolbarApi.set_graph_toolbar_enabled(bool(state)))
-    graphToolbarApi.bind_graph_toolbar_toggle(graph_toolbar_action)
+    toolCommon.connect_checkable_action(
+        graph_toolbar_action,
+        getter=graphToolbarApi.get_graph_toolbar_checkbox_state,
+        setter=lambda state: graphToolbarApi.set_graph_toolbar_enabled(bool(state)),
+        signal=graphToolbarApi.custom_graph_bus.graph_toolbar_enabled_changed,
+    )
 
     dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the Graph Editor toolbar.")
     menu.addMenu(dock_menu)

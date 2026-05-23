@@ -245,23 +245,22 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     if not graph_qw:
         return
 
-    flow_qw = cw.QFlowContainer()
+    flow_qw = cw.QFlatToolbar(
+        settings_namespace="graph_toolbar_toolbuttons",
+        margin=2,
+        spacing_w=10,
+        spacing_h=6,
+        alignment=_graph_toolbar_alignment(),
+    )
     flow_qw.setObjectName(_GRAPH_TOOLBAR_OBJECT)
-    flow_qw._tkm_sections = []
     flow_qw.hide()
     _GRAPH_TOOLBAR_WIDGET = flow_qw
 
-    flowtoolbar_layout = cw.QFlowLayout(flow_qw, margin=2, Wspacing=10, Hspacing=6, alignment=_graph_toolbar_alignment())
-
     def new_section(hiddeable=True, color=None):
-        sec = cw.QFlatSectionWidget(
+        return flow_qw.add_section(
             hiddeable=hiddeable,
-            settings_namespace="graph_toolbar_toolbuttons",
             color=color,
         )
-        flow_qw._tkm_sections.append(sec)
-        flowtoolbar_layout.addWidget(sec)
-        return sec
 
     def _build_graph_settings_menu(_menu, source_widget=None):
         return toolMenus.build_graph_settings_menu(

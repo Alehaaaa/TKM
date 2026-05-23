@@ -42,6 +42,8 @@ MANIP_CONTEXT_TOKENS = (
 
 
 class AnimationOffsetController(QtCore.QObject):
+    stateChanged = QtCore.Signal(bool)
+
     def __init__(self, owner):
         super().__init__(owner)
         self._owner = owner
@@ -475,6 +477,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._last_values = {}
         self._pending_manip_plugs.clear()
         self._time_range = None
+        self.stateChanged.emit(False)
 
     def toggle(self, checked=None, button_widget=None):
         if checked is None:
@@ -491,14 +494,10 @@ class AnimationOffsetController(QtCore.QObject):
             if tint_color is not None:
                 self._tint_color = tint_color
 
-        if button_widget and isValid(button_widget):
-            button_widget.blockSignals(True)
-            button_widget.setChecked(checked)
-            button_widget.blockSignals(False)
-
         if checked:
             self._chunk_opened = toolCommon.open_undo_chunk()
             self.activate()
+            self.stateChanged.emit(self.is_enabled())
         else:
             self.deactivate()
             try:

@@ -1347,6 +1347,8 @@ def selector_window(*args):
     # If no instance exists, create a new one
     dlg = customDialogs.QFlatSelectorDialog()
     dlg.place_near_cursor()
+    dlg.activateWindow()
+    dlg.list_widget.setFocus()
 
 
 def select_objects_from_list(list_name, *args):

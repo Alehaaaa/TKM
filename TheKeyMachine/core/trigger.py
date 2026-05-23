@@ -177,14 +177,16 @@ def nudge_value(default: int = 1, source_widget=None) -> int:
 def _toggle_animation_offset(*_args, **_kwargs):
     toolbar = _toolbar()
     if toolbar:
-        return toolbar.toggleAnimOffsetButton()
+        state = _args[0] if _args else _kwargs.get("checked")
+        return toolbar.toggleAnimOffsetButton(state)
     return None
 
 
 def _toggle_micro_move(*_args, **_kwargs):
     toolbar = _toolbar()
     if toolbar:
-        return toolbar.toggle_micro_move_button()
+        state = _args[0] if _args else _kwargs.get("checked")
+        return toolbar.toggle_micro_move_button(state)
     return None
 
 

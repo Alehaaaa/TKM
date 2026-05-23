@@ -674,6 +674,30 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         )
         self.setShortcutVariants(shortcut_variants or [])
 
+    def connect_tool(self, callback=None, *, checkable=None, state_fn=None, bind_fn=None, changed_signal=None):
+        """
+        Bind this tool button to its action in the same place its check state is wired.
+
+        Tool descriptors can still use ``create_tool_button_from_data``. Direct callers
+        can use this when they need a button first and wiring second.
+        """
+        return toolCommon.connect_tool_control(
+            self,
+            callback,
+            checkable=checkable,
+            getter=state_fn,
+            changed_signal=changed_signal,
+            bind_fn=bind_fn,
+        )
+
+    def connect_window_toggle(self, toggle, *, menu_factory=None, context_attr="_tkm_window_toggle_context_menu"):
+        return toolCommon.connect_window_toggle_control(
+            self,
+            toggle,
+            menu_factory=menu_factory,
+            context_attr=context_attr,
+        )
+
     def setIcon(self, icon):
         """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
         if isinstance(icon, (str, bytes)):
@@ -983,10 +1007,7 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
     if data.get("tint_color") is not None:
         btn.set_tint_color(data.get("tint_color"))
 
-    callback = data.get("callback")
-    if callback:
-        checkable, state_fn = _setup_setting_synced_checkable(btn, data)
-        _connect_tool_button_callback(btn, callback, checkable, state_fn)
+    toolCommon.connect_control_from_data(btn, data)
 
     menu = data.get("menu")
     if callable(menu):
@@ -1012,57 +1033,18 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
 
 
 def _checked_state_fn(data):
-    return data.get("set_checked_fn") or data.get("set_checked")
+    return toolCommon.checked_state_getter(data)
 
 
 def _sync_checked_from_setting(control, state_fn):
-    if control is None or not callable(state_fn):
-        return
-    try:
-        control.setChecked(bool(state_fn()))
-    except Exception:
-        pass
+    return toolCommon.sync_checked(control, state_fn)
 
 
 def _setup_setting_synced_checkable(control, data):
     checkable = bool(data.get("checkable", data.get("type") == "check"))
     state_fn = _checked_state_fn(data)
-    bind_fn = data.get("bind_checked_fn")
-
-    control.setCheckable(checkable)
-    if not checkable:
-        return checkable, None
-
-    _sync_checked_from_setting(control, state_fn)
-    if callable(bind_fn):
-        try:
-            bind_fn(control)
-        except Exception:
-            pass
+    toolCommon.connect_control_from_data(control, data, callback=None)
     return checkable, state_fn
-
-
-def _connect_tool_button_callback(button, callback, checkable=False, state_fn=None):
-    if not callback:
-        return
-
-    if checkable:
-        def _checked_cb(*args, cb=callback, b=button, fn=state_fn):
-            checked = bool(args[0]) if args else b.isChecked()
-            b.triggerToolCallback(cb, checked)
-            try:
-                valid = isValid(b)
-            except Exception:
-                valid = False
-            if valid:
-                _sync_checked_from_setting(b, fn)
-
-        return button.clicked.connect(_checked_cb)
-
-    def _clicked_cb(*_args, cb=callback, b=button):
-        return b.triggerToolCallback(cb)
-
-    button.clicked.connect(_clicked_cb)
 
 
 class QFlowLayout(QtWidgets.QLayout):
@@ -1412,6 +1394,53 @@ class QFlowContainer(QtWidgets.QWidget):
                 self.setFixedHeight(new_h)
 
 
+class QFlatToolbar(QFlowContainer):
+    """
+    A unified, reusable toolbar widget that uses QFlowLayout to contain
+    multiple QFlatSectionWidgets and dynamically updates its height.
+    """
+
+    def __init__(self, parent=None, settings_namespace=None, margin=2, spacing_w=10, spacing_h=6, alignment=None):
+        super().__init__(parent)
+        self.setObjectName("tkm_flat_toolbar")
+        self._tkm_sections = []
+        self._settings_namespace = settings_namespace
+
+        # Use QFlowLayout to allow section wrapping
+        layout = QFlowLayout(
+            self,
+            margin=margin,
+            Wspacing=spacing_w,
+            Hspacing=spacing_h,
+            alignment=alignment or QtCore.Qt.AlignLeft
+        )
+        self.setLayout(layout)
+
+    def add_section(self, spacing=0, hiddeable=True, color=None, settings_namespace=None):
+        sec = QFlatSectionWidget(
+            parent=self,
+            spacing=spacing,
+            hiddeable=hiddeable,
+            settings_namespace=settings_namespace or self._settings_namespace,
+            color=color,
+        )
+        self._tkm_sections.append(sec)
+        self.layout().addWidget(sec)
+        return sec
+
+    def set_alignment(self, alignment):
+        layout = self.layout()
+        if layout:
+            try:
+                layout.setAlignment(alignment)
+                layout.invalidate()
+            except Exception:
+                pass
+        self.updateGeometry()
+        self.update()
+        self._update_height()
+
+
 class PersistentPlaceholderLineEdit(QtWidgets.QLineEdit):
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -1751,8 +1780,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             List of action descriptors or the string ``"separator"``.
             Each descriptor dict may contain:
               key, label, icon, callback,
-             checkable (bool), set_checked_fn/set_checked (callable),
-             bind_checked_fn (callable), tooltip, description.
+              checkable (bool), get_checked/get_checked_fn (callable),
+              changed_signal, bind_checked_fn (callable), tooltip, description.
         """
         default_items = [
             i
@@ -1773,10 +1802,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             key = default_item.get("id", "unknown")
             item_default = default_item.get("default", default)
 
-            checkable, set_checked_fn = _setup_setting_synced_checkable(widget, default_item)
-
-            if "callback" in default_item:
-                _connect_tool_button_callback(widget, default_item["callback"], checkable, set_checked_fn)
+            toolCommon.connect_control_from_data(widget, default_item)
 
             # 1. Register the main widget in the section
             self.addWidget(

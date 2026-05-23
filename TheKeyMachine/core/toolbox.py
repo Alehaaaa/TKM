@@ -240,7 +240,7 @@ TOOL_DEFINITIONS = {
         "text": "TP",
         "icon": icons.temp_pivot,
         "callback": tempPivotApi.toggle_temp_pivot,
-        "set_checked_fn": tempPivotApi.is_temp_pivot_active,
+        "get_checked": tempPivotApi.is_temp_pivot_active,
         "bind_checked_fn": tempPivotApi.bind_temp_pivot_toolbar_button,
         "tooltip_template": helper.temp_pivot_tooltip_text,
     },

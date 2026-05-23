@@ -67,10 +67,10 @@ def setting_toggle_specs():
         manager.overshootChanged.emit(bool(state))
 
     def _get_euler_filter():
-        return attributeSwitcherApi.get_attribute_switcher_euler_filter_enabled()
+        return attributeSwitcherApi.is_euler_filter_enabled()
 
     def _set_euler_filter(state):
-        attributeSwitcherApi.set_attribute_switcher_euler_filter_enabled(bool(state))
+        attributeSwitcherApi.set_euler_filter_enabled(bool(state))
 
     def _set_graph_toolbar(state):
         graphToolbarApi.set_graph_toolbar_enabled(bool(state), apply=True)
@@ -211,7 +211,7 @@ def add_selector_button(section, item_data):
     def update_selector_button_text(*_args, button=btn):
         if not wutil.is_valid_widget(button):
             return
-        button.setCount(selectionMod.get_selected_object_count())
+        button.setCount(len(selectionMod.get_valid_selected_objects()))
 
     toolCommon.replace_tracked_connection(
         btn,

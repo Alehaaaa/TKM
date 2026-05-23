@@ -1,7 +1,7 @@
 try:
-    from PySide2 import QtCore, QtGui
+    from PySide2 import QtCore, QtGui  # type: ignore
 except ImportError:
-    from PySide6 import QtCore, QtGui
+    from PySide6 import QtCore, QtGui  # type: ignore
 
 import TheKeyMachine.tools.orbit.api as orbitApi
 from TheKeyMachine.widgets import customDialogs

@@ -30,7 +30,7 @@ except ImportError:
     QRegularExpression = QRegExp
     QRegularExpressionValidator = QRegExpValidator
 
-from TheKeyMachine.mods.selectionMod import get_selected_objects
+from TheKeyMachine.mods.selectionMod import get_selected_objects, get_valid_selected_objects
 from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
@@ -1147,7 +1147,10 @@ class QFlatSelectorDialog(QFlatToolBarPopupDialog):
         """Fills the list with current selection names and preserves active selection in the UI."""
         self._refreshing = True
         self.list_widget.blockSignals(True)
-        selected = self._sort_selected_objects_for_display(get_selected_objects(long=True))
+        
+        valid_selected = get_valid_selected_objects(long=True)
+            
+        selected = self._sort_selected_objects_for_display(valid_selected)
         self._pending_objects = selected
         item_labels = [obj.rsplit("|", 1)[-1] for obj in selected]
         self.title_label.setText(str(len(selected)))

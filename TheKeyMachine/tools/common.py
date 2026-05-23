@@ -262,6 +262,195 @@ def set_checked_safely(widget, checked):
                 pass
 
 
+def connect_action(action, callback):
+    if action is None or callback is None:
+        return action
+    try:
+        action.triggered.connect(callback)
+    except Exception:
+        pass
+    return action
+
+
+def connect_checkable_action(action, getter=None, setter=None, signal=None):
+    if action is None:
+        return action
+    try:
+        action.setCheckable(True)
+    except Exception:
+        return action
+    if callable(getter):
+        set_checked_safely(action, getter())
+    if setter is not None:
+        try:
+            action.triggered.connect(setter)
+        except Exception:
+            pass
+
+    if signal is not None and callable(getter):
+        def _sync(*_args, target=action, state_fn=getter):
+            set_checked_safely(target, state_fn())
+
+        replace_tracked_connection(
+            action,
+            "_tkm_checkable_action_sync",
+            signal,
+            _sync,
+            parent=action,
+        )
+    return action
+
+
+def checked_state_getter(data):
+    if not isinstance(data, dict):
+        return None
+    return (
+        data.get("get_checked_fn")
+        or data.get("get_checked")
+        or data.get("is_checked_fn")
+        or data.get("is_checked")
+        or data.get("set_checked_fn")
+        or data.get("set_checked")
+    )
+
+
+def sync_checked(control, getter):
+    if control is None or not callable(getter):
+        return False
+    try:
+        return set_checked_safely(control, bool(getter()))
+    except Exception:
+        return False
+
+
+def bind_checked_signal(control, signal, getter, attr_name="_tkm_checked_state_sync"):
+    if control is None or signal is None or not callable(getter):
+        return None
+
+    def _sync(*_args, target=control, state_fn=getter):
+        sync_checked(target, state_fn)
+
+    return replace_tracked_connection(
+        control,
+        attr_name,
+        signal,
+        _sync,
+        parent=control,
+    )
+
+
+def configure_checkable_control(control, checkable=None, getter=None, changed_signal=None):
+    if control is None:
+        return control
+    if checkable is not None:
+        try:
+            control.setCheckable(bool(checkable))
+        except Exception:
+            return control
+    try:
+        is_checkable = bool(control.isCheckable())
+    except Exception:
+        is_checkable = bool(checkable)
+    if is_checkable:
+        sync_checked(control, getter)
+        bind_checked_signal(control, changed_signal, getter)
+    return control
+
+
+def trigger_tool_callback(button, callback, *args, **kwargs):
+    trigger_fn = getattr(button, "triggerToolCallback", None)
+    if callable(trigger_fn):
+        return trigger_fn(callback, *args, **kwargs)
+    if callable(callback):
+        return callback(*args, **kwargs)
+    return None
+
+
+def _connect_control_trigger(control, callback):
+    signal = getattr(control, "clicked", None) or getattr(control, "triggered", None)
+    if signal is None:
+        return False
+    try:
+        signal.connect(callback)
+        return True
+    except Exception:
+        return False
+
+
+def connect_tool_control(
+    control,
+    callback=None,
+    *,
+    checkable=None,
+    getter=None,
+    changed_signal=None,
+    bind_fn=None,
+):
+    configure_checkable_control(control, checkable=checkable, getter=getter, changed_signal=changed_signal)
+
+    if callable(bind_fn):
+        try:
+            bind_fn(control)
+        except Exception:
+            pass
+
+    if callback is None or control is None:
+        return control
+
+    try:
+        is_checkable = bool(control.isCheckable())
+    except Exception:
+        is_checkable = bool(checkable)
+
+    if is_checkable:
+        def _checked_cb(*args, cb=callback, target=control, state_fn=getter):
+            checked = bool(args[0]) if args else bool(target.isChecked())
+            result = trigger_tool_callback(target, cb, checked)
+            sync_checked(target, state_fn)
+            return result
+
+        _connect_control_trigger(control, _checked_cb)
+        return control
+
+    def _clicked_cb(*_args, cb=callback, target=control):
+        return trigger_tool_callback(target, cb)
+
+    _connect_control_trigger(control, _clicked_cb)
+    return control
+
+
+_USE_DESCRIPTOR_CALLBACK = object()
+
+
+def connect_control_from_data(control, data, callback=_USE_DESCRIPTOR_CALLBACK):
+    data = data or {}
+    resolved_callback = data.get("callback") if callback is _USE_DESCRIPTOR_CALLBACK else callback
+    checkable = bool(data.get("checkable", data.get("type") == "check"))
+    getter = checked_state_getter(data)
+    changed_signal = data.get("changed_signal")
+    bind_fn = data.get("bind_checked_fn")
+
+    if checkable or resolved_callback is not None or getter or changed_signal or bind_fn:
+        connect_tool_control(
+            control,
+            resolved_callback,
+            checkable=checkable,
+            getter=getter,
+            changed_signal=changed_signal,
+            bind_fn=bind_fn,
+        )
+    return control
+
+
+def connect_window_toggle_control(control, toggle, *, menu_factory=None, context_attr="_tkm_window_toggle_context_menu"):
+    if menu_factory is None:
+        if toggle:
+            toggle.attach_button(control)
+        return control
+    bind_toolbar_button_context_menu(toggle, control, context_attr, menu_factory)
+    return control
+
+
 def clear_tracked_connection(owner, attr_name):
     relay = getattr(owner, attr_name, None)
     if relay is None:

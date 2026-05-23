@@ -668,24 +668,24 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_toolbar_widget = cw.QFlowContainer()
-        self.main_toolbar_widget._tkm_sections = []
+
+        toolbar_alignment = self._get_current_icon_alignment()
+        self.main_toolbar_widget = cw.QFlatToolbar(
+            parent=self,
+            settings_namespace="main_toolbar_toolbuttons",
+            margin=2,
+            spacing_w=10,
+            spacing_h=6,
+            alignment=toolbar_alignment,
+        )
         self.main_layout.addWidget(self.main_toolbar_widget)
 
-        # Use QFlowLayout to allow wrapping
-        toolbar_alignment = self._get_current_icon_alignment()
-        self.toolbar_layout = cw.QFlowLayout(self.main_toolbar_widget, margin=2, Wspacing=10, Hspacing=6, alignment=toolbar_alignment)
-
         def new_section(spacing=0, hiddeable=True, color=None):
-            sec = cw.QFlatSectionWidget(
+            return self.main_toolbar_widget.add_section(
                 spacing=spacing,
                 hiddeable=hiddeable,
-                settings_namespace="main_toolbar_toolbuttons",
                 color=color,
             )
-            self.main_toolbar_widget._tkm_sections.append(sec)
-            self.toolbar_layout.addWidget(sec)
-            return sec
 
         self._populate_toolbar_from_layout("main", new_section)
 

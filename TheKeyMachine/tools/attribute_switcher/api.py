@@ -1,7 +1,7 @@
-try:
-    from PySide2 import QtCore, QtGui, QtWidgets
-except ImportError:
-    from PySide6 import QtCore, QtGui, QtWidgets
+# try:
+#     from PySide2 import QtCore, QtGui, QtWidgets
+# except ImportError:
+#     from PySide6 import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
@@ -16,9 +16,21 @@ from TheKeyMachine.tools.attribute_switcher.common import (
 from TheKeyMachine.tools.attribute_switcher.customDialogs import AttributeSwitcherWindow
 from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
 
+# Public API surface
+__all__ = [
+    "attribute_switcher_window",
+    "close_attribute_switcher_window",
+    "toggle_attribute_switcher_window",
+    "show",
+    "popup",
+    "is_euler_filter_enabled",
+    "set_euler_filter_enabled",
+    "is_stay_on_top",
+    "set_stay_on_top",
+    "bind_attribute_switcher_toolbar_button",
+]
+
 _attribute_switcher_instance = None
-
-
 attribute_switcher_window_bus = toolCommon.WindowStateBus()
 
 
@@ -33,17 +45,27 @@ def _emit_attribute_switcher_window_state(is_open):
         pass
 
 
-def _attribute_switcher_stays_on_top():
-    return settings.get_setting(ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY, False, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
+def is_stay_on_top():
+    """Return whether the Attribute Switcher window is set to stay on top."""
+    return settings.get_setting(
+        ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
+        False,
+        namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
+    )
 
 
-def get_attribute_switcher_euler_filter_enabled():
-    return bool(settings.get_setting("euler_filter", True, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE))
+def is_euler_filter_enabled():
+    """Return the current euler‑filter setting for the Attribute Switcher."""
+    return bool(
+        settings.get_setting(
+            "euler_filter", True, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE
+        )
+    )
 
 
 def emit_attribute_switcher_euler_filter_state():
     try:
-        runtime.get_runtime_manager().eulerFilterChanged.emit(get_attribute_switcher_euler_filter_enabled())
+        runtime.get_runtime_manager().eulerFilterChanged.emit(is_euler_filter_enabled())
     except Exception:
         pass
 
@@ -51,7 +73,6 @@ def emit_attribute_switcher_euler_filter_state():
 def bind_attribute_switcher_euler_filter_toggle(widget):
     if widget is None:
         return
-
     def _sync(enabled):
         try:
             if not wutil.is_valid_widget(widget):
@@ -59,8 +80,7 @@ def bind_attribute_switcher_euler_filter_toggle(widget):
         except Exception:
             pass
         toolCommon.set_checked_safely(widget, bool(enabled))
-
-    toolCommon.set_checked_safely(widget, get_attribute_switcher_euler_filter_enabled())
+    toolCommon.set_checked_safely(widget, is_euler_filter_enabled())
     toolCommon.replace_tracked_connection(
         widget,
         "_tkm_attribute_switcher_euler_filter_sync_relay",
@@ -70,8 +90,10 @@ def bind_attribute_switcher_euler_filter_toggle(widget):
     )
 
 
-def set_attribute_switcher_euler_filter_enabled(enabled):
-    settings.set_setting("euler_filter", bool(enabled), namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
+def set_euler_filter_enabled(enabled):
+    settings.set_setting(
+        "euler_filter", bool(enabled), namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE
+    )
     dlg = get_attribute_switcher_window()
     if dlg and wutil.is_valid_widget(dlg):
         try:
@@ -83,7 +105,10 @@ def set_attribute_switcher_euler_filter_enabled(enabled):
 
 def get_attribute_switcher_window():
     global _attribute_switcher_instance
-    if _attribute_switcher_instance and wutil.is_valid_widget(_attribute_switcher_instance):
+    if (
+        _attribute_switcher_instance
+        and wutil.is_valid_widget(_attribute_switcher_instance)
+    ):
         return _attribute_switcher_instance
     _attribute_switcher_instance = None
     return None
@@ -116,7 +141,7 @@ def attribute_switcher_window(reuse_existing=True, popup=True, anchor_to_toolbar
     if reuse_existing and dlg and wutil.is_valid_widget(dlg):
         if not dlg.isVisible():
             dlg.show()
-        dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, _attribute_switcher_stays_on_top())
+        dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, is_stay_on_top())
         dlg.show()
         if anchor_to_toolbar:
             dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=wutil.DPI(18))
@@ -126,22 +151,18 @@ def attribute_switcher_window(reuse_existing=True, popup=True, anchor_to_toolbar
         dlg.activateWindow()
         _emit_attribute_switcher_window_state(True)
         return dlg
-
     close_attribute_switcher_window()
-
     dlg = AttributeSwitcherWindow(parent=_parent_widget(), popup=popup)
-    dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, _attribute_switcher_stays_on_top())
+    dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, is_stay_on_top())
     dlg.show()
     if anchor_to_toolbar:
         dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=wutil.DPI(18))
     elif popup:
         dlg.place_near_cursor()
-
     def _on_destroyed(*_):
         global _attribute_switcher_instance
         _attribute_switcher_instance = None
         _emit_attribute_switcher_window_state(False)
-
     dlg.destroyed.connect(_on_destroyed)
     _attribute_switcher_instance = dlg
     _emit_attribute_switcher_window_state(True)
@@ -157,14 +178,20 @@ attribute_switcher_toolbar_toggle = ToolbarWindowToggle(
 
 
 def restore_attribute_switcher_default_position():
-    settings.set_setting(ATTRIBUTE_SWITCHER_GEOMETRY_KEY, None, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
+    settings.set_setting(
+        ATTRIBUTE_SWITCHER_GEOMETRY_KEY, None, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE
+    )
     dlg = get_attribute_switcher_window()
     if dlg and wutil.is_valid_widget(dlg):
         dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=wutil.DPI(18))
 
 
-def _set_attribute_switcher_stays_on_top(enabled):
-    settings.set_setting(ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY, bool(enabled), namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE)
+def set_stay_on_top(enabled):
+    settings.set_setting(
+        ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
+        bool(enabled),
+        namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
+    )
     dlg = get_attribute_switcher_window()
     if dlg and wutil.is_valid_widget(dlg):
         dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, bool(enabled))
@@ -175,28 +202,29 @@ def _set_attribute_switcher_stays_on_top(enabled):
 
 def build_attribute_switcher_context_menu(parent=None):
     menu = widgets.OpenMenuWidget(parent)
-
     stays_on_top_action = menu.addAction(
         QtGui.QIcon(icons.settings),
         "Stay on Top",
         description="Keep the floating Attribute Switcher window above other Maya windows.",
     )
-    stays_on_top_action.setCheckable(True)
-    stays_on_top_action.setChecked(_attribute_switcher_stays_on_top())
-    stays_on_top_action.triggered.connect(_set_attribute_switcher_stays_on_top)
-
+    toolCommon.connect_checkable_action(
+        stays_on_top_action, is_stay_on_top, set_stay_on_top
+    )
     restore_position_action = menu.addAction(
         QtGui.QIcon(icons.attribute_switcher),
         "Restore Position",
         description="Reset the Attribute Switcher position above its toolbar button.",
     )
-    restore_position_action.triggered.connect(lambda *_: restore_attribute_switcher_default_position())
-
+    toolCommon.connect_action(
+        restore_position_action, lambda *_: restore_attribute_switcher_default_position()
+    )
     return menu
 
 
 def bind_attribute_switcher_toolbar_button(button):
-    toolCommon.bind_toolbar_button_context_menu(
+    """Bind a toolbar button to the Attribute Switcher toggle using the shared helper."""
+    from TheKeyMachine.tools.common_toolbar_utils import bind_toolbar_button_common
+    bind_toolbar_button_common(
         attribute_switcher_toolbar_toggle,
         button,
         "_tkm_attribute_switcher_context_menu_slot",
