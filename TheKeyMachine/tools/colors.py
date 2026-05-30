@@ -98,9 +98,6 @@ def _make_ui_palette():
 
 
 SELECTION_SET_ROWS = (
-    ("_25", "Gray Light", "gray", "light", 1, "#A0A0A0", "#AEAEAE", "#1a1a1a"),
-    ("_26", "Gray", "gray", "base", 2, "#5A5A5A", "#696969", "#e9edf2"),
-    ("_27", "Gray Dark", "gray", "dark", 3, "#333333", "#404040", "#cfd6df"),
     ("_01", "Red Light", "red", "light", 4, "#DDA6A1", "#E4B4AF", "#1a1a1a"),
     ("_02", "Red", "red", "base", 5, "#C96B68", "#D57E7A", "#1a1a1a"),
     ("_03", "Red Dark", "red", "dark", 6, "#7E3D3C", "#8E4A49", "#DDA6A1"),
@@ -125,6 +122,9 @@ SELECTION_SET_ROWS = (
     ("_22", "Pink Light", "pink", "light", 25, "#D5A6B7", "#DCB6C4", "#1a1a1a"),
     ("_23", "Pink", "pink", "base", 26, "#B8718D", "#C3839B", "#1a1a1a"),
     ("_24", "Pink Dark", "pink", "dark", 27, "#6F4155", "#7D4E61", "#D5A6B7"),
+    ("_25", "Gray Light", "gray", "light", 1, "#A0A0A0", "#AEAEAE", "#1a1a1a"),
+    ("_26", "Gray", "gray", "base", 2, "#5A5A5A", "#696969", "#e9edf2"),
+    ("_27", "Gray Dark", "gray", "dark", 3, "#333333", "#404040", "#cfd6df"),
 )
 
 

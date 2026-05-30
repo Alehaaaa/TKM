@@ -31,10 +31,7 @@ import maya.cmds as cmds
 
 import TheKeyMachine.mods.generalMod as general
 
-try:
-    from PySide2 import QtCore, QtWidgets
-except ImportError:
-    from PySide6 import QtCore, QtWidgets
+from TheKeyMachine.Qt import QtCore, QtWidgets
 
 from TheKeyMachine.widgets import customDialogs
 

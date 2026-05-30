@@ -27,12 +27,7 @@ from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
-try:
-    from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
-    from shiboken6 import isValid  # type: ignore
-except ImportError:
-    from PySide2 import QtCore, QtGui, QtWidgets  # type: ignore
-    from shiboken2 import isValid  # type: ignore
+from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
 
 
 MAIN_SPECIAL_TOOL_KEYS = {
@@ -144,7 +139,7 @@ def _is_valid_setting_toggle_target(widget):
     if widget is None:
         return False
     try:
-        return bool(isValid(widget))
+        return bool(QtCompat.isValid(widget))
     except Exception:
         return False
 

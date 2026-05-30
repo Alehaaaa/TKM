@@ -20,12 +20,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 import maya.cmds as cmds
 import maya.mel as mel
 
-try:
-    from PySide6 import QtCore
-    from PySide6.QtCore import QTimer
-except ImportError:
-    from PySide2 import QtCore
-    from PySide2.QtCore import QTimer
+from TheKeyMachine.Qt import QtCore
+
+QTimer = QtCore.QTimer
 
 try:
     from importlib import reload

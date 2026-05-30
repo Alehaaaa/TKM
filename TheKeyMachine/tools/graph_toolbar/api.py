@@ -1,7 +1,4 @@
-try:
-    from PySide6 import QtCore
-except ImportError:
-    from PySide2 import QtCore
+from TheKeyMachine.Qt import QtCore
 
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.widgets.util as wutil

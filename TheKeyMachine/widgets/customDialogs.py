@@ -4,31 +4,12 @@ import re
 import xml.etree.ElementTree as ET
 from functools import partial
 
-try:
-    from PySide6 import QtWidgets, QtCore, QtGui
-    from PySide6.QtGui import QRegularExpressionValidator
-    from PySide6.QtCore import QRegularExpression
+from TheKeyMachine.Qt import IsPyQt6, IsPySide6, QtCore, QtGui, QtSvg, QtWidgets
 
-    try:
-        from PySide6.QtSvg import QSvgRenderer  # type: ignore
-    except ImportError:
-        QSvgRenderer = None  # type: ignore
-
-    PYSIDE_VERSION = 6
-except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui
-    from PySide2.QtGui import QRegExpValidator
-    from PySide2.QtCore import QRegExp
-
-    try:
-        from PySide2.QtSvg import QSvgRenderer  # type: ignore
-    except ImportError:
-        QSvgRenderer = None  # type: ignore
-
-    PYSIDE_VERSION = 2
-
-    QRegularExpression = QRegExp
-    QRegularExpressionValidator = QRegExpValidator
+QRegularExpression = getattr(QtCore, "QRegularExpression", None) or getattr(QtCore, "QRegExp")
+QRegularExpressionValidator = getattr(QtGui, "QRegularExpressionValidator", None) or getattr(QtGui, "QRegExpValidator")
+QSvgRenderer = getattr(QtSvg, "QSvgRenderer", None)
+PYSIDE_VERSION = 6 if (IsPySide6 or IsPyQt6) else 2
 
 from TheKeyMachine.mods.selectionMod import get_selected_objects, get_valid_selected_objects
 from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget

@@ -8,14 +8,9 @@ import os
 
 from maya import cmds, mel
 
-try:
-    from PySide6 import QtCore, QtGui, QtWidgets
+from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
 
-    QActionGroup = QtGui.QActionGroup
-except ImportError:
-    from PySide2 import QtCore, QtGui, QtWidgets
-
-    QActionGroup = QtWidgets.QActionGroup
+QActionGroup = QtGui.QActionGroup
 
 import TheKeyMachine.mods.hotkeysMod as hotkeys
 import TheKeyMachine.mods.generalMod as general

@@ -1,7 +1,4 @@
-# try:
-#     from PySide2 import QtCore, QtGui, QtWidgets
-# except ImportError:
-#     from PySide6 import QtCore, QtGui, QtWidgets
+from TheKeyMachine.Qt import QtWidgets
 
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings

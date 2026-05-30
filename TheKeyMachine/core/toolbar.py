@@ -21,12 +21,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 from maya import cmds, mel, OpenMayaUI as mui
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin  # type: ignore
 
-try:
-    from PySide6 import QtWidgets, QtCore, QtGui  # type: ignore
-    from shiboken6 import isValid  # type: ignore
-except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui  # type: ignore
-    from shiboken2 import isValid  # type: ignore
+from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
 
 
 # Standard library imports
@@ -282,7 +277,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             self.link_obj_pulse_thread = None
 
         # Cleanup painter
-        if self.shelf_painter and isValid(self.shelf_painter):
+        if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
             try:
                 self.shelf_painter.setParent(None)
                 self.shelf_painter.deleteLater()
@@ -293,7 +288,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         super().closeEvent(event)
 
     def _on_scene_opened(self, *_args):
-        if not isValid(self):
+        if not QtCompat.isValid(self):
             return
         self.update_iBookmarks_menu()
 
@@ -301,14 +296,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         return self.selection_sets_controller.toggle_selection_sets_workspace(*args)
 
     def _on_graph_editor_opened(self, *_args):
-        if not isValid(self):
+        if not QtCompat.isValid(self):
             return
         if not settings.get_setting("graph_toolbar_enabled", True):
             return
         QtCore.QTimer.singleShot(0, cg.createCustomGraph)
 
     def _sync_graph_editor_on_startup(self):
-        if not isValid(self):
+        if not QtCompat.isValid(self):
             return
         if not settings.get_setting("graph_toolbar_enabled", True):
             return
@@ -355,7 +350,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         QtCore.QTimer.singleShot(500, self.update_height)
 
     def visible_change_command(self, *args):
-        if not isValid(self):
+        if not QtCompat.isValid(self):
             return
 
         if not self.isDockable():
@@ -363,10 +358,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if self.current_layout != cmds.workspaceLayoutManager(q=1, current=True):
             self.current_layout = cmds.workspaceLayoutManager(q=1, current=True)
             if not self.isVisible():
-                if isValid(self):
+                if QtCompat.isValid(self):
                     cmds.evalDeferred(show, lowestPriority=True)
 
-                if self.shelf_painter and isValid(self.shelf_painter):
+                if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
                     self.shelf_painter.show()
                 else:
                     cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
@@ -387,21 +382,21 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     )
                 )
                 timer.start(100)
-            if self.shelf_painter and isValid(self.shelf_painter):
+            if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
                 self.shelf_painter.show()
             else:
                 cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
         else:
-            if self.shelf_painter and isValid(self.shelf_painter):
+            if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
                 self.shelf_painter.hide()
 
         self.update_height()
 
     def shelf_tabbar(self):
-        if not isValid(self):
+        if not QtCompat.isValid(self):
             return
 
-        if self.shelf_painter and isValid(self.shelf_painter):
+        if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
             try:
                 self.shelf_painter.setParent(None)
                 self.shelf_painter.deleteLater()
@@ -470,7 +465,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         for group in [self.pos_ac_group, self.dock_ac_group]:
             for action in group.actions():
-                if action and isValid(action):
+                if action and QtCompat.isValid(action):
                     action.setEnabled(not action.isChecked())
 
         # Build up kwargs for the workspaceControl command
@@ -512,7 +507,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     # Update the iBookmarks menu when scene changes
     def update_iBookmarks_menu(self, *args):
-        if not isValid(self):
+        if not QtCompat.isValid(self):
             return
         iBookmarksApi.update_isolate_popup_menu()
 
@@ -556,7 +551,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
-        if isValid(self):
+        if QtCompat.isValid(self):
             try:
                 self.blockSignals(True)
                 self.close()
@@ -606,7 +601,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             pass
 
         try:
-            if isValid(self):
+            if QtCompat.isValid(self):
                 self.blockSignals(True)
                 self.close()
                 self.deleteLater()
@@ -713,7 +708,7 @@ def show():
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
-    if _toolbar_instance and isValid(_toolbar_instance):
+    if _toolbar_instance and QtCompat.isValid(_toolbar_instance):
         try:
             _toolbar_instance.close()
             _toolbar_instance.deleteLater()

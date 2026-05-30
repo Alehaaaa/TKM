@@ -7,10 +7,7 @@ Slider mode metadata and dispatch dictionaries.
 import TheKeyMachine.mods.helperMod as helper
 from TheKeyMachine.data import icons
 
-try:
-    from PySide6 import QtCore
-except ImportError:
-    from PySide2 import QtCore
+from TheKeyMachine.Qt import QtCore
 
 
 CTRL = QtCore.Qt.Key_Control

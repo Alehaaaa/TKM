@@ -5,14 +5,32 @@ import os
 import importlib
 import traceback
 
-try:
-    from PySide6.QtCore import Qt, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker  # type: ignore
-    from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QActionGroup, QIcon  # type: ignore
-    from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QSlider, QWidget, QPushButton, QStyle, QStyleOptionSlider, QLayout  # type: ignore
-except ImportError:
-    from PySide2.QtCore import Qt, QRect, Signal, QTimer, QPoint, QEvent, QSignalBlocker  # type: ignore
-    from PySide2.QtGui import QColor, QFont, QMouseEvent, QPainter, QWheelEvent, QPen, QPainterPath, QIcon  # type: ignore
-    from PySide2.QtWidgets import QWidget, QHBoxLayout, QSizePolicy, QSlider, QPushButton, QActionGroup, QStyle, QStyleOptionSlider, QLayout  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
+
+Qt = QtCore.Qt
+QRect = QtCore.QRect
+Signal = QtCore.Signal
+QTimer = QtCore.QTimer
+QPoint = QtCore.QPoint
+QEvent = QtCore.QEvent
+QSignalBlocker = QtCore.QSignalBlocker
+QColor = QtGui.QColor
+QFont = QtGui.QFont
+QMouseEvent = QtGui.QMouseEvent
+QPainter = QtGui.QPainter
+QWheelEvent = QtGui.QWheelEvent
+QPen = QtGui.QPen
+QPainterPath = QtGui.QPainterPath
+QActionGroup = QtGui.QActionGroup
+QIcon = QtGui.QIcon
+QWidget = QtWidgets.QWidget
+QHBoxLayout = QtWidgets.QHBoxLayout
+QSizePolicy = QtWidgets.QSizePolicy
+QSlider = QtWidgets.QSlider
+QPushButton = QtWidgets.QPushButton
+QStyle = QtWidgets.QStyle
+QStyleOptionSlider = QtWidgets.QStyleOptionSlider
+QLayout = QtWidgets.QLayout
 
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.reportMod as report

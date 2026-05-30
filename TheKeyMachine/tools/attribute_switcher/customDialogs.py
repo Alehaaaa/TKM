@@ -1,7 +1,4 @@
-try:
-    from PySide2 import QtCore, QtGui
-except ImportError:
-    from PySide6 import QtCore, QtGui
+from TheKeyMachine.Qt import QtCore, QtGui
 
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
 from TheKeyMachine.tools.attribute_switcher.customWidgets import AttributeSwitcherWidget

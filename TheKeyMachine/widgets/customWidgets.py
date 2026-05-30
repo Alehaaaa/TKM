@@ -14,16 +14,7 @@ try:
 except ImportError:
     user_preferences = None
 
-try:
-    from PySide6 import QtWidgets, QtCore, QtGui  # type: ignore
-    from shiboken6 import isValid  # type: ignore
-
-    QAction = QtGui.QAction
-except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui  # type: ignore
-    from shiboken2 import isValid  # type: ignore
-
-    QAction = QtWidgets.QAction
+from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
 
 
 """
@@ -141,7 +132,7 @@ class HelpSystem:
 
         status = f"{c_title} - {c_desc}" if (c_title and c_desc) else (c_title or c_desc)
 
-        is_action = isinstance(widget_or_action, QAction)
+        is_action = isinstance(widget_or_action, QtGui.QAction)
         if hasattr(widget_or_action, "setStatusTip") and not is_action:
             widget_or_action.setStatusTip(status)
             try:
@@ -155,9 +146,9 @@ class HelpSystem:
             widget_or_action.setProperty("tkm_description", raw_desc)
             widget_or_action.setProperty("description", raw_desc)
 
-        # Maya 2023's embedded Qt can crash in QAction::showStatusText while
+        # Maya 2023's embedded Qt can crash in QtGui.QAction::showStatusText while
         # hovering menus if custom menu actions push native status-tip events.
-        # Keep TKM metadata for our own tooltip UI, but leave menu QAction
+        # Keep TKM metadata for our own tooltip UI, but leave menu QtGui.QAction
         # status text to Qt's default empty state.
 
 
@@ -224,7 +215,7 @@ class MenuWidget(QtWidgets.QMenu):
         self.hovered.connect(self._on_action_hovered)
 
     def _action_tooltip_key(self, action):
-        if action is None or not isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
+        if action is None or not QtCompat.isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
             return None
         try:
             key = action.property("tkm_tooltip_source_key")
@@ -244,7 +235,7 @@ class MenuWidget(QtWidgets.QMenu):
             pass
 
     def _set_action_help(self, action, title, description="", tooltip_template=None):
-        if action is None or not isValid(action):
+        if action is None or not QtCompat.isValid(action):
             return
         if isinstance(action, QtWidgets.QWidgetAction):
             self._clear_native_action_tips(action)
@@ -267,7 +258,7 @@ class MenuWidget(QtWidgets.QMenu):
         keep_open = kwargs.pop("open", False)
 
         res = QtWidgets.QMenu.addAction(self, *args, **kwargs)
-        action = args[0] if (len(args) > 0 and isinstance(args[0], QAction)) else res
+        action = args[0] if (len(args) > 0 and isinstance(args[0], QtGui.QAction)) else res
 
         if keep_open and hasattr(action, "setProperty"):
             action.setProperty("tkm_keep_menu_open", True)
@@ -302,7 +293,7 @@ class MenuWidget(QtWidgets.QMenu):
         return item
 
     def _on_action_hovered(self, action):
-        if action is None or not isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
+        if action is None or not QtCompat.isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
             QFlatTooltipManager.cancel_timer()
             return
 
@@ -1649,7 +1640,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
     def _has_visible_content(self):
         for widget in self._widgets.values():
-            if widget and isValid(widget) and not widget.isHidden():
+            if widget and QtCompat.isValid(widget) and not widget.isHidden():
                 return True
         return False
 
@@ -1825,7 +1816,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             menu.setTearOffEnabled(True)
 
             source_key = None
-            if source_widget and isValid(source_widget):
+            if source_widget and QtCompat.isValid(source_widget):
                 for k, w in section._widgets.items():
                     if w == source_widget:
                         source_key = k
@@ -1874,7 +1865,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                 def _sync(pairs=checkable_sync_pairs):
                     for act, fn in pairs:
-                        if isValid(act):
+                        if QtCompat.isValid(act):
                             _sync_checked_from_setting(act, fn)
 
                 menu.aboutToShow.connect(_sync)
@@ -1891,13 +1882,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for w_key in keys_list:
             if menu_factory:
                 widget = self._widgets.get(w_key)
-                if widget and isValid(widget):
+                if widget and QtCompat.isValid(widget):
                     widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
                     def _ctx(pos, mf=menu_factory, w=widget):
                         try:
                             m = mf(source_widget=w)
-                            if m and isValid(m):
+                            if m and QtCompat.isValid(m):
                                 m.exec_(w.mapToGlobal(pos))
                         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                             pass
@@ -1907,7 +1898,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     def toggle_widget(self, key, visible, save_setting=True, menu=None):
         """Toggle widget visibility and update menu/settings if needed."""
         widget = self._widgets.get(key)
-        if widget and isValid(widget):
+        if widget and QtCompat.isValid(widget):
             widget.setVisible(visible)
 
         if save_setting:
@@ -1915,13 +1906,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._sync_section_visibility()
 
         # Update the currently open menu action, keyed by mode key for mode-driven sections.
-        if menu and isValid(menu):
+        if menu and QtCompat.isValid(menu):
             # Try to look up by slot key or by current mode key of that widget
             widget = self._widgets.get(key)
             current_cm = getattr(widget, "_current_mode", None) if widget else None
             action_key = current_cm.key if current_cm else key
             action = getattr(menu, "_tkm_actions", {}).get(action_key)
-            if action and isValid(action):
+            if action and QtCompat.isValid(action):
                 action.blockSignals(True)
                 action.setChecked(visible)
                 action.blockSignals(False)
@@ -1936,7 +1927,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._default_keys = default_keys
         # Extract the full ordered mode list from the first slider that has one
         for w in self._widgets.values():
-            if isValid(w) and hasattr(w, "_modes") and w._modes:
+            if QtCompat.isValid(w) and hasattr(w, "_modes") and w._modes:
                 self._all_modes = w._modes
                 break
 
@@ -1990,7 +1981,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._sync_section_visibility()
 
         # Sync check states in the currently open menu, keyed by mode key.
-        if menu and isValid(menu):
+        if menu and QtCompat.isValid(menu):
             actions = getattr(menu, "_tkm_actions", {})
 
             # Recalculate which modes actively have a visible slider representative
@@ -1999,7 +1990,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             }
 
             for mode_key, action in actions.items():
-                if isValid(action):
+                if QtCompat.isValid(action):
                     action.blockSignals(True)
                     action.setChecked(mode_key in actual_visible_modes)
                     action.blockSignals(False)
@@ -2063,7 +2054,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         return handler
 
     def _sync_widget_menu_actions(self, menu):
-        if menu is None or not isValid(menu):
+        if menu is None or not QtCompat.isValid(menu):
             return
 
         actions = getattr(menu, "_tkm_actions", {})
@@ -2073,7 +2064,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             key = item.get("id")
             action = actions.get(key)
             widget = self._widgets.get(key)
-            if not key or action is None or not isValid(action) or widget is None or not isValid(widget):
+            if not key or action is None or not QtCompat.isValid(action) or widget is None or not QtCompat.isValid(widget):
                 continue
             action.blockSignals(True)
             action.setChecked(widget.isVisible())
@@ -2084,7 +2075,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
     def _refresh_layout(self):
         """Trigger a height recalculation."""
-        if not isValid(self):
+        if not QtCompat.isValid(self):
             return
 
         parent = self.parent()
@@ -2129,7 +2120,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                 slot_key = self._mode_to_slot.get(mode.key)
                 widget = self._widgets.get(slot_key) if slot_key else None
-                is_visible = widget is not None and isValid(widget) and widget.isVisible()
+                is_visible = widget is not None and QtCompat.isValid(widget) and widget.isVisible()
 
                 def make_mode_toggle(mk):
                     def handler(checked):
@@ -2166,7 +2157,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 elif item["type"] == "widget":
                     key = item["id"]
                     widget = self._widgets.get(key)
-                    if widget is None or not isValid(widget):
+                    if widget is None or not QtCompat.isValid(widget):
                         continue
                     self._add_checkable_menu_action(
                         menu,

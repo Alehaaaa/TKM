@@ -5,66 +5,34 @@ from maya import cmds
 from maya import mel
 from TheKeyMachine.tools import common as toolCommon
 
-try:
-    PYSIDE_VERSION = 6
-    from PySide6.QtWidgets import (  # type: ignore
-        QWidget,
-        QHBoxLayout,
-        QLabel,
-        QPushButton,
-        QFrame,
-        QVBoxLayout,
-        QSizePolicy,
-        QSizeGrip,
-        QListWidget,
-        QListWidgetItem,
-        QGraphicsOpacityEffect,
-    )
-    from PySide6.QtGui import (  # type: ignore
-        QIcon,
-        QPainter,
-        QColor,
-        QCursor,
-        QPixmap,
-        QPen,
-        QPolygonF,
-        QGuiApplication,
-        QBrush,
-    )
-    from PySide6.QtCore import (  # type: ignore
-        Qt,
-        QPointF,
-        QPoint,
-        QTimer,
-        QSize,
-    )
-except ImportError:
-    PYSIDE_VERSION = 2
-    from PySide2.QtWidgets import (
-        QWidget,
-        QHBoxLayout,
-        QLabel,
-        QPushButton,
-        QFrame,
-        QVBoxLayout,
-        QSizePolicy,
-        QSizeGrip,
-        QListWidget,
-        QListWidgetItem,
-        QGraphicsOpacityEffect,
-    )
-    from PySide2.QtGui import (
-        QIcon,
-        QPainter,
-        QColor,
-        QCursor,
-        QPixmap,
-        QPen,
-        QPolygonF,
-        QGuiApplication,
-        QBrush,
-    )
-    from PySide2.QtCore import Qt, QPointF, QPoint, QTimer, QSize
+from TheKeyMachine.Qt import IsPyQt6, IsPySide6, QtCore, QtGui, QtWidgets
+
+PYSIDE_VERSION = 6 if (IsPySide6 or IsPyQt6) else 2
+QWidget = QtWidgets.QWidget
+QHBoxLayout = QtWidgets.QHBoxLayout
+QLabel = QtWidgets.QLabel
+QPushButton = QtWidgets.QPushButton
+QFrame = QtWidgets.QFrame
+QVBoxLayout = QtWidgets.QVBoxLayout
+QSizePolicy = QtWidgets.QSizePolicy
+QSizeGrip = QtWidgets.QSizeGrip
+QListWidget = QtWidgets.QListWidget
+QListWidgetItem = QtWidgets.QListWidgetItem
+QGraphicsOpacityEffect = QtWidgets.QGraphicsOpacityEffect
+QIcon = QtGui.QIcon
+QPainter = QtGui.QPainter
+QColor = QtGui.QColor
+QCursor = QtGui.QCursor
+QPixmap = QtGui.QPixmap
+QPen = QtGui.QPen
+QPolygonF = QtGui.QPolygonF
+QGuiApplication = QtGui.QGuiApplication
+QBrush = QtGui.QBrush
+Qt = QtCore.Qt
+QPointF = QtCore.QPointF
+QPoint = QtCore.QPoint
+QTimer = QtCore.QTimer
+QSize = QtCore.QSize
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod

@@ -1,7 +1,4 @@
-try:
-    from PySide6 import QtCore  # type: ignore
-except ImportError:
-    from PySide2 import QtCore  # type: ignore
+from TheKeyMachine.Qt import QtCore  # type: ignore
 
 
 class LinkObjectPulseThread(QtCore.QThread):

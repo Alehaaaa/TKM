@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import os
 
-try:
-    from PySide6.QtWidgets import QWidget, QLabel, QFrame, QVBoxLayout  # type: ignore
-    from PySide6.QtGui import QPainterPath, QRegion  # type: ignore
-    from PySide6.QtCore import Qt, QRectF  # type: ignore
-except ImportError:
-    from PySide2.QtWidgets import QWidget, QLabel, QFrame, QVBoxLayout  # type: ignore
-    from PySide2.QtGui import QPainterPath, QRegion  # type: ignore
-    from PySide2.QtCore import Qt, QRectF  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
+
+QWidget = QtWidgets.QWidget
+QLabel = QtWidgets.QLabel
+QFrame = QtWidgets.QFrame
+QVBoxLayout = QtWidgets.QVBoxLayout
+QPainterPath = QtGui.QPainterPath
+QRegion = QtGui.QRegion
+Qt = QtCore.Qt
+QRectF = QtCore.QRectF
 
 from TheKeyMachine.mods.generalMod import config
 from TheKeyMachine.widgets import util as wutil

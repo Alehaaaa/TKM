@@ -1,74 +1,32 @@
 import sys
 from TheKeyMachine.tools import common as toolCommon
 
-try:
-    from PySide6.QtWidgets import (  # type: ignore
-        QWidget,
-        QHBoxLayout,
-        QVBoxLayout,
-        QLabel,
-        QFrame,
-        QMenu,
-        QApplication,
-        QSizePolicy,
-    )
-    from PySide6.QtGui import (  # type: ignore
-        QColor,
-        QPixmap,
-        QPainter,
-        QPolygonF,
-        QCursor,
-        QGuiApplication,
-        QMovie,
-        QFontMetrics,
-        QIcon,
-    )
-    from PySide6.QtCore import (  # type: ignore
-        Qt,
-        QSize,
-        QPoint,
-        QPointF,
-        QTimer,
-        QRect,
-    )
-    try:
-        from PySide6.QtSvg import QSvgRenderer  # type: ignore
-    except ImportError:
-        QSvgRenderer = None  # type: ignore
-except ImportError:
-    from PySide2.QtWidgets import (  # type: ignore
-        QWidget,
-        QHBoxLayout,
-        QVBoxLayout,
-        QLabel,
-        QFrame,
-        QMenu,
-        QApplication,
-        QSizePolicy,
-    )
-    from PySide2.QtGui import (  # type: ignore
-        QColor,
-        QPixmap,
-        QPainter,
-        QPolygonF,
-        QCursor,
-        QGuiApplication,
-        QMovie,
-        QFontMetrics,
-        QIcon,
-    )
-    from PySide2.QtCore import (  # type: ignore
-        Qt,
-        QSize,
-        QPoint,
-        QPointF,
-        QTimer,
-        QRect,
-    )
-    try:
-        from PySide2.QtSvg import QSvgRenderer  # type: ignore
-    except ImportError:
-        QSvgRenderer = None  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtGui, QtSvg, QtWidgets  # type: ignore
+
+QWidget = QtWidgets.QWidget
+QHBoxLayout = QtWidgets.QHBoxLayout
+QVBoxLayout = QtWidgets.QVBoxLayout
+QLabel = QtWidgets.QLabel
+QFrame = QtWidgets.QFrame
+QMenu = QtWidgets.QMenu
+QApplication = QtWidgets.QApplication
+QSizePolicy = QtWidgets.QSizePolicy
+QColor = QtGui.QColor
+QPixmap = QtGui.QPixmap
+QPainter = QtGui.QPainter
+QPolygonF = QtGui.QPolygonF
+QCursor = QtGui.QCursor
+QGuiApplication = QtGui.QGuiApplication
+QMovie = QtGui.QMovie
+QFontMetrics = QtGui.QFontMetrics
+QIcon = QtGui.QIcon
+Qt = QtCore.Qt
+QSize = QtCore.QSize
+QPoint = QtCore.QPoint
+QPointF = QtCore.QPointF
+QTimer = QtCore.QTimer
+QRect = QtCore.QRect
+QSvgRenderer = getattr(QtSvg, "QSvgRenderer", None)
 
 from TheKeyMachine.widgets import util as wutil
 from TheKeyMachine.data.movies import TooltipMedia, TooltipMovieWidget

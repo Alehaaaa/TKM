@@ -9,10 +9,7 @@ import os
 
 from maya import cmds, mel
 
-try:
-    from PySide6 import QtCore, QtGui, QtWidgets # type: ignore
-except ImportError:
-    from PySide2 import QtCore, QtGui, QtWidgets # type: ignore
+from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.core.toolbox as toolbox

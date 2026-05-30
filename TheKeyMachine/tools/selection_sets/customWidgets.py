@@ -1,7 +1,4 @@
-try:
-    from PySide2 import QtCore, QtGui
-except ImportError:
-    from PySide6 import QtCore, QtGui
+from TheKeyMachine.Qt import QtCore, QtGui
 
 from TheKeyMachine.widgets import customWidgets as cw, util as wutil
 

@@ -2,10 +2,7 @@ import re
 
 import maya.cmds as cmds
 
-try:
-    from PySide2 import QtCore, QtGui, QtWidgets
-except ImportError:
-    from PySide6 import QtCore, QtGui, QtWidgets
+from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.data import icons
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
@@ -307,7 +304,7 @@ class SelectionSetMembersDialog(customDialogs.QFlatCloseableFloatingWidget):
 class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableFloatingWidget):
     def __init__(self, controller=None, parent=None):
         super().__init__(popup=False, parent=parent)
-        self.controller = controller or selectionSetsApi.resolve_selection_sets_controller(controller)
+        self.controller = controller or selectionSetsApi._resolve_toolbar_controller(controller)
         self._creation_dialog = None
         self._set_buttons = {}
         self._selection_match_timer = QtCore.QTimer(self)
@@ -465,7 +462,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         return super().eventFilter(obj, event)
 
     def _open_set_creation_window(self):
-        controller = self.controller or selectionSetsApi.resolve_selection_sets_controller()
+        controller = self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller:
             selectionSetsApi.open_selection_set_creation_dialog(controller=controller, parent=self)
 
@@ -473,17 +470,17 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         selectionSetsApi.build_selection_sets_context_menu(parent=self, controller=self.controller).exec_(QtGui.QCursor.pos())
 
     def _export_sets(self):
-        controller = self.controller or selectionSetsApi.resolve_selection_sets_controller()
+        controller = self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller and self._has_exportable_sets(controller):
             controller.export_sets()
 
     def _import_sets(self):
-        controller = self.controller or selectionSetsApi.resolve_selection_sets_controller()
+        controller = self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller:
             controller.import_sets()
 
     def _has_exportable_sets(self, controller=None):
-        controller = controller or self.controller or selectionSetsApi.resolve_selection_sets_controller()
+        controller = controller or self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller is None:
             return False
         for subset in controller.get_selection_sets():
@@ -493,10 +490,10 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         return False
 
     def _auto_transparency_setting_enabled(self):
-        return selectionSetsApi.get_selection_sets_auto_transparency_enabled()
+        return selectionSetsApi._selection_sets_auto_transparency_enabled()
 
     def _stays_on_top_setting_enabled(self):
-        return selectionSetsApi.get_selection_sets_stays_on_top()
+        return selectionSetsApi._selection_sets_stays_on_top()
 
     def _geometry_settings_key(self):
         return "selection_sets_geometry"
@@ -506,12 +503,12 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
 
     def closeEvent(self, event):
         self._disconnect_selection_callback()
-        selectionSetsApi.emit_selection_sets_window_state(False)
+        selectionSetsApi._emit_selection_sets_window_state(False)
         super().closeEvent(event)
 
     def refresh(self):
         self._clear_scroll()
-        controller = self.controller or selectionSetsApi.resolve_selection_sets_controller()
+        controller = self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller is None:
             self._add_empty_state("Toolbar not available.")
             return

@@ -13,10 +13,7 @@ from __future__ import annotations
 
 import os
 
-try:
-    from PySide6 import QtCore, QtGui  # type: ignore
-except ImportError:
-    from PySide2 import QtCore, QtGui  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
 
 import TheKeyMachine.tools.colors as toolColors
 from TheKeyMachine.mods.generalMod import config

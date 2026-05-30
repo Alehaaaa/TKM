@@ -26,10 +26,11 @@ except ImportError:
 except ImportError:
     pass
 
-try:
-    from PySide6.QtCore import QTimer, QThread, Signal
-except ImportError:
-    from PySide2.QtCore import QTimer, QThread, Signal
+from TheKeyMachine.Qt import QtCore, QtGui
+
+QTimer = QtCore.QTimer
+QThread = QtCore.QThread
+Signal = QtCore.Signal
 
 from TheKeyMachine.mods.generalMod import get_thekeymachine_version
 
@@ -39,10 +40,6 @@ from TheKeyMachine.data import icons
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.mods.settingsMod as settings
 
-try:
-    from PySide6 import QtGui
-except ImportError:
-    from PySide2 import QtGui
 
 
 # Constants

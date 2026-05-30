@@ -17,9 +17,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.90"
+__version__ = "0.1.91"
 __stage__ = "beta"
-__build__ = "316"
+__build__ = "317"
 __codename__ = "Cold Brew"
 
 
@@ -48,10 +48,7 @@ def reload():
         pass
 
     try:
-        try:
-            from PySide6 import QtWidgets  # type: ignore
-        except ImportError:
-            from PySide2 import QtWidgets  # type: ignore
+        from TheKeyMachine.Qt import QtWidgets  # type: ignore
 
         for widget in QtWidgets.QApplication.topLevelWidgets():
             if widget.property("tkm_floating_widget"):

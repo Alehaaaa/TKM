@@ -1,12 +1,7 @@
 from maya import OpenMaya as om
 from maya import cmds, utils
 
-try:
-    from PySide6 import QtCore, QtGui, QtWidgets
-    from shiboken6 import isValid
-except Exception:
-    from PySide2 import QtCore, QtGui, QtWidgets
-    from shiboken2 import isValid
+from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
@@ -447,7 +442,7 @@ class MicroMoveController(QtCore.QObject):
         return self._enabled
 
     def _refresh_context(self):
-        if not self._enabled or not isValid(self._owner):
+        if not self._enabled or not QtCompat.isValid(self._owner):
             return
         utils.executeDeferred(activate_micro_move)
 

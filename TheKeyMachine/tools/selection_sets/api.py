@@ -1,10 +1,7 @@
 import os
 
 
-try:
-    from PySide2 import QtCore, QtGui, QtWidgets
-except ImportError:
-    from PySide6 import QtCore, QtGui, QtWidgets
+from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.data import icons
@@ -17,6 +14,7 @@ from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wu
 
 SELECTION_SETS_SETTINGS_NAMESPACE = "selection_sets_window"
 SELECTION_SETS_AUTO_TRANSPARENCY_KEY = "selection_sets_auto_transparency"
+ANIMBOT_CONVERSION_PROMPT_KEY = "animbot_conversion_prompt"
 
 SELECTION_SET_COLORS = toolColors.SELECTION_SET_COLORS
 SELECTION_SET_COLOR_BY_SUFFIX = toolColors.SELECTION_SET_COLOR_BY_SUFFIX
@@ -167,8 +165,75 @@ def _can_open_selection_set_creation(show_message=True):
     return False
 
 
+def create_selection_set_from_data(name, color_suffix, objects, controller=None, refresh=True):
+    controller = _resolve_toolbar_controller(controller)
+    if controller and hasattr(controller, "create_selection_set_from_data"):
+        return controller.create_selection_set_from_data(name, color_suffix, objects, refresh=refresh)
+    return None
+
+
+def _maybe_convert_animbot_selection_sets(controller=None):
+    controller = _resolve_toolbar_controller(controller)
+    if controller is None:
+        return True
+
+    pending_fn = getattr(controller, "pending_animbot_selection_sets", None)
+    convert_fn = getattr(controller, "convert_animbot_selection_sets", None)
+    if not callable(pending_fn) or not callable(convert_fn):
+        return True
+
+    pending = pending_fn()
+    if not pending:
+        return True
+
+    prompt_mode = settings.get_setting(
+        ANIMBOT_CONVERSION_PROMPT_KEY,
+        "ask",
+        namespace=SELECTION_SETS_SETTINGS_NAMESPACE,
+    )
+    if prompt_mode == "never":
+        return True
+    if prompt_mode == "always":
+        convert_fn(pending)
+        return True
+
+    clicked = customDialogs.QFlatConfirmDialog.question(
+        parent=_parent_widget(),
+        window="Selection Sets",
+        title="Convert animBot selection sets?",
+        message=(
+            f"{len(pending)} animBot selection set"
+            f"{'' if len(pending) == 1 else 's'} can be copied into TKM Selection Sets."
+        ),
+        buttons=[
+            customDialogs.QFlatConfirmDialog.CustomButton("Yes", positive=True, icon=icons.apply),
+            customDialogs.QFlatConfirmDialog.CustomButton("Always", positive=True, icon=icons.apply),
+            customDialogs.QFlatConfirmDialog.CustomButton("Never", positive=False, icon=icons.cancel),
+            customDialogs.QFlatConfirmDialog.Cancel,
+        ],
+        highlight="Yes",
+        closeButton=False,
+        icon=icons.selection_sets,
+    )
+    choice = (clicked or {}).get("name")
+    if choice == "Yes":
+        convert_fn(pending)
+        return True
+    if choice == "Always":
+        settings.set_setting(ANIMBOT_CONVERSION_PROMPT_KEY, "always", namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
+        convert_fn(pending)
+        return True
+    if choice == "Never":
+        settings.set_setting(ANIMBOT_CONVERSION_PROMPT_KEY, "never", namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
+        return True
+    return False
+
+
 def _open_selection_sets_from_toolbar(controller=None):
     controller = _resolve_toolbar_controller(controller)
+    if not _maybe_convert_animbot_selection_sets(controller):
+        _emit_selection_sets_window_state(False)
+        return
     if not _has_any_selection_sets(controller):
         if not _can_open_selection_set_creation(show_message=True):
             _emit_selection_sets_window_state(False)
@@ -277,8 +342,9 @@ def clear_all_selection_sets(controller=None, parent=None, menu=None):
         controller.clear_selection_sets()
 
 
-def restore_selection_sets_default_position(controller=None):
+def restore_selection_sets_default_settings(controller=None):
     settings.set_setting("selection_sets_geometry", None, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
+    settings.set_setting(ANIMBOT_CONVERSION_PROMPT_KEY, None, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
     win = get_selection_sets_window()
     if win and wutil.is_valid_widget(win):
         _place_selection_sets_window_default(win)
@@ -343,9 +409,9 @@ def build_selection_sets_context_menu(parent=None, controller=None):
 
     menu.addAction(
         QtGui.QIcon(icons.selection_sets_reload),
-        "Restore Position",
+        "Restore Settings",
         description="Reset the floating Selection Sets palette to its default position above the Selection Sets toolbar button.",
-    ).triggered.connect(lambda *_: restore_selection_sets_default_position(controller=controller))
+    ).triggered.connect(lambda *_: restore_selection_sets_default_settings(controller=controller))
 
     return menu
 

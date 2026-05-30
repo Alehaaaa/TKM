@@ -24,15 +24,10 @@ try:
 except ImportError:
     import maya.api.OpenMaya as om  # type: ignore
 
-try:
-    from PySide6.QtGui import QRegularExpressionValidator  # type: ignore
-    from PySide6.QtCore import QRegularExpression  # type: ignore
-except ImportError:
-    from PySide2.QtGui import QRegExpValidator  # type: ignore
-    from PySide2.QtCore import QRegExp  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtGui
 
-    QRegularExpression = QRegExp
-    QRegularExpressionValidator = QRegExpValidator
+QRegularExpression = getattr(QtCore, "QRegularExpression", None) or getattr(QtCore, "QRegExp")
+QRegularExpressionValidator = getattr(QtGui, "QRegularExpressionValidator", None) or getattr(QtGui, "QRegExpValidator")
 
 
 import json

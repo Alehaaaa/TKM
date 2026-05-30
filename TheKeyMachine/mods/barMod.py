@@ -21,10 +21,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 from maya import OpenMaya as om
 
-try:
-    from PySide2 import QtCore, QtWidgets, QtGui
-except ImportError:
-    from PySide6 import QtWidgets, QtCore, QtGui
+from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
 
 
 import json

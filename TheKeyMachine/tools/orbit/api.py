@@ -14,10 +14,7 @@ __all__ = [
 
 from maya import cmds
 
-try:
-    from PySide2 import QtCore, QtGui, QtWidgets  # type: ignore
-except ImportError:
-    from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 from TheKeyMachine.data import icons
 from TheKeyMachine.core import trigger

@@ -1,11 +1,6 @@
 from maya import cmds
 
-try:
-    from PySide6 import QtCore, QtWidgets
-    from shiboken6 import isValid
-except Exception:
-    from PySide2 import QtCore, QtWidgets
-    from shiboken2 import isValid
+from TheKeyMachine.Qt import QtCompat, QtCore, QtWidgets
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
@@ -405,7 +400,7 @@ class AnimationOffsetController(QtCore.QObject):
         return any_applied
 
     def _poll(self):
-        if not self._enabled or not isValid(self._owner):
+        if not self._enabled or not QtCompat.isValid(self._owner):
             return
         if self._state == "applying":
             return
@@ -486,7 +481,7 @@ class AnimationOffsetController(QtCore.QObject):
         checked = bool(checked)
         self._enabled = checked
 
-        if button_widget and isValid(button_widget) and hasattr(button_widget, "get_tint_color"):
+        if button_widget and QtCompat.isValid(button_widget) and hasattr(button_widget, "get_tint_color"):
             try:
                 tint_color = button_widget.get_tint_color()
             except Exception:

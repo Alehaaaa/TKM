@@ -13,10 +13,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from maya import cmds
 
-try:
-    from PySide6 import QtCore, QtWidgets  # type: ignore
-except ImportError:  # pragma: no cover
-    from PySide2 import QtCore, QtWidgets  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtWidgets  # type: ignore
 
 try:
     from maya.api import OpenMaya as om  # type: ignore

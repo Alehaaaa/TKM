@@ -2,10 +2,7 @@ from functools import lru_cache
 
 import maya.cmds as cmds  # type: ignore
 
-try:
-    from PySide2 import QtCore, QtGui  # type: ignore
-except ImportError:
-    from PySide6 import QtCore, QtGui  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
 
 from TheKeyMachine.widgets import util as wutil
 from TheKeyMachine.mods import settingsMod as settings
