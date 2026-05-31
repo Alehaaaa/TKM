@@ -32,6 +32,7 @@ class OrbitWindow(OrbitWindowMixin, customDialogs.QFlatCloseableFloatingWidget):
             else:
                 self.place_above_toolbar_button(orbitApi._get_orbit_toolbar_button())
 
+        self.update_orbit_layout_for_current_geometry()
         self.apply_stay_on_top_setting()
         self.update_transparency_state(False)
 

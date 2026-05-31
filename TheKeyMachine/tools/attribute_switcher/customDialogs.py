@@ -1,4 +1,4 @@
-from TheKeyMachine.Qt import QtCore, QtGui
+from TheKeyMachine.Qt import QtCore
 
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
 from TheKeyMachine.tools.attribute_switcher.customWidgets import AttributeSwitcherWidget
@@ -13,7 +13,7 @@ class AttributeSwitcherWindow(AttributeSwitcherWidget):
         if popup:
             self.place_near_cursor()
 
-        self.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, attributeSwitcherApi._attribute_switcher_stays_on_top())
+        self.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, attributeSwitcherApi.is_stay_on_top())
         self.show()
         self.raise_()
         self.activateWindow()

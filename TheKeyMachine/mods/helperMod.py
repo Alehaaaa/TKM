@@ -311,7 +311,7 @@ isolate_tooltip_text = (
 )
 
 
-ibookmarks_window_tooltip_text = (
+isolate_bookmarks_window_tooltip_text = (
     "Isolate Bookmarks",
     [
         "Save groups of isolates so that you can quickly change what you see in a viewport."

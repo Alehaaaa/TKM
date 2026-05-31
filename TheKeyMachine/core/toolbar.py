@@ -64,8 +64,9 @@ import TheKeyMachine.core.toolWidgets as toolWidgets  # type: ignore
 import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
 import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
+import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi  # type: ignore
 import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
-import TheKeyMachine.tools.ibookmarks.api as iBookmarksApi  # type: ignore
+import TheKeyMachine.tools.isolate_bookmarks.api as isolateBookmarksApi  # type: ignore
 
 from TheKeyMachine.tools.link_objects.pulse_thread import LinkObjectPulseThread  # type: ignore
 from TheKeyMachine.tools.selection_sets.controller import SelectionSetsController  # type: ignore
@@ -95,8 +96,9 @@ mods = [
     toolWidgets,
     animationOffsetApi,
     graphToolbarApi,
+    gimbalFixerApi,
     microMoveApi,
-    iBookmarksApi,
+    isolateBookmarksApi,
 ]
 
 for m in mods:
@@ -290,7 +292,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def _on_scene_opened(self, *_args):
         if not QtCompat.isValid(self):
             return
-        self.update_iBookmarks_menu()
+        self.update_isolate_bookmarks_menu()
 
     def toggle_selection_sets_workspace(self, *args):
         return self.selection_sets_controller.toggle_selection_sets_workspace(*args)
@@ -505,11 +507,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         cmds.shelfButton(parent=current_shelf_tab, image=icon, command=command, label=button_name)
 
-    # Update the iBookmarks menu when scene changes
-    def update_iBookmarks_menu(self, *args):
+    # Update the isolate_bookmarks menu when scene changes
+    def update_isolate_bookmarks_menu(self, *args):
         if not QtCompat.isValid(self):
             return
-        iBookmarksApi.update_isolate_popup_menu()
+        isolateBookmarksApi.update_isolate_popup_menu()
 
     # For use with toggle functionality on Shelf or Launcher
     def toggle(self, *args):

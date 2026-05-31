@@ -253,13 +253,13 @@ def _resolve_slider_targets():
             }
 
     try:
-        legacy_graph_curves = cmds.keyframe(query=True, name=True, sl=True) or []
+        selected_graph_curves = cmds.keyframe(query=True, name=True, sl=True) or []
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        legacy_graph_curves = []
-    if legacy_graph_curves:
+        selected_graph_curves = []
+    if selected_graph_curves:
         return {
-            "plugs": _plugs_from_anim_curves(legacy_graph_curves),
-            "curves": _unique(legacy_graph_curves),
+            "plugs": _plugs_from_anim_curves(selected_graph_curves),
+            "curves": _unique(selected_graph_curves),
             "source": "graph_editor",
             "time_range": time_range,
             "has_graph_keys": True,

@@ -69,7 +69,7 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 - `Graph Editor Toolbar`
 - `Custom Tools`
 - `Custom Scripts`
-- `iBookmarks`
+- `Isolate Bookmarks`
 
 ## Timeline Feedback
 
@@ -92,8 +92,9 @@ Dedicated modules live under `TheKeyMachine/tools/` for:
 
 - `animation_offset`
 - `attribute_switcher`
+- `gimbal_fixer`
 - `graph_toolbar`
-- `ibookmarks`
+- `isolate_bookmarks`
 - `micro_move`
 - `orbit`
 - `selection_sets`

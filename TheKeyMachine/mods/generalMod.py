@@ -202,19 +202,19 @@ def create_TheKeyMachine_node():
             cmds.select(initial_selection, replace=True)
 
 
-def create_ibookmarks_node():
+def create_isolate_bookmarks_node():
     # Guardar la selección inicial
     initial_selection = selectionMod.get_selected_objects()
 
-    if not cmds.objExists("iBookmarks"):
-        node = cmds.createNode("transform", name="iBookmarks")
+    if not cmds.objExists("isolate_bookmarks"):
+        node = cmds.createNode("transform", name="isolate_bookmarks")
 
         # Bloquear y ocultar todos los atributos de transformación
         attributes = ["translateX", "translateY", "translateZ", "rotateX", "rotateY", "rotateZ", "scaleX", "scaleY", "scaleZ", "visibility"]
 
         for attr in attributes:
             cmds.setAttr(node + "." + attr, lock=True, keyable=False, channelBox=False)
-        cmds.parent("iBookmarks", "TheKeyMachine")
+        cmds.parent("isolate_bookmarks", "TheKeyMachine")
 
     # Restaurar la selección inicial
     if initial_selection:

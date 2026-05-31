@@ -10,7 +10,8 @@ import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.core.toolMenus as toolMenus
-import TheKeyMachine.tools.ibookmarks.api as iBookmarksApi
+import TheKeyMachine.tools.isolate_bookmarks.api as isolateBookmarksApi
+import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 import TheKeyMachine.tools.temp_pivot.api as tempPivotApi
 from TheKeyMachine.tools import colors as toolColors
@@ -225,7 +226,7 @@ TOOL_DEFINITIONS = {
         "label": "Gimbal Fixer",
         "text": "Gim",
         "icon": icons.reblock,
-        "callback": bar.gimbal_fixer_window,
+        "callback": gimbalFixerApi.gimbal_fixer_window,
         "tooltip_template": helper.gimbal_fixer_tooltip_text,
     },
 
@@ -484,9 +485,9 @@ TOOL_DEFINITIONS = {
     "isolate_bookmarks": {
         "type": "tool",
         "label": "Isolate Bookmarks",
-        "icon": icons.ibookmarks_menu,
-        "callback": iBookmarksApi.create_ibookmarks_window,
-        "tooltip_template": helper.ibookmarks_window_tooltip_text,
+        "icon": icons.isolate_bookmarks_menu,
+        "callback": isolateBookmarksApi.create_isolate_bookmarks_window,
+        "tooltip_template": helper.isolate_bookmarks_window_tooltip_text,
     },
     "isolate_help": {
         "type": "tool",
@@ -1958,6 +1959,8 @@ def get_toolbar_sections(layout_id, resolve_items=True):
         return []
 
     section_ids = list(TOOL_SECTION_DEFINITIONS.keys())
+    if layout_id == "graph":
+        section_ids = [section_id for section_id in section_ids if section_id != "system"]
     return [
         section
         for section in (

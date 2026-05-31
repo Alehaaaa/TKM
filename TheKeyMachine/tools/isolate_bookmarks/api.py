@@ -5,31 +5,60 @@ from maya import cmds
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.generalMod as general
+from TheKeyMachine.Qt import QtCore, QtWidgets  # type: ignore
 from TheKeyMachine.data import icons
+from TheKeyMachine.widgets import customDialogs
 from TheKeyMachine.widgets import util as wutil
 
 
-WINDOW_NAME = "iBookmarksWindow"
-ROOT_NODE = "iBookmarks"
+WINDOW_NAME = "isolate_bookmarksWindow"
+ROOT_NODE = "isolate_bookmarks"
 POPUP_MENU = "isolate_button_popupMenu"
 
 
-def create_ibookmark_node():
+def create_isolate_bookmark_node():
     if not cmds.objExists("TheKeyMachine"):
         general.create_TheKeyMachine_node()
     if not cmds.objExists(ROOT_NODE):
-        general.create_ibookmarks_node()
+        general.create_isolate_bookmarks_node()
 
 
 def list_bookmarks():
     return cmds.listRelatives(ROOT_NODE, children=True) or []
 
 
+def _bookmark_label(bookmark):
+    return bookmark.replace("_isolate_bookmark", "")
+
+
+def _selected_bookmark(list_widget):
+    if isinstance(list_widget, QtWidgets.QListWidget):
+        item = list_widget.currentItem()
+        return item.text() if item else None
+
+    item = cmds.textScrollList(list_widget, query=True, selectItem=True)
+    return item[0] if item else None
+
+
 def update_bookmark_list(list_widget, *_args):
     bookmarks = list_bookmarks()
+    if isinstance(list_widget, QtWidgets.QListWidget):
+        current_name = _selected_bookmark(list_widget)
+        list_widget.clear()
+        for bookmark in bookmarks:
+            list_widget.addItem(_bookmark_label(bookmark))
+
+        if current_name:
+            matches = list_widget.findItems(current_name, QtCore.Qt.MatchExactly)
+            if matches:
+                list_widget.setCurrentItem(matches[0])
+        elif list_widget.count():
+            list_widget.setCurrentRow(0)
+        return
+
     cmds.textScrollList(list_widget, edit=True, removeAll=True)
     for bookmark in bookmarks:
-        cmds.textScrollList(list_widget, edit=True, append=bookmark.replace("_ibookmark", ""))
+        cmds.textScrollList(list_widget, edit=True, append=_bookmark_label(bookmark))
 
 
 def create_bookmark(list_widget, *_args):
@@ -58,8 +87,8 @@ def create_bookmark(list_widget, *_args):
         cmds.warning("Invalid bookmark name. It should start with a letter or underscore and contain only letters, numbers, and underscores")
         return
 
-    create_ibookmark_node()
-    bookmark_node = cmds.group(em=True, name="{}_ibookmark".format(bookmark_name))
+    create_isolate_bookmark_node()
+    bookmark_node = cmds.group(em=True, name="{}_isolate_bookmark".format(bookmark_name))
     cmds.parent(bookmark_node, ROOT_NODE)
 
     new_groups = []
@@ -68,7 +97,7 @@ def create_bookmark(list_widget, *_args):
         if "->" in obj_name:
             obj_name = obj_name.split("->")[-1]
         obj_name = obj_name.replace(".", "_")
-        new_group = cmds.group(em=True, name="{}_{}_ibook".format(obj_name, bookmark_name))
+        new_group = cmds.group(em=True, name="{}_{}_isolate_bookmark_item".format(obj_name, bookmark_name))
         cmds.parent(new_group, bookmark_node)
         new_groups.append(new_group)
 
@@ -81,11 +110,11 @@ def create_bookmark(list_widget, *_args):
 
 
 def remove_bookmark(list_widget, *_args):
-    item = cmds.textScrollList(list_widget, query=True, selectItem=True)
-    if not item:
+    bookmark_name = _selected_bookmark(list_widget)
+    if not bookmark_name:
         return
 
-    cmds.delete("{}_ibookmark".format(item[0]))
+    cmds.delete("{}_isolate_bookmark".format(bookmark_name))
     update_bookmark_list(list_widget)
     update_isolate_popup_menu()
 
@@ -94,16 +123,14 @@ def isolate_bookmark(list_widget=None, bookmark_name=None, *_args):
     current_selection = selectionMod.get_selected_objects(long=True)
 
     if not bookmark_name and list_widget:
-        item = cmds.textScrollList(list_widget, query=True, selectItem=True)
-        if item:
-            bookmark_name = item[0]
+        bookmark_name = _selected_bookmark(list_widget)
 
     if not bookmark_name:
         cmds.warning("No bookmark selected")
         return
 
-    bookmark_name = bookmark_name.replace("_ibookmark", "")
-    bookmark_node = "{}_ibookmark".format(bookmark_name)
+    bookmark_name = bookmark_name.replace("_isolate_bookmark", "")
+    bookmark_node = "{}_isolate_bookmark".format(bookmark_name)
     if not cmds.objExists(bookmark_node):
         cmds.warning("Bookmark '{}' not found".format(bookmark_name))
         return
@@ -115,7 +142,7 @@ def isolate_bookmark(list_widget=None, bookmark_name=None, *_args):
 
     selected_objects = []
     for obj in objects:
-        obj_name = obj.rsplit("|", 1)[-1].replace("_ibook", "")
+        obj_name = obj.rsplit("|", 1)[-1].replace("_isolate_bookmark_item", "")
         obj_name = obj_name.replace("_{}".format(bookmark_name), "")
         if cmds.objExists(obj_name):
             selected_objects.append(obj_name)
@@ -149,7 +176,7 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
 
     if cmds.objExists(ROOT_NODE):
         for bookmark in list_bookmarks():
-            text = bookmark.replace("_ibookmark", "")
+            text = bookmark.replace("_isolate_bookmark", "")
             cmds.menuItem(
                 l=text,
                 parent=popup_menu,
@@ -160,9 +187,9 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
 
     cmds.menuItem(
         l="Bookmarks",
-        c=lambda x: create_ibookmarks_window(),
+        c=lambda x: create_isolate_bookmarks_window(),
         annotation="Open isolate bookmarks window",
-        image=icons.ibookmarks_menu,
+        image=icons.isolate_bookmarks_menu,
         parent=popup_menu,
     )
     cmds.menuItem(divider=True, parent=popup_menu)
@@ -176,35 +203,82 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
     )
 
 
-def create_ibookmarks_window(*_args):
+class IsolateBookmarksWindow(customDialogs.QFlatToolBarPopupDialog):
+    def __init__(self, parent=None):
+        self.title = "Isolate Bookmarks"
+        self.icon = icons.isolate_bookmarks_menu
+        self.COLOR_BG_TRACK = self.DARK_BG_COLOR
+
+        super().__init__(parent=parent, popup=False, closeButton=True)
+        self.setObjectName(WINDOW_NAME)
+        self.setMinimumWidth(wutil.DPI(260))
+        self.title_label.setText(self.title)
+
+        self.bookmark_list = QtWidgets.QListWidget(self)
+        self.bookmark_list.setMinimumHeight(wutil.DPI(140))
+        self.bookmark_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.bookmark_list.itemDoubleClicked.connect(lambda *_: self.isolate_selected())
+        self.mainLayout.addWidget(self.bookmark_list, 1)
+
+        self.setBottomBar(
+            buttons=[
+                customDialogs.QFlatDialogButton("Create", callback=self.create_selected, icon=icons.add),
+                customDialogs.QFlatDialogButton("Remove", callback=self.remove_selected, icon=icons.trash),
+                customDialogs.QFlatDialogButton("Isolate", callback=self.isolate_selected, icon=icons.isolate, highlight=True),
+            ],
+            closeButton=True,
+            margins=0,
+            spacing=2,
+            highlight="Isolate",
+        )
+
+        create_isolate_bookmark_node()
+        self.refresh()
+
+    def refresh(self):
+        update_bookmark_list(self.bookmark_list)
+
+    def create_selected(self, *_args):
+        create_bookmark(self.bookmark_list)
+        self.refresh()
+
+    def remove_selected(self, *_args):
+        remove_bookmark(self.bookmark_list)
+        self.refresh()
+
+    def isolate_selected(self, *_args):
+        isolate_bookmark(self.bookmark_list)
+
+
+def _existing_isolate_bookmarks_window():
+    for widget in QtWidgets.QApplication.topLevelWidgets():
+        if widget.objectName() == WINDOW_NAME and isinstance(widget, IsolateBookmarksWindow) and wutil.is_valid_widget(widget):
+            return widget
+    return None
+
+
+def create_isolate_bookmarks_window(*_args):
     original_selection = selectionMod.get_selected_objects()
+
+    existing = _existing_isolate_bookmarks_window()
+    if existing:
+        existing.refresh()
+        existing.show()
+        existing.raise_()
+        existing.activateWindow()
+        return existing
 
     if cmds.window(WINDOW_NAME, exists=True):
         cmds.deleteUI(WINDOW_NAME)
 
-    window = cmds.window(WINDOW_NAME, title="Isolate Bookmarks", widthHeight=(265, 140), sizeable=False)
-    main_layout = cmds.columnLayout(adjustableColumn=True, rowSpacing=10, columnAlign="center")
-    form_layout = cmds.formLayout()
-    list_widget = cmds.textScrollList(allowMultiSelection=False, h=130)
-
-    button_layout = cmds.columnLayout(adjustableColumn=True, columnAlign="center")
-    cmds.button(label="Create", command=lambda x: create_bookmark(list_widget), width=90)
-    cmds.button(label="Remove", command=lambda x: remove_bookmark(list_widget), width=90)
-    cmds.button(label="Isolate", command=lambda x: isolate_bookmark(list_widget), width=90)
-
-    cmds.formLayout(
-        form_layout,
-        edit=True,
-        attachForm=[(list_widget, "left", 5), (list_widget, "top", 5), (button_layout, "top", 5), (button_layout, "right", 5)],
-        attachControl=[(list_widget, "right", 5, button_layout)],
-    )
-
-    cmds.setParent(main_layout)
-    cmds.showWindow(window)
-    create_ibookmark_node()
-    update_bookmark_list(list_widget)
+    window = IsolateBookmarksWindow(parent=wutil.get_maya_qt(qt=QtWidgets.QWidget))
+    window.show()
+    window.raise_()
+    window.activateWindow()
 
     if original_selection:
         cmds.select(original_selection, replace=True)
     else:
         cmds.select(clear=True)
+
+    return window

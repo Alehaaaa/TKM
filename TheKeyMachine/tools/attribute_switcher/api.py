@@ -1,4 +1,4 @@
-from TheKeyMachine.Qt import QtWidgets
+from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
@@ -11,6 +11,7 @@ from TheKeyMachine.tools.attribute_switcher.common import (
     ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
 )
 from TheKeyMachine.tools.attribute_switcher.customDialogs import AttributeSwitcherWindow
+import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
 from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
 
 # Public API surface
@@ -199,6 +200,15 @@ def set_stay_on_top(enabled):
 
 def build_attribute_switcher_context_menu(parent=None):
     menu = widgets.OpenMenuWidget(parent)
+    menu.addAction(
+        QtGui.QIcon(icons.reblock),
+        "Gimbal Fixer",
+        description="Open the Gimbal Fixer rotation-order analyzer.",
+        callback=lambda *_: gimbalFixerApi.gimbal_fixer_window(),
+    )
+
+    menu.addSeparator()
+
     stays_on_top_action = menu.addAction(
         QtGui.QIcon(icons.settings),
         "Stay on Top",

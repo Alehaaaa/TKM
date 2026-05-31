@@ -50,13 +50,13 @@ from TheKeyMachine.tools.attribute_switcher.common import (
     COLOR_BLEND_MULTI,
     COLOR_TEXT_MAIN,
     COLOR_TEXT_SECONDARY,
-    GimbalAnalyzer,
     ATTRIBUTE_SWITCHER_GEOMETRY_KEY,
     ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
     ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
     ATTRIBUTE_SWITCHER_GLOBE_IMAGE,
     UI_COLOR,
 )
+from TheKeyMachine.tools.gimbal_fixer.analyzer import GimbalAnalyzer
 from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import customDialogs as cd
 from TheKeyMachine.widgets import customWidgets as cw

@@ -165,9 +165,6 @@ class SelectionSetsController:
 
         cmds.rename(set_node[0], new_set_name)
 
-        if cmds.window("changeSetColorWindow", exists=True):
-            cmds.deleteUI("changeSetColorWindow")
-
         cmds.evalDeferred(self.create_buttons_for_sel_sets)
 
     def update_set_group_menu(self, combo_widget):
