@@ -1677,11 +1677,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
             for attr in ["rx", "ry", "rz"]:
                 attribute = "%s.%s" % (target, attr)
                 if cmds.objExists(attribute):
-                    anim_curve = cmds.listConnections(attribute, source=True, type="animCurve")
-                    if anim_curve:
-                        anim_curve = anim_curve[0]
-                        if cmds.objExists(anim_curve):
-                            anim_curves.append(anim_curve)
+                    anim_curves.extend(selectionMod.get_anim_curves_from_plugs([attribute]))
 
         anim_curves = list(set(anim_curves))
         cmds.filterCurve(*anim_curves)

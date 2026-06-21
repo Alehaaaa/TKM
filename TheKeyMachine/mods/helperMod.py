@@ -640,7 +640,7 @@ insert_inbetween_tooltip_text = (
 )
 
 delete_static_animation_tooltip_text = (
-    "Delete Static Keys",
+    "Remove Static Anim Curves",
     [
         "These are the curves that have keys but where all the key values are the same, meaning there is no movement.",
         movie.delete_all_animation_static,

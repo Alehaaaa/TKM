@@ -79,46 +79,7 @@ def openCustomGraph():
 
 
 def delete_animation():
-    # Obtener canales seleccionados
-    target_info = keyTools.resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
-    selection = target_info["target_objects"]
-    target_plugs = target_info["target_plugs"]
-    selected_channels = target_info["selected_channels"]
-
-    # Obtener selección actual
-    if not selection and not target_plugs:
-        return
-    time_context = target_info["time_context"]
-    tint_session = timelineWidgets.begin_timeline_context(
-        default_mode="all_animation",
-        color=_active_tint_color("delete_all_animation"),
-        key="delete_all_animation",
-    )
-
-    try:
-        if target_info["has_graph_keys"]:
-            for curve, frame in target_info["selected_keyframes"]:
-                cmds.cutKey(curve, time=(frame, frame), clear=True)
-            return
-
-        if target_plugs:
-            cut_kwargs = {"clear": True}
-            if time_context.mode == "time_slider_range":
-                cut_kwargs["time"] = (time_context.start_frame, time_context.end_frame)
-            for plug in target_plugs:
-                cmds.cutKey(plug, **cut_kwargs)
-            return
-
-        cut_kwargs = {"clear": True}
-        if selected_channels:
-            cut_kwargs["attribute"] = selected_channels
-        if time_context.mode == "time_slider_range":
-            cut_kwargs["time"] = (time_context.start_frame, time_context.end_frame)
-
-        for obj in selection:
-            cmds.cutKey(obj, **cut_kwargs)
-    finally:
-        tint_session.finish()
+    return keyTools.clear_animation_keys()
 
 
 def createLocator():
@@ -190,6 +151,10 @@ def _set_tangent_on_target(target, tangent_type, time_range, handle_mode="both")
     cmds.keyTangent(target, **kwargs)
 
 
+def set_maya_default_tangent(tangent_type):
+    cmds.keyTangent(**{"global": True, "inTangentType": tangent_type, "outTangentType": tangent_type})
+
+
 def _normalize_curve_frames(curve_frames):
     frames = []
     for frame in curve_frames or []:
@@ -211,12 +176,10 @@ def _collect_target_curves(target_info):
 
     target_plugs = target_info.get("target_plugs") or []
     if target_plugs:
-        for plug in target_plugs:
-            plug_curves = cmds.listConnections(plug, source=True, destination=False, type="animCurve") or []
-            for curve in plug_curves:
-                if curve and curve not in seen:
-                    seen.add(curve)
-                    curves.append(curve)
+        for curve in selectionMod.get_anim_curves_from_plugs(target_plugs):
+            if curve and curve not in seen:
+                seen.add(curve)
+                curves.append(curve)
         return curves
 
     target_objects = target_info.get("target_objects") or []
@@ -253,8 +216,7 @@ def _resolve_tangent_target_info():
                 if not cmds.objExists(plug):
                     continue
                 target_plugs.append(plug)
-                curves = cmds.listConnections(plug, source=True, destination=False, type="animCurve") or []
-                for curve in curves:
+                for curve in selectionMod.get_anim_curves_from_plugs([plug]):
                     if curve and curve not in seen_curves:
                         seen_curves.add(curve)
                         selected_curves.append(curve)
@@ -1444,14 +1406,14 @@ def select_rig_controls_animated(*args):
         for transform in transforms:
             # Comprobar si el transform es un joint
             if cmds.nodeType(transform) == "joint":
-                if is_animated_and_keyable(transform):
+                if selectionMod.is_node_animated(transform):
                     controls.append(transform)
             elif cmds.nodeType(transform) == "transform":
                 shapes = cmds.listRelatives(transform, shapes=True, fullPath=True)
                 if shapes:
                     for shape in shapes:
                         if cmds.nodeType(shape) == "nurbsCurve":
-                            if is_animated_and_keyable(transform):
+                            if selectionMod.is_node_animated(transform):
                                 controls.append(transform)
 
         children = cmds.listRelatives(node, children=True, fullPath=True)
@@ -1461,27 +1423,6 @@ def select_rig_controls_animated(*args):
 
         cache[node] = controls
         return controls
-
-    def is_animated_and_keyable(node):
-        if node in cache:
-            return cache[node]
-
-        attrs = cmds.listAttr(node, keyable=True)
-        if not attrs:
-            cache[node] = False
-            return False
-
-        for attr in attrs:
-            if not cmds.getAttr(node + "." + attr, lock=True):
-                connections = cmds.listConnections(node + "." + attr, type="animCurve")
-                if connections:
-                    for conn in connections:
-                        if cmds.nodeType(conn) in ["animCurveTA", "animCurveTL", "animCurveTU"]:
-                            cache[node] = True
-                            return True
-
-        cache[node] = False
-        return False
 
     selected = selectionMod.get_selected_objects(long=True)
 

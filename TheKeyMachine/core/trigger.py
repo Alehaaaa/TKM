@@ -340,6 +340,31 @@ def _register_builtin_commands():
 
     register_command("create_locator", _make_module_command("TheKeyMachine.mods.barMod", "createLocator"))
     register_command("depth_mover", _make_module_command("TheKeyMachine.mods.barMod", "depth_mover"))
+    register_command(
+        "hotkey_apply_smart_euler_filter",
+        _make_module_command("TheKeyMachine.mods.keyToolsMod", "apply_smart_euler_filter"),
+    )
+    register_command("hotkey_clear_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "clear_animation_keys"))
+    register_command("hotkey_copy_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_keys"))
+    register_command("hotkey_crop_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "crop_animation"))
+    register_command("hotkey_cut_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "cut_keys"))
+    register_command("hotkey_delete_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "delete_keys"))
+    register_command("hotkey_paste_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_keys"))
+    register_command("hotkey_paste_keys_relative", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_keys_relative"))
+    register_command(
+        "hotkey_remove_redundant_keys",
+        _make_module_command("TheKeyMachine.mods.keyToolsMod", "remove_redundant_keys"),
+    )
+    register_command(
+        "hotkey_remove_static_anim_curves",
+        _make_module_command("TheKeyMachine.mods.keyToolsMod", "remove_static_anim_curves"),
+    )
+    register_command("hotkey_reverse_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reverse_animation"))
+    register_command("hotkey_set_smart_key", _make_module_command("TheKeyMachine.mods.keyToolsMod", "set_smart_key"))
+    register_command(
+        "hotkey_set_smart_key_all_channels",
+        _make_module_command("TheKeyMachine.mods.keyToolsMod", "set_smart_key_all_channels"),
+    )
     register_command("isolate_master", _make_module_command("TheKeyMachine.mods.barMod", "isolate_master"))
     register_command("select_rig_controls", _make_module_command("TheKeyMachine.mods.barMod", "select_rig_controls"))
     register_command("select_rig_controls_animated", _make_module_command("TheKeyMachine.mods.barMod", "select_rig_controls_animated"))
@@ -347,7 +372,8 @@ def _register_builtin_commands():
     register_command("align_selected_objects", _make_module_command("TheKeyMachine.mods.barMod", "align_selected_objects"))
     register_command("create_tracer", _make_module_command("TheKeyMachine.mods.barMod", "create_tracer"))
     register_command("tracer_refresh", _make_module_command("TheKeyMachine.mods.barMod", "tracer_refresh"))
-    register_command("delete_all_animation", _make_module_command("TheKeyMachine.mods.barMod", "delete_animation"))
+    register_command("delete_all_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "clear_animation_keys"))
+    register_command("delete_static_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "remove_static_anim_curves"))
     register_command("ws_copy_frame", _make_module_command("TheKeyMachine.mods.barMod", "copy_worldspace_single_frame"))
     register_command("ws_paste_frame", _make_module_command("TheKeyMachine.mods.barMod", "paste_worldspace_single_frame"))
     register_command(

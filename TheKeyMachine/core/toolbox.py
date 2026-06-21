@@ -25,6 +25,30 @@ icons, callbacks, and documentation across different UI contexts
 """
 
 
+def _tangent_shortcuts(tool_id, tangent_type, tangent_label, *, maya_default=True, all_keys_callback=None):
+    shortcuts = []
+    if maya_default:
+        shortcuts.append(
+            {
+                "id": tool_id,
+                "label": "Set Maya Default Tangent",
+                "keys": [QtCore.Qt.Key_Control],
+                "callback": lambda t=tangent_type: bar.set_maya_default_tangent(t),
+                "description": "Use {} for newly created keys.".format(tangent_label),
+            }
+        )
+    shortcuts.append(
+        {
+            "id": tool_id,
+            "label": "{} All Keys".format(tangent_label),
+            "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift, QtCore.Qt.Key_Alt],
+            "callback": all_keys_callback or (lambda t=tangent_type: bar.setTangent(t, key_scope="all")),
+            "description": "Set {} on all keys.".format(tangent_label.lower()),
+        }
+    )
+    return shortcuts
+
+
 def _tool_menu_builder(builder_name, **pdefault_kwargs):
     def _build(menu, source_widget=None):
 
@@ -425,11 +449,89 @@ TOOL_DEFINITIONS = {
     },
     "delete_static_animation": {
         "type": "tool",
-        "label": "Delete Static Keys",
+        "label": "Remove Static Anim Curves",
         "text": "S",
         "icon": icons.delete_animation,
         "tooltip_template": helper.delete_static_animation_tooltip_text,
-        "callback": lambda: keyTools.deleteStaticCurves(),
+        "callback": trigger.make_command_callback("hotkey_remove_static_anim_curves"),
+    },
+    "hotkey_apply_smart_euler_filter": {
+        "type": "tool",
+        "label": "Apply Smart Euler Filter",
+        "icon": icons.euler_filter,
+        "callback": trigger.make_command_callback("hotkey_apply_smart_euler_filter"),
+    },
+    "hotkey_clear_animation": {
+        "type": "tool",
+        "label": "Clear Animation",
+        "icon": icons.delete_animation,
+        "callback": trigger.make_command_callback("hotkey_clear_animation"),
+    },
+    "hotkey_copy_keys": {
+        "type": "tool",
+        "label": "Copy Keys",
+        "icon": icons.copy_animation,
+        "callback": trigger.make_command_callback("hotkey_copy_keys"),
+    },
+    "hotkey_crop_animation": {
+        "type": "tool",
+        "label": "Crop Animation",
+        "icon": icons.isolate,
+        "callback": trigger.make_command_callback("hotkey_crop_animation"),
+    },
+    "hotkey_cut_keys": {
+        "type": "tool",
+        "label": "Cut Keys",
+        "icon": icons.get("eraser"),
+        "callback": trigger.make_command_callback("hotkey_cut_keys"),
+    },
+    "hotkey_delete_keys": {
+        "type": "tool",
+        "label": "Delete Keys",
+        "icon": icons.trash,
+        "callback": trigger.make_command_callback("hotkey_delete_keys"),
+    },
+    "hotkey_paste_keys": {
+        "type": "tool",
+        "label": "Paste Keys",
+        "icon": icons.paste_animation,
+        "callback": trigger.make_command_callback("hotkey_paste_keys"),
+    },
+    "hotkey_paste_keys_relative": {
+        "type": "tool",
+        "label": "Paste Keys Relative",
+        "icon": icons.paste_insert_animation,
+        "callback": trigger.make_command_callback("hotkey_paste_keys_relative"),
+    },
+    "hotkey_remove_redundant_keys": {
+        "type": "tool",
+        "label": "Remove Redundant Keys",
+        "icon": icons.get("eraser"),
+        "callback": trigger.make_command_callback("hotkey_remove_redundant_keys"),
+    },
+    "hotkey_remove_static_anim_curves": {
+        "type": "tool",
+        "label": "Remove Static Anim Curves",
+        "icon": icons.delete_animation,
+        "callback": trigger.make_command_callback("hotkey_remove_static_anim_curves"),
+    },
+    "hotkey_reverse_animation": {
+        "type": "tool",
+        "label": "Reverse Animation",
+        "icon": icons.get("flip"),
+        "callback": trigger.make_command_callback("hotkey_reverse_animation"),
+    },
+    "hotkey_set_smart_key": {
+        "type": "tool",
+        "label": "Set Smart Key",
+        "text": "S",
+        "callback": trigger.make_command_callback("hotkey_set_smart_key"),
+    },
+    "hotkey_set_smart_key_all_channels": {
+        "type": "tool",
+        "label": "Set Smart Key All Channels",
+        "text": "S+",
+        "callback": trigger.make_command_callback("hotkey_set_smart_key_all_channels"),
     },
     "graph_match_keys": {
         "type": "tool",
@@ -546,9 +648,9 @@ TOOL_DEFINITIONS = {
 
     "delete_all_animation": {
         "type": "tool",
-        "label": "Delete All Animation",
+        "label": "Clear Animation",
         "icon": icons.delete_animation,
-        "callback": bar.delete_animation,
+        "callback": trigger.make_command_callback("hotkey_clear_animation"),
         "tooltip_template": helper.delete_animation_tooltip_text,
     },
 
@@ -1355,18 +1457,6 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "select_scene_animation"},
         ],
     },
-    "delete_tools": {
-        "label": "Delete Animation",
-        "color": toolColors.TOOLBAR_RED,
-        "items": [
-            {
-                "id": "delete_all_animation",
-                "default": True,
-                "shortcuts": [{"id": "delete_static_animation", "keys": [QtCore.Qt.Key_Shift]}],
-            },
-            {"id": "delete_static_animation"},
-        ],
-    },
     "main_key_editing": {
         "label": "Key Editing",
         "color": toolColors.TOOLBAR_GREEN,
@@ -1560,15 +1650,50 @@ TOOL_SECTION_DEFINITIONS = {
         "color": toolColors.TOOLBAR_ORANGE,
         "items": [
             {"id": "tangent_cycle_matcher"},
-            {"id": "tangent_bouncy", "default": True},
+            {
+                "id": "tangent_bouncy",
+                "default": True,
+                "shortcuts": _tangent_shortcuts(
+                    "tangent_bouncy",
+                    "bouncy",
+                    "Bouncy Tangent",
+                    maya_default=False,
+                    all_keys_callback=lambda: keyTools.bouncy_tangets(key_scope="all"),
+                ),
+            },
             "separator",
-            {"id": "tangent_auto", "default": True},
-            {"id": "tangent_spline", "default": True},
-            {"id": "tangent_clamped"},
-            {"id": "tangent_linear", "default": True},
-            {"id": "tangent_flat"},
-            {"id": "tangent_step", "default": True},
-            {"id": "tangent_plateau"},
+            {
+                "id": "tangent_auto",
+                "default": True,
+                "shortcuts": _tangent_shortcuts("tangent_auto", "auto", "Auto Tangent"),
+            },
+            {
+                "id": "tangent_spline",
+                "default": True,
+                "shortcuts": _tangent_shortcuts("tangent_spline", "spline", "Spline Tangent"),
+            },
+            {
+                "id": "tangent_clamped",
+                "shortcuts": _tangent_shortcuts("tangent_clamped", "clamped", "Clamped Tangent"),
+            },
+            {
+                "id": "tangent_linear",
+                "default": True,
+                "shortcuts": _tangent_shortcuts("tangent_linear", "linear", "Linear Tangent"),
+            },
+            {
+                "id": "tangent_flat",
+                "shortcuts": _tangent_shortcuts("tangent_flat", "flat", "Flat Tangent"),
+            },
+            {
+                "id": "tangent_step",
+                "default": True,
+                "shortcuts": _tangent_shortcuts("tangent_step", "step", "Step Tangent"),
+            },
+            {
+                "id": "tangent_plateau",
+                "shortcuts": _tangent_shortcuts("tangent_plateau", "plateau", "Plateau Tangent"),
+            },
         ],
     },
     # --- Special Tools ---
@@ -1760,6 +1885,25 @@ TOOL_SECTION_DEFINITIONS = {
                     {"id": "disable_graph_filter", "keys": [QtCore.Qt.Key_Control]},
                 ],
             },
+        ],
+    },
+    "anim_curve_tools": {
+        "label": "Anim Curve Tools",
+        "color": toolColors.TOOLBAR_GREEN,
+        "items": [
+            {"id": "hotkey_apply_smart_euler_filter"},
+            {"id": "hotkey_clear_animation"},
+            {"id": "hotkey_copy_keys"},
+            {"id": "hotkey_crop_animation"},
+            {"id": "hotkey_cut_keys"},
+            {"id": "hotkey_delete_keys"},
+            {"id": "hotkey_paste_keys"},
+            {"id": "hotkey_paste_keys_relative"},
+            {"id": "hotkey_remove_redundant_keys"},
+            {"id": "hotkey_remove_static_anim_curves"},
+            {"id": "hotkey_reverse_animation"},
+            {"id": "hotkey_set_smart_key"},
+            {"id": "hotkey_set_smart_key_all_channels"},
             "separator",
             {"id": "snap", "default": True},
         ],
@@ -1813,15 +1957,22 @@ def _apply_shortcuts(tool, item):
     def shortcut_mask(keys):
         return sum(mask for key, mask in key_masks if key in (keys or []))
 
-    shortcuts = [shortcut_display(tool, "Click")]
+    shortcuts = []
     variants = []
-    for shortcut_item in shortcut_items:
+    for index, shortcut_item in enumerate(shortcut_items):
         tool_id = shortcut_item.get("id")
         if not tool_id:
             continue
-        variant = get_tool(tool_id, **_descriptor_overrides(shortcut_item, include_keys=False))
+        overrides = _descriptor_overrides(shortcut_item, include_keys=False)
+        if shortcut_item.get("callback") is not None:
+            variant = dict(tool)
+            variant.update(overrides)
+            variant["id"] = shortcut_item.get("variant_id") or "{}__shortcut_{}".format(tool.get("id", tool_id), index)
+            variant.pop("shortcut_variants", None)
+        else:
+            variant = get_tool(tool_id, **overrides)
         variant["mask"] = shortcut_mask(shortcut_item.get("keys", []))
-        variant.setdefault("shortcuts", [shortcut_display(variant, "Click")])
+        variant.setdefault("shortcuts", [])
         shortcuts.append(shortcut_display(variant, shortcut_item.get("keys", [])))
         variants.append(variant)
 

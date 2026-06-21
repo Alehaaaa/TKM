@@ -625,6 +625,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     dragFinished = Signal()
     modeSelected = Signal(str)
     modeRequested = Signal(str, bool)
+    currentModeChanged = Signal(object, object, object)
 
     def __init__(
         self,
@@ -906,19 +907,18 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                     self._temporary_mode = found
                     self._setCurrentMode(found)
             else:
-                # Notify the section BEFORE changing _current_mode so it can unregister the old key
-                section = getattr(self, "_section_parent", None)
-                if section and hasattr(section, "notify_mode_changed"):
-                    old_key = self._current_mode.key if self._current_mode else None
-                    section.notify_mode_changed(self, old_key, found.key)
-
+                old_key = self._current_mode.key if self._current_mode else None
                 self._current_mode = found
                 self._temporary_mode = None
                 self._setCurrentMode(found)
+                self.currentModeChanged.emit(self, old_key, found.key)
         else:
             # Fallback for initialization or unknown keys
+            old_key = self._current_mode.key if self._current_mode else None
             self._current_mode = None
             self._temporary_mode = None
+            if old_key:
+                self.currentModeChanged.emit(self, old_key, None)
 
     def setTemporaryMode(self, mask: int, requires_mid_click: bool = False) -> bool:
         if not self.idle() or not self._is_pointer_over_widget():
@@ -1053,13 +1053,10 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             is_current = active and (mode.key == active.key or mode.label == active.label)
             act.setChecked(is_current)
 
-            # Use the section's authoritative _mode_to_slot for an O(1) exclusivity check
+            # Use the section's visible modes so this menu matches the pinning menu live.
             is_already_pinned = False
-            if section and hasattr(section, "_mode_to_slot"):
-                occupying_slot = section._mode_to_slot.get(mode.key)
-                if occupying_slot:
-                    occupying_widget = section._widgets.get(occupying_slot)
-                    is_already_pinned = occupying_widget is not None and occupying_widget is not self and occupying_widget.isVisible()
+            if section and hasattr(section, "_visible_slider_mode_keys"):
+                is_already_pinned = mode.key in section._visible_slider_mode_keys() and not is_current
 
             if is_current or is_already_pinned:
                 act.setEnabled(False)

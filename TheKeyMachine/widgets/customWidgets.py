@@ -1580,6 +1580,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     for toggling the visibility of its child widgets.
     """
 
+    sliderModesChanged = QtCore.Signal(object)
+
     def __init__(self, parent=None, spacing=0, hiddeable=True, settings_namespace=None, color=None):
         super().__init__(parent)
         self.setLayout(QtWidgets.QHBoxLayout())
@@ -1691,6 +1693,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         # If the widget is a mode-aware slider, restore its saved mode assignment
         if is_valid_widget(widget) and hasattr(widget, "_current_mode"):
+            if hasattr(widget, "currentModeChanged"):
+                try:
+                    widget.currentModeChanged.disconnect(self._on_slider_current_mode_changed)
+                except (RuntimeError, TypeError):
+                    pass
+                widget.currentModeChanged.connect(self._on_slider_current_mode_changed)
+
             cm = getattr(widget, "_current_mode", None)
             if cm:
                 saved_mode_key = cm.key
@@ -1931,8 +1940,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 self._all_modes = w._modes
                 break
 
-    def notify_mode_changed(self, widget, old_key, new_key):
-        """Called by a slider when its mode changes. Updates the authoritative mode map."""
+    def _on_slider_current_mode_changed(self, widget, old_key, new_key):
+        """Slot for QFlatSliderWidget.currentModeChanged."""
         slot_key = next((k for k, v in self._widgets.items() if v is widget), None)
         if not slot_key:
             return
@@ -1942,6 +1951,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._mode_to_slot[new_key] = slot_key
             if self._persist_slider_modes:
                 self._set_setting(f"slider_mode_{slot_key}", new_key)
+        self._emit_slider_modes_changed()
 
     def _set_visible_modes(self, desired_mode_keys, menu=None):
         """
@@ -1967,7 +1977,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             slot = next(free_iter, None)
             if slot is None:
                 break  # Pool exhausted (more modes than sliders)
-            # setCurrentMode triggers notify_mode_changed → updates _mode_to_slot
+            # setCurrentMode emits currentModeChanged, which updates _mode_to_slot.
             pool[slot].setCurrentMode(mode_key)
             newly_assigned.add(slot)
 
@@ -1979,25 +1989,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             widget.setVisible(visible)
             self._set_setting(f"pin_{slot}", visible)
         self._sync_section_visibility()
-
-        # Sync check states in the currently open menu, keyed by mode key.
-        if menu and QtCompat.isValid(menu):
-            actions = getattr(menu, "_tkm_actions", {})
-
-            # Recalculate which modes actively have a visible slider representative
-            actual_visible_modes = {
-                getattr(pool[slot], "_current_mode", None).key for slot in active_slots if getattr(pool[slot], "_current_mode", None)
-            }
-
-            for mode_key, action in actions.items():
-                if QtCompat.isValid(action):
-                    action.blockSignals(True)
-                    action.setChecked(mode_key in actual_visible_modes)
-                    action.blockSignals(False)
-
-            # Force the menu to repaint so the visual check marks reflect the new state immediately
-            menu.update()
-            menu.repaint()
+        self._emit_slider_modes_changed()
 
         self._refresh_layout()
 
@@ -2073,6 +2065,44 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         menu.update()
         menu.repaint()
 
+    def _visible_slider_mode_keys(self):
+        modes = set()
+        for widget in self._widgets.values():
+            if not QtCompat.isValid(widget) or not widget.isVisible() or not hasattr(widget, "_current_mode"):
+                continue
+            current_mode = getattr(widget, "_current_mode", None)
+            if current_mode:
+                modes.add(current_mode.key)
+        return modes
+
+    def _emit_slider_modes_changed(self):
+        if self._all_modes:
+            self.sliderModesChanged.emit(self._visible_slider_mode_keys())
+
+    def _bind_slider_mode_action(self, menu, action, mode_key):
+        def sync_action(visible_modes, action=action, menu=menu, mode_key=mode_key):
+            if not QtCompat.isValid(action):
+                return
+            action.blockSignals(True)
+            action.setChecked(mode_key in set(visible_modes or []))
+            action.blockSignals(False)
+            if QtCompat.isValid(menu):
+                menu.update()
+                menu.repaint()
+
+        self.sliderModesChanged.connect(sync_action)
+        menu._tkm_slider_mode_syncs.append(sync_action)
+
+        def disconnect_action(*_args, sync_fn=sync_action):
+            try:
+                self.sliderModesChanged.disconnect(sync_fn)
+            except (RuntimeError, TypeError):
+                pass
+
+        action.destroyed.connect(disconnect_action)
+        sync_action(self._visible_slider_mode_keys())
+        return action
+
     def _refresh_layout(self):
         """Trigger a height recalculation."""
         if not QtCompat.isValid(self):
@@ -2111,6 +2141,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         menu._tkm_actions = {}
 
         if self._all_modes:
+            menu._tkm_slider_mode_syncs = []
+
             # Mode-driven sections (sliders): build from the full mode list.
             # Checked = a visible slider currently operates in that mode.
             for mode in self._all_modes:
@@ -2118,9 +2150,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     menu.addSeparator()
                     continue
 
-                slot_key = self._mode_to_slot.get(mode.key)
-                widget = self._widgets.get(slot_key) if slot_key else None
-                is_visible = widget is not None and QtCompat.isValid(widget) and widget.isVisible()
+                is_visible = mode.key in self._visible_slider_mode_keys()
 
                 def make_mode_toggle(mk):
                     def handler(checked):
@@ -2128,7 +2158,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         current = {
                             getattr(w, "_current_mode", None).key
                             for w in self._widgets.values()
-                            if w.isVisible() and getattr(w, "_current_mode", None)
+                            if QtCompat.isValid(w) and w.isVisible() and getattr(w, "_current_mode", None)
                         }
                         if checked:
                             current.add(mk)
@@ -2148,6 +2178,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     title=mode.label,
                     tooltip_template=getattr(mode, "tooltip_template", None),
                 )
+                self._bind_slider_mode_action(menu, menu._tkm_actions[mode.key], mode.key)
 
         else:
             # Non-slider sections (toolbar buttons): build from registration metadata

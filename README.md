@@ -4,7 +4,7 @@
 
 # TheKeyMachine, animation toolbar
 
-![Version](https://img.shields.io/badge/version-0.1.91-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.92-blue.svg)
 
 TheKeyMachine (TKM) is an open source Maya animation toolset built for faster key editing, cleaner selection workflows, smarter copy/paste utilities, floating tools, and timeline-aware operations.
 
@@ -28,6 +28,16 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 - `Bake on Ones / Twos / Threes / Fours / Custom` for fixed or custom sampling
 - `Clear Selection` to remove key selection quickly
 - `Select Scene Anim` to collect animation curves from the scene
+- `Anim Curve Tools` for selection-aware clear/copy/cut/paste/crop/reverse/filter workflows
+- `Set Smart Key` for animated curves, selected channels, Graph Editor keys, and highlighted time ranges
+- `Smart Euler Filter`, redundant-key removal, and static-curve cleanup that respect the active selection context
+- `Snap Keys` grouped with the Anim Curve Tools
+
+### Tangents
+
+- tangent buttons support modifier-click variants for Maya default tangent and all-keys operations
+- stepped tangent menus focus on stepped-safe actions
+- slider mode menus stay connected to visible modes, including torn-off menus and live pin/default changes
 
 ### Selection And Scene Tools
 
@@ -37,7 +47,7 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 - `Align` for translation, rotation, scale, full transform, and range matching
 - `Tracer` for animation tracing, refresh, visibility, and style switching
 - `Default Values` on the current frame, selected keys, or ranges
-- `Delete Anim` in the active time context
+- `Clear Animation` in the active time context
 - `Selector` for a live selection list window
 - `Select Opposite` and `Mirror` for side-based workflows
 - `Select Hierarchy` for deeper rig selection

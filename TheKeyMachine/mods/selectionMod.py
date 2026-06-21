@@ -93,7 +93,28 @@ def _unique(items):
     return unique_items
 
 
-def _plugs_from_anim_curves(curves):
+def is_anim_curve(node):
+    try:
+        return bool(node and cmds.objExists(node) and cmds.nodeType(node).startswith("animCurve"))
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return False
+
+
+def is_rotation_anim_curve(node):
+    try:
+        return bool(node and cmds.objExists(node) and cmds.nodeType(node) in ("animCurveTA", "animCurveTU"))
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return False
+
+
+def get_keyable_scalar_attributes(node):
+    try:
+        return cmds.listAttr(node, keyable=True, scalar=True) or []
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return []
+
+
+def get_anim_curve_output_plugs(curves):
     plugs = []
     for curve in curves or []:
         try:
@@ -104,7 +125,7 @@ def _plugs_from_anim_curves(curves):
     return _unique(plugs)
 
 
-def _anim_curves_from_plugs(plugs):
+def get_anim_curves_from_plugs(plugs):
     curves = []
     for plug in plugs or []:
         if not plug or not cmds.objExists(plug):
@@ -116,7 +137,27 @@ def _anim_curves_from_plugs(plugs):
     return _unique(curves)
 
 
-def _attribute_plugs_from_nodes(nodes):
+def get_anim_curves_for_nodes(nodes, include_shapes=False):
+    lookup_nodes = list(nodes or [])
+    if include_shapes:
+        for node in nodes or []:
+            try:
+                lookup_nodes.extend(cmds.listRelatives(node, shapes=True, fullPath=True) or [])
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+
+    curves = []
+    for node in _unique(lookup_nodes):
+        if not node or not cmds.objExists(node):
+            continue
+        try:
+            curves.extend(cmds.listConnections(node, type="animCurve", connections=False, plugs=False) or [])
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+    return _unique(curves)
+
+
+def get_attribute_plugs_from_nodes(nodes):
     selected_channels = get_selected_channels()
     if selected_channels:
         plugs = ["{}.{}".format(obj, attr) for obj in nodes for attr in selected_channels]
@@ -124,28 +165,99 @@ def _attribute_plugs_from_nodes(nodes):
     else:
         plugs = []
         for obj in nodes:
-            try:
-                attrs = cmds.listAttr(obj, keyable=True, scalar=True) or []
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                attrs = []
+            attrs = get_keyable_scalar_attributes(obj)
             plugs.extend(["{}.{}".format(obj, attr) for attr in attrs])
         source = "keyable_scalar"
 
     return [plug for plug in plugs if plug and cmds.objExists(plug)], source
 
 
+def is_plug_animated(plug):
+    return bool(get_anim_curves_from_plugs([plug]))
+
+
+def is_channel_animated(node, attr):
+    if not node or not attr:
+        return False
+    plug = "{}.{}".format(node, attr)
+    return cmds.objExists(plug) and is_plug_animated(plug)
+
+
+def is_node_animated(node, keyable_only=True, unlocked_only=True):
+    if not node or not cmds.objExists(node):
+        return False
+
+    attrs = get_keyable_scalar_attributes(node) if keyable_only else (cmds.listAttr(node) or [])
+    for attr in attrs:
+        plug = "{}.{}".format(node, attr)
+        if not cmds.objExists(plug):
+            continue
+        if unlocked_only:
+            try:
+                if cmds.getAttr(plug, lock=True):
+                    continue
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                continue
+        if is_plug_animated(plug):
+            return True
+    return False
+
+
+def get_animated_channels_for_node(node, keyable_only=True, settable_only=False):
+    if not node or not cmds.objExists(node):
+        return []
+
+    attrs = get_keyable_scalar_attributes(node) if keyable_only else (cmds.listAttr(node) or [])
+    animated = []
+    for attr in attrs:
+        plug = "{}.{}".format(node, attr)
+        if not cmds.objExists(plug):
+            continue
+        if settable_only:
+            try:
+                if not cmds.getAttr(plug, settable=True):
+                    continue
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                continue
+        if is_plug_animated(plug):
+            animated.append(attr)
+    return animated
+
+
+def split_plug(plug):
+    if not plug or "." not in plug:
+        return None, None
+    return plug.split(".", 1)
+
+
+def object_names_from_plugs(plugs):
+    objects = []
+    for plug in plugs or []:
+        obj, _attr = split_plug(plug)
+        if obj:
+            objects.append(obj)
+    return _unique(objects)
+
+
+def attribute_names_from_plugs(plugs):
+    attrs = []
+    for plug in plugs or []:
+        _obj, attr = split_plug(plug)
+        if attr:
+            attrs.append(attr)
+    return _unique(attrs)
+
+
+_plugs_from_anim_curves = get_anim_curve_output_plugs
+_anim_curves_from_plugs = get_anim_curves_from_plugs
+_attribute_plugs_from_nodes = get_attribute_plugs_from_nodes
+
+
 def _selected_object_attribute_plugs():
     nodes = get_selected_objects()
     if not nodes:
         return [], "none"
-    return _attribute_plugs_from_nodes(nodes)
-
-
-def _is_anim_curve(node):
-    try:
-        return bool(node and cmds.objExists(node) and cmds.nodeType(node).startswith("animCurve"))
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return False
+    return get_attribute_plugs_from_nodes(nodes)
 
 
 def _resolve_graph_outliner_items(items):
@@ -157,20 +269,20 @@ def _resolve_graph_outliner_items(items):
             continue
         if "." in item and cmds.objExists(item):
             plugs.append(item)
-        elif _is_anim_curve(item):
+        elif is_anim_curve(item):
             curves.append(item)
         else:
             nodes.append(item)
 
-    node_plugs, _source = _attribute_plugs_from_nodes(nodes)
-    plugs = _unique(plugs + node_plugs + _plugs_from_anim_curves(curves))
-    curves = _unique(curves + _anim_curves_from_plugs(plugs))
+    node_plugs, _source = get_attribute_plugs_from_nodes(nodes)
+    plugs = _unique(plugs + node_plugs + get_anim_curve_output_plugs(curves))
+    curves = _unique(curves + get_anim_curves_from_plugs(plugs))
     return plugs, curves
 
 
 def get_graph_editor_selected_attribute_plugs():
     anim_curves = cmds.keyframe(q=True, selected=True, name=True) or []
-    return _plugs_from_anim_curves(anim_curves)
+    return get_anim_curve_output_plugs(anim_curves)
 
 
 def get_graph_editor_outliner_items():
@@ -220,7 +332,7 @@ def get_target_curves():
 
 def get_selected_object_curves():
     plugs, _source = _selected_object_attribute_plugs()
-    return _anim_curves_from_plugs(plugs)
+    return get_anim_curves_from_plugs(plugs)
 
 
 def _resolve_slider_targets():
@@ -233,7 +345,7 @@ def _resolve_slider_targets():
         selected_key_curves = []
     if selected_key_curves:
         return {
-            "plugs": _plugs_from_anim_curves(selected_key_curves),
+            "plugs": get_anim_curve_output_plugs(selected_key_curves),
             "curves": _unique(selected_key_curves),
             "source": "graph_editor",
             "time_range": time_range,
@@ -258,7 +370,7 @@ def _resolve_slider_targets():
         selected_graph_curves = []
     if selected_graph_curves:
         return {
-            "plugs": _plugs_from_anim_curves(selected_graph_curves),
+            "plugs": get_anim_curve_output_plugs(selected_graph_curves),
             "curves": _unique(selected_graph_curves),
             "source": "graph_editor",
             "time_range": time_range,
@@ -269,7 +381,7 @@ def _resolve_slider_targets():
     if plugs:
         return {
             "plugs": plugs,
-            "curves": _anim_curves_from_plugs(plugs),
+            "curves": get_anim_curves_from_plugs(plugs),
             "source": source,
             "time_range": time_range,
             "has_graph_keys": False,
@@ -278,13 +390,17 @@ def _resolve_slider_targets():
     return {"plugs": [], "curves": [], "source": "none", "time_range": time_range, "has_graph_keys": False}
 
 
+def resolve_target_context():
+    return dict(_resolve_slider_targets())
+
+
 def resolve_target_attribute_plugs():
-    targets = _resolve_slider_targets()
+    targets = resolve_target_context()
     return targets["plugs"], targets["source"], targets["time_range"], targets["has_graph_keys"]
 
 
 def resolve_target_curves():
-    targets = _resolve_slider_targets()
+    targets = resolve_target_context()
     return targets["curves"], targets["source"], targets["time_range"], targets["has_graph_keys"]
 
 

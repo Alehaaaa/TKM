@@ -284,14 +284,16 @@ def build_tangent_menu(menu, tangent_type, tangent_label, icon=None, source_widg
         )
 
     def _set_maya_default_tangent():
-        cmds.keyTangent(**{"global": True, "inTangentType": tangent_type, "outTangentType": tangent_type})
+        bar.set_maya_default_tangent(tangent_type)
 
-    _add_action("in", "In Tangent", "selection", "the in tangent on the current selection")
-    _add_action("out", "Out Tangent", "selection", "the out tangent on the current selection")
-    menu.addSeparator()
-    _add_action("both", "First Key", "first", "the first key")
-    _add_action("both", "Last Key", "last", "the last key")
-    menu.addSeparator()
+    if tangent_type != "step":
+        _add_action("in", "In Tangent", "selection", "the in tangent on the current selection")
+        _add_action("out", "Out Tangent", "selection", "the out tangent on the current selection")
+        menu.addSeparator()
+        _add_action("both", "First Key", "first", "the first key")
+        _add_action("both", "Last Key", "last", "the last key")
+        menu.addSeparator()
+
     _add_action("both", "All Keys", "all", "all keys")
 
     if maya_default_tangent:
