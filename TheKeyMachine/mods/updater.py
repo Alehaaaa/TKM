@@ -5,6 +5,7 @@ import json
 import shutil
 import zipfile
 import sys
+from xml.sax.saxutils import escape as xml_escape, quoteattr
 import maya.cmds as cmds
 import maya.mel as mel
 
@@ -41,11 +42,98 @@ import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.mods.settingsMod as settings
 
 
+CHANGE_KIND_LABELS = {
+    "new": "New",
+    "feature": "New",
+    "functionality": "New",
+    "bugfix": "Bugfix",
+    "fix": "Bugfix",
+    "change": "Changed",
+    "changed": "Changed",
+    "ui": "UI",
+    "polish": "Polish",
+    "performance": "Performance",
+}
+MAX_CHANGELOG_ENTRIES = 6
+
+
+def _change_kind_icon(kind):
+    normalized = str(kind or "").strip().lower()
+    if normalized in {"bugfix", "fix"}:
+        return icons.bugfix
+    if normalized in {"new", "feature", "functionality"}:
+        return icons.new
+    if normalized in {"ui", "polish"}:
+        return icons.color
+    if normalized == "performance":
+        return icons.system
+    return icons.refresh
+
+
+def _change_kind_label(kind):
+    normalized = str(kind or "").strip().lower()
+    return CHANGE_KIND_LABELS.get(normalized, normalized.title() if normalized else "Changed")
+
+
+def _parse_changelog(raw, version):
+    entries = []
+    target_version = str(version or "").strip()
+    current_version = None
+    for line in str(raw or "").splitlines():
+        raw_line = line.rstrip()
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if line.endswith(":") and not line.startswith("-"):
+            current_version = line[:-1].strip()
+            continue
+
+        if line.startswith("-") and current_version == target_version:
+            item = line[1:].strip()
+            if ":" not in item:
+                continue
+            kind, description = [part.strip() for part in item.split(":", 1)]
+            if description:
+                entries.append({"kind": kind, "description": description})
+            continue
+
+        parts = [part.strip() for part in line.split("|", 2)]
+        if len(parts) != 3:
+            continue
+        entry_version, kind, description = parts
+        if entry_version != target_version or not description:
+            continue
+        entries.append({"kind": kind, "description": description})
+    return entries
+
+
+def _changelog_template(raw, version):
+    entries = _parse_changelog(raw, version)
+    if not entries:
+        return "<text>No changelog available for new version.</text>\n"
+
+    template = "<separator/><text><b>What's changed</b></text>\n"
+    for entry in entries[:MAX_CHANGELOG_ENTRIES]:
+        kind = entry.get("kind", "")
+        icon = _change_kind_icon(kind)
+        label = xml_escape(_change_kind_label(kind))
+        description = xml_escape(entry.get("description", ""))
+        icon_html = ""
+        if icon:
+            icon_html = '<img src={} width="20" height="20" align="middle"/> '.format(quoteattr(icon))
+        template += "<text>{}<b>{}</b> {}</text>\n".format(icon_html, label, description)
+    if len(entries) > MAX_CHANGELOG_ENTRIES:
+        template += "<text>And {} more changes.</text>\n".format(len(entries) - MAX_CHANGELOG_ENTRIES)
+    return template
+
+
 
 # Constants
 REPO = "https://raw.githubusercontent.com/Alehaaaa/TKM/main/"
 NO_DATA_ERROR = "<hl>No Data</hl>\nCould not sync with the server."
 NO_SERVER_ERROR = "<hl>%s %s</hl>\nCould not sync with the server."
+_REPO_ARCHIVE_REF = None
 
 # SSL Context
 unverified_ssl_context = ssl.create_default_context()
@@ -79,6 +167,17 @@ def compare_versions(version1, version2):
         elif v1[i] < v2[i]:
             return -1
     return 0
+
+
+def _repo_parts():
+    if "raw.githubusercontent.com" not in REPO:
+        return None
+    parts = str(REPO).split("raw.githubusercontent.com/")[-1].strip("/").split("/")
+    if len(parts) < 2:
+        return None
+    owner, repo = parts[0], parts[1]
+    branch = parts[2] if len(parts) > 2 else "main"
+    return owner, repo, branch
 
 
 def download(downloadUrl, saveFile):
@@ -123,6 +222,39 @@ def download(downloadUrl, saveFile):
     return True
 
 
+def _repo_archive_ref():
+    global _REPO_ARCHIVE_REF
+    if _REPO_ARCHIVE_REF:
+        return _REPO_ARCHIVE_REF
+
+    sha = "main"
+    repo_parts = _repo_parts()
+    if not repo_parts:
+        _REPO_ARCHIVE_REF = sha
+        return _REPO_ARCHIVE_REF
+
+    owner, repo, branch = repo_parts
+    api_url = "https://api.github.com/repos/%s/%s/commits/%s" % (owner, repo, branch)
+    try:
+        req = urllib_request.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib_request.urlopen(req, context=unverified_ssl_context, timeout=10) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                sha = data.get("sha", sha)
+    except Exception:
+        pass
+    _REPO_ARCHIVE_REF = sha
+    return _REPO_ARCHIVE_REF
+
+
+def _repo_archive_url(ref):
+    repo_parts = _repo_parts()
+    if not repo_parts:
+        return "https://github.com/Alehaaaa/TKM/archive/%s.zip" % ref
+    owner, repo, _branch = repo_parts
+    return "https://github.com/%s/%s/archive/%s.zip" % (owner, repo, ref)
+
+
 def install(command=None, file_path=None):
     # Derive the actual installation path of TKM
     toolsFolder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -139,24 +271,7 @@ def install(command=None, file_path=None):
     if file_path:
         shutil.copy(file_path, tmpZipFile)
     else:
-        sha = "main"
-        if "raw.githubusercontent.com" in REPO:
-            parts = str(REPO).split("raw.githubusercontent.com/")[-1].strip("/").split("/")
-            if len(parts) >= 2:
-                owner, repo = parts[0], parts[1]
-                branch = parts[2] if len(parts) > 2 else "main"
-                try:
-                    api_url = "https://api.github.com/repos/%s/%s/commits/%s" % (owner, repo, branch)
-                    req = urllib_request.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
-                    with urllib_request.urlopen(req, context=unverified_ssl_context, timeout=10) as response:
-                        if response.status == 200:
-                            data = json.loads(response.read().decode("utf-8"))
-                            sha = data.get("sha", "main")
-                except Exception:
-                    pass
-
-        FileUrl = "https://github.com/Alehaaaa/TKM/archive/%s.zip" % sha
-        download(FileUrl, tmpZipFile)
+        download(_repo_archive_url(_repo_archive_ref()), tmpZipFile)
 
     if not os.path.isfile(tmpZipFile):
         return cmds.error("Error trying to install.")
@@ -219,22 +334,7 @@ def install(command=None, file_path=None):
 
 
 def _fetch_repo_file(filename):
-    sha = "main"
-    if "raw.githubusercontent.com" in REPO:
-        parts = str(REPO).split("raw.githubusercontent.com/")[-1].strip("/").split("/")
-        if len(parts) >= 2:
-            owner, repo = parts[0], parts[1]
-            branch = parts[2] if len(parts) > 2 else "main"
-            api_url = "https://api.github.com/repos/%s/%s/commits/%s" % (owner, repo, branch)
-            try:
-                req = urllib_request.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib_request.urlopen(req, context=unverified_ssl_context, timeout=10) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode("utf-8"))
-                        if "sha" in data:
-                            sha = data["sha"]
-            except Exception:
-                pass
+    sha = _repo_archive_ref()
 
     url = REPO.replace("/main/", "/%s/TheKeyMachine/" % sha) + filename
     success, result = _download_text(url)
@@ -272,6 +372,49 @@ def get_latest_version():
     return False, result
 
 
+def get_changelog():
+    success, result = _fetch_repo_file("changelog")
+    if success:
+        return True, result
+
+    local_path = _local_changelog_path()
+    try:
+        with open(local_path, "r") as handle:
+            return True, handle.read()
+    except Exception:
+        return False, ""
+
+
+def _local_changelog_path():
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "changelog")
+
+
+def _update_buttons(dialog_cls):
+    return [
+        dialog_cls.CustomButton("Install", positive=True, icon=icons.install),
+        dialog_cls.CustomButton("Skip", positive=True, icon=icons.skip),
+        dialog_cls.No,
+    ]
+
+
+def _update_template(latest_version, installed_version, changelog):
+    return (
+        "<title>Version {} available\n(using {})</title>\n".format(latest_version, installed_version)
+        + "<text>A new version of TheKeyMachine is ready to download and install.</text>\n"
+        + _changelog_template(changelog, latest_version)
+        + "<separator/>"
+        + "<text>Install will replace the current tool files while keeping your user data and preferences.</text>\n"
+        + "<text>Choose Skip to hide this update prompt until you check manually again.</text>\n"
+    )
+
+
+def _update_message():
+    return (
+        "A new version of TheKeyMachine is ready to download and install.<br><br>"
+        "Install will replace the current tool files while keeping your user data and preferences."
+    )
+
+
 class UpdateCheckWorker(QThread):
     result_ready = Signal(bool, object)
 
@@ -291,15 +434,19 @@ class UpdateCheckWorker(QThread):
             return
 
         comp = compare_versions(latest_version, self.installed_version)
-        if comp <= 0 and not self.force:
-            self.result_ready.emit(True, None)
-            return
-        elif comp <= 0 and self.force:
+        if comp <= 0:
             # We still want to let them know they are up to date instead of prompting a false update.
             self.result_ready.emit(True, None)
             return
 
-        self.result_ready.emit(True, latest_version)
+        changelog_success, changelog = get_changelog()
+        self.result_ready.emit(
+            True,
+            {
+                "version": latest_version,
+                "changelog": changelog if changelog_success else "",
+            },
+        )
 
 
 updater_worker = None
@@ -333,6 +480,11 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 wutil.make_inViewMessage("<hl>" + installed_version + "</hl>\nYou are up-to-date.")
             return
 
+        changelog = ""
+        if isinstance(latest_version, dict):
+            changelog = latest_version.get("changelog") or ""
+            latest_version = latest_version.get("version")
+
         # Update the icon
         if anchor_widget and hasattr(anchor_widget, "setIcon"):
             anchor_widget.setIcon(QtGui.QIcon(icons.settings_update))
@@ -341,36 +493,26 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
         if not force and settings.get_setting("skip_updates", False):
             return
 
-        template = (
-            "<title>Version {} available\n(using {})</title>\n".format(latest_version, installed_version)
-            + "<text>A new version of TheKeyMachine is available to download and install.</text>\n"
-        )
+        latest_version = latest_version.strip()
+        template = _update_template(latest_version, installed_version, changelog)
 
         if anchor_widget:
             result = QFlatTooltipConfirm.question(
                 anchor_widget,
                 title="Update available",
-                template=template,
+                tooltip_template=template,
                 icon=icons.settings_update,
-                buttons=[
-                    QFlatTooltipConfirm.CustomButton("Install", positive=True, icon=icons.install),
-                    QFlatTooltipConfirm.CustomButton("Skip", positive=True, icon=icons.skip),
-                    QFlatTooltipConfirm.No,
-                ],
+                buttons=_update_buttons(QFlatTooltipConfirm),
                 highlight="Install",
             )
         else:
             result = QFlatConfirmDialog.question(
                 None,
                 "Update available",
-                title=f"Version {latest_version.strip()} available",
-                message="A new version of TheKeyMachine is available to download and install.",
+                title=f"Version {latest_version} available",
+                message=_update_message(),
                 icon=icons.settings_update,
-                buttons=[
-                    QFlatConfirmDialog.CustomButton("Install", positive=True, icon=icons.install),
-                    QFlatConfirmDialog.CustomButton("Skip", positive=True, icon=icons.skip),
-                    QFlatConfirmDialog.No,
-                ],
+                buttons=_update_buttons(QFlatConfirmDialog),
                 highlight="Install",
             )
 
@@ -390,7 +532,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                     QFlatConfirmDialog.information(
                         None,
                         "Updated",
-                        title=f"Installed TheKeyMachine {latest_version.strip()}",
+                        title=f"Installed TheKeyMachine {latest_version}",
                         message="You have successfully updated the tool!<br><br>\nPlease restart Maya if you experience any issues.",
                         icon=icons.success,
                         closeButton=True,
