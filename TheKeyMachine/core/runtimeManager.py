@@ -134,6 +134,7 @@ class RuntimeManager(QtCore.QObject):
     overshootChanged = QtCore.Signal(bool)
     eulerFilterChanged = QtCore.Signal(bool)
     nudgeValueChanged = QtCore.Signal(int)
+    backgroundRunnerChanged = QtCore.Signal(str, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -156,6 +157,7 @@ class RuntimeManager(QtCore.QObject):
         self._alt_pressed = False
 
         self._event_filter_installed = False
+        self._background_runner_controller = None
 
     # ----------------------------
     # Lifecycle
@@ -172,11 +174,13 @@ class RuntimeManager(QtCore.QObject):
         self._install_time_changed_callback()
         self._install_undo_callback()
         self._refresh_event_filter_state()
+        self._start_background_runners()
 
         self._started = True
         self._persist_state()
 
     def shutdown(self) -> None:
+        self._shutdown_background_runners()
         self._remove_event_filter()
         self._clear_managed_widgets()
         self._remove_all()
@@ -345,6 +349,13 @@ class RuntimeManager(QtCore.QObject):
         widget = self._managed_widgets.pop(key, None)
         self._safe_delete_widget(widget)
 
+    def background_runners(self):
+        if self._background_runner_controller is None:
+            import TheKeyMachine.core.backgroundRunners as backgroundRunners
+
+            self._background_runner_controller = backgroundRunners.get_controller(self)
+        return self._background_runner_controller
+
     # ----------------------------
     # Internal installs
     # ----------------------------
@@ -412,6 +423,26 @@ class RuntimeManager(QtCore.QObject):
         cb_new = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterNew, _after_new)
         self._track_om("scene_opened", int(cb_open))
         self._track_om("scene_new", int(cb_new))
+
+    def _start_background_runners(self) -> None:
+        try:
+            self.background_runners().start_enabled()
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+
+    def _shutdown_background_runners(self) -> None:
+        try:
+            if self._background_runner_controller is not None:
+                self._background_runner_controller.shutdown()
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+        try:
+            import TheKeyMachine.core.backgroundRunners as backgroundRunners
+
+            backgroundRunners.shutdown_controller()
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+        self._background_runner_controller = None
 
     def _install_event_filter(self) -> None:
         if self._event_filter_installed:

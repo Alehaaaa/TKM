@@ -1153,6 +1153,13 @@ TOOL_DEFINITIONS = {
         "menu": _tool_menu_builder("build_custom_scripts_menu"),
         "tooltip_template": helper.custom_scripts_tooltip_text,
     },
+    "background_runners": {
+        "type": "menu",
+        "label": "Background Runners",
+        "icon": icons.system,
+        "description": "Toggle persistent automatic helpers and background tool runners.",
+        "menu": _tool_menu_builder("build_background_runners_menu"),
+    },
     "settings": {
         "type": "menu",
         "label": "Settings",
@@ -1475,6 +1482,7 @@ TOOL_SECTION_DEFINITIONS = {
     "slider_blend": {
         "label": "Blend Sliders",
         "color": toolColors.TOOLBAR_GREEN,
+        "icon_color": toolColors.SLIDER_ICON_GREEN,
         "type": "slider",
         "slider_type": "blend",
         "modes_attr": "BLEND_MODES",
@@ -1483,6 +1491,7 @@ TOOL_SECTION_DEFINITIONS = {
     "slider_tween": {
         "label": "Tween Sliders",
         "color": toolColors.TOOLBAR_YELLOW,
+        "icon_color": toolColors.SLIDER_ICON_YELLOW,
         "type": "slider",
         "slider_type": "tween",
         "modes_attr": "TWEEN_MODES",
@@ -1491,6 +1500,7 @@ TOOL_SECTION_DEFINITIONS = {
     "slider_tangent": {
         "label": "Tangent Sliders",
         "color": toolColors.TOOLBAR_ORANGE,
+        "icon_color": toolColors.SLIDER_ICON_ORANGE,
         "icon": icons.tangent_auto,
         "type": "slider",
         "slider_type": "tangent",
@@ -1500,7 +1510,7 @@ TOOL_SECTION_DEFINITIONS = {
     # --- Scene Tools ---
     "pointer_tools": {
         "label": "Pointer",
-        "color": toolColors.TOOLBAR_RED,
+        "color": toolColors.TOOLBAR_GRAY,
         "items": [
             {
                 "id": "select_rig_controls",
@@ -1514,7 +1524,7 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "isolate_tools": {
         "label": "Isolate Tools",
-        "color": toolColors.TOOLBAR_RED,
+        "color": toolColors.TOOLBAR_GRAY,
         "items": [
             {
                 "id": "isolate_master",
@@ -1853,14 +1863,17 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "tracer_remove"},
         ],
     },
+    "background_runner_tools": {
+        "label": "Background Runners",
+        "color": toolColors.TOOLBAR_GRAY,
+        "items": [
+            {"id": "background_runners", "default": True},
+        ],
+    },
     "extension_tools": {
         "label": "Extensions",
         "toolbar": True,
         "items": [
-            {"type": "widget", "id": "overshoot_sliders", "default": True},
-            {"type": "widget", "id": "attribute_switcher_euler_filter"},
-            {"id": "custom_graph"},
-            "separator",
             {"id": "custom_tools"},
             {"id": "custom_scripts"},
         ],
@@ -1889,7 +1902,7 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "anim_curve_tools": {
         "label": "Anim Curve Tools",
-        "color": toolColors.TOOLBAR_GREEN,
+        "color": toolColors.TOOLBAR_BLUE,
         "items": [
             {"id": "hotkey_apply_smart_euler_filter"},
             {"id": "hotkey_clear_animation"},

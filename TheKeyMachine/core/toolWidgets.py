@@ -337,6 +337,7 @@ def add_slider_section(section, section_def, *, namespace, object_prefix):
 
     prefix = section_def["slider_type"]
     color = section_def["color"]
+    icon_color = section_def.get("icon_color", color)
     modes = getattr(sliders, section_def["modes_attr"])
     default_keys = [f"{prefix}_{key}" for key in section_def.get("default_modes", [])]
 
@@ -362,6 +363,7 @@ def add_slider_section(section, section_def, *, namespace, object_prefix):
             max=100,
             text=mode.get("icon", "SL"),
             color=color,
+            icon_color=icon_color,
             dragCommand=lambda mode_key, value, p=prefix, session=None: trigger.execute_slider(p, mode_key, value, session=session),
             tooltipTitle=label,
             tooltipDescription=desc,

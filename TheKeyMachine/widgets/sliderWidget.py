@@ -278,7 +278,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
     moved = Signal(float)
     finished = Signal()
 
-    def __init__(self, parent: QWidget, *, text: str, color: str):
+    def __init__(self, parent: QWidget, *, text: str, color: str, icon_color: Optional[str] = None):
         super().__init__(Qt.Horizontal, parent)
 
         # behavior
@@ -289,6 +289,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
         # theme/state
         self._color = color
+        self._icon_color = icon_color or color
         self._text = text
         self._press_offset: Optional[int | bool] = None
         self._hover = False
@@ -535,7 +536,7 @@ QSlider::handle:horizontal {{
         hrect = self._handle_rect()
         p.setRenderHint(QPainter.Antialiasing)
 
-        base_color = QColor(self._color)
+        base_color = QColor(self._icon_color)
         handle_highlighted = getattr(self, "_handle_hover", False) or bool(self._press_offset)
         if handle_highlighted:
             main_color = QColor(
@@ -550,8 +551,7 @@ QSlider::handle:horizontal {{
             if not qicon.isNull():
                 icon_rect = QRect(0, 0, icon_size, icon_size)
                 icon_rect.moveCenter(hrect.center())
-                if handle_highlighted:
-                    qicon = icons.QHoverableIcon.color_icon(qicon, main_color, icon_rect.size())
+                qicon = icons.QHoverableIcon.color_icon(qicon, main_color, icon_rect.size())
                 qicon.paint(p, icon_rect, Qt.AlignCenter)
         else:
             p.setFont(self._text_font)
@@ -633,6 +633,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         min: int = 0,
         max: int = 100,
         color: str = "#AAAAAA",
+        icon_color: Optional[str] = None,
         text: str = "",
         dragCommand: Optional[callable] = None,
         tooltipTitle: str = "",
@@ -644,6 +645,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         self._scale = 1000  # internal units per 1%
         self._color = color
+        self._icon_color = icon_color or color
 
         self._worldSpace = False
         self._frameButtons = False
@@ -670,7 +672,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         base.setContentsMargins(1, 0, 1, 0)
         base.setSpacing(0)
 
-        self._slider = SliderHandle(self, text=text, color=color)
+        self._slider = SliderHandle(self, text=text, color=color, icon_color=self._icon_color)
         self._slider.setRange(int(min * self._scale), int(max * self._scale))
         self._slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         base.addWidget(self._slider)
@@ -826,6 +828,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             if btn in (self._leftFrameButton, self._rightFrameButton):
                 continue
             btn.setColor(color)
+        self._slider.update()
+
+    def setIconColor(self, color: str):
+        self._icon_color = color
+        self._slider._icon_color = color
         self._slider.update()
 
     def setWorldSpace(self, enabled: bool):

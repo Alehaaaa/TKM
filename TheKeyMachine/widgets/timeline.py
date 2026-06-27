@@ -101,8 +101,10 @@ class TimelineTint(QtWidgets.QWidget):
         icon=None,
         full_width=False,
         icon_scale=1.0,
+        z_index=0,
     ):
         self._full_width = bool(full_width)
+        self._z_index = int(z_index or 0)
         parent_widget = parent or self.get_timeline_widget(full_width=self._full_width)
         super().__init__(parent_widget)
         self._parent_widget = parent_widget
@@ -127,6 +129,7 @@ class TimelineTint(QtWidgets.QWidget):
 
         self._sync_geometry()
         self.show()
+        self._sync_z_order()
 
         if not self._persistent:
             lifetime_ms = max(300, int(duration_ms or 0))
@@ -208,7 +211,28 @@ class TimelineTint(QtWidgets.QWidget):
         new_geometry = self._parent_widget.rect()
         if self.geometry() != new_geometry:
             self.setGeometry(new_geometry)
+        self._sync_z_order()
         self.update()
+
+    def _sync_z_order(self):
+        if self._z_index < 0:
+            self._stack_under_managed_tints()
+        elif self._z_index > 0:
+            self.raise_()
+
+    def _stack_under_managed_tints(self):
+        parent = self.parentWidget()
+        if parent is None:
+            return
+        for sibling in parent.findChildren(TimelineTint):
+            if sibling is self:
+                continue
+            if getattr(sibling, "_z_index", 0) >= 0:
+                try:
+                    self.stackUnder(sibling)
+                except RuntimeError:
+                    pass
+                return
 
     def _current_tint_rect(self):
         if self._full_width:
@@ -273,7 +297,7 @@ class TimelineTintSession(QtCore.QObject):
 
 
 def show_timeline_tint(
-    timerange=None, color=None, duration_ms=200, owner=None, key=None, center_line=False, icon=None, icon_scale=1.0
+    timerange=None, color=None, duration_ms=200, owner=None, key=None, center_line=False, icon=None, icon_scale=1.0, z_index=0
 ):
     color = color or _default_tint_color()
     context = timerange or resolve_time_context(default_mode="all_animation").timerange
@@ -286,12 +310,13 @@ def show_timeline_tint(
         icon=icon,
         full_width=full_width,
         icon_scale=icon_scale,
+        z_index=z_index,
     )
     return runtime.get_runtime_manager().register_managed_widget(widget, key=key, owner=owner)
 
 
 def show_timeline_context(
-    default_mode="all_animation", color=None, duration_ms=200, owner=None, key=None, center_line=False, icon=None, icon_scale=1.0
+    default_mode="all_animation", color=None, duration_ms=200, owner=None, key=None, center_line=False, icon=None, icon_scale=1.0, z_index=0
 ):
     context = resolve_time_context(default_mode=default_mode)
     return show_timeline_tint(
@@ -303,11 +328,12 @@ def show_timeline_context(
         center_line=center_line,
         icon=icon,
         icon_scale=icon_scale,
+        z_index=z_index,
     )
 
 
 def begin_timeline_tint(
-    timerange=None, color=None, owner=None, key=None, min_duration=300, center_line=False, icon=None, icon_scale=1.0
+    timerange=None, color=None, owner=None, key=None, min_duration=300, center_line=False, icon=None, icon_scale=1.0, z_index=0
 ):
     widget = show_timeline_tint(
         timerange=timerange,
@@ -318,12 +344,13 @@ def begin_timeline_tint(
         center_line=center_line,
         icon=icon,
         icon_scale=icon_scale,
+        z_index=z_index,
     )
     return TimelineTintSession(widget, key=key, min_duration=min_duration, parent=owner)
 
 
 def begin_timeline_context(
-    default_mode="all_animation", color=None, owner=None, key=None, min_duration=300, center_line=False, icon=None, icon_scale=1.0
+    default_mode="all_animation", color=None, owner=None, key=None, min_duration=300, center_line=False, icon=None, icon_scale=1.0, z_index=0
 ):
     context = resolve_time_context(default_mode=default_mode)
     return begin_timeline_tint(
@@ -335,6 +362,7 @@ def begin_timeline_context(
         center_line=center_line,
         icon=icon,
         icon_scale=icon_scale,
+        z_index=z_index,
     )
 
 
@@ -373,6 +401,7 @@ def _normalize_tint_color(color):
 
     if qcolor.alpha() == 255:
         qcolor.setAlpha(default_alpha)
+    qcolor.setAlpha(max(0, min(255, int(round(qcolor.alpha() * 0.8)))))
     return qcolor
 
 

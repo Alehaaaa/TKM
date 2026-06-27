@@ -20,6 +20,7 @@ import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.core.toolWidgets as toolWidgets
+import TheKeyMachine.core.backgroundRunners as backgroundRunners
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.customWidgets as cw
@@ -171,6 +172,36 @@ def build_custom_scripts_menu(menu, source_widget=None):
         config_folder="TheKeyMachine_user_data/connect/scripts",
         config_file="scripts.py",
     )
+
+
+def build_background_runners_menu(menu, source_widget=None):
+    specs = backgroundRunners.get_runner_specs()
+    for runner_id, spec in specs.items():
+        action = menu.addAction(
+            QtGui.QIcon(spec.get("icon") or ""),
+            spec.get("menu_label") or spec.get("label", runner_id),
+            description=spec.get("description") or "",
+            open=True,
+        )
+        action.setCheckable(True)
+        getter = spec.get("get_enabled")
+        if callable(getter):
+            toolCommon.set_checked_safely(action, getter())
+        action.toggled.connect(lambda checked, rid=runner_id: backgroundRunners.set_runner_enabled(rid, checked))
+
+        signal = spec.get("changed_signal")
+        if signal is not None and callable(getter):
+            def _sync(*_args, target=action, state_fn=getter):
+                toolCommon.set_checked_safely(target, state_fn())
+
+            toolCommon.replace_tracked_connection(
+                action,
+                "_tkm_background_runner_action_sync",
+                signal,
+                _sync,
+                parent=action,
+            )
+    return False
 
 
 def build_graph_extra_tools_menu(menu, source_widget=None):
