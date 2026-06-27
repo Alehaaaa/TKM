@@ -113,6 +113,7 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Bug Report",
         "icon": icons.bug,
+        "callback": trigger._open_bug_report_window,
     },
 
     # ---------------------------------------------------------------  SMART TOOLS  --------------------------------------------------------------

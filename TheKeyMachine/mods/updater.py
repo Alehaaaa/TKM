@@ -5,7 +5,6 @@ import json
 import shutil
 import zipfile
 import sys
-from xml.sax.saxutils import escape as xml_escape, quoteattr
 import maya.cmds as cmds
 import maya.mel as mel
 
@@ -40,93 +39,7 @@ from TheKeyMachine.widgets.customDialogs import QFlatConfirmDialog, QFlatTooltip
 from TheKeyMachine.data import icons
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.mods.settingsMod as settings
-
-
-CHANGE_KIND_LABELS = {
-    "new": "New",
-    "feature": "New",
-    "functionality": "New",
-    "bugfix": "Bugfix",
-    "fix": "Bugfix",
-    "change": "Changed",
-    "changed": "Changed",
-    "ui": "UI",
-    "polish": "Polish",
-    "performance": "Performance",
-}
-MAX_CHANGELOG_ENTRIES = 6
-
-
-def _change_kind_icon(kind):
-    normalized = str(kind or "").strip().lower()
-    if normalized in {"bugfix", "fix"}:
-        return icons.bugfix
-    if normalized in {"new", "feature", "functionality"}:
-        return icons.new
-    if normalized in {"ui", "polish"}:
-        return icons.color
-    if normalized == "performance":
-        return icons.system
-    return icons.refresh
-
-
-def _change_kind_label(kind):
-    normalized = str(kind or "").strip().lower()
-    return CHANGE_KIND_LABELS.get(normalized, normalized.title() if normalized else "Changed")
-
-
-def _parse_changelog(raw, version):
-    entries = []
-    target_version = str(version or "").strip()
-    current_version = None
-    for line in str(raw or "").splitlines():
-        raw_line = line.rstrip()
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-
-        if line.endswith(":") and not line.startswith("-"):
-            current_version = line[:-1].strip()
-            continue
-
-        if line.startswith("-") and current_version == target_version:
-            item = line[1:].strip()
-            if ":" not in item:
-                continue
-            kind, description = [part.strip() for part in item.split(":", 1)]
-            if description:
-                entries.append({"kind": kind, "description": description})
-            continue
-
-        parts = [part.strip() for part in line.split("|", 2)]
-        if len(parts) != 3:
-            continue
-        entry_version, kind, description = parts
-        if entry_version != target_version or not description:
-            continue
-        entries.append({"kind": kind, "description": description})
-    return entries
-
-
-def _changelog_template(raw, version):
-    entries = _parse_changelog(raw, version)
-    if not entries:
-        return "<text>No changelog available for new version.</text>\n"
-
-    template = "<separator/><text><b>What's changed</b></text>\n"
-    for entry in entries[:MAX_CHANGELOG_ENTRIES]:
-        kind = entry.get("kind", "")
-        icon = _change_kind_icon(kind)
-        label = xml_escape(_change_kind_label(kind))
-        description = xml_escape(entry.get("description", ""))
-        icon_html = ""
-        if icon:
-            icon_html = '<img src={} width="20" height="20" align="middle"/> '.format(quoteattr(icon))
-        template += "<text>{}<b>{}</b> {}</text>\n".format(icon_html, label, description)
-    if len(entries) > MAX_CHANGELOG_ENTRIES:
-        template += "<text>And {} more changes.</text>\n".format(len(entries) - MAX_CHANGELOG_ENTRIES)
-    return template
-
+import TheKeyMachine.mods.changelogMod as changelogMod
 
 
 # Constants
@@ -377,16 +290,8 @@ def get_changelog():
     if success:
         return True, result
 
-    local_path = _local_changelog_path()
-    try:
-        with open(local_path, "r") as handle:
-            return True, handle.read()
-    except Exception:
-        return False, ""
-
-
-def _local_changelog_path():
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "changelog")
+    changelog = changelogMod.read_local_changelog()
+    return (True, changelog) if changelog else (False, "")
 
 
 def _update_buttons(dialog_cls):
@@ -401,7 +306,7 @@ def _update_template(latest_version, installed_version, changelog):
     return (
         "<title>Version {} available\n(using {})</title>\n".format(latest_version, installed_version)
         + "<text>A new version of TheKeyMachine is ready to download and install.</text>\n"
-        + _changelog_template(changelog, latest_version)
+        + changelogMod.changelog_template(changelog, latest_version)
         + "<separator/>"
         + "<text>Install will replace the current tool files while keeping your user data and preferences.</text>\n"
         + "<text>Choose Skip to hide this update prompt until you check manually again.</text>\n"

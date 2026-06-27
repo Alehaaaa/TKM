@@ -250,6 +250,16 @@ class MenuWidget(QtWidgets.QMenu):
     def _cursor_target_rect(pos=None):
         return QtCore.QRect(pos or QtGui.QCursor.pos(), QtCore.QSize(1, 1))
 
+    def _action_global_rect(self, action):
+        try:
+            rect = self.actionGeometry(action)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return self._cursor_target_rect()
+        if not rect.isValid():
+            return self._cursor_target_rect()
+        rect.moveTo(self.mapToGlobal(rect.topLeft()))
+        return rect
+
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
         tooltip_template = kwargs.pop("tooltip_template", None)
@@ -264,7 +274,7 @@ class MenuWidget(QtWidgets.QMenu):
             action.setProperty("tkm_keep_menu_open", True)
 
         if callback:
-            action.triggered.connect(callback)
+            action.triggered.connect(lambda _checked=False, cb=callback: QtCore.QTimer.singleShot(0, cb))
 
         label = ""
         for arg in args:
@@ -322,7 +332,7 @@ class MenuWidget(QtWidgets.QMenu):
             QFlatTooltipManager.delayed_show(
                 text=title,
                 anchor_widget=self,
-                target_rect=self._cursor_target_rect(cursor_pos),
+                target_rect=self._action_global_rect(action),
                 target_pos=cursor_pos,
                 description=desc,
                 tooltip_template=display_template,
@@ -444,17 +454,25 @@ class QFlatButton(QtWidgets.QPushButton):
     QPushButton:pressed {
         background-color: %s;
     }
+    QPushButton:disabled {
+        color: %s;
+        background-color: %s;
+    }
     """
 
     DEFAULT_COLOR = "#ffffff"
     DEFAULT_BACKGROUND = "#5D5D5D"
     DEFAULT_HOVER_BACKGROUND = "#707070"
     DEFAULT_PRESSED_BACKGROUND = "#252525"
+    DEFAULT_DISABLED_COLOR = "#8a8a8a"
+    DEFAULT_DISABLED_BACKGROUND = "#444444"
 
     HIGHLIGHT_COLOR = "#282828"
     HIGHLIGHT_BACKGROUND = "#bdbdbd"
     HIGHLIGHT_HOVER_BACKGROUND = "#cfcfcf"
     HIGHLIGHT_PRESSED_BACKGROUND = "#707070"
+    HIGHLIGHT_DISABLED_COLOR = "#d0d0d0"
+    HIGHLIGHT_DISABLED_BACKGROUND = "#8a8a8a"
 
     DEFAULT_FONT_SIZE = DPI(12)
     HIGHLIGHT_FONT_SIZE = DPI(15)
@@ -489,6 +507,8 @@ class QFlatButton(QtWidgets.QPushButton):
             background = self.HIGHLIGHT_BACKGROUND
             hover_background = self.HIGHLIGHT_HOVER_BACKGROUND
             pressed_background = self.HIGHLIGHT_PRESSED_BACKGROUND
+            disabled_color = self.HIGHLIGHT_DISABLED_COLOR
+            disabled_background = self.HIGHLIGHT_DISABLED_BACKGROUND
             font_size = self.HIGHLIGHT_FONT_SIZE
             weight = "bold"
         elif background != self.DEFAULT_BACKGROUND:
@@ -503,11 +523,15 @@ class QFlatButton(QtWidgets.QPushButton):
                 r, g, b = 93, 93, 93
             hover_background = "#%02x%02x%02x" % (min(r + 10, 255), min(g + 10, 255), min(b + 10, 255))
             pressed_background = "#%02x%02x%02x" % (max(r - 10, 0), max(g - 10, 0), max(b - 10, 0))
+            disabled_color = self.DEFAULT_DISABLED_COLOR
+            disabled_background = self.DEFAULT_DISABLED_BACKGROUND
             font_size = self.DEFAULT_FONT_SIZE
             weight = "normal"
         else:
             hover_background = self.DEFAULT_HOVER_BACKGROUND
             pressed_background = self.DEFAULT_PRESSED_BACKGROUND
+            disabled_color = self.DEFAULT_DISABLED_COLOR
+            disabled_background = self.DEFAULT_DISABLED_BACKGROUND
             font_size = self.DEFAULT_FONT_SIZE
             weight = "normal"
 
@@ -525,8 +549,16 @@ class QFlatButton(QtWidgets.QPushButton):
                 int(font_size),
                 hover_background,
                 pressed_background,
+                disabled_color,
+                disabled_background,
             )
         )
+
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.EnabledChange:
+            cursor = QtCore.Qt.PointingHandCursor if self.isEnabled() else QtCore.Qt.ArrowCursor
+            self.setCursor(cursor)
+        QtWidgets.QPushButton.changeEvent(self, event)
 
 
 class QFlatBottomBar(QtWidgets.QFrame):

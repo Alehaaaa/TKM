@@ -16,8 +16,12 @@ from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
 from TheKeyMachine.data import icons
+import TheKeyMachine.mods.changelogMod as changelogMod
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.widgets.customWidgets as cw
+
+
+_version_history_dialog = None
 
 
 def _parent_widget_for_layout(layout, fallback=None):
@@ -1187,12 +1191,18 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
         self,
         parent=None,
         submit_callback=None,
+        prepare_callback=None,
+        worker_class=None,
         dialog_title="Report a Bug",
         prefill_name="",
         prefill_explanation="",
         prefill_script_error="",
     ):
         self._submit_callback = submit_callback
+        self._prepare_callback = prepare_callback
+        self._worker_class = worker_class
+        self._submit_worker = None
+        self._submitted_successfully = False
         self._send_button = None
         super().__init__(parent=parent)
         self.setWindowTitle(dialog_title)
@@ -1205,7 +1215,7 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
 
         content_widget = QtWidgets.QWidget(self)
         content_layout = QtWidgets.QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(DPI(12), DPI(12), DPI(12), DPI(12))
+        content_layout.setContentsMargins(DPI(12), DPI(12), DPI(12), 0)
         content_layout.setSpacing(DPI(8))
 
         self.addWindowHeader(
@@ -1229,6 +1239,7 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
         self.status_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.status_label.setMinimumHeight(self._status_row_height())
         self.status_label.setStyleSheet("color: %s;" % self._info_color)
+        self.status_label.setVisible(False)
 
         self.name_input = QtWidgets.QLineEdit(content_widget)
         self.name_input.setPlaceholderText("* Your name")
@@ -1267,6 +1278,7 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
 
         left_fields = QtWidgets.QWidget(content_widget)
         left_fields_layout = QtWidgets.QVBoxLayout(left_fields)
+        left_fields_layout.setContentsMargins(0, 0, 0, 0)
         left_fields_layout.setSpacing(DPI(8))
         left_fields_layout.addWidget(self.name_input)
         left_fields_layout.addWidget(self.explanation_textbox, 1)
@@ -1317,6 +1329,7 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
         self.name_input.setText(name or "")
         self.explanation_textbox.setPlainText(explanation or "")
         self.script_error_textbox.setPlainText(script_error or "")
+        self._submitted_successfully = False
         self._set_send_enabled(True)
         self._clear_status_message()
 
@@ -1361,12 +1374,16 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
     def _set_status(self, message, error=False):
         color = self._error_color if error else self._info_color
         self.status_label.setStyleSheet("color: %s;" % color)
-        self.status_label.setText(message or self._status_placeholder)
+        self.status_label.setText(message or "")
+        self.status_label.setVisible(bool(message))
 
     def _clear_status_message(self):
+        if self._submitted_successfully:
+            return
         if self._send_button and not self._send_button.isEnabled():
             return
-        self.status_label.setText(self._status_placeholder)
+        self.status_label.setText("")
+        self.status_label.setVisible(False)
 
     def _enforce_text_limit(self, widget, limit=None):
         limit = int(limit or self.MAX_TEXT_CHARS)
@@ -1390,21 +1407,48 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
             self._set_status("Bug reporting is unavailable right now.", error=True)
             return
 
+        if self._submit_worker and self._submit_worker.isRunning():
+            return
+
+        if self._prepare_callback:
+            try:
+                payload = self._prepare_callback(**payload)
+            except Exception as exc:
+                print("[TheKeyMachine] Bug report preparation failed:", exc)
+                self._set_status("Failed to prepare the report.", error=True)
+                return
+
         self._set_status("Sending bug report...", error=False)
         self._set_send_enabled(False)
 
-        success = False
-        try:
-            success = bool(self._submit_callback(**payload))
-        except Exception as exc:
-            print("[TheKeyMachine] Bug report submission failed:", exc)
+        if self._worker_class is None:
+            self._set_status("Bug reporting is unavailable right now.", error=True)
+            self._set_send_enabled(True)
+            return
 
+        self._submit_worker = self._worker_class(self._submit_callback, payload, parent=self)
+        self._submit_worker.result_ready.connect(self._on_submit_finished)
+        self._submit_worker.finished.connect(self._submit_worker.deleteLater)
+        self._submit_worker.start()
+
+    def _on_submit_finished(self, success, error):
         if success:
+            self._submitted_successfully = True
             self._set_status("Report sent successfully. Thanks!", error=False)
-            QtCore.QTimer.singleShot(3100, self.close)
+            self._set_send_enabled(False)
         else:
+            if error:
+                print("[TheKeyMachine] Bug report submission failed:", error)
             self._set_status("Failed to send the report. Try again later.", error=True)
             self._set_send_enabled(True)
+        self._submit_worker = None
+
+    def closeEvent(self, event):
+        if self._submit_worker and self._submit_worker.isRunning():
+            self._set_status("Sending bug report. Please wait...", error=False)
+            event.ignore()
+            return
+        QFlatToolBarWindowDialog.closeEvent(self, event)
 
     def show_centered(self):
         # Avoid adjustSize() here: it tends to make this dialog overly tall based on content hints.
@@ -1455,38 +1499,19 @@ class TKMAboutDialog(QFlatDialog):
 
         # Version Badge
         version_btn = QtWidgets.QPushButton(f"v{TheKeyMachine_version} {TheKeyMachine_stage_version}")
+        version_btn.setCursor(QtCore.Qt.PointingHandCursor)
 
-        if general.config["INTERNET_CONNECTION"]:
-            version_btn.setCursor(QtCore.Qt.PointingHandCursor)
-
-            clickable_style = """
-                QPushButton:hover {
-                    background-color: #498042;
-                    color: white;
-                }
-                QPushButton:pressed {
-                    background-color: #3a5a3d;
-                    color: #98ae97;
-                }
-                """
-
-            def _check_updates():
-                import TheKeyMachine.mods.updater as updater
-
-                try:
-                    from importlib import reload
-                except ImportError:
-                    from imp import reload
-                except ImportError:
-                    pass
-
-                reload(updater)
-
-                updater.check_for_updates(force=True)
-
-            version_btn.clicked.connect(_check_updates)
-        else:
-            clickable_style = ""
+        clickable_style = """
+            QPushButton:hover {
+                background-color: #498042;
+                color: white;
+            }
+            QPushButton:pressed {
+                background-color: #3a5a3d;
+                color: #98ae97;
+            }
+            """
+        version_btn.clicked.connect(self._open_version_history)
 
         version_btn.setStyleSheet(
             """
@@ -1533,6 +1558,167 @@ class TKMAboutDialog(QFlatDialog):
         self.root_layout.addWidget(content_widget)
         self.setBottomBar(closeButton=True)
         self.adjustSize()
+
+    def _open_version_history(self):
+        self.accept()
+
+        def _show():
+            show_version_history_dialog(parent=None)
+
+        QtCore.QTimer.singleShot(0, _show)
+
+
+def show_version_history_dialog(parent=None):
+    global _version_history_dialog
+
+    if _version_history_dialog and is_valid_widget(_version_history_dialog):
+        _version_history_dialog.show()
+        _version_history_dialog.raise_()
+        _version_history_dialog.activateWindow()
+        return _version_history_dialog
+
+    dlg = TKMVersionHistoryDialog(parent=parent)
+    dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
+
+    def _clear_ref(*_args):
+        global _version_history_dialog
+        _version_history_dialog = None
+
+    dlg.destroyed.connect(_clear_ref)
+    _version_history_dialog = dlg
+    dlg.show()
+    dlg.raise_()
+    dlg.activateWindow()
+    return dlg
+
+
+class TKMVersionHistoryDialog(QFlatDialog):
+    def __init__(self, parent=None):
+        QFlatDialog.__init__(self, parent)
+        self.setWindowTitle("TheKeyMachine Version History")
+        self.setMinimumSize(DPI(620), DPI(520))
+
+        content_widget = QtWidgets.QWidget()
+        content_layout = QtWidgets.QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(DPI(12), DPI(12), DPI(12), 0)
+        content_layout.setSpacing(DPI(0))
+
+        logo_label = QtWidgets.QLabel()
+        logo_label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        logo_pixmap = QtGui.QPixmap(icons.TheKeyMachine_logo_250)
+        if not logo_pixmap.isNull():
+            logo_label.setPixmap(
+                logo_pixmap.scaledToWidth(DPI(170), QtCore.Qt.SmoothTransformation)
+            )
+        content_layout.addWidget(logo_label)
+        content_layout.addSpacing(DPI(18))
+
+        title_label = QtWidgets.QLabel("Version History")
+        title_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        title_label.setStyleSheet("font-size: %spx; font-weight: bold; color: #cfcfcf;" % DPI(15))
+        content_layout.addWidget(title_label)
+
+        sections = changelogMod.get_local_changelog_sections()
+        range_text = self._version_range_text(sections)
+        range_label = QtWidgets.QLabel(range_text)
+        range_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        range_label.setStyleSheet("font-size: %spx; font-weight: bold; color: #a8a8a8;" % DPI(10))
+        content_layout.addWidget(range_label)
+        content_layout.addSpacing(DPI(24))
+
+        scroll_area = QtWidgets.QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll_area.setStyleSheet(
+            """
+            QScrollArea {
+                background-color: #242424;
+                border: none;
+            }
+            """
+        )
+
+        history_widget = QtWidgets.QWidget()
+        history_widget.setStyleSheet("background-color: #242424;")
+        history_layout = QtWidgets.QVBoxLayout(history_widget)
+        history_layout.setContentsMargins(0, 0, 0, 0)
+        history_layout.setSpacing(0)
+
+        if sections:
+            for index, section in enumerate(sections):
+                history_layout.addWidget(self._build_version_block(section, index))
+        else:
+            empty_label = QtWidgets.QLabel("No changelog available.")
+            empty_label.setAlignment(QtCore.Qt.AlignCenter)
+            empty_label.setStyleSheet("color: #bbbbbb; font-size: %spx; padding: %spx;" % (DPI(12), DPI(24)))
+            history_layout.addWidget(empty_label)
+
+        history_layout.addStretch(1)
+        scroll_area.setWidget(history_widget)
+        content_layout.addWidget(scroll_area, 1)
+
+        self.root_layout.addWidget(content_widget)
+        self.setBottomBar(closeButton=True)
+        self.resize(DPI(650), DPI(580))
+
+    def _version_range_text(self, sections):
+        if not sections:
+            return "(No changelog entries found)"
+        newest = sections[0].get("version", "")
+        oldest = sections[-1].get("version", "")
+        return "(From %s up to %s)" % (oldest, newest)
+
+    def _build_version_block(self, section, index):
+        frame = QtWidgets.QFrame()
+        frame.setStyleSheet(
+            """
+            QFrame {
+                background-color: %s;
+                border: none;
+            }
+            """
+            % ("#292929" if index % 2 == 0 else "#262626")
+        )
+
+        layout = QtWidgets.QVBoxLayout(frame)
+        layout.setContentsMargins(DPI(10), DPI(10), DPI(10), DPI(12))
+        layout.setSpacing(DPI(7))
+
+        version_label = QtWidgets.QLabel("Version %s" % section.get("version", ""))
+        version_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        version_label.setStyleSheet("font-size: %spx; font-weight: bold; color: #f0f0f0;" % DPI(15))
+        layout.addWidget(version_label)
+
+        for entry in section.get("entries", []):
+            layout.addLayout(self._build_entry_row(entry))
+
+        return frame
+
+    def _build_entry_row(self, entry):
+        row = QtWidgets.QHBoxLayout()
+        row.setContentsMargins(DPI(2), 0, 0, 0)
+        row.setSpacing(DPI(8))
+
+        icon_label = QtWidgets.QLabel()
+        pixmap = QtGui.QPixmap(changelogMod.change_kind_icon(entry.get("kind", "")))
+        icon_size = DPI(17)
+        if not pixmap.isNull():
+            icon_label.setPixmap(pixmap.scaled(icon_size, icon_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+        icon_label.setFixedSize(icon_size, icon_size)
+        row.addWidget(icon_label, 0, QtCore.Qt.AlignTop)
+
+        text = "<b>%s:</b> %s" % (
+            changelogMod.escape_text(changelogMod.change_kind_label(entry.get("kind", ""))),
+            changelogMod.escape_text(entry.get("description", "")),
+        )
+        label = QtWidgets.QLabel(text)
+        label.setWordWrap(True)
+        label.setTextFormat(QtCore.Qt.RichText)
+        label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        label.setStyleSheet("font-size: %spx; color: #d3d3d3;" % DPI(11))
+        row.addWidget(label, 1)
+
+        return row
 
 
 class QFlatNumberInput(QFlatToolBarPopupDialog):

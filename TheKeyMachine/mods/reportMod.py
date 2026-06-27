@@ -141,14 +141,33 @@ def _collect_debug_context():
     return {key: _sanitize_payload_value(value) for key, value in info.items()}
 
 
-def send_bug_report(name, explanation, script_error):
+class BugReportSubmitWorker(QtCore.QThread):
+    result_ready = QtCore.Signal(bool, object)
+
+    def __init__(self, submit_callback, payload, parent=None):
+        QtCore.QThread.__init__(self, parent)
+        self._submit_callback = submit_callback
+        self._payload = dict(payload or {})
+
+    def run(self):
+        try:
+            success = bool(self._submit_callback(**self._payload))
+            self.result_ready.emit(success, None)
+        except Exception as exc:
+            self.result_ready.emit(False, exc)
+
+
+def prepare_bug_report_payload(name, explanation, script_error):
     payload = {
         "name": name,
         "explanation": explanation,
         "script_error": script_error,
     }
     payload.update(_collect_debug_context())
+    return payload
 
+
+def write_bug_report_payload(**payload):
     try:
         time.sleep(1.2)
 
@@ -164,13 +183,13 @@ def send_bug_report(name, explanation, script_error):
             "Generated: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
             "",
             "[User]",
-            "Name: {}".format(name),
+            "Name: {}".format(payload.get("name", "")),
             "",
             "[Explanation]",
-            explanation or "",
+            payload.get("explanation", "") or "",
             "",
             "[Script Error]",
-            script_error or "",
+            payload.get("script_error", "") or "",
             "",
             "[System Details]",
         ]
@@ -185,6 +204,10 @@ def send_bug_report(name, explanation, script_error):
         return False
 
     return True
+
+
+def send_bug_report(name, explanation, script_error):
+    return write_bug_report_payload(**prepare_bug_report_payload(name, explanation, script_error))
 
 
 def _extract_exception_source_file(exc=None, tb=None):
@@ -469,7 +492,9 @@ def bug_report_window(*args, dialog_title="Report a Bug", prefill_name="", prefi
         return existing_dialog
 
     dlg = customDialogs.QFlatBugReportDialog(
-        submit_callback=send_bug_report,
+        submit_callback=write_bug_report_payload,
+        prepare_callback=prepare_bug_report_payload,
+        worker_class=BugReportSubmitWorker,
         dialog_title=dialog_title,
         prefill_name=prefill_name,
         prefill_explanation=prefill_explanation,

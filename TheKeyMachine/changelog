@@ -7,11 +7,152 @@
 # Supported kinds include: new, feature, bugfix, fix, change, ui, polish, performance.
 # Rule: keep each version to 6 changes at most.
 # Rule: keep descriptions short and efficient.
+# Rule: focus on animation tool changes, visible workflow changes, and bugfixes.
+# Rule: do not include repo housekeeping, docs, funding, metadata, or asset-only changes.
+# Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
+# Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
+
+0.1.94:
+  - new: Version history window from the About dialog
+  - fix: Bug Report action opens the report window again
+  - bugfix: Menu tooltips stay visible while hovering actions
+  - polish: Bug Report window spacing and field layout
+  - polish: Sending bug reports keeps Maya responsive
+  - ui: Disabled dialog buttons are easier to read
 
 0.1.93:
   - new: Background Runners menu
-  - new: Channel Box timeline highlight
-  - new: Channel Box clear-on-selection runner
+  - new: Highlight Channel Box Selection runner
+  - new: Clear Channel Box Selection runner
   - new: Camera orbit-around-selection runner
-  - ui: Rebalanced toolbar and slider colors
-  - bugfix: Update tooltip details
+  - new: Overshoot Sliders background toggle
+  - ui: Toolbar and slider colors rebalanced
+
+0.1.92:
+  - new: Gimbal Fixer tool
+  - change: iBookmarks renamed to Isolate Bookmarks
+  - new: Animation curve tools
+  - change: Attribute Switcher target handling refined
+  - polish: Orbit window workflow
+
+0.1.91:
+  - feature: animBot selection set conversion
+  - feature: Temp Pivot modes, time sync and persistence
+  - new: Nudge, Bake and Share Keys tools
+  - change: Relative transform tools use driven selection
+  - polish: Hotkeys and slider auto-keying
+  - polish: Toolbar alignment and tool menus
+
+0.1.89:
+  - bugfix: Slider overlap issue
+  - polish: Toolbar pinning workflow
+  - polish: Slider behavior
+
+0.1.88:
+  - bugfix: Startup import issue
+
+0.1.87:
+  - change: Slider session behavior refined
+  - change: Slider reset behavior streamlined
+  - new: Tangent slider operations
+  - new: Time slider operations
+  - polish: Toolbar and Graph Editor UI
+
+0.1.86:
+  - polish: Toolbar setting sync
+  - polish: Window dialogs
+  - new: Auto Euler Filter option
+  - new: Overshoot Sliders option
+
+0.1.85:
+  - new: Graph Editor toolbar toggle
+  - new: Tooltip video timeline
+  - bugfix: Sliders with keys on one side
+  - change: Time slider range preservation
+  - change: Keyframe targeting improved during sliders
+  - polish: Hotkey tooltip status
+
+0.1.84:
+  - change: Hotkeys workflow refined
+  - polish: Floating windows refined
+  - change: Selection sets workflow updated
+  - polish: Bug reporting workflow
+
+0.1.83:
+  - change: Toolbar and Graph Editor tools reorganized
+  - new: Tangent tool presets
+  - polish: Key baking
+  - polish: Tint color handling
+
+0.1.82:
+  - new: Frame-button support
+  - bugfix: TimelineTint resizing
+  - polish: Toolbar UI and reporting
+  - polish: Selection set buttons
+
+0.1.81:
+  - new: Orbit floating tool
+  - new: Selection Sets floating tool
+  - polish: Selection set color controls
+  - polish: Selection set delete controls
+
+0.1.80:
+  - polish: Floating tools
+  - polish: Shortcuts workflow
+  - polish: Selection sets workflow
+  - bugfix: Report window size
+  - bugfix: Tools saving undo checkpoints
+
+0.1.76:
+  - polish: Orbit window
+  - polish: Selection set windows
+  - new: Checkable toolbar buttons
+
+0.1.75:
+  - new: Baking tools
+  - new: Nudge insert and remove inbetween
+  - polish: Toolbar refresh alignment
+  - fix: No-internet compatibility
+  - fix: Missing flat button style
+
+0.1.74:
+  - new: In-view messages
+  - change: Isolate select panel handling
+  - change: Menu item properties updated
+  - bugfix: Tooltip DPI scaling
+  - bugfix: Layout existence checks
+
+0.1.73:
+  - new: Worldspace copy and paste tools
+  - new: Link Relative copy and paste tools
+  - polish: Toolbar tool grouping
+
+0.1.72:
+  - new: Checked button styling
+  - polish: Tooltip text handling
+  - polish: Toolbar button consistency
+
+0.1.71:
+  - new: Relative transform linking
+  - new: Animation toolset utilities
+  - fix: WorldSpace slider globe display
+  - change: Key tools updated
+
+0.1.70:
+  - new: Update checking and installation
+  - new: Update status feedback
+  - change: Toolbar config section relocated
+  - new: Toolbar context menu
+  - fix: Multiple slider modes display
+
+0.1.60:
+  - new: Link Objects tool
+  - new: Custom toolbar UI
+  - new: Rich tooltips and enhanced menus
+  - change: Layout, settings and window logic refactored
+
+pre-0.1.60:
+  - new: Initial TheKeyMachine animation toolset
+  - change: Slider look and logic updated
+  - change: Colors and error handling refactored
+  - new: Add Select Opposite shortcut
