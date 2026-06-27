@@ -1,0 +1,17 @@
+# TheKeyMachine changelog
+#
+# Format:
+# version:
+#   - kind: short description
+#
+# Supported kinds include: new, feature, bugfix, fix, change, ui, polish, performance.
+# Rule: keep each version to 6 changes at most.
+# Rule: keep descriptions short and efficient.
+
+0.1.93:
+  - new: Background Runners menu
+  - new: Channel Box timeline highlight
+  - new: Channel Box clear-on-selection runner
+  - new: Camera orbit-around-selection runner
+  - ui: Rebalanced toolbar and slider colors
+  - bugfix: Update tooltip details
