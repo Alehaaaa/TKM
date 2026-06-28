@@ -941,7 +941,7 @@ class TargetItemWidget(QWidget):
 
         label = QLabel(name.split(":")[-1])
         close_btn = QPushButton()
-        icons.QHoverableIcon.apply(close_btn, icons.close)
+        close_btn.setIcon(QIcon(icons.close))
 
         close_btn.setIconSize(QSize(15, 15))
         close_btn.setFixedSize(15, 15)

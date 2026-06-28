@@ -372,10 +372,40 @@ tracer_toggle_tooltip_text = (
     icons.tracer_show_hide,
 )
 
+tracer_offset_tooltip_text = (
+    "Select Offset Object",
+    ["Select the tracer offset object so you can move or adjust the whole trail display."],
+    icons.tracer_select_offset,
+)
+
+tracer_grey_tooltip_text = (
+    "Tracer Style: Grey",
+    ["Set the active tracer trail to the grey display style."],
+    icons.tracer_grey,
+)
+
+tracer_red_tooltip_text = (
+    "Tracer Style: Red",
+    ["Set the active tracer trail to the red display style."],
+    icons.tracer_red,
+)
+
+tracer_blue_tooltip_text = (
+    "Tracer Style: Blue",
+    ["Set the active tracer trail to the blue display style."],
+    icons.tracer_blue,
+)
+
 tracer_remove_tooltip_text = (
     "Remove Tracer",
     ["Remove the active tracer setup from the scene."],
     icons.remove,
+)
+
+tracer_connected_tooltip_text = (
+    "Auto Update",
+    ["Keep the tracer connected so the trail updates live while the animation changes."],
+    icons.tracer,
 )
 
 default_values_tooltip_text = (

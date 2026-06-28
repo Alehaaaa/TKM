@@ -487,6 +487,7 @@ class QFlatTooltipConfirm(QFlatDialog):
     BORDER_RADIUS = 8
     ARROW_W = 12
     ARROW_H = 8
+    HEADER_ICON_SIZE = 60
 
     def __init__(self, parent=None, title="", message="", buttons=None, icon=None, tooltip_template=None, highlight=None, **kwargs):
         tooltip_template = tooltip_template
@@ -560,11 +561,13 @@ class QFlatTooltipConfirm(QFlatDialog):
         has_header = False
         for child in root:
             if child.tag == "icon":
-                pix = QtGui.QPixmap(child.text)
+                dim = DPI(self.HEADER_ICON_SIZE)
+                pix = self._windowIconPixmap(child.text, QtCore.QSize(dim, dim))
                 if not pix.isNull():
                     lbl = QtWidgets.QLabel()
-                    dim = DPI(80)
-                    lbl.setPixmap(pix.scaled(dim, dim, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+                    lbl.setFixedSize(dim, dim)
+                    lbl.setAlignment(QtCore.Qt.AlignCenter)
+                    lbl.setPixmap(pix)
                     header_layout.addWidget(lbl)
                     has_header = True
             elif child.tag == "title":
@@ -596,32 +599,80 @@ class QFlatTooltipConfirm(QFlatDialog):
             if not in_content:
                 continue
 
-            if child.tag == "text":
-                inner_text = (child.text or "") + "".join(
-                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
-                    for c in child
-                )
-                lbl = QtWidgets.QLabel(inner_text)
-                lbl.setWordWrap(True)
-                lbl.setStyleSheet("color: {}; font-size: {}px; background: transparent;".format(self.TEXT_COLOR, DPI(11.5)))
-                content_layout.addWidget(lbl)
-            elif child.tag == "separator":
-                sep = QtWidgets.QFrame()
-                sep.setFixedHeight(1)
-                sep.setStyleSheet("background-color: rgba(255,255,255,10); margin: {}px 0px;".format(DPI(4)))
-                content_layout.addWidget(sep)
-            elif child.tag in ["image", "gif"]:
-                lbl = QtWidgets.QLabel()
-                lbl.setAlignment(QtCore.Qt.AlignCenter)
-                pix = QtGui.QPixmap(child.text)
-                if not pix.isNull():
-                    if pix.width() > DPI(280):
-                        pix = pix.scaledToWidth(DPI(280), QtCore.Qt.SmoothTransformation)
-                    lbl.setPixmap(pix)
-                    content_layout.addWidget(lbl)
+            self._add_content_element(content_layout, child)
 
         if content_layout.count() > 0:
             self.bg_layout.addLayout(content_layout)
+
+    def _element_inner_text(self, element):
+        return (element.text or "") + "".join(
+            ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
+            for c in element
+        )
+
+    def _add_content_element(self, layout, element):
+        if element.tag == "text":
+            lbl = QtWidgets.QLabel(self._element_inner_text(element))
+            lbl.setWordWrap(True)
+            lbl.setTextFormat(QtCore.Qt.RichText)
+            lbl.setStyleSheet("color: {}; font-size: {}px; background: transparent;".format(self.TEXT_COLOR, DPI(11.5)))
+            layout.addWidget(lbl)
+        elif element.tag == "separator":
+            try:
+                margin = int(element.attrib.get("margin", 4))
+            except (TypeError, ValueError):
+                margin = 4
+            if margin > 0:
+                layout.addSpacing(DPI(margin))
+            sep = QtWidgets.QFrame()
+            sep.setFixedHeight(1)
+            sep.setStyleSheet("background-color: rgba(255,255,255,10);")
+            layout.addWidget(sep)
+            if margin > 0:
+                layout.addSpacing(DPI(margin))
+        elif element.tag == "spacing":
+            try:
+                size = int(element.attrib.get("size", 6))
+            except (TypeError, ValueError):
+                size = 6
+            layout.addSpacing(DPI(size))
+        elif element.tag in ["image", "gif"]:
+            lbl = QtWidgets.QLabel()
+            lbl.setAlignment(QtCore.Qt.AlignCenter)
+            pix = QtGui.QPixmap(element.text)
+            if not pix.isNull():
+                if pix.width() > DPI(280):
+                    pix = pix.scaledToWidth(DPI(280), QtCore.Qt.SmoothTransformation)
+                lbl.setPixmap(pix)
+                layout.addWidget(lbl)
+        elif element.tag == "scroll":
+            self._add_scroll_content(layout, element)
+
+    def _add_scroll_content(self, layout, element):
+        max_height = element.attrib.get("max_height", "")
+        try:
+            max_height = DPI(int(max_height))
+        except (TypeError, ValueError):
+            max_height = DPI(240)
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll.setMaximumHeight(max_height)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
+        content = QtWidgets.QWidget()
+        content.setStyleSheet("background: transparent;")
+        scroll_layout = QtWidgets.QVBoxLayout(content)
+        scroll_layout.setContentsMargins(0, 0, DPI(8), 0)
+        scroll_layout.setSpacing(DPI(6))
+
+        for child in element:
+            self._add_content_element(scroll_layout, child)
+
+        scroll_layout.addStretch(1)
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
 
     def _buttonConfigHook(self, index, config):
         if isinstance(config, (str, bytes)):
@@ -1689,36 +1740,46 @@ class TKMVersionHistoryDialog(QFlatDialog):
         version_label.setStyleSheet("font-size: %spx; font-weight: bold; color: #f0f0f0;" % DPI(15))
         layout.addWidget(version_label)
 
-        for entry in section.get("entries", []):
-            layout.addLayout(self._build_entry_row(entry))
+        for group in changelogMod.group_changelog_entries(section.get("entries", [])):
+            layout.addLayout(self._build_entry_group(group))
 
         return frame
 
-    def _build_entry_row(self, entry):
-        row = QtWidgets.QHBoxLayout()
-        row.setContentsMargins(DPI(2), 0, 0, 0)
-        row.setSpacing(DPI(8))
+    def _build_entry_group(self, group):
+        group_layout = QtWidgets.QVBoxLayout()
+        group_layout.setContentsMargins(DPI(2), 0, 0, 0)
+        group_layout.setSpacing(DPI(3))
+
+        header_layout = QtWidgets.QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(DPI(8))
 
         icon_label = QtWidgets.QLabel()
-        pixmap = QtGui.QPixmap(changelogMod.change_kind_icon(entry.get("kind", "")))
+        kind = group.get("kind", "")
+        pixmap = QtGui.QPixmap(changelogMod.change_kind_icon(kind))
         icon_size = DPI(17)
         if not pixmap.isNull():
             icon_label.setPixmap(pixmap.scaled(icon_size, icon_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
         icon_label.setFixedSize(icon_size, icon_size)
-        row.addWidget(icon_label, 0, QtCore.Qt.AlignTop)
+        header_layout.addWidget(icon_label, 0, QtCore.Qt.AlignVCenter)
 
-        text = "<b>%s:</b> %s" % (
-            changelogMod.escape_text(changelogMod.change_kind_label(entry.get("kind", ""))),
-            changelogMod.escape_text(entry.get("description", "")),
-        )
-        label = QtWidgets.QLabel(text)
-        label.setWordWrap(True)
-        label.setTextFormat(QtCore.Qt.RichText)
-        label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        label.setStyleSheet("font-size: %spx; color: #d3d3d3;" % DPI(11))
-        row.addWidget(label, 1)
+        title = QtWidgets.QLabel("<b>%s</b>" % changelogMod.escape_text(changelogMod.change_kind_label(kind)))
+        title.setTextFormat(QtCore.Qt.RichText)
+        title.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        title.setStyleSheet("font-size: %spx; color: #d3d3d3;" % DPI(11))
+        header_layout.addWidget(title, 0, QtCore.Qt.AlignVCenter)
+        header_layout.addStretch(1)
+        group_layout.addLayout(header_layout)
 
-        return row
+        for entry in group.get("entries", []):
+            label = QtWidgets.QLabel(changelogMod.escape_text(entry.get("description", "")))
+            label.setWordWrap(True)
+            label.setTextFormat(QtCore.Qt.RichText)
+            label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+            label.setStyleSheet("font-size: %spx; color: #d3d3d3;" % DPI(11))
+            group_layout.addWidget(label)
+
+        return group_layout
 
 
 class QFlatNumberInput(QFlatToolBarPopupDialog):

@@ -974,46 +974,55 @@ TOOL_DEFINITIONS = {
         "label": "Refresh Tracer",
         "icon": icons.refresh,
         "callback": bar.tracer_refresh,
+        "tooltip_template": helper.tracer_refresh_tooltip_text,
     },
     "tracer_show_hide": {
         "type": "tool",
         "label": "Toggle Tracer",
         "icon": icons.tracer_show_hide,
         "callback": bar.tracer_show_hide,
+        "tooltip_template": helper.tracer_toggle_tooltip_text,
     },
     "tracer_offset_node": {
         "type": "tool",
         "label": "Select Offset Object",
         "icon": icons.tracer_select_offset,
         "callback": bar.select_tracer_offset_node,
+        "tooltip_template": helper.tracer_offset_tooltip_text,
     },
     "tracer_grey": {
         "type": "tool",
         "label": "Tracer Style: Grey",
         "icon": icons.tracer_grey,
         "callback": bar.set_tracer_grey_color,
+        "tooltip_template": helper.tracer_grey_tooltip_text,
     },
     "tracer_red": {
         "type": "tool",
         "label": "Tracer Style: Red",
         "icon": icons.tracer_red,
         "callback": bar.set_tracer_red_color,
+        "tooltip_template": helper.tracer_red_tooltip_text,
     },
     "tracer_blue": {
         "type": "tool",
         "label": "Tracer Style: Blue",
         "icon": icons.tracer_blue,
         "callback": bar.set_tracer_blue_color,
+        "tooltip_template": helper.tracer_blue_tooltip_text,
     },
     "tracer_remove": {
         "type": "tool",
         "label": "Remove Tracer",
         "icon": icons.remove,
         "callback": bar.remove_tracer_node,
+        "tooltip_template": helper.tracer_remove_tooltip_text,
     },
     "tracer_connected": {
         "type": "widget",
         "label": "Connected",
+        "description": "Keep the tracer connected so the trail updates live while the animation changes.",
+        "tooltip_template": helper.tracer_connected_tooltip_text,
     },
 
 # ---------------------------------------------------------------  MIRROR --------------------------------------------------------------
@@ -2011,6 +2020,13 @@ def get_tool(tool_id, **overrides):
             tool["callback"] = trigger.make_command_callback(tool_id, callback)
         elif not getattr(callback, "_tkm_trigger_proxy", False):
             trigger.register_command(tool_id, callback)
+    elif callable(tool.get("menu")):
+        def _show_menu_at_cursor(tid=tool_id):
+            from TheKeyMachine.mods import shelfMod
+
+            return shelfMod.show_tool_menu_at_cursor(tid)
+
+        trigger.register_command(tool_id, _show_menu_at_cursor)
     return tool
 
 

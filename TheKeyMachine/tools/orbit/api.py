@@ -98,7 +98,7 @@ def execute_action(action_identifier):
     chunk_opened = False
     try:
         chunk_opened = toolCommon.open_undo_chunk()
-        trigger.invoke(action_identifier)
+        getattr(trigger, action_identifier)()
     finally:
         if chunk_opened:
             toolCommon.close_undo_chunk()

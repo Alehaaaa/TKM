@@ -304,12 +304,13 @@ def _update_buttons(dialog_cls):
 
 def _update_template(latest_version, installed_version, changelog):
     return (
-        "<title>Version {} available\n(using {})</title>\n".format(latest_version, installed_version)
+        "<title>Update {} available\n(using {})</title>\n".format(latest_version, installed_version)
         + "<text>A new version of TheKeyMachine is ready to download and install.</text>\n"
-        + changelogMod.changelog_template(changelog, latest_version)
+        + changelogMod.changelog_template(changelog, latest_version, installed_version=installed_version)
         + "<separator/>"
-        + "<text>Install will replace the current tool files while keeping your user data and preferences.</text>\n"
-        + "<text>Choose Skip to hide this update prompt until you check manually again.</text>\n"
+        + '<spacing size="8"/>\n'
+        + "<text>Install replaces tool files and keeps your user data.</text>\n"
+        + "<text>Skip hides this prompt until you check again.</text>\n"
     )
 
 
@@ -414,7 +415,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
             result = QFlatConfirmDialog.question(
                 None,
                 "Update available",
-                title=f"Version {latest_version} available",
+                title=f"Update {latest_version} available",
                 message=_update_message(),
                 icon=icons.settings_update,
                 buttons=_update_buttons(QFlatConfirmDialog),

@@ -21,8 +21,7 @@ from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
 TheKeyMachine Custom Widgets
 ===========================
 Centralized repository for UI components used throughout the toolbar.
-Includes QFlatToolButton with automated sizing, hover effects (glow), 
-and user preference integration.
+Includes QFlatToolButton with automated sizing and user preference integration.
 """
 
 
@@ -96,6 +95,85 @@ def _color_to_hex(color, default=None):
     except Exception:
         pass
     return str(color) if isinstance(color, str) else default
+
+
+def _tinted_icon(icon_path, color, size):
+    source = QtGui.QPixmap(icon_path)
+    if source.isNull():
+        source = QtGui.QIcon(icon_path).pixmap(size)
+    if source.isNull():
+        return QtGui.QIcon(icon_path)
+
+    pixmap = source.scaled(size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+    if pixmap.isNull():
+        return QtGui.QIcon(icon_path)
+
+    tinted = QtGui.QPixmap(pixmap.size())
+    tinted.fill(QtCore.Qt.transparent)
+
+    painter = QtGui.QPainter(tinted)
+    painter.drawPixmap(0, 0, pixmap)
+    painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceIn)
+    painter.fillRect(tinted.rect(), QtGui.QColor(color))
+    painter.end()
+
+    return QtGui.QIcon(tinted)
+
+
+TOOLTIP_STATE_KEYS = (
+    "text",
+    "description",
+    "shortcuts",
+    "tooltip_template",
+    "icon",
+    "status_title",
+    "status_description",
+    "command_id",
+    "command_label",
+    "command_icon",
+)
+
+
+def _tool_command_label(data, fallback=""):
+    tooltip_template = data.get("tooltip_template") if isinstance(data, dict) else None
+    return (
+        data.get("status_title")
+        or data.get("label")
+        or data.get("menu_label")
+        or toolCommon.get_tooltip_title(tooltip_template)
+        or data.get("text")
+        or data.get("id")
+        or fallback
+        or ""
+    )
+
+
+def _tool_status_description(data):
+    return _status_description(
+        description=data.get("description"),
+        status_description=data.get("status_description"),
+        tooltip_template=data.get("tooltip_template"),
+    )
+
+
+def _tooltip_state_from_data(data, *, display_text=None):
+    data = dict(data or {})
+    title = _tool_command_label(data)
+    state = {
+        "text": title,
+        "description": data.get("description"),
+        "shortcuts": data.get("shortcuts"),
+        "tooltip_template": data.get("tooltip_template"),
+        "icon": data.get("icon"),
+        "status_title": title,
+        "status_description": _tool_status_description(data),
+        "command_id": data.get("id"),
+        "command_label": title,
+        "command_icon": data.get("icon"),
+    }
+    if display_text is not None:
+        state["display_text"] = display_text
+    return state
 
 
 class HelpSystem:
@@ -234,7 +312,7 @@ class MenuWidget(QtWidgets.QMenu):
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
-    def _set_action_help(self, action, title, description="", tooltip_template=None):
+    def _set_action_help(self, action, title, description="", tooltip_template=None, command_id=None, command_icon=None):
         if action is None or not QtCompat.isValid(action):
             return
         if isinstance(action, QtWidgets.QWidgetAction):
@@ -242,9 +320,29 @@ class MenuWidget(QtWidgets.QMenu):
             return
         if hasattr(action, "setProperty"):
             action.setProperty("tkm_tooltip_template", tooltip_template)
+            action.setProperty("tkm_command_id", command_id)
+            action.setProperty("tkm_command_label", title)
+            action.setProperty("tkm_command_icon", command_icon)
             self._action_tooltip_key(action)
         HelpSystem.push(action, title, description)
         self._clear_native_action_tips(action)
+
+    @staticmethod
+    def _callback_from_args(args):
+        for arg in args:
+            if callable(arg) and not isinstance(arg, (QtGui.QIcon, QtGui.QAction)):
+                return arg
+        return None
+
+    @staticmethod
+    def _trigger_command_from_callback(callback):
+        name = getattr(callback, "__name__", None)
+        try:
+            from TheKeyMachine.core import trigger
+
+            return trigger.command_name_for_callback(callback)
+        except Exception:
+            return name if getattr(callback, "_tkm_trigger_proxy", False) else None
 
     @staticmethod
     def _cursor_target_rect(pos=None):
@@ -266,6 +364,10 @@ class MenuWidget(QtWidgets.QMenu):
         callback = kwargs.pop("callback", None)
         label_override = kwargs.pop("label", None)
         keep_open = kwargs.pop("open", False)
+        command_id = kwargs.pop("command_id", None)
+        command_icon = kwargs.pop("command_icon", None)
+        positional_callback = self._callback_from_args(args)
+        metadata_callback = callback or positional_callback
 
         res = QtWidgets.QMenu.addAction(self, *args, **kwargs)
         action = args[0] if (len(args) > 0 and isinstance(args[0], QtGui.QAction)) else res
@@ -283,23 +385,27 @@ class MenuWidget(QtWidgets.QMenu):
                 break
 
         title = label_override or toolCommon.get_tooltip_title(tooltip_template) or label or action.text()
+        if command_id is None:
+            command_id = self._trigger_command_from_callback(metadata_callback)
         resolved_description = _status_description(
             description=description or "",
             tooltip_template=tooltip_template,
         )
         if title or resolved_description or tooltip_template:
-            self._set_action_help(action, title, resolved_description, tooltip_template)
+            self._set_action_help(action, title, resolved_description, tooltip_template, command_id=command_id, command_icon=command_icon)
         else:
             self._clear_native_action_tips(action)
         return action
 
     def addMenu(self, *args, **kwargs):
         description = kwargs.pop("description", None)
+        command_id = kwargs.pop("command_id", None)
+        command_icon = kwargs.pop("command_icon", None)
         item = QtWidgets.QMenu.addMenu(self, *args, **kwargs)
         action = item.menuAction() if hasattr(item, "menuAction") else item
 
         label = action.text()
-        self._set_action_help(action, label, description)
+        self._set_action_help(action, label, description, command_id=command_id, command_icon=command_icon)
         return item
 
     def _on_action_hovered(self, action):
@@ -317,6 +423,9 @@ class MenuWidget(QtWidgets.QMenu):
             title = action.property("tkm_title") or action.text()
             desc = action.property("tkm_description") or ""
             tooltip_template = action.property("tkm_tooltip_template") or None
+            command_id = action.property("tkm_command_id") or None
+            command_label = action.property("tkm_command_label") or title
+            command_icon = action.property("tkm_command_icon") or None
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return
 
@@ -337,6 +446,9 @@ class MenuWidget(QtWidgets.QMenu):
                 description=desc,
                 tooltip_template=display_template,
                 icon_obj=icon,
+                command_id=command_id,
+                command_label=command_label,
+                command_icon=command_icon,
                 source_key=source_key,
             )
 
@@ -379,7 +491,17 @@ class OpenMenuWidget(MenuWidget):
 
 class TooltipMixin:
     def setData(
-        self, text="", description="", shortcuts=None, icon=None, tooltip_template=None, status_title=None, status_description=None
+        self,
+        text="",
+        description="",
+        shortcuts=None,
+        icon=None,
+        tooltip_template=None,
+        status_title=None,
+        status_description=None,
+        command_id=None,
+        command_label=None,
+        command_icon=None,
     ):
         # Automatically pick up the widget's icon if not provided
         if not icon and hasattr(self, "_icon"):
@@ -397,6 +519,9 @@ class TooltipMixin:
                 status_description=status_description,
                 tooltip_template=tooltip_template,
             ),
+            "command_id": command_id,
+            "command_label": command_label,
+            "command_icon": command_icon,
         }
         _push_help(self, self._toolTipData)
 
@@ -495,11 +620,9 @@ class QFlatButton(QtWidgets.QPushButton):
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.setFixedHeight(DPI(34))
 
-        # Consistent Icon Size
-        self.setIconSize(QtCore.QSize(DPI(19), DPI(19)))
-        if icon:
-            icons.QHoverableIcon.apply(self, icon, highlight=highlight)
-
+        icon_dim = DPI(24) if highlight else DPI(19)
+        icon_size = QtCore.QSize(icon_dim, icon_dim)
+        self.setIconSize(icon_size)
         v_padding = 2  # Tight padding since height is fixed
 
         if highlight:
@@ -534,6 +657,9 @@ class QFlatButton(QtWidgets.QPushButton):
             disabled_background = self.DEFAULT_DISABLED_BACKGROUND
             font_size = self.DEFAULT_FONT_SIZE
             weight = "normal"
+
+        if icon:
+            self.setIcon(_tinted_icon(icon, color, icon_size) if highlight else QtGui.QIcon(icon))
 
         actual_border = min(int(border), int(DPI(34)) // 2)
 
@@ -672,22 +798,22 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             h = getattr(user_preferences, "toolbar_icon_h", 28)
 
         self.setFixedSize(w, h)
-        # Small margin to prevent glow clipping (w-2 x h-2)
+        # Small margin inside the fixed button bounds.
         self.setIconSize(QtCore.QSize(w - 2, h - 2))
 
+        self._icon = None
+        self._base_state = {key: None for key in TOOLTIP_STATE_KEYS}
+        self._base_state.update(
+            {
+                "text": text,
+                "description": description,
+                "shortcuts": shortcuts or [],
+                "tooltip_template": tooltip_template,
+                "icon": icon,
+            }
+        )
         self._icon = icon
-        self._highlight = highlight
-        self._base_state = {
-            "text": text,
-            "description": description,
-            "shortcuts": shortcuts or [],
-            "tooltip_template": tooltip_template,
-            "icon": icon,
-            "status_title": None,
-            "status_description": None,
-        }
-        if icon:
-            self._apply_icon_visual(icon)
+        self.setIcon(QtGui.QIcon(icon or ""))
         self.setToolTipData(
             text=text,
             description=description,
@@ -721,15 +847,42 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             context_attr=context_attr,
         )
 
-    def setIcon(self, icon):
-        """Mixin of QToolButton.setIcon that also handles TKM path tracking and hover effects."""
-        if isinstance(icon, (str, bytes)):
-            self._icon = str(icon)
-            self._apply_icon_visual(self._icon)
-            data = getattr(self, "_toolTipData", {})
-            self.setToolTipData(icon=self._icon, **data)
-        elif icon:
-            super().setIcon(icon)
+    def configure_from_data(self, data, *, display_text=None):
+        state = _tooltip_state_from_data(data, display_text=display_text)
+        self.setToolTipData(**state)
+        if data.get("tint_color") is not None:
+            self.set_tint_color(data.get("tint_color"))
+        self.setShortcutVariants(data.get("shortcut_variants") or [])
+        return self
+
+    def connect_from_data(self, data):
+        toolCommon.connect_control_from_data(self, data)
+        return self
+
+    def attach_menu(self, setup_fn, *, popup_on_click=False):
+        if not callable(setup_fn):
+            return self
+
+        self._tkm_menu_factory = setup_fn
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+
+        def _show_tool_menu(pos, menu_factory=setup_fn, widget=self):
+            menu = OpenMenuWidget(widget)
+            try:
+                built_menu = menu_factory(menu, source_widget=widget)
+            except TypeError:
+                built_menu = menu_factory(menu)
+            if built_menu is not None and built_menu is not False:
+                menu = built_menu
+            if menu.actions():
+                menu.exec_(widget.mapToGlobal(pos))
+
+        self.customContextMenuRequested.connect(_show_tool_menu)
+        if popup_on_click:
+            self.clicked.connect(
+                lambda _checked=False, widget=self: widget.customContextMenuRequested.emit(widget.mapFromGlobal(QtGui.QCursor.pos()))
+            )
+        return self
 
     def setToolTipData(self, **kwargs):
         display_text = kwargs.pop("display_text", None)
@@ -739,12 +892,9 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 self._base_state["text"] = display_text
             elif self._base_state.get("text") is None:
                 self._base_state["text"] = kwargs.get("text")
-            self._base_state["description"] = kwargs.get("description", self._base_state.get("description"))
-            self._base_state["shortcuts"] = kwargs.get("shortcuts", self._base_state.get("shortcuts", []))
-            self._base_state["tooltip_template"] = kwargs.get("tooltip_template", self._base_state.get("tooltip_template"))
-            self._base_state["icon"] = kwargs.get("icon", self._base_state.get("icon"))
-            self._base_state["status_title"] = kwargs.get("status_title", self._base_state.get("status_title"))
-            self._base_state["status_description"] = kwargs.get("status_description", self._base_state.get("status_description"))
+            for key in TOOLTIP_STATE_KEYS:
+                if key != "text":
+                    self._base_state[key] = kwargs.get(key, self._base_state.get(key))
 
     def setShortcutVariants(self, variants):
         self._shortcut_variants = list(variants or [])
@@ -799,15 +949,12 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         )
 
     def triggerToolCallback(self, base_callback, *args, **kwargs):
-        variant = self._get_active_shortcut_variant()
-        callback = variant.get("callback") if variant else None
+        callback = self._active_callback(base_callback)
         chunk_opened = False
         try:
             chunk_opened = toolCommon.open_undo_chunk()
             if callback:
                 return callback(*args, **kwargs)
-            if base_callback:
-                return base_callback(*args, **kwargs)
         finally:
             if chunk_opened:
                 try:
@@ -815,11 +962,11 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 except Exception:
                     pass
 
-    def _apply_icon_visual(self, icon):
-        if isinstance(icon, (str, bytes)):
-            icons.QHoverableIcon.apply(self, str(icon), highlight=self._highlight)
-        elif icon:
-            super().setIcon(icon)
+    def _active_callback(self, base_callback=None):
+        variant = self._get_active_shortcut_variant()
+        if variant and variant.get("callback"):
+            return variant.get("callback")
+        return base_callback
 
     def _get_active_shortcut_variant(self):
         if not self._shortcut_variants:
@@ -848,7 +995,8 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             status_title = state.get("status_title")
             status_description = state.get("status_description")
             self.setText(text or "")
-            self._apply_icon_visual(icon)
+            self._icon = icon
+            self.setIcon(QtGui.QIcon(icon or ""))
             TooltipMixin.setToolTipData(
                 self,
                 text=status_title or text,
@@ -858,22 +1006,23 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 icon=icon,
                 status_title=status_title,
                 status_description=status_description,
+                command_id=state.get("command_id"),
+                command_label=state.get("command_label"),
+                command_icon=state.get("command_icon"),
             )
         finally:
             self._variant_state_lock = False
 
     def _variant_to_state(self, variant):
         if not variant:
-            return {
-                "text": self._base_state.get("text"),
-                "description": self._base_state.get("description"),
-                "shortcuts": self._base_state.get("shortcuts", []),
-                "tooltip_template": self._base_state.get("tooltip_template"),
-                "icon": self._base_state.get("icon"),
-                "status_title": self._base_state.get("status_title"),
-                "status_description": self._base_state.get("status_description"),
-            }
+            return dict(self._base_state)
         tooltip_template = variant.get("tooltip_template")
+        command_label = (
+            variant.get("label")
+            or variant.get("menu_label")
+            or toolCommon.get_tooltip_title(tooltip_template)
+            or variant.get("id")
+        )
         return {
             "text": variant.get("text", self._base_state.get("text")),
             "description": variant.get("description", ""),
@@ -891,6 +1040,9 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 status_description=variant.get("status_description"),
                 tooltip_template=tooltip_template,
             ),
+            "command_id": variant.get("id", self._base_state.get("command_id")),
+            "command_label": command_label,
+            "command_icon": variant.get("icon", self._base_state.get("command_icon")),
         }
 
     def _refresh_modifier_variant_state(self):
@@ -991,67 +1143,20 @@ class QFlatSelectorButton(QFlatToolButton):
 def create_tool_button_from_data(tool_data, parent=None, **overrides):
     data = dict(tool_data or {})
     data.update(overrides)
-    tooltip_template = data.get("tooltip_template")
     display_text = data.get("text")
-    title = (
-        data.get("status_title")
-        or data.get("label")
-        or toolCommon.get_tooltip_title(tooltip_template)
-        or display_text
-        or data.get("id")
-        or ""
-    )
-    description = data.get("description")
-    status_description = _status_description(
-        description=description,
-        status_description=data.get("status_description"),
-        tooltip_template=tooltip_template,
-    )
 
     btn = QFlatToolButton(
         parent=parent,
         icon=data.get("icon"),
         text=display_text,
-        tooltip_template=tooltip_template,
-        description=description,
+        tooltip_template=data.get("tooltip_template"),
+        description=data.get("description"),
         shortcuts=data.get("shortcuts"),
         shortcut_variants=data.get("shortcut_variants"),
     )
-    btn.setToolTipData(
-        text=title,
-        description=description,
-        shortcuts=data.get("shortcuts"),
-        tooltip_template=tooltip_template,
-        icon=data.get("icon"),
-        status_title=title,
-        status_description=status_description,
-        display_text=display_text,
-    )
-    if data.get("tint_color") is not None:
-        btn.set_tint_color(data.get("tint_color"))
-
-    toolCommon.connect_control_from_data(btn, data)
-
-    menu = data.get("menu")
-    if callable(menu):
-        btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-
-        def _show_tool_menu(pos, setup_fn=menu, widget=btn):
-            menu = OpenMenuWidget(widget)
-            try:
-                built_menu = setup_fn(menu, source_widget=widget)
-            except TypeError:
-                built_menu = setup_fn(menu)
-            if built_menu is not None and built_menu is not False:
-                menu = built_menu
-            if menu.actions():
-                menu.exec_(widget.mapToGlobal(pos))
-
-        btn.customContextMenuRequested.connect(_show_tool_menu)
-        if data.get("type") == "menu":
-            btn.clicked.connect(
-                lambda _checked=False, widget=btn: widget.customContextMenuRequested.emit(widget.mapFromGlobal(QtGui.QCursor.pos()))
-            )
+    btn.configure_from_data(data, display_text=display_text)
+    btn.connect_from_data(data)
+    btn.attach_menu(data.get("menu"), popup_on_click=data.get("type") == "menu")
     return btn
 
 
@@ -1796,6 +1901,9 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 icon=existing.get("icon"),
                 status_title=existing.get("status_title") or label,
                 status_description=status_description,
+                command_id=existing.get("command_id") or key,
+                command_label=existing.get("command_label") or label,
+                command_icon=existing.get("command_icon") or existing.get("icon"),
             )
         else:
             HelpSystem.push(widget, label, description or "")

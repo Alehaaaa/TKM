@@ -5,6 +5,7 @@ Central trigger registry for toolbar tools, hotkeys, and slider commands.
 from __future__ import annotations
 
 import importlib
+import keyword
 from typing import Callable, Dict, Optional
 
 
@@ -101,11 +102,22 @@ def has_command(name: str) -> bool:
     return name in _COMMANDS
 
 
-def invoke(name: str, *args, **kwargs):
-    callback = get_command(name)
-    if callback is None:
-        raise AttributeError("Unknown TheKeyMachine trigger command: {}".format(name))
-    return callback(*args, **kwargs)
+def command_name_for_callback(callback: Callable) -> Optional[str]:
+    """Return the registered trigger name for a callback, when one exists."""
+    if not callable(callback):
+        return None
+    name = getattr(callback, "__name__", None)
+    if not name:
+        return None
+    if getattr(callback, "_tkm_trigger_proxy", False):
+        return name
+    if has_command(name):
+        return name
+    for command_name in list_commands():
+        registered = get_command(command_name)
+        if getattr(registered, "__name__", None) == name:
+            return command_name
+    return None
 
 
 def make_command_callback(name: str, callback: Optional[Callable] = None) -> Callable:
@@ -114,7 +126,10 @@ def make_command_callback(name: str, callback: Optional[Callable] = None) -> Cal
         register_command(name, callback)
 
     def _proxy(*args, **kwargs):
-        return invoke(name, *args, **kwargs)
+        registered = get_command(name)
+        if registered is None:
+            raise AttributeError("Unknown TheKeyMachine trigger command: {}".format(name))
+        return registered(*args, **kwargs)
 
     _proxy.__name__ = name
     _proxy._tkm_trigger_proxy = True
@@ -123,10 +138,10 @@ def make_command_callback(name: str, callback: Optional[Callable] = None) -> Cal
 
 def command_string(name: str, *args) -> str:
     """Return a Maya-friendly python command string."""
+    if not name.isidentifier() or keyword.iskeyword(name):
+        raise ValueError("Trigger command is not a valid Python attribute: {}".format(name))
     serialized_args = ", ".join(repr(arg) for arg in args)
-    if serialized_args:
-        serialized_args = ", " + serialized_args
-    return "import TheKeyMachine.core as TKM_CORE; TKM_CORE.trigger.invoke({!r}{})".format(name, serialized_args)
+    return "import TheKeyMachine.core as TKM_CORE; TKM_CORE.trigger.{}({})".format(name, serialized_args)
 
 
 def execute_slider(prefix: str, mode: str, value: int = 0, session=None):

@@ -17,9 +17,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.94"
+__version__ = "0.1.95"
 __stage__ = "beta"
-__build__ = "320"
+__build__ = "321"
 __codename__ = "Cold Brew"
 
 

@@ -144,10 +144,6 @@ def _shortcut_mask(shortcut):
     return mask
 
 
-def _trigger_command_string(command_name):
-    return "import TheKeyMachine.core as TKM_CORE; TKM_CORE.trigger.invoke({!r})".format(command_name)
-
-
 def _normalize_combo(combo):
     if not combo:
         return None
@@ -254,7 +250,7 @@ def _ensure_runtime_binding(command_name, title):
         "category": "TheKeyMachine",
         "showInHotkeyEditor": False,
         "commandLanguage": "python",
-        "command": _trigger_command_string(command_name),
+        "command": trigger.command_string(command_name),
     }
     try:
         if cmds.runTimeCommand(runtime_name, query=True, exists=True):
@@ -269,7 +265,7 @@ def _ensure_runtime_binding(command_name, title):
                 annotation=title,
                 category="TheKeyMachine",
                 showInHotkeyEditor=False,
-                command=_trigger_command_string(command_name),
+                command=trigger.command_string(command_name),
             )
         else:
             cmds.runTimeCommand(
@@ -277,7 +273,7 @@ def _ensure_runtime_binding(command_name, title):
                 annotation=title,
                 category="TheKeyMachine",
                 showInHotkeyEditor=False,
-                command=_trigger_command_string(command_name),
+                command=trigger.command_string(command_name),
             )
 
     try:
@@ -766,7 +762,10 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
     comboChanged = QtCore.Signal(str, object)
     requestSelect = QtCore.Signal(str)
     invokeRequested = QtCore.Signal(str)
-    TITLE_STYLESHEET = "#HotkeyCommandTitle{background:transparent;color:#d0d0d0;font-size:%spx;text-align:left;}"
+    TITLE_STYLESHEET = (
+        "QToolButton#HotkeyCommandTitle{background:transparent;border:none;border-radius:0px;color:#d0d0d0;font-size:%spx;text-align:left;}"
+        "QToolButton#HotkeyCommandTitle:pressed{background-color:#1f1f1f;border:none;border-radius:0px;}"
+    )
 
     def __init__(self, command_data, row_index=0, parent=None):
         super().__init__(parent, base_color="#2b2b2b" if row_index % 2 == 0 else "#2e2e2e")
@@ -779,19 +778,17 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         layout.setSpacing(wutil.DPI(6))
 
 
-        self.hotkey_button = QtWidgets.QPushButton(self)
+        self.hotkey_button = QtWidgets.QToolButton(self)
         self.hotkey_button.setText(command_data["title"])
-        self.hotkey_button.setFlat(True)
+        self.hotkey_button.setAutoRaise(True)
+        self.hotkey_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        self.hotkey_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.hotkey_button.setIconSize(QtCore.QSize(wutil.DPI(20), wutil.DPI(20)))
-        if command_data.get("icon"):
-            icons.QHoverableIcon.apply(self.hotkey_button, command_data.get("icon"))
+        icon_path = command_data.get("icon")
+        if icon_path:
+            self.hotkey_button.setIcon(QtGui.QIcon(icon_path))
         elif command_data.get("badge_text"):
-            badge_icon = _text_badge_qicon(command_data.get("badge_text"))
-            self.hotkey_button._icon_normal = badge_icon
-            self.hotkey_button._icon_hover = icons.QHoverableIcon.hover_icon(
-                badge_icon, self.hotkey_button.iconSize(), 80
-            )
-            self.hotkey_button.setIcon(badge_icon)
+            self.hotkey_button.setIcon(_text_badge_qicon(command_data.get("badge_text")))
         self.hotkey_button.setObjectName("HotkeyCommandTitle")
         self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % wutil.DPI(12))
         self.hotkey_button.setMinimumHeight(wutil.DPI(22))
@@ -853,10 +850,6 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         if self._hovered == hovered:
             return
         self._hovered = hovered
-        icon_attr = "_icon_hover" if hovered else "_icon_normal"
-        icon = getattr(self.hotkey_button, icon_attr, None)
-        if icon:
-            self.hotkey_button.setIcon(icon)
 
     def _contains_cursor(self):
         return QtCore.QRect(self.mapToGlobal(QtCore.QPoint(0, 0)), self.size()).contains(QtGui.QCursor.pos())
@@ -1135,7 +1128,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             row = HotkeyCommandItemWidget(command, row_index=row_index, parent=command_list)
             row.comboChanged.connect(self._on_row_combo_changed)
             row.requestSelect.connect(self._select_command_by_name)
-            row.invokeRequested.connect(trigger.invoke)
+            row.invokeRequested.connect(lambda command_name: getattr(trigger, command_name)())
             command_list.setItemWidget(item, row)
             self._set_row_combo_from_draft(row)
             self._pending_view["rows"].append(row)
@@ -1203,6 +1196,38 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             if item.data(QtCore.Qt.UserRole) == command_name:
                 view["list"].setCurrentRow(index)
                 break
+
+    def _section_id_for_command(self, command_name):
+        for section in self._sections:
+            for command in section.get("commands", []):
+                if command.get("command") == command_name:
+                    return section.get("id")
+        return None
+
+    def focus_command(self, command_name):
+        section_id = self._section_id_for_command(command_name)
+        if not section_id:
+            return False
+
+        self._select_section_by_id(section_id)
+
+        def _focus_when_ready():
+            view = self._section_views.get(section_id)
+            if not view or not view.get("built"):
+                QtCore.QTimer.singleShot(40, _focus_when_ready)
+                return
+            for index, item in enumerate(view["items"]):
+                if item.data(QtCore.Qt.UserRole) != command_name:
+                    continue
+                view["list"].setCurrentRow(index)
+                view["list"].scrollToItem(item, QtWidgets.QAbstractItemView.PositionAtCenter)
+                row = view["rows"][index]
+                row.edit.setFocus(QtCore.Qt.OtherFocusReason)
+                row.edit.selectAll()
+                return
+
+        QtCore.QTimer.singleShot(0, _focus_when_ready)
+        return True
 
     def _sync_section_selection(self):
         current = self.section_list.currentItem()
@@ -1479,6 +1504,13 @@ def show_hotkeys_window(*_args):
     dialog.show()
     dialog.raise_()
     dialog.activateWindow()
+    return dialog
+
+
+def show_hotkeys_window_for_command(command_name):
+    dialog = show_hotkeys_window()
+    if dialog and command_name:
+        dialog.focus_command(command_name)
     return dialog
 
 

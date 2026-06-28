@@ -14,6 +14,7 @@ QActionGroup = QtGui.QActionGroup
 
 import TheKeyMachine.mods.hotkeysMod as hotkeys
 import TheKeyMachine.mods.generalMod as general
+import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.mods.keyToolsMod as keyTools
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
@@ -60,6 +61,8 @@ def _add_toolbox_action(menu, tool_id):
         callback=None if tool.get("setting_toggle") else tool.get("callback"),
         tooltip_template=tool.get("tooltip_template"),
         description=tool.get("description") or "",
+        command_id=tool.get("id", tool_id),
+        command_icon=tool.get("icon"),
     )
     if tool.get("setting_toggle"):
         spec = toolWidgets.setting_toggle_specs().get(tool_id)
@@ -368,6 +371,7 @@ def build_tracer_menu(menu, source_widget=None):
         QtGui.QIcon(icons.tracer),
         "Auto Update",
         description="Keep the tracer connected for live updates.",
+        tooltip_template=helper.tracer_connected_tooltip_text,
     )
     auto_update_action.setCheckable(True)
 
@@ -385,18 +389,54 @@ def build_tracer_menu(menu, source_widget=None):
     menu.aboutToShow.connect(_sync_auto_update_action)
 
     menu.addSeparator()
-    menu.addAction(QtGui.QIcon(icons.refresh), "Refresh Tracer", bar.tracer_refresh)
-    menu.addAction(QtGui.QIcon(icons.tracer_show_hide), "Toggle Tracer", bar.tracer_show_hide)
-    menu.addAction(QtGui.QIcon(icons.tracer_select_offset), "Select Offset Object", bar.select_tracer_offset_node)
+    menu.addAction(
+        QtGui.QIcon(icons.refresh),
+        "Refresh Tracer",
+        bar.tracer_refresh,
+        tooltip_template=helper.tracer_refresh_tooltip_text,
+    )
+    menu.addAction(
+        QtGui.QIcon(icons.tracer_show_hide),
+        "Toggle Tracer",
+        bar.tracer_show_hide,
+        tooltip_template=helper.tracer_toggle_tooltip_text,
+    )
+    menu.addAction(
+        QtGui.QIcon(icons.tracer_select_offset),
+        "Select Offset Object",
+        bar.select_tracer_offset_node,
+        tooltip_template=helper.tracer_offset_tooltip_text,
+    )
 
     menu.addSeparator()
-    style_menu = menu.addMenu(QtGui.QIcon(icons.tracer), "Style")
-    style_menu.addAction(QtGui.QIcon(icons.tracer_grey), "Tracer Style: Grey", bar.set_tracer_grey_color)
-    style_menu.addAction(QtGui.QIcon(icons.tracer_red), "Tracer Style: Red", bar.set_tracer_red_color)
-    style_menu.addAction(QtGui.QIcon(icons.tracer_blue), "Tracer Style: Blue", bar.set_tracer_blue_color)
+    style_menu = cw.MenuWidget(QtGui.QIcon(icons.tracer), "Style", menu, description="Choose the active tracer trail display style.")
+    menu.addMenu(style_menu, description="Choose the active tracer trail display style.")
+    style_menu.addAction(
+        QtGui.QIcon(icons.tracer_grey),
+        "Tracer Style: Grey",
+        bar.set_tracer_grey_color,
+        tooltip_template=helper.tracer_grey_tooltip_text,
+    )
+    style_menu.addAction(
+        QtGui.QIcon(icons.tracer_red),
+        "Tracer Style: Red",
+        bar.set_tracer_red_color,
+        tooltip_template=helper.tracer_red_tooltip_text,
+    )
+    style_menu.addAction(
+        QtGui.QIcon(icons.tracer_blue),
+        "Tracer Style: Blue",
+        bar.set_tracer_blue_color,
+        tooltip_template=helper.tracer_blue_tooltip_text,
+    )
 
     menu.addSeparator()
-    menu.addAction(QtGui.QIcon(icons.remove), "Remove Tracer", bar.remove_tracer_node)
+    menu.addAction(
+        QtGui.QIcon(icons.remove),
+        "Remove Tracer",
+        bar.remove_tracer_node,
+        tooltip_template=helper.tracer_remove_tooltip_text,
+    )
 
 
 def _build_nudge_menu(menu, direction):
@@ -673,8 +713,22 @@ def add_other_sources_help_menu(parent_menu):
 def add_main_system_menu(toolbar, parent_menu):
     system_menu = cw.MenuWidget(QtGui.QIcon(icons.system), "System")
     parent_menu.addMenu(system_menu, description="Maintenance actions.")
-    system_menu.addAction(QtGui.QIcon(icons.reload), "Reload", toolbar.reload, description="Refresh the TKM interface.")
-    system_menu.addAction(QtGui.QIcon(icons.close), "Unload", toolbar.unload, description="Close TheKeyMachine and remove callbacks.")
+    system_menu.addAction(
+        QtGui.QIcon(icons.reload),
+        "Reload",
+        toolbar.reload,
+        description="Refresh the TKM interface.",
+        command_id="toolbar_reload",
+        command_icon=icons.reload,
+    )
+    system_menu.addAction(
+        QtGui.QIcon(icons.close),
+        "Unload",
+        toolbar.unload,
+        description="Close TheKeyMachine and remove callbacks.",
+        command_id="toolbar_unload",
+        command_icon=icons.close,
+    )
     system_menu.addAction(QtGui.QIcon(icons.remove), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
     return system_menu
 
@@ -695,6 +749,8 @@ def add_main_preferences_menu(
         "Create a Shelf Button",
         toolbar.create_shelf_icon,
         description="Add a shelf button for showing or hiding the toolbar.",
+        command_id="toolbar_add_shelf_button",
+        command_icon=icons.TheKeyMachine_icon,
     )
 
     run_on_startup_action = preferences_menu.addAction(
@@ -750,6 +806,8 @@ def build_main_settings_menu(
         "Hotkeys",
         hotkeys.show_hotkeys_window,
         description="Edit keyboard shortcuts for TheKeyMachine tools.",
+        command_id="hotkeys_window",
+        command_icon=icons.hotkeys,
     )
     toolbar_menu.addMenu(build_main_dock_menu(toolbar), description="Move the toolbar to a different Maya area.")
     add_main_system_menu(toolbar, toolbar_menu)
@@ -763,8 +821,17 @@ def build_main_settings_menu(
             "Check for updates",
             lambda: updater.check_for_updates(parent_button, force=True),
             description="Look for a new version.",
+            command_id="check_for_updates",
+            command_icon=icons.check_updates,
         )
-    toolbar_menu.addAction(QtGui.QIcon(icons.about), "About", ui.about_window, description="Show version info and credits.")
+    toolbar_menu.addAction(
+        QtGui.QIcon(icons.about),
+        "About",
+        ui.about_window,
+        description="Show version info and credits.",
+        command_id="about_window",
+        command_icon=icons.about,
+    )
     return toolbar_menu
 
 
@@ -838,9 +905,23 @@ def build_graph_settings_menu(
         description="Hide the TKM Graph Editor toolbar and keep it disabled.",
     )
 
-    menu.addAction(QtGui.QIcon(icons.hotkeys), "Hotkeys", hotkeys.show_hotkeys_window, description="Manage trigger hotkeys.")
+    menu.addAction(
+        QtGui.QIcon(icons.hotkeys),
+        "Hotkeys",
+        hotkeys.show_hotkeys_window,
+        description="Manage trigger hotkeys.",
+        command_id="hotkeys_window",
+        command_icon=icons.hotkeys,
+    )
     menu.addSeparator()
     add_other_sources_help_menu(menu)
 
-    menu.addAction(QtGui.QIcon(icons.about), "About", ui.about_window, description="Show version info and credits.")
+    menu.addAction(
+        QtGui.QIcon(icons.about),
+        "About",
+        ui.about_window,
+        description="Show version info and credits.",
+        command_id="about_window",
+        command_icon=icons.about,
+    )
     return menu

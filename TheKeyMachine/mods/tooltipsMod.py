@@ -7,6 +7,7 @@ QWidget = QtWidgets.QWidget
 QHBoxLayout = QtWidgets.QHBoxLayout
 QVBoxLayout = QtWidgets.QVBoxLayout
 QLabel = QtWidgets.QLabel
+QToolButton = QtWidgets.QToolButton
 QFrame = QtWidgets.QFrame
 QMenu = QtWidgets.QMenu
 QApplication = QtWidgets.QApplication
@@ -29,6 +30,7 @@ QRect = QtCore.QRect
 QSvgRenderer = getattr(QtSvg, "QSvgRenderer", None)
 
 from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.data import icons
 from TheKeyMachine.data.movies import TooltipMedia, TooltipMovieWidget
 
 
@@ -162,7 +164,19 @@ class QFlatTooltip(QWidget):
     MAX_WIDTH = 320
     MIN_WIDTH = 220
 
-    def __init__(self, text="", anchor_widget=None, icon=None, shortcuts=None, description=None, tooltip_template=None, icon_obj=None):
+    def __init__(
+        self,
+        text="",
+        anchor_widget=None,
+        icon=None,
+        shortcuts=None,
+        description=None,
+        tooltip_template=None,
+        icon_obj=None,
+        command_id=None,
+        command_label=None,
+        command_icon=None,
+    ):
         QWidget.__init__(self, wutil.get_maya_qt())
         self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -171,6 +185,9 @@ class QFlatTooltip(QWidget):
         self.anchor_widget = anchor_widget
         self.shortcuts = shortcuts or []
         self.icon_obj = icon_obj
+        self.command_id = command_id
+        self.command_label = command_label
+        self.command_icon = command_icon
         self.text = text
         self.description = description
         self.icon = icon  # Store for reference
@@ -275,7 +292,7 @@ class QFlatTooltip(QWidget):
                 header_pixmap = QIcon(self.icon)
 
         if header_title or header_pixmap:
-            header_frame, header_layout = self._create_section_frame("")
+            header_frame, header_layout = self._create_section_frame(self.HEADER_COLOR, rounded_top=True)
             if header_pixmap:
                 lbl = self._create_icon_label(header_pixmap, dim=22.5)
                 header_layout.addWidget(lbl)
@@ -284,12 +301,13 @@ class QFlatTooltip(QWidget):
                 header_layout.addWidget(title_lbl)
 
             header_layout.addStretch()
+            self._add_header_action_buttons(header_layout, header_title)
             self.bg_layout.addWidget(header_frame)
             self.has_header = True
 
         content_layout = QVBoxLayout()
         content_layout.setSpacing(wutil.DPI(6))
-        top_margin = wutil.DPI(0) if self.has_header else wutil.DPI(12)
+        top_margin = wutil.DPI(12)
         content_layout.setContentsMargins(wutil.DPI(12), top_margin, wutil.DPI(12), wutil.DPI(8))
         self.content_layout = content_layout
 
@@ -308,13 +326,80 @@ class QFlatTooltip(QWidget):
         if self.shortcuts:
             self._build_shortcuts_section()
 
-    def _create_section_frame(self, color):
+    def _create_section_frame(self, color, rounded_top=False):
         frame = QFrame()
-        frame.setStyleSheet("background-color: {};".format(color))
+        if rounded_top:
+            frame.setObjectName("TooltipHeaderFrame")
+            frame.setStyleSheet(
+                "QFrame#TooltipHeaderFrame {{ background-color: {}; border-top-left-radius: {}px; border-top-right-radius: {}px; }}".format(
+                    color, wutil.DPI(self.BORDER_RADIUS), wutil.DPI(self.BORDER_RADIUS)
+                )
+            )
+        else:
+            frame.setObjectName("TooltipSectionFrame")
+            frame.setStyleSheet("QFrame#TooltipSectionFrame {{ background-color: {}; }}".format(color))
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(wutil.DPI(12), wutil.DPI(12), wutil.DPI(12), wutil.DPI(12))
-        layout.setSpacing(wutil.DPI(8))
+        if rounded_top:
+            layout.setContentsMargins(wutil.DPI(10), wutil.DPI(8), wutil.DPI(8), wutil.DPI(8))
+            layout.setSpacing(wutil.DPI(6))
+        else:
+            layout.setContentsMargins(wutil.DPI(12), wutil.DPI(12), wutil.DPI(12), wutil.DPI(12))
+            layout.setSpacing(wutil.DPI(8))
         return frame, layout
+
+    def _add_header_action_buttons(self, layout, header_title):
+        if not self.command_id:
+            return
+        actions = QWidget(self)
+        actions_layout = QHBoxLayout(actions)
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        actions_layout.setSpacing(wutil.DPI(2))
+        if self.command_id:
+            actions_layout.addWidget(self._create_header_button(icons.hotkeys, "Edit hotkey", self._open_hotkey_editor))
+        actions_layout.addWidget(self._create_header_button(icons.add_to_shelf, "Add to shelf", lambda: self._add_to_shelf(header_title)))
+        layout.addWidget(actions)
+
+    def _create_header_button(self, icon_path, tooltip, callback):
+        btn = QToolButton(self)
+        btn.setObjectName("TooltipHeaderButton")
+        btn.setAutoRaise(True)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setToolTip(tooltip)
+        btn.setIcon(QIcon(icon_path))
+        btn.setIconSize(QSize(wutil.DPI(26), wutil.DPI(26)))
+        btn.setFixedSize(wutil.DPI(28), wutil.DPI(28))
+        btn.setStyleSheet(
+            "QToolButton#TooltipHeaderButton { background-color: transparent; border: none; border-radius: 0px; padding: 0px; }"
+            "QToolButton#TooltipHeaderButton:pressed { background-color: #1f1f1f; border: none; border-radius: 0px; }"
+        )
+        btn.clicked.connect(lambda _checked=False: callback())
+        return btn
+
+    def _open_hotkey_editor(self):
+        if not self.command_id:
+            return
+        command_id = self.command_id
+        QFlatTooltipManager.hide()
+        try:
+            from TheKeyMachine.mods import hotkeysMod
+
+            hotkeysMod.show_hotkeys_window_for_command(command_id)
+        except Exception:
+            pass
+
+    def _add_to_shelf(self, header_title):
+        if not self.command_id:
+            return
+        command_id = self.command_id
+        command_label = self.command_label or header_title
+        command_icon = self.command_icon or self.icon
+        QFlatTooltipManager.hide()
+        try:
+            from TheKeyMachine.mods import shelfMod
+
+            shelfMod.create_tool_shelf_button(command_id, command_label, icon=command_icon)
+        except Exception:
+            pass
 
     def _build_shortcuts_section(self):
         frame, layout = self._create_section_frame(self.HEADER_COLOR)
@@ -669,6 +754,9 @@ class QFlatTooltipManager(object):
         target_rect=None,
         target_pos=None,
         source_key=None,
+        command_id=None,
+        command_label=None,
+        command_icon=None,
         **kwargs,
     ):
         if not cls.enabled:
@@ -696,6 +784,9 @@ class QFlatTooltipManager(object):
             description=description,
             tooltip_template=tooltip_template,
             icon_obj=icon_obj,
+            command_id=command_id,
+            command_label=command_label,
+            command_icon=command_icon,
         )
         cls._current_tooltip.show_around(anchor_widget, action_rect, target_rect=target_rect, target_pos=target_pos)
 

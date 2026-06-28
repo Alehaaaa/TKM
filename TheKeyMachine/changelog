@@ -13,6 +13,14 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.95:
+  - new: Tooltip actions for editing hotkeys and adding shelf buttons
+  - changed: Update prompt shows all changes since the installed version
+  - polish: Update changelog is scrollable and grouped by change type
+  - polish: Version History groups changes with one icon per type
+  - polish: Tooltip header and button styling refined
+  - bugfix: Menu tooltip actions keep their correct trigger behavior
+
 0.1.94:
   - new: Version history window from the About dialog
   - polish: Bug Report window spacing and field layout
