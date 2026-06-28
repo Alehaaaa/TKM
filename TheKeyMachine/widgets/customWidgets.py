@@ -235,24 +235,33 @@ class LogoAction(QtWidgets.QWidgetAction):
         super().__init__(parent)
         self.setStatusTip("")
         self.setToolTip("")
+        self.clickable = clickable
+        self._widgets = []
 
-        self._container = QtWidgets.QWidget(parent)
-        layout = QtWidgets.QVBoxLayout(self._container)
+    def createWidget(self, parent):
+        container = QtWidgets.QWidget(parent)
+        layout = QtWidgets.QVBoxLayout(container)
         layout.setContentsMargins(0, 10, 0, 10)
         layout.setSpacing(0)
 
         logo_pix = QtGui.QPixmap(icons.TheKeyMachine_logo_250)
         if not logo_pix.isNull():
-            self.logo_label = QtWidgets.QLabel()
-            self.logo_label.setPixmap(logo_pix.scaledToHeight(DPI(60), QtCore.Qt.SmoothTransformation))
-            self.logo_label.setAlignment(QtCore.Qt.AlignCenter)
-            layout.addWidget(self.logo_label)
+            logo_label = QtWidgets.QLabel(container)
+            logo_label.setPixmap(logo_pix.scaledToHeight(DPI(60), QtCore.Qt.SmoothTransformation))
+            logo_label.setAlignment(QtCore.Qt.AlignCenter)
+            layout.addWidget(logo_label)
 
-        self.setDefaultWidget(self._container)
-        self.clickable = clickable
-        if clickable:
-            self._container.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-            self._container.mouseReleaseEvent = self._on_clicked
+        if self.clickable:
+            container.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+            container.mouseReleaseEvent = self._on_clicked
+
+        self._widgets.append(container)
+        return container
+
+    def deleteWidget(self, widget):
+        if widget in self._widgets:
+            self._widgets.remove(widget)
+        QtWidgets.QWidgetAction.deleteWidget(self, widget)
 
     def isClickable(self):
         return self.clickable
@@ -348,14 +357,30 @@ class MenuWidget(QtWidgets.QMenu):
     def _cursor_target_rect(pos=None):
         return QtCore.QRect(pos or QtGui.QCursor.pos(), QtCore.QSize(1, 1))
 
-    def _action_global_rect(self, action):
+    def _menu_at_global_pos(self, pos):
+        widget = QtWidgets.QApplication.widgetAt(pos)
+        while widget:
+            if isinstance(widget, QtWidgets.QMenu):
+                return widget
+            widget = widget.parentWidget()
+        for widget in QtWidgets.QApplication.topLevelWidgets():
+            if isinstance(widget, QtWidgets.QMenu) and widget.isVisible() and widget.frameGeometry().contains(pos):
+                return widget
+        return self
+
+    def _action_global_rect(self, action, pos=None):
+        pos = pos or QtGui.QCursor.pos()
+        menu = self._menu_at_global_pos(pos)
         try:
-            rect = self.actionGeometry(action)
+            local_pos = menu.mapFromGlobal(pos)
+            hovered_action = menu.actionAt(local_pos)
+            rect_action = hovered_action or action
+            rect = menu.actionGeometry(rect_action)
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            return self._cursor_target_rect()
+            return self._cursor_target_rect(pos)
         if not rect.isValid():
-            return self._cursor_target_rect()
-        rect.moveTo(self.mapToGlobal(rect.topLeft()))
+            return self._cursor_target_rect(pos)
+        rect.moveTo(menu.mapToGlobal(rect.topLeft()))
         return rect
 
     def addAction(self, *args, **kwargs):
@@ -441,7 +466,7 @@ class MenuWidget(QtWidgets.QMenu):
             QFlatTooltipManager.delayed_show(
                 text=title,
                 anchor_widget=self,
-                target_rect=self._action_global_rect(action),
+                target_rect=self._action_global_rect(action, cursor_pos),
                 target_pos=cursor_pos,
                 description=desc,
                 tooltip_template=display_template,

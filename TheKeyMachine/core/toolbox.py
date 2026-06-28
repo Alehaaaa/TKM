@@ -113,6 +113,7 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Bug Report",
         "icon": icons.bug,
+        "description": "Open the bug report window to save a report with your notes and current error details.",
         "callback": trigger._open_bug_report_window,
     },
 

@@ -11,6 +11,9 @@ from maya import cmds
 from TheKeyMachine.Qt import QtGui  # type: ignore
 
 
+_MENU_BUILDERS = {}
+
+
 def _current_shelf():
     try:
         return cmds.tabLayout("ShelfLayout", query=True, selectTab=True)
@@ -37,6 +40,23 @@ def _dedupe_shelf_button(parent, label, command):
                 cmds.deleteUI(child)
         except Exception:
             continue
+
+
+def register_menu_builder(tool_id, builder):
+    if not tool_id or not callable(builder):
+        return
+
+    _MENU_BUILDERS[tool_id] = builder
+
+    try:
+        from TheKeyMachine.core import trigger
+
+        def _show_menu_at_cursor():
+            return show_tool_menu_at_cursor(tool_id)
+
+        trigger.register_command(tool_id, _show_menu_at_cursor)
+    except Exception:
+        pass
 
 
 def create_tool_shelf_button(tool_id, tool_name, icon=None):
@@ -66,9 +86,39 @@ def create_tool_shelf_button(tool_id, tool_name, icon=None):
     )
 
 
-def show_tool_menu_at_cursor(tool_id):
-    from TheKeyMachine.core import toolbox
+def _exec_menu(menu):
+    if not menu or not menu.actions():
+        return None
+    return menu.exec_(QtGui.QCursor.pos())
+
+
+def _build_toolbox_menu(setup_fn):
     from TheKeyMachine.widgets.customWidgets import OpenMenuWidget
+
+    menu = OpenMenuWidget()
+    try:
+        built_menu = setup_fn(menu, source_widget=None)
+    except TypeError:
+        built_menu = setup_fn(menu)
+    if built_menu is not None and built_menu is not False:
+        menu = built_menu
+    return menu
+
+
+def show_tool_menu_at_cursor(tool_id):
+    if tool_id in _MENU_BUILDERS:
+        return _exec_menu(_MENU_BUILDERS[tool_id]())
+
+    try:
+        from TheKeyMachine.core import toolMenus
+
+        menu = toolMenus.build_menu_for_shelf(tool_id)
+        if menu:
+            return _exec_menu(menu)
+    except Exception:
+        pass
+
+    from TheKeyMachine.core import toolbox
 
     try:
         tool = toolbox.get_tool(tool_id)
@@ -82,13 +132,4 @@ def show_tool_menu_at_cursor(tool_id):
             return callback()
         return None
 
-    menu = OpenMenuWidget()
-    try:
-        built_menu = setup_fn(menu, source_widget=None)
-    except TypeError:
-        built_menu = setup_fn(menu)
-    if built_menu is not None and built_menu is not False:
-        menu = built_menu
-    if not menu.actions():
-        return None
-    return menu.exec_(QtGui.QCursor.pos())
+    return _exec_menu(_build_toolbox_menu(setup_fn))

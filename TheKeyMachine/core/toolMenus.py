@@ -85,6 +85,25 @@ def _add_toolbox_actions(menu, items, source_widget=None):
             _add_toolbox_action(menu, item)
 
 
+def _register_menu_builder(command_id, builder):
+    try:
+        from TheKeyMachine.mods import shelfMod
+
+        shelfMod.register_menu_builder(command_id, builder)
+    except Exception:
+        pass
+
+
+def _add_registered_menu(parent_menu, menu, *, command_id, command_icon, description, builder):
+    _register_menu_builder(command_id, builder)
+    return parent_menu.addMenu(
+        menu,
+        description=description,
+        command_id=command_id,
+        command_icon=command_icon,
+    )
+
+
 def _add_exclusive_setting_actions(menu, specs, current_value, setter, group_attr=None):
     group = QActionGroup(menu)
     group.setExclusive(True)
@@ -683,9 +702,8 @@ def should_show_toolbar_pinning_menu(toolbar_widget, pos):
     return child is toolbar_widget
 
 
-def add_other_sources_help_menu(parent_menu):
+def build_other_sources_help_menu():
     help_menu = cw.MenuWidget(QtGui.QIcon(icons.help), "Help")
-    parent_menu.addMenu(help_menu, description="Docs, support, and community links.")
     _add_toolbox_actions(help_menu, ("bug_report_window",))
     help_menu.addSeparator()
 
@@ -710,9 +728,19 @@ def add_other_sources_help_menu(parent_menu):
     return help_menu
 
 
-def add_main_system_menu(toolbar, parent_menu):
+def add_other_sources_help_menu(parent_menu):
+    return _add_registered_menu(
+        parent_menu,
+        build_other_sources_help_menu(),
+        command_id="help_menu",
+        command_icon=icons.help,
+        description="Docs, support, and community links.",
+        builder=build_other_sources_help_menu,
+    )
+
+
+def build_main_system_menu(toolbar):
     system_menu = cw.MenuWidget(QtGui.QIcon(icons.system), "System")
-    parent_menu.addMenu(system_menu, description="Maintenance actions.")
     system_menu.addAction(
         QtGui.QIcon(icons.reload),
         "Reload",
@@ -733,16 +761,25 @@ def add_main_system_menu(toolbar, parent_menu):
     return system_menu
 
 
-def add_main_preferences_menu(
+def add_main_system_menu(toolbar, parent_menu):
+    return _add_registered_menu(
+        parent_menu,
+        build_main_system_menu(toolbar),
+        command_id="main_system_menu",
+        command_icon=icons.system,
+        description="Maintenance actions.",
+        builder=lambda: build_main_system_menu(toolbar),
+    )
+
+
+def build_main_preferences_menu(
     toolbar,
-    parent_menu,
     show_tooltips,
     toolbar_alignment,
     update_show_tooltips,
     update_toolbar_icon_alignment,
 ):
     preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(icons.settings), "Preferences")
-    parent_menu.addMenu(preferences_menu, description="General toolbar options.")
     preferences_menu.addSection("Startup")
     preferences_menu.addAction(
         QtGui.QIcon(icons.TheKeyMachine_icon),
@@ -782,6 +819,78 @@ def add_main_preferences_menu(
     return preferences_menu
 
 
+def add_main_preferences_menu(
+    toolbar,
+    parent_menu,
+    show_tooltips,
+    toolbar_alignment,
+    update_show_tooltips,
+    update_toolbar_icon_alignment,
+):
+    builder = lambda: build_main_preferences_menu(
+        toolbar,
+        show_tooltips=show_tooltips,
+        toolbar_alignment=toolbar_alignment,
+        update_show_tooltips=update_show_tooltips,
+        update_toolbar_icon_alignment=update_toolbar_icon_alignment,
+    )
+    return _add_registered_menu(
+        parent_menu,
+        builder(),
+        command_id="main_preferences_menu",
+        command_icon=icons.settings,
+        description="General toolbar options.",
+        builder=builder,
+    )
+
+
+def build_menu_for_shelf(command_id):
+    if command_id == "help_menu":
+        return build_other_sources_help_menu()
+
+    try:
+        from TheKeyMachine.core import toolbar as toolbarMod
+
+        toolbar = toolbarMod.get_toolbar()
+    except Exception:
+        toolbar = None
+
+    if toolbar and command_id == "main_system_menu":
+        return build_main_system_menu(toolbar)
+    if toolbar and command_id == "main_dock_menu":
+        return build_main_dock_menu(toolbar)
+    if toolbar and command_id == "main_preferences_menu":
+        from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
+
+        def update_show_tooltips(value):
+            settings.set_setting("show_tooltips", value)
+            QFlatTooltipManager.enabled = value
+
+        def update_toolbar_icon_alignment(alignment_name):
+            toolWidgets.set_main_toolbar_icon_alignment(toolbar, alignment_name)
+
+        return build_main_preferences_menu(
+            toolbar,
+            show_tooltips=settings.get_setting("show_tooltips", True),
+            toolbar_alignment=toolWidgets.get_main_toolbar_icon_alignment(),
+            update_show_tooltips=update_show_tooltips,
+            update_toolbar_icon_alignment=update_toolbar_icon_alignment,
+        )
+
+    if command_id in ("graph_settings_menu", "graph_dock_menu"):
+        from TheKeyMachine.core import customGraph
+
+        if command_id == "graph_settings_menu":
+            return build_graph_settings_submenu(customGraph.applyCustomGraphAlignment)
+        return build_graph_dock_menu(
+            customGraph._DOCK_OPTIONS,
+            customGraph._GRAPH_TOOLBAR_DOCK_SETTING,
+            customGraph._DOCK_BOTTOM_GRAPH,
+            customGraph.moveCustomGraphDock,
+        )
+    return None
+
+
 def build_main_settings_menu(
     toolbar,
     parent_button,
@@ -809,7 +918,14 @@ def build_main_settings_menu(
         command_id="hotkeys_window",
         command_icon=icons.hotkeys,
     )
-    toolbar_menu.addMenu(build_main_dock_menu(toolbar), description="Move the toolbar to a different Maya area.")
+    _add_registered_menu(
+        toolbar_menu,
+        build_main_dock_menu(toolbar),
+        command_id="main_dock_menu",
+        command_icon=icons.dock,
+        description="Move the toolbar to a different Maya area.",
+        builder=lambda: build_main_dock_menu(toolbar),
+    )
     add_main_system_menu(toolbar, toolbar_menu)
     toolbar_menu.addSeparator()
     add_other_sources_help_menu(toolbar_menu)
@@ -835,19 +951,8 @@ def build_main_settings_menu(
     return toolbar_menu
 
 
-def build_graph_settings_menu(
-    parent_button,
-    dock_options,
-    dock_setting,
-    default_dock_position,
-    move_dock_fn,
-    apply_alignment_fn,
-):
-    menu = cw.MenuWidget(parent=parent_button)
-    menu.addAction(cw.LogoAction(menu))
-
+def build_graph_settings_submenu(apply_alignment_fn):
     settings_menu = cw.MenuWidget(QtGui.QIcon(icons.settings), "Settings", description="Tool configuration and preferences.")
-    menu.addMenu(settings_menu)
 
     settings_menu.addSection("Graph toolbar")
     graph_toolbar_action = settings_menu.addAction(
@@ -861,25 +966,6 @@ def build_graph_settings_menu(
         setter=lambda state: graphToolbarApi.set_graph_toolbar_enabled(bool(state)),
         signal=graphToolbarApi.custom_graph_bus.graph_toolbar_enabled_changed,
     )
-
-    dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the Graph Editor toolbar.")
-    menu.addMenu(dock_menu)
-    dock_group = QActionGroup(dock_menu)
-    dock_group.setExclusive(True)
-
-    dock_actions = {}
-    for position, label, description in dock_options:
-        action = dock_menu.addAction(label, description=description)
-        action.setCheckable(True)
-        dock_group.addAction(action)
-        action.triggered.connect(lambda checked=False, p=position: move_dock_fn(p))
-        dock_actions[position] = action
-
-    current_position = settings.get_setting(dock_setting, default_dock_position)
-    if current_position not in dock_actions:
-        current_position = default_dock_position
-    for position, action in dock_actions.items():
-        action.setChecked(position == current_position)
 
     settings_menu.addSection("Toolbar's icons alignment")
     align_group = QActionGroup(settings_menu)
@@ -903,6 +989,64 @@ def build_graph_settings_menu(
         "Close",
         lambda: QtCore.QTimer.singleShot(0, lambda: graphToolbarApi.set_graph_toolbar_enabled(False)),
         description="Hide the TKM Graph Editor toolbar and keep it disabled.",
+    )
+    return settings_menu
+
+
+def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, move_dock_fn):
+    dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the Graph Editor toolbar.")
+    dock_group = QActionGroup(dock_menu)
+    dock_group.setExclusive(True)
+
+    dock_actions = {}
+    for position, label, description in dock_options:
+        action = dock_menu.addAction(label, description=description)
+        action.setCheckable(True)
+        dock_group.addAction(action)
+        action.triggered.connect(lambda checked=False, p=position: move_dock_fn(p))
+        dock_actions[position] = action
+
+    current_position = settings.get_setting(dock_setting, default_dock_position)
+    if current_position not in dock_actions:
+        current_position = default_dock_position
+    for position, action in dock_actions.items():
+        action.setChecked(position == current_position)
+    return dock_menu
+
+
+def build_graph_settings_menu(
+    parent_button,
+    dock_options,
+    dock_setting,
+    default_dock_position,
+    move_dock_fn,
+    apply_alignment_fn,
+):
+    menu = cw.MenuWidget(parent=parent_button)
+    menu.addAction(cw.LogoAction(menu))
+    build_settings_submenu = lambda: build_graph_settings_submenu(apply_alignment_fn)
+    build_dock_submenu = lambda: build_graph_dock_menu(
+        dock_options,
+        dock_setting,
+        default_dock_position,
+        move_dock_fn,
+    )
+
+    _add_registered_menu(
+        menu,
+        build_settings_submenu(),
+        command_id="graph_settings_menu",
+        command_icon=icons.settings,
+        description="Tool configuration and preferences.",
+        builder=build_settings_submenu,
+    )
+    _add_registered_menu(
+        menu,
+        build_dock_submenu(),
+        command_id="graph_dock_menu",
+        command_icon=icons.dock,
+        description="Move the Graph Editor toolbar.",
+        builder=build_dock_submenu,
     )
 
     menu.addAction(

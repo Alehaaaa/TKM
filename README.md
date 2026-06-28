@@ -4,7 +4,7 @@
 
 # TheKeyMachine, animation toolbar
 
-![Version](https://img.shields.io/badge/version-0.1.94-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.96-blue.svg)
 
 TheKeyMachine (TKM) is an open source Maya animation toolset built for faster key editing, cleaner selection workflows, smarter copy/paste utilities, floating tools, and timeline-aware operations.
 

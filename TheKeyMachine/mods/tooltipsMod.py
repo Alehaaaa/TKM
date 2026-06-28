@@ -176,11 +176,14 @@ class QFlatTooltip(QWidget):
         command_id=None,
         command_label=None,
         command_icon=None,
+        from_menu=False,
     ):
         QWidget.__init__(self, wutil.get_maya_qt())
-        self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        window_type = Qt.ToolTip if from_menu else Qt.Tool
+        self.setWindowFlags(window_type | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setAttribute(Qt.WA_NoMouseReplay)
 
         self.anchor_widget = anchor_widget
         self.shortcuts = shortcuts or []
@@ -283,6 +286,11 @@ class QFlatTooltip(QWidget):
         self.has_header = False
         header_title = getattr(self.tooltip_template, "title", "") or self.text
         header_pixmap = self.icon_obj if self.icon_obj and not self.icon_obj.isNull() else None
+        body_items = tuple(getattr(self.tooltip_template, "body_lines", ()) or ())
+        if not body_items and self.description:
+            body_items = tooltip_body(self.description)
+        has_body = bool(body_items)
+        header_only = bool(header_title or header_pixmap) and not has_body and not self.shortcuts
 
         if not header_pixmap:
             template_icon = getattr(self.tooltip_template, "icon", None)
@@ -292,7 +300,11 @@ class QFlatTooltip(QWidget):
                 header_pixmap = QIcon(self.icon)
 
         if header_title or header_pixmap:
-            header_frame, header_layout = self._create_section_frame(self.HEADER_COLOR, rounded_top=True)
+            header_frame, header_layout = self._create_section_frame(
+                self.HEADER_COLOR,
+                rounded_top=True,
+                rounded_bottom=header_only,
+            )
             if header_pixmap:
                 lbl = self._create_icon_label(header_pixmap, dim=22.5)
                 header_layout.addWidget(lbl)
@@ -311,11 +323,7 @@ class QFlatTooltip(QWidget):
         content_layout.setContentsMargins(wutil.DPI(12), top_margin, wutil.DPI(12), wutil.DPI(8))
         self.content_layout = content_layout
 
-        body_items = tuple(getattr(self.tooltip_template, "body_lines", ()) or ())
-        if not body_items and self.description:
-            body_items = tooltip_body(self.description)
-
-        if body_items:
+        if has_body:
             self._populate_body_content(content_layout, body_items)
             self.bg_layout.addLayout(content_layout)
             if self.shortcuts:
@@ -326,13 +334,21 @@ class QFlatTooltip(QWidget):
         if self.shortcuts:
             self._build_shortcuts_section()
 
-    def _create_section_frame(self, color, rounded_top=False):
+    def _create_section_frame(self, color, rounded_top=False, rounded_bottom=False):
         frame = QFrame()
-        if rounded_top:
+        if rounded_top or rounded_bottom:
             frame.setObjectName("TooltipHeaderFrame")
             frame.setStyleSheet(
-                "QFrame#TooltipHeaderFrame {{ background-color: {}; border-top-left-radius: {}px; border-top-right-radius: {}px; }}".format(
-                    color, wutil.DPI(self.BORDER_RADIUS), wutil.DPI(self.BORDER_RADIUS)
+                (
+                    "QFrame#TooltipHeaderFrame {{ background-color: {}; "
+                    "border-top-left-radius: {}px; border-top-right-radius: {}px; "
+                    "border-bottom-left-radius: {}px; border-bottom-right-radius: {}px; }}"
+                ).format(
+                    color,
+                    wutil.DPI(self.BORDER_RADIUS) if rounded_top else 0,
+                    wutil.DPI(self.BORDER_RADIUS) if rounded_top else 0,
+                    wutil.DPI(self.BORDER_RADIUS) if rounded_bottom else 0,
+                    wutil.DPI(self.BORDER_RADIUS) if rounded_bottom else 0,
                 )
             )
         else:
@@ -696,11 +712,69 @@ class QFlatTooltip(QWidget):
         self.show()
 
 
+class _TooltipMouseFilter(QtCore.QObject):
+    def __init__(self, manager):
+        QtCore.QObject.__init__(self)
+        self.manager = manager
+        self._pressed_button = None
+
+    def eventFilter(self, obj, event):
+        tooltip = self.manager._current_tooltip
+        if not tooltip or not tooltip.isVisible():
+            self._pressed_button = None
+            return False
+
+        if event.type() not in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonRelease, QtCore.QEvent.MouseButtonDblClick):
+            return False
+
+        global_pos = self._event_global_pos(event)
+        if global_pos is None or not tooltip.frameGeometry().contains(global_pos):
+            self._pressed_button = None
+            return False
+
+        button = self._tooltip_button_at(tooltip, global_pos)
+        if event.type() == QtCore.QEvent.MouseButtonPress:
+            self._pressed_button = button
+            if button:
+                button.setDown(True)
+            return True
+
+        if event.type() == QtCore.QEvent.MouseButtonRelease:
+            pressed_button = self._pressed_button
+            self._pressed_button = None
+            if pressed_button:
+                pressed_button.setDown(False)
+                if pressed_button is button and pressed_button.isEnabled():
+                    pressed_button.click()
+            return True
+
+        return True
+
+    @staticmethod
+    def _event_global_pos(event):
+        if hasattr(event, "globalPos"):
+            return event.globalPos()
+        if hasattr(event, "globalPosition"):
+            pos = event.globalPosition()
+            return QPoint(int(pos.x()), int(pos.y()))
+        return None
+
+    @staticmethod
+    def _tooltip_button_at(tooltip, global_pos):
+        widget = tooltip.childAt(tooltip.mapFromGlobal(global_pos))
+        while widget and widget is not tooltip:
+            if isinstance(widget, QToolButton):
+                return widget
+            widget = widget.parentWidget()
+        return None
+
+
 class QFlatTooltipManager(object):
     """Manages global state for QFlatTooltips ensuring only one exists at a time."""
 
     _current_tooltip = None
     _timer = None
+    _mouse_filter = None
     _current_source_key = None
     _pending_source_key = None
     enabled = True
@@ -722,6 +796,15 @@ class QFlatTooltipManager(object):
     @classmethod
     def _clear_pending(cls):
         cls._pending_source_key = None
+
+    @classmethod
+    def _ensure_mouse_filter(cls):
+        app = QApplication.instance()
+        if not app:
+            return
+        if cls._mouse_filter is None:
+            cls._mouse_filter = _TooltipMouseFilter(cls)
+            app.installEventFilter(cls._mouse_filter)
 
     @classmethod
     def cancel_timer(cls):
@@ -767,6 +850,8 @@ class QFlatTooltipManager(object):
         if anchor_widget is not None and not wutil.is_valid_widget(anchor_widget):
             return
 
+        cls._ensure_mouse_filter()
+
         if icon and not isinstance(icon, (str, bytes)):
             icon_obj = icon
             icon = None
@@ -787,11 +872,12 @@ class QFlatTooltipManager(object):
             command_id=command_id,
             command_label=command_label,
             command_icon=command_icon,
+            from_menu=isinstance(anchor_widget, QMenu),
         )
         cls._current_tooltip.show_around(anchor_widget, action_rect, target_rect=target_rect, target_pos=target_pos)
 
     @classmethod
-    def delayed_show(cls, delay=800, **kwargs):
+    def delayed_show(cls, delay=1200, **kwargs):
         if not cls.enabled:
             return
         source_key = kwargs.get("source_key")

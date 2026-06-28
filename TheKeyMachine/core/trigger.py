@@ -129,7 +129,8 @@ def make_command_callback(name: str, callback: Optional[Callable] = None) -> Cal
         registered = get_command(name)
         if registered is None:
             raise AttributeError("Unknown TheKeyMachine trigger command: {}".format(name))
-        return registered(*args, **kwargs)
+        registered(*args, **kwargs)
+        return None
 
     _proxy.__name__ = name
     _proxy._tkm_trigger_proxy = True
@@ -346,6 +347,30 @@ def _open_orbit_window(*_args, **_kwargs):
 def _register_builtin_commands():
     _register_core_commands()
     register_command("hotkeys_window", _make_module_command("TheKeyMachine.mods.hotkeysMod", "show_hotkeys_window"))
+    register_command(
+        "main_preferences_menu",
+        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "main_preferences_menu"),
+    )
+    register_command(
+        "main_dock_menu",
+        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "main_dock_menu"),
+    )
+    register_command(
+        "main_system_menu",
+        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "main_system_menu"),
+    )
+    register_command(
+        "help_menu",
+        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "help_menu"),
+    )
+    register_command(
+        "graph_settings_menu",
+        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "graph_settings_menu"),
+    )
+    register_command(
+        "graph_dock_menu",
+        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "graph_dock_menu"),
+    )
     register_command("smart_rotation", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_rotation_manipulator"))
     register_command("smart_rotation_release", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_rotation_manipulator_release"))
     register_command("smart_translation", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_translate_manipulator"))

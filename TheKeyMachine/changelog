@@ -13,6 +13,14 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.96:
+  - new: Menu tooltips can add submenu shelf buttons
+  - changed: Tooltip hover delay is calmer
+  - polish: Toolbar section green is warmer
+  - polish: Header-only tooltips keep rounded corners
+  - bugfix: Tooltip header buttons are easier to click over menus
+  - bugfix: Torn-off menu tooltips and logo display correctly
+
 0.1.95:
   - new: Tooltip actions for editing hotkeys and adding shelf buttons
   - changed: Update prompt shows all changes since the installed version

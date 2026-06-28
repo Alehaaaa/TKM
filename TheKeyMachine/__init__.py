@@ -17,10 +17,10 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.95"
+__version__ = "0.1.96"
 __stage__ = "beta"
-__build__ = "321"
-__codename__ = "Cold Brew"
+__build__ = "322"
+__codename__ = "Flat White"
 
 
 def reload():
