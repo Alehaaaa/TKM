@@ -311,6 +311,148 @@ class QFlatDialog(QFlatWindowMixin, QtWidgets.QDialog):
             self.bottomBar.layout().addWidget(btn)
 
 
+class QFlatTooltipContent(QFlatWindowMixin, QtWidgets.QWidget):
+    TEXT_COLOR = "#bbbbbb"
+    HEADER_ICON_SIZE = 60
+
+    def __init__(self, tooltip_template, icon=None, title="", parent=None):
+        QtWidgets.QWidget.__init__(self, parent)
+        self.tooltip_template = tooltip_template or ""
+        if icon and "<icon>" not in self.tooltip_template:
+            self.tooltip_template = "<icon>{}</icon>{}".format(icon, self.tooltip_template)
+        if title and "<title>" not in self.tooltip_template:
+            self.tooltip_template = "<title>{}</title>{}".format(title, self.tooltip_template)
+
+        self.content_layout = QtWidgets.QVBoxLayout(self)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(0)
+        self._build_content()
+
+    def _build_content(self):
+        try:
+            safe_tooltip_template = self.tooltip_template.replace("&", "&amp;")
+            if "<br>" in safe_tooltip_template.lower():
+                safe_tooltip_template = re.sub(r"(?i)<br\s*>", "<br/>", safe_tooltip_template)
+            root = ET.fromstring("<root>{}</root>".format(safe_tooltip_template))
+        except Exception as e:
+            root = ET.fromstring("<root><text>Invalid XML: {}</text></root>".format(e))
+
+        header_frame = QtWidgets.QFrame(self)
+        header_layout = QtWidgets.QHBoxLayout(header_frame)
+        header_layout.setContentsMargins(DPI(18), DPI(15), DPI(18), DPI(10))
+        header_layout.setSpacing(DPI(12))
+
+        has_header = False
+        for child in root:
+            if child.tag == "icon":
+                dim = DPI(self.HEADER_ICON_SIZE)
+                pix = self._windowIconPixmap(child.text, QtCore.QSize(dim, dim))
+                if not pix.isNull():
+                    lbl = QtWidgets.QLabel(header_frame)
+                    lbl.setFixedSize(dim, dim)
+                    lbl.setAlignment(QtCore.Qt.AlignCenter)
+                    lbl.setPixmap(pix)
+                    header_layout.addWidget(lbl)
+                    has_header = True
+            elif child.tag == "title":
+                lbl = QtWidgets.QLabel(self._element_inner_text(child), header_frame)
+                lbl.setStyleSheet(
+                    "color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(self.TEXT_COLOR, DPI(18))
+                )
+                lbl.setWordWrap(True)
+                header_layout.addWidget(lbl)
+                has_header = True
+
+        if has_header:
+            header_layout.addStretch()
+            self.content_layout.addWidget(header_frame)
+
+        body_layout = QtWidgets.QVBoxLayout()
+        body_layout.setContentsMargins(DPI(18), 0, DPI(18), 0)
+        body_layout.setSpacing(DPI(6))
+
+        in_content = False
+        for child in root:
+            if not in_content and child.tag not in ["title", "icon"]:
+                in_content = True
+            if not in_content:
+                continue
+            self._add_content_element(body_layout, child)
+
+        if body_layout.count() > 0:
+            self.content_layout.addLayout(body_layout)
+
+    def _element_inner_text(self, element):
+        return (element.text or "") + "".join(
+            ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
+            for c in element
+        )
+
+    def _add_content_element(self, layout, element):
+        if element.tag == "text":
+            lbl = QtWidgets.QLabel(self._element_inner_text(element), self)
+            lbl.setWordWrap(True)
+            lbl.setTextFormat(QtCore.Qt.RichText)
+            lbl.setStyleSheet("color: {}; font-size: {}px; background: transparent;".format(self.TEXT_COLOR, DPI(11.5)))
+            layout.addWidget(lbl)
+        elif element.tag == "separator":
+            try:
+                margin = int(element.attrib.get("margin", 4))
+            except (TypeError, ValueError):
+                margin = 4
+            if margin > 0:
+                layout.addSpacing(DPI(margin))
+            sep = QtWidgets.QFrame(self)
+            sep.setFixedHeight(1)
+            sep.setStyleSheet("background-color: rgba(255,255,255,10);")
+            layout.addWidget(sep)
+            if margin > 0:
+                layout.addSpacing(DPI(margin))
+        elif element.tag == "spacing":
+            try:
+                size = int(element.attrib.get("size", 6))
+            except (TypeError, ValueError):
+                size = 6
+            layout.addSpacing(DPI(size))
+        elif element.tag in ["image", "gif"]:
+            lbl = QtWidgets.QLabel(self)
+            lbl.setAlignment(QtCore.Qt.AlignCenter)
+            pix = QtGui.QPixmap(element.text)
+            if not pix.isNull():
+                if pix.width() > DPI(280):
+                    pix = pix.scaledToWidth(DPI(280), QtCore.Qt.SmoothTransformation)
+                lbl.setPixmap(pix)
+                layout.addWidget(lbl)
+        elif element.tag == "scroll":
+            self._add_scroll_content(layout, element)
+
+    def _add_scroll_content(self, layout, element):
+        max_height = element.attrib.get("max_height", "")
+        try:
+            max_height = DPI(int(max_height))
+        except (TypeError, ValueError):
+            max_height = DPI(240)
+
+        scroll = QtWidgets.QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll.setMaximumHeight(max_height)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
+        content = QtWidgets.QWidget()
+        content.setStyleSheet("background: transparent;")
+        scroll_layout = QtWidgets.QVBoxLayout(content)
+        scroll_layout.setContentsMargins(0, 0, DPI(8), 0)
+        scroll_layout.setSpacing(DPI(6))
+
+        for child in element:
+            self._add_content_element(scroll_layout, child)
+
+        scroll_layout.addStretch(1)
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
+
+
 class QFlatConfirmDialog(QFlatDialog):
     TEXT_COLOR = "#bbbbbb"
 
@@ -323,6 +465,7 @@ class QFlatConfirmDialog(QFlatDialog):
         closeButton=True,
         highlight=None,
         icon=None,
+        tooltip_template=None,
         exclusive=True,
         parent=None,
         **kwargs,
@@ -348,39 +491,42 @@ class QFlatConfirmDialog(QFlatDialog):
         self.setMinimumWidth(0)
         self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
 
-        content_widget = QtWidgets.QWidget(self)
-        content_layout = QtWidgets.QHBoxLayout(content_widget)
-        content_layout.setContentsMargins(DPI(25), DPI(20), DPI(25), DPI(20))
+        if tooltip_template:
+            self.root_layout.addWidget(QFlatTooltipContent(tooltip_template, icon=icon, title=title, parent=self))
+        else:
+            content_widget = QtWidgets.QWidget(self)
+            content_layout = QtWidgets.QHBoxLayout(content_widget)
+            content_layout.setContentsMargins(DPI(25), DPI(20), DPI(25), DPI(20))
 
-        if icon:
-            icon_label = QtWidgets.QLabel(content_widget)
-            pix = QtGui.QPixmap(icon)
-            if not pix.isNull():
-                icon_dim = DPI(80)
-                icon_label.setPixmap(pix.scaled(icon_dim, icon_dim, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
-                icon_label.setFixedSize(icon_dim, icon_dim)
-                content_layout.addWidget(icon_label, 0, QtCore.Qt.AlignTop)
+            if icon:
+                icon_label = QtWidgets.QLabel(content_widget)
+                pix = QtGui.QPixmap(icon)
+                if not pix.isNull():
+                    icon_dim = DPI(80)
+                    icon_label.setPixmap(pix.scaled(icon_dim, icon_dim, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+                    icon_label.setFixedSize(icon_dim, icon_dim)
+                    content_layout.addWidget(icon_label, 0, QtCore.Qt.AlignTop)
 
-        text_layout = QtWidgets.QVBoxLayout()
-        text_layout.setSpacing(DPI(5))
-        content_layout.addLayout(text_layout, 1)
+            text_layout = QtWidgets.QVBoxLayout()
+            text_layout.setSpacing(DPI(5))
+            content_layout.addLayout(text_layout, 1)
 
-        if title:
-            self.title_label = QtWidgets.QLabel(title, content_widget)
-            self.title_label.setWordWrap(True)
-            self.title_label.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
-            self.title_label.setStyleSheet("font-size: %spx; color: %s; font-weight: bold;" % (DPI(18), self.TEXT_COLOR))
-            text_layout.addWidget(self.title_label)
+            if title:
+                self.title_label = QtWidgets.QLabel(title, content_widget)
+                self.title_label.setWordWrap(True)
+                self.title_label.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
+                self.title_label.setStyleSheet("font-size: %spx; color: %s; font-weight: bold;" % (DPI(18), self.TEXT_COLOR))
+                text_layout.addWidget(self.title_label)
 
-        if isinstance(message, (list, tuple)):
-            message = "<br><br>".join(message)
+            if isinstance(message, (list, tuple)):
+                message = "<br><br>".join(message)
 
-        self.message_label = QtWidgets.QLabel(message, content_widget)
-        self.message_label.setWordWrap(True)
-        self.message_label.setStyleSheet("font-size: %spx; color: %s;" % (DPI(11.5), self.TEXT_COLOR))
-        text_layout.addWidget(self.message_label)
+            self.message_label = QtWidgets.QLabel(message, content_widget)
+            self.message_label.setWordWrap(True)
+            self.message_label.setStyleSheet("font-size: %spx; color: %s;" % (DPI(11.5), self.TEXT_COLOR))
+            text_layout.addWidget(self.message_label)
 
-        self.root_layout.addWidget(content_widget)
+            self.root_layout.addWidget(content_widget)
 
         self.setBottomBar(buttons, closeButton=closeButton, highlight=highlight)
         self.adjustSize()
@@ -529,7 +675,7 @@ class QFlatTooltipConfirm(QFlatDialog):
         self.bg_layout.setSpacing(0)
         self.root_layout.addWidget(self.bg_frame)
 
-        self._build_content()
+        self.bg_layout.addWidget(QFlatTooltipContent(self.tooltip_template, parent=self.bg_frame))
 
         # Add the interactive buttons at the bottom
         self.setBottomBar(buttons, margins=12, spacing=DPI(6), highlight=highlight)
@@ -539,140 +685,6 @@ class QFlatTooltipConfirm(QFlatDialog):
             self.bg_layout.addSpacing(DPI(8))
             self.bg_layout.addWidget(self.bottomBar)
             self.bg_layout.addSpacing(DPI(4))
-
-    def _build_content(self):
-        """Parses the XML tooltip_template and builds the body, same as QFlatTooltip."""
-        try:
-            # Basic sanitization
-            safe_tooltip_template = self.tooltip_template.replace("&", "&amp;")
-            if "<br>" in safe_tooltip_template.lower():
-                safe_tooltip_template = re.sub(r"(?i)<br\s*>", "<br/>", safe_tooltip_template)
-
-            root = ET.fromstring("<root>{}</root>".format(safe_tooltip_template))
-        except Exception as e:
-            root = ET.fromstring("<root><text>Invalid XML: {}</text></root>".format(e))
-
-        # 1. Header Area (Icon + Title)
-        header_frame = QtWidgets.QFrame()
-        header_layout = QtWidgets.QHBoxLayout(header_frame)
-        header_layout.setContentsMargins(DPI(18), DPI(15), DPI(18), DPI(10))
-        header_layout.setSpacing(DPI(12))
-
-        has_header = False
-        for child in root:
-            if child.tag == "icon":
-                dim = DPI(self.HEADER_ICON_SIZE)
-                pix = self._windowIconPixmap(child.text, QtCore.QSize(dim, dim))
-                if not pix.isNull():
-                    lbl = QtWidgets.QLabel()
-                    lbl.setFixedSize(dim, dim)
-                    lbl.setAlignment(QtCore.Qt.AlignCenter)
-                    lbl.setPixmap(pix)
-                    header_layout.addWidget(lbl)
-                    has_header = True
-            elif child.tag == "title":
-                inner_text = (child.text or "") + "".join(
-                    ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
-                    for c in child
-                )
-                lbl = QtWidgets.QLabel(inner_text)
-                lbl.setStyleSheet(
-                    "color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(self.TEXT_COLOR, DPI(18))
-                )
-                lbl.setWordWrap(True)
-                header_layout.addWidget(lbl)
-                has_header = True
-
-        if has_header:
-            header_layout.addStretch()
-            self.bg_layout.addWidget(header_frame)
-
-        # 2. Main Content Area (Text, Separators, Images)
-        content_layout = QtWidgets.QVBoxLayout()
-        content_layout.setContentsMargins(DPI(18), 0, DPI(18), 0)
-        content_layout.setSpacing(DPI(6))
-
-        in_content = False
-        for child in root:
-            if not in_content and child.tag not in ["title", "icon"]:
-                in_content = True
-            if not in_content:
-                continue
-
-            self._add_content_element(content_layout, child)
-
-        if content_layout.count() > 0:
-            self.bg_layout.addLayout(content_layout)
-
-    def _element_inner_text(self, element):
-        return (element.text or "") + "".join(
-            ET.tostring(c, encoding="utf-8").decode("utf-8") if sys.version_info[0] < 3 else ET.tostring(c, encoding="unicode")
-            for c in element
-        )
-
-    def _add_content_element(self, layout, element):
-        if element.tag == "text":
-            lbl = QtWidgets.QLabel(self._element_inner_text(element))
-            lbl.setWordWrap(True)
-            lbl.setTextFormat(QtCore.Qt.RichText)
-            lbl.setStyleSheet("color: {}; font-size: {}px; background: transparent;".format(self.TEXT_COLOR, DPI(11.5)))
-            layout.addWidget(lbl)
-        elif element.tag == "separator":
-            try:
-                margin = int(element.attrib.get("margin", 4))
-            except (TypeError, ValueError):
-                margin = 4
-            if margin > 0:
-                layout.addSpacing(DPI(margin))
-            sep = QtWidgets.QFrame()
-            sep.setFixedHeight(1)
-            sep.setStyleSheet("background-color: rgba(255,255,255,10);")
-            layout.addWidget(sep)
-            if margin > 0:
-                layout.addSpacing(DPI(margin))
-        elif element.tag == "spacing":
-            try:
-                size = int(element.attrib.get("size", 6))
-            except (TypeError, ValueError):
-                size = 6
-            layout.addSpacing(DPI(size))
-        elif element.tag in ["image", "gif"]:
-            lbl = QtWidgets.QLabel()
-            lbl.setAlignment(QtCore.Qt.AlignCenter)
-            pix = QtGui.QPixmap(element.text)
-            if not pix.isNull():
-                if pix.width() > DPI(280):
-                    pix = pix.scaledToWidth(DPI(280), QtCore.Qt.SmoothTransformation)
-                lbl.setPixmap(pix)
-                layout.addWidget(lbl)
-        elif element.tag == "scroll":
-            self._add_scroll_content(layout, element)
-
-    def _add_scroll_content(self, layout, element):
-        max_height = element.attrib.get("max_height", "")
-        try:
-            max_height = DPI(int(max_height))
-        except (TypeError, ValueError):
-            max_height = DPI(240)
-
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
-        scroll.setMaximumHeight(max_height)
-        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-
-        content = QtWidgets.QWidget()
-        content.setStyleSheet("background: transparent;")
-        scroll_layout = QtWidgets.QVBoxLayout(content)
-        scroll_layout.setContentsMargins(0, 0, DPI(8), 0)
-        scroll_layout.setSpacing(DPI(6))
-
-        for child in element:
-            self._add_content_element(scroll_layout, child)
-
-        scroll_layout.addStretch(1)
-        scroll.setWidget(content)
-        layout.addWidget(scroll)
 
     def _buttonConfigHook(self, index, config):
         if isinstance(config, (str, bytes)):

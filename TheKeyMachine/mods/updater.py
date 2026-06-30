@@ -314,13 +314,6 @@ def _update_template(latest_version, installed_version, changelog):
     )
 
 
-def _update_message():
-    return (
-        "A new version of TheKeyMachine is ready to download and install.<br><br>"
-        "Install will replace the current tool files while keeping your user data and preferences."
-    )
-
-
 class UpdateCheckWorker(QThread):
     result_ready = Signal(bool, object)
 
@@ -401,7 +394,6 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
 
         latest_version = latest_version.strip()
         template = _update_template(latest_version, installed_version, changelog)
-
         if anchor_widget:
             result = QFlatTooltipConfirm.question(
                 anchor_widget,
@@ -415,8 +407,9 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
             result = QFlatConfirmDialog.question(
                 None,
                 "Update available",
-                title=f"Update {latest_version} available",
-                message=_update_message(),
+                title="",
+                message="",
+                tooltip_template=template,
                 icon=icons.tkm_main_update,
                 buttons=_update_buttons(QFlatConfirmDialog),
                 highlight="Install",
