@@ -491,7 +491,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def create_shelf_icon(self, *args):
         button_name = "TheKeyMachine"
         command = "import TheKeyMachine;TheKeyMachine.toggle()"
-        icon = icons.TheKeyMachine_icon
+        icon = icons.tkm_main
         icon = os.path.normpath(icon)
         current_shelf_tab = cmds.tabLayout("ShelfLayout", query=True, selectTab=True)
 

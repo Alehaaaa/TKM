@@ -346,6 +346,7 @@ def _open_orbit_window(*_args, **_kwargs):
 
 def _register_builtin_commands():
     _register_core_commands()
+    register_command("TKM", _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "TKM"))
     register_command("hotkeys_window", _make_module_command("TheKeyMachine.mods.hotkeysMod", "show_hotkeys_window"))
     register_command(
         "main_preferences_menu",

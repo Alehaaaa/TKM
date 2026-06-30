@@ -6,6 +6,8 @@ settings-backed check button, so the main toolbar and Graph Editor toolbar
 build the same controls from the same definitions.
 """
 
+import random
+
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.generalMod as general  # type: ignore
 import TheKeyMachine.mods.keyToolsMod as keyTools  # type: ignore
@@ -38,7 +40,7 @@ MAIN_SPECIAL_TOOL_KEYS = {
     "attribute_switcher",
     "custom_graph",
     "selector",
-    "settings",
+    "TKM",
 }
 
 GRAPH_SPECIAL_TOOL_KEYS = {
@@ -47,7 +49,7 @@ GRAPH_SPECIAL_TOOL_KEYS = {
     "attribute_switcher",
     "custom_graph",
     "selector",
-    "settings",
+    "TKM",
 }
 
 
@@ -163,6 +165,8 @@ def add_tool_button(section, item_data, *, overrides=None):
         data.update(overrides)
     tool_id = item_key(data)
     btn = cw.create_tool_button_from_data(data)
+    if tool_id == "background_runners":
+        bind_background_runners_activity_button(btn)
     section.addWidget(
         btn,
         data.get("label", ""),
@@ -172,6 +176,73 @@ def add_tool_button(section, item_data, *, overrides=None):
         tooltip_template=data.get("tooltip_template"),
         pinnable=data.get("pinnable", True),
     )
+    return btn
+
+
+def bind_background_runners_activity_button(btn):
+    if not wutil.is_valid_widget(btn):
+        return btn
+
+    default_icon = icons.background_runners_0
+    activity_icons = [
+        icons.background_runners_1,
+        icons.background_runners_2,
+        icons.background_runners_3,
+        icons.background_runners_4,
+    ]
+    btn.setIcon(QtGui.QIcon(default_icon))
+
+    timer = getattr(btn, "_tkm_background_runner_activity_timer", None)
+    if timer is None:
+        timer = QtCore.QTimer(btn)
+        timer.setInterval(90)
+        btn._tkm_background_runner_activity_timer = timer
+
+    state = {"index": 0, "sequence": []}
+
+    def _show_default():
+        if wutil.is_valid_widget(btn):
+            btn.setIcon(QtGui.QIcon(default_icon))
+
+    def _advance_icon():
+        if not wutil.is_valid_widget(btn):
+            timer.stop()
+            return
+        sequence = state.get("sequence") or []
+        index = state.get("index", 0)
+        if index >= len(sequence):
+            timer.stop()
+            _show_default()
+            return
+        btn.setIcon(QtGui.QIcon(sequence[index]))
+        state["index"] = index + 1
+
+    try:
+        timer.timeout.disconnect()
+    except Exception:
+        pass
+    timer.timeout.connect(_advance_icon)
+
+    def _pulse(*_args):
+        if not wutil.is_valid_widget(btn):
+            return
+        timer.stop()
+        sequence_len = random.randint(1, 2)
+        state["sequence"] = [random.choice(activity_icons) for _idx in range(sequence_len)]
+        state["index"] = 0
+        _advance_icon()
+        timer.start()
+
+    manager = runtime.get_runtime_manager(start=False)
+    signal = getattr(manager, "backgroundRunnerTriggered", None)
+    if signal is not None:
+        toolCommon.replace_tracked_connection(
+            btn,
+            "_tkm_background_runner_activity_connection",
+            signal,
+            _pulse,
+            parent=btn,
+        )
     return btn
 
 
@@ -547,7 +618,7 @@ def add_main_tool_item(section, item_data, owner):
         return add_micro_move_button(section, item_data, owner)
     if key == "custom_graph":
         return add_setting_toggle_widget(section, item_data, "custom_graph", owner=owner)
-    if key == "settings":
+    if key == "TKM":
         return add_main_settings_button(section, item_data, owner)
     if key == "orbit":
         owner.orbit_button_widget = add_bound_tool_button(section, item_data, orbitApi.bind_orbit_toolbar_button)
@@ -716,9 +787,9 @@ def add_main_settings_button(section, item_data, owner):
             internet_connection=internet_connection,
         )
 
-    settings_tool = toolbox.get_tool("settings", menu=_build_settings_menu)
+    settings_tool = toolbox.get_tool("TKM", menu=_build_settings_menu)
     btn = add_tool_button(section, settings_tool)
-    btn.setObjectName("settings_toolbar_button")
+    btn.setObjectName("TKM_toolbar_button")
 
     toolbar_widget = owner.main_toolbar_widget
 
@@ -769,7 +840,7 @@ def set_main_toolbar_icon_alignment(owner, alignment_name):
 def add_graph_tool_item(section, item_data, graph_settings_menu_fn):
     if item_key(item_data) == "selector":
         return add_selector_button(section, item_data)
-    overrides = {"menu": graph_settings_menu_fn} if item_key(item_data) == "settings" else None
+    overrides = {"menu": graph_settings_menu_fn} if item_key(item_data) == "TKM" else None
     return add_tool_button(section, item_data, overrides=overrides)
 
 

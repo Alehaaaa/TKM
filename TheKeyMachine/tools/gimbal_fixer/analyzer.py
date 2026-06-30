@@ -1,7 +1,9 @@
 import math
 
 from maya import cmds
-from maya import OpenMaya as om
+from maya.api import OpenMaya as om
+
+import TheKeyMachine.core.openMayaUtils as omutils
 
 
 class GimbalAnalyzer:
@@ -35,18 +37,10 @@ class GimbalAnalyzer:
     def convert_order_string(self, order):
         return self.rotation_orders.get(order, om.MEulerRotation.kZYX)
 
-    def _safe_get_depend_node(self, sel_list, index=0):
-        try:
-            return sel_list.getDependNode(index)
-        except TypeError:
-            mobj = om.MObject()
-            sel_list.getDependNode(index, mobj)
-            return mobj
-
     def get_rotation(self, obj):
-        sel = om.MSelectionList()
-        sel.add(obj)
-        node = self._safe_get_depend_node(sel, 0)
+        node = omutils.mobject_from_node(obj)
+        if node is None:
+            return om.MEulerRotation()
         tfm = om.MFnTransform(node)
         return tfm.rotation()
 

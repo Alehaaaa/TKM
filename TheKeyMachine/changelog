@@ -8,10 +8,17 @@
 # Rule: keep each version to 6 changes at most.
 # Rule: sort entries by main group in this order: New, Changed, Polish, Bugfix.
 # Rule: keep descriptions short and efficient.
+# Rule: mention each tool only once per version.
 # Rule: focus on animation tool changes, visible workflow changes, and bugfixes.
 # Rule: do not include repo housekeeping, docs, funding, metadata, or asset-only changes.
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
+
+0.1.97:
+  - changed: TheKeyMachine menu button now starts the toolbar
+  - changed: Camera orbit runner is quieter while animating
+  - polish: Background Runners button shows activity pulses
+  - polish: TheKeyMachine shelf and update icons refreshed
 
 0.1.96:
   - new: Menu tooltips can add submenu shelf buttons

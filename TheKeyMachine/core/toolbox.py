@@ -67,7 +67,7 @@ TOOL_DEFINITIONS = {
     "toolbar_add_shelf_button": {
         "type": "tool",
         "label": "Add Toggle Button To Shelf",
-        "icon": icons.TheKeyMachine_icon,
+        "icon": icons.tkm_main,
     },
     "toolbar_reload": {
         "type": "tool",
@@ -1167,14 +1167,14 @@ TOOL_DEFINITIONS = {
     "background_runners": {
         "type": "menu",
         "label": "Background Runners",
-        "icon": icons.system,
+        "icon": icons.background_runners_0,
         "description": "Toggle persistent automatic helpers and background tool runners.",
         "menu": _tool_menu_builder("build_background_runners_menu"),
     },
-    "settings": {
+    "TKM": {
         "type": "menu",
-        "label": "Settings",
-        "icon": icons.settings,
+        "label": "TheKeyMachine",
+        "icon": icons.tkm_main,
         "description": "Access global preferences, check for updates, and view credits.",
     },
     "graph_isolate_curves": {
@@ -1376,6 +1376,11 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "smart_translation_release"},
             {"id": "depth_mover"},
         ],
+    },
+    "system": {
+        "label": "System",
+        "hiddeable": False,
+        "items": [{"id": "TKM"}],
     },
     # --- Key Editing ---
     "nudge_tools": {
@@ -1931,11 +1936,6 @@ TOOL_SECTION_DEFINITIONS = {
             "separator",
             {"id": "snap", "default": True},
         ],
-    },
-    "system": {
-        "label": "System",
-        "hiddeable": False,
-        "items": [{"id": "settings"}],
     },
 }
 

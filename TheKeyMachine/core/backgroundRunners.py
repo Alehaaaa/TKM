@@ -15,6 +15,7 @@ from maya import cmds
 from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
 
 import TheKeyMachine.mods.settingsMod as settings
+import TheKeyMachine.core.openMayaUtils as omutils
 from TheKeyMachine.data import icons
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
@@ -41,6 +42,22 @@ def get_runner_enabled(runner_id, default=False):
 def set_runner_enabled(runner_id, enabled):
     controller = get_controller()
     controller.set_enabled(runner_id, enabled)
+
+
+def _emit_runner_triggered(manager, runner_id):
+    try:
+        manager.backgroundRunnerTriggered.emit(runner_id)
+    except Exception:
+        pass
+
+
+def _is_playing(manager=None):
+    if manager is not None and hasattr(manager, "is_playing"):
+        return bool(manager.is_playing())
+    try:
+        return bool(cmds.play(query=True, state=True))
+    except Exception:
+        return False
 
 
 def _get_overshoot_enabled():
@@ -222,18 +239,6 @@ def _selection_center():
     )
 
 
-def _set_attr_vector(node, attr, values):
-    if not node:
-        return False
-    try:
-        if not cmds.attributeQuery(attr, node=node, exists=True):
-            return False
-        cmds.setAttr("{}.{}".format(node, attr), values[0], values[1], values[2], type="double3")
-        return True
-    except Exception:
-        return False
-
-
 def _set_camera_center_of_interest(camera_transform, camera_shape, center):
     if not camera_transform or not camera_shape:
         return False
@@ -246,8 +251,7 @@ def _set_camera_center_of_interest(camera_transform, camera_shape, center):
             + (camera_position[1] - center[1]) ** 2
             + (camera_position[2] - center[2]) ** 2
         )
-        cmds.setAttr("{}.centerOfInterest".format(camera_shape), distance)
-        return True
+        return omutils.set_plug_double(camera_shape, "centerOfInterest", distance)
     except Exception:
         return False
 
@@ -263,16 +267,10 @@ def _set_camera_orbit_point_to_selection():
 
     changed = False
     for node in (camera_shape, camera_transform):
-        changed = _set_attr_vector(node, "tumblePivot", center) or changed
-        changed = _set_attr_vector(node, "tumblePivotTranslate", center) or changed
+        changed = omutils.set_plug_vector(node, "tumblePivot", center) or changed
+        changed = omutils.set_plug_vector(node, "tumblePivotTranslate", center) or changed
     changed = _set_camera_center_of_interest(camera_transform, camera_shape, center) or changed
-
-    if camera_transform:
-        try:
-            cmds.xform(camera_transform, worldSpace=True, preserve=True, rotatePivot=center)
-            changed = True
-        except Exception:
-            pass
+    changed = omutils.set_plug_vector(camera_transform, "rotatePivot", center) or changed
     return changed
 
 
@@ -304,6 +302,7 @@ class ChannelBoxSelectionHighlightRunner(QtCore.QObject):
             return
         self._has_selection = has_selection
         self._set_highlight_visible(has_selection)
+        _emit_runner_triggered(self._manager, CHANNELBOX_HIGHLIGHT_ID)
 
     def _set_highlight_visible(self, visible):
         if visible:
@@ -339,12 +338,16 @@ class ChannelBoxClearOnSelectionChangeRunner(QtCore.QObject):
         self._manager.disconnect_callbacks(self.RUNTIME_KEY)
 
     def _schedule_clear(self, *_args):
+        _emit_runner_triggered(self._manager, CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID)
         QtCore.QTimer.singleShot(0, _clear_channelbox_attribute_selection)
 
 
 class CameraOrbitSelectionRunner(QtCore.QObject):
     RUNTIME_KEY = "background_runner:camera_orbit_selection"
+    TIME_KEY = "background_runner:camera_orbit_selection_time"
+    PLAYBACK_KEY = "background_runner:camera_orbit_selection_playback"
     WATCH_KEY = "background_runner:camera_orbit_selection_watch"
+    TRANSFORM_SETTLE_MS = 180
 
     def __init__(self, manager, parent=None):
         super().__init__(parent or manager)
@@ -361,10 +364,11 @@ class CameraOrbitSelectionRunner(QtCore.QObject):
             key=self.RUNTIME_KEY,
             unique=True,
         )
+        self._connect_time_changed()
         self._manager.connect_signal(
-            self._manager.time_changed,
-            self._schedule_update,
-            key=self.RUNTIME_KEY,
+            self._manager.playbackStateChanged,
+            self._on_playback_state_changed,
+            key=self.PLAYBACK_KEY,
             unique=False,
         )
         self._refresh_watched_nodes()
@@ -372,24 +376,55 @@ class CameraOrbitSelectionRunner(QtCore.QObject):
 
     def stop(self):
         self._manager.disconnect_callbacks(self.RUNTIME_KEY)
+        self._manager.disconnect_callbacks(self.TIME_KEY)
+        self._manager.disconnect_callbacks(self.PLAYBACK_KEY)
         self._manager.disconnect_callbacks(self.WATCH_KEY)
         try:
             self._update_timer.stop()
         except Exception:
             pass
 
-    def _schedule_update(self, *_args):
+    def _connect_time_changed(self):
+        if _is_playing(self._manager):
+            self._manager.disconnect_callbacks(self.TIME_KEY)
+            return False
+        return self._manager.connect_signal(
+            self._manager.time_changed,
+            self._schedule_update,
+            key=self.TIME_KEY,
+            unique=True,
+        )
+
+    def _schedule_update(self, *_args, delay_ms=0, restart=False):
         if self._updating:
             return
-        if not self._update_timer.isActive():
-            self._update_timer.start(0)
+        if _is_playing(self._manager):
+            try:
+                self._update_timer.stop()
+            except Exception:
+                pass
+            return
+        if restart and self._update_timer.isActive():
+            self._update_timer.stop()
+        if restart or not self._update_timer.isActive():
+            self._update_timer.start(int(delay_ms))
 
     def _on_selection_changed(self, *_args):
         self._refresh_watched_nodes()
         self._schedule_update()
 
     def _on_watched_node_changed(self, *_args):
-        self._schedule_update()
+        self._schedule_update(delay_ms=self.TRANSFORM_SETTLE_MS, restart=True)
+
+    def _on_playback_state_changed(self, playing):
+        if playing:
+            self._manager.disconnect_callbacks(self.TIME_KEY)
+            try:
+                self._update_timer.stop()
+            except Exception:
+                pass
+            return
+        self._connect_time_changed()
 
     def _refresh_watched_nodes(self):
         self._manager.disconnect_callbacks(self.WATCH_KEY)
@@ -416,9 +451,12 @@ class CameraOrbitSelectionRunner(QtCore.QObject):
     def _update_orbit_point(self):
         if self._updating:
             return
+        if _is_playing(self._manager):
+            return
         self._updating = True
         try:
-            _set_camera_orbit_point_to_selection()
+            if _set_camera_orbit_point_to_selection():
+                _emit_runner_triggered(self._manager, CAMERA_ORBIT_SELECTION_ID)
         finally:
             self._updating = False
 

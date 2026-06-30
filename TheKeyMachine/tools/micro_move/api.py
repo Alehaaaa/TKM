@@ -1,10 +1,11 @@
-from maya import OpenMaya as om
+from maya.api import OpenMaya as om
 from maya import cmds, utils
 
 from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
+import TheKeyMachine.core.openMayaUtils as omutils
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import common as toolCommon
@@ -122,10 +123,9 @@ def micro_move_attribute_callback_function(msg, plug, other_plug, client_data):
 
 
 def add_micro_move_callback(object_name):
-    selection_list = om.MSelectionList()
-    selection_list.add(object_name)
-    mobject = om.MObject()
-    selection_list.getDependNode(0, mobject)
+    mobject = omutils.mobject_from_node(object_name)
+    if mobject is None:
+        return
 
     callback_id = om.MNodeMessage.addAttributeChangedCallback(mobject, micro_move_attribute_callback_function, object_name)
     micro_move_callback_ids.append(callback_id)
@@ -257,10 +257,9 @@ def micro_rotate_pack_funtion():
     global micro_rotate_selected_objects, micro_rotate_drivers
 
     def add_micro_rotate_callback(source_object, target_object):
-        selection_list = om.MSelectionList()
-        selection_list.add(source_object)
-        mobject = om.MObject()
-        selection_list.getDependNode(0, mobject)
+        mobject = omutils.mobject_from_node(source_object)
+        if mobject is None:
+            return
 
         def add_micro_rotate_dirty_callback(mobject, plug, client_data):
             if plug.partialName() in ("r", "rx", "ry", "rz"):

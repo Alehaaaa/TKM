@@ -782,12 +782,12 @@ def build_main_preferences_menu(
     preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(icons.settings), "Preferences")
     preferences_menu.addSection("Startup")
     preferences_menu.addAction(
-        QtGui.QIcon(icons.TheKeyMachine_icon),
+        QtGui.QIcon(icons.tkm_main),
         "Create a Shelf Button",
         toolbar.create_shelf_icon,
         description="Add a shelf button for showing or hiding the toolbar.",
         command_id="toolbar_add_shelf_button",
-        command_icon=icons.TheKeyMachine_icon,
+        command_icon=icons.tkm_main,
     )
 
     run_on_startup_action = preferences_menu.addAction(
@@ -859,6 +859,25 @@ def build_menu_for_shelf(command_id):
         return build_main_system_menu(toolbar)
     if toolbar and command_id == "main_dock_menu":
         return build_main_dock_menu(toolbar)
+    if toolbar and command_id == "TKM":
+        from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
+
+        def update_show_tooltips(value):
+            settings.set_setting("show_tooltips", value)
+            QFlatTooltipManager.enabled = value
+
+        def update_toolbar_icon_alignment(alignment_name):
+            toolWidgets.set_main_toolbar_icon_alignment(toolbar, alignment_name)
+
+        return build_main_settings_menu(
+            toolbar,
+            None,
+            show_tooltips=settings.get_setting("show_tooltips", True),
+            toolbar_alignment=toolWidgets.get_main_toolbar_icon_alignment(),
+            update_show_tooltips=update_show_tooltips,
+            update_toolbar_icon_alignment=update_toolbar_icon_alignment,
+            internet_connection=general.config.get("INTERNET_CONNECTION", True),
+        )
     if toolbar and command_id == "main_preferences_menu":
         from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 

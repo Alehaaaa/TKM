@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 from maya import cmds
 
 from TheKeyMachine.Qt import QtCore, QtWidgets  # type: ignore
+import TheKeyMachine.core.openMayaUtils as omutils
 
 try:
     from maya.api import OpenMaya as om  # type: ignore
@@ -135,6 +136,8 @@ class RuntimeManager(QtCore.QObject):
     eulerFilterChanged = QtCore.Signal(bool)
     nudgeValueChanged = QtCore.Signal(int)
     backgroundRunnerChanged = QtCore.Signal(str, bool)
+    backgroundRunnerTriggered = QtCore.Signal(str)
+    playbackStateChanged = QtCore.Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -155,6 +158,7 @@ class RuntimeManager(QtCore.QObject):
         self._ctrl_pressed = False
         self._shift_pressed = False
         self._alt_pressed = False
+        self._playback_active = False
 
         self._event_filter_installed = False
         self._background_runner_controller = None
@@ -173,6 +177,7 @@ class RuntimeManager(QtCore.QObject):
         self._install_selection_callback()
         self._install_time_changed_callback()
         self._install_undo_callback()
+        self._install_playback_state_callback()
         self._refresh_event_filter_state()
         self._start_background_runners()
 
@@ -223,6 +228,7 @@ class RuntimeManager(QtCore.QObject):
         self,
         *,
         event: Any = None,
+        condition: Any = None,
         key: str,
         callback: Callable[..., Any],
         run_once: bool = False,
@@ -240,7 +246,20 @@ class RuntimeManager(QtCore.QObject):
                 self._emit(key)
 
         try:
-            if isinstance(event, (list, tuple)) and len(event) == 2:
+            if condition is not None:
+                if isinstance(condition, (list, tuple)) and len(condition) == 2:
+                    job_id = cmds.scriptJob(
+                        conditionChange=(condition[0], _wrapped),
+                        runOnce=bool(run_once),
+                        killWithScene=bool(kill_with_scene),
+                    )
+                else:
+                    job_id = cmds.scriptJob(
+                        conditionChange=(condition, _wrapped),
+                        runOnce=bool(run_once),
+                        killWithScene=bool(kill_with_scene),
+                    )
+            elif isinstance(event, (list, tuple)) and len(event) == 2:
                 job_id = cmds.scriptJob(event=(event[0], _wrapped), runOnce=bool(run_once), killWithScene=bool(kill_with_scene))
             else:
                 job_id = cmds.scriptJob(event=(event, _wrapped), runOnce=bool(run_once), killWithScene=bool(kill_with_scene))
@@ -249,6 +268,9 @@ class RuntimeManager(QtCore.QObject):
 
         self._track_scriptjob(key, int(job_id))
         return int(job_id)
+
+    def is_playing(self) -> bool:
+        return bool(self._playback_active)
 
     def add_node_attribute_changed_callback(
         self,
@@ -261,14 +283,8 @@ class RuntimeManager(QtCore.QObject):
         if not om:
             return None
 
-        try:
-            if isinstance(node, om.MObject):
-                mobject = node
-            else:
-                selection_list = om.MSelectionList()
-                selection_list.add(str(node))
-                mobject = selection_list.getDependNode(0)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        mobject = omutils.mobject_from_node(node)
+        if mobject is None:
             return None
 
         def _wrapped(*args):
@@ -386,6 +402,31 @@ class RuntimeManager(QtCore.QObject):
 
         cb_id = om.MEventMessage.addEventCallback("timeChanged", _on_time_changed)
         self._track_om("time_changed", int(cb_id))
+
+    def _query_playback_state(self) -> bool:
+        try:
+            return bool(cmds.play(query=True, state=True))
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return False
+
+    def _install_playback_state_callback(self) -> None:
+        self._playback_active = self._query_playback_state()
+
+        def _on_playback_state_changed(*_args):
+            playing = self._query_playback_state()
+            if playing == self._playback_active:
+                return
+            self._playback_active = playing
+            try:
+                self.playbackStateChanged.emit(playing)
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+
+        self.add_scriptjob(
+            condition="playingBack",
+            key="playback_state",
+            callback=_on_playback_state_changed,
+        )
 
     def _install_undo_callback(self) -> None:
         if not om:

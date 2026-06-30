@@ -393,7 +393,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
 
         # Update the icon
         if anchor_widget and hasattr(anchor_widget, "setIcon"):
-            anchor_widget.setIcon(QtGui.QIcon(icons.settings_update))
+            anchor_widget.setIcon(QtGui.QIcon(icons.tkm_main_update))
 
         # If we are skipping updates and this isn't a forced check, don't do anything else
         if not force and settings.get_setting("skip_updates", False):
@@ -407,7 +407,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 anchor_widget,
                 title="Update available",
                 tooltip_template=template,
-                icon=icons.settings_update,
+                icon=icons.tkm_main_update,
                 buttons=_update_buttons(QFlatTooltipConfirm),
                 highlight="Install",
             )
@@ -417,7 +417,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 "Update available",
                 title=f"Update {latest_version} available",
                 message=_update_message(),
-                icon=icons.settings_update,
+                icon=icons.tkm_main_update,
                 buttons=_update_buttons(QFlatConfirmDialog),
                 highlight="Install",
             )
