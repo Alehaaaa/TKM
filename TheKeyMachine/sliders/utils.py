@@ -8,8 +8,12 @@ import maya.cmds as cmds
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 
+import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.mods.selectionMod as selectionMod
+import TheKeyMachine.core.openMayaUtils as omutils
+import TheKeyMachine.widgets.timeline as timelineWidgets
+from TheKeyMachine.tools import colors as toolColors
 
 
 @dataclass
@@ -141,7 +145,7 @@ def _ensure_key_between_neighbors(plug, curr):
         return False
 
 
-def resolve_keyframe_targets():
+def resolve_keyframe_targets(create_missing_keys=True):
     """Unified entry for resolving attribute plugs and affected times."""
     plugs, _src, time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
     if not plugs:
@@ -162,7 +166,8 @@ def resolve_keyframe_targets():
         elif time_range:
             times = cmds.keyframe(plug, q=True, time=(time_range[0], time_range[1]), timeChange=True) or [curr]
         else:
-            _ensure_key_between_neighbors(plug, curr)
+            if create_missing_keys:
+                _ensure_key_between_neighbors(plug, curr)
             times = [curr]
         affected[plug] = sorted(list(set(times)))
     return affected, time_range
@@ -204,6 +209,17 @@ class SliderSession:
         self.targets = SliderTargetContext()
         self.cache = SliderCaches()
         self._is_open = False
+        self.preview = False
+        self._tint_key = "slider_{}_range".format(self.mode)
+        self._tint_range = None
+
+    def begin_preview(self):
+        self.preview = True
+
+    def begin_commit(self):
+        self.restore_preview_start_values()
+        self.preview = False
+        self.ensure_undo_open()
 
     def ensure_undo_open(self):
         """Lazily open the undo chunk on the first operation."""
@@ -221,10 +237,12 @@ class SliderSession:
     def switch_mode(self, mode, title=None, description="", tooltip_template=None):
         if mode == self.mode:
             return
+        self.clear_tint()
         self.mode = mode
         self.title = title or self.title
         self.description = description
         self.tooltip_template = tooltip_template
+        self._tint_key = "slider_{}_range".format(self.mode)
         
         # If we switch modes mid-session, we keep the undo chunk open
         # but reset the resolved targets so they are re-calculated for the new mode.
@@ -234,6 +252,63 @@ class SliderSession:
         """Clear drag-scoped caches while keeping the undo chunk open."""
         self.targets.clear()
         self.cache.clear(keep_pose=True)
+        self._tint_range = None
+
+    def show_tint(self, timerange, color=None, center_line=False):
+        if not timerange:
+            return
+        try:
+            tint_range = (int(round(timerange[0])), int(round(timerange[1])))
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return
+        if self._tint_range == tint_range:
+            return
+        self._tint_range = tint_range
+        timelineWidgets.show_timeline_tint(
+            timerange=tint_range,
+            color=color or toolColors.TOOLBAR_GREEN,
+            duration_ms=None,
+            key=self._tint_key,
+            center_line=center_line,
+        )
+
+    def clear_tint(self):
+        if not self._tint_range:
+            return
+        runtime.get_runtime_manager().clear_managed_widget(self._tint_key)
+        self._tint_range = None
+
+    def _restore_plug_value_with_api(self, attr_full, time, value, use_direct_attr=False):
+        if not isinstance(value, (int, float)):
+            return
+        if use_direct_attr:
+            omutils.set_numeric_plug_value(attr_full, value)
+            return
+        for curve in selectionMod.get_anim_curves_from_plugs([attr_full]):
+            if omutils.set_anim_curve_key_value(curve, time, value):
+                return
+
+    def restore_preview_start_values(self):
+        """Put API-previewed values back to their cached start before the undoable commit."""
+        for (attr_full, time), data in self.cache.tween_frame_data.items():
+            self._restore_plug_value_with_api(
+                attr_full,
+                time,
+                getattr(data, "currentValue", None),
+                use_direct_attr=getattr(data, "use_direct_attr", False),
+            )
+
+        for (attr_full, time), data in self.cache.frame_data.items():
+            self._restore_plug_value_with_api(
+                attr_full,
+                time,
+                getattr(data, "original_value", None),
+                use_direct_attr=getattr(data, "use_direct_attr", False),
+            )
+
+        for curve, keyed_values in self.cache.original_keyframes.items():
+            for time, value in keyed_values.items():
+                omutils.set_anim_curve_key_value(curve, time, value)
 
     def snapshot_pose_buffer(self, affected_map):
         """Capture the current pose for modes that need an original-pose target."""
@@ -251,6 +326,8 @@ class SliderSession:
 
     def finish(self):
         """Close the undo chunk and clear all session-owned state."""
+        self.preview = False
+        self.clear_tint()
         if self._is_open:
             try:
                 cmds.undoInfo(closeChunk=True)

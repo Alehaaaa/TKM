@@ -29,9 +29,9 @@ except ImportError:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
 
-__version__ = "0.1.96"
+__version__ = "0.1.98"
 __stage__ = "beta"
-__build__ = "322"
+__build__ = "324"
 __codename__ = "Flat White"
 
 

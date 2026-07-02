@@ -159,11 +159,12 @@ class SliderButton(cw.TooltipMixin, QPushButton):
     def _update_tooltip(self):
         title = self._tooltip_title or "Value"
         value_label = "Set Frame" if self._frameButton else f"{self._percent}%"
-        self.setToolTipData(text=f"{title}: {value_label}", description=self._tooltip_description)
+        self.setToolTipData(text=f"{title}: {value_label}", description=self._tooltip_description, tooltip_template=getattr(self, "_tooltip_template", None))
 
-    def setTooltipInfo(self, title: str, description: str = ""):
+    def setTooltipInfo(self, title: str, description: str = "", tooltip_template=None):
         self._tooltip_title = title
         self._tooltip_description = description
+        self._tooltip_template = tooltip_template
         self._update_tooltip()
 
     @property
@@ -312,9 +313,10 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
         self._apply_stylesheet(thick=False)
 
-    def setTooltipInfo(self, title: str, description: str = ""):
+    def setTooltipInfo(self, title: str, description: str = "", tooltip_template=None):
         self._tooltip_title = title
         self._tooltip_description = description
+        self._tooltip_template = tooltip_template
         self._update_self_tooltip()
 
     def enterEvent(self, e):
@@ -329,14 +331,14 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._handle_hover = False
 
         if self._press_offset is not None and not self.isSliderDown():
-            self._reset()
+            self._finish_interaction()
 
         self.update()
         super().leaveEvent(e)
 
     def _update_self_tooltip(self, _v=None):
         title = self._tooltip_title or self._text
-        self.setToolTipData(text=title, description=self._tooltip_description)
+        self.setToolTipData(text=title, description=self._tooltip_description, tooltip_template=getattr(self, "_tooltip_template", None))
 
     @staticmethod
     def _looks_like_icon(value: str) -> bool:
@@ -373,18 +375,15 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
         # enter "active" visuals
         self._apply_stylesheet(thick=True)
-        if not self.isSliderDown():
+        if not self._is_active():
             self.started.emit()
 
         self.setValue(self.value() - inc)
-        self.moved.emit(self.percent())
 
         self._press_offset = True
 
     # --- internals --------------------------------------------------------------
-    def _reset(self):
-        self.finished.emit()
-
+    def _reset_visual_state(self):
         with ResetWithoutEmit(self):
             self._press_offset = None
             self._apply_stylesheet(thick=False)
@@ -392,6 +391,10 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._wheel_count = 0
         self._prev_wheel_direction = 0
         self.update()
+
+    def _finish_interaction(self):
+        self.finished.emit()
+        self._reset_visual_state()
 
     def _apply_stylesheet(self, *, thick: bool):
         h = self.handle_size()
@@ -495,7 +498,6 @@ QSlider::handle:horizontal {{
             rng = float(self.maximum() - self.minimum())
             self.setSliderPosition(int(round(self.minimum() + ratio * rng)))
             self._has_dragged = True
-            self.moved.emit(self.percent())
             e.accept()
             return
         super().mouseMoveEvent(e)
@@ -504,9 +506,7 @@ QSlider::handle:horizontal {{
         if e.button() == Qt.LeftButton and self.isSliderDown():
             self.setSliderDown(False)
             self._apply_stylesheet(thick=False)
-            self.finished.emit()
-
-            self._reset()
+            self._finish_interaction()
             self._press_offset = None
             return e.accept()
         super().mouseReleaseEvent(e)
@@ -518,11 +518,9 @@ QSlider::handle:horizontal {{
 
     def keyPressEvent(self, e):
         super().keyPressEvent(e)
-        self.moved.emit(self.percent())
 
     def keyReleaseEvent(self, e):
         super().keyReleaseEvent(e)
-        self.moved.emit(self.percent())
 
     def sliderChange(self, change):
         super().sliderChange(change)
@@ -636,6 +634,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         dragCommand: Optional[callable] = None,
         tooltipTitle: str = "",
         tooltipDescription: str = "",
+        tooltipTemplate = None,
         p: Optional[QLayout] = None,
     ):
         super().__init__(None)
@@ -649,6 +648,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._frameButtons = False
         self._tooltipTitle = tooltipTitle
         self._tooltipDescription = tooltipDescription
+        self._tooltipTemplate = tooltipTemplate
         self._dragCommand = None
         self._sliderSession = None
 
@@ -757,13 +757,15 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         # initial geometry & tooltip sync
         if tooltipTitle:
-            self.setTooltipInfo(tooltipTitle, tooltipDescription)
+            self.setTooltipInfo(tooltipTitle, tooltipDescription, tooltipTemplate)
         else:
             self._slider._update_self_tooltip()
 
         # Connect to global signal and initialize
+        manager = runtime.get_runtime_manager()
         self.setOvershoot(settings.get_setting("sliders_overshoot", False))
-        runtime.get_runtime_manager().overshootChanged.connect(self.setOvershoot)
+        manager.overshootChanged.connect(self.setOvershoot)
+        manager.undo_performed.connect(self._on_maya_undo_performed)
 
         # add to provided layout, if any
         if p is not None:
@@ -947,18 +949,19 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self.modeRequested.emit(self._current_mode.key, True)
         return True
 
-    def setTooltipInfo(self, title: str, description: str = ""):
+    def setTooltipInfo(self, title: str, description: str = "", tooltip_template=None):
         """Sets tooltip and status tip info for the widget and all its components."""
         self._tooltipTitle = title
         self._tooltipDescription = description
+        self._tooltipTemplate = tooltip_template
 
         # Update the mixin state for the main widget (handles statusTip)
-        cw.TooltipMixin.setTooltipInfo(self, title, description)
+        cw.TooltipMixin.setTooltipInfo(self, title, description, tooltip_template=tooltip_template)
 
         # Update inner components
-        self._slider.setTooltipInfo(title, description)
+        self._slider.setTooltipInfo(title, description, tooltip_template)
         for b in self._leftButtons + self._rightButtons:
-            b.setTooltipInfo(title, description)
+            b.setTooltipInfo(title, description, tooltip_template)
 
     ################################ GETTERS ################################
 
@@ -1004,7 +1007,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if mode.icon:
             self.setText(mode.icon)
 
-        self.setTooltipInfo(mode.label, mode.description)
+        self.setTooltipInfo(mode.label, mode.description, mode.tooltip_template)
         self.setWorldSpace(mode.worldSpace)
         self.setFrameButtonsVisible(mode.frameButtons)
         self._refresh_toolTipData()
@@ -1123,7 +1126,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def _on_drag_started(self):
         QFlatTooltipManager.hide()
-        self._begin_active_session(open_undo=True)
+        self._finish_active_session()
+        self._start_slider_interaction(preview=True)
 
         self.dragStarted.emit()
 
@@ -1132,24 +1136,28 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def _on_drag_moved(self, percent: float):
         self.valueChanged.emit(float(percent))
-        self._run_dragCommand(percent)
+        self._preview_slider_value(percent)
 
     def _on_drag_finished(self):
-        if not getattr(self._slider, "_has_dragged", True):
-            # Pure click-and-release with no drag movement
-            self.valueSet.emit(0.0)
-            self._run_dragCommand(0.0)
+        if self._sliderSession is None:
+            self._leftOverlay.show()
+            self._rightOverlay.show()
+            return
 
-        self.dragFinished.emit()
-        self._finish_active_session()
-
-        self._leftOverlay.show()
-        self._rightOverlay.show()
+        value = 0.0 if not getattr(self._slider, "_has_dragged", True) else self.percent()
+        try:
+            self.valueSet.emit(float(value))
+            self._commit_slider_value(value, require_existing_session=True)
+        finally:
+            self.dragFinished.emit()
+            self._finish_active_session()
+            self._leftOverlay.show()
+            self._rightOverlay.show()
 
     def _on_button_clicked(self, btn: SliderButton):
         try:
             self.valueSet.emit(float(btn.percent))
-            self._run_dragCommand(btn.percent)
+            self._commit_slider_value(btn.percent)
         finally:
             self.dragFinished.emit()
             self._finish_active_session()
@@ -1159,7 +1167,12 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._sliderSession.finish()
             self._sliderSession = None
 
-    def _begin_active_session(self, *, open_undo: bool = False):
+    def _on_maya_undo_performed(self):
+        self._finish_active_session()
+        if self._slider:
+            self._slider._reset_visual_state()
+
+    def _start_slider_interaction(self, *, preview: bool):
         mode = self.currentMode()
         if mode is None:
             return None
@@ -1174,18 +1187,35 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                 tooltip_template=getattr(mode, "tooltip_template", None),
             )
 
-        if open_undo:
-            self._sliderSession.ensure_undo_open()
+        if preview:
+            self._sliderSession.begin_preview()
 
         return self._sliderSession
 
-    def _run_dragCommand(self, value: float):
+    def _preview_slider_value(self, value: float):
         if self._dragCommand is None:
             return
 
-        session = self._begin_active_session(open_undo=True)
+        session = self._start_slider_interaction(preview=True)
         if session is None:
             return
+
+        try:
+            self._dragCommand(session.mode, value, session=session)
+        except Exception as exc:
+            self._on_drag_error(exc)
+
+    def _commit_slider_value(self, value: float, require_existing_session: bool = False):
+        if self._dragCommand is None:
+            return
+
+        if require_existing_session and self._sliderSession is None:
+            return
+
+        session = self._start_slider_interaction(preview=False)
+        if session is None:
+            return
+        session.begin_commit()
 
         try:
             self._dragCommand(session.mode, value, session=session)
@@ -1207,7 +1237,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if self._slider:
             try:
                 self._slider.setSliderDown(False)
-                self._slider._reset()
+                self._slider._reset_visual_state()
             except Exception:
                 pass
 
@@ -1225,7 +1255,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self.resetDefaultMode()
         # Finalize the interaction if we were wheeling when the mouse leaves the widget
         if self._slider and self._slider._is_active() and not self._slider.isSliderDown():
-            self._slider._reset()
+            self._slider._reset_visual_state()
         super().leaveEvent(e)
 
     def enterEvent(self, e):

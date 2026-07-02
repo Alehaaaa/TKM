@@ -63,7 +63,7 @@ def execute_blend_to_undo(session, percentage, world_space=False):
 
 
 def execute_connect_neighbors(session, curves, value):
-    return curve_ops.apply_connect_neighbors(session, curves, abs(value) / 100.0)
+    return curve_ops.apply_connect_neighbors(session, curves, value / 100.0)
 
 
 def execute_ease_in_out(session, curves, value):

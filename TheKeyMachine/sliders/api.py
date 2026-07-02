@@ -59,6 +59,22 @@ DISPATCH_MAPS = {
     },
 }
 
+COMMAND_ONLY_PREVIEW_TYPES = {"tangent", "time"}
+COMMAND_ONLY_PREVIEW_MODES = {
+    "blend_to_frame_ws",
+    "blend_to_neighbors_ws",
+    "blend_to_infinity_ws",
+    "tweener_worldspace",
+}
+
+
+def _can_preview_with_openmaya(type_key, mode, value, world_space=False):
+    if world_space or type_key in COMMAND_ONLY_PREVIEW_TYPES or mode in COMMAND_ONLY_PREVIEW_MODES:
+        return False
+    if mode == "simplify_bake" and value > 0:
+        return False
+    return True
+
 
 def _resolve_type_key(type_key, mode):
     """Return the registered slider family for a mode, falling back to the requested family."""
@@ -72,10 +88,12 @@ def _resolve_type_key(type_key, mode):
 
 def create_session(mode):
     """Create a per-interaction slider session for the given mode."""
+    mode_def = manager.get_slider_mode(mode)
+    tooltip_template = mode_def.get("tooltip_template") if mode_def else None
     return utils.SliderSession(
         mode,
         title=toolCommon.humanize_tool_name(mode),
-        tooltip_template=manager.SLIDER_MODE_TOOLTIPS.get(mode),
+        tooltip_template=tooltip_template,
     )
 
 
@@ -83,10 +101,12 @@ def _resolve_session(mode, session):
     """Ensures we have a valid session, switching its mode if necessary."""
     if session is None:
         return create_session(mode), True
+    mode_def = manager.get_slider_mode(mode)
+    tooltip_template = mode_def.get("tooltip_template") if mode_def else None
     session.switch_mode(
         mode,
         title=toolCommon.humanize_tool_name(mode),
-        tooltip_template=manager.SLIDER_MODE_TOOLTIPS.get(mode),
+        tooltip_template=tooltip_template,
     )
     return session, False
 
@@ -94,7 +114,7 @@ def _resolve_session(mode, session):
 def start_dragging(mode):
     """Public entry to start a drag session."""
     session = create_session(mode)
-    session.ensure_undo_open()
+    session.begin_preview()
     return session
 
 
@@ -109,17 +129,22 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
     type_key = _resolve_type_key(type_key, mode)
     session, should_finish = _resolve_session(mode, session)
     try:
+        if session.preview and not _can_preview_with_openmaya(type_key, mode, value, world_space=world_space):
+            return session
+
         dispatch = DISPATCH_MAPS.get(type_key, {})
         func = dispatch.get(mode)
 
         if not func:
             # Fallback for generic tween if mode not explicitly mapped
             if type_key == "tween":
-                session.ensure_undo_open()
+                if not session.preview:
+                    session.ensure_undo_open()
                 sliderMod.execute_tweener(session, value, world_space=world_space)
             return session
 
-        session.ensure_undo_open()
+        if not session.preview:
+            session.ensure_undo_open()
 
         # Call with appropriate signature based on type
         if type_key == "tween":

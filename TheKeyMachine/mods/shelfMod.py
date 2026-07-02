@@ -5,13 +5,15 @@ Shelf helpers for creating persistent TheKeyMachine shelf buttons.
 from __future__ import annotations
 
 import os
+import weakref
 
 from maya import cmds
 
-from TheKeyMachine.Qt import QtGui  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
 
 
 _MENU_BUILDERS = {}
+_OPEN_SHELF_MENUS = []
 
 
 def _current_shelf():
@@ -86,10 +88,44 @@ def create_tool_shelf_button(tool_id, tool_name, icon=None):
     )
 
 
+def _is_menu_open(menu):
+    try:
+        return bool(menu.isVisible() or menu.isTearOffMenuVisible())
+    except Exception:
+        return False
+
+
+def _release_closed_menu(menu_ref):
+    menu = menu_ref()
+    if menu is None or _is_menu_open(menu):
+        return
+    try:
+        _OPEN_SHELF_MENUS.remove(menu)
+    except ValueError:
+        pass
+
+
+def _keep_menu_alive(menu):
+    if menu not in _OPEN_SHELF_MENUS:
+        _OPEN_SHELF_MENUS.append(menu)
+    try:
+        if menu.property("tkm_shelf_lifetime_bound"):
+            return
+        menu.setProperty("tkm_shelf_lifetime_bound", True)
+        menu_ref = weakref.ref(menu)
+        menu.aboutToHide.connect(lambda: QtCore.QTimer.singleShot(0, lambda: _release_closed_menu(menu_ref)))
+        menu.destroyed.connect(lambda *_args: _release_closed_menu(menu_ref))
+    except Exception:
+        pass
+
+
 def _exec_menu(menu):
     if not menu or not menu.actions():
         return None
-    return menu.exec_(QtGui.QCursor.pos())
+    _keep_menu_alive(menu)
+    result = menu.exec_(QtGui.QCursor.pos())
+    QtCore.QTimer.singleShot(0, lambda: _release_closed_menu(weakref.ref(menu)))
+    return result
 
 
 def _build_toolbox_menu(setup_fn):

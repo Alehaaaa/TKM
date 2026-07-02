@@ -9,6 +9,7 @@ except ImportError:
 
 GRAPH_EDITOR_OUTLINER = "graphEditor1FromOutliner"
 GRAPH_EDITOR = "graphEditor1GraphEd"
+GRAPH_EDITOR_PANEL = "graphEditor1"
 
 
 def _ls_selected(long=False, ordered=False):
@@ -77,10 +78,27 @@ def get_selected_time_range():
 def get_selected_channels():
     try:
         main_channel_box = mel.eval("global string $gChannelBoxName; $temp=$gChannelBoxName;")
-        selected_channels = cmds.channelBox(main_channel_box, query=True, selectedMainAttributes=True)
-        return selected_channels or None
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return None
+        return []
+
+    if not main_channel_box:
+        return []
+
+    attrs = []
+
+    for query_flag in (
+        "selectedMainAttributes",
+        "selectedShapeAttributes",
+        "selectedHistoryAttributes",
+        "selectedOutputAttributes",
+    ):
+        try:
+            values = cmds.channelBox(main_channel_box, query=True, **{query_flag: True}) or []
+            attrs.extend(values)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+
+    return _unique(attrs)
 
 
 def _unique(items):
@@ -158,19 +176,32 @@ def get_anim_curves_for_nodes(nodes, include_shapes=False):
 
 
 def get_attribute_plugs_from_nodes(nodes):
+    nodes = _unique(nodes)
+    if not nodes:
+        return [], "none"
+
     selected_channels = get_selected_channels()
+
     if selected_channels:
-        plugs = ["{}.{}".format(obj, attr) for obj in nodes for attr in selected_channels]
-        source = "channel_box"
-    else:
         plugs = []
         for obj in nodes:
-            attrs = get_keyable_scalar_attributes(obj)
-            plugs.extend(["{}.{}".format(obj, attr) for attr in attrs])
-        source = "keyable_scalar"
+            for attr in selected_channels:
+                plug = "{}.{}".format(obj, attr)
+                if cmds.objExists(plug):
+                    plugs.append(plug)
 
-    return [plug for plug in plugs if plug and cmds.objExists(plug)], source
+        if plugs:
+            return _unique(plugs), "channel_box"
 
+    plugs = []
+    for obj in nodes:
+        attrs = get_keyable_scalar_attributes(obj)
+        for attr in attrs:
+            plug = "{}.{}".format(obj, attr)
+            if cmds.objExists(plug):
+                plugs.append(plug)
+
+    return _unique(plugs), "keyable_scalar"
 
 def is_plug_animated(plug):
     return bool(get_anim_curves_from_plugs([plug]))
@@ -281,11 +312,22 @@ def _resolve_graph_outliner_items(items):
 
 
 def get_graph_editor_selected_attribute_plugs():
+    if not is_graph_editor_visible():
+        return []
     anim_curves = cmds.keyframe(q=True, selected=True, name=True) or []
     return get_anim_curve_output_plugs(anim_curves)
 
 
+def is_graph_editor_visible():
+    try:
+        return GRAPH_EDITOR_PANEL in (cmds.getPanel(vis=True) or [])
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return False
+
+
 def get_graph_editor_outliner_items():
+    if not is_graph_editor_visible():
+        return []
     try:
         return cmds.selectionConnection(GRAPH_EDITOR_OUTLINER, query=True, object=True) or []
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
@@ -293,6 +335,8 @@ def get_graph_editor_outliner_items():
 
 
 def get_graph_editor_selected_curves():
+    if not is_graph_editor_visible():
+        return []
     try:
         selected_curves = cmds.keyframe(query=True, selected=True, name=True) or []
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
@@ -321,6 +365,8 @@ def get_graph_editor_selected_keyframes():
 
 
 def get_target_curves():
+    if not is_graph_editor_visible():
+        return []
     _plugs, curves = _resolve_graph_outliner_items(get_graph_editor_outliner_items())
     if curves:
         return curves
@@ -427,6 +473,8 @@ def _normalize_frames(frames):
 
 
 def get_graph_editor_selected_tangent_frames():
+    if not is_graph_editor_visible():
+        return []
     try:
         tangent_frames = cmds.keyTangent(query=True, selected=True, timeChange=True) or []
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
@@ -435,6 +483,8 @@ def get_graph_editor_selected_tangent_frames():
 
 
 def get_graph_editor_selected_frames(include_tangents=True):
+    if not is_graph_editor_visible():
+        return []
     try:
         frames = list(cmds.keyframe(query=True, selected=True, tc=True) or [])
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):

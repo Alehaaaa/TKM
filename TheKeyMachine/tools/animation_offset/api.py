@@ -48,6 +48,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._time_range = None
         self._tint_key = "animation_offset_range"
         self._selection_signature = ()
+        self._snapshot_time = None
         self._baseline = {}
         self._last_values = {}
         self._pending_manip_plugs = set()
@@ -304,6 +305,7 @@ class AnimationOffsetController(QtCore.QObject):
 
         selection = self._selection()
         self._selection_signature = self._selection_signature_value(selection)
+        self._snapshot_time = self._current_time()
         baseline = {}
 
         for obj in selection:
@@ -410,6 +412,11 @@ class AnimationOffsetController(QtCore.QObject):
             self._resnapshot(update_range=False)
             return
 
+        if self._snapshot_time != self._current_time():
+            self._pending_manip_plugs.clear()
+            self._resnapshot(update_range=False)
+            return
+
         current_values = self._capture_current_values()
         self._last_values = current_values
 
@@ -468,6 +475,7 @@ class AnimationOffsetController(QtCore.QObject):
         runtime.get_runtime_manager().clear_managed_widget(self._tint_key)
         self._state = "idle"
         self._selection_signature = ()
+        self._snapshot_time = None
         self._baseline = {}
         self._last_values = {}
         self._pending_manip_plugs.clear()

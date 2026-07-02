@@ -88,6 +88,15 @@ blend_tooltip_text = (
     ],
 )
 
+connect_neighbors_tooltip_text = (
+    "Connect to Neighbors",
+    [
+        "Connects a section of animation to a neighbor pose.",
+        "Go to the first or last frame of the section you want to connect and nudge the slider.",
+        "You can also select a specific range of keys.",
+    ],
+)
+
 blend_to_default_tooltip_text = (
     "Blend to Default",
     ["Blend the current value toward its default value."],

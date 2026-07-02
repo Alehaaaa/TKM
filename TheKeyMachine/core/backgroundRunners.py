@@ -239,38 +239,29 @@ def _selection_center():
     )
 
 
-def _set_camera_center_of_interest(camera_transform, camera_shape, center):
-    if not camera_transform or not camera_shape:
-        return False
-    try:
-        if not cmds.attributeQuery("centerOfInterest", node=camera_shape, exists=True):
-            return False
-        camera_position = cmds.xform(camera_transform, query=True, worldSpace=True, translation=True)
-        distance = math.sqrt(
-            (camera_position[0] - center[0]) ** 2
-            + (camera_position[1] - center[1]) ** 2
-            + (camera_position[2] - center[2]) ** 2
-        )
-        return omutils.set_plug_double(camera_shape, "centerOfInterest", distance)
-    except Exception:
-        return False
-
-
 def _set_camera_orbit_point_to_selection():
     center = _selection_center()
     if center is None:
         return False
 
     camera_transform, camera_shape = _current_camera_nodes()
-    if not camera_transform and not camera_shape:
+    if not camera_shape:
         return False
 
-    changed = False
-    for node in (camera_shape, camera_transform):
-        changed = omutils.set_plug_vector(node, "tumblePivot", center) or changed
-        changed = omutils.set_plug_vector(node, "tumblePivotTranslate", center) or changed
-    changed = _set_camera_center_of_interest(camera_transform, camera_shape, center) or changed
-    changed = omutils.set_plug_vector(camera_transform, "rotatePivot", center) or changed
+    changed = omutils.set_plug_vector(camera_shape, "tumblePivot", center)
+
+    if camera_transform:
+        try:
+            camera_position = cmds.xform(camera_transform, query=True, worldSpace=True, translation=True)
+            distance = math.sqrt(
+                (camera_position[0] - center[0]) ** 2
+                + (camera_position[1] - center[1]) ** 2
+                + (camera_position[2] - center[2]) ** 2
+            )
+            changed = omutils.set_plug_double(camera_shape, "centerOfInterest", distance) or changed
+        except Exception:
+            pass
+
     return changed
 
 
@@ -347,7 +338,7 @@ class CameraOrbitSelectionRunner(QtCore.QObject):
     TIME_KEY = "background_runner:camera_orbit_selection_time"
     PLAYBACK_KEY = "background_runner:camera_orbit_selection_playback"
     WATCH_KEY = "background_runner:camera_orbit_selection_watch"
-    TRANSFORM_SETTLE_MS = 180
+    UPDATE_DELAY_MS = 200
 
     def __init__(self, manager, parent=None):
         super().__init__(parent or manager)
@@ -395,7 +386,7 @@ class CameraOrbitSelectionRunner(QtCore.QObject):
             unique=True,
         )
 
-    def _schedule_update(self, *_args, delay_ms=0, restart=False):
+    def _schedule_update(self, *_args, delay_ms=UPDATE_DELAY_MS, restart=True):
         if self._updating:
             return
         if _is_playing(self._manager):
@@ -414,7 +405,7 @@ class CameraOrbitSelectionRunner(QtCore.QObject):
         self._schedule_update()
 
     def _on_watched_node_changed(self, *_args):
-        self._schedule_update(delay_ms=self.TRANSFORM_SETTLE_MS, restart=True)
+        self._schedule_update(delay_ms=self.UPDATE_DELAY_MS, restart=True)
 
     def _on_playback_state_changed(self, playing):
         if playing:

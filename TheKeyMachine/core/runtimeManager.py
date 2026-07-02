@@ -52,6 +52,21 @@ def _clear_state() -> None:
         pass
 
 
+def _scriptjob_exists(job_id: int) -> bool:
+    try:
+        return bool(cmds.scriptJob(exists=int(job_id)))
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return False
+
+
+def _kill_scriptjob(job_id: int) -> None:
+    try:
+        if _scriptjob_exists(int(job_id)):
+            cmds.scriptJob(kill=int(job_id), force=True)
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
+
+
 def cleanup_orphaned_callbacks() -> None:
     """
     Best-effort cleanup for callbacks that may have survived a python reload.
@@ -69,10 +84,7 @@ def cleanup_orphaned_callbacks() -> None:
 
     # scriptJobs
     for job_id in state.get("scriptjob", []) or []:
-        try:
-            cmds.scriptJob(kill=int(job_id), force=True)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
+        _kill_scriptjob(int(job_id))
 
     _clear_state()
 
@@ -318,10 +330,7 @@ class RuntimeManager(QtCore.QObject):
             self._remove_om_callback_id(cb_id)
 
         for job_id in list(self._scriptjobs.get(key, []) or []):
-            try:
-                cmds.scriptJob(kill=int(job_id), force=True)
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
+            _kill_scriptjob(int(job_id))
         self._scriptjobs.pop(key, None)
 
         for signal, handler in self._signal_connections.pop(key, []) or []:
@@ -719,10 +728,7 @@ class RuntimeManager(QtCore.QObject):
 
         # Remove scriptJobs
         for job_id in [job_id for ids in self._scriptjobs.values() for job_id in ids]:
-            try:
-                cmds.scriptJob(kill=int(job_id), force=True)
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
+            _kill_scriptjob(int(job_id))
         self._scriptjobs.clear()
 
         for connections in self._signal_connections.values():

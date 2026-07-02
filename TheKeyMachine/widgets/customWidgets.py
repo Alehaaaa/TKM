@@ -557,8 +557,8 @@ class TooltipMixin:
         self._has_tooltip = True
         self.setData(**kwargs)
 
-    def setTooltipInfo(self, title: str, description: str = ""):
-        self.setToolTipData(text=title, description=description)
+    def setTooltipInfo(self, title: str, description: str = "", tooltip_template=None):
+        self.setToolTipData(text=title, description=description, tooltip_template=tooltip_template)
 
     def enterEvent(self, event: QtCore.QEvent):
         # Refresh description and trigger Maya event
@@ -731,6 +731,231 @@ class QFlatBottomBar(QtWidgets.QFrame):
             if button.parentWidget() is None:
                 button.setParent(self)
             layout.addWidget(button)
+
+
+def _paste_to_node_leaf(node):
+    return str(node or "").split("|")[-1]
+
+
+def _paste_to_node_namespace(node):
+    leaf = _paste_to_node_leaf(node)
+    if ":" not in leaf:
+        return ""
+    return leaf.rsplit(":", 1)[0]
+
+
+def _paste_to_node_base_name(node):
+    return _paste_to_node_leaf(node).rsplit(":", 1)[-1]
+
+
+def _paste_to_node_with_namespace(base_name, namespace):
+    namespace = str(namespace or "").strip().strip(":")
+    return f"{namespace}:{base_name}" if namespace else base_name
+
+
+def _paste_to_scene_namespaces():
+    from maya import cmds
+
+    namespaces = set()
+    try:
+        namespaces.update(cmds.namespaceInfo(listOnlyNamespaces=True, recurse=True) or [])
+    except Exception:
+        pass
+    namespaces.discard("UI")
+    namespaces.discard("shared")
+    namespaces.discard(":")
+    return [""] + sorted(ns.strip(":") for ns in namespaces if ns is not None)
+
+
+def _paste_to_namespace_display(namespace):
+    return namespace or ""
+
+
+def _paste_to_resolve_node(source_node, namespace):
+    from maya import cmds
+
+    candidate = _paste_to_node_with_namespace(_paste_to_node_base_name(source_node), namespace)
+    if cmds.objExists(candidate):
+        return candidate
+    matches = cmds.ls(candidate, long=False) or []
+    return matches[0] if matches else None
+
+
+class PasteToDialog:
+    def __init__(self, saved_data, apply_callback, data_label="animation", parent=None):
+        from TheKeyMachine.widgets import customDialogs
+
+        self.saved_data = saved_data or {}
+        self.apply_callback = apply_callback
+        self.data_label = data_label
+        self._asset_rows = {}
+
+        title = f"Paste {data_label.title()} To..."
+        buttons = [
+            customDialogs.QFlatDialogButton(
+                f"Paste Insert {data_label.title()}",
+                callback=lambda: self._apply(insert=True),
+                icon=icons.paste_insert_animation if data_label == "animation" else icons.paste_pose,
+                highlight=True,
+            ),
+            customDialogs.QFlatDialogButton(
+                f"Paste Replace {data_label.title()}",
+                callback=lambda: self._apply(insert=False),
+                icon=icons.paste_animation if data_label == "animation" else icons.paste_pose,
+                highlight=True,
+            ),
+            customDialogs.QFlatDialogButton("Close", callback=self.close, icon=icons.close),
+        ]
+
+        self.dialog = customDialogs.QFlatDialog(parent=parent, buttons=buttons, closeButton=False)
+        self.dialog.setWindowTitle(title)
+        self.dialog.addWindowHeader(
+            self.dialog.root_layout,
+            text=title,
+            icon=icons.paste_animation if data_label == "animation" else icons.paste_pose,
+        )
+        self._build_content()
+        self.dialog.setBottomBar(buttons=buttons)
+        self.dialog.resize(DPI(590), DPI(390))
+
+    def show(self):
+        self.dialog.show()
+        self.dialog.raise_()
+
+    def close(self):
+        self.dialog.close()
+
+    def _build_content(self):
+        content = QtWidgets.QWidget(self.dialog)
+        layout = QtWidgets.QVBoxLayout(content)
+        layout.setContentsMargins(DPI(10), 0, DPI(10), DPI(10))
+        layout.setSpacing(DPI(6))
+
+        self.tree = QtWidgets.QTreeWidget(content)
+        self.tree.setObjectName("pasteToAssetsTree")
+        self.tree.setColumnCount(3)
+        self.tree.setHeaderLabels(["Assets", "Scene Namespace", "Custom Namespace"])
+        self.tree.setRootIsDecorated(False)
+        self.tree.setUniformRowHeights(True)
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setAllColumnsShowFocus(True)
+        self.tree.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tree.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self.tree.header().setStretchLastSection(True)
+        self.tree.setStyleSheet(
+            """
+            QTreeWidget#pasteToAssetsTree {
+                background-color: #282828;
+                alternate-background-color: #303030;
+                border: 1px solid #3b3b3b;
+                color: #bdbdbd;
+                outline: none;
+            }
+            QTreeWidget#pasteToAssetsTree::item:selected {
+                background-color: #4a4a4a;
+                color: #ffffff;
+            }
+            QTreeWidget#pasteToAssetsTree QLineEdit#pasteToCustomNamespace {
+                background-color: #bdbdbd;
+                border: none;
+                border-radius: 5px;
+                color: #202020;
+                padding: 2px 7px;
+                font-size: 11px;
+            }
+            QTreeWidget#pasteToAssetsTree QHeaderView::section {
+                background-color: #444444;
+                color: #c7c7c7;
+                border: none;
+                padding: 4px;
+                font-weight: bold;
+            }
+            """
+        )
+        layout.addWidget(self.tree, 1)
+        self.dialog.root_layout.addWidget(content)
+        self._populate_tree()
+
+    def _populate_tree(self):
+        scene_namespaces = _paste_to_scene_namespaces()
+        for source_node in sorted((self.saved_data or {}).keys()):
+            source_namespace = _paste_to_node_namespace(source_node)
+            target_node = _paste_to_resolve_node(source_node, source_namespace)
+            item = QtWidgets.QTreeWidgetItem([source_node, target_node or "", ""])
+            item.setData(0, QtCore.Qt.UserRole, source_node)
+            self.tree.addTopLevelItem(item)
+
+            combo = QtWidgets.QComboBox(self.tree)
+            combo.setObjectName("pasteToNamespaceCombo")
+            for scene_namespace in scene_namespaces:
+                combo.addItem(_paste_to_namespace_display(scene_namespace), scene_namespace)
+            if source_namespace in scene_namespaces:
+                combo.setCurrentIndex(scene_namespaces.index(source_namespace))
+            elif scene_namespaces:
+                combo.setCurrentIndex(0)
+
+            custom = QtWidgets.QLineEdit(self.tree)
+            custom.setObjectName("pasteToCustomNamespace")
+            custom.textChanged.connect(lambda _text, source=source_node: self._refresh_asset_preview(source))
+            combo.currentIndexChanged.connect(lambda _idx, source=source_node: self._refresh_asset_preview(source))
+
+            self.tree.setItemWidget(item, 1, combo)
+            self.tree.setItemWidget(item, 2, custom)
+            self._asset_rows[source_node] = {"combo": combo, "custom": custom, "item": item}
+
+        QtCore.QTimer.singleShot(0, self._resize_columns)
+
+    def _resize_columns(self):
+        viewport_width = max(0, self.tree.viewport().width())
+        if viewport_width <= 0:
+            return
+        first_width = int(viewport_width * 0.25)
+        second_width = int(viewport_width * 0.25)
+        self.tree.setColumnWidth(0, first_width)
+        self.tree.setColumnWidth(1, second_width)
+        self.tree.setColumnWidth(2, max(DPI(120), viewport_width - first_width - second_width))
+
+    def _selected_namespace(self, source_node):
+        widgets = self._asset_rows.get(source_node)
+        if not widgets:
+            return _paste_to_node_namespace(source_node)
+        custom_text = widgets["custom"].text().strip().strip(":")
+        if custom_text:
+            return custom_text
+        combo = widgets["combo"]
+        return combo.currentData() if combo.currentIndex() >= 0 else ""
+
+    def _refresh_asset_preview(self, source_node):
+        widgets = self._asset_rows.get(source_node)
+        if not widgets:
+            return
+        target_node = _paste_to_resolve_node(source_node, self._selected_namespace(source_node))
+        widgets["item"].setText(1, target_node or "")
+
+    def mappings(self):
+        resolved = []
+        missing = []
+        items = self.tree.selectedItems() or [self.tree.topLevelItem(index) for index in range(self.tree.topLevelItemCount())]
+        for item in items:
+            source_node = item.data(0, QtCore.Qt.UserRole)
+            target_namespace = self._selected_namespace(source_node)
+            target_node = _paste_to_resolve_node(source_node, target_namespace)
+            if target_node:
+                resolved.append((source_node, target_node))
+            else:
+                missing.append(_paste_to_node_with_namespace(_paste_to_node_base_name(source_node), target_namespace))
+        return resolved, missing
+
+    def _apply(self, insert=False):
+        from maya import cmds
+
+        mappings, _missing = self.mappings()
+        if not mappings:
+            cmds.warning(f"No matching {self.data_label} targets found")
+            return
+        if self.apply_callback(mappings, insert=insert):
+            self.close()
 
 
 class QFlatSpinBox(QtWidgets.QSpinBox):

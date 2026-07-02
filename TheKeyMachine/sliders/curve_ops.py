@@ -7,6 +7,7 @@ Operations that work directly on animation curves and their keys.
 import maya.cmds as cmds
 import random
 
+import TheKeyMachine.core.openMayaUtils as omutils
 from . import utils
 
 
@@ -39,6 +40,21 @@ def _cached_curve_values(session, curve, keys):
     return session.cache.original_keyframes[curve]
 
 
+def _cached_value_at_time(session, curve, time):
+    original_data = _cached_curve_values(session, curve, [time])
+    if time in original_data:
+        return original_data[time]
+    try:
+        values = cmds.keyframe(curve, query=True, eval=True, time=(time, time)) or []
+        if values:
+            value = float(values[0])
+            original_data[time] = value
+            return value
+    except Exception:
+        pass
+    return None
+
+
 def _selected_cached_values(session, curve, keys):
     original_data = _cached_curve_values(session, curve, keys)
     return {time: original_data[time] for time in keys if time in original_data}
@@ -60,8 +76,18 @@ def _neighbor_values(curve, time, target_times_set, all_keys, original_data):
     return p_time, p_val, n_time, n_val
 
 
-def _apply_value(curve, time, value):
+def _apply_value(session, curve, time, value):
+    if getattr(session, "preview", False):
+        omutils.set_anim_curve_key_value(curve, time, value)
+        return
     cmds.keyframe(curve, edit=True, time=(time, time), valueChange=value)
+
+
+def _set_connect_value(session, curve, time, value):
+    if getattr(session, "preview", False):
+        omutils.set_anim_curve_key_value(curve, time, value)
+        return
+    cmds.setKeyframe(curve, time=(time,), value=value)
 
 
 def _curve_default_value(curve):
@@ -133,7 +159,7 @@ def apply_smooth(session, curves=None, factor=1.0):
             if w_p + w_n > 0:
                 avg = (p_val * w_p + n_val * w_n) / (w_p + w_n)
                 res = orig_val + (avg - orig_val) * factor
-                _apply_value(curve, time, res)
+                _apply_value(session, curve, time, res)
 
 
 def apply_noise(session, curves=None, factor=1.0):
@@ -154,7 +180,7 @@ def apply_noise(session, curves=None, factor=1.0):
             if time in original_data:
                 init_val = original_data[time]
                 noise = noise_seeds[i] * factor
-                _apply_value(curve, time, init_val + noise)
+                _apply_value(session, curve, time, init_val + noise)
 
 
 def apply_wave(session, curves=None, factor=1.0):
@@ -171,7 +197,7 @@ def apply_wave(session, curves=None, factor=1.0):
             if time in original_data:
                 init_val = original_data[time]
                 direction = 1 if i % 2 == 0 else -1
-                _apply_value(curve, time, init_val + direction * factor)
+                _apply_value(session, curve, time, init_val + direction * factor)
 
 
 def apply_linear(session, curve_list=None, blend_factor=1.0):
@@ -198,7 +224,7 @@ def apply_linear(session, curve_list=None, blend_factor=1.0):
                     target_v = p_val + lerp_t * (n_val - p_val)
 
                 new_v = orig_v + blend_factor * (target_v - orig_v)
-                _apply_value(curve, t, new_v)
+                _apply_value(session, curve, t, new_v)
 
 
 def apply_flat(session, curve_list=None, blend_factor=1.0):
@@ -219,7 +245,7 @@ def apply_flat(session, curve_list=None, blend_factor=1.0):
             if t in original_data:
                 orig = original_data[t]
                 new_v = orig + blend_factor * (avg - orig)
-                _apply_value(curve, t, new_v)
+                _apply_value(session, curve, t, new_v)
 
 
 def apply_ease(session, curve_list=None, factor=0.5):
@@ -262,7 +288,7 @@ def apply_ease(session, curve_list=None, factor=0.5):
                 target = utils.lerp(first_v, last_v, e_pos)
                 orig_v = original_data[t]
                 new_v = utils.lerp(orig_v, target, f)
-                _apply_value(curve, t, new_v)
+                _apply_value(session, curve, t, new_v)
 
 
 def apply_scale(session, curves=None, factor=1.0):
@@ -283,7 +309,7 @@ def apply_scale(session, curves=None, factor=1.0):
             if t in original_data:
                 init = original_data[t]
                 new_v = avg + (init - avg) * factor
-                _apply_value(curve, t, new_v)
+                _apply_value(session, curve, t, new_v)
 
 
 def apply_scale_selection(session, curves, factor):
@@ -305,7 +331,7 @@ def apply_scale_from_pivot(session, curves=None, pivot_getter=None, factor=1.0):
         if pivot is None:
             continue
         for t, value in selected.items():
-            _apply_value(curve, t, pivot + (value - pivot) * factor)
+            _apply_value(session, curve, t, pivot + (value - pivot) * factor)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -338,11 +364,106 @@ def apply_pull_push(session, curves=None, amount=0.0):
                     pivot = p_val + lerp_t * (n_val - p_val)
 
                 new_v = pivot + (orig_v - pivot) * factor
-                _apply_value(curve, t, new_v)
+                _apply_value(session, curve, t, new_v)
+
+
+def _selected_tint_range(target_times_per_curve):
+    frames = []
+    for keys in (target_times_per_curve or {}).values():
+        frames.extend(keys or [])
+    if not frames:
+        return None
+    return min(frames), max(frames)
+
+
+def _connect_neighbor_tint_range(direction, current_time, neighbor_times):
+    candidates = [time for time in neighbor_times if time is not None]
+    if not candidates:
+        return None
+    if direction < 0:
+        neighbor = min(candidates)
+    else:
+        neighbor = max(candidates)
+    return min(current_time, neighbor), max(current_time, neighbor)
+
+
+def _implicit_connect_block(direction, current_time, all_keys):
+    left_keys = [time for time in all_keys if time < current_time]
+    right_keys = [time for time in all_keys if time > current_time]
+
+    if direction < 0:
+        if not left_keys:
+            return [], None
+        next_time = right_keys[0] if right_keys else current_time
+        block = [current_time]
+        block.extend(time for time in all_keys if current_time < time <= next_time)
+        return sorted(set(block)), left_keys[-1]
+
+    if not right_keys:
+        return [], None
+    previous_time = left_keys[-1] if left_keys else current_time
+    block = [time for time in all_keys if previous_time <= time < current_time]
+    block.append(current_time)
+    return sorted(set(block)), right_keys[0]
 
 
 def apply_connect_neighbors(session, curves, amount):
-    apply_linear(session, curves, max(0.0, amount))
+    """Shift the affected block vertically so its edge connects to a neighbor."""
+    resolved_curves, target_times_per_curve = _resolve_targets_for_session(session)
+    direction = -1 if amount < 0 else 1
+    factor = min(1.0, max(0.0, abs(amount)))
+    current_time = float(cmds.currentTime(query=True))
+    has_selected_range = bool(session.targets.has_graph_keys or session.targets.time_range)
+    neighbor_tint_times = []
+
+    if has_selected_range:
+        session.show_tint(session.targets.time_range or _selected_tint_range(target_times_per_curve))
+
+    for curve in resolved_curves:
+        resolved_keys = sorted(float(t) for t in (target_times_per_curve.get(curve, []) or []))
+        if not resolved_keys:
+            continue
+
+        original_data = _cached_curve_values(session, curve, resolved_keys)
+        _cached_value_at_time(session, curve, current_time)
+        all_keys = sorted(original_data.keys())
+
+        if has_selected_range:
+            keys = resolved_keys
+            target_times_set = set(keys)
+            if direction < 0:
+                anchor_time = min(keys)
+                neighbor_time, _right_time = utils.get_block_neighbors(anchor_time, target_times_set, all_keys)
+            else:
+                anchor_time = max(keys)
+                _left_time, neighbor_time = utils.get_block_neighbors(anchor_time, target_times_set, all_keys)
+        else:
+            keys, neighbor_time = _implicit_connect_block(direction, current_time, all_keys)
+            anchor_time = current_time
+
+        for time in keys:
+            _cached_value_at_time(session, curve, time)
+
+        if neighbor_time is None or neighbor_time == anchor_time:
+            continue
+
+        anchor_value = _cached_value_at_time(session, curve, anchor_time)
+        neighbor_value = _cached_value_at_time(session, curve, neighbor_time)
+        if anchor_value is None or neighbor_value is None:
+            continue
+
+        if not has_selected_range:
+            neighbor_tint_times.append(neighbor_time)
+
+        offset = (neighbor_value - anchor_value) * factor
+        for time in keys:
+            value = _cached_value_at_time(session, curve, time)
+            if value is None:
+                continue
+            _set_connect_value(session, curve, time, value + offset)
+
+    if not has_selected_range:
+        session.show_tint(_connect_neighbor_tint_range(direction, current_time, neighbor_tint_times))
 
 
 def apply_gap_stitcher(session, curves, amount):

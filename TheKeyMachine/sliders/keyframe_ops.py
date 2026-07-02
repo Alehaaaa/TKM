@@ -6,6 +6,8 @@ Tweening and blending operations translated from keyToolsMod.
 
 import maya.cmds as cmds
 
+import TheKeyMachine.core.openMayaUtils as omutils
+import TheKeyMachine.mods.selectionMod as selectionMod
 from . import utils
 from .utils import TweenFrameData, BlendFrameData
 
@@ -32,7 +34,7 @@ def _right_frame_from_time_range(time_range):
 def _resolve_keyframe_targets_for_session(session):
     """Cache the resolved keyframe target map on the session."""
     if not session.targets.resolved:
-        affected_map, time_range = utils.resolve_keyframe_targets()
+        affected_map, time_range = utils.resolve_keyframe_targets(create_missing_keys=not getattr(session, "preview", False))
         session.targets.affected_map = affected_map
         session.targets.time_range = time_range
         session.targets.resolved = True
@@ -84,8 +86,11 @@ def _clamp_numeric_attr_value(attr_full, value):
     return value
 
 
-def _set_attr_value(attr_full, value):
+def _set_attr_value(attr_full, value, preview=False):
     value = _clamp_numeric_attr_value(attr_full, value)
+    if preview:
+        omutils.set_numeric_plug_value(attr_full, value)
+        return
     try:
         cmds.setAttr(attr_full, float(value))
         return
@@ -97,10 +102,20 @@ def _set_attr_value(attr_full, value):
         pass
 
 
-def _apply_cached_value(attr_full, value, current_time, use_direct_attr=False):
+def _set_keyed_value_with_openmaya(attr_full, current_time, value):
+    for curve in selectionMod.get_anim_curves_from_plugs([attr_full]):
+        if omutils.set_anim_curve_key_value(curve, current_time, value):
+            return True
+    return False
+
+
+def _apply_cached_value(session, attr_full, value, current_time, use_direct_attr=False):
     value = _clamp_numeric_attr_value(attr_full, value)
     if use_direct_attr:
-        _set_attr_value(attr_full, value)
+        _set_attr_value(attr_full, value, preview=getattr(session, "preview", False))
+        return
+    if getattr(session, "preview", False):
+        _set_keyed_value_with_openmaya(attr_full, current_time, value)
         return
     try:
         cmds.setKeyframe(attr_full, time=(current_time,), value=float(value), absolute=True)
@@ -325,7 +340,7 @@ def apply_tween(session, value, world_space=False):
                 cmds.setKeyframe(obj, time=time, respectKeyable=True)
             else:
                 new_v = utils.lerp(prev_v, next_v, t)
-                _apply_cached_value(attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+                _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
     finally:
         if world_space and cmds.currentTime(query=True) != initial_time:
             cmds.currentTime(initial_time, edit=True)
@@ -403,7 +418,7 @@ def apply_blend_to_neighbors(session, percentage, world_space=False):
                 continue
 
         new_v = utils.lerp_towards(left_target, right_target, t, orig)
-        _apply_cached_value(attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+        _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
 
 
 def apply_blend_to_ease(session, percentage, world_space=False):
@@ -437,7 +452,7 @@ def apply_blend_to_ease(session, percentage, world_space=False):
         left_target = utils.lerp(prev_v, next_v, ease_in)
         right_target = utils.lerp(prev_v, next_v, ease_out)
         new_v = utils.lerp_towards(left_target, right_target, blend, orig)
-        _apply_cached_value(attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+        _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
 
 
 def apply_blend_to_default(session, percentage, world_space=False):
@@ -490,7 +505,7 @@ def apply_blend_to_default(session, percentage, world_space=False):
         mirrored = (2.0 * orig) - default_value
         new_value = utils.lerp_towards(mirrored, default_value, t, orig)
 
-        _apply_cached_value(attr_full, new_value, current_time, use_direct_attr=cache.use_direct_attr)
+        _apply_cached_value(session, attr_full, new_value, current_time, use_direct_attr=cache.use_direct_attr)
 
 
 def apply_blend_to_key(session, percentage, objs=None):
@@ -548,7 +563,7 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
             if _apply_world_space_blend(attr_full, time, target_f, t):
                 continue
         new_v = utils.lerp_towards(cache.leftValue, cache.rightValue, t, orig)
-        _apply_cached_value(attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+        _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
 
 
 def apply_blend_to_infinity(session, percentage, world_space=False):
@@ -585,7 +600,7 @@ def apply_blend_to_infinity(session, percentage, world_space=False):
             continue
 
         new_v = utils.lerp_towards(left_target, right_target, t, orig)
-        _apply_cached_value(attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+        _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
 
 
 def apply_blend_to_buffer(session, percentage, world_space=False):
@@ -619,7 +634,7 @@ def apply_blend_to_buffer(session, percentage, world_space=False):
             continue
         mirror_value = (2.0 * orig) - buffer_value
         new_value = utils.lerp_towards(mirror_value, buffer_value, t, orig)
-        _apply_cached_value(attr_full, new_value, current_time, use_direct_attr=cache.use_direct_attr)
+        _apply_cached_value(session, attr_full, new_value, current_time, use_direct_attr=cache.use_direct_attr)
 
 
 def apply_blend_to_undo(session, percentage, world_space=False):

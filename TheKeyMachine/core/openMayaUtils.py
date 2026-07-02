@@ -12,6 +12,11 @@ try:
 except ImportError:  # pragma: no cover
     om = None
 
+try:
+    from maya.api import OpenMayaAnim as oma  # type: ignore
+except ImportError:  # pragma: no cover
+    oma = None
+
 
 def is_available():
     return om is not None
@@ -66,6 +71,74 @@ def set_plug_double(node, attr, value, tolerance=0.000001):
         if abs(float(plug.asDouble()) - value) <= tolerance:
             return False
         plug.setDouble(value)
+        return True
+    except Exception:
+        return False
+
+
+def set_numeric_plug_value(plug_name, value, tolerance=0.000001):
+    try:
+        node, attr = str(plug_name).split(".", 1)
+    except ValueError:
+        return False
+    plug = find_plug(node, attr)
+    if plug is None:
+        return False
+    try:
+        value = float(value)
+        if abs(float(plug.asDouble()) - value) > tolerance:
+            plug.setDouble(value)
+        return True
+    except Exception:
+        return False
+
+
+def _anim_curve_fn(curve):
+    if om is None or oma is None or not curve:
+        return None
+    mobject = mobject_from_node(curve)
+    if mobject is None:
+        return None
+    try:
+        if not mobject.hasFn(om.MFn.kAnimCurve):
+            return None
+        return oma.MFnAnimCurve(mobject)
+    except Exception:
+        return None
+
+
+def _time_unit():
+    if om is None:
+        return None
+    try:
+        return om.MTime.uiUnit()
+    except Exception:
+        return om.MTime.kFilm
+
+
+def _find_anim_key_index(fn, time):
+    if om is None or fn is None:
+        return None
+    try:
+        target = om.MTime(float(time), _time_unit())
+        num_keys = fn.numKeys() if callable(fn.numKeys) else fn.numKeys
+        for index in range(num_keys):
+            if abs(fn.input(index).value - target.value) <= 0.000001:
+                return index
+    except Exception:
+        return None
+    return None
+
+
+def set_anim_curve_key_value(curve, time, value, tolerance=0.000001):
+    fn = _anim_curve_fn(curve)
+    index = _find_anim_key_index(fn, time)
+    if index is None:
+        return False
+    try:
+        value = float(value)
+        if abs(float(fn.value(index)) - value) > tolerance:
+            fn.setValue(index, value)
         return True
     except Exception:
         return False

@@ -114,11 +114,9 @@ def resolve_status_metadata(title="", description="", tooltip_template=None, sta
 
 def format_tool_label(title, description="", prefix=UNDO_PREFIX):
     clean_title = clean_tool_text(title) or "Tool"
-    clean_desc = get_tool_summary(description)
-    label = clean_title if not clean_desc else f"{clean_title} - {clean_desc}"
     if prefix:
-        return f"{prefix}: {label}"
-    return label
+        return f"{prefix} - {clean_title}"
+    return clean_title
 
 
 @lru_cache(maxsize=256)
@@ -167,13 +165,13 @@ def resolve_undo_metadata(tool_id=None, title=None, description="", tooltip_temp
 
 
 def make_undo_chunk_name(tool_id=None, title=None, description="", tooltip_template=None):
-    resolved_title, resolved_description = resolve_undo_metadata(
+    resolved_title, _resolved_description = resolve_undo_metadata(
         tool_id=tool_id,
         title=title,
         description=description,
         tooltip_template=tooltip_template,
     )
-    return format_tool_label(resolved_title, resolved_description)
+    return format_tool_label(resolved_title)
 
 
 def open_undo_chunk(chunk_name=None):

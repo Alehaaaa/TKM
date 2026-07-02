@@ -42,6 +42,7 @@ import TheKeyMachine.core.runtimeManager as runtime
 
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.timeline as timelineWidgets
+import TheKeyMachine.widgets.customWidgets as customWidgets
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.mods.settingsMod as settings
@@ -65,6 +66,7 @@ BAKE_UNDO_HELP = {
     4: ("Bake on Fours", helper.bake_animation_4_tooltip_text),
 }
 _hotkey_key_clipboard_start_frame = None
+_paste_to_dialog = None
 
 
 # _____________________________________________________ General _______________________________________________________________#
@@ -1062,17 +1064,25 @@ def deleteStaticCurves():
 
 
 @contextmanager
-def _animation_command_context(label, tint_key, default_mode="all_animation", timerange=None):
-    """Wrap animation hotkey commands with the shared undo chunk and timeline tint."""
+def _animation_command_context(label, tint_key=None, default_mode="all_animation", timerange=None, tint=True):
+    """Wrap animation hotkey commands with the shared undo chunk.
+
+    tint=False disables the timeline/context tint for commands that should feel silent.
+    """
     tint_session = None
     chunk_opened = False
+
     try:
-        chunk_opened = toolCommon.open_undo_chunk(label)
-        if timerange is not None:
-            tint_session = _begin_timeline_tint(timerange, tint_key)
-        else:
-            tint_session = _begin_timeline_context_tint(default_mode, tint_key)
+        chunk_opened = toolCommon.open_undo_chunk(toolCommon.make_undo_chunk_name(title=label))
+
+        if tint:
+            if timerange is not None:
+                tint_session = _begin_timeline_tint(timerange, tint_key)
+            else:
+                tint_session = _begin_timeline_context_tint(default_mode, tint_key)
+
         yield
+
     finally:
         try:
             if chunk_opened:
@@ -1093,6 +1103,17 @@ def _selection_time_kwargs(time_context):
 def _resolve_key_command_targets(default_mode="all_animation", include_shapes=True):
     """Return the selection context in the shapes most key-edit commands need."""
     target_info = resolve_tool_targets(default_mode=default_mode, ordered_selection=True, long_names=True)
+    channel_plugs, channel_source = selectionMod.get_attribute_plugs_from_nodes(selectionMod.get_selected_objects(long=True))
+    if channel_source == "channel_box" and channel_plugs:
+        target_info = dict(target_info)
+        target_info["target_plugs"] = _unique(channel_plugs)
+        target_info["target_objects"] = selectionMod.object_names_from_plugs(channel_plugs)
+        target_info["selected_channels"] = selectionMod.attribute_names_from_plugs(channel_plugs)
+        target_info["selected_curves"] = selectionMod.get_anim_curves_from_plugs(channel_plugs)
+        target_info["selected_keyframes"] = []
+        target_info["source"] = "channel_box"
+        target_info["has_graph_keys"] = False
+
     target_plugs = _unique(target_info.get("target_plugs"))
     selected_objects = _unique(target_info.get("target_objects"))
     selected_channels = _unique(target_info.get("selected_channels"))
@@ -1118,6 +1139,8 @@ def _curves_for_key_selection(target_info=None, include_shapes=True):
 
     target_plugs = _unique(target_info.get("target_plugs"))
     curves.extend(selectionMod.get_anim_curves_from_plugs(target_plugs))
+    if _is_explicit_channel_source(target_info.get("source")):
+        return _unique(curves)
 
     selected_objects = _unique(target_info.get("target_objects"))
     curves.extend(selectionMod.get_anim_curves_for_nodes(selected_objects, include_shapes=include_shapes))
@@ -1209,28 +1232,77 @@ def _filter_curves_preserving_selection(curves, filter_name, command_label, targ
         _restore_key_selection_context(selection_context)
 
 
-def _run_key_command(command, command_name, default_mode="all_animation", **base_kwargs):
-    target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(default_mode=default_mode)
+def _run_key_command(
+    command,
+    command_name,
+    default_mode="all_animation",
+    **base_kwargs
+):
+    target_info, target_plugs, selected_objects, _selected_channels = _resolve_key_command_targets(
+        default_mode=default_mode,
+        include_shapes=False,
+    )
 
-    if not target_plugs and not selected_objects and not target_info.get("has_graph_keys"):
+    has_graph_keys = bool(target_info.get("has_graph_keys"))
+    time_context = target_info.get("time_context")
+    source = target_info.get("source")
+
+    target_plugs = _unique(target_plugs)
+    selected_objects = _unique(selected_objects)
+
+    if not target_plugs and not selected_objects and not has_graph_keys:
         return wutil.make_inViewMessage("Select at least one object, channel, or key")
 
-    time_context = target_info.get("time_context")
-    with _animation_command_context(command_name, command_name, default_mode=default_mode):
-        if target_info.get("has_graph_keys"):
-            kwargs = dict(base_kwargs)
+    chunk_opened = False
+
+    try:
+        chunk_opened = toolCommon.open_undo_chunk(toolCommon.make_undo_chunk_name(tool_id=command_name))
+
+        kwargs = dict(base_kwargs)
+
+        if has_graph_keys:
             kwargs.setdefault("animation", "keys")
             return command(**kwargs)
 
-        kwargs = dict(base_kwargs)
         kwargs.update(_selection_time_kwargs(time_context))
 
-        if target_plugs:
-            return command(target_plugs, **kwargs)
+        if default_mode == "current_frame" and not _has_key_time_filter(kwargs):
+            frame = cmds.currentTime(query=True)
+            kwargs["time"] = (frame, frame)
 
-        if selected_channels:
-            kwargs["attribute"] = selected_channels
-        return command(selected_objects, **kwargs)
+        if source == "channel_box" and target_plugs:
+            return _run_command_on_plugs(command, target_plugs, **kwargs)
+
+        targets = target_plugs if _is_explicit_channel_source(source) else selected_objects
+        if not targets:
+            targets = target_plugs or selected_objects
+        return command(targets, **kwargs)
+
+    finally:
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
+
+
+def _has_key_time_filter(kwargs):
+    return any(key in kwargs for key in ("time", "index", "float"))
+
+
+def _is_explicit_channel_source(source):
+    return source in (
+        "channel_box",
+        "graph_editor",
+        "graph_editor_outliner",
+    )
+
+
+def _run_command_on_plugs(command, plugs, **kwargs):
+    result = None
+    for plug in plugs or []:
+        if not plug or "." not in plug:
+            continue
+        node, attr = plug.rsplit(".", 1)
+        result = command(node, attribute=attr, **kwargs)
+    return result
 
 
 def apply_smart_euler_filter(*args):
@@ -1270,7 +1342,12 @@ def cut_keys(*args):
 
 
 def delete_keys(*args):
-    return _run_key_command(cmds.cutKey, "hotkey_delete_keys", clear=True)
+    return _run_key_command(
+        cmds.cutKey,
+        "hotkey_delete_keys",
+        default_mode="current_frame",
+        clear=True,
+    )
 
 
 def paste_keys(*args):
@@ -1448,45 +1525,116 @@ def _set_key_on_curve_preserving_tangent(curve, frame):
     return True
 
 
+def _set_selected_graph_editor_curves_current_time():
+    curves = _unique(selectionMod.get_graph_editor_selected_curves())
+    if not curves:
+        return False
+    frame = cmds.currentTime(query=True)
+    keyed = False
+    for curve in curves:
+        keyed = _set_key_on_curve_preserving_tangent(curve, frame) or keyed
+    return keyed
+
+
 def set_smart_key(*args):
     target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(
-        default_mode="current_frame", include_shapes=False
+        default_mode="current_frame",
+        include_shapes=False,
     )
-    if not target_plugs and not selected_objects:
-        return wutil.make_inViewMessage("Select at least one object or channel")
 
-    curves = _curves_for_key_selection(target_info, include_shapes=False)
-    if not curves:
-        return wutil.make_inViewMessage("No animated curves found")
+    selected_objects = _unique(selected_objects)
+    target_plugs = _unique(target_plugs)
 
     frames = _frames_for_key_time_context(target_info["time_context"])
-    with _animation_command_context("Set Smart Key", "hotkey_set_smart_key", timerange=(frames[0], frames[-1])):
-        keyed = False
-        for curve in curves:
-            for frame in frames:
-                keyed = _set_key_on_curve_preserving_tangent(curve, frame) or keyed
+    source = target_info.get("source")
+
+    with _animation_command_context(
+        "Set Smart Key",
+        tint=False,
+    ):
+        keyed = _set_selected_graph_editor_curves_current_time()
+
+        if not keyed and _is_explicit_channel_source(source) and target_plugs:
+            if source == "channel_box":
+                for plug in target_plugs:
+                    if not plug or "." not in plug:
+                        continue
+
+                    node, attr = plug.rsplit(".", 1)
+
+                    try:
+                        for frame in frames:
+                            cmds.setKeyframe(node, attribute=attr, time=(frame,))
+                            keyed = True
+                    except (RuntimeError, ValueError, TypeError):
+                        pass
+            else:
+                curves = _curves_for_key_selection(target_info, include_shapes=False)
+                curve_frames = frames
+                if source in ("graph_editor", "graph_editor_outliner") and not target_info.get("selected_keyframes"):
+                    curve_frames = (cmds.currentTime(query=True),)
+
+                for curve in curves:
+                    for frame in curve_frames:
+                        keyed = _set_key_on_curve_preserving_tangent(curve, frame) or keyed
+
+        elif not keyed:
+            if not selected_objects:
+                return wutil.make_inViewMessage("Select at least one object")
+
+            curves = _curves_for_key_selection(target_info, include_shapes=False)
+            for curve in curves:
+                for frame in frames:
+                    keyed = _set_key_on_curve_preserving_tangent(curve, frame) or keyed
+
+            if not keyed and target_plugs:
+                for plug in target_plugs:
+                    if not plug or "." not in plug:
+                        continue
+                    node, attr = plug.rsplit(".", 1)
+                    try:
+                        for frame in frames:
+                            cmds.setKeyframe(node, attribute=attr, time=(frame,))
+                            keyed = True
+                    except (RuntimeError, ValueError, TypeError):
+                        pass
+
         if not keyed:
-            return wutil.make_inViewMessage("No animated curves found")
+            return wutil.make_inViewMessage("No keyable channels found")
 
 
 def set_smart_key_all_channels(*args):
     target_info, _target_plugs, selected_objects, _selected_channels = _resolve_key_command_targets(
-        default_mode="current_frame", include_shapes=False
+        default_mode="current_frame",
+        include_shapes=False,
     )
-    if not selected_objects:
-        return wutil.make_inViewMessage("Select at least one object")
+
+    selected_objects = _unique(selected_objects)
 
     frames = _frames_for_key_time_context(target_info["time_context"])
+
     with _animation_command_context(
         "Set Smart Key All Channels",
-        "hotkey_set_smart_key_all_channels",
-        timerange=(frames[0], frames[-1]),
+        tint=False,
     ):
+        if not selected_objects:
+            return wutil.make_inViewMessage("Select at least one object")
+
+        keyed = False
         for obj in selected_objects:
             attrs = selectionMod.get_keyable_scalar_attributes(obj)
-            if attrs:
+            if not attrs:
+                continue
+
+            try:
                 for frame in frames:
-                    cmds.setKeyframe(obj, attribute=attrs, time=(frame,), insert=True)
+                    cmds.setKeyframe(obj, attribute=attrs, time=(frame,))
+                    keyed = True
+            except (RuntimeError, ValueError, TypeError):
+                pass
+
+        if not keyed:
+            return wutil.make_inViewMessage("No keyable channels found")
 
 
 def snapKeyframes():
@@ -1881,23 +2029,32 @@ def remove_default_values_for_selected_object(*args):
 
 def default_object_values(default_translations=False, default_rotations=False, default_scales=False):
     default_trs = default_translations and default_rotations and default_scales
-    if default_trs:
-        title = "Reset Translation Rotation Scale"
-        tooltip_template = helper.default_trs_tooltip_text
-    elif default_scales:
-        title = "Reset Scales"
-        tooltip_template = helper.default_scales_tooltip_text
-    elif default_rotations:
-        title = "Reset Rotation"
-        tooltip_template = helper.default_rotations_tooltip_text
-    elif default_translations:
-        title = "Reset Translation"
-        tooltip_template = helper.default_translations_tooltip_text
-    else:
-        title = None
-        tooltip_template = helper.default_values_tooltip_text
+    has_transform_filter = any((default_translations, default_rotations, default_scales))
+    translation_attrs = {"translate", "translateX", "translateY", "translateZ"}
+    rotation_attrs = {"rotate", "rotateX", "rotateY", "rotateZ"}
+    scale_attrs = {"scale", "scaleX", "scaleY", "scaleZ"}
 
-    chunk_opened = toolCommon.open_undo_chunk()
+    def _matches_requested_default_attrs(attr):
+        if not has_transform_filter:
+            return True
+        return (
+            (default_translations and attr in translation_attrs)
+            or (default_rotations and attr in rotation_attrs)
+            or (default_scales and attr in scale_attrs)
+        )
+
+    if default_trs:
+        tool_id = "default_trs"
+    elif default_scales:
+        tool_id = "default_scales"
+    elif default_rotations:
+        tool_id = "default_rotations"
+    elif default_translations:
+        tool_id = "default_translations"
+    else:
+        tool_id = "default_object_values"
+
+    chunk_opened = toolCommon.open_undo_chunk(toolCommon.make_undo_chunk_name(tool_id=tool_id))
     tint_session = None
     selected_objects = []
 
@@ -1913,7 +2070,8 @@ def default_object_values(default_translations=False, default_rotations=False, d
 
         target_info = resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=True)
         time_context = target_info["time_context"]
-        tint_session = _begin_timeline_context_tint("current_frame", "default_object_values")
+        if time_context.mode in ("graph_editor_keys", "time_slider_range"):
+            tint_session = _begin_timeline_context_tint("current_frame", "default_object_values")
 
         selected_objects = target_info["target_objects"]
         target_plugs = target_info["target_plugs"]
@@ -1924,19 +2082,7 @@ def default_object_values(default_translations=False, default_rotations=False, d
                 if not target_plugs:
                     continue
                 obj, attr = target_plugs[0].split(".", 1)
-                if default_translations and not attr.startswith("translate"):
-                    continue
-                if default_rotations and not attr.startswith("rotate"):
-                    continue
-                if default_scales and not attr.startswith("scale"):
-                    continue
-                if not any((default_translations, default_rotations, default_scales)):
-                    pass
-                elif not (
-                    (default_translations and attr.startswith("translate"))
-                    or (default_rotations and attr.startswith("rotate"))
-                    or (default_scales and attr.startswith("scale"))
-                ):
+                if not _matches_requested_default_attrs(attr):
                     continue
                 default_value = _get_default_value_for_attribute(obj, attr, data)
                 if default_value is None:
@@ -1951,17 +2097,7 @@ def default_object_values(default_translations=False, default_rotations=False, d
             if "." not in attr_plug:
                 continue
             obj, attr = attr_plug.split(".", 1)
-            if default_translations and not attr.startswith("translate"):
-                continue
-            if default_rotations and not attr.startswith("rotate"):
-                continue
-            if default_scales and not attr.startswith("scale"):
-                continue
-            if any((default_translations, default_rotations, default_scales)) and not (
-                (default_translations and attr.startswith("translate"))
-                or (default_rotations and attr.startswith("rotate"))
-                or (default_scales and attr.startswith("scale"))
-            ):
+            if not _matches_requested_default_attrs(attr):
                 continue
 
             try:
@@ -2619,17 +2755,177 @@ def remove_mirror_invert_exception(*args):
 # ______________________________________________________COPY PASTE ANIMATION ______________________________________________________________________________#
 
 
+def _load_copy_paste_json(json_file_path, missing_warning):
+    if not os.path.exists(json_file_path):
+        cmds.warning(missing_warning)
+        return None
+    with open(json_file_path, "r") as json_file:
+        return json.load(json_file)
+
+
+def _save_copy_paste_json(json_file_path, data):
+    os.makedirs(os.path.dirname(json_file_path), exist_ok=True)
+    with open(json_file_path, "w") as json_file:
+        json.dump(data, json_file, indent=4)
+
+
+def _copy_paste_targets(saved_data, selected_objects):
+    if selected_objects:
+        return selected_objects
+    return [control for control in (saved_data or {}).keys() if cmds.objExists(control)]
+
+
+def _attr_exists_and_settable(node, attr):
+    if not cmds.objExists(node):
+        return False
+    full_attr = f"{node}.{attr}"
+    if not cmds.objExists(full_attr):
+        return False
+    try:
+        return cmds.getAttr(full_attr, se=True) and not cmds.getAttr(full_attr, lock=True)
+    except Exception:
+        return False
+
+
+@contextmanager
+def _copy_paste_undo_chunk(tool_id):
+    chunk_opened = toolCommon.open_undo_chunk(toolCommon.make_undo_chunk_name(tool_id=tool_id))
+    try:
+        yield
+    finally:
+        toolCommon.close_undo_chunk(chunk_opened)
+
+
+@contextmanager
+def _copy_paste_operation(tool_id, success_message, undo=False, tint="none", default_mode="current_frame"):
+    state = {"success": False, "timerange": None}
+    tint_session = None
+    try:
+        if tint == "current":
+            tint_session = _begin_timeline_context_tint(default_mode, tool_id)
+
+        if undo:
+            with _copy_paste_undo_chunk(tool_id):
+                yield state
+        else:
+            yield state
+
+        if state.get("success"):
+            if tint == "range" and state.get("timerange"):
+                tint_session = _begin_timeline_tint(state["timerange"], tool_id)
+            wutil.make_inViewMessage(success_message)
+    finally:
+        if tint_session:
+            tint_session.finish()
+
+
+def _apply_animation_channels_to_targets(
+    targets,
+    channels_data,
+    replace=False,
+    insert_time=None,
+    time_shift=None,
+    replace_range=(0, 10000),
+):
+    keys_set = 0
+    original_time = cmds.currentTime(query=True)
+    try:
+        for target in targets or []:
+            for channel, anim_data in (channels_data or {}).items():
+                if not _attr_exists_and_settable(target, channel):
+                    continue
+
+                keyframes = anim_data.get("keyframes") or []
+                values = anim_data.get("values") or []
+                if not keyframes or not values:
+                    continue
+
+                if replace:
+                    try:
+                        cmds.cutKey(target, time=replace_range, attribute=channel, option="keys")
+                    except Exception:
+                        pass
+
+                channel_time_shift = time_shift
+                if channel_time_shift is None:
+                    channel_time_shift = insert_time - keyframes[0] if insert_time is not None else 0
+                for frame, value in zip(keyframes, values):
+                    try:
+                        key_time = frame + channel_time_shift
+                        plug = f"{target}.{channel}"
+                        cmds.currentTime(key_time, edit=True)
+                        cmds.setAttr(plug, value)
+                        cmds.setKeyframe(target, time=(key_time,), attribute=channel)
+                        keys_set += 1
+                    except Exception as e:
+                        import TheKeyMachine.mods.reportMod as report
+
+                        report.report_detected_exception(e, context="paste animation set key")
+    finally:
+        cmds.currentTime(original_time, edit=True)
+
+    return keys_set
+
+
+def _apply_animation_data(animation_data, selected_objects, replace=False, insert_time=None):
+    targets = _copy_paste_targets(animation_data, selected_objects)
+    if not targets:
+        return 0
+
+    keys_set = 0
+    for control in targets:
+        if control in animation_data:
+            keys_set += _apply_animation_channels_to_targets(
+                [control],
+                animation_data[control],
+                replace=replace,
+                insert_time=insert_time,
+            )
+
+    return keys_set
+
+
+def _is_valid_pose_attribute_value(value):
+    if isinstance(value, (float, int)):
+        return True
+    if isinstance(value, list) and all(isinstance(v, (float, int)) for v in value):
+        return True
+    if isinstance(value, str) and not re.search(r"[# ]", value):
+        return True
+    return False
+
+
+def _apply_pose_data(pose_data, selected_objects):
+    targets = _copy_paste_targets(pose_data, selected_objects)
+    if not targets:
+        return 0
+
+    attrs_set = 0
+    for control in targets:
+        if control not in pose_data:
+            continue
+        for attr, value in pose_data[control].items():
+            if not _is_valid_pose_attribute_value(value):
+                continue
+            if not _attr_exists_and_settable(control, attr):
+                continue
+            try:
+                if isinstance(value, list):
+                    cmds.setAttr(f"{control}.{attr}", *value)
+                else:
+                    cmds.setAttr(f"{control}.{attr}", value)
+                attrs_set += 1
+            except RuntimeError as e:
+                import TheKeyMachine.mods.reportMod as report
+
+                report.report_detected_exception(e, context="paste pose attribute set")
+
+    return attrs_set
+
+
 def copy_animation(*args):
     def get_animation_channels(control):
         return selectionMod.get_animated_channels_for_node(control, settable_only=True)
-
-    # Función para guardar la animación en un archivo JSON
-    def save_animation_to_json(json_file_path, animation_data):
-        # Asegurar que la carpeta donde se guardará el archivo exista
-        os.makedirs(os.path.dirname(json_file_path), exist_ok=True)
-
-        with open(json_file_path, "w") as json_file:
-            json.dump(animation_data, json_file, indent=4)
 
     selected_objects = selectionMod.get_selected_objects()
 
@@ -2638,150 +2934,95 @@ def copy_animation(*args):
 
     time_context = timelineWidgets.resolve_time_context(default_mode="all_animation")
     animation_data = {}
-    tint_session = None
 
     try:
-        # Procesar cada objeto seleccionado
-        for control in selected_objects:
-            control_name = control.rsplit(":", 1)[-1]  # Eliminar namespace
-            animated_channels = get_animation_channels(control)
+        with _copy_paste_operation("copy_animation", "Animation Copied", tint="range") as operation:
+            for control in selected_objects:
+                control_name = control
+                animated_channels = get_animation_channels(control)
 
-            # Obtener la animación de los canales animados
-            animation_data[control_name] = {}
-            for channel in animated_channels:
-                if time_context.mode == "graph_editor_keys":
-                    selected_frames = set(time_context.frames)
-                    keyframes = cmds.keyframe(f"{control}.{channel}", query=True) or []
-                    keyframes = [frame for frame in keyframes if int(frame) in selected_frames]
-                    values = [cmds.keyframe(f"{control}.{channel}", query=True, vc=True, time=(frame, frame))[0] for frame in keyframes]
-                elif time_context.mode == "time_slider_range":
-                    keyframes = cmds.keyframe(
-                        f"{control}.{channel}",
-                        query=True,
-                        time=(time_context.start_frame, time_context.end_frame),
-                    )
-                    values = cmds.keyframe(
-                        f"{control}.{channel}",
-                        query=True,
-                        vc=True,
-                        time=(time_context.start_frame, time_context.end_frame),
-                    )
-                else:
-                    keyframes = cmds.keyframe(f"{control}.{channel}", query=True)
-                    values = cmds.keyframe(f"{control}.{channel}", query=True, vc=True)
-                animation_data[control_name][channel] = {"keyframes": keyframes, "values": values}
+                animation_data[control_name] = {}
+                for channel in animated_channels:
+                    if time_context.mode == "graph_editor_keys":
+                        selected_frames = set(time_context.frames)
+                        keyframes = cmds.keyframe(f"{control}.{channel}", query=True) or []
+                        keyframes = [frame for frame in keyframes if int(frame) in selected_frames]
+                        values = [cmds.keyframe(f"{control}.{channel}", query=True, vc=True, time=(frame, frame))[0] for frame in keyframes]
+                    elif time_context.mode == "time_slider_range":
+                        keyframes = cmds.keyframe(
+                            f"{control}.{channel}",
+                            query=True,
+                            time=(time_context.start_frame, time_context.end_frame),
+                        )
+                        values = cmds.keyframe(
+                            f"{control}.{channel}",
+                            query=True,
+                            vc=True,
+                            time=(time_context.start_frame, time_context.end_frame),
+                        )
+                    else:
+                        keyframes = cmds.keyframe(f"{control}.{channel}", query=True)
+                        values = cmds.keyframe(f"{control}.{channel}", query=True, vc=True)
+                    animation_data[control_name][channel] = {"keyframes": keyframes, "values": values}
 
-        json_file_path = general.get_copy_animation_file()
+            json_file_path = general.get_copy_animation_file()
 
-        save_animation_to_json(json_file_path, animation_data)
+            _save_copy_paste_json(json_file_path, animation_data)
 
-        tint_range = None
-        if time_context.mode == "time_slider_range":
-            tint_range = time_context.timerange
-            clear_timeslider_selection()
-        elif time_context.mode == "all_animation":
-            tint_range = timelineWidgets.get_playback_range()
-        else:
-            tint_range = timelineWidgets.get_animation_data_timerange(animation_data)
+            tint_range = None
+            if time_context.mode == "time_slider_range":
+                tint_range = time_context.timerange
+                clear_timeslider_selection()
+            elif time_context.mode == "all_animation":
+                tint_range = timelineWidgets.get_playback_range()
+            else:
+                tint_range = timelineWidgets.get_animation_data_timerange(animation_data)
 
-        if tint_range:
-            tint_session = _begin_timeline_tint(
-                timerange=tint_range,
-                key="copy_animation",
-            )
-
-        wutil.make_inViewMessage("Animation saved")
+            operation["timerange"] = tint_range
+            operation["success"] = True
     except Exception as e:
         cmds.warning(f"Error saving animation: {e}")
-    finally:
-        if tint_session:
-            tint_session.finish()
 
 
 # PASTE ANIMATION ___________________________________________________________________________
 
 
 def paste_animation(*args):
-    def apply_animation_from_json(json_file_path, selected_objects):
-        # Leer el archivo JSON
-        with open(json_file_path, "r") as json_file:
-            animation_data = json.load(json_file)
-
-        # Aplicar animación a los objetos seleccionados
-        for control in selected_objects:
-            control_name = control.rsplit(":", 1)[-1]  # Eliminar namespace
-
-            if control_name in animation_data:
-                for channel, anim_data in animation_data[control_name].items():
-                    # Borrar animación existente
-                    cmds.cutKey(control, time=(0, 10000), attribute=channel, option="keys")
-
-                    # Aplicar nueva animación
-                    for frame, value in zip(anim_data["keyframes"], anim_data["values"]):
-                        cmds.setKeyframe(control, time=frame, attribute=channel, value=value)
-        return timelineWidgets.get_animation_data_timerange(animation_data)
-
-    # Obtener los objetos seleccionados
     selected_objects = selectionMod.get_selected_objects()
 
-    if not selected_objects:
+    json_file_path = general.get_copy_animation_file()
+    animation_data = _load_copy_paste_json(json_file_path, "No animation file found. Please copy animation first")
+    if not animation_data:
         return
 
-    json_file_path = general.get_copy_animation_file()
-
-    # Aplicar animación a los objetos seleccionados
-    tint_session = None
-    try:
-        paste_range = apply_animation_from_json(json_file_path, selected_objects)
-        if paste_range:
-            tint_session = _begin_timeline_tint(
-                timerange=paste_range,
-                key="paste_animation",
-            )
-    finally:
-        if tint_session:
-            tint_session.finish()
-
-    wutil.make_inViewMessage("Animation restored")
+    with _copy_paste_operation("paste_animation", "Animation Pasted", undo=True, tint="range") as operation:
+        keys_set = _apply_animation_data(animation_data, selected_objects, replace=True)
+        if keys_set:
+            paste_range = timelineWidgets.get_animation_data_timerange(animation_data)
+            operation["timerange"] = paste_range
+            operation["success"] = True
+        else:
+            cmds.warning("No matching animation targets found")
 
 
 # PASTE INSERT _________________________________________________________________________
 
 
 def paste_insert_animation(*args):
-    def apply_animation_from_json(json_file_path, selected_objects, insert_time):
-        # Leer el archivo JSON
-        with open(json_file_path, "r") as json_file:
-            animation_data = json.load(json_file)
-
-        # Aplicar animación a los objetos seleccionados
-        for control in selected_objects:
-            control_name = control.rsplit(":", 1)[-1]  # Eliminar namespace
-
-            if control_name in animation_data:
-                for channel, anim_data in animation_data[control_name].items():
-                    if anim_data["keyframes"]:
-                        # Calcular la diferencia de tiempo
-                        time_diff = insert_time - anim_data["keyframes"][0]
-
-                        # Insertar animación ajustada
-                        for frame, value in zip(anim_data["keyframes"], anim_data["values"]):
-                            adjusted_frame = frame + time_diff
-                            cmds.setKeyframe(control, time=adjusted_frame, attribute=channel, value=value)
-
-    # Obtener los objetos seleccionados y el tiempo actual
     selected_objects = selectionMod.get_selected_objects()
     current_time = cmds.currentTime(query=True)
 
-    if not selected_objects:
+    json_file_path = general.get_copy_animation_file()
+    animation_data = _load_copy_paste_json(json_file_path, "No animation file found. Please copy animation first")
+    if not animation_data:
         return
 
-    json_file_path = general.get_copy_animation_file()
-
-    # Aplicar animación a los objetos seleccionados en el tiempo actual
-    apply_animation_from_json(json_file_path, selected_objects, current_time)
-
-    wutil.make_inViewMessage("Animation inserted")
+    with _copy_paste_operation("paste_insert_animation", "Animation Pasted", undo=True, tint="range") as operation:
+        if _apply_animation_data(animation_data, selected_objects, insert_time=current_time):
+            operation["timerange"] = timelineWidgets.get_animation_data_timerange(animation_data)
+            operation["success"] = True
+        else:
+            cmds.warning("No matching animation targets found")
 
 
 # PASTE OPPOSITE ________________________________________________________________________
@@ -2792,7 +3033,6 @@ def paste_opposite_animation(*args):
 
     # ATTRIBUTES_TO_IGNORE = {"tag"}
 
-    # Cargar excepciones
     def load_exceptions(file_path):
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
@@ -2818,192 +3058,98 @@ def paste_opposite_animation(*args):
         return value
 
     json_file_path = general.get_copy_animation_file()
+    animation_data = _load_copy_paste_json(json_file_path, "No animation file found. Please copy animation first")
+    if not animation_data:
+        return
 
-    with open(json_file_path, "r") as json_file:
-        animation_data = json.load(json_file)
+    with _copy_paste_operation("paste_opposite_animation", "Animation Pasted", undo=True, tint="range") as operation:
+        keys_set = 0
+        for control_name, anim_data in animation_data.items():
+            mirror_control_name = find_mirror_control(control_name)
 
-    for control_name, anim_data in animation_data.items():
-        mirror_control_name = find_mirror_control(control_name)
+            if mirror_control_name:
+                full_mirror_control_name = next((c for c in cmds.ls() if c.endswith(mirror_control_name)), None)
+                if not full_mirror_control_name:
+                    continue
 
-        if mirror_control_name:
-            full_mirror_control_name = next((c for c in cmds.ls() if c.endswith(mirror_control_name)), None)
-            if not full_mirror_control_name:
-                continue
+                mirrored_channels = {}
+                for channel, channel_data in anim_data.items():
+                    mirrored_channels[channel] = {
+                        "keyframes": channel_data.get("keyframes") or [],
+                        "values": [mirror_value(channel, v) for v in channel_data.get("values") or []],
+                    }
+                keys_set += _apply_animation_channels_to_targets([full_mirror_control_name], mirrored_channels, replace=True)
 
-            for channel, channel_data in anim_data.items():
-                mirrored_values = [mirror_value(channel, v) for v in channel_data["values"]]
-                cmds.cutKey(full_mirror_control_name, time=(0, 10000), attribute=channel, option="keys")
-                for frame, value in zip(channel_data["keyframes"], mirrored_values):
-                    cmds.setKeyframe(full_mirror_control_name, time=frame, attribute=channel, value=value)
-
-    wutil.make_inViewMessage("Mirror Animation Restored")
+        if keys_set:
+            operation["timerange"] = timelineWidgets.get_animation_data_timerange(animation_data)
+            operation["success"] = True
+        else:
+            cmds.warning("No matching animation targets found")
 
 
 def paste_animation_to(source_control_name=None, replace=True, insert_at_current=False, *args, **kwargs):
-    # Utilidades locales
-    def _short(name):
-        # quita namespace si lo hay
-        return name.rsplit(":", 1)[-1]
+    global _paste_to_dialog
 
-    def _attr_exists_and_settable(node, attr):
-        if not cmds.objExists(node):
-            return False
-        full_attr = f"{node}.{attr}"
-        if not cmds.objExists(full_attr):
-            return False
-        try:
-            # settable=True y no locked
-            return cmds.getAttr(full_attr, se=True) and not cmds.getAttr(full_attr, lock=True)
-        except Exception:
-            return False
-
-    def _load_animation(json_file_path):
-        with open(json_file_path, "r") as f:
-            return json.load(f)
-
-    # Destinos: selección actual
-    targets = selectionMod.get_selected_objects()
-    if not targets:
-        return wutil.make_inViewMessage("Select at least one destination control")
-
-    # Cargar JSON
     json_file_path = general.get_copy_animation_file()
-    if not os.path.exists(json_file_path):
-        cmds.warning("No animation file found. Please copy animation first")
-        return
-
     try:
-        animation_data = _load_animation(json_file_path)
+        animation_data = _load_copy_paste_json(json_file_path, "No animation file found. Please copy animation first")
     except Exception as e:
         cmds.warning("Error reading animation file: {}".format(e))
+        return
+    if animation_data is None:
         return
 
     if not isinstance(animation_data, dict) or not animation_data:
         cmds.warning("Animation file is empty or invalid")
         return
 
-    # Determinar ORIGEN
-    available_sources = list(animation_data.keys())
-
-    if source_control_name is None:
-        if len(available_sources) == 1:
-            source_control_name = available_sources[0]
-        else:
-            cmds.warning(
-                "Multiple sources found in animation file. Please specify source_control_name. Available: {}".format(
-                    ", ".join(available_sources)
+    def _apply_mappings(mappings, insert=False):
+        current_time = cmds.currentTime(query=True) if insert else None
+        pasted_data = {}
+        with _copy_paste_operation("paste_animation_to", "Animation Pasted", undo=True, tint="range") as operation:
+            total_keys_set = 0
+            for source_node, target_node in mappings:
+                src_channels = animation_data.get(source_node, {})
+                total_keys_set += _apply_animation_channels_to_targets(
+                    [target_node],
+                    src_channels,
+                    replace=not insert,
+                    insert_time=current_time if insert else None,
+                    replace_range=(0, 1e6),
                 )
-            )
-            return
-    else:
-        # Aceptar tanto con como sin namespace; normalizamos a corto
-        source_control_name = _short(source_control_name)
+                if src_channels:
+                    pasted_data[target_node] = src_channels
 
-    # Buscar el nombre EXACTO en el JSON por comparación de cortos
-    matched_source = None
-    for k in available_sources:
-        if _short(k) == source_control_name:
-            matched_source = k
-            break
+            if total_keys_set == 0:
+                cmds.warning("No keys were pasted. Check that destination controls have the needed attributes and that the source has keyframes.")
+                return False
 
-    if matched_source is None:
-        cmds.warning(
-            "Source control '{}' not found in animation file. Available: {}".format(source_control_name, ", ".join(available_sources))
-        )
-        return
+            operation["timerange"] = timelineWidgets.get_animation_data_timerange(pasted_data or animation_data)
+            operation["success"] = True
+            return True
 
-    src_channels = animation_data.get(matched_source, {})
-    if not src_channels:
-        cmds.warning("No channel data found for source '{}'.".format(matched_source))
-        return
-
-    # Calcular desplazamiento temporal si insertamos en el tiempo actual
-    time_shift = 0.0
-    if insert_at_current:
-        # Primer key del primer canal que tenga keys
-        first_key_time = None
-        for ch, data in src_channels.items():
-            kfs = data.get("keyframes") or []
-            if kfs:
-                t0 = kfs[0]
-                if first_key_time is None or (t0 is not None and t0 < first_key_time):
-                    first_key_time = t0
-        if first_key_time is not None:
-            current = cmds.currentTime(query=True)
-            time_shift = current - first_key_time
-
-    # Aplicar a cada destino seleccionado
-    total_keys_set = 0
-    for dst in targets:
-        # Para logs legibles, también mostramos el corto
-        # dst_short = _short(dst)
-
-        for channel, anim_data in src_channels.items():
-            keyframes = anim_data.get("keyframes") or []
-            values = anim_data.get("values") or []
-
-            if not keyframes or not values:
-                continue
-
-            if not _attr_exists_and_settable(dst, channel):
-                # Canal no existe en el destino; lo saltamos
-                continue
-
-            if replace:
-                try:
-                    cmds.cutKey(dst, time=(0, 1e6), attribute=channel, option="keys")
-                except Exception:
-                    pass
-
-            # Pegar keys (con posible desplazamiento)
-            for frame, value in zip(keyframes, values):
-                t = frame + time_shift
-                try:
-                    cmds.setKeyframe(dst, time=t, attribute=channel, value=value)
-                    total_keys_set += 1
-                except Exception as e:
-                    # Si un key falla, seguimos con los demás canales
-                    import TheKeyMachine.mods.reportMod as report
-
-                    report.report_detected_exception(e, context="paste animation set key")
-
-    if total_keys_set == 0:
-        cmds.warning("No keys were pasted. Check that destination controls have the needed attributes and that the source has keyframes.")
-    else:
-        mode = "inserted at current time" if insert_at_current else "pasted"
-        repl = " (replaced existing keys)" if replace else ""
-        cmds.warning(
-            "Animation {} from '{}' to {} target(s){} — {} keys set.".format(
-                mode, _short(matched_source), len(targets), repl, total_keys_set
-            )
-        )
+    _paste_to_dialog = customWidgets.PasteToDialog(animation_data, _apply_mappings, data_label="animation")
+    _paste_to_dialog.show()
 
 
 # COPY POSE ________________________________________________________________________
 
 
 def copy_pose(*args):
-    def save_pose_to_json(json_file_path, pose_data):
-        os.makedirs(os.path.dirname(json_file_path), exist_ok=True)
-        with open(json_file_path, "w") as json_file:
-            json.dump(pose_data, json_file, indent=4)
-
     selected_objects = selectionMod.get_selected_objects()
 
     if not selected_objects:
         return
 
     pose_data = {}
-    tint_session = _begin_timeline_context_tint("current_frame", "copy_pose")
 
-    try:
-        # Procesar cada objeto seleccionado
+    with _copy_paste_operation("copy_pose", "Pose Copied", tint="current") as operation:
         for control in selected_objects:
-            control_name = control.rsplit(":", 1)[-1]  # Eliminar namespace
+            control_name = control
             attributes = cmds.listAttr(control, keyable=True)
 
             if attributes is None:
-                continue  # Si no hay atributos keyable, continuar con el siguiente objeto
+                continue
 
             pose_data[control_name] = {}
             for attr in attributes:
@@ -3015,77 +3161,30 @@ def copy_pose(*args):
                         import TheKeyMachine.mods.reportMod as report
 
                         report.report_detected_exception(e, context="copy pose attribute read")
-                        pass  # Ignorar atributos que no pueden ser leídos
+                        pass
 
         json_file_path = general.get_copy_paste_pose_file()
 
-        save_pose_to_json(json_file_path, pose_data)
-
-        wutil.make_inViewMessage("Pose saved")
-    finally:
-        tint_session.finish()
+        _save_copy_paste_json(json_file_path, pose_data)
+        operation["success"] = True
 
 
 # PASTE POSE _____________________________________________________________
 
 
 def paste_pose(*args):
-    def is_valid_attribute_value(value):
-        """
-        Valida si el valor del atributo es estándar (numérico o lista numérica)
-        y no contiene caracteres inusuales como '#'.
-        """
-        if isinstance(value, (float, int)):
-            return True
-        if isinstance(value, list) and all(isinstance(v, (float, int)) for v in value):
-            return True
-        if isinstance(value, str) and not re.search(r"[# ]", value):
-            return True
-        return False
-
-    def apply_pose_from_json(json_file_path, selected_objects):
-        # Leer el archivo JSON
-        with open(json_file_path, "r") as json_file:
-            pose_data = json.load(json_file)
-
-        # Aplicar pose a los objetos seleccionados
-        for control in selected_objects:
-            control_name = control.rsplit(":", 1)[-1]  # Eliminar namespace
-
-            if control_name in pose_data:
-                for attr, value in pose_data[control_name].items():
-                    # Validar el valor del atributo
-                    if not is_valid_attribute_value(value):
-                        continue
-
-                    # Aplicar valor al atributo
-                    if not cmds.getAttr(f"{control}.{attr}", lock=True):
-                        try:
-                            if isinstance(value, list):
-                                cmds.setAttr(f"{control}.{attr}", *value)
-                            else:
-                                cmds.setAttr(f"{control}.{attr}", value)
-                        except RuntimeError as e:
-                            import TheKeyMachine.mods.reportMod as report
-
-                            report.report_detected_exception(e, context="paste pose attribute set")
-
-    # Obtener los objetos seleccionados
     selected_objects = selectionMod.get_selected_objects()
 
-    if not selected_objects:
+    json_file_path = general.get_copy_paste_pose_file()
+    pose_data = _load_copy_paste_json(json_file_path, "No pose file found. Please copy pose first")
+    if not pose_data:
         return
 
-    json_file_path = general.get_copy_paste_pose_file()
-    tint_session = _begin_timeline_context_tint("current_frame", "paste_pose")
-
-    try:
-        # Aplicar pose a los objetos seleccionados
-        apply_pose_from_json(json_file_path, selected_objects)
-
-        wutil.make_inViewMessage("Pose pasted")
-    finally:
-        tint_session.finish()
+    with _copy_paste_operation("paste_pose", "Pose Pasted", undo=True, tint="current") as operation:
+        if _apply_pose_data(pose_data, selected_objects):
+            operation["success"] = True
+        else:
+            cmds.warning("No matching pose targets found")
 
 
 # ______________________________________________ TANGENTS

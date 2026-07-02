@@ -103,12 +103,13 @@ def _save_hotkeys_to_maya():
         pass
 
 
-def _runtime_command_name(command_name):
-    return "TKMTriggerRuntime_{}".format(command_name)
-
-
 def _name_command_name(command_name):
     return "TKMTriggerName_{}".format(command_name)
+
+
+def _mel_python_command(command):
+    escaped = str(command).replace("\\", "\\\\").replace('"', '\\"')
+    return 'python("{}")'.format(escaped)
 
 
 def _humanize(name):
@@ -242,51 +243,20 @@ def _clear_hotkey(combo):
         pass
 
 
-def _ensure_runtime_binding(command_name, title):
-    runtime_name = _runtime_command_name(command_name)
+def _ensure_name_command_binding(command_name, title):
     name_command = _name_command_name(command_name)
-    kwargs = {
-        "annotation": title,
-        "category": "TheKeyMachine",
-        "showInHotkeyEditor": False,
-        "commandLanguage": "python",
-        "command": trigger.command_string(command_name),
-    }
+    command = _mel_python_command(trigger.command_string(command_name))
     try:
-        if cmds.runTimeCommand(runtime_name, query=True, exists=True):
-            cmds.runTimeCommand(runtime_name, edit=True, **kwargs)
-        else:
-            cmds.runTimeCommand(runtime_name, **kwargs)
+        cmds.nameCommand(name_command, edit=True, annotation=title, command=command)
     except Exception:
-        if cmds.runTimeCommand(runtime_name, query=True, exists=True):
-            cmds.runTimeCommand(
-                runtime_name,
-                edit=True,
-                annotation=title,
-                category="TheKeyMachine",
-                showInHotkeyEditor=False,
-                command=trigger.command_string(command_name),
-            )
-        else:
-            cmds.runTimeCommand(
-                runtime_name,
-                annotation=title,
-                category="TheKeyMachine",
-                showInHotkeyEditor=False,
-                command=trigger.command_string(command_name),
-            )
-
-    try:
-        cmds.nameCommand(name_command, edit=True, annotation=title, command=runtime_name)
-    except Exception:
-        cmds.nameCommand(name_command, annotation=title, command=runtime_name)
+        cmds.nameCommand(name_command, annotation=title, command=command)
     return name_command
 
 
 def _assign_hotkey(command_name, title, combo):
     if not combo:
         return
-    name_command = _ensure_runtime_binding(command_name, title)
+    name_command = _ensure_name_command_binding(command_name, title)
     cmds.hotkey(
         keyShortcut=combo["maya_key"],
         alt=bool(combo.get("alt")),
