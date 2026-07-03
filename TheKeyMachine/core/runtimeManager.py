@@ -150,6 +150,7 @@ class RuntimeManager(QtCore.QObject):
     backgroundRunnerChanged = QtCore.Signal(str, bool)
     backgroundRunnerTriggered = QtCore.Signal(str)
     playbackStateChanged = QtCore.Signal(bool)
+    toolStateChanged = QtCore.Signal(str, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -158,6 +159,7 @@ class RuntimeManager(QtCore.QObject):
         self._scriptjobs: Dict[str, List[int]] = {}
         self._signal_connections: Dict[str, List[tuple]] = {}
         self._managed_widgets: Dict[str, QtWidgets.QWidget] = {}
+        self._tool_states: Dict[str, bool] = {}
 
         self._graph_editor_visible = False
         self._graph_editor_watch_enabled = False
@@ -380,6 +382,34 @@ class RuntimeManager(QtCore.QObject):
 
             self._background_runner_controller = backgroundRunners.get_controller(self)
         return self._background_runner_controller
+
+    def set_tool_state(self, key: str, state: bool, *, emit: bool = True) -> bool:
+        if not key:
+            return False
+        state = bool(state)
+        if self._tool_states.get(key) == state and emit:
+            return state
+        self._tool_states[key] = state
+        if emit:
+            try:
+                self.toolStateChanged.emit(str(key), state)
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+        return state
+
+    def get_tool_state(self, key: str, default: bool = False) -> bool:
+        if not key:
+            return bool(default)
+        return bool(self._tool_states.get(key, default))
+
+    def sync_tool_state(self, key: str, getter: Callable[[], Any]) -> bool:
+        if not key or not callable(getter):
+            return False
+        try:
+            state = bool(getter())
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            state = False
+        return self.set_tool_state(key, state)
 
     # ----------------------------
     # Internal installs

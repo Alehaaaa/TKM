@@ -18,6 +18,7 @@ import TheKeyMachine.mods.selectionMod as selectionMod  # type: ignore
 import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
 import TheKeyMachine.core.toolMenus as toolMenus  # type: ignore
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi  # type: ignore
+import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 import TheKeyMachine.tools.orbit.api as orbitApi  # type: ignore
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi  # type: ignore
@@ -634,6 +635,8 @@ def add_main_tool_item(section, item_data, owner):
         )
     if key == "attribute_switcher":
         return add_bound_tool_button(section, item_data, attributeSwitcherApi.bind_attribute_switcher_toolbar_button)
+    if key == "gimbal":
+        return add_bound_tool_button(section, item_data, gimbalFixerApi.bind_gimbal_fixer_toolbar_button)
     return add_tool_button(section, item_data)
 
 

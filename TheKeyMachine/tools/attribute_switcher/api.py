@@ -37,10 +37,12 @@ def _parent_widget():
 
 
 def _emit_attribute_switcher_window_state(is_open):
+    state = bool(is_open)
     try:
-        attribute_switcher_window_bus.stateChanged.emit(bool(is_open))
+        attribute_switcher_window_bus.stateChanged.emit(state)
     except Exception:
         pass
+    runtime.get_runtime_manager().set_tool_state("attribute_switcher", state)
 
 
 def is_stay_on_top():
@@ -62,10 +64,12 @@ def is_euler_filter_enabled():
 
 
 def emit_attribute_switcher_euler_filter_state():
+    state = is_euler_filter_enabled()
     try:
-        runtime.get_runtime_manager().eulerFilterChanged.emit(is_euler_filter_enabled())
+        runtime.get_runtime_manager().eulerFilterChanged.emit(state)
     except Exception:
         pass
+    runtime.get_runtime_manager().set_tool_state("attribute_switcher_euler_filter", state)
 
 
 def bind_attribute_switcher_euler_filter_toggle(widget):
@@ -237,6 +241,7 @@ def bind_attribute_switcher_toolbar_button(button):
         "_tkm_attribute_switcher_context_menu_slot",
         lambda parent: build_attribute_switcher_context_menu(parent=parent),
     )
+    return True
 
 
 def toggle_attribute_switcher_window():

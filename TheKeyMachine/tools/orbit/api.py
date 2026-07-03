@@ -146,7 +146,9 @@ def _emit_orbit_window_state(is_open: bool) -> None:
     Args:
         is_open: True if the Orbit window is now open, False otherwise.
     """
-    orbit_window_bus.stateChanged.emit(bool(is_open))
+    state = bool(is_open)
+    orbit_window_bus.stateChanged.emit(state)
+    runtime.get_runtime_manager().set_tool_state("orbit", state)
 
 def get_orbit_window():
     window_class = _window_class()
@@ -300,6 +302,7 @@ def bind_orbit_toolbar_button(button):
         "_tkm_orbit_context_menu_slot",
         lambda parent: build_orbit_context_menu(parent=parent),
     )
+    return True
 
 def toggle_orbit_window():
     """Toggle the Orbit window via the toolbar toggle."""

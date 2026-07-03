@@ -481,6 +481,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._pending_manip_plugs.clear()
         self._time_range = None
         self.stateChanged.emit(False)
+        runtime.get_runtime_manager().set_tool_state("animation_offset", False)
 
     def toggle(self, checked=None, button_widget=None):
         if checked is None:
@@ -501,6 +502,7 @@ class AnimationOffsetController(QtCore.QObject):
             self._chunk_opened = toolCommon.open_undo_chunk()
             self.activate()
             self.stateChanged.emit(self.is_enabled())
+            runtime.get_runtime_manager().set_tool_state("animation_offset", self.is_enabled())
         else:
             self.deactivate()
             try:

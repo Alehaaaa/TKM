@@ -17,6 +17,7 @@ import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.data import icons
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import customDialogs as cd
 from TheKeyMachine.widgets import util as wutil
 
@@ -38,13 +39,12 @@ def _ensure_hotkey_folder():
 def _combo_from_assign_command_key_string(key_string):
     if not key_string or len(key_string) < 7:
         return None
-    maya_key = key_string[0]
-    if not maya_key or maya_key == "NONE":
+    key = key_string[0]
+    if not key or key == "NONE":
         return None
     return _normalize_combo(
         {
-            "maya_key": maya_key,
-            "display_key": str(maya_key).upper() if len(str(maya_key)) == 1 else str(maya_key),
+            "key": str(key).upper() if len(str(key)) == 1 else str(key),
             "alt": key_string[1] == "1",
             "ctrl": key_string[2] == "1",
             "shift": key_string[6] == "1",
@@ -71,7 +71,10 @@ def _load_hotkeys_from_maya():
         if not trigger.has_command(command_name):
             stale_assignments.append(combo)
             continue
-        mapping[command_name] = combo
+        shortcut = _shortcut_from_combo(combo)
+        mapping.setdefault(command_name, [])
+        if _combo_key(shortcut) not in {_combo_key(existing) for existing in mapping[command_name]}:
+            mapping[command_name].append(shortcut)
 
     if stale_assignments:
         _clear_stale_hotkey_assignments(stale_assignments)
@@ -79,21 +82,31 @@ def _load_hotkeys_from_maya():
     return mapping
 
 
-def _normalize_hotkey_mapping(data):
+def _hotkey_mapping_from_data(data):
     mapping = {}
     if not isinstance(data, dict):
         return mapping
-    for name, combo in data.items():
-        normalized_combo = _normalize_combo(combo)
-        if not normalized_combo:
-            continue
+    for name, shortcuts in data.items():
         command_name = str(name)
         if not trigger.has_command(command_name):
             continue
-        if command_name in mapping:
+        if isinstance(shortcuts, str):
+            shortcuts = [shortcuts]
+        if not isinstance(shortcuts, list) or not shortcuts:
             continue
-        mapping[command_name] = normalized_combo
+        shortcuts = [shortcut for shortcut in shortcuts if isinstance(shortcut, str) and _combo_from_shortcut(shortcut)]
+        if shortcuts:
+            mapping[command_name] = shortcuts
     return mapping
+
+
+def _hotkey_mapping_to_data(mapping):
+    data = {}
+    for command_name, shortcuts in mapping.items():
+        if not shortcuts:
+            continue
+        data[command_name] = shortcuts[0] if len(shortcuts) == 1 else list(shortcuts)
+    return data
 
 
 def _save_hotkeys_to_maya():
@@ -148,9 +161,14 @@ def _shortcut_mask(shortcut):
 def _normalize_combo(combo):
     if not combo:
         return None
+    if isinstance(combo, str):
+        return _combo_from_shortcut(combo)
+    key = combo.get("key")
+    if not key:
+        return None
+    key = str(key).upper() if len(str(key)) == 1 and str(key).isalpha() else str(key)
     return {
-        "maya_key": combo["maya_key"],
-        "display_key": combo.get("display_key", combo["maya_key"].upper()),
+        "key": key,
         "ctrl": bool(combo.get("ctrl")),
         "shift": bool(combo.get("shift")),
         "alt": bool(combo.get("alt")),
@@ -158,6 +176,11 @@ def _normalize_combo(combo):
 
 
 def _combo_display(combo):
+    return _shortcut_from_combo(combo)
+
+
+def _shortcut_from_combo(combo):
+    combo = _normalize_combo(combo)
     if not combo:
         return ""
     parts = []
@@ -167,15 +190,70 @@ def _combo_display(combo):
         parts.append("Shift")
     if combo.get("alt"):
         parts.append("Alt")
-    parts.append(combo.get("display_key", combo.get("maya_key", "")))
+    parts.append(combo.get("key", ""))
     return "+".join(part for part in parts if part)
+
+
+def _combo_from_shortcut(shortcut):
+    if isinstance(shortcut, dict):
+        return _normalize_combo(shortcut)
+    if not isinstance(shortcut, str):
+        return None
+    parts = [part.strip() for part in shortcut.split("+") if part.strip()]
+    if not parts:
+        return None
+
+    key_text = parts[-1]
+    modifiers = {part.lower() for part in parts[:-1]}
+    ctrl_aliases = {"control", "ctrl", "ctl"}
+    shift_aliases = {"shift"}
+    alt_aliases = {"alt", "option"}
+    known_modifiers = ctrl_aliases | shift_aliases | alt_aliases
+    if any(modifier not in known_modifiers for modifier in modifiers):
+        return None
+
+    key_lookup = {
+        "space": "Space",
+        "tab": "Tab",
+        "enter": "Enter",
+        "return": "Enter",
+        "escape": "Escape",
+        "esc": "Escape",
+        "left": "Left",
+        "right": "Right",
+        "up": "Up",
+        "down": "Down",
+        "home": "Home",
+        "end": "End",
+        "pageup": "PageUp",
+        "pagedown": "PageDown",
+        "insert": "Insert",
+    }
+    lower_key = key_text.lower()
+    if len(key_text) == 1 and key_text.isalpha():
+        key = key_text.upper()
+    elif len(key_text) == 1 and key_text.isdigit():
+        key = key_text
+    elif lower_key in key_lookup:
+        key = key_lookup[lower_key]
+    elif lower_key.startswith("f") and lower_key[1:].isdigit() and 1 <= int(lower_key[1:]) <= 12:
+        key = "F{}".format(int(lower_key[1:]))
+    else:
+        return None
+
+    return {
+        "key": key,
+        "ctrl": bool(modifiers & ctrl_aliases),
+        "shift": bool(modifiers & shift_aliases),
+        "alt": bool(modifiers & alt_aliases),
+    }
 
 
 def _combo_key(combo):
     combo = _normalize_combo(combo)
     if not combo:
         return ""
-    return "{}|{}|{}|{}".format(combo["maya_key"], int(combo["ctrl"]), int(combo["shift"]), int(combo["alt"]))
+    return "{}|{}|{}|{}".format(combo["key"], int(combo["ctrl"]), int(combo["shift"]), int(combo["alt"]))
 
 
 def _text_badge_qicon(text, size=18):
@@ -197,12 +275,13 @@ def _query_current_name_command(combo):
     """
     Queries Maya to find which command (if any) is assigned to the given combo.
     """
+    combo = _normalize_combo(combo)
     if not combo:
         return None
     try:
         # 1. Primary check: Current hotkey set
         res = cmds.hotkey(
-            keyShortcut=combo["maya_key"],
+            keyShortcut=combo["key"],
             alt=bool(combo.get("alt")),
             ctl=bool(combo.get("ctrl")),
             sht=bool(combo.get("shift")),
@@ -214,7 +293,7 @@ def _query_current_name_command(combo):
             
         # 2. Secondary check: hotkeyCheck (can find defaults)
         annotation = cmds.hotkeyCheck(
-            keyString=combo["maya_key"],
+            keyString=combo["key"],
             altModifier=bool(combo.get("alt")),
             ctrlModifier=bool(combo.get("ctrl")),
             shiftModifier=bool(combo.get("shift")),
@@ -229,11 +308,12 @@ def _query_current_name_command(combo):
 
 
 def _clear_hotkey(combo):
+    combo = _normalize_combo(combo)
     if not combo:
         return
     try:
         cmds.hotkey(
-            keyShortcut=combo["maya_key"],
+            keyShortcut=combo["key"],
             alt=bool(combo.get("alt")),
             ctl=bool(combo.get("ctrl")),
             sht=bool(combo.get("shift")),
@@ -254,11 +334,12 @@ def _ensure_name_command_binding(command_name, title):
 
 
 def _assign_hotkey(command_name, title, combo):
+    combo = _normalize_combo(combo)
     if not combo:
         return
     name_command = _ensure_name_command_binding(command_name, title)
     cmds.hotkey(
-        keyShortcut=combo["maya_key"],
+        keyShortcut=combo["key"],
         alt=bool(combo.get("alt")),
         ctl=bool(combo.get("ctrl")),
         sht=bool(combo.get("shift")),
@@ -283,7 +364,7 @@ def _qt_key_to_combo(event):
     if key in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Delete):
         return {}
 
-    letter_map = {getattr(QtCore.Qt, "Key_{}".format(chr(code))): chr(code).lower() for code in range(ord("A"), ord("Z") + 1)}
+    letter_map = {getattr(QtCore.Qt, "Key_{}".format(chr(code))): chr(code) for code in range(ord("A"), ord("Z") + 1)}
     digit_map = {getattr(QtCore.Qt, "Key_{}".format(num)): str(num) for num in range(10)}
     special_map = {
         QtCore.Qt.Key_Space: "Space",
@@ -314,23 +395,19 @@ def _qt_key_to_combo(event):
     }
 
     if key in letter_map:
-        maya_key = letter_map[key]
-        display_key = maya_key.upper()
+        key_text = letter_map[key]
     elif key in digit_map:
-        maya_key = digit_map[key]
-        display_key = maya_key
+        key_text = digit_map[key]
     elif QtCore.Qt.Key_F1 <= key <= QtCore.Qt.Key_F12:
-        display_key = "F{}".format(key - QtCore.Qt.Key_F1 + 1)
-        maya_key = display_key
+        key_text = "F{}".format(key - QtCore.Qt.Key_F1 + 1)
     elif key in special_map:
-        display_key = maya_key = special_map[key]
+        key_text = special_map[key]
     else:
         return None
 
     return _normalize_combo(
         {
-            "maya_key": maya_key,
-            "display_key": display_key,
+            "key": key_text,
             "ctrl": bool(modifiers & QtCore.Qt.ControlModifier),
             "shift": bool(modifiers & QtCore.Qt.ShiftModifier),
             "alt": bool(modifiers & QtCore.Qt.AltModifier),
@@ -381,6 +458,13 @@ def _tool_command_row(tool_data):
         "description": tool_data.get("status_description") or tool_data.get("description"),
         "tooltip_template": tool_data.get("tooltip_template") or tool_data.get("text"),
         "shortcuts": tool_data.get("shortcuts", []),
+        "checkable": bool(tool_data.get("checkable", tool_data.get("type") == "check")),
+        "callback": tool_data.get("callback"),
+        "get_checked": tool_data.get("get_checked") or tool_data.get("get_checked_fn"),
+        "set_checked": tool_data.get("set_checked") or tool_data.get("set_checked_fn"),
+        "changed_signal": tool_data.get("changed_signal"),
+        "bind_checked_fn": tool_data.get("bind_checked_fn"),
+        "state_key": tool_data.get("state_key"),
     }
 
 
@@ -406,6 +490,13 @@ def _variant_command_row(tool_data, variant, shortcut_label=None):
             or tool_data.get("text")
         ),
         "shortcuts": variant.get("shortcuts", []),
+        "checkable": bool(variant.get("checkable", variant.get("type") == "check")),
+        "callback": variant.get("callback"),
+        "get_checked": variant.get("get_checked") or variant.get("get_checked_fn"),
+        "set_checked": variant.get("set_checked") or variant.get("set_checked_fn"),
+        "changed_signal": variant.get("changed_signal"),
+        "bind_checked_fn": variant.get("bind_checked_fn"),
+        "state_key": variant.get("state_key") or tool_data.get("state_key"),
     }
 
 
@@ -596,33 +687,42 @@ class HotkeyCaptureEdit(QtWidgets.QLineEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._combo = None
+        self._updating = False
         self.setPlaceholderText("Type a hotkey")
         self.setReadOnly(False)
         self.setFixedWidth(wutil.DPI(120))
         self.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.setCursor(QtCore.Qt.IBeamCursor)
         self.setCursorPosition(0)
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        if self.hasFocus() and not self.text() and self.placeholderText():
-            painter = QtGui.QPainter(self)
-            painter.setPen(self.palette().color(QtGui.QPalette.Text))
-            
-            option = QtWidgets.QStyleOptionFrame()
-            self.initStyleOption(option)
-            rect = self.style().subElementRect(QtWidgets.QStyle.SE_LineEditContents, option, self)
-            rect.adjust(wutil.DPI(2), 0, 0, 0)
-            
-            painter.drawText(rect, self.alignment(), self.placeholderText())
-            painter.end()
+        self._clear_action = self.addAction(QtGui.QIcon(icons.close), QtWidgets.QLineEdit.TrailingPosition)
+        self._clear_action.setVisible(False)
+        self._clear_action.triggered.connect(self.clear_hotkey)
+        self.textChanged.connect(self._on_text_changed)
+
+    def _on_text_changed(self, text):
+        self._clear_action.setVisible(bool(text))
+        if self._updating or text:
+            return
+        if self._combo is None:
+            return
+        self._combo = None
+        self.comboChanged.emit(None)
+
+    def clear_hotkey(self):
+        self.setCombo(None)
+        self.comboChanged.emit(None)
 
     def combo(self):
-        return _normalize_combo(self._combo)
+        return self._combo
 
     def setCombo(self, combo):
-        self._combo = _normalize_combo(combo)
-        self.setText(_combo_display(self._combo))
-        self.setCursorPosition(len(self.text()))
+        self._updating = True
+        try:
+            self._combo = _shortcut_from_combo(combo) if combo else None
+            self.setText(self._combo or "")
+            self.setCursorPosition(len(self.text()))
+        finally:
+            self._updating = False
 
     def keyPressEvent(self, event):
         combo = _qt_key_to_combo(event)
@@ -634,25 +734,10 @@ class HotkeyCaptureEdit(QtWidgets.QLineEdit):
         if combo is None:
             event.accept()
             return
-        self.setCombo(combo)
+        shortcut = _shortcut_from_combo(combo)
+        self.setCombo(shortcut)
         self.comboChanged.emit(self.combo())
         event.accept()
-
-
-def _draw_row_focus(widget, painter, rect):
-    if not rect.isValid():
-        return
-    # Only draw the focus rectangle if the parent list actually has focus
-    if widget.parent() and not widget.parent().hasFocus():
-        return
-
-    option = QtWidgets.QStyleOptionFocusRect()
-    option.initFrom(widget)
-    option.state |= QtWidgets.QStyle.State_KeyboardFocusChange
-    # Force the focus color to white instead of the Maya default orange
-    option.palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(255, 255, 255))
-    option.palette.setColor(QtGui.QPalette.WindowText, QtGui.QColor(255, 255, 255))
-    widget.style().drawPrimitive(QtWidgets.QStyle.PE_FrameFocusRect, option, painter, widget)
 
 
 class HotkeySelectableItemWidget(QtWidgets.QWidget):
@@ -661,21 +746,22 @@ class HotkeySelectableItemWidget(QtWidgets.QWidget):
     def __init__(self, parent=None, base_color=None):
         super().__init__(parent)
         self._selected = False
-        self._base_color = QtGui.QColor(base_color) if base_color else None
-        self.setAutoFillBackground(False)
+        self.setObjectName("HotkeySelectableItemWidget")
+        self.setProperty("rowSelected", False)
+        self.setProperty("rowBase", base_color or "#2b2b2b")
+        self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
+        self.setStyleSheet(
+            "#HotkeySelectableItemWidget{background:%s;}"
+            "#HotkeySelectableItemWidget[rowSelected='true']{background:#5f88a8;}"
+            % (base_color or "#2b2b2b")
+        )
 
     def set_selected(self, selected):
         self._selected = bool(selected)
+        self.setProperty("rowSelected", self._selected)
+        self.style().unpolish(self)
+        self.style().polish(self)
         self.update()
-
-    def paintEvent(self, event):
-        painter = QtGui.QPainter(self)
-        if self._base_color:
-            painter.fillRect(self.rect(), self._base_color)
-        if self._selected:
-            _draw_row_focus(self, painter, self.rect())
-        painter.end()
-        super().paintEvent(event)
 
     def mousePressEvent(self, event):
         self.clicked.emit()
@@ -712,16 +798,6 @@ class HotkeySectionItemWidget(HotkeySelectableItemWidget):
             % ("#ffffff" if selected else "#d0d0d0", wutil.DPI(11))
         )
 
-    def paintEvent(self, event):
-        painter = QtGui.QPainter(self)
-        if self._selected:
-            painter.fillRect(self.rect(), self.palette().color(QtGui.QPalette.Highlight))
-            _draw_row_focus(self, painter, self.rect())
-        elif self._base_color:
-            painter.fillRect(self.rect(), self._base_color)
-        painter.end()
-        QtWidgets.QWidget.paintEvent(self, event)
-
     def eventFilter(self, watched, event):
         if event.type() == QtCore.QEvent.MouseButtonPress:
             self.clicked.emit()
@@ -729,12 +805,12 @@ class HotkeySectionItemWidget(HotkeySelectableItemWidget):
 
 
 class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
-    comboChanged = QtCore.Signal(str, object)
+    comboChanged = QtCore.Signal(str, int, object)
     requestSelect = QtCore.Signal(str)
     invokeRequested = QtCore.Signal(str)
     TITLE_STYLESHEET = (
-        "QToolButton#HotkeyCommandTitle{background:transparent;border:none;border-radius:0px;color:#d0d0d0;font-size:%spx;text-align:left;}"
-        "QToolButton#HotkeyCommandTitle:pressed{background-color:#1f1f1f;border:none;border-radius:0px;}"
+        "QPushButton#HotkeyCommandTitle{background:transparent;border:none;border-radius:0px;color:#d0d0d0;font-size:%spx;text-align:left;padding-left:0px;}"
+        "QPushButton#HotkeyCommandTitle:pressed{background-color:#1f1f1f;border:none;border-radius:0px;}"
     )
 
     def __init__(self, command_data, row_index=0, parent=None):
@@ -745,20 +821,46 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(wutil.DPI(8), 0, wutil.DPI(8), 0)
-        layout.setSpacing(wutil.DPI(6))
+        layout.setSpacing(wutil.DPI(5))
 
-
-        self.hotkey_button = QtWidgets.QToolButton(self)
-        self.hotkey_button.setText(command_data["title"])
-        self.hotkey_button.setAutoRaise(True)
-        self.hotkey_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
-        self.hotkey_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        self.hotkey_button.setIconSize(QtCore.QSize(wutil.DPI(20), wutil.DPI(20)))
+        self.icon_label = QtWidgets.QLabel(self)
+        self.icon_label.setFixedSize(wutil.DPI(22), wutil.DPI(22))
+        self.icon_label.setAlignment(QtCore.Qt.AlignCenter)
         icon_path = command_data.get("icon")
         if icon_path:
-            self.hotkey_button.setIcon(QtGui.QIcon(icon_path))
+            self.icon_label.setPixmap(QtGui.QIcon(icon_path).pixmap(wutil.DPI(20), wutil.DPI(20)))
         elif command_data.get("badge_text"):
-            self.hotkey_button.setIcon(_text_badge_qicon(command_data.get("badge_text")))
+            self.icon_label.setPixmap(_text_badge_qicon(command_data.get("badge_text")).pixmap(wutil.DPI(20), wutil.DPI(20)))
+        layout.addWidget(self.icon_label, 0)
+
+        self.check_box = None
+        if command_data.get("checkable"):
+            self.check_box = QtWidgets.QCheckBox(self)
+            self.check_box.setObjectName("HotkeyCommandCheckBox")
+            self.check_box.setFixedSize(wutil.DPI(15), wutil.DPI(22))
+            self.check_box.setFocusPolicy(QtCore.Qt.NoFocus)
+            self.check_box.setStyleSheet(
+                "#HotkeyCommandCheckBox{background:transparent;spacing:0px;}"
+                "#HotkeyCommandCheckBox::indicator{width:%spx;height:%spx;border:1px solid #626262;border-radius:%spx;background:#262626;}"
+                "#HotkeyCommandCheckBox::indicator:hover{border-color:#7d7d7d;background:#303030;}"
+                "#HotkeyCommandCheckBox::indicator:checked{image:url(%s);border-color:#7d7d7d;background:#363636;}"
+                % (wutil.DPI(11), wutil.DPI(11), wutil.DPI(3), icons.apply)
+            )
+            callback = self.command_data.get("callback") or trigger.get_command(self.command_name())
+            toolCommon.connect_tool_control(
+                self.check_box,
+                (lambda *_args, cb=callback: cb()) if callable(callback) else None,
+                checkable=True,
+                getter=self._check_state_getter(),
+                setter=self.command_data.get("set_checked"),
+                state_key=self.command_data.get("state_key"),
+            )
+            layout.addWidget(self.check_box, 0)
+            layout.setSpacing(wutil.DPI(5))
+
+        self.hotkey_button = QtWidgets.QPushButton(command_data["title"], self)
+        self.hotkey_button.setFlat(True)
+        self.hotkey_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.hotkey_button.setObjectName("HotkeyCommandTitle")
         self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % wutil.DPI(12))
         self.hotkey_button.setMinimumHeight(wutil.DPI(22))
@@ -771,16 +873,22 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         self.status_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(self.status_label)
 
-        self.edit = HotkeyCaptureEdit(self)
-        self.edit.setObjectName("HotkeyCaptureField")
-        self.edit.setMinimumHeight(wutil.DPI(22))
-        self.edit.setStyleSheet(
-            "#HotkeyCaptureField{background:#282828;border-radius:%spx;color:#bdbdbd;padding:%spx %spx;}"
-            "#HotkeyCaptureField:focus{background:#bdbdbd;color:#282828;}"
-            % (wutil.DPI(6), wutil.DPI(3), wutil.DPI(8))
-        )
-        self.edit.comboChanged.connect(lambda combo: self.comboChanged.emit(self.command_name(), combo))
-        layout.addWidget(self.edit, 0)
+        self.edit_container = QtWidgets.QWidget(self)
+        self.edit_layout = QtWidgets.QHBoxLayout(self.edit_container)
+        self.edit_layout.setContentsMargins(0, 0, 0, 0)
+        self.edit_layout.setSpacing(wutil.DPI(4))
+        layout.addWidget(self.edit_container, 0)
+        self.edits = []
+        self._add_edit()
+
+        self.add_button = QtWidgets.QToolButton(self)
+        self.add_button.setAutoRaise(True)
+        self.add_button.setIcon(QtGui.QIcon(icons.add))
+        self.add_button.setIconSize(QtCore.QSize(wutil.DPI(14), wutil.DPI(14)))
+        self.add_button.setFixedSize(wutil.DPI(22), wutil.DPI(22))
+        self.add_button.setToolTip("Add another hotkey")
+        self.add_button.clicked.connect(self.add_empty_hotkey)
+        layout.addWidget(self.add_button, 0)
 
         for watched in self._hover_targets():
             watched.setMouseTracking(True)
@@ -789,31 +897,84 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
     def command_name(self):
         return self.command_data["command"]
 
+    def _check_state_getter(self):
+        getter = self.command_data.get("get_checked")
+        return getter if callable(getter) else None
+
+    def combos(self):
+        return [edit.combo() for edit in self.edits if edit.combo()]
+
     def combo(self):
-        return self.edit.combo()
+        combos = self.combos()
+        return combos[0] if combos else None
+
+    def _style_edit(self, edit):
+        edit.setObjectName("HotkeyCaptureField")
+        edit.setMinimumHeight(wutil.DPI(22))
+        edit.setStyleSheet(
+            "#HotkeyCaptureField{background:#282828;border-radius:%spx;color:#bdbdbd;padding:%spx %spx;}"
+            "#HotkeyCaptureField:focus{background:#bdbdbd;color:#282828;}"
+            % (wutil.DPI(6), wutil.DPI(3), wutil.DPI(8))
+        )
+
+    def _add_edit(self, combo=None):
+        edit = HotkeyCaptureEdit(self.edit_container)
+        self._style_edit(edit)
+        edit.comboChanged.connect(lambda value, target=edit: self._on_edit_combo_changed(target, value))
+        edit.setMouseTracking(True)
+        edit.installEventFilter(self)
+        self.edit_layout.addWidget(edit, 0)
+        self.edits.append(edit)
+        edit.setCombo(combo)
+        edit.setVisible(True)
+        return edit
+
+    def _on_edit_combo_changed(self, edit, combo):
+        self.comboChanged.emit(self.command_name(), self.edits.index(edit), combo)
+
+    def add_empty_hotkey(self):
+        edit = self._add_edit(None)
+        edit.setFocus(QtCore.Qt.OtherFocusReason)
+
+    def ensure_empty_hotkey(self):
+        if any(not edit.combo() for edit in self.edits):
+            return
+        self._add_edit(None)
+
+    def setCombos(self, combos):
+        combos = combos or []
+        needed = max(1, len(combos))
+        while len(self.edits) < needed:
+            self._add_edit(None)
+        while len(self.edits) > needed:
+            edit = self.edits.pop()
+            self.edit_layout.removeWidget(edit)
+            edit.deleteLater()
+        for index, edit in enumerate(self.edits):
+            edit.setCombo(combos[index] if index < len(combos) else None)
 
     def setCombo(self, combo):
-        self.edit.setCombo(combo)
+        self.setCombos([combo] if combo else [])
 
     def set_status(self, icon=None, tooltip="", tooltip_data=None):
         self.status_label.setPixmap(QtGui.QIcon(icon).pixmap(wutil.DPI(20), wutil.DPI(20)) if icon else QtGui.QPixmap())
         self.status_label.setToolTip(_status_tooltip_html(tooltip_data) if tooltip_data else (tooltip or ""))
-
-    def paintEvent(self, event):
-        painter = QtGui.QPainter(self)
-        if self._base_color:
-            painter.fillRect(self.rect(), self._base_color)
-        if self._selected:
-            _draw_row_focus(self, painter, self.rect())
-        painter.end()
-        QtWidgets.QWidget.paintEvent(self, event)
 
     def set_selected(self, selected):
         super().set_selected(selected)
         self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % wutil.DPI(12))
 
     def _hover_targets(self):
-        return (self, self.hotkey_button, self.status_label, self.edit)
+        targets = [self]
+        for attr_name in ("icon_label", "hotkey_button", "status_label", "edit_container", "add_button"):
+            widget = getattr(self, attr_name, None)
+            if widget:
+                targets.append(widget)
+        check_box = getattr(self, "check_box", None)
+        if check_box:
+            targets.append(check_box)
+        targets.extend(getattr(self, "edits", []))
+        return tuple(targets)
 
     def _set_hovered(self, hovered):
         hovered = bool(hovered)
@@ -876,17 +1037,7 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
 
 
 class HotkeyItemList(QtWidgets.QListWidget):
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        current = self.currentItem()
-        current_widget = self.itemWidget(current) if current else None
-        if current_widget and current.isSelected():
-            return
-        if not current or not current.isSelected():
-            return
-        painter = QtGui.QPainter(self.viewport())
-        _draw_row_focus(self, painter, self.visualItemRect(current))
-        painter.end()
+    pass
 
 
 class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
@@ -898,7 +1049,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         self._sections, self._title_lookup, self._icon_lookup = _build_command_catalog()
         self._section_lookup = {section["id"]: section for section in self._sections}
         self._stored_mapping = _load_hotkeys_from_maya()
-        self._draft_mapping = dict(self._stored_mapping)
+        self._draft_mapping = {name: list(combos) for name, combos in self._stored_mapping.items()}
         self._section_views = {}
         self._current_section_id = None
         self._pending_section_id = None
@@ -1053,8 +1204,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         return self._section_views.get(self._current_section_id)
 
     def _set_row_combo_from_draft(self, row):
-        combo = self._draft_mapping.get(row.command_name())
-        row.setCombo(combo if combo else None)
+        row.setCombos(self._draft_mapping.get(row.command_name()) or [])
 
     def _sync_view_from_draft(self, view):
         for row in view["rows"]:
@@ -1098,7 +1248,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             row = HotkeyCommandItemWidget(command, row_index=row_index, parent=command_list)
             row.comboChanged.connect(self._on_row_combo_changed)
             row.requestSelect.connect(self._select_command_by_name)
-            row.invokeRequested.connect(lambda command_name: getattr(trigger, command_name)())
+            row.invokeRequested.connect(self._invoke_command)
             command_list.setItemWidget(item, row)
             self._set_row_combo_from_draft(row)
             self._pending_view["rows"].append(row)
@@ -1192,8 +1342,9 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
                 view["list"].setCurrentRow(index)
                 view["list"].scrollToItem(item, QtWidgets.QAbstractItemView.PositionAtCenter)
                 row = view["rows"][index]
-                row.edit.setFocus(QtCore.Qt.OtherFocusReason)
-                row.edit.selectAll()
+                if row.edits:
+                    row.edits[0].setFocus(QtCore.Qt.OtherFocusReason)
+                    row.edits[0].selectAll()
                 return
 
         QtCore.QTimer.singleShot(0, _focus_when_ready)
@@ -1215,30 +1366,58 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             row.set_selected(item is current)
 
     def _pending_mapping(self):
-        return {name: _normalize_combo(combo) for name, combo in self._draft_mapping.items() if _normalize_combo(combo)}
+        return {name: combos for name, combos in self._draft_mapping.items() if combos}
 
-    def _on_row_combo_changed(self, command_name, combo):
+    def _invoke_command(self, command_name):
+        callback = trigger.get_command(command_name)
+        if callable(callback):
+            callback()
+
+    def _on_row_combo_changed(self, command_name, index, combo):
+        combos = list(self._draft_mapping.get(command_name) or [])
+        while len(combos) <= index:
+            combos.append(None)
+
         if combo:
-            # Transfer behavior: If this hotkey is already used elsewhere in the DRAFT, 
-            # we clear it from the other row and move it here.
             ckey = _combo_key(combo)
-            for other_name, other_combo in list(self._draft_mapping.items()):
-                if other_name != command_name and _combo_key(other_combo) == ckey:
-                    self._draft_mapping.pop(other_name)
-            
-            self._draft_mapping[command_name] = combo
+            for other_name, other_combos in list(self._draft_mapping.items()):
+                cleaned = []
+                for other_index, other_combo in enumerate(other_combos):
+                    if other_name == command_name and other_index == index:
+                        continue
+                    if other_combo and _combo_key(other_combo) == ckey:
+                        continue
+                    cleaned.append(other_combo)
+                if cleaned:
+                    self._draft_mapping[other_name] = cleaned
+                else:
+                    self._draft_mapping.pop(other_name, None)
+            combos = list(self._draft_mapping.get(command_name) or combos)
+            while len(combos) <= index:
+                combos.append(None)
+            combos[index] = combo
+        else:
+            combos[index] = None
+
+        combos = [value for value in combos if value]
+        if combos:
+            self._draft_mapping[command_name] = combos
         else:
             self._draft_mapping.pop(command_name, None)
-            
+
         # Update the UI to reflect changes (especially if another row was cleared)
         self._sync_view_from_draft(self._active_view() or {"rows": []})
+        for row in self._iter_visible_rows():
+            if row.command_name() == command_name:
+                row.ensure_empty_hotkey()
+                break
         self._refresh_all_view_statuses()
 
     def _is_dirty(self):
         return self._pending_mapping() != self._stored_mapping
 
     def _discard_hotkey_changes(self):
-        self._draft_mapping = dict(self._stored_mapping)
+        self._draft_mapping = {name: list(combos) for name, combos in self._stored_mapping.items()}
         self._sync_view_from_draft(self._active_view() or {"rows": []})
         self._refresh_all_view_statuses()
 
@@ -1254,55 +1433,57 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         
         # 2. Pre-calculate internal conflicts (multiple tools in draft using same key)
         reverse_pending = {}
-        for name, combo in pending.items():
-            reverse_pending.setdefault(_combo_key(combo), []).append(name)
+        for name, combos in pending.items():
+            for combo in combos:
+                reverse_pending.setdefault(_combo_key(combo), []).append(name)
 
         # 3. Cache for Maya external queries (non-TKM conflicts)
         external_cache = {}
 
         for row in self._iter_visible_rows():
-            combo = row.combo()
-            if not combo:
+            combos = row.combos()
+            if not combos:
                 row.set_status(None, "")
                 continue
 
-            ckey = _combo_key(combo)
-            
-            # --- 1. INTERNAL CONFLICT (Draft) ---
-            # (Handled by _on_row_combo_changed, but kept here for safety)
-            duplicate_names = reverse_pending.get(ckey, [])
-            if len(duplicate_names) > 1 and row.edit.hasFocus():
-                others = [self._title_lookup.get(name, name) for name in duplicate_names if name != row.command_name()]
-                row.set_status(
-                    icons.warning,
-                    "Also used by {}".format(", ".join(others)),
-                    tooltip_data={
-                        "text": ", ".join(others),
-                        "description": "Draft Conflict.<br>This combination is used by multiple tools in your current changes.",
-                        "icon": icons.warning,
-                    },
-                )
+            row_status_set = False
+            applied_combos = maya_hotkeys.get(row.command_name()) or []
+            for combo in combos:
+                ckey = _combo_key(combo)
+                duplicate_names = reverse_pending.get(ckey, [])
+                if len(duplicate_names) > 1:
+                    others = [self._title_lookup.get(name, name) for name in duplicate_names if name != row.command_name()]
+                    row.set_status(
+                        icons.warning,
+                        "Also used by {}".format(", ".join(others)),
+                        tooltip_data={
+                            "text": ", ".join(others),
+                            "description": "Draft Conflict.<br>This combination is used by multiple tools in your current changes.",
+                            "icon": icons.warning,
+                        },
+                    )
+                    row_status_set = True
+                    break
+
+                if ckey not in external_cache:
+                    external_cache[ckey] = _query_current_name_command(combo)
+                current_assignment = external_cache[ckey]
+                current_tkm_assignment = current_assignment.replace("TKMTriggerName_", "", 1) if current_assignment else None
+                if current_assignment and current_tkm_assignment != row.command_name():
+                    row.set_status(
+                        icons.warning,
+                        "Assigned to {}".format(_tooltip_for_assignment(current_assignment, self._title_lookup)),
+                        tooltip_data=_assignment_tooltip_data(current_assignment, self._title_lookup, self._icon_lookup),
+                    )
+                    row_status_set = True
+                    break
+
+            if row_status_set:
                 continue
 
-            # --- 2. APPLIED STATUS (TKM) ---
-            applied_combo = maya_hotkeys.get(row.command_name())
-            if applied_combo and _combo_key(applied_combo) == ckey:
-                row.set_status(icons.success, "Hotkey applied and active.")
-                continue
-
-            # --- 3. EXTERNAL CONFLICT (Maya/Other) ---
-            if ckey not in external_cache:
-                external_cache[ckey] = _query_current_name_command(combo)
-            current_assignment = external_cache[ckey]
-
-            if current_assignment:
-                row.set_status(
-                    icons.warning,
-                    "Assigned to {}".format(_tooltip_for_assignment(current_assignment, self._title_lookup)),
-                    tooltip_data=_assignment_tooltip_data(current_assignment, self._title_lookup, self._icon_lookup),
-                )
+            if applied_combos and all(any(_combo_key(applied) == _combo_key(combo) for applied in applied_combos) for combo in combos):
+                row.set_status(icons.success, "Hotkeys applied and active.")
             else:
-                # Valid combination, not yet assigned anywhere
                 row.set_status(None, "")
 
     def _refresh_all_view_statuses(self):
@@ -1327,7 +1508,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         if not isinstance(data, dict):
             cmds.warning("Invalid hotkey file.")
             return
-        self._draft_mapping = _normalize_hotkey_mapping(data)
+        self._draft_mapping = _hotkey_mapping_from_data(data)
         self._sync_view_from_draft(self._active_view() or {"rows": []})
         self._refresh_all_view_statuses()
 
@@ -1340,7 +1521,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
             path += ".json"
         try:
             with open(path, "w") as fh:
-                json.dump(self._pending_mapping(), fh, indent=2, sort_keys=True)
+                json.dump(_hotkey_mapping_to_data(self._pending_mapping()), fh, indent=2, sort_keys=True)
         except Exception as exc:
             cmds.warning("Could not export hotkeys: {}".format(exc))
 
@@ -1358,7 +1539,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
         self._draft_mapping = {}
         for row in self._iter_visible_rows():
-            row.setCombo(None)
+            row.setCombos([])
         self._refresh_statuses()
 
     def apply_hotkeys(self):
@@ -1370,12 +1551,13 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         # 1. Final check for internal duplicates
         seen = {}
         duplicates = []
-        for name, combo in pending.items():
-            ckey = _combo_key(combo)
-            if ckey in seen:
-                duplicates.append((name, seen[ckey]))
-            else:
-                seen[ckey] = name
+        for name, combos in pending.items():
+            for combo in combos:
+                ckey = _combo_key(combo)
+                if ckey in seen:
+                    duplicates.append((name, seen[ckey]))
+                else:
+                    seen[ckey] = name
         
         if duplicates:
             cmds.warning("Duplicate hotkeys found. Resolve conflicts before applying.")
@@ -1396,18 +1578,20 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
         # 3. Clear existing TKM hotkeys to avoid duplicates and stale assignments
         previous = _load_hotkeys_from_maya()
-        for combo in previous.values():
-            _clear_hotkey(combo)
+        for combos in previous.values():
+            for combo in combos:
+                _clear_hotkey(combo)
 
         # 4. Assign new hotkeys
-        for command_name, combo in pending.items():
+        for command_name, combos in pending.items():
             title = self._title_lookup.get(command_name, _humanize(command_name))
-            _assign_hotkey(command_name, title, combo)
+            for combo in combos:
+                _assign_hotkey(command_name, title, combo)
 
         # 5. Finalize
         _save_hotkeys_to_maya()
-        self._stored_mapping = dict(pending)
-        self._draft_mapping = dict(pending)
+        self._stored_mapping = {name: list(combos) for name, combos in pending.items()}
+        self._draft_mapping = {name: list(combos) for name, combos in pending.items()}
         
         # Use a small delay to ensure Maya is ready for status queries
         QtCore.QTimer.singleShot(100, self._refresh_all_view_statuses)

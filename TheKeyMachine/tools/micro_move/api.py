@@ -6,6 +6,7 @@ from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.core.openMayaUtils as omutils
+import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import common as toolCommon
@@ -450,6 +451,7 @@ class MicroMoveController(QtCore.QObject):
         activate_micro_move()
         self._timer.start()
         self.stateChanged.emit(self.is_enabled())
+        runtime.get_runtime_manager().set_tool_state("micro_move", self.is_enabled())
 
     def deactivate(self):
         self._enabled = False
@@ -468,6 +470,7 @@ class MicroMoveController(QtCore.QObject):
         except Exception:
             pass
         self.stateChanged.emit(False)
+        runtime.get_runtime_manager().set_tool_state("micro_move", False)
 
     def toggle(self, checked=None, button_widget=None):
         if checked is None:

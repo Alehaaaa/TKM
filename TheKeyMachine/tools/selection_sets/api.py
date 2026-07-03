@@ -52,8 +52,14 @@ def _parent_widget():
 
 
 def _emit_selection_sets_window_state(is_open):
+    state = bool(is_open)
     try:
-        selection_sets_window_bus.stateChanged.emit(bool(is_open))
+        selection_sets_window_bus.stateChanged.emit(state)
+    except Exception:
+        pass
+    try:
+        import TheKeyMachine.core.runtimeManager as runtime
+        runtime.get_runtime_manager().set_tool_state("selection_sets", state)
     except Exception:
         pass
 
@@ -498,3 +504,4 @@ def bind_selection_sets_toolbar_button(button, controller=None):
             "_tkm_selection_sets_context_menu_slot",
             lambda parent, c=controller: build_selection_sets_context_menu(parent=parent, controller=c),
         )
+        return True

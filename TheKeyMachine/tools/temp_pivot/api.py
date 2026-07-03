@@ -183,6 +183,10 @@ def _emit_temp_pivot_state_changed():
         runtime.get_runtime_manager().callback_fired.emit(RUNTIME_KEY)
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
+    try:
+        runtime.get_runtime_manager().set_tool_state(RUNTIME_KEY, is_temp_pivot_active())
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
 
 
 def _playback_slider():

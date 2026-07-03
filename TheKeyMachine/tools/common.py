@@ -237,6 +237,9 @@ def safe_signal_connect(signal, slot):
 def set_checked_safely(widget, checked):
     if not widget:
         return False
+    method = getattr(widget, "set_checked_safely", None)
+    if callable(method):
+        return method(checked)
     block_signals = getattr(widget, "blockSignals", None)
     previous = False
     if callable(block_signals):
@@ -309,8 +312,19 @@ def checked_state_getter(data):
     )
 
 
+def checked_state_setter(data):
+    if not isinstance(data, dict):
+        return None
+    return data.get("set_checked")
+
+
 def sync_checked(control, getter):
-    if control is None or not callable(getter):
+    if control is None:
+        return False
+    method = getattr(control, "sync_checked_state", None)
+    if callable(method):
+        return method()
+    if not callable(getter):
         return False
     try:
         return set_checked_safely(control, bool(getter()))
@@ -334,9 +348,34 @@ def bind_checked_signal(control, signal, getter, attr_name="_tkm_checked_state_s
     )
 
 
-def configure_checkable_control(control, checkable=None, getter=None, changed_signal=None):
+def bind_tool_state_signal(control, state_key, sync_fn, attr_name="_tkm_tool_state_sync"):
+    if control is None or not state_key or not callable(sync_fn):
+        return None
+    try:
+        import TheKeyMachine.core.runtimeManager as runtime
+        manager = runtime.get_runtime_manager()
+    except Exception:
+        return None
+
+    def _sync(changed_key, _state, key=str(state_key), callback=sync_fn):
+        if changed_key == key:
+            callback()
+
+    return replace_tracked_connection(
+        control,
+        attr_name,
+        manager.toolStateChanged,
+        _sync,
+        parent=control,
+    )
+
+
+def configure_checkable_control(control, checkable=None, getter=None, changed_signal=None, state_key=None):
     if control is None:
         return control
+    configure_method = getattr(control, "configure_check_state", None)
+    if callable(configure_method):
+        return configure_method(checkable=checkable, getter=getter, changed_signal=changed_signal, state_key=state_key)
     if checkable is not None:
         try:
             control.setCheckable(bool(checkable))
@@ -349,15 +388,22 @@ def configure_checkable_control(control, checkable=None, getter=None, changed_si
     if is_checkable:
         sync_checked(control, getter)
         bind_checked_signal(control, changed_signal, getter)
+        bind_tool_state_signal(control, state_key, lambda target=control, state_fn=getter: sync_checked(target, state_fn))
     return control
 
 
 def trigger_tool_callback(button, callback, *args, **kwargs):
     trigger_fn = getattr(button, "triggerToolCallback", None)
     if callable(trigger_fn):
-        return trigger_fn(callback, *args, **kwargs)
+        try:
+            return trigger_fn(callback, *args, **kwargs)
+        except TypeError:
+            return trigger_fn(callback)
     if callable(callback):
-        return callback(*args, **kwargs)
+        try:
+            return callback(*args, **kwargs)
+        except TypeError:
+            return callback()
     return None
 
 
@@ -378,16 +424,32 @@ def connect_tool_control(
     *,
     checkable=None,
     getter=None,
+    setter=None,
     changed_signal=None,
     bind_fn=None,
+    state_key=None,
 ):
-    configure_checkable_control(control, checkable=checkable, getter=getter, changed_signal=changed_signal)
+    configure_method = getattr(control, "configure_check_state", None)
+    if callable(configure_method):
+        configure_method(
+            checkable=checkable,
+            getter=getter,
+            setter=setter,
+            changed_signal=changed_signal,
+            bind_fn=bind_fn,
+            state_key=state_key,
+        )
+        if getattr(control, "_tkm_check_binding_owns_trigger", False):
+            callback = None
+    else:
+        configure_checkable_control(control, checkable=checkable, getter=getter, changed_signal=changed_signal, state_key=state_key)
 
-    if callable(bind_fn):
-        try:
-            bind_fn(control)
-        except Exception:
-            pass
+        if callable(bind_fn):
+            try:
+                if bind_fn(control) is True:
+                    callback = None
+            except Exception:
+                pass
 
     if callback is None or control is None:
         return control
@@ -398,9 +460,15 @@ def connect_tool_control(
         is_checkable = bool(checkable)
 
     if is_checkable:
-        def _checked_cb(*args, cb=callback, target=control, state_fn=getter):
+        def _checked_cb(*args, cb=callback, target=control, state_fn=getter, set_fn=setter):
             checked = bool(args[0]) if args else bool(target.isChecked())
-            result = trigger_tool_callback(target, cb, checked)
+            set_state = getattr(target, "set_checked_state", None)
+            if cb is not None:
+                result = trigger_tool_callback(target, cb, checked)
+            elif callable(set_state) and callable(set_fn):
+                result = set_state(checked, apply=True)
+            else:
+                result = None
             sync_checked(target, state_fn)
             return result
 
@@ -422,8 +490,10 @@ def connect_control_from_data(control, data, callback=_USE_DESCRIPTOR_CALLBACK):
     resolved_callback = data.get("callback") if callback is _USE_DESCRIPTOR_CALLBACK else callback
     checkable = bool(data.get("checkable", data.get("type") == "check"))
     getter = checked_state_getter(data)
+    setter = checked_state_setter(data)
     changed_signal = data.get("changed_signal")
     bind_fn = data.get("bind_checked_fn")
+    state_key = data.get("state_key")
 
     if checkable or resolved_callback is not None or getter or changed_signal or bind_fn:
         connect_tool_control(
@@ -431,8 +501,10 @@ def connect_control_from_data(control, data, callback=_USE_DESCRIPTOR_CALLBACK):
             resolved_callback,
             checkable=checkable,
             getter=getter,
+            setter=setter,
             changed_signal=changed_signal,
             bind_fn=bind_fn,
+            state_key=state_key,
         )
     return control
 

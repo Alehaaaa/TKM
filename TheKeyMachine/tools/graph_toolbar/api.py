@@ -31,8 +31,13 @@ def is_graph_toolbar_visible() -> bool:
 
 
 def emit_graph_toolbar_state() -> None:
+    state = get_graph_toolbar_checkbox_state()
     try:
-        custom_graph_bus.graph_toolbar_enabled_changed.emit(get_graph_toolbar_checkbox_state())
+        custom_graph_bus.graph_toolbar_enabled_changed.emit(state)
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
+    try:
+        runtime.get_runtime_manager().set_tool_state("custom_graph", state)
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 

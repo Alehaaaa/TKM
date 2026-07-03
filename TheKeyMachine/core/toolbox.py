@@ -7,11 +7,15 @@ import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.generalMod as general
+import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.core.toolMenus as toolMenus
+import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
+import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
 import TheKeyMachine.tools.isolate_bookmarks.api as isolateBookmarksApi
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
+import TheKeyMachine.tools.orbit.api as orbitApi
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 import TheKeyMachine.tools.temp_pivot.api as tempPivotApi
 from TheKeyMachine.tools import colors as toolColors
@@ -56,6 +60,95 @@ def _tool_menu_builder(builder_name, **pdefault_kwargs):
         return builder(menu, source_widget=source_widget, **pdefault_kwargs)
 
     return _build
+
+
+def _toolbar_controller_enabled(controller_attr):
+    try:
+        from TheKeyMachine.core.toolbar import get_toolbar
+    except Exception:
+        return False
+    toolbar = get_toolbar()
+    controller = getattr(toolbar, controller_attr, None) if toolbar else None
+    is_enabled = getattr(controller, "is_enabled", None)
+    return bool(is_enabled()) if callable(is_enabled) else False
+
+
+def _set_animation_offset_enabled(enabled):
+    try:
+        from TheKeyMachine.core.toolbar import get_toolbar
+    except Exception:
+        return None
+    toolbar = get_toolbar()
+    if toolbar:
+        return toolbar.toggleAnimOffsetButton(bool(enabled))
+    return None
+
+
+def _set_micro_move_enabled(enabled):
+    try:
+        from TheKeyMachine.core.toolbar import get_toolbar
+    except Exception:
+        return None
+    toolbar = get_toolbar()
+    if toolbar:
+        return toolbar.toggle_micro_move_button(bool(enabled))
+    return None
+
+
+def _set_orbit_window_open(enabled):
+    return orbitApi.orbit_window(reuse_existing=True) if enabled else orbitApi.close_orbit_window()
+
+
+def _set_attribute_switcher_window_open(enabled):
+    return attributeSwitcherApi.attribute_switcher_window(reuse_existing=True, popup=False) if enabled else attributeSwitcherApi.close_attribute_switcher_window()
+
+
+def _set_gimbal_fixer_window_open(enabled):
+    return gimbalFixerApi.gimbal_fixer_window() if enabled else gimbalFixerApi.close_gimbal_fixer_window()
+
+
+def _set_selection_sets_window_open(enabled):
+    return selectionSetsApi.selection_sets_window(reuse_existing=True) if enabled else selectionSetsApi.close_selection_sets_window()
+
+
+def _get_overshoot_sliders_enabled():
+    return bool(settings.get_setting("sliders_overshoot", False))
+
+
+def _set_overshoot_sliders_enabled(enabled):
+    settings.set_setting("sliders_overshoot", bool(enabled))
+    try:
+        import TheKeyMachine.core.runtimeManager as runtime
+        manager = runtime.get_runtime_manager()
+        manager.overshootChanged.emit(bool(enabled))
+        manager.set_tool_state("overshoot_sliders", bool(enabled))
+    except Exception:
+        pass
+
+
+def _get_link_autolink_enabled():
+    return bool(settings.get_setting("link_checkbox_state", False))
+
+
+def _set_link_autolink_enabled(enabled):
+    enabled = bool(enabled)
+    settings.set_setting("link_checkbox_state", enabled)
+    try:
+        from TheKeyMachine.core.toolbar import get_toolbar
+        toolbar = get_toolbar()
+        if toolbar:
+            toolbar.link_checkbox_state = enabled
+    except Exception:
+        pass
+    if enabled:
+        keyTools.add_link_obj_callbacks()
+    else:
+        keyTools.remove_link_obj_callbacks()
+    try:
+        import TheKeyMachine.core.runtimeManager as runtime
+        runtime.get_runtime_manager().set_tool_state("link_autolink", enabled)
+    except Exception:
+        pass
 
 
 TOOL_DEFINITIONS = {
@@ -233,26 +326,38 @@ TOOL_DEFINITIONS = {
 
     "orbit": {
         "type": "check",
+        "state_key": "orbit",
         "label": "Orbit",
         "text": "Orb",
         "icon": icons.orbit_ui,
-        "callback": lambda: ui.orbit_window(0, 0),
+        "callback": orbitApi.toggle_orbit_window,
+        "get_checked": orbitApi.is_orbit_window_open,
+        "set_checked": _set_orbit_window_open,
+        "bind_checked_fn": orbitApi.bind_orbit_toolbar_button,
         "tooltip_template": helper.orbit_tooltip_text,
     },
     "attribute_switcher": {
         "type": "check",
+        "state_key": "attribute_switcher",
         "label": "Attribute Switcher",
         "text": "SSw",
         "icon": icons.attribute_switcher,
-        "callback": lambda: ui.toggle_attribute_switcher_window(),
+        "callback": attributeSwitcherApi.toggle_attribute_switcher_window,
+        "get_checked": attributeSwitcherApi.is_attribute_switcher_window_open,
+        "set_checked": _set_attribute_switcher_window_open,
+        "bind_checked_fn": attributeSwitcherApi.bind_attribute_switcher_toolbar_button,
         "tooltip_template": helper.attribute_switcher_tooltip_text,
     },
     "gimbal": {
-        "type": "tool",
+        "type": "check",
+        "state_key": "gimbal",
         "label": "Gimbal Fixer",
         "text": "Gim",
         "icon": icons.reblock,
-        "callback": gimbalFixerApi.gimbal_fixer_window,
+        "callback": gimbalFixerApi.toggle_gimbal_fixer_window,
+        "get_checked": gimbalFixerApi.is_gimbal_fixer_window_open,
+        "set_checked": _set_gimbal_fixer_window_open,
+        "bind_checked_fn": gimbalFixerApi.bind_gimbal_fixer_toolbar_button,
         "tooltip_template": helper.gimbal_fixer_tooltip_text,
     },
 
@@ -260,11 +365,13 @@ TOOL_DEFINITIONS = {
 
     "temp_pivot": {
         "type": "check",
+        "state_key": "temp_pivot",
         "label": "Temp Pivot",
         "text": "TP",
         "icon": icons.temp_pivot,
         "callback": tempPivotApi.toggle_temp_pivot,
         "get_checked": tempPivotApi.is_temp_pivot_active,
+        "set_checked": tempPivotApi.toggle_temp_pivot,
         "bind_checked_fn": tempPivotApi.bind_temp_pivot_toolbar_button,
         "tooltip_template": helper.temp_pivot_tooltip_text,
     },
@@ -314,10 +421,13 @@ TOOL_DEFINITIONS = {
     },
     "micro_move": {
         "type": "check",
+        "state_key": "micro_move",
         "label": "Micro Move",
         "text": "MM",
         "icon": icons.ruler,
         "callback": trigger.make_command_callback("micro_move"),
+        "get_checked": lambda: _toolbar_controller_enabled("micro_move_controller"),
+        "set_checked": _set_micro_move_enabled,
         "tooltip_template": helper.micro_move_tooltip_text,
     },
 
@@ -325,21 +435,27 @@ TOOL_DEFINITIONS = {
 
     "overshoot_sliders": {
         "type": "check",
+        "state_key": "overshoot_sliders",
         "label": "Overshoot Sliders",
         "menu_label": "Overshoot Sliders",
         "text": "OS",
         "icon": icons.sliders_overshoot,
         "callback": trigger.make_command_callback("overshoot_sliders"),
+        "get_checked": _get_overshoot_sliders_enabled,
+        "set_checked": _set_overshoot_sliders_enabled,
         "description": "Set range for sliders to -150/150, from -100/100.",
         "setting_toggle": "overshoot_sliders",
     },
     "attribute_switcher_euler_filter": {
         "type": "check",
+        "state_key": "attribute_switcher_euler_filter",
         "label": "Auto Euler Filter",
         "menu_label": "Auto Euler Filter",
         "text": "EF",
         "icon": icons.euler_filter,
         "callback": trigger.make_command_callback("attribute_switcher_euler_filter"),
+        "get_checked": attributeSwitcherApi.is_euler_filter_enabled,
+        "set_checked": attributeSwitcherApi.set_euler_filter_enabled,
         "description": "Apply Euler filtering after Attribute Switcher changes rotation order.",
         "setting_toggle": "attribute_switcher_euler_filter",
     },
@@ -712,10 +828,14 @@ TOOL_DEFINITIONS = {
 
     "selection_sets": {
         "type": "check",
+        "state_key": "selection_sets",
         "label": "Selection Sets",
         "text": "SS",
         "icon": icons.selection_sets,
-        "callback": trigger.make_command_callback("selection_sets"),
+        "callback": selectionSetsApi.toggle_selection_sets_window,
+        "get_checked": selectionSetsApi.is_selection_sets_window_open,
+        "set_checked": _set_selection_sets_window_open,
+        "bind_checked_fn": selectionSetsApi.bind_selection_sets_toolbar_button,
         "tooltip_template": helper.selection_sets_tooltip_text,
     },
     "selection_sets_quick_export": {
@@ -760,11 +880,14 @@ TOOL_DEFINITIONS = {
     },
     "custom_graph": {
         "type": "check",
+        "state_key": "custom_graph",
         "label": "Graph Editor Toolbar",
         "menu_label": "Show Graph Editor Toolbar",
         "text": "GE",
         "icon": icons.customGraph,
         "callback": trigger.make_command_callback("custom_graph"),
+        "get_checked": graphToolbarApi.get_graph_toolbar_checkbox_state,
+        "set_checked": lambda state: graphToolbarApi.set_graph_toolbar_enabled(bool(state), apply=True),
         "tooltip_template": helper.customGraph_tooltip_text,
         "description": "Show the TKM toolbar in the Graph Editor.",
         "setting_toggle": "custom_graph",
@@ -911,9 +1034,12 @@ TOOL_DEFINITIONS = {
     },
     "animation_offset": {
         "type": "check",
+        "state_key": "animation_offset",
         "label": "Anim Offset",
         "icon": icons.animation_offset,
         "callback": trigger.make_command_callback("animation_offset"),
+        "get_checked": lambda: _toolbar_controller_enabled("animation_offset_controller"),
+        "set_checked": _set_animation_offset_enabled,
         "tooltip_template": helper.animation_offset_tooltip_text,
     },
     "ws_copy_frame": {
@@ -1100,9 +1226,12 @@ TOOL_DEFINITIONS = {
     },
     "link_autolink": {
         "type": "check",
+        "state_key": "link_autolink",
         "label": "Auto Link Position",
         "icon": icons.link_relative,
         "checkable": True,
+        "get_checked": _get_link_autolink_enabled,
+        "set_checked": _set_link_autolink_enabled,
         "tooltip_template": helper.auto_link_tooltip_text,
     },
     "link_help": {

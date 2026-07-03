@@ -19,6 +19,20 @@ from TheKeyMachine.widgets import util as wutil
 
 
 _gimbal_fixer_window = None
+gimbal_fixer_window_bus = toolCommon.WindowStateBus()
+
+
+def _emit_gimbal_fixer_window_state(is_open):
+    state = bool(is_open)
+    try:
+        gimbal_fixer_window_bus.stateChanged.emit(state)
+    except Exception:
+        pass
+    try:
+        import TheKeyMachine.core.runtimeManager as runtime
+        runtime.get_runtime_manager().set_tool_state("gimbal", state)
+    except Exception:
+        pass
 
 
 class GimbalFixerWindow(customDialogs.QFlatToolBarDialog):
@@ -139,6 +153,7 @@ class GimbalFixerWindow(customDialogs.QFlatToolBarDialog):
 
     def closeEvent(self, event):
         self._disconnect_runtime_manager()
+        _emit_gimbal_fixer_window_state(False)
         super().closeEvent(event)
 
 
@@ -155,6 +170,19 @@ def existing_gimbal_fixer_window():
     return None
 
 
+def is_gimbal_fixer_window_open():
+    window = existing_gimbal_fixer_window()
+    return bool(window and window.isVisible())
+
+
+def close_gimbal_fixer_window():
+    window = existing_gimbal_fixer_window()
+    if window and wutil.is_valid_widget(window):
+        window.close()
+    else:
+        _emit_gimbal_fixer_window_state(False)
+
+
 def show_gimbal_fixer_window():
     global _gimbal_fixer_window
     existing = existing_gimbal_fixer_window()
@@ -163,6 +191,7 @@ def show_gimbal_fixer_window():
         existing.show()
         existing.raise_()
         existing.activateWindow()
+        _emit_gimbal_fixer_window_state(True)
         return existing
 
     if cmds.window(WINDOW_NAME, exists=True):
@@ -174,13 +203,36 @@ def show_gimbal_fixer_window():
     def _on_destroyed(*_):
         global _gimbal_fixer_window
         _gimbal_fixer_window = None
+        _emit_gimbal_fixer_window_state(False)
 
     window.destroyed.connect(_on_destroyed)
     window.show()
     window.raise_()
     window.activateWindow()
+    _emit_gimbal_fixer_window_state(True)
 
     if not selectionMod.get_selected_objects():
         wutil.make_inViewMessage("Select a control and reload")
 
     return window
+
+
+gimbal_fixer_toolbar_toggle = toolCommon.ToolbarWindowToggle(
+    is_gimbal_fixer_window_open,
+    show_gimbal_fixer_window,
+    close_gimbal_fixer_window,
+    gimbal_fixer_window_bus.stateChanged,
+)
+
+
+def toggle_gimbal_fixer_window(*_args):
+    return gimbal_fixer_toolbar_toggle.toggle()
+
+
+def bind_gimbal_fixer_toolbar_button(button):
+    connect_window_toggle = getattr(button, "connect_window_toggle", None)
+    if callable(connect_window_toggle):
+        connect_window_toggle(gimbal_fixer_toolbar_toggle)
+    else:
+        toolCommon.connect_window_toggle_control(button, gimbal_fixer_toolbar_toggle)
+    return True
