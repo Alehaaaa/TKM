@@ -4,15 +4,14 @@
   <defs>
     <style>
       .st0 {
-        fill: none;
-        stroke: #d86552;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        stroke-width: 5.2px;
+        fill: #d86552;
+      }
+
+      .st1 {
+        fill: #3a3a3a;
       }
     </style>
   </defs>
-  <g id="surface2">
-    <path class="st0" d="M9.76,26h31.85"/>
-  </g>
+  <path class="st0" d="M9.8,29.8c-2.1,0-3.8-1.6-3.8-3.8s1.6-3.8,3.8-3.8h31.8c2.1,0,3.8,1.6,3.8,3.8s-1.6,3.8-3.8,3.8H9.8Z"/>
+  <path class="st1" d="M41.6,23.5c1.4,0,2.5,1.1,2.5,2.5s-1.1,2.5-2.5,2.5H9.8c-1.4,0-2.5-1.1-2.5-2.5s1.1-2.5,2.5-2.5h31.8M41.6,21H9.8c-2.8,0-5,2.2-5,5s2.2,5,5,5h31.8c2.8,0,5-2.2,5-5s-2.2-5-5-5h0Z"/>
 </svg>

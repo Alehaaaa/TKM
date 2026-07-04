@@ -116,6 +116,108 @@ def _time_unit():
         return om.MTime.kFilm
 
 
+def mtime(time):
+    if om is None:
+        return None
+    return om.MTime(float(time), _time_unit())
+
+
+def anim_curve_fn(curve):
+    return _anim_curve_fn(curve)
+
+
+def anim_curve_key_index(fn, time):
+    return _find_anim_key_index(fn, time)
+
+
+def anim_curve_value(fn, index, fallback=None):
+    if fn is None or index is None:
+        return fallback
+    try:
+        return fn.value(index)
+    except Exception:
+        return fallback
+
+
+def anim_curve_value_at_time(fn, time, fallback=None):
+    if fn is None:
+        return fallback
+    index = anim_curve_key_index(fn, time)
+    if index is not None:
+        return anim_curve_value(fn, index, fallback=fallback)
+    try:
+        target = mtime(time)
+        if target is None:
+            return fallback
+        return fn.evaluate(target)
+    except Exception:
+        return fallback
+
+
+def add_anim_curve_key(fn, time, change=None):
+    if fn is None:
+        return None
+    target = mtime(time)
+    if target is None:
+        return None
+    index = anim_curve_key_index(fn, time)
+    if index is not None:
+        return index
+    try:
+        value = fn.evaluate(target)
+        if change is not None:
+            return fn.addKey(target, value, change=change)
+        return fn.addKey(target, value)
+    except Exception:
+        return None
+
+
+def set_anim_curve_value_by_index(fn, index, value, change=None):
+    if fn is None or index is None:
+        return False
+    try:
+        if change is not None:
+            fn.setValue(index, float(value), change=change)
+        else:
+            fn.setValue(index, float(value))
+        return True
+    except Exception:
+        return False
+
+
+def _anim_curve_type(fn):
+    if fn is None:
+        return None
+    for getter in (
+        lambda: fn.animCurveType(),
+        lambda: fn.animCurveType,
+    ):
+        try:
+            return getter()
+        except Exception:
+            pass
+    return None
+
+
+def anim_curve_value_to_attr_value(curve, value):
+    """Convert an MFnAnimCurve value to command-layer attribute units."""
+    if om is None or oma is None or curve is None:
+        return value
+    fn = anim_curve_fn(curve)
+    curve_type = _anim_curve_type(fn)
+    try:
+        if curve_type == oma.MFnAnimCurve.kAnimCurveTA:
+            return om.MAngle(float(value)).asUnits(om.MAngle.uiUnit())
+    except Exception:
+        pass
+    try:
+        if curve_type == oma.MFnAnimCurve.kAnimCurveTL:
+            return om.MDistance(float(value)).asUnits(om.MDistance.uiUnit())
+    except Exception:
+        pass
+    return value
+
+
 def _find_anim_key_index(fn, time):
     if om is None or fn is None:
         return None

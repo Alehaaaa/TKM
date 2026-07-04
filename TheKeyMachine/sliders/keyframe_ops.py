@@ -6,9 +6,7 @@ Tweening and blending operations translated from keyToolsMod.
 
 import maya.cmds as cmds
 
-import TheKeyMachine.core.openMayaUtils as omutils
-import TheKeyMachine.mods.selectionMod as selectionMod
-from . import utils
+from . import mode_values, utils
 from .utils import TweenFrameData, BlendFrameData
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -34,7 +32,7 @@ def _right_frame_from_time_range(time_range):
 def _resolve_keyframe_targets_for_session(session):
     """Cache the resolved keyframe target map on the session."""
     if not session.targets.resolved:
-        affected_map, time_range = utils.resolve_keyframe_targets(create_missing_keys=not getattr(session, "preview", False))
+        affected_map, time_range = utils.resolve_keyframe_targets()
         session.targets.affected_map = affected_map
         session.targets.time_range = time_range
         session.targets.resolved = True
@@ -69,61 +67,6 @@ def _has_keyframes(attr_full):
         return bool(cmds.keyframe(attr_full, query=True) or [])
     except Exception:
         return False
-
-
-def _clamp_numeric_attr_value(attr_full, value):
-    try:
-        obj, attr = attr_full.split(".", 1)
-    except ValueError:
-        return value
-    try:
-        if cmds.attributeQuery(attr, node=obj, minExists=True):
-            value = max(value, cmds.attributeQuery(attr, node=obj, minimum=True)[0])
-        if cmds.attributeQuery(attr, node=obj, maxExists=True):
-            value = min(value, cmds.attributeQuery(attr, node=obj, maximum=True)[0])
-    except Exception:
-        pass
-    return value
-
-
-def _set_attr_value(attr_full, value, preview=False):
-    value = _clamp_numeric_attr_value(attr_full, value)
-    if preview:
-        omutils.set_numeric_plug_value(attr_full, value)
-        return
-    try:
-        cmds.setAttr(attr_full, float(value))
-        return
-    except Exception:
-        pass
-    try:
-        cmds.setAttr(attr_full, int(round(value)))
-    except Exception:
-        pass
-
-
-def _set_keyed_value_with_openmaya(attr_full, current_time, value):
-    for curve in selectionMod.get_anim_curves_from_plugs([attr_full]):
-        if omutils.set_anim_curve_key_value(curve, current_time, value):
-            return True
-    return False
-
-
-def _apply_cached_value(session, attr_full, value, current_time, use_direct_attr=False):
-    value = _clamp_numeric_attr_value(attr_full, value)
-    if use_direct_attr:
-        _set_attr_value(attr_full, value, preview=getattr(session, "preview", False))
-        return
-    if getattr(session, "preview", False):
-        _set_keyed_value_with_openmaya(attr_full, current_time, value)
-        return
-    try:
-        cmds.setKeyframe(attr_full, time=(current_time,), value=float(value), absolute=True)
-    except Exception:
-        try:
-            cmds.keyframe(attr_full, edit=True, time=(current_time, current_time), valueChange=float(value), absolute=True)
-        except Exception:
-            pass
 
 
 def _apply_world_space_blend(attr_full, time, target_frame, blend):
@@ -177,18 +120,22 @@ def prepare_tween_data(session, objs=None, attrs=None, attr_plugs=None, time_ran
             continue
 
         keyframes = None  # lazy load
+        curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
 
         for current_time in times:
             try:
-                current_v = cmds.getAttr(attr_full, time=current_time)
+                current_v = mode_values.curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
             except Exception:
                 continue
+            key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
+            if key_index is not None:
+                current_v = mode_values.curve_value(curve_fn, key_index, current_v)
 
             # Case A: Boundary-based Tweening (Selected Range)
             if time_range and right_frame is not None:
                 try:
-                    prev_v = cmds.getAttr(attr_full, time=time_range[0])
-                    next_v = cmds.getAttr(attr_full, time=right_frame)
+                    prev_v = mode_values.curve_value_at_time(curve_fn, time_range[0], cmds.getAttr(attr_full, time=time_range[0]))
+                    next_v = mode_values.curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
                     session.cache.tween_frame_data[(attr_full, current_time)] = TweenFrameData(
                         previousValue=prev_v,
                         nextValue=next_v,
@@ -196,6 +143,8 @@ def prepare_tween_data(session, objs=None, attrs=None, attr_plugs=None, time_ran
                         needsCalculation=(prev_v is not None and next_v is not None),
                         prev_f=time_range[0],
                         next_f=right_frame,
+                        curve=curve,
+                        keyIndex=key_index,
                     )
                     continue
                 except Exception:
@@ -222,8 +171,8 @@ def prepare_tween_data(session, objs=None, attrs=None, attr_plugs=None, time_ran
             elif next_f is None:
                 next_f = prev_f
 
-            prev_v = cmds.getAttr(attr_full, time=prev_f)
-            next_v = cmds.getAttr(attr_full, time=next_f)
+            prev_v = mode_values.curve_value_at_time(curve_fn, prev_f, cmds.getAttr(attr_full, time=prev_f))
+            next_v = mode_values.curve_value_at_time(curve_fn, next_f, cmds.getAttr(attr_full, time=next_f))
 
             session.cache.tween_frame_data[(attr_full, current_time)] = TweenFrameData(
                 previousValue=prev_v,
@@ -233,6 +182,8 @@ def prepare_tween_data(session, objs=None, attrs=None, attr_plugs=None, time_ran
                 use_direct_attr=False,
                 prev_f=prev_f,
                 next_f=next_f,
+                curve=curve,
+                keyIndex=key_index,
             )
     return session.cache.tween_frame_data
 
@@ -248,12 +199,16 @@ def cache_neighbor_keyframe_data(session, affected_map, time_range=None):
             continue
 
         keyframes = None  # lazy load
+        curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
 
         for current_time in times:
             try:
-                original_value = cmds.getAttr(attr_full, time=current_time)
+                original_value = mode_values.curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
             except Exception:
                 continue
+            key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
+            if key_index is not None:
+                original_value = mode_values.curve_value(curve_fn, key_index, original_value)
 
             previous_value = None
             next_value = None
@@ -263,8 +218,8 @@ def cache_neighbor_keyframe_data(session, affected_map, time_range=None):
 
             if time_range and right_frame is not None:
                 try:
-                    previous_value = cmds.getAttr(attr_full, time=time_range[0])
-                    next_value = cmds.getAttr(attr_full, time=right_frame)
+                    previous_value = mode_values.curve_value_at_time(curve_fn, time_range[0], cmds.getAttr(attr_full, time=time_range[0]))
+                    next_value = mode_values.curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
                     prev_f = time_range[0]
                     next_f = right_frame
                 except Exception:
@@ -278,14 +233,14 @@ def cache_neighbor_keyframe_data(session, affected_map, time_range=None):
 
                 if prev_f is not None:
                     try:
-                        previous_value = cmds.getAttr(attr_full, time=prev_f)
+                        previous_value = mode_values.curve_value_at_time(curve_fn, prev_f, cmds.getAttr(attr_full, time=prev_f))
                         prev_tan_type = cmds.keyTangent(attr_full, query=True, time=(prev_f,), outTangentType=True)[0]
                     except Exception:
                         pass
 
                 if next_f is not None:
                     try:
-                        next_value = cmds.getAttr(attr_full, time=next_f)
+                        next_value = mode_values.curve_value_at_time(curve_fn, next_f, cmds.getAttr(attr_full, time=next_f))
                     except Exception:
                         pass
 
@@ -297,6 +252,8 @@ def cache_neighbor_keyframe_data(session, affected_map, time_range=None):
                 prev_f=prev_f,
                 next_f=next_f,
                 use_direct_attr=not _has_keyframes(attr_full),
+                curve=curve,
+                keyIndex=key_index,
             )
 
     return session.cache.frame_data
@@ -340,7 +297,15 @@ def apply_tween(session, value, world_space=False):
                 cmds.setKeyframe(obj, time=time, respectKeyable=True)
             else:
                 new_v = utils.lerp(prev_v, next_v, t)
-                _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+                mode_values.apply_attr_curve_value(
+                    session,
+                    attr_full,
+                    new_v,
+                    time,
+                    use_direct_attr=cache.use_direct_attr,
+                    curve=cache.curve,
+                    key_index=cache.keyIndex,
+                )
     finally:
         if world_space and cmds.currentTime(query=True) != initial_time:
             cmds.currentTime(initial_time, edit=True)
@@ -418,7 +383,15 @@ def apply_blend_to_neighbors(session, percentage, world_space=False):
                 continue
 
         new_v = utils.lerp_towards(left_target, right_target, t, orig)
-        _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+        mode_values.apply_attr_curve_value(
+            session,
+            attr_full,
+            new_v,
+            time,
+            use_direct_attr=cache.use_direct_attr,
+            curve=cache.curve,
+            key_index=cache.keyIndex,
+        )
 
 
 def apply_blend_to_ease(session, percentage, world_space=False):
@@ -452,7 +425,15 @@ def apply_blend_to_ease(session, percentage, world_space=False):
         left_target = utils.lerp(prev_v, next_v, ease_in)
         right_target = utils.lerp(prev_v, next_v, ease_out)
         new_v = utils.lerp_towards(left_target, right_target, blend, orig)
-        _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+        mode_values.apply_attr_curve_value(
+            session,
+            attr_full,
+            new_v,
+            time,
+            use_direct_attr=cache.use_direct_attr,
+            curve=cache.curve,
+            key_index=cache.keyIndex,
+        )
 
 
 def apply_blend_to_default(session, percentage, world_space=False):
@@ -481,14 +462,20 @@ def apply_blend_to_default(session, percentage, world_space=False):
             default_value = float(default_query[0])
 
             has_keys = _has_keyframes(attr_full)
+            curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
 
             for current_time in times:
                 try:
-                    original_value = float(cmds.getAttr(attr_full, time=current_time))
+                    original_value = mode_values.curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
+                    key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
+                    if key_index is not None:
+                        original_value = mode_values.curve_value(curve_fn, key_index, original_value)
                     session.cache.frame_data[(attr_full, current_time)] = BlendFrameData(
                         original_value=original_value,
                         defaultValue=default_value,
                         use_direct_attr=not has_keys,
+                        curve=curve,
+                        keyIndex=key_index,
                     )
                 except Exception:
                     pass
@@ -505,7 +492,15 @@ def apply_blend_to_default(session, percentage, world_space=False):
         mirrored = (2.0 * orig) - default_value
         new_value = utils.lerp_towards(mirrored, default_value, t, orig)
 
-        _apply_cached_value(session, attr_full, new_value, current_time, use_direct_attr=cache.use_direct_attr)
+        mode_values.apply_attr_curve_value(
+            session,
+            attr_full,
+            new_value,
+            current_time,
+            use_direct_attr=cache.use_direct_attr,
+            curve=cache.curve,
+            key_index=cache.keyIndex,
+        )
 
 
 def apply_blend_to_key(session, percentage, objs=None):
@@ -529,15 +524,19 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
                 continue
 
             try:
-                l_val = cmds.getAttr(attr_full, time=left_frame)
-                r_val = cmds.getAttr(attr_full, time=right_frame)
+                curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
+                l_val = mode_values.curve_value_at_time(curve_fn, left_frame, cmds.getAttr(attr_full, time=left_frame))
+                r_val = mode_values.curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
             except Exception:
                 continue
 
             has_keys = _has_keyframes(attr_full)
             for t in times:
                 try:
-                    orig = cmds.getAttr(attr_full, time=t)
+                    orig = mode_values.curve_value_at_time(curve_fn, t, cmds.getAttr(attr_full, time=t))
+                    key_index = mode_values.find_or_add_key_index(session, curve_fn, t)
+                    if key_index is not None:
+                        orig = mode_values.curve_value(curve_fn, key_index, orig)
                     session.cache.frame_data[(attr_full, t)] = BlendFrameData(
                         original_value=orig,
                         leftValue=l_val,
@@ -545,6 +544,8 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
                         leftFrame=left_frame,
                         rightFrame=right_frame,
                         use_direct_attr=not has_keys,
+                        curve=curve,
+                        keyIndex=key_index,
                     )
                 except Exception:
                     pass
@@ -563,7 +564,15 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
             if _apply_world_space_blend(attr_full, time, target_f, t):
                 continue
         new_v = utils.lerp_towards(cache.leftValue, cache.rightValue, t, orig)
-        _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+        mode_values.apply_attr_curve_value(
+            session,
+            attr_full,
+            new_v,
+            time,
+            use_direct_attr=cache.use_direct_attr,
+            curve=cache.curve,
+            key_index=cache.keyIndex,
+        )
 
 
 def apply_blend_to_infinity(session, percentage, world_space=False):
@@ -600,7 +609,15 @@ def apply_blend_to_infinity(session, percentage, world_space=False):
             continue
 
         new_v = utils.lerp_towards(left_target, right_target, t, orig)
-        _apply_cached_value(session, attr_full, new_v, time, use_direct_attr=cache.use_direct_attr)
+        mode_values.apply_attr_curve_value(
+            session,
+            attr_full,
+            new_v,
+            time,
+            use_direct_attr=cache.use_direct_attr,
+            curve=cache.curve,
+            key_index=cache.keyIndex,
+        )
 
 
 def apply_blend_to_buffer(session, percentage, world_space=False):
@@ -613,16 +630,22 @@ def apply_blend_to_buffer(session, percentage, world_space=False):
         session.cache.frame_data.clear()
         for attr_full, times in affected_map.items():
             has_keys = _has_keyframes(attr_full)
+            curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
             for current_time in times:
                 try:
-                    orig = cmds.getAttr(attr_full, time=current_time)
+                    orig = mode_values.curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
                 except Exception:
                     continue
+                key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
+                if key_index is not None:
+                    orig = mode_values.curve_value(curve_fn, key_index, orig)
                 buffer_value = session.cache.pose_buffer.get((attr_full, current_time), orig)
                 session.cache.frame_data[(attr_full, current_time)] = BlendFrameData(
                     original_value=orig,
                     bufferValue=buffer_value,
                     use_direct_attr=not has_keys,
+                    curve=curve,
+                    keyIndex=key_index,
                 )
         session.cache.is_cached = True
 
@@ -634,7 +657,15 @@ def apply_blend_to_buffer(session, percentage, world_space=False):
             continue
         mirror_value = (2.0 * orig) - buffer_value
         new_value = utils.lerp_towards(mirror_value, buffer_value, t, orig)
-        _apply_cached_value(session, attr_full, new_value, current_time, use_direct_attr=cache.use_direct_attr)
+        mode_values.apply_attr_curve_value(
+            session,
+            attr_full,
+            new_value,
+            current_time,
+            use_direct_attr=cache.use_direct_attr,
+            curve=cache.curve,
+            key_index=cache.keyIndex,
+        )
 
 
 def apply_blend_to_undo(session, percentage, world_space=False):

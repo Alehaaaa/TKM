@@ -405,7 +405,6 @@ def add_grouped_section_items(section, items, *, add_widget_item_fn, add_group_i
 
 def add_slider_section(section, section_def, *, namespace, object_prefix):
     section.set_settings_namespace(namespace)
-    section.set_persist_slider_modes(False)
 
     prefix = section_def["slider_type"]
     color = section_def["color"]

@@ -37,25 +37,21 @@ def _humanize_compound_word(raw):
 
 
 def _tooltip_parts(raw):
+    """Extract (title, first_line) from a TooltipTemplate (mods.tooltipsMod).
+
+    Uses attribute access rather than isinstance to avoid a circular import
+    (tooltipsMod already imports this module). Expects a TooltipTemplate;
+    falls back gracefully to a plain string.
+    """
     if not raw:
         return "", ""
 
-    if hasattr(raw, "title") or hasattr(raw, "body_lines"):
-        return clean_tool_text(getattr(raw, "title", "")), clean_tool_text(getattr(raw, "first_line", ""))
+    # TooltipTemplate (from mods.tooltipsMod) exposes .title and .first_line
+    if hasattr(raw, "title") and hasattr(raw, "first_line"):
+        return clean_tool_text(raw.title), clean_tool_text(raw.first_line)
 
-    if isinstance(raw, (list, tuple)):
-        title = clean_tool_text(raw[0] if len(raw) > 0 else "")
-        body = raw[1] if len(raw) > 1 else ""
-        body_lines = body if isinstance(body, (list, tuple)) else [body]
-        for line in body_lines:
-            if not isinstance(line, str):
-                continue
-            clean_line = clean_tool_text(line)
-            if clean_line:
-                return title, clean_line
-        return title, ""
-
-    return "", ""
+    # Plain string fallback (ad-hoc tooltip text not from tool_tooltip)
+    return "", clean_tool_text(raw)
 
 
 def clean_tool_text(raw):

@@ -7,8 +7,13 @@ Operations that work directly on animation curves and their keys.
 import maya.cmds as cmds
 import random
 
+try:
+    from maya.api import OpenMaya as om
+except ImportError:
+    om = None
+
 import TheKeyMachine.core.openMayaUtils as omutils
-from . import utils
+from . import mode_values, utils
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -31,6 +36,17 @@ def _resolve_targets_for_session(session):
 def _ensure_curve_value_cache(session, curve, keys):
     """Caches original values for ALL keyframes on a curve for stable dragging."""
     if curve not in session.cache.original_keyframes:
+        curve_fn = omutils._anim_curve_fn(curve)
+        if curve_fn is not None:
+            try:
+                num_keys = curve_fn.numKeys() if callable(curve_fn.numKeys) else curve_fn.numKeys
+                session.cache.original_keyframes[curve] = {
+                    float(curve_fn.input(i).value): curve_fn.value(i)
+                    for i in range(num_keys)
+                }
+                return
+            except Exception:
+                pass
         data = cmds.keyframe(curve, query=True, timeChange=True, valueChange=True) or []
         session.cache.original_keyframes[curve] = {float(data[i]): data[i + 1] for i in range(0, len(data), 2)}
 
@@ -44,6 +60,14 @@ def _cached_value_at_time(session, curve, time):
     original_data = _cached_curve_values(session, curve, [time])
     if time in original_data:
         return original_data[time]
+    curve_fn = omutils._anim_curve_fn(curve)
+    if curve_fn is not None and om is not None:
+        try:
+            value = curve_fn.evaluate(om.MTime(float(time), _time_unit()))
+            original_data[time] = value
+            return value
+        except Exception:
+            pass
     try:
         values = cmds.keyframe(curve, query=True, eval=True, time=(time, time)) or []
         if values:
@@ -76,18 +100,27 @@ def _neighbor_values(curve, time, target_times_set, all_keys, original_data):
     return p_time, p_val, n_time, n_val
 
 
+def _time_unit():
+    if om is None:
+        return None
+    try:
+        return om.MTime.uiUnit()
+    except Exception:
+        return om.MTime.kFilm
+
+
 def _apply_value(session, curve, time, value):
     if getattr(session, "preview", False):
-        omutils.set_anim_curve_key_value(curve, time, value)
+        mode_values.apply_curve_value(session, curve, time, value, create=True, allow_cmds_fallback=False)
         return
-    cmds.keyframe(curve, edit=True, time=(time, time), valueChange=value)
+    mode_values.apply_curve_value(session, curve, time, value, create=True, allow_cmds_fallback=True)
 
 
 def _set_connect_value(session, curve, time, value):
     if getattr(session, "preview", False):
-        omutils.set_anim_curve_key_value(curve, time, value)
+        mode_values.apply_curve_value(session, curve, time, value, create=True, allow_cmds_fallback=False)
         return
-    cmds.setKeyframe(curve, time=(time,), value=value)
+    mode_values.apply_curve_value(session, curve, time, value, create=True, allow_cmds_fallback=True)
 
 
 def _curve_default_value(curve):
@@ -125,8 +158,9 @@ def add_random_keys(session, curves=None, value=0):
         for i in range(idx):
             if i < len(session.cache.generated_positions[curve]):
                 next_p = session.cache.generated_positions[curve][i]
-                curr_v = cmds.keyframe(curve, query=True, eval=True, time=(next_p,))[0]
-                cmds.setKeyframe(curve, time=next_p, value=curr_v)
+                curr_v = _cached_value_at_time(session, curve, next_p)
+                if curr_v is not None:
+                    mode_values.apply_curve_value(session, curve, next_p, curr_v, create=True, allow_cmds_fallback=True)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -160,6 +194,35 @@ def apply_smooth(session, curves=None, factor=1.0):
                 avg = (p_val * w_p + n_val * w_n) / (w_p + w_n)
                 res = orig_val + (avg - orig_val) * factor
                 _apply_value(session, curve, time, res)
+
+
+def apply_rough(session, curves=None, factor=1.0):
+    """Push keys away from the neighbor trend only when that trend has motion."""
+    factor = 1.0 + max(0.0, factor)
+    resolved_curves, target_times_per_curve = _resolve_targets_for_session(session)
+    for curve in resolved_curves:
+        keys = target_times_per_curve.get(curve, [])
+        if not keys:
+            continue
+
+        original_data = _cached_curve_values(session, curve, keys)
+        all_keys = sorted(original_data.keys())
+        target_times_set = set(keys)
+
+        for time in keys:
+            if time not in original_data:
+                continue
+
+            orig_val = original_data[time]
+            p_time, p_val, n_time, n_val = _neighbor_values(curve, time, target_times_set, all_keys, original_data)
+            if p_time is None or n_time is None or p_time == n_time:
+                continue
+            if p_val is None or n_val is None or abs(n_val - p_val) <= 0.000001:
+                continue
+
+            lerp_t = (time - p_time) / (n_time - p_time)
+            pivot = p_val + lerp_t * (n_val - p_val)
+            _apply_value(session, curve, time, pivot + (orig_val - pivot) * factor)
 
 
 def apply_noise(session, curves=None, factor=1.0):

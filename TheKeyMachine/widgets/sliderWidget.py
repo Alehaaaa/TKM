@@ -1155,6 +1155,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._rightOverlay.show()
 
     def _on_button_clicked(self, btn: SliderButton):
+        self._finish_active_session()
         try:
             self.valueSet.emit(float(btn.percent))
             self._commit_slider_value(btn.percent)

@@ -93,7 +93,7 @@ def execute_simplify_bake(session, curves, value):
 def execute_smooth_rough(session, curves, value):
     if value < 0:
         return curve_ops.apply_smooth(session, curves, abs(value) / 100.0)
-    return curve_ops.apply_noise(session, curves, value / 60.0)
+    return curve_ops.apply_rough(session, curves, value / 100.0)
 
 
 def execute_scale_average(session, curves, value):

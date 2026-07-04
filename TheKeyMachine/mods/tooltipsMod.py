@@ -88,20 +88,19 @@ def tooltip_body(*paragraphs):
 
 def _tooltip_template_from_data(raw, fallback_title="", fallback_description="", fallback_icon=None):
     if isinstance(raw, TooltipTemplate):
+        if fallback_title:
+            raw.title = fallback_title
+        if fallback_icon and not raw.icon:
+            raw.icon = fallback_icon
         return raw
 
-    if isinstance(raw, (list, tuple)):
-        title = raw[0] if len(raw) > 0 else fallback_title
-        body = raw[1] if len(raw) > 1 else fallback_description
-        icon = raw[2] if len(raw) > 2 else fallback_icon
-        return tool_tooltip(title, body, icon=icon)
-
-    if raw:
-        title = toolCommon.clean_tool_text(fallback_title or raw)
+    # Fallback: plain string passed directly as a tooltip template
+    if isinstance(raw, str) and raw:
+        title = fallback_title or raw
         lines = list(_string_body_lines(raw))
         if title and lines and lines[0].lower() == title.lower():
             lines = lines[1:]
-        return TooltipTemplate(str(raw), title=title, body_lines=lines, icon=fallback_icon)
+        return TooltipTemplate(raw, title=title, body_lines=lines, icon=fallback_icon)
 
     if fallback_title or fallback_description or fallback_icon:
         return tool_tooltip(fallback_title, fallback_description, icon=fallback_icon)

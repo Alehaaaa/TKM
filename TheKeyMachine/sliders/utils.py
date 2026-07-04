@@ -8,10 +8,14 @@ import maya.cmds as cmds
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 
+try:
+    from maya.api import OpenMayaAnim as oma
+except ImportError:
+    oma = None
+
 import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.mods.selectionMod as selectionMod
-import TheKeyMachine.core.openMayaUtils as omutils
 import TheKeyMachine.widgets.timeline as timelineWidgets
 from TheKeyMachine.tools import colors as toolColors
 
@@ -65,6 +69,8 @@ class TweenFrameData:
     currentValue: Optional[float] = None
     prev_f: Optional[float] = None
     next_f: Optional[float] = None
+    curve: Optional[str] = None
+    keyIndex: Optional[int] = None
 
 
 @dataclass
@@ -82,6 +88,8 @@ class BlendFrameData:
     leftFrame: Optional[float] = None
     rightFrame: Optional[float] = None
     bufferValue: Optional[float] = None
+    curve: Optional[str] = None
+    keyIndex: Optional[int] = None
 
 
 def get_block_neighbors(time, target_times_set, all_keys):
@@ -117,35 +125,7 @@ def lerp_towards(left, right, t, current):
     return current
 
 
-def _ensure_key_between_neighbors(plug, curr):
-    """If *plug* has animation with keys on both sides of *curr* but none at
-    *curr* itself, plant a key there so the slider can operate on it.
-
-    Returns True if a key was created, False otherwise.
-    """
-    all_keys = cmds.keyframe(plug, q=True, timeChange=True)
-    if not all_keys:
-        return False
-    all_keys = sorted(set(float(k) for k in all_keys))
-    if float(curr) in all_keys:
-        return False
-    has_prev = any(k < float(curr) for k in all_keys)
-    has_next = any(k > float(curr) for k in all_keys)
-    if not (has_prev and has_next):
-        return False
-    # Attribute must be writable
-    try:
-        if cmds.getAttr(plug, lock=True) or not cmds.getAttr(plug, settable=True):
-            return False
-        if cmds.getAttr(plug, type=True) in ("enum", "string", "message"):
-            return False
-        cmds.setKeyframe(plug, time=(curr,), insert=True)
-        return True
-    except Exception:
-        return False
-
-
-def resolve_keyframe_targets(create_missing_keys=True):
+def resolve_keyframe_targets():
     """Unified entry for resolving attribute plugs and affected times."""
     plugs, _src, time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
     if not plugs:
@@ -166,8 +146,6 @@ def resolve_keyframe_targets(create_missing_keys=True):
         elif time_range:
             times = cmds.keyframe(plug, q=True, time=(time_range[0], time_range[1]), timeChange=True) or [curr]
         else:
-            if create_missing_keys:
-                _ensure_key_between_neighbors(plug, curr)
             times = [curr]
         affected[plug] = sorted(list(set(times)))
     return affected, time_range
@@ -192,7 +170,6 @@ def resolve_curve_targets():
     return curves, times_map, time_range, has_graph_keys
 
 
-
 class SliderSession:
     """Per-interaction slider state.
 
@@ -210,6 +187,8 @@ class SliderSession:
         self.cache = SliderCaches()
         self._is_open = False
         self.preview = False
+        self.committing_preview = False
+        self.anim_change = oma.MAnimCurveChange() if oma is not None else None
         self._tint_key = "slider_{}_range".format(self.mode)
         self._tint_range = None
 
@@ -217,8 +196,11 @@ class SliderSession:
         self.preview = True
 
     def begin_commit(self):
-        self.restore_preview_start_values()
+        was_previewing = self.preview
         self.preview = False
+        self.committing_preview = False
+        if was_previewing:
+            self.undo_preview_changes()
         self.ensure_undo_open()
 
     def ensure_undo_open(self):
@@ -250,9 +232,22 @@ class SliderSession:
 
     def reset(self):
         """Clear drag-scoped caches while keeping the undo chunk open."""
+        self.undo_preview_changes()
         self.targets.clear()
         self.cache.clear(keep_pose=True)
         self._tint_range = None
+
+    def reset_anim_change(self):
+        self.anim_change = oma.MAnimCurveChange() if oma is not None else None
+
+    def undo_preview_changes(self):
+        if self.anim_change is None:
+            return
+        try:
+            self.anim_change.undoIt()
+        except Exception:
+            pass
+        self.reset_anim_change()
 
     def show_tint(self, timerange, color=None, center_line=False):
         if not timerange:
@@ -278,38 +273,6 @@ class SliderSession:
         runtime.get_runtime_manager().clear_managed_widget(self._tint_key)
         self._tint_range = None
 
-    def _restore_plug_value_with_api(self, attr_full, time, value, use_direct_attr=False):
-        if not isinstance(value, (int, float)):
-            return
-        if use_direct_attr:
-            omutils.set_numeric_plug_value(attr_full, value)
-            return
-        for curve in selectionMod.get_anim_curves_from_plugs([attr_full]):
-            if omutils.set_anim_curve_key_value(curve, time, value):
-                return
-
-    def restore_preview_start_values(self):
-        """Put API-previewed values back to their cached start before the undoable commit."""
-        for (attr_full, time), data in self.cache.tween_frame_data.items():
-            self._restore_plug_value_with_api(
-                attr_full,
-                time,
-                getattr(data, "currentValue", None),
-                use_direct_attr=getattr(data, "use_direct_attr", False),
-            )
-
-        for (attr_full, time), data in self.cache.frame_data.items():
-            self._restore_plug_value_with_api(
-                attr_full,
-                time,
-                getattr(data, "original_value", None),
-                use_direct_attr=getattr(data, "use_direct_attr", False),
-            )
-
-        for curve, keyed_values in self.cache.original_keyframes.items():
-            for time, value in keyed_values.items():
-                omutils.set_anim_curve_key_value(curve, time, value)
-
     def snapshot_pose_buffer(self, affected_map):
         """Capture the current pose for modes that need an original-pose target."""
         self.cache.pose_buffer.clear()
@@ -326,7 +289,10 @@ class SliderSession:
 
     def finish(self):
         """Close the undo chunk and clear all session-owned state."""
+        if self.preview:
+            self.undo_preview_changes()
         self.preview = False
+        self.committing_preview = False
         self.clear_tint()
         if self._is_open:
             try:

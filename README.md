@@ -4,7 +4,7 @@
 
 # TheKeyMachine, animation toolbar
 
-![Version](https://img.shields.io/badge/version-0.1.98-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.20-blue.svg)
 
 TheKeyMachine (TKM) is an open source Maya animation toolset built for faster key editing, cleaner selection workflows, smarter copy/paste utilities, floating tools, and timeline-aware operations.
 
@@ -32,6 +32,7 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 - `Set Smart Key` for animated curves, selected channels, Graph Editor keys, and highlighted time ranges
 - `Smart Euler Filter`, redundant-key removal, and static-curve cleanup that respect the active selection context
 - `Snap Keys` grouped with the Anim Curve Tools
+- nudge, inbetween, bake, tangent, and background-runner actions use clearer toolbar icons
 
 ### Tangents
 
@@ -85,6 +86,10 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 
 Many tools tint the Maya time slider while they run. Full-range tools tint the full slider holder, while range-based tools tint only the working range, making it easier to see the current operation at a glance.
 
+## Tooltips And Menus
+
+Tooltips use the active tool labels and icons, including torn-off menus and shelf buttons. Menu actions keep their full rich tooltip content while hovering, so videos, media, and multi-line help remain available from menu-driven tools.
+
 ## Selection Sets
 
 Selection Sets support:
@@ -98,7 +103,7 @@ Selection Sets support:
 
 ## Integrated Tool Modules
 
-Dedicated modules live under `TheKeyMachine/tools/` for:
+Dedicated tools live under `TheKeyMachine/tools/` for:
 
 - `animation_offset`
 - `attribute_switcher`

@@ -39,24 +39,39 @@ MANIP_CONTEXT_TOKENS = (
 class AnimationOffsetController(QtCore.QObject):
     stateChanged = QtCore.Signal(bool)
 
+    STATE_IDLE = "idle"
+    STATE_ARMED = "armed"
+    STATE_APPLYING = "applying"
+    STATE_RESNAPSHOT_PENDING = "resnapshot_pending"
+    STATE_TRACKING_MANIP = "tracking_manip"
+
+    POLL_INTERVAL_MS = 70
+    RESNAPSHOT_DELAY_MS = 120
+
     def __init__(self, owner):
         super().__init__(owner)
         self._owner = owner
         self._runtime_manager = runtime.get_runtime_manager()
         self._enabled = False
-        self._state = "idle"
+        self._state = self.STATE_IDLE
         self._time_range = None
         self._tint_key = "animation_offset_range"
         self._selection_signature = ()
         self._snapshot_time = None
         self._baseline = {}
-        self._last_values = {}
         self._pending_manip_plugs = set()
         self._tint_color = toolColors.TOOLBAR_PURPLE
+        self._pending_resnapshot_update_range = False
+        self._settling_after_resnapshot = False
 
         self._poll_timer = QtCore.QTimer(self)
-        self._poll_timer.setInterval(70)
+        self._poll_timer.setInterval(self.POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
+
+        self._resnapshot_timer = QtCore.QTimer(self)
+        self._resnapshot_timer.setSingleShot(True)
+        self._resnapshot_timer.setInterval(self.RESNAPSHOT_DELAY_MS)
+        self._resnapshot_timer.timeout.connect(self._perform_deferred_resnapshot)
         
         self._chunk_opened = False
 
@@ -134,19 +149,19 @@ class AnimationOffsetController(QtCore.QObject):
         toolCommon.clear_tracked_connections(self, "_runtime_manager_relays")
 
     def _on_selection_changed(self):
-        if not self._enabled or self._state == "applying":
+        if not self._can_resnapshot_from_event():
             return
-        self._resnapshot(update_range=False)
+        self._request_resnapshot(update_range=False)
 
     def _on_time_changed(self):
-        if not self._enabled or self._state == "applying":
+        if not self._can_resnapshot_from_event():
             return
-        self._resnapshot(update_range=False)
+        self._request_resnapshot(update_range=False)
 
     def _on_undo_performed(self):
-        if not self._enabled or self._state == "applying":
+        if not self._can_resnapshot_from_event():
             return
-        self._resnapshot(update_range=False)
+        self._request_resnapshot(update_range=False)
 
     def _on_scene_reset(self):
         if not self._enabled:
@@ -316,9 +331,26 @@ class AnimationOffsetController(QtCore.QObject):
                 baseline[obj] = obj_snapshot
 
         self._baseline = baseline
-        self._last_values = self._capture_current_values()
         self._pending_manip_plugs.clear()
-        self._state = "armed" if self._enabled else "idle"
+        self._state = self.STATE_ARMED if self._enabled else self.STATE_IDLE
+
+    def _can_resnapshot_from_event(self):
+        return self._enabled and self._state != self.STATE_APPLYING
+
+    def _request_resnapshot(self, update_range=False):
+        self._pending_resnapshot_update_range = self._pending_resnapshot_update_range or bool(update_range)
+        self._pending_manip_plugs.clear()
+        self._settling_after_resnapshot = False
+        self._state = self.STATE_RESNAPSHOT_PENDING if self._enabled else self.STATE_IDLE
+        self._resnapshot_timer.start()
+
+    def _perform_deferred_resnapshot(self):
+        if not self._enabled:
+            return
+        update_range = self._pending_resnapshot_update_range
+        self._pending_resnapshot_update_range = False
+        self._resnapshot(update_range=update_range)
+        self._settling_after_resnapshot = True
 
     def _ensure_driver_key(self, obj, attr, current_value):
         current_time = self._current_time()
@@ -350,7 +382,7 @@ class AnimationOffsetController(QtCore.QObject):
         if not self._is_in_locked_range():
             return False
 
-        self._state = "applying"
+        self._state = self.STATE_APPLYING
         current_time = self._current_time()
         any_applied = False
 
@@ -396,7 +428,7 @@ class AnimationOffsetController(QtCore.QObject):
                     except Exception:
                         continue
         finally:
-            self._state = "armed" if self._enabled else "idle"
+            self._state = self.STATE_ARMED if self._enabled else self.STATE_IDLE
 
         self._resnapshot(update_range=False)
         return any_applied
@@ -404,31 +436,36 @@ class AnimationOffsetController(QtCore.QObject):
     def _poll(self):
         if not self._enabled or not QtCompat.isValid(self._owner):
             return
-        if self._state == "applying":
+        if self._state in (self.STATE_APPLYING, self.STATE_RESNAPSHOT_PENDING):
             return
 
         current_selection_signature = self._selection_signature_value()
         if current_selection_signature != self._selection_signature:
-            self._resnapshot(update_range=False)
+            self._request_resnapshot(update_range=False)
             return
 
         if self._snapshot_time != self._current_time():
             self._pending_manip_plugs.clear()
-            self._resnapshot(update_range=False)
+            self._request_resnapshot(update_range=False)
             return
 
         current_values = self._capture_current_values()
-        self._last_values = current_values
+        if self._settling_after_resnapshot:
+            self._settling_after_resnapshot = False
+            changed_plugs = self._find_changed_plugs(current_values)
+            if changed_plugs:
+                self._request_resnapshot(update_range=False)
+            return
 
         if not self._is_in_locked_range():
-            if self._state == "tracking_manip" and not self._is_manip_edit_active():
+            if self._state == self.STATE_TRACKING_MANIP and not self._is_manip_edit_active():
                 self._pending_manip_plugs.clear()
                 self._resnapshot(update_range=False)
             return
 
         changed_plugs = self._find_changed_plugs(current_values)
 
-        if self._state == "tracking_manip":
+        if self._state == self.STATE_TRACKING_MANIP:
             if changed_plugs:
                 self._pending_manip_plugs.update(changed_plugs)
 
@@ -442,7 +479,7 @@ class AnimationOffsetController(QtCore.QObject):
             return
 
         if self._is_manip_edit_active():
-            self._state = "tracking_manip"
+            self._state = self.STATE_TRACKING_MANIP
             self._pending_manip_plugs.update(changed_plugs)
             return
 
@@ -472,13 +509,15 @@ class AnimationOffsetController(QtCore.QObject):
         self._enabled = False
         self._disconnect_runtime_manager()
         self._poll_timer.stop()
+        self._resnapshot_timer.stop()
         runtime.get_runtime_manager().clear_managed_widget(self._tint_key)
-        self._state = "idle"
+        self._state = self.STATE_IDLE
         self._selection_signature = ()
         self._snapshot_time = None
         self._baseline = {}
-        self._last_values = {}
         self._pending_manip_plugs.clear()
+        self._pending_resnapshot_update_range = False
+        self._settling_after_resnapshot = False
         self._time_range = None
         self.stateChanged.emit(False)
         runtime.get_runtime_manager().set_tool_state("animation_offset", False)

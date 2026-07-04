@@ -300,6 +300,9 @@ class MenuWidget(QtWidgets.QMenu):
             HelpSystem.push(self, self.title(), description)
 
         self.hovered.connect(self._on_action_hovered)
+        # Python-side store for TooltipTemplate objects: Qt setProperty/property
+        # cannot round-trip subclass attributes (body_lines, icon, etc.)
+        self._template_store = {}
 
     def _action_tooltip_key(self, action):
         if action is None or not QtCompat.isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
@@ -328,7 +331,12 @@ class MenuWidget(QtWidgets.QMenu):
             self._clear_native_action_tips(action)
             return
         if hasattr(action, "setProperty"):
-            action.setProperty("tkm_tooltip_template", tooltip_template)
+            # Store the full TooltipTemplate in a Python dict (not via Qt property)
+            # so that body_lines / TooltipMedia objects survive the round-trip.
+            action_id = id(action)
+            if tooltip_template is not None:
+                self._template_store[action_id] = tooltip_template
+            action.setProperty("tkm_tooltip_source_key", "menu-action:{}".format(action_id))
             action.setProperty("tkm_command_id", command_id)
             action.setProperty("tkm_command_label", title)
             action.setProperty("tkm_command_icon", command_icon)
@@ -447,7 +455,8 @@ class MenuWidget(QtWidgets.QMenu):
         try:
             title = action.property("tkm_title") or action.text()
             desc = action.property("tkm_description") or ""
-            tooltip_template = action.property("tkm_tooltip_template") or None
+            # Retrieve from Python-side store to preserve TooltipTemplate body_lines / TooltipMedia
+            tooltip_template = self._template_store.get(id(action))
             command_id = action.property("tkm_command_id") or None
             command_label = action.property("tkm_command_label") or title
             command_icon = action.property("tkm_command_icon") or None

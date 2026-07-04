@@ -607,7 +607,7 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
             "id": CAMERA_ORBIT_SELECTION_ID,
             "label": "Rotate Camera Around Selection",
             "menu_label": "Rotate Camera Around Selection",
-            "icon": icons.camera,
+            "icon": icons.follow_cam,
             "description": "Set the active viewport camera rotation point to the center of the current selection.",
             "default": False,
             "get_enabled": lambda: get_runner_enabled(CAMERA_ORBIT_SELECTION_ID, False),

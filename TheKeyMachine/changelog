@@ -14,6 +14,18 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.20:
+  - polish: Some more tools have refined icons
+  - bugfix: Fixed sliders messing with rotations and not saving Undo Chunks
+  - bugfix: Fixed Animation Offset setting keys on timeChange in heavy scenes
+
+0.1.99:
+  - polish: Tooltips use current tool names and icons
+  - polish: Torn-off menu tooltips keep their full rich content
+  - polish: Temp Pivot modes have clearer dedicated icons
+  - polish: Nudge, Inbetween, Bake, Tangent, World Space, Link and Follow Cam icons refreshed
+  - bugfix: Menu action hover help no longer loses video or multi-line content
+
 0.1.98:
   - new: Copy Animation/Pose can paste to remapped scene assets
   - polish: Paste Animation/Pose set an Undo Chunk and work with namespaces

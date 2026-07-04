@@ -65,7 +65,7 @@ BAKE_UNDO_HELP = {
     3: ("Bake on Threes", helper.bake_animation_3_tooltip_text),
     4: ("Bake on Fours", helper.bake_animation_4_tooltip_text),
 }
-_hotkey_key_clipboard_start_frame = None
+_key_clipboard_start_frame = None
 _paste_to_dialog = None
 
 
@@ -847,26 +847,6 @@ def clear_selected_keys(*args):
 # For Hotkeys
 
 
-def __get_move_keyframes_offset():
-    try:
-        from TheKeyMachine.core import trigger
-
-        return trigger.nudge_value()
-    except Exception:
-        pass
-    return 1
-
-
-def hotkey_move_keyframes_left():
-    offset = __get_move_keyframes_offset()
-    move_keyframes_in_range(-offset)
-
-
-def hotkey_move_keyframes_right():
-    offset = __get_move_keyframes_offset()
-    move_keyframes_in_range(offset)
-
-
 # _____
 
 
@@ -947,11 +927,12 @@ def _relative_timechange(count):
     cmds.keyframe(time=("{}:".format(current + 1),), relative=True, timeChange=count, option="over")
 
 
+
 def move_keyframes_in_range(*args):
     if args and isinstance(args[0], (int, float)):
         offset = int(args[0])
     else:
-        offset = __get_move_keyframes_offset()
+        offset = int(settings.get_setting("nudge_value", 1))
         if args and args[0] == -1:
             offset = -offset
 
@@ -1315,36 +1296,36 @@ def apply_smart_euler_filter(*args):
     if not curves:
         return wutil.make_inViewMessage("No rotation animation curves found")
 
-    with _animation_command_context("Apply Smart Euler Filter", "hotkey_apply_smart_euler_filter"):
+    with _animation_command_context("Apply Smart Euler Filter", "apply_smart_euler_filter"):
         return _filter_curves_preserving_selection(curves, "euler", "Apply Smart Euler Filter", target_info)
 
 
 def clear_animation_keys(*args):
-    return _run_key_command(cmds.cutKey, "hotkey_clear_animation", clear=True)
+    return _run_key_command(cmds.cutKey, "clear_animation", clear=True)
 
 
 def copy_keys(*args):
-    global _hotkey_key_clipboard_start_frame
+    global _key_clipboard_start_frame
 
     target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(default_mode="all_animation")
     key_range = _key_selection_range(target_info, target_plugs, selected_objects, selected_channels)
-    _hotkey_key_clipboard_start_frame = key_range[0] if key_range else None
-    return _run_key_command(cmds.copyKey, "hotkey_copy_keys", option="keys")
+    _key_clipboard_start_frame = key_range[0] if key_range else None
+    return _run_key_command(cmds.copyKey, "copy_keys", option="keys")
 
 
 def cut_keys(*args):
-    global _hotkey_key_clipboard_start_frame
+    global _key_clipboard_start_frame
 
     target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(default_mode="all_animation")
     key_range = _key_selection_range(target_info, target_plugs, selected_objects, selected_channels)
-    _hotkey_key_clipboard_start_frame = key_range[0] if key_range else None
-    return _run_key_command(cmds.cutKey, "hotkey_cut_keys", option="keys")
+    _key_clipboard_start_frame = key_range[0] if key_range else None
+    return _run_key_command(cmds.cutKey, "cut_keys", option="keys")
 
 
 def delete_keys(*args):
     return _run_key_command(
         cmds.cutKey,
-        "hotkey_delete_keys",
+        "delete_keys",
         default_mode="current_frame",
         clear=True,
     )
@@ -1358,7 +1339,7 @@ def paste_keys(*args):
         return wutil.make_inViewMessage("Select at least one object or channel")
 
     targets = target_plugs or selected_objects
-    with _animation_command_context("Paste Keys", "hotkey_paste_keys", default_mode="current_frame"):
+    with _animation_command_context("Paste Keys", "paste_keys", default_mode="current_frame"):
         kwargs = {"option": "merge"}
         if selected_channels and not target_plugs:
             kwargs["attribute"] = selected_channels
@@ -1366,7 +1347,7 @@ def paste_keys(*args):
 
 
 def paste_keys_relative(*args):
-    global _hotkey_key_clipboard_start_frame
+    global _key_clipboard_start_frame
 
     target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(
         default_mode="current_frame", include_shapes=False
@@ -1376,10 +1357,10 @@ def paste_keys_relative(*args):
 
     paste_time = target_info["time_context"].start_frame
     targets = target_plugs or selected_objects
-    with _animation_command_context("Paste Keys Relative", "hotkey_paste_keys_relative", default_mode="current_frame"):
+    with _animation_command_context("Paste Keys Relative", "paste_keys_relative", default_mode="current_frame"):
         time_offset = paste_time
-        if _hotkey_key_clipboard_start_frame is not None:
-            time_offset = paste_time - _hotkey_key_clipboard_start_frame
+        if _key_clipboard_start_frame is not None:
+            time_offset = paste_time - _key_clipboard_start_frame
         kwargs = {"option": "merge", "timeOffset": time_offset}
         if selected_channels and not target_plugs:
             kwargs["attribute"] = selected_channels
@@ -1397,7 +1378,7 @@ def crop_animation(*args):
     if not curves:
         return wutil.make_inViewMessage("No animation curves found")
 
-    with _animation_command_context("Crop Animation", "hotkey_crop_animation", timerange=crop_range):
+    with _animation_command_context("Crop Animation", "crop_animation", timerange=crop_range):
         for curve in curves:
             frames = cmds.keyframe(curve, query=True, timeChange=True) or []
             for frame in frames:
@@ -1411,7 +1392,10 @@ def remove_redundant_keys(*args):
     if not curves:
         return wutil.make_inViewMessage("No animation curves found")
 
-    with _animation_command_context("Remove Redundant Keys", "hotkey_remove_redundant_keys"):
+    time_context = target_info["time_context"]
+    _range = (time_context.start_frame, time_context.end_frame)
+
+    with _animation_command_context("Remove Redundant Keys", "remove_redundant_keys", timerange=_range, tint=False):
         return _filter_curves_preserving_selection(curves, "simplify", "Remove Redundant Keys", target_info)
 
 
@@ -1430,7 +1414,10 @@ def remove_static_anim_curves(*args):
     if not curves_to_delete:
         return wutil.make_inViewMessage("No static animation curves found")
 
-    with _animation_command_context("Remove Static Anim Curves", "hotkey_remove_static_anim_curves"):
+    time_context = target_info["time_context"]
+    _range = (time_context.start_frame, time_context.end_frame)
+
+    with _animation_command_context("Remove Static Anim Curves", "remove_static_anim_curves", timerange=_range, tint=False):
         cmds.delete(_unique(curves_to_delete))
 
 
@@ -1442,7 +1429,7 @@ def reverse_animation(*args):
 
     time_context = target_info["time_context"]
     reverse_range = (time_context.start_frame, time_context.end_frame)
-    with _animation_command_context("Reverse Animation", "hotkey_reverse_animation", timerange=reverse_range):
+    with _animation_command_context("Reverse Animation", "reverse_animation", timerange=reverse_range):
         pivot = (reverse_range[0] + reverse_range[1]) * 0.5
         for curve in curves:
             cmds.scaleKey(curve, time=reverse_range, timeScale=-1, timePivot=pivot)
@@ -2617,6 +2604,151 @@ def mirror_to_opposite(*args):
                 processed_controls.add(control)
 
     mirror_controls()
+
+
+def _mirror_token_side(token):
+    clean = str(token or "").strip("_").lower()
+    if clean in {"r", "rt", "rg", "rf", "right"}:
+        return "right"
+    if clean in {"l", "lf", "left"}:
+        return "left"
+    return None
+
+
+def _mirror_control_side(control):
+    _namespace, _sep, control_name = control.rpartition(":")
+    for pattern, _opposite_pattern in MIRROR_PATTERNS:
+        if pattern in control_name:
+            return _mirror_token_side(pattern)
+    return None
+
+
+def _load_mirror_exceptions():
+    mirror_exceptions_file_path = general.get_mirror_exceptions_file()
+    if os.path.exists(mirror_exceptions_file_path):
+        try:
+            with open(mirror_exceptions_file_path, "r") as file:
+                return json.load(file)
+        except Exception:
+            return {}
+    return {}
+
+
+def _mirror_exception_value(exceptions, control, attr, value):
+    control_name = control.rsplit(":", 1)[-1]
+    exception_type = (exceptions.get(control_name) or {}).get(attr)
+    if exception_type == "invert":
+        return -value
+    return value
+
+
+def _mirror_keyable_attrs(control):
+    return [attr for attr in (cmds.listAttr(control, keyable=True) or []) if attr != "tag"]
+
+
+def _attr_settable(control, attr):
+    try:
+        return cmds.objExists(f"{control}.{attr}") and cmds.getAttr(f"{control}.{attr}", settable=True)
+    except Exception:
+        return False
+
+
+def _mirror_current_values(target_side=None):
+    selected_controls = selectionMod.get_selected_objects()
+    if not selected_controls:
+        return wutil.make_inViewMessage("Select at least one object")
+
+    exceptions = _load_mirror_exceptions()
+    copied = 0
+
+    for source in selected_controls:
+        if target_side and _mirror_control_side(source) == target_side:
+            continue
+
+        target = find_opposite_name(source)
+        if not target or not cmds.objExists(target):
+            continue
+        if target_side and _mirror_control_side(target) != target_side:
+            continue
+
+        for attr in _mirror_keyable_attrs(source):
+            if not _attr_settable(source, attr) or not _attr_settable(target, attr):
+                continue
+            try:
+                value = cmds.getAttr(f"{source}.{attr}")
+                cmds.setAttr(f"{target}.{attr}", _mirror_exception_value(exceptions, source, attr, value))
+                copied += 1
+            except Exception as e:
+                cmds.warning(f"Could not mirror {source}.{attr} to {target}: {str(e)}")
+
+    if not copied:
+        cmds.warning("No mirrorable opposite controls or attributes found")
+    return copied
+
+
+def mirror_to_right(*args):
+    chunk_opened = toolCommon.open_undo_chunk()
+    try:
+        return _mirror_current_values(target_side="right")
+    finally:
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
+
+
+def mirror_to_left(*args):
+    chunk_opened = toolCommon.open_undo_chunk()
+    try:
+        return _mirror_current_values(target_side="left")
+    finally:
+        if chunk_opened:
+            toolCommon.close_undo_chunk()
+
+
+def mirror_all_keys(*args):
+    selected_controls = selectionMod.get_selected_objects()
+    if not selected_controls:
+        return wutil.make_inViewMessage("Select at least one object")
+
+    exceptions = _load_mirror_exceptions()
+    copied_data = {}
+    key_count = 0
+    processed_controls = set()
+
+    with _copy_paste_operation("mirror_all_keys", "Animation Mirrored", undo=True, tint="range") as operation:
+        for source in selected_controls:
+            if source in processed_controls:
+                continue
+            target = find_opposite_name(source)
+            if not target or not cmds.objExists(target):
+                continue
+            processed_controls.add(source)
+            processed_controls.add(target)
+
+            target_channels = {}
+            for attr in _mirror_keyable_attrs(source):
+                if not _attr_settable(source, attr) or not _attr_settable(target, attr):
+                    continue
+                plug = f"{source}.{attr}"
+                keyframes = cmds.keyframe(plug, query=True) or []
+                if not keyframes:
+                    continue
+                values = cmds.keyframe(plug, query=True, valueChange=True) or []
+                if not values:
+                    continue
+                target_channels[attr] = {
+                    "keyframes": keyframes,
+                    "values": [_mirror_exception_value(exceptions, source, attr, value) for value in values],
+                }
+
+            if target_channels:
+                key_count += _apply_animation_channels_to_targets([target], target_channels, replace=True)
+                copied_data[target] = target_channels
+
+        if key_count:
+            operation["timerange"] = timelineWidgets.get_animation_data_timerange(copied_data)
+            operation["success"] = True
+        else:
+            cmds.warning("No mirrorable animation keys found")
 
 
 # _____________________________________ add exception

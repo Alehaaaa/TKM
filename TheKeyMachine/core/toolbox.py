@@ -378,7 +378,7 @@ TOOL_DEFINITIONS = {
     "temp_pivot_last_object": {
         "type": "tool",
         "label": "Temp Pivot to Last Object",
-        "icon": icons.temp_pivot,
+        "icon": icons.temp_pivot_last_object,
         "callback": tempPivotApi.create_last_object_temp_pivot,
         "tooltip_template": helper.temp_pivot_last_object_tooltip_text,
         "pinnable": False,
@@ -393,21 +393,21 @@ TOOL_DEFINITIONS = {
     "temp_pivot_worldspace": {
         "type": "tool",
         "label": "Temp Pivot WorldSpace",
-        "icon": icons.globe,
+        "icon": icons.temp_pivot_worldspace,
         "callback": tempPivotApi.create_worldspace_temp_pivot,
         "tooltip_template": helper.temp_pivot_worldspace_tooltip_text,
     },
     "temp_pivot_edit": {
         "type": "tool",
         "label": "Edit Temp Pivot",
-        "icon": icons.temp_pivot,
+        "icon": icons.temp_pivot_edit,
         "callback": tempPivotApi.edit_temp_pivot,
         "tooltip_template": helper.temp_pivot_edit_tooltip_text,
     },
     "temp_pivot_reset": {
         "type": "tool",
         "label": "Reset Temp Pivot",
-        "icon": icons.refresh,
+        "icon": icons.temp_pivot_reset,
         "callback": tempPivotApi.reset_temp_pivot,
         "tooltip_template": helper.temp_pivot_reset_tooltip_text,
     },
@@ -479,7 +479,7 @@ TOOL_DEFINITIONS = {
     "nudge_left_all_keys": {
         "type": "tool",
         "label": "Nudge Left All Keys",
-        "icon": icons.nudge_left,
+        "icon": icons.nudge_left_all_keys,
         "callback": trigger.make_command_callback("nudge_left_all_keys"),
         "tooltip_template": helper.nudge_left_tooltip_text,
         "default": False,
@@ -487,7 +487,7 @@ TOOL_DEFINITIONS = {
     "nudge_left_scene": {
         "type": "tool",
         "label": "Nudge Left Scene",
-        "icon": icons.nudge_left,
+        "icon": icons.nudge_left_scene,
         "callback": trigger.make_command_callback("nudge_left_scene"),
         "tooltip_template": helper.nudge_left_tooltip_text,
         "default": False,
@@ -504,7 +504,7 @@ TOOL_DEFINITIONS = {
     "nudge_right_all_keys": {
         "type": "tool",
         "label": "Nudge Right All Keys",
-        "icon": icons.nudge_right,
+        "icon": icons.nudge_right_all_keys,
         "callback": trigger.make_command_callback("nudge_right_all_keys"),
         "tooltip_template": helper.nudge_right_tooltip_text,
         "default": False,
@@ -512,7 +512,7 @@ TOOL_DEFINITIONS = {
     "nudge_right_scene": {
         "type": "tool",
         "label": "Nudge Right Scene",
-        "icon": icons.nudge_right,
+        "icon": icons.nudge_right_scene,
         "callback": trigger.make_command_callback("nudge_right_scene"),
         "tooltip_template": helper.nudge_right_tooltip_text,
         "default": False,
@@ -528,7 +528,7 @@ TOOL_DEFINITIONS = {
     "nudge_insert_inbetween_scene": {
         "type": "tool",
         "label": "Insert Inbetween Scene",
-        "icon": icons.nudge_insert_inbetween,
+        "icon": icons.nudge_insert_inbetween_scene,
         "callback": trigger.make_command_callback("nudge_insert_inbetween_scene"),
         "tooltip_template": helper.insert_inbetween_tooltip_text,
         "default": False,
@@ -543,7 +543,7 @@ TOOL_DEFINITIONS = {
     "nudge_remove_inbetween_scene": {
         "type": "tool",
         "label": "Remove Inbetween Scene",
-        "icon": icons.nudge_remove_inbetween,
+        "icon": icons.nudge_remove_inbetween_scene,
         "callback": trigger.make_command_callback("nudge_remove_inbetween_scene"),
         "tooltip_template": helper.remove_inbetween_tooltip_text,
         "default": False,
@@ -571,91 +571,91 @@ TOOL_DEFINITIONS = {
         "text": "S",
         "icon": icons.delete_animation,
         "tooltip_template": helper.delete_static_animation_tooltip_text,
-        "callback": trigger.make_command_callback("hotkey_remove_static_anim_curves"),
+        "callback": trigger.make_command_callback("remove_static_anim_curves"),
     },
-    "hotkey_apply_smart_euler_filter": {
+    "apply_smart_euler_filter": {
         "type": "tool",
         "label": "Apply Smart Euler Filter",
         "icon": icons.euler_filter,
-        "callback": trigger.make_command_callback("hotkey_apply_smart_euler_filter"),
+        "callback": trigger.make_command_callback("apply_smart_euler_filter"),
     },
-    "hotkey_clear_animation": {
+    "clear_animation": {
         "type": "tool",
         "label": "Clear Animation",
         "icon": icons.delete_animation,
-        "callback": trigger.make_command_callback("hotkey_clear_animation"),
+        "callback": trigger.make_command_callback("clear_animation"),
     },
-    "hotkey_copy_keys": {
+    "copy_keys": {
         "type": "tool",
         "label": "Copy Keys",
         "icon": icons.copy_animation,
-        "callback": trigger.make_command_callback("hotkey_copy_keys"),
+        "callback": trigger.make_command_callback("copy_keys"),
     },
-    "hotkey_crop_animation": {
+    "crop_animation": {
         "type": "tool",
         "label": "Crop Animation",
         "icon": icons.isolate,
-        "callback": trigger.make_command_callback("hotkey_crop_animation"),
+        "callback": trigger.make_command_callback("crop_animation"),
     },
-    "hotkey_cut_keys": {
+    "cut_keys": {
         "type": "tool",
         "label": "Cut Keys",
         "icon": icons.get("eraser"),
-        "callback": trigger.make_command_callback("hotkey_cut_keys"),
+        "callback": trigger.make_command_callback("cut_keys"),
     },
-    "hotkey_delete_keys": {
+    "delete_keys": {
         "type": "tool",
         "label": "Delete Keys",
         "icon": icons.trash,
-        "callback": trigger.make_command_callback("hotkey_delete_keys"),
+        "callback": trigger.make_command_callback("delete_keys"),
     },
-    "hotkey_paste_keys": {
+    "paste_keys": {
         "type": "tool",
         "label": "Paste Keys",
         "icon": icons.paste_animation,
-        "callback": trigger.make_command_callback("hotkey_paste_keys"),
+        "callback": trigger.make_command_callback("paste_keys"),
     },
-    "hotkey_paste_keys_relative": {
+    "paste_keys_relative": {
         "type": "tool",
         "label": "Paste Keys Relative",
         "icon": icons.paste_insert_animation,
-        "callback": trigger.make_command_callback("hotkey_paste_keys_relative"),
+        "callback": trigger.make_command_callback("paste_keys_relative"),
     },
-    "hotkey_remove_redundant_keys": {
+    "remove_redundant_keys": {
         "type": "tool",
         "label": "Remove Redundant Keys",
-        "icon": icons.get("eraser"),
-        "callback": trigger.make_command_callback("hotkey_remove_redundant_keys"),
+        "icon": icons.remove_redundant_keys,
+        "callback": trigger.make_command_callback("remove_redundant_keys"),
     },
-    "hotkey_remove_static_anim_curves": {
+    "remove_static_anim_curves": {
         "type": "tool",
         "label": "Remove Static Anim Curves",
-        "icon": icons.delete_animation,
-        "callback": trigger.make_command_callback("hotkey_remove_static_anim_curves"),
+        "icon": icons.remove_static_anim_curves,
+        "callback": trigger.make_command_callback("remove_static_anim_curves"),
     },
-    "hotkey_reverse_animation": {
+    "reverse_animation": {
         "type": "tool",
         "label": "Reverse Animation",
         "icon": icons.get("flip"),
-        "callback": trigger.make_command_callback("hotkey_reverse_animation"),
+        "callback": trigger.make_command_callback("reverse_animation"),
     },
-    "hotkey_set_smart_key": {
+    "set_smart_key": {
         "type": "tool",
         "label": "Set Smart Key",
         "text": "S",
-        "callback": trigger.make_command_callback("hotkey_set_smart_key"),
+        "callback": trigger.make_command_callback("set_smart_key"),
     },
-    "hotkey_set_smart_key_all_channels": {
+    "set_smart_key_all_channels": {
         "type": "tool",
         "label": "Set Smart Key All Channels",
         "text": "S+",
-        "callback": trigger.make_command_callback("hotkey_set_smart_key_all_channels"),
+        "callback": trigger.make_command_callback("set_smart_key_all_channels"),
     },
     "graph_match_keys": {
         "type": "tool",
         "label": "Match",
         "text": "M",
-        "icon": icons.magnet,
+        "icon": icons.align,
         "tooltip_template": helper.graph_match_keys_tooltip_text,
         "callback": lambda: keyTools.graph_match_keys(),
     },
@@ -705,7 +705,7 @@ TOOL_DEFINITIONS = {
     "isolate_bookmarks": {
         "type": "tool",
         "label": "Isolate Bookmarks",
-        "icon": icons.isolate_bookmarks_menu,
+        "icon": icons.isolate_bookmarks,
         "callback": isolateBookmarksApi.create_isolate_bookmarks_window,
         "tooltip_template": helper.isolate_bookmarks_window_tooltip_text,
     },
@@ -768,7 +768,7 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Clear Animation",
         "icon": icons.delete_animation,
-        "callback": trigger.make_command_callback("hotkey_clear_animation"),
+        "callback": trigger.make_command_callback("clear_animation"),
         "tooltip_template": helper.delete_animation_tooltip_text,
     },
 
@@ -1008,21 +1008,21 @@ TOOL_DEFINITIONS = {
     "follow_cam": {
         "type": "tool",
         "label": "Follow Cam",
-        "icon": icons.camera,
+        "icon": icons.follow_cam,
         "callback": lambda *args: bar.create_follow_cam(translation=True, rotation=True),
         "tooltip_template": helper.follow_cam_tooltip_text,
     },
     "follow_cam_translation": {
         "type": "tool",
         "label": "Follow only Translation",
-        "icon": icons.camera,
+        "icon": icons.follow_cam,
         "callback": lambda: bar.create_follow_cam(translation=True, rotation=False),
         "tooltip_template": helper.follow_cam_tooltip_text,
     },
     "follow_cam_rotation": {
         "type": "tool",
         "label": "Follow only Rotation",
-        "icon": icons.camera,
+        "icon": icons.follow_cam,
         "callback": lambda: bar.create_follow_cam(translation=False, rotation=True),
         "tooltip_template": helper.follow_cam_tooltip_text,
     },
@@ -1055,26 +1055,26 @@ TOOL_DEFINITIONS = {
     "align_objects": {
         "type": "tool",
         "label": "Align Objects",
-        "icon": icons.magnet,
+        "icon": icons.align,
         "callback": bar.align_selected_objects,
         "tooltip_template": helper.align_tooltip_text,
     },
     "align_object_translation": {
         "type": "tool",
         "label": "Align Object Translation",
-        "icon": icons.magnet,
+        "icon": icons.align,
         "callback": partial(bar.align_selected_objects, pos=True, rot=False, scl=False),
     },
     "align_object_rotation": {
         "type": "tool",
         "label": "Align Object Rotation",
-        "icon": icons.magnet,
+        "icon": icons.align,
         "callback": partial(bar.align_selected_objects, pos=False, rot=True, scl=False),
     },
     "align_object_scale": {
         "type": "tool",
         "label": "Align Object Scale",
-        "icon": icons.magnet,
+        "icon": icons.align,
         "callback": partial(bar.align_selected_objects, pos=False, rot=False, scl=True),
     },
     "align_objects_help": {
@@ -1161,23 +1161,53 @@ TOOL_DEFINITIONS = {
         "callback": keyTools.mirror,
         "tooltip_template": helper.mirror_tooltip_text,
     },
+    "mirror_to_right": {
+        "type": "tool",
+        "label": "Mirror to Right",
+        "description": "Copy selected left-side controls to their right-side opposites.",
+        "icon": icons.mirror,
+        "callback": keyTools.mirror_to_right,
+        "tooltip_template": helper.mirror_to_right_tooltip_text,
+    },
+    "mirror_to_left": {
+        "type": "tool",
+        "label": "Mirror to Left",
+        "description": "Copy selected right-side controls to their left-side opposites.",
+        "icon": icons.mirror,
+        "callback": keyTools.mirror_to_left,
+        "tooltip_template": helper.mirror_to_left_tooltip_text,
+    },
+    "mirror_all_keys": {
+        "type": "tool",
+        "label": "Mirror All Keys",
+        "description": "Copy all keyed animation from selected controls to their opposite-side controls.",
+        "icon": icons.mirror,
+        "callback": keyTools.mirror_all_keys,
+        "tooltip_template": helper.mirror_all_keys_tooltip_text,
+    },
     "mirror_add_invert": {
         "type": "tool",
         "label": "Add Exception Invert",
+        "description": "Save an exception that flips selected channels during mirror operations.",
         "icon": icons.mirror,
         "callback": keyTools.add_mirror_invert_exception,
+        "tooltip_template": helper.mirror_add_invert_tooltip_text,
     },
     "mirror_add_keep": {
         "type": "tool",
         "label": "Add Exception Keep",
+        "description": "Save an exception that keeps selected channels unchanged during mirror operations.",
         "icon": icons.mirror,
         "callback": keyTools.add_mirror_keep_exception,
+        "tooltip_template": helper.mirror_add_keep_tooltip_text,
     },
     "mirror_remove_exc": {
         "type": "tool",
         "label": "Remove Exception",
+        "description": "Remove saved mirror exceptions from selected channels.",
         "icon": icons.mirror,
         "callback": keyTools.remove_mirror_invert_exception,
+        "tooltip_template": helper.mirror_remove_exception_tooltip_text,
     },
     "mirror_help": {
         "type": "tool",
@@ -1228,7 +1258,7 @@ TOOL_DEFINITIONS = {
         "type": "check",
         "state_key": "link_autolink",
         "label": "Auto Link Position",
-        "icon": icons.link_relative,
+        "icon": icons.link_relative_on,
         "checkable": True,
         "get_checked": _get_link_autolink_enabled,
         "set_checked": _set_link_autolink_enabled,
@@ -1481,7 +1511,7 @@ TOOL_SECTION_DEFINITIONS = {
     # --- Hotkey/System Tools ---
     "window_tools": {
         "label": "Windows",
-        "hotkey_only": True,
+        "only": True,
         "items": [
             {"id": "toolbar_toggle"},
             {"id": "toolbar_add_shelf_button"},
@@ -1497,7 +1527,7 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "manipulator_tools": {
         "label": "Manipulators",
-        "hotkey_only": True,
+        "only": True,
         "items": [
             {"id": "smart_rotation"},
             {"id": "smart_rotation_release"},
@@ -1519,13 +1549,21 @@ TOOL_SECTION_DEFINITIONS = {
             {
                 "id": "nudge_left",
                 "default": True,
-                "shortcuts": [{"id": "nudge_remove_inbetween", "keys": [QtCore.Qt.Key_Shift]}],
+                "shortcuts": [
+                    {"id": "nudge_remove_inbetween", "keys": [QtCore.Qt.Key_Shift]},
+                    {"id": "nudge_left_all_keys", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+                    {"id": "nudge_left_scene", "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]}
+                ],
             },
             {"id": "nudge_remove_inbetween"},
             {
                 "id": "nudge_right",
                 "default": True,
-                "shortcuts": [{"id": "nudge_insert_inbetween", "keys": [QtCore.Qt.Key_Shift]}],
+                "shortcuts": [
+                    {"id": "nudge_insert_inbetween", "keys": [QtCore.Qt.Key_Shift]},
+                    {"id": "nudge_right_all_keys", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+                    {"id": "nudge_right_scene", "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]}
+                ],
             },
             {"id": "nudge_insert_inbetween"},
             {"id": "nudge_left_all_keys", "default": False},
@@ -1734,6 +1772,10 @@ TOOL_SECTION_DEFINITIONS = {
                     {"id": "mirror_remove_exc", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
                 ],
             },
+            {"id": "mirror_to_right"},
+            {"id": "mirror_to_left"},
+            {"id": "mirror_all_keys"},
+            "separator",
             {"id": "mirror_add_invert"},
             {"id": "mirror_add_keep"},
             {"id": "mirror_remove_exc"},
@@ -1870,7 +1912,17 @@ TOOL_SECTION_DEFINITIONS = {
         "label": "Temp Pivot",
         "color": toolColors.TOOLBAR_PURPLE,
         "items": [
-            {"id": "temp_pivot", "default": True},
+            {
+                "id": "temp_pivot",
+                "default": True,
+                "shortcuts": [
+                    {"id": "temp_pivot_reset", "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Control]},
+                    {"id": "temp_pivot_centered", "keys": [QtCore.Qt.Key_Control]},
+                    {"id": "temp_pivot_last_object", "keys": [QtCore.Qt.Key_Shift]},
+                    {"id": "temp_pivot_worldspace", "keys": [QtCore.Qt.Key_Shift, QtCore.Qt.Key_Control]},
+                    {"id": "temp_pivot_edit", "keys": [QtCore.Qt.Key_Alt]},
+                ],
+            },
             {"id": "temp_pivot_last_object"},
             {"id": "temp_pivot_centered"},
             {"id": "temp_pivot_worldspace"},
@@ -2049,19 +2101,19 @@ TOOL_SECTION_DEFINITIONS = {
         "label": "Anim Curve Tools",
         "color": toolColors.TOOLBAR_BLUE,
         "items": [
-            {"id": "hotkey_apply_smart_euler_filter"},
-            {"id": "hotkey_clear_animation"},
-            {"id": "hotkey_copy_keys"},
-            {"id": "hotkey_crop_animation"},
-            {"id": "hotkey_cut_keys"},
-            {"id": "hotkey_delete_keys"},
-            {"id": "hotkey_paste_keys"},
-            {"id": "hotkey_paste_keys_relative"},
-            {"id": "hotkey_remove_redundant_keys"},
-            {"id": "hotkey_remove_static_anim_curves"},
-            {"id": "hotkey_reverse_animation"},
-            {"id": "hotkey_set_smart_key"},
-            {"id": "hotkey_set_smart_key_all_channels"},
+            {"id": "apply_smart_euler_filter"},
+            {"id": "clear_animation"},
+            {"id": "copy_keys"},
+            {"id": "crop_animation"},
+            {"id": "cut_keys"},
+            {"id": "delete_keys"},
+            {"id": "paste_keys"},
+            {"id": "paste_keys_relative"},
+            {"id": "remove_redundant_keys"},
+            {"id": "remove_static_anim_curves"},
+            {"id": "reverse_animation"},
+            {"id": "set_smart_key"},
+            {"id": "set_smart_key_all_channels"},
             "separator",
             {"id": "snap", "default": True},
         ],
@@ -2277,7 +2329,7 @@ def get_toolbar_sections(layout_id, resolve_items=True):
         for section in (
             get_tool_section(section_id, resolve_items=resolve_items, toolbar_id=layout_id)
             for section_id in section_ids
-            if not TOOL_SECTION_DEFINITIONS[section_id].get("hotkey_only")
+            if not TOOL_SECTION_DEFINITIONS[section_id].get("only")
             and TOOL_SECTION_DEFINITIONS[section_id].get("toolbar") is not False
         )
         if section is not None

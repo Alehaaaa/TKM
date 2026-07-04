@@ -1,36 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 50 50">
-  <!-- Generator: Adobe Illustrator 30.3.0, SVG Export Plug-In . SVG Version: 2.1.3 Build 182)  -->
+  <!-- Generator: Adobe Illustrator 30.1.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 136)  -->
   <defs>
     <style>
-      .st0, .st1 {
-        fill: #8aa8b2;
-      }
-
-      .st2 {
-        fill: #41646d;
+      .st0 {
+        fill: #eaeaea;
       }
 
       .st1 {
-        stroke: #2c4249;
-        stroke-miterlimit: 10;
-        stroke-width: 2px;
+        fill: #41646d;
+      }
+
+      .st2 {
+        fill: #8aa8b2;
       }
 
       .st3 {
-        fill: #eaeaea;
+        fill: #cecece;
+      }
+
+      .st4 {
+        fill: #3a3a3a;
+      }
+
+      .st5 {
+        fill: none;
+        stroke: #3a3a3a;
+        stroke-miterlimit: 10;
+        stroke-width: 5px;
       }
     </style>
   </defs>
   <g>
-    <path class="st2" d="M19.18,23.77l-7.63.08-.13-5.31c-.03-3.41,1.32-6.62,3.82-9.04,2.44-2.36,5.68-3.67,9.13-3.71.09,0,.16,0,.25,0,7.09.05,12.91,5.82,12.98,12.86l.13,4.93-7.63.08-.13-5.31c-.03-2.9-2.49-5.23-5.51-5.2-3.01.03-5.43,2.41-5.4,5.31l.12,5.32h0Z"/>
-    <polygon class="st3" points="30.13 29.9 37.76 29.81 37.69 23.57 30.1 23.64 30.13 29.9"/>
-    <polygon class="st3" points="11.58 30.09 19.25 31.16 19.13 23.77 11.55 23.85 11.58 30.09"/>
-    <path class="st0" d="M19.31,33.7l-.1-6.64-7.68.08.1,6.64,7.68-.08Z"/>
-    <path class="st0" d="M30.2,33.58l7.66-.09-.1-6.63-7.66.09s.1,6.63.1,6.63Z"/>
+    <rect class="st2" x="5" y="34.9" width="40" height="5"/>
+    <path class="st4" d="M43.8,36.1v2.5H6.2v-2.5h37.5M46.3,33.6H3.7v7.5h42.5v-7.5h0Z"/>
   </g>
   <g>
-    <rect class="st0" x="8.83" y="37.83" width="32.33" height="3.87"/>
-    <rect class="st1" x="21.07" y="35.85" width="7.85" height="7.85"/>
+    <rect class="st3" x="20.4" y="32.8" width="9.2" height="9.2"/>
+    <path class="st4" d="M21.7,34v6.7h6.7v-6.7h-6.7M19.2,31.5h11.7v11.7h-11.7v-11.7h0Z"/>
+  </g>
+  <path class="st5" d="M25,5.9c-6.9,0-12.5,5.6-12.5,12.6v12.9h4.8v-8.4h0v-4.5c0-4.3,3.5-7.7,7.7-7.7s7.7,3.5,7.7,7.7v4.5h0v8.4h4.8v-12.9c0-6.9-5.6-12.6-12.5-12.6Z"/>
+  <g>
+    <path class="st1" d="M17.3,18.5c0-4.3,3.5-7.7,7.7-7.7s7.7,3.5,7.7,7.7v4.5h4.8v-4.5c0-6.9-5.6-12.6-12.5-12.6s-12.5,5.6-12.5,12.6v4.5h4.8v-4.5Z"/>
+    <rect class="st0" x="12.5" y="23" width="4.8" height="3.2"/>
+    <rect class="st0" x="32.7" y="23" width="4.8" height="3.2"/>
+    <rect class="st2" x="32.7" y="26.2" width="4.8" height="5.2"/>
+    <rect class="st2" x="12.5" y="26.2" width="4.8" height="5.2"/>
   </g>
 </svg>

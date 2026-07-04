@@ -17,9 +17,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.98"
+__version__ = "0.1.20"
 __stage__ = "beta"
-__build__ = "324"
+__build__ = "326"
 __codename__ = "Flat White"
 
 

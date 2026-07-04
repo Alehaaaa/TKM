@@ -127,7 +127,7 @@ def is_rotation_anim_curve(node):
 
 def get_keyable_scalar_attributes(node):
     try:
-        return cmds.listAttr(node, keyable=True, scalar=True) or []
+        return cmds.listAttr(node, keyable=True, scalar=True, visible=True) or []
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return []
 
@@ -145,9 +145,28 @@ def get_anim_curve_output_plugs(curves):
 
 def get_anim_curves_from_plugs(plugs):
     curves = []
+    try:
+        from TheKeyMachine.sliders import animlayers as slider_animlayers
+    except Exception:
+        slider_animlayers = None
+    use_layer_lookup = False
+    if slider_animlayers is not None:
+        try:
+            use_layer_lookup = slider_animlayers.has_anim_layers()
+        except Exception:
+            use_layer_lookup = False
+
     for plug in plugs or []:
         if not plug or not cmds.objExists(plug):
             continue
+        if use_layer_lookup:
+            try:
+                layer_curve = slider_animlayers.get_anim_curve_for_plug(plug)
+            except Exception:
+                layer_curve = None
+            if layer_curve:
+                curves.append(layer_curve)
+                continue
         try:
             curves.extend(cmds.listConnections(plug, source=True, destination=False, type="animCurve") or [])
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):

@@ -181,15 +181,6 @@ def _toolbar():
     return get_toolbar()
 
 
-
-def nudge_value(default: int = 1, source_widget=None) -> int:
-    import TheKeyMachine.mods.settingsMod as settings
-    try:
-        return int(settings.get_setting("nudge_value", 1)) or default
-    except (ValueError, TypeError):
-        return default
-
-
 def _toggle_animation_offset(*_args, **_kwargs):
     toolbar = _toolbar()
     if toolbar:
@@ -382,28 +373,28 @@ def _register_builtin_commands():
     register_command("create_locator", _make_module_command("TheKeyMachine.mods.barMod", "createLocator"))
     register_command("depth_mover", _make_module_command("TheKeyMachine.mods.barMod", "depth_mover"))
     register_command(
-        "hotkey_apply_smart_euler_filter",
+        "apply_smart_euler_filter",
         _make_module_command("TheKeyMachine.mods.keyToolsMod", "apply_smart_euler_filter"),
     )
-    register_command("hotkey_clear_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "clear_animation_keys"))
-    register_command("hotkey_copy_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_keys"))
-    register_command("hotkey_crop_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "crop_animation"))
-    register_command("hotkey_cut_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "cut_keys"))
-    register_command("hotkey_delete_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "delete_keys"))
-    register_command("hotkey_paste_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_keys"))
-    register_command("hotkey_paste_keys_relative", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_keys_relative"))
+    register_command("clear_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "clear_animation_keys"))
+    register_command("copy_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_keys"))
+    register_command("crop_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "crop_animation"))
+    register_command("cut_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "cut_keys"))
+    register_command("delete_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "delete_keys"))
+    register_command("paste_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_keys"))
+    register_command("paste_keys_relative", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_keys_relative"))
     register_command(
-        "hotkey_remove_redundant_keys",
+        "remove_redundant_keys",
         _make_module_command("TheKeyMachine.mods.keyToolsMod", "remove_redundant_keys"),
     )
     register_command(
-        "hotkey_remove_static_anim_curves",
+        "remove_static_anim_curves",
         _make_module_command("TheKeyMachine.mods.keyToolsMod", "remove_static_anim_curves"),
     )
-    register_command("hotkey_reverse_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reverse_animation"))
-    register_command("hotkey_set_smart_key", _make_module_command("TheKeyMachine.mods.keyToolsMod", "set_smart_key"))
+    register_command("reverse_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reverse_animation"))
+    register_command("set_smart_key", _make_module_command("TheKeyMachine.mods.keyToolsMod", "set_smart_key"))
     register_command(
-        "hotkey_set_smart_key_all_channels",
+        "set_smart_key_all_channels",
         _make_module_command("TheKeyMachine.mods.keyToolsMod", "set_smart_key_all_channels"),
     )
     register_command("isolate_master", _make_module_command("TheKeyMachine.mods.barMod", "isolate_master"))
@@ -452,6 +443,10 @@ def _register_builtin_commands():
     register_command("select_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "selectOpposite"))
     register_command("opposite_add", _make_module_command("TheKeyMachine.mods.keyToolsMod", "addSelectOpposite"))
     register_command("opposite_copy", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copyOpposite"))
+    register_command("mirror", _make_module_command("TheKeyMachine.mods.keyToolsMod", "mirror"))
+    register_command("mirror_to_right", _make_module_command("TheKeyMachine.mods.keyToolsMod", "mirror_to_right"))
+    register_command("mirror_to_left", _make_module_command("TheKeyMachine.mods.keyToolsMod", "mirror_to_left"))
+    register_command("mirror_all_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "mirror_all_keys"))
     register_command("copy_pose", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_pose"))
     register_command("paste_pose", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_pose"))
     register_command("copy_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_animation"))

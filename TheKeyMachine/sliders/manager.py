@@ -259,7 +259,7 @@ BLEND_MODES = [
         "tooltip_template": helper.blend_tooltip_text,
         "icon": "SR",
         "shortcut": [SHIFT],
-        "description": "Smooths the curve (drag left) or adds jittery roughness (drag right).",
+        "description": "Smooths the curve (drag left) or pushes keys away from the neighbor trend (drag right).",
     },
     {
         "label": "Time Offsetter",
