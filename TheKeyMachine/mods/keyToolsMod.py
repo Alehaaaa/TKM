@@ -927,14 +927,17 @@ def _relative_timechange(count):
     cmds.keyframe(time=("{}:".format(current + 1),), relative=True, timeChange=count, option="over")
 
 
+def nudge_value(default=1):
+    try:
+        return int(settings.get_setting("nudge_value", default))
+    except Exception:
+        return default
+
 
 def move_keyframes_in_range(*args):
+    offset = nudge_value()
     if args and isinstance(args[0], (int, float)):
-        offset = int(args[0])
-    else:
-        offset = int(settings.get_setting("nudge_value", 1))
-        if args and args[0] == -1:
-            offset = -offset
+        offset = offset * int(args[0])
 
     if not offset:
         return

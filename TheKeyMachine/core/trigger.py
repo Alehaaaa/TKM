@@ -463,43 +463,43 @@ def _register_builtin_commands():
     )
     register_command(
         "nudge_insert_inbetween",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "insert_inbetween", nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "insert_inbetween", 1),
     )
     register_command(
         "nudge_remove_inbetween",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "remove_inbetween", nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "remove_inbetween", 1),
     )
     register_command(
         "nudge_left",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", -nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", -1),
     )
     register_command(
         "nudge_right",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", 1),
     )
     register_command(
         "nudge_left_all_keys",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_all_keys", -nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_all_keys", -1),
     )
     register_command(
         "nudge_left_scene",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_scene_keys", -nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_scene_keys", -1),
     )
     register_command(
         "nudge_right_all_keys",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_all_keys", nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_all_keys", 1),
     )
     register_command(
         "nudge_right_scene",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_scene_keys", nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_scene_keys", 1),
     )
     register_command(
         "nudge_insert_inbetween_scene",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "inbetween_scene", nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "inbetween_scene", 1),
     )
     register_command(
         "nudge_remove_inbetween_scene",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "inbetween_scene", -nudge_value()),
+        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "inbetween_scene", -1),
     )
 
 
