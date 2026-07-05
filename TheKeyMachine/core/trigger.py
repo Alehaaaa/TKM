@@ -363,11 +363,11 @@ def _register_builtin_commands():
         "graph_dock_menu",
         _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "graph_dock_menu"),
     )
-    register_command("smart_rotation", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_rotation_manipulator"))
-    register_command("smart_rotation_release", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_rotation_manipulator_release"))
-    register_command("smart_translation", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_translate_manipulator"))
+    register_command("smart_rotation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator"))
+    register_command("smart_rotation_release", _make_module_command("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator_release"))
+    register_command("smart_translation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "smart_translate_manipulator"))
     register_command(
-        "smart_translation_release", _make_module_command("TheKeyMachine.mods.hotkeysMod", "smart_translate_manipulator_release")
+        "smart_translation_release", _make_module_command("TheKeyMachine.mods.keyToolsMod", "smart_translate_manipulator_release")
     )
 
     register_command("create_locator", _make_module_command("TheKeyMachine.mods.barMod", "createLocator"))

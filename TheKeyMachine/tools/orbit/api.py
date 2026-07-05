@@ -18,6 +18,7 @@ from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 from TheKeyMachine.data import icons
 from TheKeyMachine.core import trigger
+import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools import common as toolCommon

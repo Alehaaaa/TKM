@@ -30,6 +30,11 @@ icons, callbacks, and documentation across different UI contexts
 
 
 def _tangent_shortcuts(tool_id, tangent_type, tangent_label, *, maya_default=True, all_keys_callback=None):
+    def _set_tangent(handle_mode="both", key_scope="selection"):
+        if tangent_type == "bouncy":
+            return keyTools.bouncy_tangets(handle_mode=handle_mode, key_scope=key_scope)
+        return bar.setTangent(tangent_type, handle_mode=handle_mode, key_scope=key_scope)
+
     shortcuts = []
     if maya_default:
         shortcuts.append(
@@ -41,12 +46,54 @@ def _tangent_shortcuts(tool_id, tangent_type, tangent_label, *, maya_default=Tru
                 "description": "Use {} for newly created keys.".format(tangent_label),
             }
         )
+
+    if tangent_type != "step":
+        shortcuts.extend(
+            [
+                {
+                    "id": tool_id,
+                    "label": "{} Both Ends".format(tangent_label),
+                    "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift],
+                    "callback": lambda: _set_tangent("both", "selection"),
+                    "description": "Set {} on the current selection.".format(tangent_label.lower()),
+                },
+                {
+                    "id": tool_id,
+                    "label": "{} First Key".format(tangent_label),
+                    "keys": [QtCore.Qt.Key_Shift],
+                    "callback": lambda: _set_tangent("both", "first"),
+                    "description": "Set {} on the first key.".format(tangent_label.lower()),
+                },
+                {
+                    "id": tool_id,
+                    "label": "{} In".format(tangent_label),
+                    "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift],
+                    "callback": lambda: _set_tangent("in", "selection"),
+                    "description": "Set the in {} on the current selection.".format(tangent_label.lower()),
+                },
+                {
+                    "id": tool_id,
+                    "label": "{} Last Key".format(tangent_label),
+                    "keys": [QtCore.Qt.Key_Alt],
+                    "callback": lambda: _set_tangent("both", "last"),
+                    "description": "Set {} on the last key.".format(tangent_label.lower()),
+                },
+                {
+                    "id": tool_id,
+                    "label": "{} Out".format(tangent_label),
+                    "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt],
+                    "callback": lambda: _set_tangent("out", "selection"),
+                    "description": "Set the out {} on the current selection.".format(tangent_label.lower()),
+                },
+            ]
+        )
+
     shortcuts.append(
         {
             "id": tool_id,
             "label": "{} All Keys".format(tangent_label),
             "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift, QtCore.Qt.Key_Alt],
-            "callback": all_keys_callback or (lambda t=tangent_type: bar.setTangent(t, key_scope="all")),
+            "callback": all_keys_callback or (lambda: _set_tangent("both", "all")),
             "description": "Set {} on all keys.".format(tangent_label.lower()),
         }
     )
@@ -254,10 +301,11 @@ TOOL_DEFINITIONS = {
     "share_keys_from_last_selected": {
         "type": "tool",
         "label": "Share Keys From Last Selected",
+        "description": "Copy key timing from the last selected object onto the target objects.",
         "text": "sK",
         "icon": icons.share_keys,
         "callback": keyTools.share_keys_from_last_selected,
-        "tooltip_template": helper.share_keys_tooltip_text,
+        "tooltip_template": helper.share_keys_from_last_selected_tooltip_text,
         "default": False,
     },
     "reblock": {
@@ -282,10 +330,11 @@ TOOL_DEFINITIONS = {
     "bake_animation_from_last_selected": {
         "type": "tool",
         "label": "Bake From Last Selected",
+        "description": "Bake target objects to the key times of the last selected object.",
         "text": "BA",
         "icon": icons.bake_animation_1,
         "callback": keyTools.bake_animation_from_last_selected,
-        "tooltip_template": helper.bake_animation_1_tooltip_text,
+        "tooltip_template": helper.bake_animation_from_last_selected_tooltip_text,
         "default": False,
     },
     "bake_animation_1": {
@@ -568,6 +617,7 @@ TOOL_DEFINITIONS = {
     "delete_static_animation": {
         "type": "tool",
         "label": "Remove Static Anim Curves",
+        "description": "Remove animation curves whose keyed values never change.",
         "text": "S",
         "icon": icons.delete_animation,
         "tooltip_template": helper.delete_static_animation_tooltip_text,
@@ -576,79 +626,105 @@ TOOL_DEFINITIONS = {
     "apply_smart_euler_filter": {
         "type": "tool",
         "label": "Apply Smart Euler Filter",
+        "description": "Clean selected rotation curves with Maya's Euler filter.",
         "icon": icons.euler_filter,
+        "tooltip_template": helper.apply_smart_euler_filter_tooltip_text,
         "callback": trigger.make_command_callback("apply_smart_euler_filter"),
     },
     "clear_animation": {
         "type": "tool",
         "label": "Clear Animation",
+        "description": "Remove animation keys from the current selection.",
         "icon": icons.delete_animation,
+        "tooltip_template": helper.clear_animation_keys_tooltip_text,
         "callback": trigger.make_command_callback("clear_animation"),
     },
     "copy_keys": {
         "type": "tool",
         "label": "Copy Keys",
+        "description": "Copy selected animation keys to Maya's key clipboard.",
         "icon": icons.copy_animation,
+        "tooltip_template": helper.copy_keys_tooltip_text,
         "callback": trigger.make_command_callback("copy_keys"),
     },
     "crop_animation": {
         "type": "tool",
         "label": "Crop Animation",
+        "description": "Keep keys inside the current time context and remove the rest.",
         "icon": icons.isolate,
+        "tooltip_template": helper.crop_animation_tooltip_text,
         "callback": trigger.make_command_callback("crop_animation"),
     },
     "cut_keys": {
         "type": "tool",
         "label": "Cut Keys",
+        "description": "Cut selected keys and place them on Maya's key clipboard.",
         "icon": icons.get("eraser"),
+        "tooltip_template": helper.cut_keys_tooltip_text,
         "callback": trigger.make_command_callback("cut_keys"),
     },
     "delete_keys": {
         "type": "tool",
         "label": "Delete Keys",
+        "description": "Delete keys from the current frame, range, channels, or curves.",
         "icon": icons.trash,
+        "tooltip_template": helper.delete_keys_tooltip_text,
         "callback": trigger.make_command_callback("delete_keys"),
     },
     "paste_keys": {
         "type": "tool",
         "label": "Paste Keys",
+        "description": "Paste copied keys onto the selected objects or channels.",
         "icon": icons.paste_animation,
+        "tooltip_template": helper.paste_keys_tooltip_text,
         "callback": trigger.make_command_callback("paste_keys"),
     },
     "paste_keys_relative": {
         "type": "tool",
         "label": "Paste Keys Relative",
+        "description": "Paste copied keys with the first copied key aligned to the current frame.",
         "icon": icons.paste_insert_animation,
+        "tooltip_template": helper.paste_keys_relative_tooltip_text,
         "callback": trigger.make_command_callback("paste_keys_relative"),
     },
     "remove_redundant_keys": {
         "type": "tool",
         "label": "Remove Redundant Keys",
+        "description": "Remove unnecessary keys while preserving the selected animation shape.",
         "icon": icons.remove_redundant_keys,
+        "tooltip_template": helper.remove_redundant_keys_tooltip_text,
         "callback": trigger.make_command_callback("remove_redundant_keys"),
     },
     "remove_static_anim_curves": {
         "type": "tool",
         "label": "Remove Static Anim Curves",
+        "description": "Remove animation curves whose keyed values never change.",
         "icon": icons.remove_static_anim_curves,
+        "tooltip_template": helper.remove_static_anim_curves_tooltip_text,
         "callback": trigger.make_command_callback("remove_static_anim_curves"),
     },
     "reverse_animation": {
         "type": "tool",
         "label": "Reverse Animation",
+        "description": "Reverse selected animation over the current time context.",
         "icon": icons.get("flip"),
+        "tooltip_template": helper.reverse_animation_tooltip_text,
         "callback": trigger.make_command_callback("reverse_animation"),
     },
     "set_smart_key": {
         "type": "tool",
         "label": "Set Smart Key",
+        "description": "Set a key on the relevant selected channels or curves.",
         "text": "S",
+        "tooltip_template": helper.set_smart_key_tooltip_text,
         "callback": trigger.make_command_callback("set_smart_key"),
     },
     "set_smart_key_all_channels": {
         "type": "tool",
         "label": "Set Smart Key All Channels",
+        "description": "Set keys on all keyable scalar channels for the selected objects.",
         "text": "S+",
+        "tooltip_template": helper.set_smart_key_all_channels_tooltip_text,
         "callback": trigger.make_command_callback("set_smart_key_all_channels"),
     },
     "graph_match_keys": {
@@ -1059,11 +1135,26 @@ TOOL_DEFINITIONS = {
         "callback": bar.align_selected_objects,
         "tooltip_template": helper.align_tooltip_text,
     },
+    "align_objects_all_keys": {
+        "type": "tool",
+        "label": "Align Objects All Keys",
+        "description": "Align translation and rotation over all keyed frames.",
+        "icon": icons.align,
+        "callback": partial(bar.align_selected_objects, key_scope="all"),
+        "tooltip_template": helper.align_tooltip_text,
+    },
     "align_object_translation": {
         "type": "tool",
         "label": "Align Object Translation",
         "icon": icons.align,
         "callback": partial(bar.align_selected_objects, pos=True, rot=False, scl=False),
+    },
+    "align_object_translation_all_keys": {
+        "type": "tool",
+        "label": "Align Object Translation All Keys",
+        "description": "Align translation over all keyed frames.",
+        "icon": icons.align,
+        "callback": partial(bar.align_selected_objects, pos=True, rot=False, scl=False, key_scope="all"),
     },
     "align_object_rotation": {
         "type": "tool",
@@ -1071,11 +1162,25 @@ TOOL_DEFINITIONS = {
         "icon": icons.align,
         "callback": partial(bar.align_selected_objects, pos=False, rot=True, scl=False),
     },
+    "align_object_rotation_all_keys": {
+        "type": "tool",
+        "label": "Align Object Rotation All Keys",
+        "description": "Align rotation over all keyed frames.",
+        "icon": icons.align,
+        "callback": partial(bar.align_selected_objects, pos=False, rot=True, scl=False, key_scope="all"),
+    },
     "align_object_scale": {
         "type": "tool",
         "label": "Align Object Scale",
         "icon": icons.align,
         "callback": partial(bar.align_selected_objects, pos=False, rot=False, scl=True),
+    },
+    "align_object_scale_all_keys": {
+        "type": "tool",
+        "label": "Align Object Scale All Keys",
+        "description": "Align scale over all keyed frames.",
+        "icon": icons.align,
+        "callback": partial(bar.align_selected_objects, pos=False, rot=False, scl=True, key_scope="all"),
     },
     "align_objects_help": {
         "type": "tool",
@@ -1615,6 +1720,7 @@ TOOL_SECTION_DEFINITIONS = {
                     {"id": "bake_animation_3", "keys": [QtCore.Qt.Key_Shift]},
                     {"id": "bake_animation_4", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
                     {"id": "bake_animation_custom", "keys": [QtCore.Qt.Key_Alt]},
+                    {"id": "bake_animation_from_last_selected", "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]},
                 ],
             },
             {"id": "bake_animation_2"},
@@ -1632,7 +1738,10 @@ TOOL_SECTION_DEFINITIONS = {
             {
                 "id": "share_keys",
                 "default": True,
-                "shortcuts": [{"id": "reblock", "keys": [QtCore.Qt.Key_Shift]}],
+                "shortcuts": [
+                    {"id": "share_keys_from_last_selected", "keys": [QtCore.Qt.Key_Control]},
+                    {"id": "reblock", "keys": [QtCore.Qt.Key_Shift]},
+                ],
             },
             {"id": "reblock"},
             "separator",
@@ -1791,14 +1900,39 @@ TOOL_SECTION_DEFINITIONS = {
                 "id": "align_objects",
                 "default": True,
                 "shortcuts": [
+                    {
+                        "id": "align_objects_all_keys",
+                        "label": "Align Objects All Keys",
+                        "keys": [QtCore.Qt.Key_Alt],
+                    },
                     {"id": "align_object_translation", "keys": [QtCore.Qt.Key_Shift]},
+                    {
+                        "id": "align_object_translation_all_keys",
+                        "label": "Align Object Translation All Keys",
+                        "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift],
+                    },
                     {"id": "align_object_rotation", "keys": [QtCore.Qt.Key_Control]},
+                    {
+                        "id": "align_object_rotation_all_keys",
+                        "label": "Align Object Rotation All Keys",
+                        "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Control],
+                    },
                     {"id": "align_object_scale", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+                    {
+                        "id": "align_object_scale_all_keys",
+                        "label": "Align Object Scale All Keys",
+                        "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift],
+                    },
                 ],
             },
             {"id": "align_object_translation"},
             {"id": "align_object_rotation"},
             {"id": "align_object_scale"},
+            "separator",
+            {"id": "align_objects_all_keys"},
+            {"id": "align_object_translation_all_keys"},
+            {"id": "align_object_rotation_all_keys"},
+            {"id": "align_object_scale_all_keys"},
             "separator",
             {"id": "align_objects_help"},
         ],

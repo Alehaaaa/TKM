@@ -51,3 +51,7 @@ class OrbitWindow(OrbitWindowMixin, customDialogs.QFlatCloseableFloatingWidget):
     def closeEvent(self, event):
         orbitApi._emit_orbit_window_state(False)
         super().closeEvent(event)
+
+    def hideEvent(self, event):
+        orbitApi._emit_orbit_window_state(False)
+        super().hideEvent(event)

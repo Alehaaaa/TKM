@@ -50,7 +50,15 @@ def _tooltip_parts(raw):
     if hasattr(raw, "title") and hasattr(raw, "first_line"):
         return clean_tool_text(raw.title), clean_tool_text(raw.first_line)
 
-    # Plain string fallback (ad-hoc tooltip text not from tool_tooltip)
+    if isinstance(raw, (list, tuple)):
+        for item in raw:
+            if isinstance(item, str):
+                first_line = clean_tool_text(item)
+                if first_line:
+                    return "", first_line
+        return "", ""
+
+    # Plain string fallback for ad-hoc tooltip text.
     return "", clean_tool_text(raw)
 
 

@@ -326,7 +326,22 @@ def setTangent(tangent_type, handle_mode="both", key_scope="selection", tint_col
         tint_session.finish()
 
 
-def align_selected_objects(*args, pos=True, rot=True, scl=False):
+def _collect_align_keyframes(objects):
+    frames = set()
+    for obj in objects or []:
+        try:
+            key_times = cmds.keyframe(obj, query=True, timeChange=True) or []
+        except Exception:
+            key_times = []
+        for frame in key_times:
+            try:
+                frames.add(int(round(frame)))
+            except Exception:
+                continue
+    return sorted(frames)
+
+
+def align_selected_objects(*args, pos=True, rot=True, scl=False, key_scope="selection"):
     # Obtener los objetos seleccionados
     sel = selectionMod.get_selected_objects()
 
@@ -345,23 +360,31 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False):
     cmds.refresh(suspend=True)
 
     try:
-        # Obtener el rango de tiempo seleccionado
-        time_range = selectionMod.get_selected_time_slider_range()
+        frames_to_align = []
+        set_keyframes = False
+        if key_scope == "all":
+            frames_to_align = _collect_align_keyframes(source_objs)
+            if not frames_to_align:
+                return wutil.make_inViewMessage("No animation keys available to align objects.")
+            set_keyframes = True
+        else:
+            # Obtener el rango de tiempo seleccionado
+            time_range = selectionMod.get_selected_time_slider_range()
+            # Si hay un rango de tiempo seleccionado y no es igual al tiempo actual
+            if time_range and time_range[0] != current_time:
+                start_frame, end_frame = time_range[0], time_range[1]
+                frames_to_align = list(range(int(start_frame), int(end_frame) + 1))
+                set_keyframes = True
 
         # Crear una barra de progreso
         gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
         cmds.progressBar(gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status="Alineando objetos...", maxValue=100)
 
         try:
-            # Si hay un rango de tiempo seleccionado y no es igual al tiempo actual
-            if time_range and time_range[0] != current_time:
-                start_frame, end_frame = time_range[0], time_range[1]
-
-                # Calcular el número total de frames en el rango
-                total_frames = int(end_frame - start_frame + 1)
-
+            if frames_to_align:
+                total_frames = max(len(frames_to_align), 1)
                 # Iterar sobre cada frame en el rango y alinear los objetos
-                for frame in range(int(start_frame), int(end_frame) + 1):
+                for index, frame in enumerate(frames_to_align):
                     # Mover el tiempo actual al frame
                     cmds.currentTime(frame)
 
@@ -370,10 +393,11 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False):
                         cmds.matchTransform(source_obj, target_obj, pos=pos, rot=rot, scl=scl)
 
                         # Definir un keyframe para el objeto fuente en este punto en el tiempo
-                        cmds.setKeyframe(source_obj)
+                        if set_keyframes:
+                            cmds.setKeyframe(source_obj)
 
                     # Actualizar la barra de progreso
-                    cmds.progressBar(gMainProgressBar, edit=True, progress=int((frame - start_frame) / total_frames * 100))
+                    cmds.progressBar(gMainProgressBar, edit=True, progress=int((index + 1) / total_frames * 100))
 
             else:
                 # Si no hay un rango de tiempo seleccionado o es igual al tiempo actual, alinear en el tiempo actual

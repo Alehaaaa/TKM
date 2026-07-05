@@ -86,31 +86,9 @@ def tooltip_body(*paragraphs):
     return tuple(lines)
 
 
-def _tooltip_template_from_data(raw, fallback_title="", fallback_description="", fallback_icon=None):
-    if isinstance(raw, TooltipTemplate):
-        if fallback_title:
-            raw.title = fallback_title
-        if fallback_icon and not raw.icon:
-            raw.icon = fallback_icon
-        return raw
-
-    # Fallback: plain string passed directly as a tooltip template
-    if isinstance(raw, str) and raw:
-        title = fallback_title or raw
-        lines = list(_string_body_lines(raw))
-        if title and lines and lines[0].lower() == title.lower():
-            lines = lines[1:]
-        return TooltipTemplate(raw, title=title, body_lines=lines, icon=fallback_icon)
-
-    if fallback_title or fallback_description or fallback_icon:
-        return tool_tooltip(fallback_title, fallback_description, icon=fallback_icon)
-
-    return TooltipTemplate("", title="", body_lines=(), icon=None)
-
-
-def tool_tooltip(title, body, icon=None):
+def _tooltip_template_from_body(body):
     body_lines = tooltip_body(*(body if isinstance(body, (list, tuple)) else [body]))
-    text_lines = [toolCommon.clean_tool_text(title)] if title else []
+    text_lines = []
     for item in body_lines:
         if item is separator:
             text_lines.append("---")
@@ -118,7 +96,32 @@ def tool_tooltip(title, body, icon=None):
             text_lines.append(item.path)
         else:
             text_lines.append(str(item))
-    return TooltipTemplate("\n\n".join(line for line in text_lines if line), title=title, body_lines=body_lines, icon=icon)
+    return TooltipTemplate("\n\n".join(line for line in text_lines if line), title="", body_lines=body_lines, icon=None)
+
+
+def _tooltip_template_from_data(raw, fallback_title="", fallback_description="", fallback_icon=None):
+    if isinstance(raw, TooltipTemplate):
+        return TooltipTemplate(
+            str(raw),
+            title="",
+            body_lines=getattr(raw, "body_lines", ()),
+            icon=None,
+        )
+
+    if isinstance(raw, (list, tuple)):
+        return _tooltip_template_from_body(raw)
+
+    # Fallback: plain string passed directly as a tooltip template
+    if isinstance(raw, str) and raw:
+        lines = list(_string_body_lines(raw))
+        if fallback_title and lines and lines[0].lower() == fallback_title.lower():
+            lines = lines[1:]
+        return TooltipTemplate(raw, title="", body_lines=lines, icon=None)
+
+    if fallback_description:
+        return _tooltip_template_from_body(fallback_description)
+
+    return TooltipTemplate("", title="", body_lines=(), icon=None)
 
 
 def format_tooltip_shortcut(keys_list, include_click_suffix=False):
@@ -292,10 +295,7 @@ class QFlatTooltip(QWidget):
         header_only = bool(header_title or header_pixmap) and not has_body and not self.shortcuts
 
         if not header_pixmap:
-            template_icon = getattr(self.tooltip_template, "icon", None)
-            if template_icon:
-                header_pixmap = QIcon(template_icon)
-            elif self.icon and isinstance(self.icon, (str, bytes)):
+            if self.icon and isinstance(self.icon, (str, bytes)):
                 header_pixmap = QIcon(self.icon)
 
         if header_title or header_pixmap:

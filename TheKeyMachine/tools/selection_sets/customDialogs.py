@@ -506,6 +506,10 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         selectionSetsApi._emit_selection_sets_window_state(False)
         super().closeEvent(event)
 
+    def hideEvent(self, event):
+        selectionSetsApi._emit_selection_sets_window_state(False)
+        super().hideEvent(event)
+
     def refresh(self):
         self._clear_scroll()
         controller = self.controller or selectionSetsApi._resolve_toolbar_controller()

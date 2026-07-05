@@ -72,6 +72,38 @@ _paste_to_dialog = None
 # _____________________________________________________ General _______________________________________________________________#
 
 
+def smart_rotation_manipulator():
+    actual_mode = cmds.currentCtx()
+    mel.eval("buildRotateMM")
+    current_rotate_mode = cmds.manipRotateContext("Rotate", q=True, mode=True)
+    if actual_mode == "RotateSuperContext":
+        if current_rotate_mode == 0:
+            cmds.manipRotateContext("Rotate", e=True, mode=1)
+        if current_rotate_mode == 1:
+            cmds.manipRotateContext("Rotate", e=True, mode=2)
+        if current_rotate_mode == 2:
+            cmds.manipRotateContext("Rotate", e=True, mode=0)
+
+
+def smart_rotation_manipulator_release():
+    mel.eval("destroySTRSMarkingMenu RotateTool")
+
+
+def smart_translate_manipulator():
+    actual_mode = cmds.currentCtx()
+    mel.eval("buildTranslateMM")
+    current_move_mode = cmds.manipMoveContext("Move", q=True, mode=True)
+    if actual_mode == "moveSuperContext":
+        if current_move_mode == 0:
+            cmds.manipMoveContext("Move", e=True, mode=2)
+        else:
+            cmds.manipMoveContext("Move", e=True, mode=0)
+
+
+def smart_translate_manipulator_release():
+    mel.eval("destroySTRSMarkingMenu MoveTool")
+
+
 def clear_timeslider_selection():
     # fix temporal para limpiar el timeslider
     selection = selectionMod.get_selected_objects()
@@ -195,6 +227,19 @@ def _set_keys_on_frames(curves, frames):
     for curve in _unique(curves):
         for frame in frames:
             cmds.setKeyframe(curve, time=(frame,))
+
+
+def _normalize_key_frames(frames):
+    normalized = []
+    for frame in frames or []:
+        try:
+            frame_value = float(frame)
+        except Exception:
+            continue
+        if int(frame_value) == frame_value:
+            frame_value = int(frame_value)
+        normalized.append(frame_value)
+    return sorted(set(normalized))
 
 
 def _apply_step_tangents(curves, time_range):
@@ -516,11 +561,31 @@ def _frames_from_last_selected(time_context=None):
     if time_context and time_context.mode != "all_animation":
         query_kwargs["time"] = time_context.timerange
     frames = cmds.keyframe(source, **query_kwargs) or []
-    frames = sorted({int(frame) if int(frame) == frame else frame for frame in frames})
+    frames = _normalize_key_frames(frames)
     if not frames:
         wutil.make_inViewMessage("Last selected object has no keys")
         return source, targets, []
     return source, targets, frames
+
+
+def _bake_curves_to_source_frames(curves, frames):
+    curves = _unique(curves)
+    frames = _normalize_key_frames(frames)
+    if not curves or not frames:
+        return
+
+    frame_lookup = set(frames)
+    time_range = (frames[0], frames[-1])
+    for frame in frames:
+        cmds.currentTime(frame)
+        for curve in curves:
+            cmds.setKeyframe(curve, time=(frame,))
+
+    for curve in curves:
+        existing_frames = _normalize_key_frames(cmds.keyframe(curve, query=True, time=time_range, timeChange=True) or [])
+        for frame in existing_frames:
+            if frame not in frame_lookup:
+                cmds.cutKey(curve, time=(frame, frame), option="keys")
 
 
 def share_keys_from_last_selected(*args):
@@ -739,15 +804,17 @@ def bake_animation_from_last_selected(*args):
 
     tint_session = _begin_timeline_tint((int(frames[0]), int(frames[-1])), "bake_animation_1")
     chunk_opened = False
+    current_time = cmds.currentTime(query=True)
     try:
         chunk_opened = toolCommon.open_undo_chunk()
         for target in targets:
             curves = _anim_curves_for_objects([target])
-            _set_keys_on_frames(curves, frames)
+            _bake_curves_to_source_frames(curves, frames)
 
             if get_bake_tangent_mode() == BAKE_TANGENT_MODE_STEP:
                 _apply_step_tangents(curves, (frames[0], frames[-1]))
     finally:
+        cmds.currentTime(current_time)
         if chunk_opened:
             toolCommon.close_undo_chunk()
         if tint_session:
@@ -883,6 +950,7 @@ def nudge_all_keys(offset, *args):
     chunk_opened = toolCommon.open_undo_chunk()
     try:
         cmds.keyframe(curves, edit=True, relative=True, includeUpperBound=True, option="over", timeChange=offset)
+        _nudge_current_time(offset)
     finally:
         if chunk_opened:
             toolCommon.close_undo_chunk()
@@ -898,6 +966,7 @@ def nudge_scene_keys(offset, *args):
     chunk_opened = toolCommon.open_undo_chunk()
     try:
         cmds.keyframe(curves, edit=True, relative=True, includeUpperBound=True, option="over", timeChange=offset)
+        _nudge_current_time(offset)
     finally:
         if chunk_opened:
             toolCommon.close_undo_chunk()
@@ -934,6 +1003,13 @@ def nudge_value(default=1):
         return default
 
 
+def _nudge_current_time(offset):
+    try:
+        cmds.currentTime(cmds.currentTime(q=True) + int(offset))
+    except Exception:
+        pass
+
+
 def move_keyframes_in_range(*args):
     offset = nudge_value()
     if args and isinstance(args[0], (int, float)):
@@ -955,6 +1031,7 @@ def move_keyframes_in_range(*args):
     try:
         if target_info["has_graph_keys"]:
             cmds.keyframe(edit=True, animation="keys", relative=True, includeUpperBound=True, option="over", timeChange=offset)
+            _nudge_current_time(offset)
             return
 
         if has_range:
@@ -3461,7 +3538,7 @@ def bouncy_tangets(*args, angle_adjustment_factor=1.3, handle_mode="both", key_s
     target_keyframes = _collect_bouncy_target_keyframes(target_info, key_scope=key_scope)
 
     if not target_keyframes:
-        return wutil.make_inViewMessage("No animation keys available for bouncy tangents.")
+        return wutil.make_inViewMessage("No animation keys available to set tangents.")
 
     time_context = target_info.get("time_context")
     if target_info.get("selected_keyframes"):

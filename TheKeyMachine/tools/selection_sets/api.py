@@ -118,8 +118,7 @@ def close_selection_sets_window():
     win = get_selection_sets_window()
     if win and wutil.is_valid_widget(win):
         win.close()
-    else:
-        _emit_selection_sets_window_state(False)
+    _emit_selection_sets_window_state(False)
 
 
 def selection_sets_window(*args, controller=None, reuse_existing=True):
@@ -498,10 +497,19 @@ def bind_selection_sets_toolbar_button(button, controller=None):
             "_tkm_selection_sets_mouse_press_filter",
             _selection_sets_mouse_press,
         )
-        toolCommon.bind_toolbar_button_context_menu(
-            _selection_sets_toolbar_toggle,
-            button,
-            "_tkm_selection_sets_context_menu_slot",
-            lambda parent, c=controller: build_selection_sets_context_menu(parent=parent, controller=c),
-        )
+        menu_factory = lambda parent, c=controller: build_selection_sets_context_menu(parent=parent, controller=c)
+        connect_window_toggle = getattr(button, "connect_window_toggle", None)
+        if callable(connect_window_toggle):
+            button.connect_window_toggle(
+                _selection_sets_toolbar_toggle,
+                context_attr="_tkm_selection_sets_context_menu_slot",
+                menu_factory=menu_factory,
+            )
+        else:
+            toolCommon.bind_toolbar_button_context_menu(
+                _selection_sets_toolbar_toggle,
+                button,
+                "_tkm_selection_sets_context_menu_slot",
+                menu_factory,
+            )
         return True
