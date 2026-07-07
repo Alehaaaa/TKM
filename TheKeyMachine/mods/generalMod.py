@@ -128,7 +128,7 @@ def get_copy_animation_file():
 
 # COPY PASTE POSE ___________________
 def get_copy_paste_pose_file():
-    return get_tool_data_path("copy_paste_pose", "copy_paste_pose_data.json")
+    return get_tool_data_path("copy_pose", "copy_pose_data.json")
 
 
 # TEMP PIVOT _____________________________

@@ -1,6 +1,9 @@
+from contextlib import contextmanager
 from functools import lru_cache
+import inspect
 
 import maya.cmds as cmds  # type: ignore
+import maya.mel as mel  # type: ignore
 
 from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
 
@@ -9,6 +12,338 @@ from TheKeyMachine.mods import settingsMod as settings
 
 
 UNDO_PREFIX = "TKM"
+
+
+def process_ui_events():
+    try:
+        QtCore.QCoreApplication.processEvents()
+    except Exception:
+        pass
+
+
+def _format_eta(seconds):
+    try:
+        seconds = max(0, int(round(float(seconds))))
+    except Exception:
+        return ""
+    if seconds < 60:
+        return "{} sseconds left".format(seconds)
+    minutes, seconds = divmod(seconds, 60)
+    return "{} minutes {} seconds left".format(minutes, seconds)
+
+
+class AdaptiveProgress(object):
+    def __init__(
+        self,
+        label,
+        max_value=0,
+        interruptable=True,
+        show_after_ms=350,
+        min_steps=40,
+        update_interval_ms=1000,
+    ):
+        self.label = label or "Processing"
+        self.max_value = max(0, int(max_value or 0))
+        self._bar_max = self.max_value if self.max_value > 0 else 100
+        self.interruptable = bool(interruptable)
+        self.show_after_ms = max(0, int(show_after_ms or 0))
+        self.min_steps = max(1, int(min_steps or 1))
+        self.update_interval_ms = max(100, int(update_interval_ms or 1000))
+        self.value = 0
+        self._bar = None
+        self._active = False
+        self._cancelled = False
+        self._last_status_update_ms = -1
+        self._last_status_label = self.label
+        self._timer = QtCore.QElapsedTimer()
+        self._timer.start()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.finish()
+
+    def _should_show(self):
+        if self._active:
+            return False
+        return (self.max_value > 0 and self.max_value >= self.min_steps) or self._timer.elapsed() >= self.show_after_ms
+
+    def _ensure_started(self):
+        if self._active or not self._should_show():
+            return
+        try:
+            self._bar = mel.eval("$tmp = $gMainProgressBar")
+            cmds.progressBar(
+                self._bar,
+                edit=True,
+                beginProgress=True,
+                isInterruptable=self.interruptable,
+                status=self._status_text(),
+                maxValue=self._bar_max,
+            )
+            self._active = True
+            self._last_status_update_ms = self._timer.elapsed()
+            process_ui_events()
+        except Exception:
+            self._bar = None
+
+    def _status_text(self):
+        if not self.max_value:
+            elapsed = max(0, int(round(self._timer.elapsed() / 1000.0)))
+            if elapsed:
+                return "{} ({}s elapsed)".format(self.label, elapsed)
+            return "{}...".format(self.label)
+        eta = ""
+        if self.value > 0:
+            elapsed_seconds = max(0.001, self._timer.elapsed() / 1000.0)
+            remaining = (elapsed_seconds / float(self.value)) * max(0, self.max_value - self.value)
+        return "{} {}".format(self.label, _format_eta(remaining))
+
+    def step(self, amount=1, status=None):
+        amount = int(amount or 1)
+        if self.max_value:
+            self.value = min(self.max_value, self.value + amount)
+            display_value = self.value
+        else:
+            self.value += amount
+            display_value = self.value % self._bar_max
+        self._ensure_started()
+        if not self._active or not self._bar:
+            return False
+        try:
+            if status:
+                self.label = status
+            now = self._timer.elapsed()
+            status_due = (
+                status
+                or self._last_status_update_ms < 0
+                or now - self._last_status_update_ms >= self.update_interval_ms
+                or (self.max_value and self.value >= self.max_value)
+            )
+            kwargs = {"edit": True, "progress": display_value}
+            if status_due:
+                kwargs["status"] = self._status_text()
+                self._last_status_update_ms = now
+                self._last_status_label = self.label
+            cmds.progressBar(self._bar, **kwargs)
+            self._cancelled = bool(cmds.progressBar(self._bar, query=True, isCancelled=True))
+            process_ui_events()
+        except Exception:
+            self._cancelled = False
+        return self._cancelled
+
+    @property
+    def cancelled(self):
+        return self._cancelled
+
+    def finish(self):
+        if not self._active or not self._bar:
+            return
+        try:
+            cmds.progressBar(self._bar, edit=True, endProgress=True)
+            process_ui_events()
+        except Exception:
+            pass
+        self._active = False
+        self._bar = None
+
+
+class ToolOperation(object):
+    def __init__(self, tool_id=None, label=None, progress=None, tint_session=None, anchor_widget=None):
+        self.tool_id = tool_id
+        self.label = label or humanize_tool_name(tool_id) or "Processing"
+        self.progress = progress
+        self.tint_session = tint_session
+        self.anchor_widget = anchor_widget
+
+    @property
+    def cancelled(self):
+        progress = self.progress
+        return bool(progress and progress.cancelled)
+
+    def step(self, amount=1, status=None):
+        if not self.progress:
+            return False
+        return self.progress.step(amount=amount, status=status)
+
+
+_TOOL_OPERATION_STACK = []
+
+
+def current_tool_operation():
+    if not _TOOL_OPERATION_STACK:
+        return None
+    return _TOOL_OPERATION_STACK[-1]
+
+
+def current_progress():
+    operation = current_tool_operation()
+    return operation.progress if operation else None
+
+
+def step_progress(amount=1, status=None):
+    progress = current_progress()
+    if not progress:
+        return False
+    return progress.step(amount=amount, status=status)
+
+
+def _begin_operation_tint(tint=None, timerange=None, default_mode="current_frame", tint_key=None, tint_color=None, owner=None):
+    if not tint or tint == "none":
+        return None
+    try:
+        from TheKeyMachine.widgets import timeline as timeline_widgets
+    except Exception:
+        return None
+    try:
+        if tint == "range" and timerange:
+            return timeline_widgets.begin_timeline_tint(
+                timerange=timerange,
+                color=tint_color,
+                owner=owner,
+                key=tint_key,
+            )
+        if tint in ("current", "context"):
+            return timeline_widgets.begin_timeline_context(
+                default_mode=default_mode,
+                color=tint_color,
+                owner=owner,
+                key=tint_key,
+            )
+    except Exception:
+        return None
+    return None
+
+
+@contextmanager
+def tool_operation(
+    tool_id=None,
+    label=None,
+    progress_max=0,
+    progress=True,
+    interruptable=True,
+    undo=False,
+    undo_name=None,
+    tint=None,
+    timerange=None,
+    default_mode="current_frame",
+    tint_key=None,
+    tint_color=None,
+    anchor_widget=None,
+):
+    progress_obj = None
+    if progress:
+        progress_obj = AdaptiveProgress(
+            label or humanize_tool_name(tool_id) or "Processing",
+            progress_max,
+            interruptable=interruptable,
+            show_after_ms=1000,
+            min_steps=40,
+            update_interval_ms=1000,
+        )
+    tint_session = _begin_operation_tint(
+        tint=tint,
+        timerange=timerange,
+        default_mode=default_mode,
+        tint_key=tint_key or tool_id,
+        tint_color=tint_color,
+        owner=anchor_widget,
+    )
+    operation = ToolOperation(
+        tool_id=tool_id,
+        label=label,
+        progress=progress_obj,
+        tint_session=tint_session,
+        anchor_widget=anchor_widget,
+    )
+    chunk_opened = False
+    _TOOL_OPERATION_STACK.append(operation)
+    try:
+        if undo:
+            chunk_opened = open_undo_chunk(
+                undo_name or make_undo_chunk_name(tool_id=tool_id, title=label)
+            )
+        with progress_obj if progress_obj else _null_context():
+            yield operation
+    finally:
+        if _TOOL_OPERATION_STACK and _TOOL_OPERATION_STACK[-1] is operation:
+            _TOOL_OPERATION_STACK.pop()
+        elif operation in _TOOL_OPERATION_STACK:
+            _TOOL_OPERATION_STACK.remove(operation)
+        if tint_session:
+            try:
+                tint_session.finish()
+            except Exception:
+                pass
+        close_undo_chunk(chunk_opened)
+
+
+@contextmanager
+def _null_context():
+    yield None
+
+
+def _button_tool_id(button):
+    for attr in ("tool_id", "command_id", "objectName"):
+        value = getattr(button, attr, None)
+        if callable(value):
+            try:
+                value = value()
+            except Exception:
+                value = None
+        if value:
+            return str(value)
+    return ""
+
+
+def _button_operation_label(button, tool_id=""):
+    try:
+        tooltip = button.toolTip()
+    except Exception:
+        tooltip = ""
+    title = get_tooltip_title(tooltip) or get_tool_summary(tooltip)
+    return title or humanize_tool_name(tool_id) or "Processing"
+
+
+def _supported_callback_kwargs(callback, kwargs, injected_keys=None):
+    injected_keys = set(injected_keys or [])
+    try:
+        signature = inspect.signature(callback)
+    except Exception:
+        return {
+            key: value
+            for key, value in kwargs.items()
+            if key not in injected_keys
+        }
+    accepts_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
+    if accepts_kwargs:
+        return kwargs
+    return {
+        key: value
+        for key, value in kwargs.items()
+        if key in signature.parameters
+    }
+
+
+def run_tool_callback(button, callback, *args, **kwargs):
+    if not callable(callback):
+        return None
+    tool_id = _button_tool_id(button)
+    label = _button_operation_label(button, tool_id)
+    with tool_operation(tool_id=tool_id, label=label, anchor_widget=button, undo=True) as operation:
+        call_kwargs = dict(kwargs)
+        call_kwargs.setdefault("anchor_widget", button)
+        call_kwargs.setdefault("tool_operation", operation)
+        call_kwargs = _supported_callback_kwargs(
+            callback,
+            call_kwargs,
+            injected_keys=("anchor_widget", "tool_operation"),
+        )
+        return callback(*args, **call_kwargs)
 
 def _split_lines(raw):
     return str(raw or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")

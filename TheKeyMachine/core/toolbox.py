@@ -202,7 +202,7 @@ TOOL_DEFINITIONS = {
     "toolbar_toggle": {
         "type": "tool",
         "label": "Toggle Toolbar",
-        "icon": icons.TheKeyMachine_icon,
+        "icon": icons.tkm_main,
     },
     "toolbar_add_shelf_button": {
         "type": "tool",
@@ -223,6 +223,30 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Check for Updates",
         "icon": icons.check_updates,
+    },
+    "main_preferences_menu": {
+        "type": "menu",
+        "label": "Preferences",
+        "icon": icons.settings,
+        "description": "Open general toolbar options.",
+    },
+    "main_dock_menu": {
+        "type": "menu",
+        "label": "Dock",
+        "icon": icons.dock,
+        "description": "Move the toolbar to a different Maya area.",
+    },
+    "main_system_menu": {
+        "type": "menu",
+        "label": "System",
+        "icon": icons.system,
+        "description": "Open maintenance actions.",
+    },
+    "help_menu": {
+        "type": "menu",
+        "label": "Help",
+        "icon": icons.help,
+        "description": "Open docs, support, and community links.",
     },
 
     # ---------------------------------------------------------------  WINDOWS  --------------------------------------------------------------
@@ -1031,6 +1055,20 @@ TOOL_DEFINITIONS = {
         "callback": keyTools.paste_pose,
         "tooltip_template": helper.paste_pose_tooltip_text,
     },
+    "export_pose_file": {
+        "type": "tool",
+        "label": "Export Pose File",
+        "icon": icons.export,
+        "callback": keyTools.export_pose_file,
+        "description": "Export the copied pose data to a JSON file.",
+    },
+    "import_pose_file": {
+        "type": "tool",
+        "label": "Import Pose File",
+        "icon": icons.import_icon if hasattr(icons, "import_icon") else icons.get("import"),
+        "callback": keyTools.import_pose_file,
+        "description": "Import copied pose data from a JSON file.",
+    },
     "copy_animation": {
         "type": "tool",
         "label": "Copy Animation",
@@ -1058,6 +1096,20 @@ TOOL_DEFINITIONS = {
         "label": "Paste To",
         "icon": icons.paste_animation,
         "callback": keyTools.paste_animation_to,
+    },
+    "export_animation_file": {
+        "type": "tool",
+        "label": "Export Animation File",
+        "icon": icons.export,
+        "callback": keyTools.export_animation_file,
+        "description": "Export the copied animation data to a JSON file.",
+    },
+    "import_animation_file": {
+        "type": "tool",
+        "label": "Import Animation File",
+        "icon": icons.import_icon if hasattr(icons, "import_icon") else icons.get("import"),
+        "callback": keyTools.import_animation_file,
+        "description": "Import copied animation data from a JSON file.",
     },
 
     "pose_help": {
@@ -1614,25 +1666,27 @@ TOOL_DEFINITIONS = {
 }
 TOOL_SECTION_DEFINITIONS = {
     # --- Hotkey/System Tools ---
-    "window_tools": {
-        "label": "Windows",
-        "only": True,
+    "system": {
+        "label": "TKM Menu",
+        "hiddeable": False,
         "items": [
-            {"id": "toolbar_toggle"},
-            {"id": "toolbar_add_shelf_button"},
-            {"id": "toolbar_reload"},
-            {"id": "toolbar_unload"},
-            {"id": "check_for_updates"},
-            {"id": "orbit_window"},
-            {"id": "hotkeys_window"},
-            {"id": "about_window"},
-            {"id": "donate_window"},
-            {"id": "bug_report_window"},
-        ],
+            {
+                "id": "TKM",
+                "default": True
+            },
+            # {"id": "toolbar_toggle"},
+            # {"id": "toolbar_add_shelf_button"},
+            # {"id": "toolbar_reload"},
+            # {"id": "toolbar_unload"},
+            # {"id": "check_for_updates"},
+            # {"id": "hotkeys_window"},
+            # {"id": "about_window"},
+            # {"id": "donate_window"},
+            # {"id": "bug_report_window"},
+            ],
     },
     "manipulator_tools": {
         "label": "Manipulators",
-        "only": True,
         "items": [
             {"id": "smart_rotation"},
             {"id": "smart_rotation_release"},
@@ -1640,11 +1694,6 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "smart_translation_release"},
             {"id": "depth_mover"},
         ],
-    },
-    "system": {
-        "label": "System",
-        "hiddeable": False,
-        "items": [{"id": "TKM"}],
     },
     # --- Key Editing ---
     "nudge_tools": {
@@ -1958,6 +2007,8 @@ TOOL_SECTION_DEFINITIONS = {
                 "shortcuts": [{"id": "paste_pose", "keys": [QtCore.Qt.Key_Control]}],
             },
             {"id": "paste_pose"},
+            {"id": "export_pose_file"},
+            {"id": "import_pose_file"},
             "separator",
             {
                 "id": "copy_animation",
@@ -1972,6 +2023,8 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "paste_insert_animation"},
             {"id": "paste_opposite_animation"},
             {"id": "paste_animation_to"},
+            {"id": "export_animation_file"},
+            {"id": "import_animation_file"},
         ],
     },
     # --- Tangents ---
@@ -2463,7 +2516,7 @@ def get_toolbar_sections(layout_id, resolve_items=True):
         for section in (
             get_tool_section(section_id, resolve_items=resolve_items, toolbar_id=layout_id)
             for section_id in section_ids
-            if not TOOL_SECTION_DEFINITIONS[section_id].get("only")
+            if not TOOL_SECTION_DEFINITIONS[section_id].get("hotkeys")
             and TOOL_SECTION_DEFINITIONS[section_id].get("toolbar") is not False
         )
         if section is not None

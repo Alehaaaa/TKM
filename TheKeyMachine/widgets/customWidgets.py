@@ -1273,17 +1273,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
 
     def triggerToolCallback(self, base_callback, *args, **kwargs):
         callback = self._active_callback(base_callback)
-        chunk_opened = False
-        try:
-            chunk_opened = toolCommon.open_undo_chunk()
-            if callback:
-                return callback(*args, **kwargs)
-        finally:
-            if chunk_opened:
-                try:
-                    toolCommon.close_undo_chunk()
-                except Exception:
-                    pass
+        return toolCommon.run_tool_callback(self, callback, *args, **kwargs)
 
     def _active_callback(self, base_callback=None):
         variant = self._get_active_shortcut_variant()

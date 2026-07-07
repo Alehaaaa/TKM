@@ -376,15 +376,12 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False, key_scope="sele
                 frames_to_align = list(range(int(start_frame), int(end_frame) + 1))
                 set_keyframes = True
 
-        # Crear una barra de progreso
-        gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
-        cmds.progressBar(gMainProgressBar, edit=True, beginProgress=True, isInterruptable=True, status="Alineando objetos...", maxValue=100)
-
-        try:
-            if frames_to_align:
-                total_frames = max(len(frames_to_align), 1)
-                # Iterar sobre cada frame en el rango y alinear los objetos
+        if frames_to_align:
+            # Iterar sobre cada frame en el rango y alinear los objetos
+            with toolCommon.AdaptiveProgress("Aligning Objects", len(frames_to_align), interruptable=True) as progress:
                 for index, frame in enumerate(frames_to_align):
+                    if progress.cancelled:
+                        break
                     # Mover el tiempo actual al frame
                     cmds.currentTime(frame)
 
@@ -397,15 +394,12 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False, key_scope="sele
                             cmds.setKeyframe(source_obj)
 
                     # Actualizar la barra de progreso
-                    cmds.progressBar(gMainProgressBar, edit=True, progress=int((index + 1) / total_frames * 100))
+                    progress.step()
 
-            else:
-                # Si no hay un rango de tiempo seleccionado o es igual al tiempo actual, alinear en el tiempo actual
-                for source_obj in source_objs:
-                    cmds.matchTransform(source_obj, target_obj, pos=pos, rot=rot, scl=scl)
-        finally:
-            # Terminar la barra de progreso
-            cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
+        else:
+            # Si no hay un rango de tiempo seleccionado o es igual al tiempo actual, alinear en el tiempo actual
+            for source_obj in source_objs:
+                cmds.matchTransform(source_obj, target_obj, pos=pos, rot=rot, scl=scl)
     finally:
         # Reanudar la actualización de la vista
         cmds.refresh(suspend=False)
@@ -658,21 +652,10 @@ def worldspace_copy_animation(*args):
     # Suspender la actualización de la vista
     cmds.refresh(suspend=True)
 
-    # Crear una barra de progreso
-    gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
     time_context = target_info["time_context"]
     keyframe_query = {"query": True}
     if time_context.mode != "all_animation":
         keyframe_query["time"] = time_context.timerange
-    total_frames = len(set(cmds.keyframe(selected_objects, **keyframe_query) or []))
-    cmds.progressBar(
-        gMainProgressBar,
-        edit=True,
-        beginProgress=True,
-        isInterruptable=True,
-        status="Copying World Space animation...",
-        maxValue=total_frames,
-    )
 
     tint_session = None
 
@@ -684,26 +667,25 @@ def worldspace_copy_animation(*args):
                 color=_active_tint_color("worldspace"),
                 key="worldspace",
             )
-        for frame in all_keyframes:
-            # Verificar si el proceso fue interrumpido por el usuario
-            if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
-                break
+        with toolCommon.AdaptiveProgress("Copying World Space Animation", len(all_keyframes), interruptable=True) as progress:
+            for frame in all_keyframes:
+                if progress.cancelled:
+                    break
 
-            cmds.currentTime(frame)
+                cmds.currentTime(frame)
 
-            for source_obj in selected_objects:
-                # Asegurarse de que el objeto tiene claves en este frame
-                if cmds.keyframe(source_obj, query=True, time=(frame, frame)):
-                    worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
-                        source_obj, query=True, rotation=True, worldSpace=True
-                    )
-                    if source_obj not in animation_data:
-                        animation_data[source_obj] = {}
+                for source_obj in selected_objects:
+                    # Asegurarse de que el objeto tiene claves en este frame
+                    if cmds.keyframe(source_obj, query=True, time=(frame, frame)):
+                        worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
+                            source_obj, query=True, rotation=True, worldSpace=True
+                        )
+                        if source_obj not in animation_data:
+                            animation_data[source_obj] = {}
 
-                    animation_data[source_obj][int(frame)] = worldspace_values
+                        animation_data[source_obj][int(frame)] = worldspace_values
 
-            # Actualizar la barra de progreso
-            cmds.progressBar(gMainProgressBar, edit=True, step=1)
+                progress.step()
 
         # Save to JSON
 
@@ -725,7 +707,6 @@ def worldspace_copy_animation(*args):
             tint_session.finish()
         # Restaurar la actualización de la vista y cerrar la barra de progreso
         cmds.refresh(suspend=False)
-        cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
         # Restaurar el tiempo actual a su estado original
         cmds.currentTime(original_time)
         wutil.make_inViewMessage("World Space animation copied")
@@ -749,7 +730,6 @@ def copy_range_worldspace_animation(*args):
 
     animation_data = {}
     tint_session = None
-    tint_session = None
 
     # Guardar el tiempo actual antes de realizar cambios
     original_time = cmds.currentTime(query=True)
@@ -763,18 +743,7 @@ def copy_range_worldspace_animation(*args):
     if time_range:
         attributes["time"] = (time_range[0], time_range[1])
 
-    # Crear una barra de progreso
-    gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
     all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, **attributes))))
-    total_frames = len(all_keyframes)
-    cmds.progressBar(
-        gMainProgressBar,
-        edit=True,
-        beginProgress=True,
-        isInterruptable=True,
-        status="Copying World Space animation...",
-        maxValue=total_frames,
-    )
 
     try:
         if all_keyframes:
@@ -784,26 +753,25 @@ def copy_range_worldspace_animation(*args):
                 key="ws_copy_range",
             )
 
-        for frame in all_keyframes:
-            # Verificar si el proceso fue interrumpido por el usuario
-            if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
-                break
+        with toolCommon.AdaptiveProgress("Copying World Space Animation", len(all_keyframes), interruptable=True) as progress:
+            for frame in all_keyframes:
+                if progress.cancelled:
+                    break
 
-            cmds.currentTime(frame)
+                cmds.currentTime(frame)
 
-            for source_obj in selected_objects:
-                # Asegurarse de que el objeto tiene claves en este frame
-                if cmds.keyframe(source_obj, query=True, time=(frame, frame)):
-                    worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
-                        source_obj, query=True, rotation=True, worldSpace=True
-                    )
-                    if source_obj not in animation_data:
-                        animation_data[source_obj] = {}
+                for source_obj in selected_objects:
+                    # Asegurarse de que el objeto tiene claves en este frame
+                    if cmds.keyframe(source_obj, query=True, time=(frame, frame)):
+                        worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
+                            source_obj, query=True, rotation=True, worldSpace=True
+                        )
+                        if source_obj not in animation_data:
+                            animation_data[source_obj] = {}
 
-                    animation_data[source_obj][int(frame)] = worldspace_values
+                        animation_data[source_obj][int(frame)] = worldspace_values
 
-            # Actualizar la barra de progreso
-            cmds.progressBar(gMainProgressBar, edit=True, step=1)
+                progress.step()
 
         # Save to JSON
         worldspace_anim_data_file = general.get_copy_worldspace_data_file()
@@ -824,7 +792,6 @@ def copy_range_worldspace_animation(*args):
             tint_session.finish()
         # Restaurar la actualización de la vista y cerrar la barra de progreso
         cmds.refresh(suspend=False)
-        cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
         # Restaurar el tiempo actual a su estado original
         keyTools.clear_timeslider_selection()
         cmds.currentTime(original_time)
@@ -876,10 +843,16 @@ def copy_worldspace_single_frame(*args):
 
 
 def paste_worldspace_single_frame(*args):
-    chunk_opened = False
+    operation_context = None
     tint_session = None
     try:
-        chunk_opened = toolCommon.open_undo_chunk()
+        operation_context = toolCommon.tool_operation(
+            tool_id="ws_paste_frame",
+            label="Paste World Space Frame",
+            progress=False,
+            undo=True,
+        )
+        operation_context.__enter__()
 
         # Rutas
         worldspace_anim_data_file = general.get_copy_worldspace_single_frame_data_file()
@@ -963,22 +936,28 @@ def paste_worldspace_single_frame(*args):
     finally:
         if tint_session:
             tint_session.finish()
-        if chunk_opened:
+        if operation_context:
             try:
-                toolCommon.close_undo_chunk()
+                operation_context.__exit__(None, None, None)
             except Exception:
                 pass
 
 
 def worldspace_paste_animation(*args):
-    chunk_opened = False
+    operation_context = None
     tint_session = None
 
     original_time = cmds.currentTime(query=True)
     worldspace_anim_data_file = general.get_copy_worldspace_data_file()
 
     try:
-        chunk_opened = toolCommon.open_undo_chunk()
+        operation_context = toolCommon.tool_operation(
+            tool_id="ws_paste",
+            label="Paste World Space Animation",
+            progress=False,
+            undo=True,
+        )
+        operation_context.__enter__()
         if not os.path.exists(worldspace_anim_data_file):
             return wutil.make_inViewMessage("No World Space animation data found")
 
@@ -1052,52 +1031,42 @@ def worldspace_paste_animation(*args):
 
         cmds.refresh(suspend=True)
 
-        gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
-        cmds.progressBar(
-            gMainProgressBar,
-            edit=True,
-            beginProgress=True,
-            isInterruptable=True,
-            status="Pasting World Space animation...",
-            maxValue=len(all_frames),
-        )
-
         try:
-            for frame in all_frames:
-                cmds.progressBar(gMainProgressBar, edit=True, step=1)
-                if cmds.progressBar(gMainProgressBar, query=True, isCancelled=True):
-                    break
+            with toolCommon.AdaptiveProgress("Pasting World Space Animation", len(all_frames), interruptable=True) as progress:
+                for frame in all_frames:
+                    if progress.cancelled:
+                        break
 
-                cmds.currentTime(frame)
-                frame_key = str(frame)
-                for source_obj, target_obj in mapping:
-                    if not cmds.objExists(target_obj):
-                        continue
-                    obj_data = animation_data.get(source_obj) or {}
-                    if not isinstance(obj_data, dict):
-                        continue
-                    if frame_key not in obj_data:
-                        continue
-                    values = obj_data[frame_key]
-                    cmds.xform(target_obj, translation=values[:3], worldSpace=True)
-                    cmds.xform(target_obj, rotation=values[3:], worldSpace=True)
-                    cmds.setKeyframe(target_obj)
+                    cmds.currentTime(frame)
+                    frame_key = str(frame)
+                    for source_obj, target_obj in mapping:
+                        if not cmds.objExists(target_obj):
+                            continue
+                        obj_data = animation_data.get(source_obj) or {}
+                        if not isinstance(obj_data, dict):
+                            continue
+                        if frame_key not in obj_data:
+                            continue
+                        values = obj_data[frame_key]
+                        cmds.xform(target_obj, translation=values[:3], worldSpace=True)
+                        cmds.xform(target_obj, rotation=values[3:], worldSpace=True)
+                        cmds.setKeyframe(target_obj)
+                    progress.step()
 
         finally:
             valid_targets = [t for _, t in mapping if cmds.objExists(t)]
             if valid_targets:
                 cmds.filterCurve(valid_targets)
             cmds.refresh(suspend=False)
-            cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
             cmds.currentTime(original_time)
             pass
 
     finally:
         if tint_session:
             tint_session.finish()
-        if chunk_opened:
+        if operation_context:
             try:
-                toolCommon.close_undo_chunk()
+                operation_context.__exit__(None, None, None)
             except Exception:
                 pass
 

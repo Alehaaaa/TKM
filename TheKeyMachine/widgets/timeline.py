@@ -7,6 +7,7 @@ from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import util as wutil
 
 
@@ -346,6 +347,7 @@ def begin_timeline_tint(
         icon_scale=icon_scale,
         z_index=z_index,
     )
+    toolCommon.process_ui_events()
     return TimelineTintSession(widget, key=key, min_duration=min_duration, parent=owner)
 
 

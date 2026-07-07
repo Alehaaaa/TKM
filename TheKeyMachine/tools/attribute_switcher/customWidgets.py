@@ -1531,51 +1531,31 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
                 key="attribute_switcher_range",
             )
 
-            # Start Progress Bar
-            gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
-            bar_value = 1
             max_bar_value = len(keyframes.keys())
-            cmds.progressBar(gMainProgressBar, e=True, bp=True, max=max_bar_value, ii=True)
 
             dictionary_xforms = {}
             current_time = cmds.currentTime(q=True)
             interrupted = False
-            for frame, targets in keyframes.items():
-                if cmds.progressBar(gMainProgressBar, q=True, ic=True):
-                    interrupted = True
-                    break
+            with toolCommon.AdaptiveProgress("Saving Positions", max_bar_value, interruptable=True) as progress:
+                for frame, targets in keyframes.items():
+                    if progress.cancelled:
+                        interrupted = True
+                        break
 
-                cmds.currentTime(frame)
-                dictionary_xforms[frame] = {}
-                for t in targets:
-                    dictionary_xforms[frame][t] = cmds.xform(t, q=True, ws=True, matrix=True)
-                cmds.progressBar(
-                    gMainProgressBar,
-                    edit=True,
-                    status="Saving Positions (%s/%s)..." % (bar_value, max_bar_value),
-                    step=1,
-                )
-                bar_value += 1
-
-            cmds.progressBar(gMainProgressBar, e=True, ep=True)
+                    cmds.currentTime(frame)
+                    dictionary_xforms[frame] = {}
+                    for t in targets:
+                        dictionary_xforms[frame][t] = cmds.xform(t, q=True, ws=True, matrix=True)
+                    progress.step()
 
             if not interrupted:
-                bar_value = 1
-                cmds.progressBar(gMainProgressBar, e=True, bp=True, max=max_bar_value, ii=False)
-                for frame, targets in dictionary_xforms.items():
-                    cmds.currentTime(frame)
-                    for target, xform in targets.items():
-                        attr = target_attrs[target] if target_attrs else enum_attr
-                        self.do_xform(target, attr, enum_value, xform)
-
-                    cmds.progressBar(
-                        gMainProgressBar,
-                        edit=True,
-                        status="Applying Positions (%s/%s)..." % (bar_value, max_bar_value),
-                        step=1,
-                    )
-                    bar_value += 1
-                cmds.progressBar(gMainProgressBar, e=True, ep=True)
+                with toolCommon.AdaptiveProgress("Applying Positions", max_bar_value, interruptable=False) as progress:
+                    for frame, targets in dictionary_xforms.items():
+                        cmds.currentTime(frame)
+                        for target, xform in targets.items():
+                            attr = target_attrs[target] if target_attrs else enum_attr
+                            self.do_xform(target, attr, enum_value, xform)
+                        progress.step()
 
             cmds.currentTime(current_time)
 
@@ -1611,9 +1591,15 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         target_attrs = options_and_objects[enum_value]["attrs"]
         enum_index = options_and_objects[enum_value].get("index", enum_value)
 
-        chunk_opened = False
+        operation_context = None
         try:
-            chunk_opened = toolCommon.open_undo_chunk()
+            operation_context = toolCommon.tool_operation(
+                tool_id="attribute_switcher",
+                label="Attribute Switcher",
+                progress=False,
+                undo=True,
+            )
+            operation_context.__enter__()
             cmds.refresh(suspend=True)
             self._disconnect_runtime_manager()
 
@@ -1665,8 +1651,11 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
             self._connect_runtime_manager()
             self.refresh(force=True)
-            if chunk_opened:
-                toolCommon.close_undo_chunk()
+            if operation_context:
+                try:
+                    operation_context.__exit__(None, None, None)
+                except Exception:
+                    pass
 
         cmds.showWindow("MayaWindow")
 

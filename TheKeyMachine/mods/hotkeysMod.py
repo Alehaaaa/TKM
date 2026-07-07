@@ -876,7 +876,7 @@ def _build_command_catalog():
         else:
             section = {
                 "id": section_id,
-                "title": section_data.get("hotkey_label") or section_data.get("label") or _humanize(section_id),
+                "title": section_data.get("label") or _humanize(section_id),
                 "icon": toolbox.get_section_icon(section_id),
                 "commands": [],
             }

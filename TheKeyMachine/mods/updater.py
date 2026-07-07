@@ -6,7 +6,7 @@ import shutil
 import zipfile
 import sys
 import maya.cmds as cmds
-import maya.mel as mel
+from TheKeyMachine.tools import common as toolCommon
 
 if sys.version_info[0] > 2:
     import urllib.request as urllib_request
@@ -104,22 +104,14 @@ def download(downloadUrl, saveFile):
     total_size = int(total_size) if total_size else 0
     block_size = 8192
 
-    try:
-        gMainProgressBar = mel.eval("$tmp = $gMainProgressBar")
-        if total_size > 0 and gMainProgressBar:
-            cmds.progressBar(
-                gMainProgressBar,
-                edit=True,
-                beginProgress=True,
-                isInterruptable=False,
-                status="Downloading Update...",
-                maxValue=total_size,
-            )
-    except Exception:
-        gMainProgressBar = None
-
     downloaded = 0
-    try:
+    progress_max = total_size if total_size > 0 else 0
+    with toolCommon.AdaptiveProgress(
+        "Downloading Update",
+        progress_max,
+        interruptable=False,
+        show_after_ms=1000,
+    ) as progress:
         with open(saveFile, "wb") as output:
             while True:
                 buffer = response.read(block_size)
@@ -127,11 +119,7 @@ def download(downloadUrl, saveFile):
                     break
                 downloaded += len(buffer)
                 output.write(buffer)
-                if gMainProgressBar and total_size > 0:
-                    cmds.progressBar(gMainProgressBar, edit=True, progress=downloaded)
-    finally:
-        if gMainProgressBar and total_size > 0:
-            cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
+                progress.step(len(buffer))
     return True
 
 

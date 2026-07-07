@@ -146,13 +146,13 @@ def get_anim_curve_output_plugs(curves):
 def get_anim_curves_from_plugs(plugs):
     curves = []
     try:
-        from TheKeyMachine.sliders import animlayers as slider_animlayers
+        from TheKeyMachine.core import animlayers
     except Exception:
-        slider_animlayers = None
+        animlayers = None
     use_layer_lookup = False
-    if slider_animlayers is not None:
+    if animlayers is not None:
         try:
-            use_layer_lookup = slider_animlayers.has_anim_layers()
+            use_layer_lookup = animlayers.has_anim_layers()
         except Exception:
             use_layer_lookup = False
 
@@ -161,7 +161,7 @@ def get_anim_curves_from_plugs(plugs):
             continue
         if use_layer_lookup:
             try:
-                layer_curve = slider_animlayers.get_anim_curve_for_plug(plug)
+                layer_curve = animlayers.get_anim_curve_for_plug(plug)
             except Exception:
                 layer_curve = None
             if layer_curve:
