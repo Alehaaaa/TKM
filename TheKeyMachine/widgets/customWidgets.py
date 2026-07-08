@@ -468,7 +468,12 @@ class MenuWidget(QtWidgets.QMenu):
             return
 
         if QFlatTooltipManager.enabled:
-            display_template = tooltip_template or ((title, [desc], None) if desc else title)
+            if tooltip_template is not None:
+                display_template = tooltip_template
+            elif desc:
+                display_template = tuple(desc) if isinstance(desc, (list, tuple)) else (desc,)
+            else:
+                display_template = ""
 
             cursor_pos = QtGui.QCursor.pos()
             icon = action.icon() if not action.icon().isNull() else None

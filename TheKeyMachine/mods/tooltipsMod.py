@@ -74,15 +74,22 @@ separator = object()
 
 def tooltip_body(*paragraphs):
     lines = []
-    for paragraph in paragraphs:
+    def _append(paragraph):
         if paragraph is separator:
             lines.append(paragraph)
-            continue
+            return
         if isinstance(paragraph, TooltipMedia):
             lines.append(paragraph)
-            continue
+            return
+        if isinstance(paragraph, (list, tuple)):
+            for item in paragraph:
+                _append(item)
+            return
         if paragraph and str(paragraph).strip():
             lines.append(str(paragraph).strip())
+
+    for paragraph in paragraphs:
+        _append(paragraph)
     return tuple(lines)
 
 
