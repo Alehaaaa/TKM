@@ -12,13 +12,7 @@ from TheKeyMachine.mods import settingsMod as settings
 
 
 UNDO_PREFIX = "TKM"
-
-
-def process_ui_events():
-    try:
-        QtCore.QCoreApplication.processEvents()
-    except Exception:
-        pass
+_ACTIVE_PROGRESS_STACK = []
 
 
 def _format_eta(seconds):
@@ -27,7 +21,7 @@ def _format_eta(seconds):
     except Exception:
         return ""
     if seconds < 60:
-        return "{} sseconds left".format(seconds)
+        return "{} seconds left".format(seconds)
     minutes, seconds = divmod(seconds, 60)
     return "{} minutes {} seconds left".format(minutes, seconds)
 
@@ -59,10 +53,17 @@ class AdaptiveProgress(object):
         self._timer.start()
 
     def __enter__(self):
+        _ACTIVE_PROGRESS_STACK.append(self)
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        self.finish()
+        try:
+            self.finish()
+        finally:
+            if _ACTIVE_PROGRESS_STACK and _ACTIVE_PROGRESS_STACK[-1] is self:
+                _ACTIVE_PROGRESS_STACK.pop()
+            elif self in _ACTIVE_PROGRESS_STACK:
+                _ACTIVE_PROGRESS_STACK.remove(self)
 
     def _should_show(self):
         if self._active:
@@ -84,21 +85,24 @@ class AdaptiveProgress(object):
             )
             self._active = True
             self._last_status_update_ms = self._timer.elapsed()
-            process_ui_events()
         except Exception:
             self._bar = None
 
     def _status_text(self):
+        title = format_tool_label(self.label)
         if not self.max_value:
             elapsed = max(0, int(round(self._timer.elapsed() / 1000.0)))
             if elapsed:
-                return "{} ({}s elapsed)".format(self.label, elapsed)
-            return "{}...".format(self.label)
+                return "{}... {} seconds elapsed".format(title, elapsed)
+            return "{}...".format(title)
         eta = ""
         if self.value > 0:
             elapsed_seconds = max(0.001, self._timer.elapsed() / 1000.0)
             remaining = (elapsed_seconds / float(self.value)) * max(0, self.max_value - self.value)
-        return "{} {}".format(self.label, _format_eta(remaining))
+            eta = _format_eta(remaining)
+        if eta:
+            return "{}... about {}".format(title, eta)
+        return "{}...".format(title)
 
     def step(self, amount=1, status=None):
         amount = int(amount or 1)
@@ -128,7 +132,6 @@ class AdaptiveProgress(object):
                 self._last_status_label = self.label
             cmds.progressBar(self._bar, **kwargs)
             self._cancelled = bool(cmds.progressBar(self._bar, query=True, isCancelled=True))
-            process_ui_events()
         except Exception:
             self._cancelled = False
         return self._cancelled
@@ -142,7 +145,6 @@ class AdaptiveProgress(object):
             return
         try:
             cmds.progressBar(self._bar, edit=True, endProgress=True)
-            process_ui_events()
         except Exception:
             pass
         self._active = False
@@ -156,6 +158,7 @@ class ToolOperation(object):
         self.progress = progress
         self.tint_session = tint_session
         self.anchor_widget = anchor_widget
+        self.undo_chunk_opened = False
 
     @property
     def cancelled(self):
@@ -177,7 +180,18 @@ def current_tool_operation():
     return _TOOL_OPERATION_STACK[-1]
 
 
+def _current_undo_operation(exclude=None):
+    for operation in reversed(_TOOL_OPERATION_STACK):
+        if operation is exclude:
+            continue
+        if getattr(operation, "undo_chunk_opened", False):
+            return operation
+    return None
+
+
 def current_progress():
+    if _ACTIVE_PROGRESS_STACK:
+        return _ACTIVE_PROGRESS_STACK[-1]
     operation = current_tool_operation()
     return operation.progress if operation else None
 
@@ -261,9 +275,12 @@ def tool_operation(
     _TOOL_OPERATION_STACK.append(operation)
     try:
         if undo:
-            chunk_opened = open_undo_chunk(
-                undo_name or make_undo_chunk_name(tool_id=tool_id, title=label)
-            )
+            existing_undo_operation = _current_undo_operation(exclude=operation)
+            if existing_undo_operation is None:
+                chunk_opened = open_undo_chunk(
+                    undo_name or make_undo_chunk_name(tool_id=tool_id, title=label)
+                )
+                operation.undo_chunk_opened = bool(chunk_opened)
         with progress_obj if progress_obj else _null_context():
             yield operation
     finally:
@@ -332,8 +349,11 @@ def _supported_callback_kwargs(callback, kwargs, injected_keys=None):
 def run_tool_callback(button, callback, *args, **kwargs):
     if not callable(callback):
         return None
-    tool_id = _button_tool_id(button)
-    label = _button_operation_label(button, tool_id)
+    tool_id = kwargs.pop("_tkm_tool_id", None) or _button_tool_id(button)
+    label = (
+        kwargs.pop("_tkm_tool_label", None)
+        or _button_operation_label(button, tool_id)
+    )
     with tool_operation(tool_id=tool_id, label=label, anchor_widget=button, undo=True) as operation:
         call_kwargs = dict(kwargs)
         call_kwargs.setdefault("anchor_widget", button)
@@ -826,6 +846,13 @@ _USE_DESCRIPTOR_CALLBACK = object()
 
 def connect_control_from_data(control, data, callback=_USE_DESCRIPTOR_CALLBACK):
     data = data or {}
+    try:
+        tool_id = data.get("key") or data.get("id") or data.get("command_id")
+        if tool_id:
+            control.tool_id = tool_id
+            control.command_id = tool_id
+    except Exception:
+        pass
     resolved_callback = data.get("callback") if callback is _USE_DESCRIPTOR_CALLBACK else callback
     checkable = bool(data.get("checkable", data.get("type") == "check"))
     getter = checked_state_getter(data)

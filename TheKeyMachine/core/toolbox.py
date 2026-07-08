@@ -1061,6 +1061,12 @@ TOOL_DEFINITIONS = {
         "callback": keyTools.paste_pose,
         "tooltip_template": helper.paste_pose_tooltip_text,
     },
+    "paste_pose_to": {
+        "type": "tool",
+        "label": "Paste Pose To",
+        "icon": icons.paste_pose,
+        "callback": keyTools.paste_pose_to,
+    },
     "export_pose_file": {
         "type": "tool",
         "label": "Export Pose File",
@@ -1099,7 +1105,7 @@ TOOL_DEFINITIONS = {
     },
     "paste_animation_to": {
         "type": "tool",
-        "label": "Paste To",
+        "label": "Paste Animation To",
         "icon": icons.paste_animation,
         "callback": keyTools.paste_animation_to,
     },
@@ -2000,9 +2006,13 @@ TOOL_SECTION_DEFINITIONS = {
             {
                 "id": "copy_pose",
                 "default": True,
-                "shortcuts": [{"id": "paste_pose", "keys": [QtCore.Qt.Key_Control]}],
+                "shortcuts": [
+                    {"id": "paste_pose", "keys": [QtCore.Qt.Key_Control]},
+                    {"id": "paste_pose_to", "keys": [QtCore.Qt.Key_Shift]},
+                ],
             },
             {"id": "paste_pose"},
+            {"id": "paste_pose_to"},
             {"id": "export_pose_file"},
             {"id": "import_pose_file"},
             "separator",

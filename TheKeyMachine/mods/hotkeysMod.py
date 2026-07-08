@@ -50,6 +50,7 @@ SHIFTED_SYMBOL_BASE_KEYS = {
     "(": "9",
     ")": "0",
 }
+SHIFTED_SYMBOL_BY_BASE_KEY = {base: symbol for symbol, base in SHIFTED_SYMBOL_BASE_KEYS.items()}
 KEY_TEXT_ALIASES = {
     "space": "Space",
     "tab": "Tab",
@@ -123,13 +124,11 @@ def _combo_from_assign_command_key_string(key_string):
     key = key_string[0]
     if not key or key == "NONE":
         return None
-    return _normalize_combo(
-        {
-            "key": str(key).upper() if len(str(key)) == 1 else str(key),
-            "alt": key_string[1] == "1",
-            "ctrl": key_string[2] == "1",
-            "shift": key_string[6] == "1",
-        }
+    return _combo_from_maya_flags(
+        str(key).upper() if len(str(key)) == 1 else str(key),
+        ctrl=key_string[2] == "1",
+        shift=key_string[6] == "1",
+        alt=key_string[1] == "1",
     )
 
 
@@ -297,12 +296,29 @@ def _normalize_combo(combo):
     if not key:
         return None
     key = str(key).upper() if len(str(key)) == 1 and str(key).isalpha() else str(key)
+    shift = bool(combo.get("shift"))
+    if key in SHIFTED_SYMBOL_BASE_KEYS:
+        shift = False
     return {
         "key": key,
         "ctrl": bool(combo.get("ctrl")),
-        "shift": bool(combo.get("shift")),
+        "shift": shift,
         "alt": bool(combo.get("alt")),
     }
+
+
+def _combo_from_maya_flags(key, ctrl=False, shift=False, alt=False):
+    key = str(key or "")
+    if shift and key in SHIFTED_SYMBOL_BY_BASE_KEY:
+        return _normalize_combo(
+            {
+                "key": SHIFTED_SYMBOL_BY_BASE_KEY[key],
+                "ctrl": ctrl,
+                "shift": False,
+                "alt": alt,
+            }
+        )
+    return _normalize_combo({"key": key, "ctrl": ctrl, "shift": shift, "alt": alt})
 
 
 def _shortcut_from_combo(combo):
@@ -310,13 +326,13 @@ def _shortcut_from_combo(combo):
     if not combo:
         return ""
     parts = []
+    key = combo.get("key", "")
     if combo.get("ctrl"):
         parts.append("Ctrl")
     if combo.get("shift"):
         parts.append("Shift")
     if combo.get("alt"):
         parts.append("Alt")
-    key = combo.get("key", "")
     parts.append(SHORTCUT_DISPLAY_KEY_ALIASES.get(key, key))
     return "+".join(part for part in parts if part)
 
@@ -353,20 +369,24 @@ def _combo_from_shortcut(shortcut):
     else:
         return None
 
-    shift = bool(modifiers & shift_aliases) or key in SHIFTED_SYMBOL_BASE_KEYS
-    return {
-        "key": key,
-        "ctrl": bool(modifiers & ctrl_aliases),
-        "shift": shift,
-        "alt": bool(modifiers & alt_aliases),
-    }
+    return _combo_from_maya_flags(
+        key,
+        ctrl=bool(modifiers & ctrl_aliases),
+        shift=bool(modifiers & shift_aliases),
+        alt=bool(modifiers & alt_aliases),
+    )
 
 
 def _combo_key(combo):
     combo = _normalize_combo(combo)
     if not combo:
         return ""
-    return "{}|{}|{}|{}".format(combo["key"], int(combo["ctrl"]), int(combo["shift"]), int(combo["alt"]))
+    return "{}|{}|{}|{}".format(
+        _maya_key_shortcut(combo),
+        int(combo["ctrl"]),
+        int(_maya_shift_required(combo)),
+        int(combo["alt"]),
+    )
 
 
 def _maya_key_shortcut(combo):
@@ -379,6 +399,13 @@ def _maya_key_shortcut(combo):
     if len(key) == 1 and key.isalpha():
         return key.lower()
     return key
+
+
+def _maya_shift_required(combo):
+    combo = _normalize_combo(combo)
+    if not combo:
+        return False
+    return bool(combo.get("shift")) or str(combo.get("key") or "") in SHIFTED_SYMBOL_BASE_KEYS
 
 
 def _maya_key_shortcut_candidates(combo):
@@ -398,7 +425,7 @@ def _hotkey_flag_kwargs(combo):
         "keyShortcut": _maya_key_shortcut(combo),
         "alt": bool(combo.get("alt")),
         "ctl": bool(combo.get("ctrl")),
-        "sht": bool(combo.get("shift")),
+        "sht": _maya_shift_required(combo),
     }
 
 
@@ -461,7 +488,7 @@ def _query_hotkey_check_assignment(combo):
     modifier_kwargs = {
         "altModifier": bool(combo.get("alt")),
         "ctrlModifier": bool(combo.get("ctrl")),
-        "shiftModifier": bool(combo.get("shift")),
+        "shiftModifier": _maya_shift_required(combo),
     }
     for key_shortcut in _maya_key_shortcut_candidates(combo):
         try:
@@ -615,12 +642,14 @@ def _qt_key_to_combo(event):
     special_map = _qt_special_key_map()
     typed_text = event.text() if hasattr(event, "text") else ""
 
-    if key in letter_map:
+    if typed_text and len(typed_text) == 1 and typed_text in PRINTABLE_KEY_CHARS and not typed_text.isalnum():
+        key_text = typed_text
+    elif key in letter_map:
         key_text = letter_map[key]
-    elif key in digit_map:
-        key_text = digit_map[key]
     elif typed_text and len(typed_text) == 1 and typed_text in PRINTABLE_KEY_CHARS:
         key_text = typed_text.upper() if typed_text.isalpha() else typed_text
+    elif key in digit_map:
+        key_text = digit_map[key]
     elif QtCore.Qt.Key_F1 <= key <= QtCore.Qt.Key_F12:
         key_text = "F{}".format(key - QtCore.Qt.Key_F1 + 1)
     elif key in special_map:
@@ -1074,8 +1103,7 @@ class HotkeyCaptureEdit(QtWidgets.QLineEdit):
     def keyPressEvent(self, event):
         combo = _qt_key_to_combo(event)
         if combo == {}:
-            self.setCombo(None)
-            self.comboChanged.emit(None)
+            self.clear_hotkey()
             event.accept()
             return
         if combo is None:

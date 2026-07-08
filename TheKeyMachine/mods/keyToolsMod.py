@@ -537,16 +537,19 @@ def share_keys(*args):
     with toolCommon.tool_operation(
         tool_id="share_keys",
         label="Share Keys",
-        progress=False,
+        progress=True,
+        progress_max=sum(len(plugs) * len(shared_frames) for plugs in object_plug_frames.values()),
         undo=True,
         tint="range",
         timerange=(int(shared_frames[0]), int(shared_frames[-1])),
         tint_color=_timeline_tint_color("share_keys"),
-    ):
+    ) as operation:
         for objeto in objetos:
             for plug, existing_frames in object_plug_frames.get(objeto, {}).items():
                 node_name, attribute_name = plug.split(".", 1)
                 for frame in shared_frames:
+                    if operation.cancelled:
+                        return
                     if frame not in existing_frames:
                         set_keyframe_kwargs = {
                             "attribute": attribute_name,
@@ -555,6 +558,7 @@ def share_keys(*args):
                         if preserve_curve_shape:
                             set_keyframe_kwargs["insert"] = True
                         cmds.setKeyframe(node_name, **set_keyframe_kwargs)
+                    operation.step()
 
 
 def _frames_from_last_selected(time_context=None):
@@ -606,14 +610,18 @@ def share_keys_from_last_selected(*args):
     with toolCommon.tool_operation(
         tool_id="share_keys",
         label="Share Keys",
-        progress=False,
+        progress=True,
+        progress_max=len(targets) * len(frames),
         undo=True,
         tint="range",
         timerange=(int(frames[0]), int(frames[-1])),
         tint_color=_timeline_tint_color("share_keys"),
-    ):
+    ) as operation:
         for target in targets:
+            if operation.cancelled:
+                return
             _set_missing_keys(_anim_curves_for_objects([target]), frames, insert=keep_curve_shape)
+            operation.step(amount=len(frames))
 
 
 # ______________________________________ ReBlock Move
@@ -757,13 +765,14 @@ def bake_animation(bake_interval=1, window=None):
         with toolCommon.tool_operation(
             tool_id=tool_key,
             label=bake_title,
-            progress=False,
+            progress=True,
+            progress_max=max(1, int((end_frame - start_frame) / float(bake_interval or 1)) + 1),
             undo=True,
             tint="range",
             timerange=time_context.timerange,
             tint_color=_timeline_tint_color(tool_key),
             anchor_widget=window,
-        ):
+        ) as operation:
             # Hacer bake a las curvas de animación de los objetos seleccionados.
             bake_kwargs = dict(
                 time=(start_frame, end_frame),
@@ -778,6 +787,7 @@ def bake_animation(bake_interval=1, window=None):
             if selected_channels:
                 bake_kwargs["attribute"] = selected_channels
             cmds.bakeResults(selected_objects, **bake_kwargs)
+            operation.step(amount=operation.progress.max_value if operation.progress else 1)
 
             if bake_tangent_mode == BAKE_TANGENT_MODE_STEP:
                 _apply_step_tangents(curves_to_update, (start_frame, end_frame))
@@ -809,15 +819,19 @@ def bake_animation_from_last_selected(*args):
         with toolCommon.tool_operation(
             tool_id="bake_animation_1",
             label="Bake Animation",
-            progress=False,
+            progress=True,
+            progress_max=len(targets) * len(frames),
             undo=True,
             tint="range",
             timerange=(int(frames[0]), int(frames[-1])),
             tint_color=_timeline_tint_color("bake_animation_1"),
-        ):
+        ) as operation:
             for target in targets:
+                if operation.cancelled:
+                    return
                 curves = _anim_curves_for_objects([target])
                 _bake_curves_to_source_frames(curves, frames)
+                operation.step(amount=len(frames))
 
                 if get_bake_tangent_mode() == BAKE_TANGENT_MODE_STEP:
                     _apply_step_tangents(curves, (frames[0], frames[-1]))
@@ -3052,6 +3066,7 @@ ANIMATION_CONTROLS_KEY = "controls"
 ANIMATION_META_KEY = "meta"
 ANIMATION_FRAME_KEY = "k"
 ANIMATION_VALUE_KEY = "v"
+ANIMATION_STATIC_VALUE_KEY = "sv"
 ANIMATION_TANGENT_KEY = "t"
 ANIMATION_LAYERS_KEY = "ly"
 TANGENT_KEYS = {
@@ -3091,6 +3106,19 @@ def _animation_data_key_count(animation_data, targets=None):
             count += len(anim_data.get(ANIMATION_FRAME_KEY) or [])
             for layer_data in (anim_data.get(ANIMATION_LAYERS_KEY) or {}).values():
                 count += len(layer_data.get(ANIMATION_FRAME_KEY) or [])
+    return count
+
+
+def _animation_data_apply_count(animation_data, targets=None):
+    count = _animation_data_key_count(animation_data, targets=targets)
+    controls = _animation_controls(animation_data)
+    target_names = set(targets or controls.keys())
+    for control, channels in controls.items():
+        if control not in target_names:
+            continue
+        for anim_data in (channels or {}).values():
+            if ANIMATION_STATIC_VALUE_KEY in (anim_data or {}):
+                count += 1
     return count
 
 
@@ -3143,6 +3171,14 @@ def _query_anim_channel_data(source, time_context):
         ANIMATION_VALUE_KEY: values,
         ANIMATION_TANGENT_KEY: _query_key_tangent_data(source, keyframes),
     }
+
+
+def _query_static_channel_value(plug):
+    try:
+        value = cmds.getAttr(plug)
+    except Exception:
+        return {}
+    return {ANIMATION_STATIC_VALUE_KEY: value}
 
 
 def _query_layered_anim_channel_data(plug, time_context):
@@ -3223,12 +3259,12 @@ def _maybe_apply_paste_range(paste_range, anchor_widget=None):
         return
 
     apply_button = customDialogs.QFlatConfirmDialog.CustomButton("Apply Range", positive=True, icon=icons.apply)
-    keep_button = customDialogs.QFlatConfirmDialog.CustomButton("Keep Current", positive=False, icon=icons.cancel)
+    no_button = customDialogs.QFlatConfirmDialog.CustomButton("No", positive=False, icon=icons.cancel)
     clicked = customDialogs.QFlatTooltipConfirm.question(
         anchor_widget or wutil.get_maya_qt(),
         title="Apply paste range?",
         message="Set the timeline range to {} - {} from the copied data?".format(start_frame, end_frame),
-        buttons=[apply_button, keep_button],
+        buttons=[apply_button, no_button],
         icon=icons.paste_animation,
         highlight=apply_button,
     )
@@ -3269,23 +3305,46 @@ def _apply_key_tangent_data(target, channel, key_time, tangent_data, index, laye
         values = tangent_data.get(name) or []
         return values[index] if index < len(values) else None
 
-    tangent_kwargs = {}
-    for source_key, target_key in TANGENT_KEYS.items():
-        if source_key == "wt":
-            continue
-        value = _value(source_key)
-        if value is not None:
-            tangent_kwargs[target_key] = value
-
-    if tangent_kwargs:
+    def _edit_tangent(**kwargs):
+        if not kwargs:
+            return
         try:
             if layer_name:
-                tangent_kwargs["animLayer"] = layer_name
-            cmds.keyTangent(target, attribute=channel, time=(key_time,), edit=True, **tangent_kwargs)
+                kwargs["animLayer"] = layer_name
+            cmds.keyTangent(target, attribute=channel, time=(key_time,), edit=True, **kwargs)
         except Exception as e:
             import TheKeyMachine.mods.reportMod as report
 
             report.report_detected_exception(e, context="paste animation tangent data")
+
+    in_type = _value("itt")
+    out_type = _value("ott")
+    type_kwargs = {}
+    if in_type is not None:
+        type_kwargs["inTangentType"] = in_type
+    if out_type is not None:
+        type_kwargs["outTangentType"] = out_type
+
+    detail_kwargs = {}
+    if in_type not in ("auto", "autoease", "autoEase", "autoMix"):
+        in_angle = _value("ia")
+        in_weight = _value("iw")
+        if in_angle is not None:
+            detail_kwargs["inAngle"] = in_angle
+        if in_weight is not None:
+            detail_kwargs["inWeight"] = in_weight
+    if out_type not in ("auto", "autoease", "autoEase", "autoMix"):
+        out_angle = _value("oa")
+        out_weight = _value("ow")
+        if out_angle is not None:
+            detail_kwargs["outAngle"] = out_angle
+        if out_weight is not None:
+            detail_kwargs["outWeight"] = out_weight
+
+    _edit_tangent(**type_kwargs)
+    _edit_tangent(**detail_kwargs)
+    if type_kwargs:
+        _edit_tangent(**type_kwargs)
 
 
 def _apply_channel_weighted_tangents(target, channel, tangent_data, layer_name=None):
@@ -3312,6 +3371,16 @@ def _attr_exists_and_settable(node, attr):
         return cmds.getAttr(full_attr, se=True) and not cmds.getAttr(full_attr, lock=True)
     except Exception:
         return False
+
+
+def _set_attr_value(plug, value):
+    if isinstance(value, list):
+        if len(value) == 1 and isinstance(value[0], (list, tuple)):
+            cmds.setAttr(plug, *value[0])
+        else:
+            cmds.setAttr(plug, *value)
+    else:
+        cmds.setAttr(plug, value)
 
 
 @contextmanager
@@ -3440,6 +3509,18 @@ def _apply_animation_channels_to_targets(
                     except Exception:
                         pass
 
+                if ANIMATION_STATIC_VALUE_KEY in (anim_data or {}):
+                    try:
+                        value = anim_data.get(ANIMATION_STATIC_VALUE_KEY)
+                        _set_attr_value(f"{target}.{channel}", value)
+                        keys_set += 1
+                    except Exception as e:
+                        import TheKeyMachine.mods.reportMod as report
+
+                        report.report_detected_exception(e, context="paste animation static attribute set")
+                    if progress:
+                        progress.step()
+
                 keys_set += _apply_channel_data(target, channel, anim_data)
                 for layer_name, layer_data in (anim_data.get(ANIMATION_LAYERS_KEY) or {}).items():
                     if progress and progress.cancelled:
@@ -3449,30 +3530,51 @@ def _apply_animation_channels_to_targets(
     return keys_set
 
 
+def _select_existing_targets(targets):
+    targets = [target for target in (targets or []) if target and cmds.objExists(target)]
+    if not targets:
+        return
+    try:
+        cmds.select(targets, replace=True)
+    except Exception:
+        pass
+
+
 def _apply_animation_data(animation_data, selected_objects, replace=False, insert_time=None, progress=None):
     targets = _copy_paste_targets(animation_data, selected_objects)
     if not targets:
-        return 0
+        return 0, []
 
     controls = _animation_controls(animation_data)
     keys_set = 0
+    pasted_targets = []
     for control in targets:
         if control in controls:
-            keys_set += _apply_animation_channels_to_targets(
+            applied = _apply_animation_channels_to_targets(
                 [control],
                 controls[control],
                 replace=replace,
                 insert_time=insert_time,
                 progress=progress,
             )
+            keys_set += applied
+            if applied:
+                pasted_targets.append(control)
 
-    return keys_set
+    return keys_set, pasted_targets
 
 
 def _is_valid_pose_attribute_value(value):
     if isinstance(value, (float, int)):
         return True
     if isinstance(value, list) and all(isinstance(v, (float, int)) for v in value):
+        return True
+    if (
+        isinstance(value, list)
+        and len(value) == 1
+        and isinstance(value[0], (list, tuple))
+        and all(isinstance(v, (float, int)) for v in value[0])
+    ):
         return True
     if isinstance(value, str) and not re.search(r"[# ]", value):
         return True
@@ -3482,34 +3584,42 @@ def _is_valid_pose_attribute_value(value):
 def _apply_pose_data(pose_data, selected_objects):
     targets = _copy_paste_targets(pose_data, selected_objects)
     if not targets:
-        return 0
+        return 0, []
 
     attrs_set = 0
+    pasted_targets = []
     for control in targets:
         if control not in pose_data:
             continue
+        control_attrs_set = 0
         for attr, value in pose_data[control].items():
             if not _is_valid_pose_attribute_value(value):
                 continue
             if not _attr_exists_and_settable(control, attr):
                 continue
             try:
-                if isinstance(value, list):
-                    cmds.setAttr(f"{control}.{attr}", *value)
-                else:
-                    cmds.setAttr(f"{control}.{attr}", value)
+                _set_attr_value(f"{control}.{attr}", value)
                 attrs_set += 1
+                control_attrs_set += 1
             except RuntimeError as e:
                 import TheKeyMachine.mods.reportMod as report
 
                 report.report_detected_exception(e, context="paste pose attribute set")
+        if control_attrs_set:
+            pasted_targets.append(control)
 
-    return attrs_set
+    return attrs_set, pasted_targets
 
 
 def copy_animation(*args):
     def get_animation_channels(control):
-        return selectionMod.get_animated_channels_for_node(control, settable_only=True)
+        channels = []
+        for attr in cmds.listAttr(control, keyable=True) or []:
+            if attr == "tag":
+                continue
+            if _attr_exists_and_settable(control, attr):
+                channels.append(attr)
+        return channels
 
     selected_objects = selectionMod.get_selected_objects()
 
@@ -3530,7 +3640,8 @@ def copy_animation(*args):
 
     try:
         with _copy_paste_operation("copy_animation", "Animation Copied", tint="range", timerange=tint_range) as operation:
-            with toolCommon.AdaptiveProgress("Copying Animation", len(selected_objects), interruptable=True) as progress:
+            channel_total = sum(len(get_animation_channels(control)) for control in selected_objects)
+            with toolCommon.AdaptiveProgress("Copying Animation", channel_total, interruptable=True) as progress:
                 for control in selected_objects:
                     if progress.cancelled:
                         return
@@ -3543,7 +3654,11 @@ def copy_animation(*args):
                         channel_data = _query_layered_anim_channel_data(plug, time_context)
                         if channel_data.get(ANIMATION_FRAME_KEY) or channel_data.get(ANIMATION_LAYERS_KEY):
                             controls_data[control_name][channel] = channel_data
-                    progress.step()
+                        else:
+                            static_data = _query_static_channel_value(plug)
+                            if static_data:
+                                controls_data[control_name][channel] = static_data
+                        progress.step()
 
             if time_context.mode == "time_slider_range":
                 clear_timeslider_selection()
@@ -3573,16 +3688,19 @@ def paste_animation(*args, anchor_widget=None):
 
     targets = _copy_paste_targets(animation_data, selected_objects)
     paste_range = _animation_data_timerange(animation_data)
-    key_count = _animation_data_key_count(animation_data, targets=targets)
+    key_count = _animation_data_apply_count(animation_data, targets=targets)
+    prompt_range = None
     with _copy_paste_operation("paste_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range) as operation:
         with toolCommon.AdaptiveProgress("Pasting Animation", key_count, interruptable=True) as progress:
-            keys_set = _apply_animation_data(animation_data, selected_objects, replace=True, progress=progress)
+            keys_set, pasted_targets = _apply_animation_data(animation_data, selected_objects, replace=True, progress=progress)
         if keys_set:
             operation["timerange"] = paste_range
             operation["success"] = True
-            _maybe_apply_paste_range(paste_range, anchor_widget=anchor_widget)
+            _select_existing_targets(pasted_targets)
+            prompt_range = paste_range
         else:
             cmds.warning("No matching animation targets found")
+    _maybe_apply_paste_range(prompt_range, anchor_widget=anchor_widget)
 
 
 # PASTE INSERT _________________________________________________________________________
@@ -3601,16 +3719,19 @@ def paste_insert_animation(*args, anchor_widget=None):
     source_range = _animation_data_timerange(animation_data)
     first_source_frame = source_range[0] if source_range else current_time
     paste_range = _shift_timerange(source_range, current_time - first_source_frame)
-    key_count = _animation_data_key_count(animation_data, targets=targets)
+    key_count = _animation_data_apply_count(animation_data, targets=targets)
+    prompt_range = None
     with _copy_paste_operation("paste_insert_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range) as operation:
         with toolCommon.AdaptiveProgress("Pasting Animation", key_count, interruptable=True) as progress:
-            keys_set = _apply_animation_data(animation_data, selected_objects, insert_time=current_time, progress=progress)
+            keys_set, pasted_targets = _apply_animation_data(animation_data, selected_objects, insert_time=current_time, progress=progress)
         if keys_set:
             operation["timerange"] = paste_range
             operation["success"] = True
-            _maybe_apply_paste_range(paste_range, anchor_widget=anchor_widget)
+            _select_existing_targets(pasted_targets)
+            prompt_range = paste_range
         else:
             cmds.warning("No matching animation targets found")
+    _maybe_apply_paste_range(prompt_range, anchor_widget=anchor_widget)
 
 
 # PASTE OPPOSITE ________________________________________________________________________
@@ -3651,10 +3772,12 @@ def paste_opposite_animation(*args, anchor_widget=None):
         return
 
     paste_range = _animation_data_timerange(animation_data)
-    key_count = _animation_data_key_count(animation_data)
+    key_count = _animation_data_apply_count(animation_data)
     controls = _animation_controls(animation_data)
+    prompt_range = None
     with _copy_paste_operation("paste_opposite_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range) as operation:
         keys_set = 0
+        pasted_targets = []
         with toolCommon.AdaptiveProgress("Pasting Opposite Animation", key_count, interruptable=True) as progress:
             for control_name, anim_data in controls.items():
                 if progress.cancelled:
@@ -3672,19 +3795,24 @@ def paste_opposite_animation(*args, anchor_widget=None):
                             channel_data,
                             lambda value, attr=channel: mirror_value(attr, value),
                         )
-                    keys_set += _apply_animation_channels_to_targets(
+                    applied = _apply_animation_channels_to_targets(
                         [full_mirror_control_name],
                         mirrored_channels,
                         replace=True,
                         progress=progress,
                     )
+                    keys_set += applied
+                    if applied:
+                        pasted_targets.append(full_mirror_control_name)
 
         if keys_set:
             operation["timerange"] = paste_range
             operation["success"] = True
-            _maybe_apply_paste_range(paste_range, anchor_widget=anchor_widget)
+            _select_existing_targets(pasted_targets)
+            prompt_range = paste_range
         else:
             cmds.warning("No matching animation targets found")
+    _maybe_apply_paste_range(prompt_range, anchor_widget=anchor_widget)
 
 
 def paste_animation_to(source_control_name=None, replace=True, insert_at_current=False, *args, anchor_widget=None, **kwargs):
@@ -3711,17 +3839,19 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
         paste_range = _shift_timerange(source_range, current_time - first_source_frame) if insert else source_range
         controls = _animation_controls(animation_data)
         key_count = sum(
-            _animation_data_key_count({ANIMATION_CONTROLS_KEY: {source_node: controls.get(source_node, {})}})
+            _animation_data_apply_count({ANIMATION_CONTROLS_KEY: {source_node: controls.get(source_node, {})}})
             for source_node, _ in mappings
         )
+        prompt_range = None
         with _copy_paste_operation("paste_animation_to", "Animation Pasted", undo=True, tint="range", timerange=paste_range) as operation:
             total_keys_set = 0
+            pasted_targets = []
             with toolCommon.AdaptiveProgress("Pasting Animation", key_count, interruptable=True) as progress:
                 for source_node, target_node in mappings:
                     if progress.cancelled:
                         break
                     src_channels = controls.get(source_node, {})
-                    total_keys_set += _apply_animation_channels_to_targets(
+                    applied = _apply_animation_channels_to_targets(
                         [target_node],
                         src_channels,
                         replace=not insert,
@@ -3729,6 +3859,9 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
                         replace_range=(0, 1e6),
                         progress=progress,
                     )
+                    total_keys_set += applied
+                    if applied:
+                        pasted_targets.append(target_node)
                     if src_channels:
                         pasted_data[target_node] = src_channels
 
@@ -3738,10 +3871,42 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
 
             operation["timerange"] = paste_range or _animation_data_timerange(animation_data)
             operation["success"] = True
-            _maybe_apply_paste_range(operation["timerange"], anchor_widget=anchor_widget)
-            return True
+            _select_existing_targets(pasted_targets)
+            prompt_range = operation["timerange"]
+        _maybe_apply_paste_range(prompt_range, anchor_widget=anchor_widget)
+        return True
 
     _paste_to_dialog = customWidgets.PasteToDialog(_animation_controls(animation_data), _apply_mappings, data_label="animation")
+    _paste_to_dialog.show()
+
+
+def paste_pose_to(*args, anchor_widget=None, **kwargs):
+    global _paste_to_dialog
+
+    pose_data = _load_pose_json()
+    if not pose_data:
+        return
+
+    def _apply_mappings(mappings, insert=False):
+        with _copy_paste_operation("paste_pose_to", "Pose Pasted", undo=True, tint="current") as operation:
+            attrs_set = 0
+            pasted_targets = []
+            for source_node, target_node in mappings:
+                source_attrs = pose_data.get(source_node, {})
+                target_pose_data = {target_node: source_attrs}
+                target_attrs_set, target_pasted = _apply_pose_data(target_pose_data, [target_node])
+                attrs_set += target_attrs_set
+                pasted_targets.extend(target_pasted)
+
+            if not attrs_set:
+                cmds.warning("No pose values were pasted. Check that destination controls have the needed attributes.")
+                return False
+
+            operation["success"] = True
+            _select_existing_targets(pasted_targets)
+            return True
+
+    _paste_to_dialog = customWidgets.PasteToDialog(pose_data, _apply_mappings, data_label="pose")
     _paste_to_dialog.show()
 
 
@@ -3809,8 +3974,10 @@ def paste_pose(*args):
         return
 
     with _copy_paste_operation("paste_pose", "Pose Pasted", undo=True, tint="current") as operation:
-        if _apply_pose_data(pose_data, selected_objects):
+        attrs_set, pasted_targets = _apply_pose_data(pose_data, selected_objects)
+        if attrs_set:
             operation["success"] = True
+            _select_existing_targets(pasted_targets)
         else:
             cmds.warning("No matching pose targets found")
 

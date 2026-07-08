@@ -102,6 +102,7 @@ _KEYTOOLS_COMMANDS = {
     "mirror_all_keys": "mirror_all_keys",
     "copy_pose": "copy_pose",
     "paste_pose": "paste_pose",
+    "paste_pose_to": "paste_pose_to",
     "export_pose_file": "export_pose_file",
     "import_pose_file": "import_pose_file",
     "copy_animation": "copy_animation",
@@ -306,7 +307,11 @@ def _module_command(command_name: str, module_name: str, attr_name: str, *preset
         call_args = preset_args + args
         call_kwargs = dict(preset_kwargs)
         call_kwargs.update(kwargs)
-        return callback(*call_args, **_supported_callback_kwargs(callback, call_kwargs))
+        from TheKeyMachine.tools import common as toolCommon
+
+        with toolCommon.tool_operation(tool_id=command_name, undo=True) as operation:
+            call_kwargs.setdefault("tool_operation", operation)
+            return callback(*call_args, **_supported_callback_kwargs(callback, call_kwargs))
 
     _command.__name__ = command_name
     return _command

@@ -716,17 +716,14 @@ def worldspace_copy_animation(*args):
 
 
 def copy_range_worldspace_animation(*args):
-    target_info = keyTools.resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=False)
+    target_info = keyTools.resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=False)
     selected_objects = target_info["target_objects"]
     if not selected_objects:
         return
 
-    # Comprobar si los objetos seleccionados tienen claves de animación
-    if not cmds.keyframe(selected_objects, query=True):
-        return
-
     time_context = target_info["time_context"]
-    time_range = time_context.timerange if time_context.mode != "current_frame" else None
+    if time_context.mode != "time_slider_range":
+        return copy_worldspace_single_frame(*args)
 
     animation_data = {}
     tint_session = None
@@ -737,39 +734,31 @@ def copy_range_worldspace_animation(*args):
     # Suspender la actualización de la vista
     cmds.refresh(suspend=True)
 
-    attributes = {
-        "query": True,
-    }
-    if time_range:
-        attributes["time"] = (time_range[0], time_range[1])
-
-    all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, **attributes))))
+    frames_to_copy = list(time_context.frames or [])
 
     try:
-        if all_keyframes:
+        if frames_to_copy:
             tint_session = timelineWidgets.begin_timeline_tint(
-                timerange=(int(all_keyframes[0]), int(all_keyframes[-1])),
+                timerange=(int(frames_to_copy[0]), int(frames_to_copy[-1])),
                 color=_active_tint_color("ws_copy_range"),
                 key="ws_copy_range",
             )
 
-        with toolCommon.AdaptiveProgress("Copying World Space Animation", len(all_keyframes), interruptable=True) as progress:
-            for frame in all_keyframes:
+        with toolCommon.AdaptiveProgress("Copying World Space Animation", len(frames_to_copy), interruptable=True) as progress:
+            for frame in frames_to_copy:
                 if progress.cancelled:
                     break
 
                 cmds.currentTime(frame)
 
                 for source_obj in selected_objects:
-                    # Asegurarse de que el objeto tiene claves en este frame
-                    if cmds.keyframe(source_obj, query=True, time=(frame, frame)):
-                        worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
-                            source_obj, query=True, rotation=True, worldSpace=True
-                        )
-                        if source_obj not in animation_data:
-                            animation_data[source_obj] = {}
+                    worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
+                        source_obj, query=True, rotation=True, worldSpace=True
+                    )
+                    if source_obj not in animation_data:
+                        animation_data[source_obj] = {}
 
-                        animation_data[source_obj][int(frame)] = worldspace_values
+                    animation_data[source_obj][int(frame)] = worldspace_values
 
                 progress.step()
 
@@ -943,6 +932,24 @@ def paste_worldspace_single_frame(*args):
                 pass
 
 
+def _worldspace_frame_number(frame_key):
+    try:
+        return int(round(float(frame_key)))
+    except Exception:
+        return None
+
+
+def _worldspace_frame_value_map(obj_data):
+    values_by_frame = {}
+    if not isinstance(obj_data, dict):
+        return values_by_frame
+    for frame_key, values in obj_data.items():
+        frame = _worldspace_frame_number(frame_key)
+        if frame is not None:
+            values_by_frame[frame] = values
+    return values_by_frame
+
+
 def worldspace_paste_animation(*args):
     operation_context = None
     tint_session = None
@@ -1006,16 +1013,14 @@ def worldspace_paste_animation(*args):
 
         # Frames to paste (union of used sources)
         mapped_animation_data = {}
+        mapped_frame_values = {}
         frame_set = set()
         for source_obj, _ in mapping:
-            obj_data = animation_data.get(source_obj) or {}
-            if isinstance(obj_data, dict):
-                mapped_animation_data[source_obj] = {"frames": list(obj_data.keys())}
-                for frame_key in obj_data.keys():
-                    try:
-                        frame_set.add(int(frame_key))
-                    except Exception:
-                        continue
+            values_by_frame = _worldspace_frame_value_map(animation_data.get(source_obj) or {})
+            if values_by_frame:
+                mapped_frame_values[source_obj] = values_by_frame
+                mapped_animation_data[source_obj] = {"frames": list(values_by_frame.keys())}
+                frame_set.update(values_by_frame.keys())
 
         paste_range = timelineWidgets.get_animation_data_timerange(mapped_animation_data, frame_key="frames")
         if not paste_range:
@@ -1038,19 +1043,15 @@ def worldspace_paste_animation(*args):
                         break
 
                     cmds.currentTime(frame)
-                    frame_key = str(frame)
                     for source_obj, target_obj in mapping:
                         if not cmds.objExists(target_obj):
                             continue
-                        obj_data = animation_data.get(source_obj) or {}
-                        if not isinstance(obj_data, dict):
+                        values = (mapped_frame_values.get(source_obj) or {}).get(frame)
+                        if values is None:
                             continue
-                        if frame_key not in obj_data:
-                            continue
-                        values = obj_data[frame_key]
                         cmds.xform(target_obj, translation=values[:3], worldSpace=True)
                         cmds.xform(target_obj, rotation=values[3:], worldSpace=True)
-                        cmds.setKeyframe(target_obj)
+                        cmds.setKeyframe(target_obj, time=(frame,), attribute=["tx", "ty", "tz", "rx", "ry", "rz"])
                     progress.step()
 
         finally:

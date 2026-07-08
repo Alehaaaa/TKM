@@ -795,6 +795,15 @@ def _paste_to_resolve_node(source_node, namespace):
     return matches[0] if matches else None
 
 
+def _paste_to_asset_key(source_node):
+    namespace = _paste_to_node_namespace(source_node)
+    return namespace or "<root>"
+
+
+def _paste_to_asset_display(asset_key):
+    return "" if asset_key == "<root>" else asset_key
+
+
 class PasteToDialog:
     def __init__(self, saved_data, apply_callback, data_label="animation", parent=None):
         from TheKeyMachine.widgets import customDialogs
@@ -803,23 +812,30 @@ class PasteToDialog:
         self.apply_callback = apply_callback
         self.data_label = data_label
         self._asset_rows = {}
+        self._asset_sources = {}
 
         title = f"Paste {data_label.title()} To..."
-        buttons = [
-            customDialogs.QFlatDialogButton(
-                f"Paste Insert {data_label.title()}",
-                callback=lambda: self._apply(insert=True),
-                icon=icons.paste_insert_animation if data_label == "animation" else icons.paste_pose,
-                highlight=True,
-            ),
-            customDialogs.QFlatDialogButton(
-                f"Paste Replace {data_label.title()}",
-                callback=lambda: self._apply(insert=False),
-                icon=icons.paste_animation if data_label == "animation" else icons.paste_pose,
-                highlight=True,
-            ),
-            customDialogs.QFlatDialogButton("Close", callback=self.close, icon=icons.close),
-        ]
+        buttons = []
+        if data_label == "animation":
+            buttons.append(
+                customDialogs.QFlatDialogButton(
+                    "Paste Insert Animation",
+                    callback=lambda: self._apply(insert=True),
+                    icon=icons.paste_insert_animation,
+                    highlight=True,
+                )
+            )
+        buttons.extend(
+            [
+                customDialogs.QFlatDialogButton(
+                    f"Paste {data_label.title()}",
+                    callback=lambda: self._apply(insert=False),
+                    icon=icons.paste_animation if data_label == "animation" else icons.paste_pose,
+                    highlight=True,
+                ),
+                customDialogs.QFlatDialogButton("Close", callback=self.close, icon=icons.close),
+            ]
+        )
 
         self.dialog = customDialogs.QFlatDialog(parent=parent, buttons=buttons, closeButton=False)
         self.dialog.setWindowTitle(title)
@@ -894,10 +910,14 @@ class PasteToDialog:
     def _populate_tree(self):
         scene_namespaces = _paste_to_scene_namespaces()
         for source_node in sorted((self.saved_data or {}).keys()):
-            source_namespace = _paste_to_node_namespace(source_node)
-            target_node = _paste_to_resolve_node(source_node, source_namespace)
-            item = QtWidgets.QTreeWidgetItem([source_node, target_node or "", ""])
-            item.setData(0, QtCore.Qt.UserRole, source_node)
+            asset_key = _paste_to_asset_key(source_node)
+            self._asset_sources.setdefault(asset_key, []).append(source_node)
+
+        for asset_key in sorted(self._asset_sources.keys(), key=lambda value: _paste_to_asset_display(value).lower()):
+            source_namespace = _paste_to_asset_display(asset_key)
+            preview_text = self._asset_preview(asset_key, source_namespace)
+            item = QtWidgets.QTreeWidgetItem([source_namespace or "<root>", preview_text, ""])
+            item.setData(0, QtCore.Qt.UserRole, asset_key)
             self.tree.addTopLevelItem(item)
 
             combo = QtWidgets.QComboBox(self.tree)
@@ -911,12 +931,12 @@ class PasteToDialog:
 
             custom = QtWidgets.QLineEdit(self.tree)
             custom.setObjectName("pasteToCustomNamespace")
-            custom.textChanged.connect(lambda _text, source=source_node: self._refresh_asset_preview(source))
-            combo.currentIndexChanged.connect(lambda _idx, source=source_node: self._refresh_asset_preview(source))
+            custom.textChanged.connect(lambda _text, source=asset_key: self._refresh_asset_preview(source))
+            combo.currentIndexChanged.connect(lambda _idx, source=asset_key: self._refresh_asset_preview(source))
 
             self.tree.setItemWidget(item, 1, combo)
             self.tree.setItemWidget(item, 2, custom)
-            self._asset_rows[source_node] = {"combo": combo, "custom": custom, "item": item}
+            self._asset_rows[asset_key] = {"combo": combo, "custom": custom, "item": item}
 
         QtCore.QTimer.singleShot(0, self._resize_columns)
 
@@ -930,35 +950,43 @@ class PasteToDialog:
         self.tree.setColumnWidth(1, second_width)
         self.tree.setColumnWidth(2, max(DPI(120), viewport_width - first_width - second_width))
 
-    def _selected_namespace(self, source_node):
-        widgets = self._asset_rows.get(source_node)
+    def _selected_namespace(self, asset_key):
+        widgets = self._asset_rows.get(asset_key)
         if not widgets:
-            return _paste_to_node_namespace(source_node)
+            return _paste_to_asset_display(asset_key)
         custom_text = widgets["custom"].text().strip().strip(":")
         if custom_text:
             return custom_text
         combo = widgets["combo"]
         return combo.currentData() if combo.currentIndex() >= 0 else ""
 
-    def _refresh_asset_preview(self, source_node):
-        widgets = self._asset_rows.get(source_node)
+    def _asset_preview(self, asset_key, target_namespace):
+        sources = self._asset_sources.get(asset_key) or []
+        resolved = 0
+        for source_node in sources:
+            if _paste_to_resolve_node(source_node, target_namespace):
+                resolved += 1
+        return f"{resolved}/{len(sources)} controls" if sources else ""
+
+    def _refresh_asset_preview(self, asset_key):
+        widgets = self._asset_rows.get(asset_key)
         if not widgets:
             return
-        target_node = _paste_to_resolve_node(source_node, self._selected_namespace(source_node))
-        widgets["item"].setText(1, target_node or "")
+        widgets["item"].setText(1, self._asset_preview(asset_key, self._selected_namespace(asset_key)))
 
     def mappings(self):
         resolved = []
         missing = []
         items = self.tree.selectedItems() or [self.tree.topLevelItem(index) for index in range(self.tree.topLevelItemCount())]
         for item in items:
-            source_node = item.data(0, QtCore.Qt.UserRole)
-            target_namespace = self._selected_namespace(source_node)
-            target_node = _paste_to_resolve_node(source_node, target_namespace)
-            if target_node:
-                resolved.append((source_node, target_node))
-            else:
-                missing.append(_paste_to_node_with_namespace(_paste_to_node_base_name(source_node), target_namespace))
+            asset_key = item.data(0, QtCore.Qt.UserRole)
+            target_namespace = self._selected_namespace(asset_key)
+            for source_node in self._asset_sources.get(asset_key, []):
+                target_node = _paste_to_resolve_node(source_node, target_namespace)
+                if target_node:
+                    resolved.append((source_node, target_node))
+                else:
+                    missing.append(_paste_to_node_with_namespace(_paste_to_node_base_name(source_node), target_namespace))
         return resolved, missing
 
     def _apply(self, insert=False):
@@ -1277,7 +1305,14 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         )
 
     def triggerToolCallback(self, base_callback, *args, **kwargs):
-        callback = self._active_callback(base_callback)
+        variant = self._get_active_shortcut_variant()
+        callback = variant.get("callback") if variant and variant.get("callback") else base_callback
+        if variant:
+            kwargs.setdefault("_tkm_tool_id", variant.get("id") or variant.get("key"))
+            kwargs.setdefault(
+                "_tkm_tool_label",
+                variant.get("status_title") or variant.get("label") or variant.get("menu_label"),
+            )
         return toolCommon.run_tool_callback(self, callback, *args, **kwargs)
 
     def _active_callback(self, base_callback=None):
