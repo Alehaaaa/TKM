@@ -105,6 +105,12 @@ def set_euler_filter_enabled(enabled):
     emit_attribute_switcher_euler_filter_state()
 
 
+def toggle_euler_filter_enabled(*_args, **_kwargs):
+    state = not is_euler_filter_enabled()
+    set_euler_filter_enabled(state)
+    return state
+
+
 def get_attribute_switcher_window():
     global _attribute_switcher_instance
     if (

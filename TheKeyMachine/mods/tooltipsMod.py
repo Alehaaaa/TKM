@@ -366,13 +366,54 @@ class QFlatTooltip(QWidget):
         if not self.command_id:
             return
         actions = QWidget(self)
-        actions_layout = QHBoxLayout(actions)
+        actions.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Minimum)
+        actions_layout = QVBoxLayout(actions)
         actions_layout.setContentsMargins(0, 0, 0, 0)
-        actions_layout.setSpacing(wutil.DPI(2))
+        actions_layout.setSpacing(wutil.DPI(1))
+
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setContentsMargins(0, 0, 0, 0)
+        buttons_layout.setSpacing(wutil.DPI(2))
         if self.command_id:
-            actions_layout.addWidget(self._create_header_button(icons.hotkeys, "Edit hotkey", self._open_hotkey_editor))
-        actions_layout.addWidget(self._create_header_button(icons.add_to_shelf, "Add to shelf", lambda: self._add_to_shelf(header_title)))
-        layout.addWidget(actions)
+            buttons_layout.addWidget(self._create_header_button(icons.hotkeys, "Edit hotkey", self._open_hotkey_editor))
+        buttons_layout.addWidget(self._create_header_button(icons.add_to_shelf, "Add to shelf", lambda: self._add_to_shelf(header_title)))
+        actions_layout.addLayout(buttons_layout)
+
+        shortcut_text = self._command_shortcut_text()
+        if shortcut_text:
+            command_lbl = self._create_command_shortcut_label(shortcut_text, buttons_layout.sizeHint().width())
+            actions_layout.addWidget(command_lbl)
+
+        layout.addWidget(actions, 0, Qt.AlignVCenter)
+
+    def _command_shortcut_text(self):
+        if not self.command_id:
+            return ""
+        try:
+            from TheKeyMachine.mods import hotkeysMod
+
+            return hotkeysMod.shortcut_for_command(self.command_id) or ""
+        except Exception:
+            return ""
+
+    def _create_command_shortcut_label(self, shortcut_text, width):
+        label = QLabel(shortcut_text)
+        label.setObjectName("TooltipCommandShortcutLabel")
+        label.setAlignment(Qt.AlignCenter)
+        label.setWordWrap(False)
+        label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        label.setToolTip(self.command_id or "")
+        font = label.font()
+        font.setPixelSize(wutil.DPI(9.5))
+        label.setFont(font)
+        label.setStyleSheet(
+            "#TooltipCommandShortcutLabel { color: #8c8c8c; background: transparent; padding: 0px; margin: 0px; }"
+        )
+        metrics = QFontMetrics(label.font())
+        available_width = max(1, int(width or label.sizeHint().width()))
+        label.setFixedWidth(available_width)
+        label.setText(metrics.elidedText(shortcut_text, Qt.ElideMiddle, available_width))
+        return label
 
     def _create_header_button(self, icon_path, tooltip, callback):
         btn = QToolButton(self)
@@ -381,8 +422,8 @@ class QFlatTooltip(QWidget):
         btn.setCursor(Qt.PointingHandCursor)
         btn.setToolTip(tooltip)
         btn.setIcon(QIcon(icon_path))
-        btn.setIconSize(QSize(wutil.DPI(26), wutil.DPI(26)))
-        btn.setFixedSize(wutil.DPI(28), wutil.DPI(28))
+        btn.setIconSize(QSize(wutil.DPI(22), wutil.DPI(22)))
+        btn.setFixedSize(wutil.DPI(24), wutil.DPI(24))
         btn.setStyleSheet(
             "QToolButton#TooltipHeaderButton { background-color: transparent; border: none; border-radius: 0px; padding: 0px; }"
             "QToolButton#TooltipHeaderButton:pressed { background-color: #1f1f1f; border: none; border-radius: 0px; }"

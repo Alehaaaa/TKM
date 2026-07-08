@@ -544,7 +544,7 @@ class QFlatConfirmDialog(QFlatDialog):
         config["callback"] = partial(self._on_button_clicked, original_config)
         return config
 
-    def _on_button_clicked(self, config):
+    def _on_button_clicked(self, config, *_args):
         self.clicked_button = config
         if config.get("positive", False):
             self.accept()
@@ -699,7 +699,7 @@ class QFlatTooltipConfirm(QFlatDialog):
         config["callback"] = partial(self._on_button_clicked, original_config)
         return config
 
-    def _on_button_clicked(self, config):
+    def _on_button_clicked(self, config, *_args):
         self.clicked_button = config
         if config.get("positive", False):
             self.accept()

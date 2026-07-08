@@ -27,6 +27,7 @@ from TheKeyMachine.tools.link_objects.pulse_thread import LinkObjectPulseThread 
 import TheKeyMachine.sliders as sliders  # type: ignore
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
+from TheKeyMachine.widgets import customDialogs  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
@@ -789,7 +790,11 @@ def add_main_settings_button(section, item_data, owner):
             internet_connection=internet_connection,
         )
 
-    settings_tool = toolbox.get_tool("TKM", menu=_build_settings_menu)
+    settings_tool = toolbox.get_tool(
+        "TKM",
+        menu=_build_settings_menu,
+        **{k: v for k, v in item_data.items() if k != "id"},
+    )
     btn = add_tool_button(section, settings_tool)
     btn.setObjectName("TKM_toolbar_button")
 
@@ -815,6 +820,27 @@ def add_main_settings_button(section, item_data, owner):
         updater.check_for_updates(btn, warning=False, force=False)
 
     return btn
+
+
+def show_welcome_shelf_prompt(anchor_button, owner):
+    if not wutil.is_valid_widget(anchor_button):
+        return
+
+    add_button = customDialogs.QFlatConfirmDialog.CustomButton("Add to Shelf", positive=True, icon=icons.add_to_shelf)
+    no_button = customDialogs.QFlatConfirmDialog.CustomButton("No", positive=False, icon=icons.cancel)
+    clicked = customDialogs.QFlatTooltipConfirm.question(
+        anchor_button,
+        title="Add TheKeyMachine to your shelf?",
+        message="Create a shelf button so you can show or hide the toolbar quickly.",
+        buttons=[add_button, no_button],
+        icon=icons.tkm_main,
+        highlight=add_button,
+    )
+    if clicked and clicked.get("positive"):
+        try:
+            owner.create_shelf_icon()
+        except Exception:
+            pass
 
 
 def get_main_toolbar_icon_alignment():

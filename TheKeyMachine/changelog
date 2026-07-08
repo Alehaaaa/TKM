@@ -14,6 +14,14 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.21:
+  - new: Welcome prompt can add the TheKeyMachine shelf button after install
+  - changed: Toolbar command routing is cleaner and more reliable
+  - polish: Tooltips show assigned hotkeys and cleaner header actions
+  - polish: Smart Manipulators now sit after Tangents in the toolbar
+  - bugfix: Hotkeys window uses the correct command tooltip details
+  - bugfix: Paste Animation is faster on dense animation clips
+
 0.1.20:
   - polish: Some more tools have refined icons
   - bugfix: Fixed sliders messing with rotations and not saving Undo Chunks

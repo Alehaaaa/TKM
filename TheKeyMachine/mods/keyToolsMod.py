@@ -3277,16 +3277,6 @@ def _apply_key_tangent_data(target, channel, key_time, tangent_data, index, laye
         if value is not None:
             tangent_kwargs[target_key] = value
 
-    weighted = _value("wt")
-    if weighted is not None:
-        try:
-            kwargs = {"weightedTangents": bool(weighted)}
-            if layer_name:
-                kwargs["animLayer"] = layer_name
-            cmds.keyTangent(target, attribute=channel, time=(key_time,), edit=True, **kwargs)
-        except Exception:
-            pass
-
     if tangent_kwargs:
         try:
             if layer_name:
@@ -3296,6 +3286,20 @@ def _apply_key_tangent_data(target, channel, key_time, tangent_data, index, laye
             import TheKeyMachine.mods.reportMod as report
 
             report.report_detected_exception(e, context="paste animation tangent data")
+
+
+def _apply_channel_weighted_tangents(target, channel, tangent_data, layer_name=None):
+    weighted_values = (tangent_data or {}).get("wt") or []
+    weighted = next((value for value in weighted_values if value is not None), None)
+    if weighted is None:
+        return
+    try:
+        kwargs = {"weightedTangents": bool(weighted)}
+        if layer_name:
+            kwargs["animLayer"] = layer_name
+        cmds.keyTangent(target, attribute=channel, edit=True, **kwargs)
+    except Exception:
+        pass
 
 
 def _attr_exists_and_settable(node, attr):
@@ -3308,6 +3312,24 @@ def _attr_exists_and_settable(node, attr):
         return cmds.getAttr(full_attr, se=True) and not cmds.getAttr(full_attr, lock=True)
     except Exception:
         return False
+
+
+@contextmanager
+def _suspend_maya_refresh():
+    suspended = False
+    try:
+        cmds.refresh(suspend=True)
+        suspended = True
+    except Exception:
+        suspended = False
+    try:
+        yield
+    finally:
+        if suspended:
+            try:
+                cmds.refresh(suspend=False)
+            except Exception:
+                pass
 
 
 @contextmanager
@@ -3362,9 +3384,12 @@ def _apply_animation_channels_to_targets(
     progress=None,
 ):
     keys_set = 0
+    attr_settable_cache = {}
+    progress_batch_size = 25
 
     def _apply_channel_data(target, channel, channel_data, layer_name=None):
         applied = 0
+        pending_progress = 0
         keyframes = channel_data.get(ANIMATION_FRAME_KEY) or []
         values = channel_data.get(ANIMATION_VALUE_KEY) or []
         if not keyframes or not values:
@@ -3375,6 +3400,7 @@ def _apply_animation_channels_to_targets(
         if channel_time_shift is None:
             channel_time_shift = insert_time - keyframes[0] if insert_time is not None else 0
         tangent_data = channel_data.get(ANIMATION_TANGENT_KEY) or {}
+        _apply_channel_weighted_tangents(target, channel, tangent_data, layer_name=paste_layer)
         for key_index, (frame, value) in enumerate(zip(keyframes, values)):
             try:
                 key_time = frame + channel_time_shift
@@ -3388,28 +3414,37 @@ def _apply_animation_channels_to_targets(
                 import TheKeyMachine.mods.reportMod as report
 
                 report.report_detected_exception(e, context="paste animation set key")
-            if progress and progress.step():
-                return applied
+            pending_progress += 1
+            if progress and pending_progress >= progress_batch_size:
+                if progress.step(amount=pending_progress):
+                    return applied
+                pending_progress = 0
+        if progress and pending_progress:
+            progress.step(amount=pending_progress)
         return applied
 
-    for target in targets or []:
-        for channel, anim_data in (channels_data or {}).items():
-            if progress and progress.cancelled:
-                return keys_set
-            if not _attr_exists_and_settable(target, channel):
-                continue
-
-            if replace:
-                try:
-                    cmds.cutKey(target, time=replace_range, attribute=channel, option="keys")
-                except Exception:
-                    pass
-
-            keys_set += _apply_channel_data(target, channel, anim_data)
-            for layer_name, layer_data in (anim_data.get(ANIMATION_LAYERS_KEY) or {}).items():
+    with _suspend_maya_refresh():
+        for target in targets or []:
+            for channel, anim_data in (channels_data or {}).items():
                 if progress and progress.cancelled:
                     return keys_set
-                keys_set += _apply_channel_data(target, channel, layer_data, layer_name=layer_name)
+                cache_key = (target, channel)
+                if cache_key not in attr_settable_cache:
+                    attr_settable_cache[cache_key] = _attr_exists_and_settable(target, channel)
+                if not attr_settable_cache[cache_key]:
+                    continue
+
+                if replace:
+                    try:
+                        cmds.cutKey(target, time=replace_range, attribute=channel, option="keys")
+                    except Exception:
+                        pass
+
+                keys_set += _apply_channel_data(target, channel, anim_data)
+                for layer_name, layer_data in (anim_data.get(ANIMATION_LAYERS_KEY) or {}).items():
+                    if progress and progress.cancelled:
+                        return keys_set
+                    keys_set += _apply_channel_data(target, channel, layer_data, layer_name=layer_name)
 
     return keys_set
 

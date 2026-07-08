@@ -1,10 +1,14 @@
 """
 Central trigger registry for toolbar tools, hotkeys, and slider commands.
+
+This module keeps command names stable for Maya hotkeys/shelf buttons while
+leaving behavior in the feature modules that own it.
 """
 
 from __future__ import annotations
 
 import importlib
+import inspect
 import keyword
 from typing import Callable, Dict, Optional
 
@@ -16,58 +20,123 @@ _BUILTINS_LOADED = False
 _SLIDERS_LOADED = False
 _TOOLBOX_LOADED = False
 
+_SHELF_MENU_COMMANDS = (
+    "TKM",
+    "main_preferences_menu",
+    "main_dock_menu",
+    "main_system_menu",
+    "help_menu",
+    "graph_settings_menu",
+    "graph_dock_menu",
+)
 
-def _register_core_commands() -> None:
-    register_command("toolbar_toggle", _toggle_main_toolbar)
-    register_command("toolbar_reload", _reload_main_toolbar)
-    register_command("toolbar_unload", _unload_main_toolbar)
-    register_command("toolbar_add_shelf_button", _create_toolbar_shelf_button)
-    register_command("check_for_updates", _check_for_updates)
-    register_command("selection_sets", _toggle_selection_sets)
-    register_command("animation_offset", _toggle_animation_offset)
-    register_command("micro_move", _toggle_micro_move)
-    register_command("custom_graph", _toggle_graph_toolbar)
-    register_command("overshoot_sliders", _toggle_sliders_overshoot)
-    register_command("attribute_switcher_euler_filter", _toggle_attribute_switcher_euler_filter)
-    register_command("custom_tools", _open_custom_tools_config)
-    register_command("custom_scripts", _open_custom_scripts_config)
-    register_command("about_window", _open_about_window)
-    register_command("donate_window", _open_donate_window)
-    register_command("bug_report_window", _open_bug_report_window)
-    register_command("orbit_window", _open_orbit_window)
+_MODULE_COMMANDS = {
+    "toolbar_toggle": ("TheKeyMachine.core.toolbar", "toggle"),
+    "toolbar_reload": ("TheKeyMachine.core.toolbar", "reload_current"),
+    "toolbar_unload": ("TheKeyMachine.core.toolbar", "unload_current"),
+    "toolbar_add_shelf_button": ("TheKeyMachine.core.toolbar", "create_shelf_icon_current"),
+    "check_for_updates": ("TheKeyMachine.mods.updater", "check_for_updates", (), {"force": True}),
+    "selection_sets": ("TheKeyMachine.core.toolbar", "toggle_selection_sets_workspace"),
+    "animation_offset": ("TheKeyMachine.core.toolbar", "toggle_animation_offset"),
+    "micro_move": ("TheKeyMachine.core.toolbar", "toggle_micro_move"),
+    "custom_graph": ("TheKeyMachine.tools.graph_toolbar.api", "toggle_graph_toolbar_enabled"),
+    "overshoot_sliders": ("TheKeyMachine.core.toolbox", "toggle_overshoot_sliders_enabled"),
+    "attribute_switcher_euler_filter": ("TheKeyMachine.tools.attribute_switcher.api", "toggle_euler_filter_enabled"),
+    "custom_tools": ("TheKeyMachine.mods.generalMod", "open_file", ("TheKeyMachine_user_data/connect/tools", "tools.py")),
+    "custom_scripts": ("TheKeyMachine.mods.generalMod", "open_file", ("TheKeyMachine_user_data/connect/scripts", "scripts.py")),
+    "about_window": ("TheKeyMachine.mods.uiMod", "about_window"),
+    "donate_window": ("TheKeyMachine.mods.uiMod", "donate_window"),
+    "bug_report_window": ("TheKeyMachine.mods.reportMod", "bug_report_window"),
+    "orbit_window": ("TheKeyMachine.mods.uiMod", "toggle_orbit_window"),
+    "hotkeys_window": ("TheKeyMachine.mods.hotkeysMod", "show_hotkeys_window"),
+    "smart_rotation": ("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator"),
+    "smart_rotation_release": ("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator_release"),
+    "smart_translation": ("TheKeyMachine.mods.keyToolsMod", "smart_translate_manipulator"),
+    "smart_translation_release": ("TheKeyMachine.mods.keyToolsMod", "smart_translate_manipulator_release"),
+    "create_locator": ("TheKeyMachine.mods.barMod", "createLocator"),
+    "depth_mover": ("TheKeyMachine.mods.barMod", "depth_mover"),
+    "isolate_master": ("TheKeyMachine.mods.barMod", "isolate_master"),
+    "select_rig_controls": ("TheKeyMachine.mods.barMod", "select_rig_controls"),
+    "select_rig_controls_animated": ("TheKeyMachine.mods.barMod", "select_rig_controls_animated"),
+    "select_hierarchy": ("TheKeyMachine.mods.barMod", "selectHierarchy"),
+    "align_selected_objects": ("TheKeyMachine.mods.barMod", "align_selected_objects"),
+    "create_tracer": ("TheKeyMachine.mods.barMod", "create_tracer"),
+    "tracer_refresh": ("TheKeyMachine.mods.barMod", "tracer_refresh"),
+    "ws_copy_frame": ("TheKeyMachine.mods.barMod", "copy_worldspace_single_frame"),
+    "ws_paste_frame": ("TheKeyMachine.mods.barMod", "paste_worldspace_single_frame"),
+    "ws_copy_range": ("TheKeyMachine.mods.barMod", "copy_range_worldspace_animation"),
+    "ws_paste": ("TheKeyMachine.mods.barMod", "worldspace_paste_animation"),
+    "follow_cam": ("TheKeyMachine.mods.barMod", "create_follow_cam", (), {"translation": True, "rotation": True}),
+    "temp_pivot": ("TheKeyMachine.tools.temp_pivot.api", "toggle_temp_pivot"),
+    "temp_pivot_last_object": ("TheKeyMachine.tools.temp_pivot.api", "create_last_object_temp_pivot"),
+    "temp_pivot_centered": ("TheKeyMachine.tools.temp_pivot.api", "create_centered_temp_pivot"),
+    "temp_pivot_worldspace": ("TheKeyMachine.tools.temp_pivot.api", "create_worldspace_temp_pivot"),
+    "temp_pivot_edit": ("TheKeyMachine.tools.temp_pivot.api", "edit_temp_pivot"),
+    "temp_pivot_reset": ("TheKeyMachine.tools.temp_pivot.api", "reset_temp_pivot"),
+    "temp_pivot_last": ("TheKeyMachine.tools.temp_pivot.api", "create_last_object_temp_pivot"),
+}
 
+_KEYTOOLS_COMMANDS = {
+    "apply_smart_euler_filter": "apply_smart_euler_filter",
+    "clear_animation": "clear_animation_keys",
+    "copy_keys": "copy_keys",
+    "crop_animation": "crop_animation",
+    "cut_keys": "cut_keys",
+    "delete_keys": "delete_keys",
+    "paste_keys": "paste_keys",
+    "paste_keys_relative": "paste_keys_relative",
+    "remove_redundant_keys": "remove_redundant_keys",
+    "remove_static_anim_curves": "remove_static_anim_curves",
+    "reverse_animation": "reverse_animation",
+    "set_smart_key": "set_smart_key",
+    "set_smart_key_all_channels": "set_smart_key_all_channels",
+    "delete_all_animation": "clear_animation_keys",
+    "delete_static_animation": "remove_static_anim_curves",
+    "default_object_values": "default_object_values",
+    "select_opposite": "selectOpposite",
+    "opposite_add": "addSelectOpposite",
+    "opposite_copy": "copyOpposite",
+    "mirror": "mirror",
+    "mirror_to_right": "mirror_to_right",
+    "mirror_to_left": "mirror_to_left",
+    "mirror_all_keys": "mirror_all_keys",
+    "copy_pose": "copy_pose",
+    "paste_pose": "paste_pose",
+    "export_pose_file": "export_pose_file",
+    "import_pose_file": "import_pose_file",
+    "copy_animation": "copy_animation",
+    "paste_animation": "paste_animation",
+    "paste_insert_animation": "paste_insert_animation",
+    "paste_opposite_animation": "paste_opposite_animation",
+    "paste_animation_to": "paste_animation_to",
+    "export_animation_file": "export_animation_file",
+    "import_animation_file": "import_animation_file",
+    "link_copy": "copy_link",
+    "link_paste": "paste_link",
+    "share_keys_from_last_selected": "share_keys_from_last_selected",
+    "bake_animation_from_last_selected": "bake_animation_from_last_selected",
+}
 
-def _ensure_builtin_commands() -> None:
-    global _BUILTINS_LOADED
-    if _BUILTINS_LOADED:
-        return
-    try:
-        _register_builtin_commands()
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return
-    _BUILTINS_LOADED = True
-
-
-def _ensure_slider_commands() -> None:
-    global _SLIDERS_LOADED
-    if _SLIDERS_LOADED:
-        return
-    try:
-        _register_slider_commands()
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return
-    _SLIDERS_LOADED = True
-
-
-def _ensure_toolbox_commands() -> None:
-    global _TOOLBOX_LOADED
-    if _TOOLBOX_LOADED:
-        return
-    try:
-        import TheKeyMachine.core.toolbox  # noqa: F401
-    except ImportError:
-        return
-    _TOOLBOX_LOADED = True
+_KEYTOOLS_VARIANTS = {
+    "default_translations": ("default_object_values", (), {"default_translations": True}),
+    "default_rotations": ("default_object_values", (), {"default_rotations": True}),
+    "default_scales": ("default_object_values", (), {"default_scales": True}),
+    "default_trs": (
+        "default_object_values",
+        (),
+        {"default_translations": True, "default_rotations": True, "default_scales": True},
+    ),
+    "nudge_insert_inbetween": ("insert_inbetween", (1,), {}),
+    "nudge_remove_inbetween": ("remove_inbetween", (1,), {}),
+    "nudge_left": ("move_keyframes_in_range", (-1,), {}),
+    "nudge_right": ("move_keyframes_in_range", (1,), {}),
+    "nudge_left_all_keys": ("nudge_all_keys", (-1,), {}),
+    "nudge_left_scene": ("nudge_scene_keys", (-1,), {}),
+    "nudge_right_all_keys": ("nudge_all_keys", (1,), {}),
+    "nudge_right_scene": ("nudge_scene_keys", (1,), {}),
+    "nudge_insert_inbetween_scene": ("inbetween_scene", (1,), {}),
+    "nudge_remove_inbetween_scene": ("inbetween_scene", (-1,), {}),
+}
 
 
 def register_command(name: str, callback: Callable) -> Callable:
@@ -129,7 +198,7 @@ def make_command_callback(name: str, callback: Optional[Callable] = None) -> Cal
         registered = get_command(name)
         if registered is None:
             raise AttributeError("Unknown TheKeyMachine trigger command: {}".format(name))
-        registered(*args, **kwargs)
+        registered(*args, **_supported_callback_kwargs(registered, kwargs))
         return None
 
     _proxy.__name__ = name
@@ -158,356 +227,67 @@ def execute_slider(prefix: str, mode: str, value: int = 0, session=None):
     raise ValueError("Unknown slider prefix: {}".format(prefix))
 
 
-def _slider_value_suffix(value: int) -> str:
-    value = int(value)
-    if value < 0:
-        return "neg{}".format(abs(value))
-    return str(value)
-
-
 def register_slider_mode(prefix: str, mode: str) -> None:
     base_command_name = "slider_{}_{}".format(prefix, mode)
     for slider_value in SLIDER_BUTTON_VALUES:
         command_name = "{}_{}".format(base_command_name, _slider_value_suffix(slider_value))
+        register_command(command_name, lambda p=prefix, m=mode, v=slider_value: execute_slider(p, m, v))
+
+
+def _ensure_builtin_commands() -> None:
+    global _BUILTINS_LOADED
+    if _BUILTINS_LOADED:
+        return
+    try:
+        _register_builtin_commands()
+    except (ImportError, RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return
+    _BUILTINS_LOADED = True
+
+
+def _ensure_slider_commands() -> None:
+    global _SLIDERS_LOADED
+    if _SLIDERS_LOADED:
+        return
+    try:
+        _register_slider_commands()
+    except (ImportError, RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return
+    _SLIDERS_LOADED = True
+
+
+def _ensure_toolbox_commands() -> None:
+    global _TOOLBOX_LOADED
+    if _TOOLBOX_LOADED:
+        return
+    try:
+        import TheKeyMachine.core.toolbox  # noqa: F401
+    except ImportError:
+        return
+    _TOOLBOX_LOADED = True
+
+
+def _register_builtin_commands() -> None:
+    for menu_name in _SHELF_MENU_COMMANDS:
+        register_command(menu_name, _module_command(menu_name, "TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", menu_name))
+
+    for command_name, spec in _MODULE_COMMANDS.items():
+        module_name, attr_name = spec[:2]
+        preset_args = spec[2] if len(spec) > 2 else ()
+        preset_kwargs = spec[3] if len(spec) > 3 else {}
+        register_command(command_name, _module_command(command_name, module_name, attr_name, *preset_args, **preset_kwargs))
+
+    for command_name, attr_name in _KEYTOOLS_COMMANDS.items():
+        register_command(command_name, _module_command(command_name, "TheKeyMachine.mods.keyToolsMod", attr_name))
+
+    for command_name, (attr_name, preset_args, preset_kwargs) in _KEYTOOLS_VARIANTS.items():
         register_command(
             command_name,
-            lambda p=prefix, m=mode, v=slider_value: execute_slider(p, m, v),
+            _module_command(command_name, "TheKeyMachine.mods.keyToolsMod", attr_name, *preset_args, **preset_kwargs),
         )
 
 
-def _toolbar():
-    from TheKeyMachine.core.toolbar import get_toolbar
-
-    return get_toolbar()
-
-
-def _toggle_animation_offset(*_args, **_kwargs):
-    toolbar = _toolbar()
-    if toolbar:
-        state = _args[0] if _args else _kwargs.get("checked")
-        return toolbar.toggleAnimOffsetButton(state)
-    return None
-
-
-def _toggle_micro_move(*_args, **_kwargs):
-    toolbar = _toolbar()
-    if toolbar:
-        state = _args[0] if _args else _kwargs.get("checked")
-        return toolbar.toggle_micro_move_button(state)
-    return None
-
-
-def _toggle_selection_sets(*_args, **_kwargs):
-    toolbar = _toolbar()
-    if toolbar:
-        return toolbar.toggle_selection_sets_workspace()
-    return None
-
-
-def _toggle_graph_toolbar(state=None, *_args, **_kwargs):
-    import TheKeyMachine.mods.reportMod as report
-    import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
-
-    if state is None:
-        state = not graphToolbarApi.get_graph_toolbar_checkbox_state()
-
-    return report.safe_execute(
-        graphToolbarApi.set_graph_toolbar_enabled,
-        bool(state),
-        apply=True,
-        context="graph toolbar toggle",
-    )
-
-
-def _toggle_sliders_overshoot(*_args, **_kwargs):
-    import TheKeyMachine.mods.settingsMod as settings
-    import TheKeyMachine.core.runtimeManager as runtime
-
-    state = not bool(settings.get_setting("sliders_overshoot", False))
-    settings.set_setting("sliders_overshoot", state)
-    runtime.get_runtime_manager().overshootChanged.emit(state)
-    return state
-
-
-def _toggle_attribute_switcher_euler_filter(*_args, **_kwargs):
-    import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
-
-    state = not attributeSwitcherApi.get_attribute_switcher_euler_filter_enabled()
-    attributeSwitcherApi.set_attribute_switcher_euler_filter_enabled(state)
-    return state
-
-
-def _open_custom_tools_config(*_args, **_kwargs):
-    import TheKeyMachine.mods.generalMod as general
-
-    return general.open_file("TheKeyMachine_user_data/connect/tools", "tools.py")
-
-
-def _open_custom_scripts_config(*_args, **_kwargs):
-    import TheKeyMachine.mods.generalMod as general
-
-    return general.open_file("TheKeyMachine_user_data/connect/scripts", "scripts.py")
-
-
-def _toggle_main_toolbar(*_args, **_kwargs):
-    import TheKeyMachine.core.toolbar as toolbar_mod
-
-    return toolbar_mod.toggle()
-
-
-def _reload_main_toolbar(*_args, **_kwargs):
-    toolbar = _toolbar()
-    if toolbar:
-        return toolbar.reload()
-    return None
-
-
-def _unload_main_toolbar(*_args, **_kwargs):
-    toolbar = _toolbar()
-    if toolbar:
-        return toolbar.unload()
-    return None
-
-
-def _create_toolbar_shelf_button(*_args, **_kwargs):
-    toolbar = _toolbar()
-    if toolbar:
-        return toolbar.create_shelf_icon()
-    return None
-
-
-def _check_for_updates(*_args, **_kwargs):
-    import TheKeyMachine.mods.updater as updater
-
-    return updater.check_for_updates(force=True)
-
-
-def _import_module(module_name: str):
-    try:
-        return importlib.import_module(module_name)
-    except ImportError:
-        return None
-
-
-def _invoke_module_attr(module_name: str, attr_name: str, *args, **kwargs):
-    module = _import_module(module_name)
-    if not module or not hasattr(module, attr_name):
-        return None
-    return getattr(module, attr_name)(*args, **kwargs)
-
-
-def _make_module_command(module_name: str, attr_name: str, *preset_args, **preset_kwargs) -> Callable:
-    def _command(*args, **kwargs):
-        call_args = preset_args + args
-        call_kwargs = dict(preset_kwargs)
-        call_kwargs.update(kwargs)
-        return _invoke_module_attr(module_name, attr_name, *call_args, **call_kwargs)
-
-    _command.__name__ = attr_name
-    return _command
-
-
-def _open_about_window(*_args, **_kwargs):
-    ui = _import_module("TheKeyMachine.mods.uiMod")
-    if ui and hasattr(ui, "about_window"):
-        return ui.about_window()
-    return None
-
-
-def _open_donate_window(*_args, **_kwargs):
-    ui = _import_module("TheKeyMachine.mods.uiMod")
-    if ui and hasattr(ui, "donate_window"):
-        return ui.donate_window()
-    return None
-
-
-def _open_bug_report_window(*_args, **_kwargs):
-    report = _import_module("TheKeyMachine.mods.reportMod")
-    if report and hasattr(report, "bug_report_window"):
-        return report.bug_report_window()
-    return None
-
-
-def _open_orbit_window(*_args, **_kwargs):
-    ui = _import_module("TheKeyMachine.mods.uiMod")
-    if ui and hasattr(ui, "toggle_orbit_window"):
-        return ui.toggle_orbit_window()
-    return None
-
-
-def _register_builtin_commands():
-    _register_core_commands()
-    register_command("TKM", _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "TKM"))
-    register_command("hotkeys_window", _make_module_command("TheKeyMachine.mods.hotkeysMod", "show_hotkeys_window"))
-    register_command(
-        "main_preferences_menu",
-        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "main_preferences_menu"),
-    )
-    register_command(
-        "main_dock_menu",
-        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "main_dock_menu"),
-    )
-    register_command(
-        "main_system_menu",
-        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "main_system_menu"),
-    )
-    register_command(
-        "help_menu",
-        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "help_menu"),
-    )
-    register_command(
-        "graph_settings_menu",
-        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "graph_settings_menu"),
-    )
-    register_command(
-        "graph_dock_menu",
-        _make_module_command("TheKeyMachine.mods.shelfMod", "show_tool_menu_at_cursor", "graph_dock_menu"),
-    )
-    register_command("smart_rotation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator"))
-    register_command("smart_rotation_release", _make_module_command("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator_release"))
-    register_command("smart_translation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "smart_translate_manipulator"))
-    register_command(
-        "smart_translation_release", _make_module_command("TheKeyMachine.mods.keyToolsMod", "smart_translate_manipulator_release")
-    )
-
-    register_command("create_locator", _make_module_command("TheKeyMachine.mods.barMod", "createLocator"))
-    register_command("depth_mover", _make_module_command("TheKeyMachine.mods.barMod", "depth_mover"))
-    register_command(
-        "apply_smart_euler_filter",
-        _make_module_command("TheKeyMachine.mods.keyToolsMod", "apply_smart_euler_filter"),
-    )
-    register_command("clear_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "clear_animation_keys"))
-    register_command("copy_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_keys"))
-    register_command("crop_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "crop_animation"))
-    register_command("cut_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "cut_keys"))
-    register_command("delete_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "delete_keys"))
-    register_command("paste_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_keys"))
-    register_command("paste_keys_relative", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_keys_relative"))
-    register_command(
-        "remove_redundant_keys",
-        _make_module_command("TheKeyMachine.mods.keyToolsMod", "remove_redundant_keys"),
-    )
-    register_command(
-        "remove_static_anim_curves",
-        _make_module_command("TheKeyMachine.mods.keyToolsMod", "remove_static_anim_curves"),
-    )
-    register_command("reverse_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "reverse_animation"))
-    register_command("set_smart_key", _make_module_command("TheKeyMachine.mods.keyToolsMod", "set_smart_key"))
-    register_command(
-        "set_smart_key_all_channels",
-        _make_module_command("TheKeyMachine.mods.keyToolsMod", "set_smart_key_all_channels"),
-    )
-    register_command("isolate_master", _make_module_command("TheKeyMachine.mods.barMod", "isolate_master"))
-    register_command("select_rig_controls", _make_module_command("TheKeyMachine.mods.barMod", "select_rig_controls"))
-    register_command("select_rig_controls_animated", _make_module_command("TheKeyMachine.mods.barMod", "select_rig_controls_animated"))
-    register_command("select_hierarchy", _make_module_command("TheKeyMachine.mods.barMod", "selectHierarchy"))
-    register_command("align_selected_objects", _make_module_command("TheKeyMachine.mods.barMod", "align_selected_objects"))
-    register_command("create_tracer", _make_module_command("TheKeyMachine.mods.barMod", "create_tracer"))
-    register_command("tracer_refresh", _make_module_command("TheKeyMachine.mods.barMod", "tracer_refresh"))
-    register_command("delete_all_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "clear_animation_keys"))
-    register_command("delete_static_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "remove_static_anim_curves"))
-    register_command("ws_copy_frame", _make_module_command("TheKeyMachine.mods.barMod", "copy_worldspace_single_frame"))
-    register_command("ws_paste_frame", _make_module_command("TheKeyMachine.mods.barMod", "paste_worldspace_single_frame"))
-    register_command(
-        "ws_copy_range", _make_module_command("TheKeyMachine.mods.barMod", "copy_range_worldspace_animation")
-    )
-    register_command("ws_paste", _make_module_command("TheKeyMachine.mods.barMod", "worldspace_paste_animation"))
-    register_command("temp_pivot", _make_module_command("TheKeyMachine.tools.temp_pivot.api", "toggle_temp_pivot"))
-    register_command("temp_pivot_last_object", _make_module_command("TheKeyMachine.tools.temp_pivot.api", "create_last_object_temp_pivot"))
-    register_command("temp_pivot_centered", _make_module_command("TheKeyMachine.tools.temp_pivot.api", "create_centered_temp_pivot"))
-    register_command("temp_pivot_worldspace", _make_module_command("TheKeyMachine.tools.temp_pivot.api", "create_worldspace_temp_pivot"))
-    register_command("temp_pivot_edit", _make_module_command("TheKeyMachine.tools.temp_pivot.api", "edit_temp_pivot"))
-    register_command("temp_pivot_reset", _make_module_command("TheKeyMachine.tools.temp_pivot.api", "reset_temp_pivot"))
-    register_command("temp_pivot_last", _make_module_command("TheKeyMachine.tools.temp_pivot.api", "create_last_object_temp_pivot"))
-    register_command("follow_cam", _make_module_command("TheKeyMachine.mods.barMod", "create_follow_cam", translation=True, rotation=True))
-    register_command("default_object_values", _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_object_values"))
-    register_command(
-        "default_translations",
-        _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_object_values", default_translations=True),
-    )
-    register_command(
-        "default_rotations",
-        _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_object_values", default_rotations=True),
-    )
-    register_command("default_scales", _make_module_command("TheKeyMachine.mods.keyToolsMod", "default_object_values", default_scales=True))
-    register_command(
-        "default_trs",
-        _make_module_command(
-            "TheKeyMachine.mods.keyToolsMod",
-            "default_object_values",
-            default_translations=True,
-            default_rotations=True,
-            default_scales=True,
-        ),
-    )
-    register_command("select_opposite", _make_module_command("TheKeyMachine.mods.keyToolsMod", "selectOpposite"))
-    register_command("opposite_add", _make_module_command("TheKeyMachine.mods.keyToolsMod", "addSelectOpposite"))
-    register_command("opposite_copy", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copyOpposite"))
-    register_command("mirror", _make_module_command("TheKeyMachine.mods.keyToolsMod", "mirror"))
-    register_command("mirror_to_right", _make_module_command("TheKeyMachine.mods.keyToolsMod", "mirror_to_right"))
-    register_command("mirror_to_left", _make_module_command("TheKeyMachine.mods.keyToolsMod", "mirror_to_left"))
-    register_command("mirror_all_keys", _make_module_command("TheKeyMachine.mods.keyToolsMod", "mirror_all_keys"))
-    register_command("copy_pose", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_pose"))
-    register_command("paste_pose", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_pose"))
-    register_command("export_pose_file", _make_module_command("TheKeyMachine.mods.keyToolsMod", "export_pose_file"))
-    register_command("import_pose_file", _make_module_command("TheKeyMachine.mods.keyToolsMod", "import_pose_file"))
-    register_command("copy_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_animation"))
-    register_command("paste_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_animation"))
-    register_command("paste_insert_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_insert_animation"))
-    register_command("paste_opposite_animation", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_opposite_animation"))
-    register_command("paste_animation_to", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_animation_to"))
-    register_command("export_animation_file", _make_module_command("TheKeyMachine.mods.keyToolsMod", "export_animation_file"))
-    register_command("import_animation_file", _make_module_command("TheKeyMachine.mods.keyToolsMod", "import_animation_file"))
-    register_command("link_copy", _make_module_command("TheKeyMachine.mods.keyToolsMod", "copy_link"))
-    register_command("link_paste", _make_module_command("TheKeyMachine.mods.keyToolsMod", "paste_link"))
-    register_command("share_keys_from_last_selected", _make_module_command("TheKeyMachine.mods.keyToolsMod", "share_keys_from_last_selected"))
-    register_command(
-        "bake_animation_from_last_selected",
-        _make_module_command("TheKeyMachine.mods.keyToolsMod", "bake_animation_from_last_selected"),
-    )
-    register_command(
-        "nudge_insert_inbetween",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "insert_inbetween", 1),
-    )
-    register_command(
-        "nudge_remove_inbetween",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "remove_inbetween", 1),
-    )
-    register_command(
-        "nudge_left",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", -1),
-    )
-    register_command(
-        "nudge_right",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "move_keyframes_in_range", 1),
-    )
-    register_command(
-        "nudge_left_all_keys",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_all_keys", -1),
-    )
-    register_command(
-        "nudge_left_scene",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_scene_keys", -1),
-    )
-    register_command(
-        "nudge_right_all_keys",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_all_keys", 1),
-    )
-    register_command(
-        "nudge_right_scene",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "nudge_scene_keys", 1),
-    )
-    register_command(
-        "nudge_insert_inbetween_scene",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "inbetween_scene", 1),
-    )
-    register_command(
-        "nudge_remove_inbetween_scene",
-        lambda: _invoke_module_attr("TheKeyMachine.mods.keyToolsMod", "inbetween_scene", -1),
-    )
-
-
-def _register_slider_commands():
+def _register_slider_commands() -> None:
     from TheKeyMachine.sliders import BLEND_MODES, TANGENT_MODES, TWEEN_MODES
 
     for prefix, modes in (("blend", BLEND_MODES), ("tween", TWEEN_MODES), ("tangent", TANGENT_MODES)):
@@ -517,10 +297,55 @@ def _register_slider_commands():
             register_slider_mode(prefix, mode["key"])
 
 
+def _module_command(command_name: str, module_name: str, attr_name: str, *preset_args, **preset_kwargs) -> Callable:
+    def _command(*args, **kwargs):
+        module = _import_module(module_name)
+        if not module or not hasattr(module, attr_name):
+            return None
+        callback = getattr(module, attr_name)
+        call_args = preset_args + args
+        call_kwargs = dict(preset_kwargs)
+        call_kwargs.update(kwargs)
+        return callback(*call_args, **_supported_callback_kwargs(callback, call_kwargs))
+
+    _command.__name__ = command_name
+    return _command
+
+
+def _import_module(module_name: str):
+    try:
+        return importlib.import_module(module_name)
+    except ImportError:
+        return None
+
+
+def _supported_callback_kwargs(callback: Callable, kwargs):
+    if not kwargs:
+        return kwargs
+    try:
+        signature = inspect.signature(callback)
+    except Exception:
+        return kwargs
+    accepts_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
+    if accepts_kwargs:
+        return kwargs
+    return {key: value for key, value in kwargs.items() if key in signature.parameters}
+
+
+def _slider_value_suffix(value: int) -> str:
+    value = int(value)
+    if value < 0:
+        return "neg{}".format(abs(value))
+    return str(value)
+
+
 def __getattr__(name: str):
     if has_command(name):
         return make_command_callback(name)
     raise AttributeError(name)
 
 
-_register_core_commands()
+_register_builtin_commands()

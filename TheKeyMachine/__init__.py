@@ -17,9 +17,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.20"
+__version__ = "0.1.21"
 __stage__ = "beta"
-__build__ = "326"
+__build__ = "327"
 __codename__ = "Flat White"
 
 
@@ -79,3 +79,9 @@ def toggle():
     import TheKeyMachine.core.toolbar as t
 
     t.toggle()
+
+
+def welcome():
+    import TheKeyMachine.core.toolbar as t
+
+    t.welcome()

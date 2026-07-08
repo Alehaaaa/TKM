@@ -736,3 +736,54 @@ def toggle():
         pass
     _toolbar_instance = toolbar()
     _toolbar_instance.showWindow()
+
+
+def welcome():
+    show()
+
+    def _show_welcome_prompt():
+        toolbar_instance = get_toolbar()
+        if not toolbar_instance or not QtCompat.isValid(toolbar_instance):
+            return
+        anchor = toolbar_instance.findChild(QtWidgets.QWidget, "TKM_toolbar_button")
+        if not wutil.is_valid_widget(anchor):
+            return
+        toolWidgets.show_welcome_shelf_prompt(anchor, toolbar_instance)
+
+    QtCore.QTimer.singleShot(700, _show_welcome_prompt)
+
+
+def _call_toolbar_method(method_name, *args, **kwargs):
+    toolbar_instance = get_toolbar()
+    if not toolbar_instance:
+        return None
+    method = getattr(toolbar_instance, method_name, None)
+    if not callable(method):
+        return None
+    return method(*args, **kwargs)
+
+
+def reload_current(*args, **kwargs):
+    return _call_toolbar_method("reload", *args, **kwargs)
+
+
+def unload_current(*args, **kwargs):
+    return _call_toolbar_method("unload", *args, **kwargs)
+
+
+def create_shelf_icon_current(*args, **kwargs):
+    return _call_toolbar_method("create_shelf_icon", *args, **kwargs)
+
+
+def toggle_animation_offset(checked=None, *args, **kwargs):
+    state = args[0] if args else kwargs.get("checked", checked)
+    return _call_toolbar_method("toggleAnimOffsetButton", state)
+
+
+def toggle_micro_move(checked=None, *args, **kwargs):
+    state = args[0] if args else kwargs.get("checked", checked)
+    return _call_toolbar_method("toggle_micro_move_button", state)
+
+
+def toggle_selection_sets_workspace(*args, **kwargs):
+    return _call_toolbar_method("toggle_selection_sets_workspace", *args, **kwargs)

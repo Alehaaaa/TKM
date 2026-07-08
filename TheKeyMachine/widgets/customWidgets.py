@@ -2192,6 +2192,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 visible = default
             widget.setVisible(visible)
             self._sync_section_visibility()
+        else:
+            widget.setVisible(bool(default))
 
         if hasattr(widget, "setToolTipData"):
             d = description

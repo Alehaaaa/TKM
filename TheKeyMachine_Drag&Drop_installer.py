@@ -27,9 +27,9 @@ except Exception:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
 
-__version__ = "0.1.20"
+__version__ = "0.1.21"
 __stage__ = "beta"
-__build__ = "326"
+__build__ = "327"
 __codename__ = "Flat White"
 
 WINDOW_NAME = "TheKeyMachineInstaller"
@@ -150,17 +150,10 @@ def load_thekeymachine():
     ensure_scripts_on_path()
     unload_tkm_modules()
 
-    import TheKeyMachine.core.toolbar as toolbar
+    import TheKeyMachine
 
-    toolbar = importlib.reload(toolbar)
-    toolbar.show()
-
-    try:
-        tb = toolbar.get_toolbar()
-        if tb:
-            tb.create_shelf_icon()
-    except Exception:
-        traceback.print_exc()
+    TheKeyMachine = importlib.reload(TheKeyMachine)
+    TheKeyMachine.welcome()
 
 
 def install_thekeymachine(parent, install_button, status_label):

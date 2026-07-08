@@ -207,6 +207,11 @@ def _load_hotkeys_from_maya():
     return _copy_hotkey_mapping(mapping)
 
 
+def shortcut_for_command(command_name):
+    shortcuts = _load_hotkeys_from_maya().get(command_name) or []
+    return shortcuts[0] if shortcuts else ""
+
+
 def _hotkey_mapping_from_data(data):
     mapping = {}
     if not isinstance(data, dict):
@@ -664,58 +669,87 @@ def _status_tooltip_html(tooltip_data):
     return "<table cellspacing='0' cellpadding='0'>{}{}{}</table>".format(icon_row, title_row, body_row)
 
 
-def _tool_command_row(tool_data):
-    command_name = tool_data.get("key") or tool_data.get("id")
+def _tool_data_for_command(command_name):
+    if not command_name:
+        return {}
+    try:
+        return toolbox.get_tool(command_name)
+    except Exception:
+        return {}
+
+
+def _command_row_from_data(command_name, primary_data, fallback_data=None, title_override=None):
     if not command_name:
         return None
+    primary_data = primary_data or {}
+    fallback_data = fallback_data or {}
+    icon = primary_data.get("icon") or fallback_data.get("icon")
+    title = (
+        title_override
+        or primary_data.get("status_title")
+        or primary_data.get("label")
+        or fallback_data.get("status_title")
+        or fallback_data.get("label")
+        or fallback_data.get("description")
+        or _humanize(command_name)
+    )
     return {
         "command": command_name,
-        "title": tool_data.get("status_title") or tool_data.get("label") or _humanize(command_name),
-        "icon": tool_data.get("icon"),
-        "badge_text": None if tool_data.get("icon") else tool_data.get("text"),
-        "description": tool_data.get("status_description") or tool_data.get("description"),
-        "tooltip_template": tool_data.get("tooltip_template") or tool_data.get("text"),
-        "shortcuts": tool_data.get("shortcuts", []),
-        "checkable": bool(tool_data.get("checkable", tool_data.get("type") == "check")),
-        "callback": tool_data.get("callback"),
-        "get_checked": tool_data.get("get_checked") or tool_data.get("get_checked_fn"),
-        "set_checked": tool_data.get("set_checked") or tool_data.get("set_checked_fn"),
-        "changed_signal": tool_data.get("changed_signal"),
-        "bind_checked_fn": tool_data.get("bind_checked_fn"),
-        "state_key": tool_data.get("state_key"),
+        "command_id": command_name,
+        "command_label": title,
+        "command_icon": icon,
+        "title": title,
+        "icon": icon,
+        "badge_text": None if icon else primary_data.get("text") or fallback_data.get("text"),
+        "description": (
+            primary_data.get("status_description")
+            or primary_data.get("description")
+            or fallback_data.get("status_description")
+            or fallback_data.get("description")
+        ),
+        "tooltip_template": (
+            primary_data.get("tooltip_template")
+            or primary_data.get("text")
+            or fallback_data.get("tooltip_template")
+            or fallback_data.get("text")
+        ),
+        "shortcuts": primary_data.get("shortcuts", fallback_data.get("shortcuts", [])),
+        "checkable": bool(primary_data.get("checkable", primary_data.get("type") == "check")),
+        "callback": primary_data.get("callback") or fallback_data.get("callback"),
+        "get_checked": (
+            primary_data.get("get_checked")
+            or primary_data.get("get_checked_fn")
+            or fallback_data.get("get_checked")
+            or fallback_data.get("get_checked_fn")
+        ),
+        "set_checked": (
+            primary_data.get("set_checked")
+            or primary_data.get("set_checked_fn")
+            or fallback_data.get("set_checked")
+            or fallback_data.get("set_checked_fn")
+        ),
+        "changed_signal": primary_data.get("changed_signal") or fallback_data.get("changed_signal"),
+        "bind_checked_fn": primary_data.get("bind_checked_fn") or fallback_data.get("bind_checked_fn"),
+        "state_key": primary_data.get("state_key") or fallback_data.get("state_key"),
     }
+
+
+def _tool_command_row(tool_data):
+    command_name = tool_data.get("key") or tool_data.get("id")
+    return _command_row_from_data(command_name, _tool_data_for_command(command_name) or tool_data, fallback_data=tool_data)
 
 
 def _variant_command_row(tool_data, variant, shortcut_label=None):
     command_name = variant.get("key") or variant.get("id")
-    if not command_name:
-        return None
-    icon = variant.get("icon") or tool_data.get("icon")
-    return {
-        "command": command_name,
-        "title": shortcut_label
-        or variant.get("status_title")
-        or variant.get("label")
-        or variant.get("description")
-        or _humanize(command_name),
-        "icon": icon,
-        "badge_text": None if icon else variant.get("text") or tool_data.get("text"),
-        "description": variant.get("status_description") or variant.get("description"),
-        "tooltip_template": (
-            variant.get("tooltip_template")
-            or variant.get("text")
-            or tool_data.get("tooltip_template")
-            or tool_data.get("text")
-        ),
-        "shortcuts": variant.get("shortcuts", []),
-        "checkable": bool(variant.get("checkable", variant.get("type") == "check")),
-        "callback": variant.get("callback"),
-        "get_checked": variant.get("get_checked") or variant.get("get_checked_fn"),
-        "set_checked": variant.get("set_checked") or variant.get("set_checked_fn"),
-        "changed_signal": variant.get("changed_signal"),
-        "bind_checked_fn": variant.get("bind_checked_fn"),
-        "state_key": variant.get("state_key") or tool_data.get("state_key"),
-    }
+    exact_data = _tool_data_for_command(command_name)
+    fallback_data = dict(tool_data or {})
+    fallback_data.update(variant or {})
+    return _command_row_from_data(
+        command_name,
+        exact_data or variant,
+        fallback_data=fallback_data,
+        title_override=shortcut_label,
+    )
 
 
 def _append_section_row(section, seen, title_lookup, icon_lookup, trigger_commands, row):
@@ -1255,9 +1289,9 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
             "shortcuts": self.command_data.get("shortcuts", []),
             "tooltip_template": self.command_data.get("tooltip_template"),
             "icon": self.command_data.get("icon"),
-            "command_id": self.command_name(),
-            "command_label": self.command_data.get("title"),
-            "command_icon": self.command_data.get("icon"),
+            "command_id": self.command_data.get("command_id") or self.command_name(),
+            "command_label": self.command_data.get("command_label") or self.command_data.get("title"),
+            "command_icon": self.command_data.get("command_icon") or self.command_data.get("icon"),
         }
 
     def _show_tooltip(self):

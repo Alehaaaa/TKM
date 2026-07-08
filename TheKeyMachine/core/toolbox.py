@@ -173,6 +173,12 @@ def _set_overshoot_sliders_enabled(enabled):
         pass
 
 
+def toggle_overshoot_sliders_enabled(*_args, **_kwargs):
+    state = not _get_overshoot_sliders_enabled()
+    _set_overshoot_sliders_enabled(state)
+    return state
+
+
 def _get_link_autolink_enabled():
     return bool(settings.get_setting("link_checkbox_state", False))
 
@@ -271,14 +277,14 @@ TOOL_DEFINITIONS = {
         "label": "Donate",
         "icon": icons.donate,
         "tooltip_template": helper.donate_tooltip_text,
-        "callback": trigger._open_donate_window,
+        "callback": trigger.make_command_callback("donate_window"),
     },
     "bug_report_window": {
         "type": "tool",
         "label": "Bug Report",
         "icon": icons.bug,
         "description": "Open the bug report window to save a report with your notes and current error details.",
-        "callback": trigger._open_bug_report_window,
+        "callback": trigger.make_command_callback("bug_report_window"),
     },
 
     # ---------------------------------------------------------------  SMART TOOLS  --------------------------------------------------------------
@@ -1674,26 +1680,16 @@ TOOL_SECTION_DEFINITIONS = {
                 "id": "TKM",
                 "default": True
             },
-            # {"id": "toolbar_toggle"},
-            # {"id": "toolbar_add_shelf_button"},
-            # {"id": "toolbar_reload"},
-            # {"id": "toolbar_unload"},
-            # {"id": "check_for_updates"},
-            # {"id": "hotkeys_window"},
-            # {"id": "about_window"},
-            # {"id": "donate_window"},
-            # {"id": "bug_report_window"},
+            {"id": "toolbar_toggle", "default": False},
+            {"id": "toolbar_add_shelf_button", "default": False},
+            {"id": "toolbar_reload", "default": False},
+            {"id": "toolbar_unload", "default": False},
+            {"id": "check_for_updates", "default": False},
+            {"id": "hotkeys_window", "default": False},
+            {"id": "about_window", "default": False},
+            {"id": "donate_window", "default": False},
+            {"id": "bug_report_window", "default": False},
             ],
-    },
-    "manipulator_tools": {
-        "label": "Manipulators",
-        "items": [
-            {"id": "smart_rotation"},
-            {"id": "smart_rotation_release"},
-            {"id": "smart_translation"},
-            {"id": "smart_translation_release"},
-            {"id": "depth_mover"},
-        ],
     },
     # --- Key Editing ---
     "nudge_tools": {
@@ -2078,6 +2074,16 @@ TOOL_SECTION_DEFINITIONS = {
                 "id": "tangent_plateau",
                 "shortcuts": _tangent_shortcuts("tangent_plateau", "plateau", "Plateau Tangent"),
             },
+        ],
+    },
+    "manipulator_tools": {
+        "label": "Manipulators",
+        "items": [
+            {"id": "smart_rotation"},
+            {"id": "smart_rotation_release"},
+            {"id": "smart_translation"},
+            {"id": "smart_translation_release"},
+            {"id": "depth_mover"},
         ],
     },
     # --- Special Tools ---
