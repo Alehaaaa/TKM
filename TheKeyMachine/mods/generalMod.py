@@ -111,59 +111,72 @@ def get_tool_data_path(tool_name, filename=None):
     return folder
 
 
+# ---------------------------------------------------------------------------
+# Clipboard path helpers
+# These thin wrappers delegate to tools.clipboard so every tool can still call
+# general.get_copy_animation_file() etc. without breaking, while the new
+# clipboard module is the single source of truth for all temp-file paths.
+# ---------------------------------------------------------------------------
+
+def _clipboard_path(slot, folder_only=False):
+    from TheKeyMachine.tools import clipboard
+    p = clipboard.path(slot)
+    return os.path.dirname(p) if folder_only else p
+
+
 # MIRROR EXCEPTIONS ___________________
 def get_mirror_exceptions_file():
-    return get_tool_data_path("mirror", "mirror_data.json")
+    return _clipboard_path("mirror")
 
 
 # SET DEFAULT VALUES ___________________
 def get_set_default_data_file():
-    return get_tool_data_path("default_default", "default_default_data.json")
+    return _clipboard_path("set_default")
 
 
 # COPY PASTE ANIMATION ___________________
 def get_copy_animation_file():
-    return get_tool_data_path("copy_animation", "copy_animation_data.json")
+    return _clipboard_path("animation")
 
 
 # COPY PASTE POSE ___________________
 def get_copy_paste_pose_file():
-    return get_tool_data_path("copy_pose", "copy_pose_data.json")
+    return _clipboard_path("pose")
 
 
 # TEMP PIVOT _____________________________
 def get_temp_pivot_data_file():
-    return get_tool_data_path("temp_pivot", "temp_pivot_data.json")
+    return _clipboard_path("temp_pivot")
 
 
 def get_temp_pivot_data_folder():
-    return get_tool_data_path("temp_pivot")
+    return _clipboard_path("temp_pivot", folder_only=True)
 
 
 # COPY LINK ______________________________
 def get_copy_link_data_file():
-    return get_tool_data_path("copy_link", "copy_link_data.json")
+    return _clipboard_path("copy_link")
 
 
 def get_copy_link_data_folder():
-    return get_tool_data_path("copy_link")
+    return _clipboard_path("copy_link", folder_only=True)
 
 
 # COPY WORLDSPACE ________________________
 def get_copy_worldspace_data_file():
-    return get_tool_data_path("copy_worldspace", "copy_worldspace_data.json")
+    return _clipboard_path("worldspace")
 
 
 def get_copy_worldspace_data_folder():
-    return get_tool_data_path("copy_worldspace")
+    return _clipboard_path("worldspace", folder_only=True)
 
 
 def get_copy_worldspace_single_frame_data_file():
-    return get_tool_data_path("copy_worldspace", "copy_worldspace_single_frame_data.json")
+    return _clipboard_path("worldspace_frame")
 
 
 def get_copy_worldspace_single_frame_data_folder():
-    return get_tool_data_path("copy_worldspace")
+    return _clipboard_path("worldspace_frame", folder_only=True)
 
 
 # ------------------------------------------------------------------------

@@ -50,6 +50,7 @@ import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import common as toolCommon
+from TheKeyMachine.tools import clipboard
 import TheKeyMachine.mods.selectionMod as selectionMod
 
 
@@ -221,15 +222,21 @@ def _anim_curves_for_objects(objects):
     return selectionMod.get_anim_curves_for_nodes(objects)
 
 
-def _set_missing_keys(curves, frames, insert=False):
+def _set_missing_keys(curves, frames, insert=False, operation=None):
     for curve in _unique(curves):
         for frame in frames:
+            if operation and operation.cancelled:
+                return
             if cmds.keyframe(curve, query=True, time=(frame, frame)):
+                if operation:
+                    operation.step()
                 continue
             if insert:
                 cmds.setKeyframe(curve, time=(frame,), insert=True)
             else:
                 cmds.setKeyframe(curve, time=(frame,))
+            if operation:
+                operation.step()
 
 
 def _set_keys_on_frames(curves, frames):
@@ -544,6 +551,7 @@ def share_keys(*args):
         timerange=(int(shared_frames[0]), int(shared_frames[-1])),
         tint_color=_timeline_tint_color("share_keys"),
     ) as operation:
+        operation.start()
         for objeto in objetos:
             for plug, existing_frames in object_plug_frames.get(objeto, {}).items():
                 node_name, attribute_name = plug.split(".", 1)
@@ -580,7 +588,7 @@ def _frames_from_last_selected(time_context=None):
     return source, targets, frames
 
 
-def _bake_curves_to_source_frames(curves, frames):
+def _bake_curves_to_source_frames(curves, frames, operation=None):
     curves = _unique(curves)
     frames = _normalize_key_frames(frames)
     if not curves or not frames:
@@ -588,16 +596,18 @@ def _bake_curves_to_source_frames(curves, frames):
 
     frame_lookup = set(frames)
     time_range = (frames[0], frames[-1])
-    for frame in frames:
-        cmds.currentTime(frame)
-        for curve in curves:
-            cmds.setKeyframe(curve, time=(frame,))
-
     for curve in curves:
+        if operation and operation.cancelled:
+            return
+        for frame in frames:
+            cmds.currentTime(frame)
+            cmds.setKeyframe(curve, time=(frame,))
         existing_frames = _normalize_key_frames(cmds.keyframe(curve, query=True, time=time_range, timeChange=True) or [])
         for frame in existing_frames:
             if frame not in frame_lookup:
                 cmds.cutKey(curve, time=(frame, frame), option="keys")
+        if operation:
+            operation.step()
 
 
 def share_keys_from_last_selected(*args):
@@ -607,11 +617,12 @@ def share_keys_from_last_selected(*args):
         return
 
     keep_curve_shape = get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE
+    curves_by_target = {target: _anim_curves_for_objects([target]) for target in targets}
     with toolCommon.tool_operation(
         tool_id="share_keys",
         label="Share Keys",
         progress=True,
-        progress_max=len(targets) * len(frames),
+        progress_max=sum(len(curves) * len(frames) for curves in curves_by_target.values()),
         undo=True,
         tint="range",
         timerange=(int(frames[0]), int(frames[-1])),
@@ -620,8 +631,7 @@ def share_keys_from_last_selected(*args):
         for target in targets:
             if operation.cancelled:
                 return
-            _set_missing_keys(_anim_curves_for_objects([target]), frames, insert=keep_curve_shape)
-            operation.step(amount=len(frames))
+            _set_missing_keys(curves_by_target[target], frames, insert=keep_curve_shape, operation=operation)
 
 
 # ______________________________________ ReBlock Move
@@ -773,6 +783,7 @@ def bake_animation(bake_interval=1, window=None):
             tint_color=_timeline_tint_color(tool_key),
             anchor_widget=window,
         ) as operation:
+            operation.start()
             # Hacer bake a las curvas de animación de los objetos seleccionados.
             bake_kwargs = dict(
                 time=(start_frame, end_frame),
@@ -815,12 +826,13 @@ def bake_animation_from_last_selected(*args):
         return
 
     current_time = cmds.currentTime(query=True)
+    curves_by_target = {target: _anim_curves_for_objects([target]) for target in targets}
     try:
         with toolCommon.tool_operation(
             tool_id="bake_animation_1",
             label="Bake Animation",
             progress=True,
-            progress_max=len(targets) * len(frames),
+            progress_max=sum(len(curves) for curves in curves_by_target.values()),
             undo=True,
             tint="range",
             timerange=(int(frames[0]), int(frames[-1])),
@@ -829,9 +841,8 @@ def bake_animation_from_last_selected(*args):
             for target in targets:
                 if operation.cancelled:
                     return
-                curves = _anim_curves_for_objects([target])
-                _bake_curves_to_source_frames(curves, frames)
-                operation.step(amount=len(frames))
+                curves = curves_by_target[target]
+                _bake_curves_to_source_frames(curves, frames, operation=operation)
 
                 if get_bake_tangent_mode() == BAKE_TANGENT_MODE_STEP:
                     _apply_step_tangents(curves, (frames[0], frames[-1]))
@@ -965,7 +976,7 @@ def nudge_all_keys(offset, *args):
     offset = int(offset)
     if not offset:
         return
-    with toolCommon.tool_operation(tool_id="nudge_all_keys", label="Nudge All Keys", progress=False, undo=True):
+    with toolCommon.tool_operation(tool_id="nudge_all_keys", label="Nudge All Keys", progress=True, progress_max=1, undo=True):
         cmds.keyframe(curves, edit=True, relative=True, includeUpperBound=True, option="over", timeChange=offset)
         _nudge_current_time(offset)
 
@@ -977,7 +988,7 @@ def nudge_scene_keys(offset, *args):
     offset = int(offset)
     if not offset:
         return
-    with toolCommon.tool_operation(tool_id="nudge_scene_keys", label="Nudge Scene Keys", progress=False, undo=True):
+    with toolCommon.tool_operation(tool_id="nudge_scene_keys", label="Nudge Scene Keys", progress=True, progress_max=1, undo=True):
         cmds.keyframe(curves, edit=True, relative=True, includeUpperBound=True, option="over", timeChange=offset)
         _nudge_current_time(offset)
 
@@ -990,7 +1001,7 @@ def inbetween_scene(count=1, *args):
     if not count:
         return
     current = cmds.currentTime(q=True)
-    with toolCommon.tool_operation(tool_id="inbetween_scene", label="Inbetween Scene", progress=False, undo=True):
+    with toolCommon.tool_operation(tool_id="inbetween_scene", label="Inbetween Scene", progress=True, progress_max=1, undo=True):
         cmds.keyframe(curves, edit=True, time=("{}:".format(current + 1),), relative=True, timeChange=count, option="over")
 
 
@@ -1033,7 +1044,7 @@ def move_keyframes_in_range(*args):
     has_range = time_context.mode == "time_slider_range"
     start_frame, end_frame = time_context.timerange
 
-    with toolCommon.tool_operation(tool_id="move_keyframes_in_range", label="Move Keyframes", progress=False, undo=True):
+    with toolCommon.tool_operation(tool_id="move_keyframes_in_range", label="Move Keyframes", progress=True, progress_max=1, undo=True):
         if target_info["has_graph_keys"]:
             cmds.keyframe(edit=True, animation="keys", relative=True, includeUpperBound=True, option="over", timeChange=offset)
             _nudge_current_time(offset)
@@ -1139,7 +1150,8 @@ def _animation_command_context(label, tint_key=None, default_mode="all_animation
     with toolCommon.tool_operation(
         tool_id=tint_key,
         label=label,
-        progress=False,
+        progress=True,
+        progress_max=1,
         undo=True,
         undo_name=toolCommon.make_undo_chunk_name(title=label),
         tint=operation_tint,
@@ -2172,7 +2184,8 @@ def default_object_values(default_translations=False, default_rotations=False, d
         operation_context = toolCommon.tool_operation(
             tool_id=tool_id,
             label=toolCommon.humanize_tool_name(tool_id),
-            progress=False,
+            progress=True,
+            progress_max=1,
             undo=True,
             undo_name=toolCommon.make_undo_chunk_name(tool_id=tool_id),
             tint="context" if time_context.mode in ("graph_editor_keys", "time_slider_range") else "none",
@@ -2413,8 +2426,16 @@ def addSelectOpposite(*args):
 def copyOpposite(*args):
     operation_context = None
     try:
-        operation_context = toolCommon.tool_operation(tool_id="copy_opposite", label="Copy Opposite", progress=False, undo=True)
+        selected_objects = selectionMod.get_selected_objects()
+        operation_context = toolCommon.tool_operation(
+            tool_id="copy_opposite",
+            label="Copy Opposite",
+            progress=True,
+            progress_max=len(selected_objects),
+            undo=True
+        )
         operation_context.__enter__()
+        operation_context.start()
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
         ATTRIBUTES_TO_IGNORE = {"tag"}
 
@@ -2441,9 +2462,9 @@ def copyOpposite(*args):
                     return attr.replace(from_pattern, to_pattern)
             return attr
 
-        selected_objects = selectionMod.get_selected_objects()
-
         for obj in selected_objects:
+            if operation_context.cancelled:
+                break
             opposite_obj = find_opposite_name(obj)
 
             # Comprobamos si el objeto opuesto es válido y existe
@@ -2465,6 +2486,7 @@ def copyOpposite(*args):
                             import TheKeyMachine.mods.reportMod as report
 
                             report.report_detected_exception(e, context="copy opposite attribute compile")
+            operation_context.step()
     except Exception as e:
         cmds.warning("Error during copy: {}".format(str(e)))
     finally:
@@ -2490,8 +2512,19 @@ def load_exceptions():
 def mirror(*args):
     operation_context = None
     try:
-        operation_context = toolCommon.tool_operation(tool_id="mirror", label="Mirror", progress=False, undo=True)
+        selected_controls = selectionMod.get_selected_objects()
+        if not selected_controls:
+            return wutil.make_inViewMessage("Select at least one object")
+
+        operation_context = toolCommon.tool_operation(
+            tool_id="mirror",
+            label="Mirror",
+            progress=True,
+            progress_max=len(selected_controls),
+            undo=True
+        )
         operation_context.__enter__()
+        operation_context.start()
         global MIRROR_PATTERNS
         mirror_exceptions_file_path = general.get_mirror_exceptions_file()
 
@@ -2585,15 +2618,14 @@ def mirror(*args):
                     cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
 
         def mirror_controls():
-            selected_controls = selectionMod.get_selected_objects()
-
-            if not selected_controls:
-                return wutil.make_inViewMessage("Select at least one object")
-
             processed_controls = set()
 
             for control in selected_controls:
+                if operation_context and operation_context.cancelled:
+                    break
                 if control in processed_controls:
+                    if operation_context:
+                        operation_context.step()
                     continue
 
                 opposite_name = find_opposite_name(control)
@@ -2607,6 +2639,9 @@ def mirror(*args):
                     # Tratar como control central o único si no se encuentra un opuesto
                     swap_control_values(control, None)
                     processed_controls.add(control)
+                
+                if operation_context:
+                    operation_context.step()
 
         mirror_controls()
     except Exception as e:
@@ -2783,7 +2818,7 @@ def _attr_settable(control, attr):
         return False
 
 
-def _mirror_current_values(target_side=None):
+def _mirror_current_values(target_side=None, operation=None):
     selected_controls = selectionMod.get_selected_objects()
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
@@ -2792,13 +2827,21 @@ def _mirror_current_values(target_side=None):
     copied = 0
 
     for source in selected_controls:
+        if operation and operation.cancelled:
+            break
         if target_side and _mirror_control_side(source) == target_side:
+            if operation:
+                operation.step()
             continue
 
         target = find_opposite_name(source)
         if not target or not cmds.objExists(target):
+            if operation:
+                operation.step()
             continue
         if target_side and _mirror_control_side(target) != target_side:
+            if operation:
+                operation.step()
             continue
 
         for attr in _mirror_keyable_attrs(source):
@@ -2810,6 +2853,9 @@ def _mirror_current_values(target_side=None):
                 copied += 1
             except Exception as e:
                 cmds.warning(f"Could not mirror {source}.{attr} to {target}: {str(e)}")
+        
+        if operation:
+            operation.step()
 
     if not copied:
         cmds.warning("No mirrorable opposite controls or attributes found")
@@ -2817,13 +2863,29 @@ def _mirror_current_values(target_side=None):
 
 
 def mirror_to_right(*args):
-    with toolCommon.tool_operation(tool_id="mirror_to_right", label="Mirror To Right", progress=False, undo=True):
-        return _mirror_current_values(target_side="right")
+    selected_controls = selectionMod.get_selected_objects()
+    with toolCommon.tool_operation(
+        tool_id="mirror_to_right",
+        label="Mirror To Right",
+        progress=True,
+        progress_max=len(selected_controls) if selected_controls else 0,
+        undo=True
+    ) as operation:
+        operation.start()
+        return _mirror_current_values(target_side="right", operation=operation)
 
 
 def mirror_to_left(*args):
-    with toolCommon.tool_operation(tool_id="mirror_to_left", label="Mirror To Left", progress=False, undo=True):
-        return _mirror_current_values(target_side="left")
+    selected_controls = selectionMod.get_selected_objects()
+    with toolCommon.tool_operation(
+        tool_id="mirror_to_left",
+        label="Mirror To Left",
+        progress=True,
+        progress_max=len(selected_controls) if selected_controls else 0,
+        undo=True
+    ) as operation:
+        operation.start()
+        return _mirror_current_values(target_side="left", operation=operation)
 
 
 def mirror_all_keys(*args):
@@ -2844,12 +2906,25 @@ def mirror_all_keys(*args):
     key_count = 0
     processed_controls = set()
 
-    with _copy_paste_operation("mirror_all_keys", "Animation Mirrored", undo=True, tint="range") as operation:
+    with _copy_paste_operation(
+        "mirror_all_keys",
+        "Animation Mirrored",
+        undo=True,
+        tint="range",
+        progress=True,
+        progress_max=len(selected_controls),
+    ) as state:
+        operation = state["operation"]
+        operation.start()
         for source in selected_controls:
+            if operation.cancelled:
+                break
             if source in processed_controls:
+                operation.step()
                 continue
             target = find_opposite_name(source)
             if not target or not cmds.objExists(target):
+                operation.step()
                 continue
             processed_controls.add(source)
             processed_controls.add(target)
@@ -2871,9 +2946,11 @@ def mirror_all_keys(*args):
                 key_count += _apply_animation_channels_to_targets([target], target_channels, replace=True)
                 mirrored_data[ANIMATION_CONTROLS_KEY][target] = target_channels
 
+            operation.step()
+
         if key_count:
-            operation["timerange"] = _animation_data_timerange(mirrored_data)
-            operation["success"] = True
+            state["timerange"] = _animation_data_timerange(mirrored_data)
+            state["success"] = True
         else:
             cmds.warning("No mirrorable animation keys found")
 
@@ -3015,21 +3092,18 @@ def remove_mirror_invert_exception(*args):
 
 
 def _load_copy_paste_json(json_file_path, missing_warning):
-    if not os.path.exists(json_file_path):
-        cmds.warning(missing_warning)
-        return None
-    with open(json_file_path, "r") as json_file:
-        return json.load(json_file)
+    """Load JSON from an explicit file path (kept for internal use)."""
+    return clipboard.load_raw(json_file_path, missing_warning)
 
 
 def _load_pose_json():
-    json_file_path = general.get_copy_paste_pose_file()
-    return _load_copy_paste_json(json_file_path, "No pose file found. Please copy pose first")
+    return clipboard.load("pose", "No pose file found. Please copy pose first")
 
 
 def _save_copy_paste_json(json_file_path, data):
+    """Save JSON to an explicit file path (kept for internal use)."""
     os.makedirs(os.path.dirname(json_file_path), exist_ok=True)
-    with open(json_file_path, "w") as json_file:
+    with open(json_file_path, "w", encoding="utf-8") as json_file:
         json.dump(data, json_file, indent=4)
 
 
@@ -3038,8 +3112,13 @@ def _copy_paste_file_dialog(caption, file_mode):
     return result[0] if result else None
 
 
-def _export_copy_paste_file(source_path, caption):
-    if not os.path.exists(source_path):
+def _export_copy_paste_file(slot_or_path, caption):
+    """Export clipboard slot (or explicit path) to a user-chosen file."""
+    # If it looks like a slot key, delegate to clipboard.export_dialog
+    if slot_or_path in ("animation", "pose", "worldspace", "worldspace_frame", "copy_link", "temp_pivot"):
+        return clipboard.export_dialog(slot_or_path, caption)
+    # Legacy: explicit file path
+    if not os.path.exists(slot_or_path):
         return wutil.make_inViewMessage("No copied data found")
     target_path = _copy_paste_file_dialog(caption, 0)
     if not target_path:
@@ -3047,18 +3126,21 @@ def _export_copy_paste_file(source_path, caption):
     if not target_path.lower().endswith(".json"):
         target_path += ".json"
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
-    shutil.copyfile(source_path, target_path)
+    shutil.copyfile(slot_or_path, target_path)
     return wutil.make_inViewMessage("File exported")
 
 
-def _import_copy_paste_file(target_path, caption):
+def _import_copy_paste_file(slot_or_path, caption):
+    """Import a user-chosen file into clipboard slot (or explicit path)."""
+    if slot_or_path in ("animation", "pose", "worldspace", "worldspace_frame", "copy_link", "temp_pivot"):
+        return clipboard.import_dialog(slot_or_path, caption)
     source_path = _copy_paste_file_dialog(caption, 1)
     if not source_path:
         return None
-    data = _load_copy_paste_json(source_path, "Could not import file")
+    data = clipboard.load_raw(source_path, "Could not import file")
     if data is None:
         return None
-    _save_copy_paste_json(target_path, data)
+    _save_copy_paste_json(slot_or_path, data)
     return wutil.make_inViewMessage("File imported")
 
 ANIMATION_SCHEMA_VERSION = 3
@@ -3279,6 +3361,37 @@ def _maybe_apply_paste_range(paste_range, anchor_widget=None):
 
 def _query_key_tangent_data(plug, keyframes):
     tangent_data = {short_key: [] for short_key in TANGENT_KEYS}
+
+    # Most animation copies contain a contiguous curve/range. Query every
+    # tangent property once for that range instead of once per property/key.
+    if keyframes:
+        time_range = (min(keyframes), max(keyframes))
+        try:
+            range_frames = cmds.keyframe(plug, query=True, time=time_range) or []
+        except Exception:
+            range_frames = []
+        if len(range_frames) == len(keyframes) and all(
+            abs(float(a) - float(b)) <= 0.000001 for a, b in zip(range_frames, keyframes)
+        ):
+            for short_key, query_key in TANGENT_KEYS.items():
+                if short_key == "wt":
+                    continue
+                try:
+                    values = cmds.keyTangent(plug, query=True, time=time_range, **{query_key: True}) or []
+                except Exception:
+                    values = []
+                tangent_data[short_key] = list(values[:len(keyframes)])
+                if len(tangent_data[short_key]) < len(keyframes):
+                    tangent_data[short_key].extend([None] * (len(keyframes) - len(tangent_data[short_key])))
+            try:
+                weighted_values = cmds.keyTangent(plug, query=True, weightedTangents=True) or []
+                weighted = bool(weighted_values[0] if isinstance(weighted_values, list) else weighted_values)
+            except Exception:
+                weighted = None
+            tangent_data["wt"] = [weighted] * len(keyframes)
+            return tangent_data
+
+    # Sparse graph-editor selections need exact per-key queries.
     for frame in keyframes or []:
         time_arg = (frame, frame)
         for short_key, query_key in TANGENT_KEYS.items():
@@ -3343,7 +3456,7 @@ def _apply_key_tangent_data(target, channel, key_time, tangent_data, index, laye
 
     _edit_tangent(**type_kwargs)
     _edit_tangent(**detail_kwargs)
-    if type_kwargs:
+    if detail_kwargs:
         _edit_tangent(**type_kwargs)
 
 
@@ -3362,13 +3475,11 @@ def _apply_channel_weighted_tangents(target, channel, tangent_data, layer_name=N
 
 
 def _attr_exists_and_settable(node, attr):
-    if not cmds.objExists(node):
-        return False
     full_attr = f"{node}.{attr}"
     if not cmds.objExists(full_attr):
         return False
     try:
-        return cmds.getAttr(full_attr, se=True) and not cmds.getAttr(full_attr, lock=True)
+        return bool(cmds.getAttr(full_attr, settable=True))
     except Exception:
         return False
 
@@ -3384,24 +3495,6 @@ def _set_attr_value(plug, value):
 
 
 @contextmanager
-def _suspend_maya_refresh():
-    suspended = False
-    try:
-        cmds.refresh(suspend=True)
-        suspended = True
-    except Exception:
-        suspended = False
-    try:
-        yield
-    finally:
-        if suspended:
-            try:
-                cmds.refresh(suspend=False)
-            except Exception:
-                pass
-
-
-@contextmanager
 def _copy_paste_operation(
     tool_id,
     success_message,
@@ -3409,8 +3502,10 @@ def _copy_paste_operation(
     tint="none",
     default_mode="current_frame",
     timerange=None,
+    progress=False,
+    progress_max=0,
 ):
-    state = {"success": False, "timerange": None}
+    state = {"success": False, "timerange": None, "operation": None}
     tint_session = None
     operation_tint = "none"
     operation_timerange = None
@@ -3423,7 +3518,8 @@ def _copy_paste_operation(
         with toolCommon.tool_operation(
             tool_id=tool_id,
             label=success_message,
-            progress=False,
+            progress=progress,
+            progress_max=progress_max,
             undo=undo,
             undo_name=toolCommon.make_undo_chunk_name(tool_id=tool_id),
             tint=operation_tint,
@@ -3431,7 +3527,8 @@ def _copy_paste_operation(
             default_mode=default_mode,
             tint_key=tool_id,
             tint_color=_timeline_tint_color(tool_id) if operation_tint != "none" else None,
-        ):
+        ) as operation:
+            state["operation"] = operation
             yield state
 
         if state.get("success"):
@@ -3492,7 +3589,7 @@ def _apply_animation_channels_to_targets(
             progress.step(amount=pending_progress)
         return applied
 
-    with _suspend_maya_refresh():
+    with toolCommon.suspend_maya_refresh():
         for target in targets or []:
             for channel, anim_data in (channels_data or {}).items():
                 if progress and progress.cancelled:
@@ -3637,28 +3734,32 @@ def copy_animation(*args):
         ANIMATION_CONTROLS_KEY: {},
     }
     controls_data = animation_data[ANIMATION_CONTROLS_KEY]
+    channel_total = sum(len(get_animation_channels(control)) for control in selected_objects)
 
     try:
-        with _copy_paste_operation("copy_animation", "Animation Copied", tint="range", timerange=tint_range) as operation:
-            channel_total = sum(len(get_animation_channels(control)) for control in selected_objects)
-            with toolCommon.AdaptiveProgress("Copying Animation", channel_total, interruptable=True) as progress:
-                for control in selected_objects:
-                    if progress.cancelled:
-                        return
-                    control_name = control
-                    animated_channels = get_animation_channels(control)
+        with _copy_paste_operation(
+            "copy_animation", "Animation Copied", tint="range", timerange=tint_range,
+            progress=True, progress_max=channel_total,
+        ) as operation:
+            processor = operation["operation"]
+            processor.set_status("Copying Animation")
+            for control in selected_objects:
+                if processor.cancelled:
+                    return
+                control_name = control
+                animated_channels = get_animation_channels(control)
 
-                    controls_data[control_name] = {}
-                    for channel in animated_channels:
-                        plug = f"{control}.{channel}"
-                        channel_data = _query_layered_anim_channel_data(plug, time_context)
-                        if channel_data.get(ANIMATION_FRAME_KEY) or channel_data.get(ANIMATION_LAYERS_KEY):
-                            controls_data[control_name][channel] = channel_data
-                        else:
-                            static_data = _query_static_channel_value(plug)
-                            if static_data:
-                                controls_data[control_name][channel] = static_data
-                        progress.step()
+                controls_data[control_name] = {}
+                for channel in animated_channels:
+                    plug = f"{control}.{channel}"
+                    channel_data = _query_layered_anim_channel_data(plug, time_context)
+                    if channel_data.get(ANIMATION_FRAME_KEY) or channel_data.get(ANIMATION_LAYERS_KEY):
+                        controls_data[control_name][channel] = channel_data
+                    else:
+                        static_data = _query_static_channel_value(plug)
+                        if static_data:
+                            controls_data[control_name][channel] = static_data
+                    processor.step()
 
             if time_context.mode == "time_slider_range":
                 clear_timeslider_selection()
@@ -3666,8 +3767,7 @@ def copy_animation(*args):
                 tint_range = _animation_data_timerange(animation_data)
 
             animation_data[ANIMATION_META_KEY]["range"] = list(tint_range) if tint_range else None
-            json_file_path = general.get_copy_animation_file()
-            _save_copy_paste_json(json_file_path, animation_data)
+            clipboard.save("animation", animation_data)
 
             operation["timerange"] = tint_range
             operation["success"] = True
@@ -3681,8 +3781,7 @@ def copy_animation(*args):
 def paste_animation(*args, anchor_widget=None):
     selected_objects = selectionMod.get_selected_objects()
 
-    json_file_path = general.get_copy_animation_file()
-    animation_data = _load_copy_paste_json(json_file_path, "No animation file found. Please copy animation first")
+    animation_data = clipboard.load("animation", "No animation file found. Please copy animation first")
     if not animation_data:
         return
 
@@ -3690,9 +3789,9 @@ def paste_animation(*args, anchor_widget=None):
     paste_range = _animation_data_timerange(animation_data)
     key_count = _animation_data_apply_count(animation_data, targets=targets)
     prompt_range = None
-    with _copy_paste_operation("paste_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range) as operation:
-        with toolCommon.AdaptiveProgress("Pasting Animation", key_count, interruptable=True) as progress:
-            keys_set, pasted_targets = _apply_animation_data(animation_data, selected_objects, replace=True, progress=progress)
+    with _copy_paste_operation("paste_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
+        processor = operation["operation"].set_status("Pasting Animation")
+        keys_set, pasted_targets = _apply_animation_data(animation_data, selected_objects, replace=True, progress=processor)
         if keys_set:
             operation["timerange"] = paste_range
             operation["success"] = True
@@ -3710,8 +3809,7 @@ def paste_insert_animation(*args, anchor_widget=None):
     selected_objects = selectionMod.get_selected_objects()
     current_time = cmds.currentTime(query=True)
 
-    json_file_path = general.get_copy_animation_file()
-    animation_data = _load_copy_paste_json(json_file_path, "No animation file found. Please copy animation first")
+    animation_data = clipboard.load("animation", "No animation file found. Please copy animation first")
     if not animation_data:
         return
 
@@ -3721,9 +3819,9 @@ def paste_insert_animation(*args, anchor_widget=None):
     paste_range = _shift_timerange(source_range, current_time - first_source_frame)
     key_count = _animation_data_apply_count(animation_data, targets=targets)
     prompt_range = None
-    with _copy_paste_operation("paste_insert_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range) as operation:
-        with toolCommon.AdaptiveProgress("Pasting Animation", key_count, interruptable=True) as progress:
-            keys_set, pasted_targets = _apply_animation_data(animation_data, selected_objects, insert_time=current_time, progress=progress)
+    with _copy_paste_operation("paste_insert_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
+        processor = operation["operation"].set_status("Pasting Animation")
+        keys_set, pasted_targets = _apply_animation_data(animation_data, selected_objects, insert_time=current_time, progress=processor)
         if keys_set:
             operation["timerange"] = paste_range
             operation["success"] = True
@@ -3766,8 +3864,7 @@ def paste_opposite_animation(*args, anchor_widget=None):
             return -value
         return value
 
-    json_file_path = general.get_copy_animation_file()
-    animation_data = _load_copy_paste_json(json_file_path, "No animation file found. Please copy animation first")
+    animation_data = clipboard.load("animation", "No animation file found. Please copy animation first")
     if not animation_data:
         return
 
@@ -3775,35 +3872,35 @@ def paste_opposite_animation(*args, anchor_widget=None):
     key_count = _animation_data_apply_count(animation_data)
     controls = _animation_controls(animation_data)
     prompt_range = None
-    with _copy_paste_operation("paste_opposite_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range) as operation:
+    with _copy_paste_operation("paste_opposite_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
         keys_set = 0
         pasted_targets = []
-        with toolCommon.AdaptiveProgress("Pasting Opposite Animation", key_count, interruptable=True) as progress:
-            for control_name, anim_data in controls.items():
-                if progress.cancelled:
-                    break
-                mirror_control_name = find_mirror_control(control_name)
+        processor = operation["operation"].set_status("Pasting Opposite Animation")
+        for control_name, anim_data in controls.items():
+            if processor.cancelled:
+                break
+            mirror_control_name = find_mirror_control(control_name)
 
-                if mirror_control_name:
-                    full_mirror_control_name = next((c for c in cmds.ls() if c.endswith(mirror_control_name)), None)
-                    if not full_mirror_control_name:
-                        continue
+            if mirror_control_name:
+                full_mirror_control_name = next((c for c in cmds.ls() if c.endswith(mirror_control_name)), None)
+                if not full_mirror_control_name:
+                    continue
 
-                    mirrored_channels = {}
-                    for channel, channel_data in anim_data.items():
-                        mirrored_channels[channel] = _transform_channel_values(
-                            channel_data,
-                            lambda value, attr=channel: mirror_value(attr, value),
-                        )
-                    applied = _apply_animation_channels_to_targets(
-                        [full_mirror_control_name],
-                        mirrored_channels,
-                        replace=True,
-                        progress=progress,
+                mirrored_channels = {}
+                for channel, channel_data in anim_data.items():
+                    mirrored_channels[channel] = _transform_channel_values(
+                        channel_data,
+                        lambda value, attr=channel: mirror_value(attr, value),
                     )
-                    keys_set += applied
-                    if applied:
-                        pasted_targets.append(full_mirror_control_name)
+                applied = _apply_animation_channels_to_targets(
+                    [full_mirror_control_name],
+                    mirrored_channels,
+                    replace=True,
+                    progress=processor,
+                )
+                keys_set += applied
+                if applied:
+                    pasted_targets.append(full_mirror_control_name)
 
         if keys_set:
             operation["timerange"] = paste_range
@@ -3818,9 +3915,8 @@ def paste_opposite_animation(*args, anchor_widget=None):
 def paste_animation_to(source_control_name=None, replace=True, insert_at_current=False, *args, anchor_widget=None, **kwargs):
     global _paste_to_dialog
 
-    json_file_path = general.get_copy_animation_file()
     try:
-        animation_data = _load_copy_paste_json(json_file_path, "No animation file found. Please copy animation first")
+        animation_data = clipboard.load("animation", "No animation file found. Please copy animation first")
     except Exception as e:
         cmds.warning("Error reading animation file: {}".format(e))
         return
@@ -3843,27 +3939,27 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             for source_node, _ in mappings
         )
         prompt_range = None
-        with _copy_paste_operation("paste_animation_to", "Animation Pasted", undo=True, tint="range", timerange=paste_range) as operation:
+        with _copy_paste_operation("paste_animation_to", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
             total_keys_set = 0
             pasted_targets = []
-            with toolCommon.AdaptiveProgress("Pasting Animation", key_count, interruptable=True) as progress:
-                for source_node, target_node in mappings:
-                    if progress.cancelled:
-                        break
-                    src_channels = controls.get(source_node, {})
-                    applied = _apply_animation_channels_to_targets(
-                        [target_node],
-                        src_channels,
-                        replace=not insert,
-                        insert_time=current_time if insert else None,
-                        replace_range=(0, 1e6),
-                        progress=progress,
-                    )
-                    total_keys_set += applied
-                    if applied:
-                        pasted_targets.append(target_node)
-                    if src_channels:
-                        pasted_data[target_node] = src_channels
+            processor = operation["operation"].set_status("Pasting Animation")
+            for source_node, target_node in mappings:
+                if processor.cancelled:
+                    break
+                src_channels = controls.get(source_node, {})
+                applied = _apply_animation_channels_to_targets(
+                    [target_node],
+                    src_channels,
+                    replace=not insert,
+                    insert_time=current_time if insert else None,
+                    replace_range=(0, 1e6),
+                    progress=processor,
+                )
+                total_keys_set += applied
+                if applied:
+                    pasted_targets.append(target_node)
+                if src_channels:
+                    pasted_data[target_node] = src_channels
 
             if total_keys_set == 0:
                 cmds.warning("No keys were pasted. Check that destination controls have the needed attributes and that the source has keyframes.")
@@ -3911,11 +4007,11 @@ def paste_pose_to(*args, anchor_widget=None, **kwargs):
 
 
 def export_animation_file(*args):
-    return _export_copy_paste_file(general.get_copy_animation_file(), "Export Animation")
+    return clipboard.export_dialog("animation", "Export Animation")
 
 
 def import_animation_file(*args):
-    return _import_copy_paste_file(general.get_copy_animation_file(), "Import Animation")
+    return clipboard.import_dialog("animation", "Import Animation")
 
 
 # COPY POSE ________________________________________________________________________
@@ -3932,35 +4028,31 @@ def copy_pose(*args):
     with _copy_paste_operation("copy_pose", "Pose Copied", tint="current") as operation:
         for control in selected_objects:
             control_name = control
-            attributes = cmds.listAttr(control, keyable=True)
+            attributes = cmds.listAttr(control, keyable=True, unlocked=True)
 
             if attributes is None:
                 continue
 
             pose_data[control_name] = {}
             for attr in attributes:
-                if not cmds.getAttr(f"{control}.{attr}", lock=True) and cmds.getAttr(f"{control}.{attr}", keyable=True):
-                    try:
-                        values = cmds.getAttr(f"{control}.{attr}")
-                        pose_data[control_name][attr] = values
-                    except Exception as e:
-                        import TheKeyMachine.mods.reportMod as report
+                try:
+                    values = cmds.getAttr(f"{control}.{attr}")
+                    pose_data[control_name][attr] = values
+                except Exception as e:
+                    import TheKeyMachine.mods.reportMod as report
 
-                        report.report_detected_exception(e, context="copy pose attribute read")
-                        pass
+                    report.report_detected_exception(e, context="copy pose attribute read")
 
-        json_file_path = general.get_copy_paste_pose_file()
-
-        _save_copy_paste_json(json_file_path, pose_data)
+        clipboard.save("pose", pose_data)
         operation["success"] = True
 
 
 def export_pose_file(*args):
-    return _export_copy_paste_file(general.get_copy_paste_pose_file(), "Export Pose")
+    return clipboard.export_dialog("pose", "Export Pose")
 
 
 def import_pose_file(*args):
-    return _import_copy_paste_file(general.get_copy_paste_pose_file(), "Import Pose")
+    return clipboard.import_dialog("pose", "Import Pose")
 
 
 # PASTE POSE _____________________________________________________________

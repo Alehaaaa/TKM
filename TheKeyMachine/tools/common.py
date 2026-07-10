@@ -13,6 +13,9 @@ from TheKeyMachine.mods import settingsMod as settings
 
 UNDO_PREFIX = "TKM"
 _ACTIVE_PROGRESS_STACK = []
+_TOOL_DURATION_ESTIMATES = {}
+_REFRESH_SUSPEND_DEPTH = 0
+_REFRESH_WAS_SUSPENDED = False
 
 
 def _format_eta(seconds):
@@ -35,6 +38,7 @@ class AdaptiveProgress(object):
         show_after_ms=350,
         min_steps=40,
         update_interval_ms=1000,
+        estimated_seconds=None,
     ):
         self.label = label or "Processing"
         self.max_value = max(0, int(max_value or 0))
@@ -43,6 +47,7 @@ class AdaptiveProgress(object):
         self.show_after_ms = max(0, int(show_after_ms or 0))
         self.min_steps = max(1, int(min_steps or 1))
         self.update_interval_ms = max(100, int(update_interval_ms or 1000))
+        self.estimated_seconds = float(estimated_seconds) if estimated_seconds else None
         self.value = 0
         self._bar = None
         self._active = False
@@ -51,9 +56,49 @@ class AdaptiveProgress(object):
         self._last_status_label = self.label
         self._timer = QtCore.QElapsedTimer()
         self._timer.start()
+        self._show_timer = QtCore.QTimer()
+        self._show_timer.setSingleShot(True)
+        self._show_timer.timeout.connect(self._delayed_start)
+        self._status_timer = QtCore.QTimer()
+        self._status_timer.setInterval(self.update_interval_ms)
+        self._status_timer.timeout.connect(self._poll_status)
+
+    def set_total(self, max_value, reset=False):
+        """Declare or revise the amount of work without replacing the processor."""
+        self.max_value = max(0, int(max_value or 0))
+        self._bar_max = self.max_value if self.max_value > 0 else 100
+        if reset:
+            self.value = 0
+            self._timer.restart()
+        elif self.max_value:
+            self.value = min(self.value, self.max_value)
+        if self._active and self._bar:
+            try:
+                cmds.progressBar(
+                    self._bar,
+                    edit=True,
+                    maxValue=self._bar_max,
+                    progress=min(self.value, self._bar_max),
+                    status=self._status_text(),
+                )
+            except Exception:
+                pass
+        return self
+
+    def set_status(self, status):
+        if status:
+            self.label = status
+        if self._active and self._bar:
+            try:
+                cmds.progressBar(self._bar, edit=True, status=self._status_text())
+            except Exception:
+                pass
+        return self
 
     def __enter__(self):
         _ACTIVE_PROGRESS_STACK.append(self)
+        if self._show_timer:
+            self._show_timer.start(self.show_after_ms)
         return self
 
     def __exit__(self, exc_type, exc, tb):
@@ -70,8 +115,13 @@ class AdaptiveProgress(object):
             return False
         return (self.max_value > 0 and self.max_value >= self.min_steps) or self._timer.elapsed() >= self.show_after_ms
 
-    def _ensure_started(self):
-        if self._active or not self._should_show():
+    def _delayed_start(self):
+        self._ensure_started(force=True)
+
+    def _ensure_started(self, force=False):
+        if self._active:
+            return
+        if not force and not self._should_show():
             return
         try:
             self._bar = mel.eval("$tmp = $gMainProgressBar")
@@ -85,13 +135,22 @@ class AdaptiveProgress(object):
             )
             self._active = True
             self._last_status_update_ms = self._timer.elapsed()
+            self._status_timer.start()
         except Exception:
             self._bar = None
+
+    def start(self):
+        self._ensure_started(force=True)
 
     def _status_text(self):
         title = format_tool_label(self.label)
         if not self.max_value:
-            elapsed = max(0, int(round(self._timer.elapsed() / 1000.0)))
+            elapsed_seconds = max(0.0, self._timer.elapsed() / 1000.0)
+            if self.estimated_seconds and self.estimated_seconds > elapsed_seconds:
+                eta = _format_eta(self.estimated_seconds - elapsed_seconds)
+                if eta:
+                    return "{}... about {}".format(title, eta)
+            elapsed = max(0, int(round(elapsed_seconds)))
             if elapsed:
                 return "{}... {} seconds elapsed".format(title, elapsed)
             return "{}...".format(title)
@@ -102,7 +161,11 @@ class AdaptiveProgress(object):
             eta = _format_eta(remaining)
         if eta:
             return "{}... about {}".format(title, eta)
-        return "{}...".format(title)
+        return "{}... estimating time".format(title)
+
+    @property
+    def elapsed_seconds(self):
+        return max(0.0, self._timer.elapsed() / 1000.0)
 
     def step(self, amount=1, status=None):
         amount = int(amount or 1)
@@ -136,19 +199,97 @@ class AdaptiveProgress(object):
             self._cancelled = False
         return self._cancelled
 
+    def _poll_status(self):
+        if not self._active or not self._bar:
+            return
+        try:
+            cmds.progressBar(self._bar, edit=True, status=self._status_text())
+            self._cancelled = bool(cmds.progressBar(self._bar, query=True, isCancelled=True))
+        except Exception:
+            pass
+
+    advance = step
+
+    def iterate(self, iterable, total=None, status=None):
+        """Yield work items and advance once after each completed item."""
+        if total is None:
+            try:
+                total = len(iterable)
+            except (TypeError, AttributeError):
+                total = None
+        if total is not None:
+            self.set_total(total)
+        if status:
+            self.set_status(status)
+        for item in iterable:
+            if self.cancelled:
+                break
+            yield item
+            self.step()
+
     @property
     def cancelled(self):
         return self._cancelled
 
     def finish(self):
-        if not self._active or not self._bar:
-            return
-        try:
-            cmds.progressBar(self._bar, edit=True, endProgress=True)
-        except Exception:
-            pass
+        for timer in (self._show_timer, self._status_timer):
+            if not timer:
+                continue
+            timer.stop()
+            try:
+                timer.timeout.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+            timer.deleteLater()
+        self._show_timer = None
+        self._status_timer = None
+        if self._active and self._bar:
+            try:
+                cmds.progressBar(self._bar, edit=True, endProgress=True)
+            except Exception:
+                pass
         self._active = False
         self._bar = None
+
+
+def _acquire_refresh_suspension():
+    """Suspend Maya refresh without disturbing suspension owned elsewhere."""
+    global _REFRESH_SUSPEND_DEPTH, _REFRESH_WAS_SUSPENDED
+    if _REFRESH_SUSPEND_DEPTH == 0:
+        try:
+            _REFRESH_WAS_SUSPENDED = bool(cmds.refresh(query=True, suspend=True))
+        except Exception:
+            _REFRESH_WAS_SUSPENDED = False
+        if not _REFRESH_WAS_SUSPENDED:
+            try:
+                cmds.refresh(suspend=True)
+            except Exception:
+                return False
+    _REFRESH_SUSPEND_DEPTH += 1
+    return True
+
+
+def _release_refresh_suspension(acquired):
+    global _REFRESH_SUSPEND_DEPTH, _REFRESH_WAS_SUSPENDED
+    if not acquired:
+        return
+    _REFRESH_SUSPEND_DEPTH = max(0, _REFRESH_SUSPEND_DEPTH - 1)
+    if _REFRESH_SUSPEND_DEPTH or _REFRESH_WAS_SUSPENDED:
+        return
+    try:
+        cmds.refresh(suspend=False)
+    except Exception:
+        pass
+
+
+@contextmanager
+def suspend_maya_refresh(enabled=True):
+    """Nest-safe context for temporarily suspending Maya viewport refresh."""
+    acquired = _acquire_refresh_suspension() if enabled else False
+    try:
+        yield acquired
+    finally:
+        _release_refresh_suspension(acquired)
 
 
 class ToolOperation(object):
@@ -159,6 +300,10 @@ class ToolOperation(object):
         self.tint_session = tint_session
         self.anchor_widget = anchor_widget
         self.undo_chunk_opened = False
+        self.success = False
+        self.timerange = None
+        self.success_message = None
+        self.refresh_suspended = False
 
     @property
     def cancelled(self):
@@ -169,6 +314,25 @@ class ToolOperation(object):
         if not self.progress:
             return False
         return self.progress.step(amount=amount, status=status)
+
+    def start(self):
+        if self.progress:
+            self.progress.start()
+
+    def set_total(self, total, reset=False):
+        if self.progress:
+            self.progress.set_total(total, reset=reset)
+        return self
+
+    def set_status(self, status):
+        if self.progress:
+            self.progress.set_status(status)
+        return self
+
+    def iterate(self, iterable, total=None, status=None):
+        if not self.progress:
+            return iter(iterable)
+        return self.progress.iterate(iterable, total=total, status=status)
 
 
 _TOOL_OPERATION_STACK = []
@@ -245,17 +409,31 @@ def tool_operation(
     tint_key=None,
     tint_color=None,
     anchor_widget=None,
+    show_success_message=True,
+    suspend_refresh=True,
 ):
+    parent_operation = current_tool_operation()
     progress_obj = None
+    owns_progress = False
+    estimate_key = str(tool_id or label or "Processing")
     if progress:
-        progress_obj = AdaptiveProgress(
-            label or humanize_tool_name(tool_id) or "Processing",
-            progress_max,
-            interruptable=interruptable,
-            show_after_ms=1000,
-            min_steps=40,
-            update_interval_ms=1000,
-        )
+        if parent_operation and parent_operation.progress:
+            progress_obj = parent_operation.progress
+            if progress_max:
+                progress_obj.set_total(progress_max, reset=True)
+            if label:
+                progress_obj.set_status(label)
+        else:
+            progress_obj = AdaptiveProgress(
+                label or humanize_tool_name(tool_id) or "Processing",
+                progress_max,
+                interruptable=interruptable,
+                show_after_ms=200,
+                min_steps=10,
+                update_interval_ms=1000,
+                estimated_seconds=_TOOL_DURATION_ESTIMATES.get(estimate_key),
+            )
+            owns_progress = True
     tint_session = _begin_operation_tint(
         tint=tint,
         timerange=timerange,
@@ -271,8 +449,17 @@ def tool_operation(
         tint_session=tint_session,
         anchor_widget=anchor_widget,
     )
+    if timerange:
+        operation.timerange = timerange
     chunk_opened = False
     _TOOL_OPERATION_STACK.append(operation)
+    
+    refresh_suspended = False
+    operation_completed = False
+    if suspend_refresh:
+        refresh_suspended = _acquire_refresh_suspension()
+        operation.refresh_suspended = refresh_suspended
+
     try:
         if undo:
             existing_undo_operation = _current_undo_operation(exclude=operation)
@@ -281,19 +468,46 @@ def tool_operation(
                     undo_name or make_undo_chunk_name(tool_id=tool_id, title=label)
                 )
                 operation.undo_chunk_opened = bool(chunk_opened)
-        with progress_obj if progress_obj else _null_context():
+        with progress_obj if owns_progress else _null_context():
             yield operation
+        operation_completed = True
+            
+        if operation.success:
+            if tint == "range" and operation.timerange and not operation.tint_session:
+                from TheKeyMachine.widgets import timeline as timeline_widgets
+                try:
+                    operation.tint_session = timeline_widgets.begin_timeline_tint(
+                        timerange=operation.timerange,
+                        color=tint_color,
+                        owner=anchor_widget,
+                        key=tint_key or tool_id,
+                    )
+                except Exception:
+                    pass
+            if show_success_message:
+                try:
+                    from TheKeyMachine.widgets import customWidgets as wutil
+                    wutil.make_inViewMessage(operation.success_message or label or "Operation Successful")
+                except Exception:
+                    pass
     finally:
+        if operation_completed and owns_progress and progress_obj and not progress_obj.cancelled:
+            elapsed = progress_obj.elapsed_seconds
+            if elapsed >= 0.2:
+                previous = _TOOL_DURATION_ESTIMATES.get(estimate_key)
+                _TOOL_DURATION_ESTIMATES[estimate_key] = elapsed if previous is None else (previous * 0.7 + elapsed * 0.3)
         if _TOOL_OPERATION_STACK and _TOOL_OPERATION_STACK[-1] is operation:
             _TOOL_OPERATION_STACK.pop()
         elif operation in _TOOL_OPERATION_STACK:
             _TOOL_OPERATION_STACK.remove(operation)
-        if tint_session:
+        if operation.tint_session:
             try:
-                tint_session.finish()
+                operation.tint_session.finish()
             except Exception:
                 pass
         close_undo_chunk(chunk_opened)
+        
+        _release_refresh_suspension(refresh_suspended)
 
 
 @contextmanager
@@ -354,6 +568,14 @@ def run_tool_callback(button, callback, *args, **kwargs):
         kwargs.pop("_tkm_tool_label", None)
         or _button_operation_label(button, tool_id)
     )
+    # Registered/proxy commands own their operation at dispatch. Forward UI
+    # metadata instead of wrapping them a second time.
+    if getattr(callback, "_tkm_trigger_proxy", False) or getattr(callback, "_tkm_tool_dispatch", False):
+        call_kwargs = dict(kwargs)
+        call_kwargs["_tkm_tool_label"] = label
+        call_kwargs["_tkm_anchor_widget"] = button
+        return callback(*args, **call_kwargs)
+
     with tool_operation(tool_id=tool_id, label=label, anchor_widget=button, undo=True) as operation:
         call_kwargs = dict(kwargs)
         call_kwargs.setdefault("anchor_widget", button)
@@ -666,8 +888,6 @@ def checked_state_getter(data):
         or data.get("get_checked")
         or data.get("is_checked_fn")
         or data.get("is_checked")
-        or data.get("set_checked_fn")
-        or data.get("set_checked")
     )
 
 
@@ -691,12 +911,49 @@ def sync_checked(control, getter):
         return False
 
 
-def bind_checked_signal(control, signal, getter, attr_name="_tkm_checked_state_sync"):
+def publish_control_state(state_key, value):
+    if not state_key:
+        return value
+    try:
+        import TheKeyMachine.core.runtimeManager as runtime
+        return runtime.get_runtime_manager().set_control_state(str(state_key), value)
+    except Exception:
+        return value
+
+
+def bind_control_state(control, state_key, apply_fn, attr_name="_tkm_control_state_sync"):
+    if control is None or not state_key or not callable(apply_fn):
+        return None
+    try:
+        import TheKeyMachine.core.runtimeManager as runtime
+        manager = runtime.get_runtime_manager()
+    except Exception:
+        return None
+
+    def _sync(changed_key, value, key=str(state_key), callback=apply_fn):
+        if changed_key == key:
+            callback(value)
+
+    relay = replace_tracked_connection(
+        control,
+        attr_name,
+        manager.controlStateChanged,
+        _sync,
+        parent=control,
+    )
+    if manager.has_control_state(str(state_key)):
+        apply_fn(manager.get_control_state(str(state_key)))
+    return relay
+
+
+def bind_checked_signal(control, signal, getter, state_key=None, attr_name="_tkm_checked_state_sync"):
     if control is None or signal is None or not callable(getter):
         return None
 
     def _sync(*_args, target=control, state_fn=getter):
-        sync_checked(target, state_fn)
+        state = bool(state_fn())
+        set_checked_safely(target, state)
+        publish_control_state(state_key, state)
 
     return replace_tracked_connection(
         control,
@@ -707,26 +964,19 @@ def bind_checked_signal(control, signal, getter, attr_name="_tkm_checked_state_s
     )
 
 
-def bind_tool_state_signal(control, state_key, sync_fn, attr_name="_tkm_tool_state_sync"):
-    if control is None or not state_key or not callable(sync_fn):
+def bind_tool_state_signal(control, state_key, attr_name="_tkm_tool_state_sync"):
+    if control is None or not state_key:
         return None
-    try:
-        import TheKeyMachine.core.runtimeManager as runtime
-        manager = runtime.get_runtime_manager()
-    except Exception:
-        return None
+    def _apply(state, target=control):
+        set_checked_safely(target, bool(state))
 
-    def _sync(changed_key, _state, key=str(state_key), callback=sync_fn):
-        if changed_key == key:
-            callback()
-
-    return replace_tracked_connection(
+    relay = bind_control_state(
         control,
-        attr_name,
-        manager.toolStateChanged,
-        _sync,
-        parent=control,
+        state_key,
+        _apply,
+        attr_name=attr_name,
     )
+    return relay
 
 
 def configure_checkable_control(control, checkable=None, getter=None, changed_signal=None, state_key=None):
@@ -745,9 +995,11 @@ def configure_checkable_control(control, checkable=None, getter=None, changed_si
     except Exception:
         is_checkable = bool(checkable)
     if is_checkable:
-        sync_checked(control, getter)
-        bind_checked_signal(control, changed_signal, getter)
-        bind_tool_state_signal(control, state_key, lambda target=control, state_fn=getter: sync_checked(target, state_fn))
+        initial_state = bool(getter()) if callable(getter) else bool(control.isChecked())
+        set_checked_safely(control, initial_state)
+        bind_checked_signal(control, changed_signal, getter, state_key=state_key)
+        bind_tool_state_signal(control, state_key)
+        publish_control_state(state_key, initial_state)
     return control
 
 
@@ -788,6 +1040,7 @@ def connect_tool_control(
     bind_fn=None,
     state_key=None,
 ):
+    binding_owns_trigger = False
     configure_method = getattr(control, "configure_check_state", None)
     if callable(configure_method):
         configure_method(
@@ -798,7 +1051,8 @@ def connect_tool_control(
             bind_fn=bind_fn,
             state_key=state_key,
         )
-        if getattr(control, "_tkm_check_binding_owns_trigger", False):
+        binding_owns_trigger = bool(getattr(control, "_tkm_check_binding_owns_trigger", False))
+        if binding_owns_trigger:
             callback = None
     else:
         configure_checkable_control(control, checkable=checkable, getter=getter, changed_signal=changed_signal, state_key=state_key)
@@ -806,9 +1060,13 @@ def connect_tool_control(
         if callable(bind_fn):
             try:
                 if bind_fn(control) is True:
+                    binding_owns_trigger = True
                     callback = None
             except Exception:
                 pass
+
+    if callback is None and callable(setter) and not binding_owns_trigger:
+        callback = setter
 
     if callback is None or control is None:
         return control
@@ -828,7 +1086,9 @@ def connect_tool_control(
                 result = set_state(checked, apply=True)
             else:
                 result = None
-            sync_checked(target, state_fn)
+            state = bool(state_fn()) if callable(state_fn) else checked
+            set_checked_safely(target, state)
+            publish_control_state(state_key, state)
             return result
 
         _connect_control_trigger(control, _checked_cb)
@@ -1001,67 +1261,72 @@ def replace_tracked_connections(owner, attr_name, pairs, parent=None):
 
 
 class ToolbarWindowToggle(QtCore.QObject):
-    """Keeps a toolbar button in sync with a floating window."""
+    """Keeps any number of controls in sync with one floating window."""
 
     def __init__(self, is_open_fn, open_fn, close_fn, state_signal=None, parent=None):
         super().__init__(parent)
-        self._button = None
+        self._buttons = {}
         self._syncing = False
-        self._button_toggled_relay = None
-        self._button_destroyed_relay = None
         self._is_open_fn = is_open_fn
         self._open_fn = open_fn
         self._close_fn = close_fn
         if state_signal is not None:
             state_signal.connect(self._on_window_state_changed)
 
+    @property
+    def _button(self):
+        """Compatibility anchor: return the most recently attached live control."""
+        for button in reversed(list(self._buttons.values())):
+            if wutil.is_valid_widget(button):
+                return button
+        return None
+
     def attach_button(self, button):
         if not button:
             return
-        if self._button and self._button is not button:
-            self._disconnect_button(self._button)
-        self._button = button
-        self._button.setCheckable(True)
-        self._syncing = True
-        try:
-            self._button.setChecked(bool(self._is_open_fn()))
-        finally:
-            self._syncing = False
-        self._disconnect_button(self._button)
-        self._button_toggled_relay = replace_tracked_connection(
-            self,
-            "_button_toggled_relay",
-            self._button.toggled,
-            self._on_button_toggled,
-            parent=self._button,
+        button_id = id(button)
+        self._buttons[button_id] = button
+        button.setCheckable(True)
+        self._set_button_checked(button, self._is_open())
+        replace_tracked_connection(
+            button,
+            "_tkm_window_toggle_relay",
+            button.toggled,
+            lambda checked, target=button: self._on_button_toggled(target, checked),
+            parent=button,
         )
-        self._button_destroyed_relay = replace_tracked_connection(
-            self,
-            "_button_destroyed_relay",
-            self._button.destroyed,
-            self._on_button_destroyed,
-            parent=self._button,
+        replace_tracked_connection(
+            button,
+            "_tkm_window_toggle_destroyed_relay",
+            button.destroyed,
+            lambda *_args, key=button_id: self._on_button_destroyed(key),
+            parent=button,
         )
 
-    def _set_button_checked(self, checked):
-        if not self._button:
+    def _is_open(self):
+        try:
+            return bool(self._is_open_fn())
+        except Exception:
+            return False
+
+    def _set_button_checked(self, button, checked):
+        if not button or not wutil.is_valid_widget(button):
             return
         self._syncing = True
         try:
-            self._button.setChecked(bool(checked))
+            set_checked_safely(button, checked)
         finally:
             self._syncing = False
 
     def _reconcile_button_state(self):
-        if not self._button:
-            return
-        try:
-            is_open = bool(self._is_open_fn())
-        except Exception:
-            return
-        self._set_button_checked(is_open)
+        is_open = self._is_open()
+        for button_id, button in list(self._buttons.items()):
+            if not wutil.is_valid_widget(button):
+                self._buttons.pop(button_id, None)
+                continue
+            self._set_button_checked(button, is_open)
 
-    def _on_button_toggled(self, checked):
+    def _on_button_toggled(self, _button, checked):
         if self._syncing:
             return
         import TheKeyMachine.mods.reportMod as report
@@ -1072,17 +1337,15 @@ class ToolbarWindowToggle(QtCore.QObject):
             report.safe_execute(self._close_fn, context="toolbar window toggle close")
         self._reconcile_button_state()
 
-    def _on_button_destroyed(self, *_):
-        if not self._button:
-            return
-        self._disconnect_button(self._button)
-        self._button = None
+    def _on_button_destroyed(self, button_id):
+        self._buttons.pop(button_id, None)
 
     def _disconnect_button(self, button):
         if not button:
             return
-        clear_tracked_connection(self, "_button_toggled_relay")
-        clear_tracked_connection(self, "_button_destroyed_relay")
+        self._buttons.pop(id(button), None)
+        clear_tracked_connection(button, "_tkm_window_toggle_relay")
+        clear_tracked_connection(button, "_tkm_window_toggle_destroyed_relay")
 
     def open(self):
         import TheKeyMachine.mods.reportMod as report
@@ -1111,13 +1374,11 @@ class ToolbarWindowToggle(QtCore.QObject):
         return result
 
     def _on_window_state_changed(self, is_open):
-        if not self._button:
-            return
-        self._syncing = True
-        try:
-            self._button.setChecked(bool(is_open))
-        finally:
-            self._syncing = False
+        for button_id, button in list(self._buttons.items()):
+            if not wutil.is_valid_widget(button):
+                self._buttons.pop(button_id, None)
+                continue
+            self._set_button_checked(button, is_open)
 
 
 class WindowStateBus(QtCore.QObject):

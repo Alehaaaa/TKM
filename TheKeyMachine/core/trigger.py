@@ -10,6 +10,8 @@ from __future__ import annotations
 import importlib
 import inspect
 import keyword
+from dataclasses import dataclass
+from functools import wraps
 from typing import Callable, Dict, Optional
 
 
@@ -29,6 +31,24 @@ _SHELF_MENU_COMMANDS = (
     "graph_settings_menu",
     "graph_dock_menu",
 )
+
+
+@dataclass(frozen=True)
+class OperationPolicy:
+    progress: bool = True
+    undo: bool = True
+    suspend_refresh: bool = False
+
+
+def _operation_policy(command_name: str) -> OperationPolicy:
+    """Central lifecycle policy for registered commands.
+
+    Windows and menus still use ToolOperation for consistent dispatch/error
+    boundaries, but they must not show a progress bar while waiting for input or
+    hold an empty undo chunk open for the lifetime of an interactive UI.
+    """
+    interactive = command_name in _SHELF_MENU_COMMANDS or command_name.endswith(("_menu", "_window"))
+    return OperationPolicy(progress=not interactive, undo=not interactive)
 
 _MODULE_COMMANDS = {
     "toolbar_toggle": ("TheKeyMachine.core.toolbar", "toggle"),
@@ -141,9 +161,43 @@ _KEYTOOLS_VARIANTS = {
 
 
 def register_command(name: str, callback: Callable) -> Callable:
-    """Register or replace a callable command."""
-    _COMMANDS[name] = callback
-    return callback
+    """Register a command behind the shared ToolOperation dispatcher."""
+    if getattr(callback, "_tkm_tool_dispatch", False) and getattr(callback, "_tkm_command_name", None) == name:
+        dispatched = callback
+    else:
+        dispatched = _make_dispatched_command(name, callback)
+    _COMMANDS[name] = dispatched
+    return dispatched
+
+
+def _make_dispatched_command(name: str, callback: Callable) -> Callable:
+    @wraps(callback)
+    def _dispatch(*args, **kwargs):
+        from TheKeyMachine.tools import common as toolCommon
+
+        label = kwargs.pop("_tkm_tool_label", None)
+        anchor_widget = kwargs.pop("_tkm_anchor_widget", None)
+        # A caller may forward its current operation; command dispatch owns the
+        # canonical outer lifecycle and only passes the canonical instance on.
+        kwargs.pop("tool_operation", None)
+        policy = _operation_policy(name)
+        with toolCommon.tool_operation(
+            tool_id=name,
+            label=label,
+            anchor_widget=anchor_widget,
+            progress=policy.progress,
+            undo=policy.undo,
+            suspend_refresh=policy.suspend_refresh,
+        ) as operation:
+            call_kwargs = dict(kwargs)
+            call_kwargs.setdefault("tool_operation", operation)
+            return callback(*args, **_supported_callback_kwargs(callback, call_kwargs))
+
+    _dispatch.__name__ = name
+    _dispatch._tkm_tool_dispatch = True
+    _dispatch._tkm_command_name = name
+    _dispatch._tkm_registered_callback = callback
+    return _dispatch
 
 
 def get_command(name: str) -> Optional[Callable]:
@@ -154,6 +208,14 @@ def get_command(name: str) -> Optional[Callable]:
         _ensure_toolbox_commands()
         callback = _COMMANDS.get(name)
     return callback
+
+
+def execute_command(name: str, *args, **kwargs):
+    """Execute any registered command through its standardized operation."""
+    callback = get_command(name)
+    if callback is None:
+        raise AttributeError("Unknown TheKeyMachine trigger command: {}".format(name))
+    return callback(*args, **kwargs)
 
 
 def list_commands() -> list[str]:
@@ -196,11 +258,7 @@ def make_command_callback(name: str, callback: Optional[Callable] = None) -> Cal
         register_command(name, callback)
 
     def _proxy(*args, **kwargs):
-        registered = get_command(name)
-        if registered is None:
-            raise AttributeError("Unknown TheKeyMachine trigger command: {}".format(name))
-        registered(*args, **_supported_callback_kwargs(registered, kwargs))
-        return None
+        return execute_command(name, *args, **kwargs)
 
     _proxy.__name__ = name
     _proxy._tkm_trigger_proxy = True
@@ -307,11 +365,7 @@ def _module_command(command_name: str, module_name: str, attr_name: str, *preset
         call_args = preset_args + args
         call_kwargs = dict(preset_kwargs)
         call_kwargs.update(kwargs)
-        from TheKeyMachine.tools import common as toolCommon
-
-        with toolCommon.tool_operation(tool_id=command_name, undo=True) as operation:
-            call_kwargs.setdefault("tool_operation", operation)
-            return callback(*call_args, **_supported_callback_kwargs(callback, call_kwargs))
+        return callback(*call_args, **_supported_callback_kwargs(callback, call_kwargs))
 
     _command.__name__ = command_name
     return _command

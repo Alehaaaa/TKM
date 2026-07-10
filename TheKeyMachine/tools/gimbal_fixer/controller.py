@@ -6,25 +6,6 @@ from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.gimbal_fixer.constants import ROTATE_ORDERS
 
 
-class UndoSetup:
-    chunk_opened = False
-
-    def __enter__(self):
-        self.chunk_opened = toolCommon.open_undo_chunk()
-
-    def __exit__(self, *args):
-        if self.chunk_opened:
-            toolCommon.close_undo_chunk()
-
-
-class StopRefresh:
-    def __enter__(self):
-        cmds.refresh(suspend=True)
-
-    def __exit__(self, *args):
-        cmds.refresh(suspend=False)
-
-
 def has_rotate_order(obj):
     return cmds.objExists(obj) and cmds.attributeQuery("rotateOrder", node=obj, exists=True)
 
@@ -85,10 +66,16 @@ def convert_rotation_order(rot_order="zxy"):
         else:
             unkeyed_objects.append(obj)
 
-    with UndoSetup():
+    with toolCommon.tool_operation(
+        tool_id="gimbal_fixer",
+        label="Gimbal Fixer",
+        progress=False,
+        undo=True,
+        suspend_refresh=False,
+    ):
         if keyed_objects:
             all_key_times = sorted(set(all_key_times))
-            with StopRefresh():
+            with toolCommon.suspend_maya_refresh():
                 for frame in all_key_times:
                     cmds.currentTime(frame, edit=True)
                     for obj in keyed_objects:

@@ -151,6 +151,7 @@ class RuntimeManager(QtCore.QObject):
     backgroundRunnerTriggered = QtCore.Signal(str)
     playbackStateChanged = QtCore.Signal(bool)
     toolStateChanged = QtCore.Signal(str, bool)
+    controlStateChanged = QtCore.Signal(str, object)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -160,6 +161,7 @@ class RuntimeManager(QtCore.QObject):
         self._signal_connections: Dict[str, List[tuple]] = {}
         self._managed_widgets: Dict[str, QtWidgets.QWidget] = {}
         self._tool_states: Dict[str, bool] = {}
+        self._control_states: Dict[str, Any] = {}
 
         self._graph_editor_visible = False
         self._graph_editor_watch_enabled = False
@@ -387,15 +389,36 @@ class RuntimeManager(QtCore.QObject):
         if not key:
             return False
         state = bool(state)
-        if self._tool_states.get(key) == state and emit:
+        changed = self._tool_states.get(key) != state
+        if not changed and emit:
             return state
         self._tool_states[key] = state
+        self.set_control_state(key, state, emit=emit)
         if emit:
             try:
                 self.toolStateChanged.emit(str(key), state)
             except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
         return state
+
+    def set_control_state(self, key: str, value: Any, *, emit: bool = True):
+        """Publish an arbitrary shared UI state value."""
+        if not key:
+            return value
+        changed = key not in self._control_states or self._control_states[key] != value
+        self._control_states[key] = value
+        if emit and changed:
+            try:
+                self.controlStateChanged.emit(str(key), value)
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+        return value
+
+    def has_control_state(self, key: str) -> bool:
+        return bool(key and key in self._control_states)
+
+    def get_control_state(self, key: str, default=None):
+        return self._control_states.get(key, default) if key else default
 
     def get_tool_state(self, key: str, default: bool = False) -> bool:
         if not key:

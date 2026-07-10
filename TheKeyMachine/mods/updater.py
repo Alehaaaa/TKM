@@ -106,12 +106,15 @@ def download(downloadUrl, saveFile):
 
     downloaded = 0
     progress_max = total_size if total_size > 0 else 0
-    with toolCommon.AdaptiveProgress(
-        "Downloading Update",
-        progress_max,
+    with toolCommon.tool_operation(
+        tool_id="download_update",
+        label="Downloading Update",
+        progress_max=progress_max,
+        progress=True,
         interruptable=False,
-        show_after_ms=1000,
-    ) as progress:
+        undo=False,
+        suspend_refresh=False,
+    ) as operation:
         with open(saveFile, "wb") as output:
             while True:
                 buffer = response.read(block_size)
@@ -119,7 +122,7 @@ def download(downloadUrl, saveFile):
                     break
                 downloaded += len(buffer)
                 output.write(buffer)
-                progress.step(len(buffer))
+                operation.step(len(buffer))
     return True
 
 

@@ -1,4 +1,5 @@
 from functools import partial
+import inspect
 
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
@@ -352,6 +353,17 @@ class MenuWidget(QtWidgets.QMenu):
         return None
 
     @staticmethod
+    def _callback_accepts_checked(callback):
+        try:
+            parameters = inspect.signature(callback).parameters.values()
+        except Exception:
+            return False
+        return any(
+            parameter.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.VAR_POSITIONAL)
+            for parameter in parameters
+        )
+
+    @staticmethod
     def _trigger_command_from_callback(callback):
         name = getattr(callback, "__name__", None)
         try:
@@ -402,14 +414,14 @@ class MenuWidget(QtWidgets.QMenu):
         positional_callback = self._callback_from_args(args)
         metadata_callback = callback or positional_callback
 
-        res = QtWidgets.QMenu.addAction(self, *args, **kwargs)
+        # Do not let Qt connect positional callbacks directly; every executable
+        # menu action must pass through the shared ToolOperation runner.
+        qt_args = tuple(arg for arg in args if arg is not positional_callback)
+        res = QtWidgets.QMenu.addAction(self, *qt_args, **kwargs)
         action = args[0] if (len(args) > 0 and isinstance(args[0], QtGui.QAction)) else res
 
         if keep_open and hasattr(action, "setProperty"):
             action.setProperty("tkm_keep_menu_open", True)
-
-        if callback:
-            action.triggered.connect(lambda _checked=False, cb=callback: QtCore.QTimer.singleShot(0, cb))
 
         label = ""
         for arg in args:
@@ -420,6 +432,27 @@ class MenuWidget(QtWidgets.QMenu):
         title = label_override or toolCommon.get_tooltip_title(tooltip_template) or label or action.text()
         if command_id is None:
             command_id = self._trigger_command_from_callback(metadata_callback)
+
+        if metadata_callback:
+            def _invoke_menu_callback(
+                checked=False,
+                cb=metadata_callback,
+                pass_checked=bool(positional_callback and self._callback_accepts_checked(positional_callback)),
+            ):
+                def _run():
+                    call_args = (checked,) if pass_checked else ()
+                    toolCommon.run_tool_callback(
+                        action,
+                        cb,
+                        *call_args,
+                        _tkm_tool_id=command_id,
+                        _tkm_tool_label=title,
+                    )
+
+                QtCore.QTimer.singleShot(0, _run)
+
+            action.triggered.connect(_invoke_menu_callback)
+
         resolved_description = _status_description(
             description=description or "",
             tooltip_template=tooltip_template,
@@ -828,7 +861,7 @@ class PasteToDialog:
         buttons.extend(
             [
                 customDialogs.QFlatDialogButton(
-                    f"Paste {data_label.title()}",
+                    f"Paste Replace {data_label.title()}",
                     callback=lambda: self._apply(insert=False),
                     icon=icons.paste_animation if data_label == "animation" else icons.paste_pose,
                     highlight=True,
@@ -1140,9 +1173,11 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
         self._checked_state_setter = setter if callable(setter) else None
         self._tkm_check_binding_owns_trigger = False
         if self.isCheckable():
-            self.sync_checked_state()
-            toolCommon.bind_checked_signal(self, changed_signal, self.checked_state)
-            toolCommon.bind_tool_state_signal(self, state_key, self.sync_checked_state)
+            initial_state = self.checked_state()
+            self.set_checked_safely(initial_state)
+            toolCommon.bind_checked_signal(self, changed_signal, self.checked_state, state_key=state_key)
+            toolCommon.bind_tool_state_signal(self, state_key)
+            toolCommon.publish_control_state(state_key, initial_state)
         if callable(bind_fn):
             try:
                 self._tkm_check_binding_owns_trigger = bind_fn(self) is True
@@ -2086,8 +2121,14 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._default_keys = []
         self._all_modes = []  # Full ordered mode list (SliderMode objects + "separator")
         self._mode_to_slot = {}  # mode_key -> slot_key (live, authoritative mapping)
+        self._desired_mode_keys = set()
         self._persist_slider_modes = True
         self._applying_pin_state = False
+
+        try:
+            runtime.get_runtime_manager().controlStateChanged.connect(self._on_shared_control_state_changed)
+        except Exception:
+            pass
 
         if self._hiddeable:
             # Overlay button: tiny checkbox in the bottom-left
@@ -2165,6 +2206,45 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     def _set_setting(self, key, value):
         settings.set_setting(key, value, namespace=self._settings_namespace)
 
+    def _shared_namespace(self):
+        return str(self._settings_namespace or self.objectName() or id(self))
+
+    def _pin_state_key(self, widget_key):
+        return "section_pin:{}:{}".format(self._shared_namespace(), widget_key)
+
+    def _mode_state_key(self):
+        mode_slots = [key for key, widget in self._widgets.items() if hasattr(widget, "_current_mode")]
+        if not mode_slots:
+            return None
+        family = mode_slots[0].split("_", 1)[0]
+        return "section_modes:{}:{}".format(self._shared_namespace(), family)
+
+    def _mode_family(self):
+        mode_state_key = self._mode_state_key()
+        return mode_state_key.rsplit(":", 1)[-1] if mode_state_key else None
+
+    def _persist_mode_pins(self, desired_mode_keys):
+        family = self._mode_family()
+        if not family:
+            return
+        desired = set(desired_mode_keys or ())
+        for mode in self._all_modes:
+            if hasattr(mode, "key"):
+                self._set_setting("pin_{}_{}".format(family, mode.key), mode.key in desired)
+
+    def _on_shared_control_state_changed(self, state_key, value):
+        mode_state_key = self._mode_state_key()
+        if mode_state_key and state_key == mode_state_key:
+            if not self._applying_pin_state:
+                self._apply_visible_modes(value or (), publish=False)
+            return
+
+        pin_prefix = "section_pin:{}:".format(self._shared_namespace())
+        if state_key.startswith(pin_prefix):
+            widget_key = state_key[len(pin_prefix):]
+            if widget_key in self._widgets and not hasattr(self._widgets[widget_key], "_current_mode"):
+                self._apply_widget_pin(widget_key, bool(value), publish=False)
+
     def addWidget(self, widget, label, key, default=True, description=None, tooltip_template=None, pinnable=True):
         """Add a widget to the section with a toggle key."""
         # Auto-extract help metadata from widget if not provided
@@ -2231,6 +2311,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             else:
                 visible = default
             widget.setVisible(visible)
+            if not hasattr(widget, "_current_mode"):
+                manager = runtime.get_runtime_manager()
+                state_key = self._pin_state_key(key)
+                if manager.has_control_state(state_key):
+                    widget.setVisible(bool(manager.get_control_state(state_key)))
+                else:
+                    manager.set_control_state(state_key, bool(visible))
             self._sync_section_visibility()
         else:
             widget.setVisible(bool(default))
@@ -2355,8 +2442,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     if checkable:
                         action = menu.addAction(QtGui.QIcon(act_icon_p), display_label, tooltip_template=full_tooltip, description=full_desc)
                         _setup_setting_synced_checkable(action, item)
-                        if cb:
-                            action.triggered.connect(cb)
                     else:
                         if cb:
                             menu.addAction(QtGui.QIcon(act_icon_p), display_label, cb, tooltip_template=full_tooltip, description=full_desc)
@@ -2389,7 +2474,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
                     widget.customContextMenuRequested.connect(_ctx)
 
-    def _apply_widget_pin(self, key, visible, save_setting=True):
+    def _apply_widget_pin(self, key, visible, save_setting=True, publish=True):
         """Apply a local pin state to a widget."""
         widget = self._widgets.get(key)
         if widget and QtCompat.isValid(widget):
@@ -2397,7 +2482,11 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         if save_setting:
             self._set_setting(f"pin_{key}", bool(visible))
+        if publish:
+            toolCommon.publish_control_state(self._pin_state_key(key), bool(visible))
         self._sync_section_visibility()
+        self.pinsChanged.emit()
+        self._refresh_layout()
 
     def addSeparator(self):
         """Add a separator to the customization menu."""
@@ -2412,6 +2501,23 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if QtCompat.isValid(w) and hasattr(w, "_modes") and w._modes:
                 self._all_modes = w._modes
                 break
+        mode_state_key = self._mode_state_key()
+        if mode_state_key:
+            manager = runtime.get_runtime_manager()
+            local_modes = tuple(
+                mode.key
+                for mode in self._all_modes
+                if hasattr(mode, "key") and mode.key in self._visible_slider_mode_keys()
+            )
+            # Persisted mode pins are authoritative at construction time. Slot
+            # assignments are deliberately not persisted.
+            self._apply_visible_modes(local_modes, publish=False)
+            ordered_modes = tuple(
+                mode.key
+                for mode in self._all_modes
+                if hasattr(mode, "key") and mode.key in self._desired_mode_keys
+            )
+            manager.set_control_state(mode_state_key, ordered_modes)
 
     def _on_slider_current_mode_changed(self, widget, old_key, new_key):
         """Slot for QFlatSliderWidget.currentModeChanged."""
@@ -2425,24 +2531,35 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if self._persist_slider_modes:
                 self._set_setting(f"slider_mode_{slot_key}", new_key)
         if not self._applying_pin_state:
+            mode_state_key = self._mode_state_key()
+            if mode_state_key:
+                toolCommon.publish_control_state(mode_state_key, tuple(sorted(self._visible_slider_mode_keys())))
             self.pinsChanged.emit()
 
-    def _apply_visible_modes(self, desired_mode_keys):
+    def _apply_visible_modes(self, desired_mode_keys, publish=True):
         """
         Show exactly the given modes, reassigning sliders from the pool as needed.
         This is the local source of truth for slider mode pin operations.
         """
         from TheKeyMachine.widgets.util import is_valid_widget
 
+        desired_set = set(desired_mode_keys or ())
+        desired_mode_keys = [
+            mode.key
+            for mode in self._all_modes
+            if hasattr(mode, "key") and mode.key in desired_set
+        ]
+        self._desired_mode_keys = set(desired_mode_keys)
+
         # Pool: only mode-aware sliders
         pool = {slot: w for slot, w in self._widgets.items() if is_valid_widget(w) and hasattr(w, "_current_mode")}
 
         # which desired modes are already covered by a slider?
-        covered = {cm.key: slot for slot, w in pool.items() if (cm := getattr(w, "_current_mode", None)) and cm.key in desired_mode_keys}
+        covered = {cm.key: slot for slot, w in pool.items() if (cm := getattr(w, "_current_mode", None)) and cm.key in desired_set}
 
         # which desired modes have NO slider yet?
         unoccupied = [mk for mk in desired_mode_keys if mk not in covered]
-        free_slots = [slot for slot, w in pool.items() if getattr(getattr(w, "_current_mode", None), "key", None) not in desired_mode_keys]
+        free_slots = [slot for slot, w in pool.items() if getattr(getattr(w, "_current_mode", None), "key", None) not in desired_set]
 
         # reassign free sliders to unoccupied desired modes
         free_iter = iter(free_slots)
@@ -2465,9 +2582,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         for slot, widget in pool.items():
             visible = slot in active_slots
             widget.setVisible(visible)
-            self._set_setting(f"pin_{slot}", visible)
+        self._persist_mode_pins(self._desired_mode_keys)
         self._sync_section_visibility()
         self.pinsChanged.emit()
+        if publish:
+            mode_state_key = self._mode_state_key()
+            if mode_state_key:
+                toolCommon.publish_control_state(mode_state_key, tuple(desired_mode_keys))
 
         self._refresh_layout()
 
@@ -2482,11 +2603,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     default_mode_keys.add(mk)
                     break
         self._publish_mode_pin_request(default_mode_keys)
+        self._sync_mode_menu_actions(menu)
 
     def pin_all(self, menu=None):
         """Show ALL modes, reassigning sliders to cover every mode in the list."""
         all_mode_keys = {m.key for m in self._all_modes if hasattr(m, "key")}
         self._publish_mode_pin_request(all_mode_keys)
+        self._sync_mode_menu_actions(menu)
 
     def pin_widget_defaults(self, menu=None):
         """Non-slider sections: restore widget visibility and sub-action pins to defaults."""
@@ -2516,22 +2639,22 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
     def _publish_mode_pin_request(self, desired_mode_keys):
         desired_mode_keys = set(desired_mode_keys or [])
-        self._apply_visible_modes(desired_mode_keys)
+        # Apply first so this section and its currently open menu always update,
+        # even when the shared state already contains the requested value.
+        self._apply_visible_modes(desired_mode_keys, publish=True)
 
     def _make_toggle_handler(self, key):
         """Create a local pin handler that captures 'key'."""
 
         def handler(checked):
             self._apply_widget_pin(key, bool(checked))
-            self.pinsChanged.emit()
-            self._refresh_layout()
 
         return handler
 
     def _visible_slider_mode_keys(self):
         modes = set()
         for widget in self._widgets.values():
-            if not QtCompat.isValid(widget) or not widget.isVisible() or not hasattr(widget, "_current_mode"):
+            if not QtCompat.isValid(widget) or widget.isHidden() or not hasattr(widget, "_current_mode"):
                 continue
             current_mode = getattr(widget, "_current_mode", None)
             if current_mode:
@@ -2543,7 +2666,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if not QtCompat.isValid(action):
                 return
             widget = section._widgets.get(widget_key)
-            checked_now = bool(widget and QtCompat.isValid(widget) and widget.isVisible())
+            checked_now = bool(widget and QtCompat.isValid(widget) and not widget.isHidden())
             action.setChecked(checked_now)
             if QtCompat.isValid(menu):
                 menu.update()
@@ -2566,7 +2689,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         def sync_action(action=action, menu=menu, section=self, key=mode_key):
             if not QtCompat.isValid(action):
                 return
-            action.setChecked(key in section._visible_slider_mode_keys())
+            action.setChecked(key in section._desired_mode_keys)
             if QtCompat.isValid(menu):
                 menu.update()
                 menu.repaint()
@@ -2583,6 +2706,17 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             pass
         sync_action()
         return action
+
+    def _sync_mode_menu_actions(self, menu):
+        """Set open-menu checks directly from the sliders currently shown."""
+        if menu is None or not QtCompat.isValid(menu):
+            return
+        visible_modes = self._visible_slider_mode_keys()
+        for mode_key, action in getattr(menu, "_tkm_actions", {}).items():
+            if action is not None and QtCompat.isValid(action):
+                action.setChecked(mode_key in visible_modes)
+        menu.repaint()
+        QtWidgets.QApplication.processEvents()
 
     def _refresh_layout(self):
         """Trigger a height recalculation."""
@@ -2629,15 +2763,11 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     menu.addSeparator()
                     continue
 
-                is_visible = mode.key in self._visible_slider_mode_keys()
+                is_visible = mode.key in self._desired_mode_keys
 
                 def make_mode_toggle(mk):
                     def handler(checked):
-                        current = {
-                            getattr(w, "_current_mode", None).key
-                            for w in self._widgets.values()
-                            if QtCompat.isValid(w) and w.isVisible() and getattr(w, "_current_mode", None)
-                        }
+                        current = set(self._desired_mode_keys)
                         if checked:
                             current.add(mk)
                         else:
@@ -2672,13 +2802,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         menu,
                         key,
                         item["label"],
-                        widget.isVisible(),
+                        not widget.isHidden(),
                         self._make_toggle_handler(key),
                         description=item.get("description") or "",
                         title=item["label"],
                         tooltip_template=item.get("tooltip_template"),
                     )
-                    self._bind_pin_menu_action(menu, action, key, widget.isVisible())
+                    self._bind_pin_menu_action(menu, action, key, not widget.isHidden())
         menu.addSeparator()
         pin_def_action = menu.addAction(QtGui.QIcon(icons.dot_round), "Pin Defaults", open=True)
         if self._all_modes:

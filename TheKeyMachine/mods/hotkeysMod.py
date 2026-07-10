@@ -738,9 +738,7 @@ def _command_row_from_data(command_name, primary_data, fallback_data=None, title
         ),
         "tooltip_template": (
             primary_data.get("tooltip_template")
-            or primary_data.get("text")
             or fallback_data.get("tooltip_template")
-            or fallback_data.get("text")
         ),
         "shortcuts": primary_data.get("shortcuts", fallback_data.get("shortcuts", [])),
         "checkable": bool(primary_data.get("checkable", primary_data.get("type") == "check")),
@@ -1118,7 +1116,7 @@ class HotkeyCaptureEdit(QtWidgets.QLineEdit):
 class HotkeySelectableItemWidget(QtWidgets.QWidget):
     clicked = QtCore.Signal()
 
-    def __init__(self, parent=None, base_color=None):
+    def __init__(self, parent=None, base_color=None, selected_color=None):
         super().__init__(parent)
         self._selected = False
         self.setObjectName("HotkeySelectableItemWidget")
@@ -1127,8 +1125,8 @@ class HotkeySelectableItemWidget(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
         self.setStyleSheet(
             "#HotkeySelectableItemWidget{background:%s;}"
-            "#HotkeySelectableItemWidget[rowSelected='true']{background:#5f88a8;}"
-            % (base_color or "#2b2b2b")
+            "#HotkeySelectableItemWidget[rowSelected='true']{background:%s;}"
+            % ((base_color or "#2b2b2b"), (selected_color or base_color or "#2b2b2b"))
         )
 
     def set_selected(self, selected):
@@ -1142,10 +1140,29 @@ class HotkeySelectableItemWidget(QtWidgets.QWidget):
         self.clicked.emit()
         super().mousePressEvent(event)
 
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not self._selected:
+            return
+        option = QtWidgets.QStyleOptionFocusRect()
+        option.initFrom(self)
+        option.rect = self.rect()
+        option.state |= QtWidgets.QStyle.State_HasFocus
+        keyboard_focus = getattr(QtWidgets.QStyle, "State_KeyboardFocusChange", None)
+        if keyboard_focus is not None:
+            option.state |= keyboard_focus
+        option.backgroundColor = self.palette().color(QtGui.QPalette.Window)
+        painter = QtGui.QPainter(self)
+        self.style().drawPrimitive(QtWidgets.QStyle.PE_FrameFocusRect, option, painter, self)
+
 
 class HotkeySectionItemWidget(HotkeySelectableItemWidget):
     def __init__(self, section, row_index=0, parent=None):
-        super().__init__(parent, base_color="#2b2b2b" if row_index % 2 == 0 else "#2e2e2e")
+        super().__init__(
+            parent,
+            base_color="#2b2b2b" if row_index % 2 == 0 else "#2e2e2e",
+            selected_color="#5f88a8",
+        )
         self.section_id = section["id"]
 
         layout = QtWidgets.QHBoxLayout(self)
@@ -1184,7 +1201,7 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
     requestSelect = QtCore.Signal(str)
     invokeRequested = QtCore.Signal(str)
     TITLE_STYLESHEET = (
-        "QPushButton#HotkeyCommandTitle{background:transparent;border:none;border-radius:0px;color:#d0d0d0;font-size:%spx;text-align:left;padding-left:0px;}"
+        "QPushButton#HotkeyCommandTitle{background:transparent;border:none;border-radius:0px;color:#d0d0d0;font-size:%spx;text-align:left;padding:0px %spx;}"
         "QPushButton#HotkeyCommandTitle:pressed{background-color:#1f1f1f;border:none;border-radius:0px;}"
     )
 
@@ -1237,7 +1254,7 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         self.hotkey_button.setFlat(True)
         self.hotkey_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.hotkey_button.setObjectName("HotkeyCommandTitle")
-        self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % wutil.DPI(12))
+        self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % (wutil.DPI(12), wutil.DPI(6)))
         self.hotkey_button.setMinimumHeight(wutil.DPI(22))
         self.hotkey_button.clicked.connect(lambda: self.invokeRequested.emit(self.command_name()))
         layout.addWidget(self.hotkey_button, 1)
@@ -1253,7 +1270,8 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         self.edit.comboChanged.connect(lambda value: self.comboChanged.emit(self.command_name(), value))
         layout.addWidget(self.edit, 0)
 
-        for watched in self._hover_targets():
+        self.clicked.connect(lambda: self.requestSelect.emit(self.command_name()))
+        for watched in self._selection_targets():
             watched.setMouseTracking(True)
             watched.installEventFilter(self)
 
@@ -1293,10 +1311,16 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
 
     def set_selected(self, selected):
         super().set_selected(selected)
-        self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % wutil.DPI(12))
+        self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % (wutil.DPI(12), wutil.DPI(6)))
 
     def _hover_targets(self):
         return (self.hotkey_button,)
+
+    def _selection_targets(self):
+        targets = [self.hotkey_button, self.icon_label, self.status_label, self.edit]
+        if self.check_box is not None:
+            targets.append(self.check_box)
+        return tuple(targets)
 
     def _set_hovered(self, hovered):
         hovered = bool(hovered)
@@ -1353,6 +1377,8 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         super().leaveEvent(event)
 
     def eventFilter(self, watched, event):
+        if watched in self._selection_targets() and event.type() in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.FocusIn):
+            self.requestSelect.emit(self.command_name())
         if watched in self._hover_targets():
             if event.type() == QtCore.QEvent.Enter:
                 self._set_hovered(True)
@@ -1506,13 +1532,12 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         command_list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         command_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         command_palette = command_list.palette()
-        command_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor("#5f88a8"))
-        command_palette.setColor(QtGui.QPalette.HighlightedText, QtGui.QColor("#ffffff"))
+        command_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(0, 0, 0, 0))
+        command_palette.setColor(QtGui.QPalette.HighlightedText, QtGui.QColor("#d0d0d0"))
         command_list.setPalette(command_palette)
         command_list.setStyleSheet(
             "#HotkeyCommandList{background:#2b2b2b;border:1px solid #3a3a3a;color:#d0d0d0;}"
-            "#HotkeyCommandList::item{margin:0px;padding:0px;border:none;}"
-            "#HotkeyCommandList::item:selected{margin:0px;padding:0px;border:none;background:transparent;}"
+            "#HotkeyCommandList::item{margin:0px;padding:0px;}"
         )
         command_list.currentItemChanged.connect(
             lambda current, previous, sid=section_id: self._on_command_item_changed(sid, current, previous)
@@ -1708,9 +1733,8 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         return _copy_hotkey_mapping(self._draft_mapping)
 
     def _invoke_command(self, command_name):
-        callback = trigger.get_command(command_name)
-        if callable(callback):
-            callback()
+        if trigger.has_command(command_name):
+            trigger.execute_command(command_name)
 
     def _on_row_combo_changed(self, command_name, combo):
         if combo:

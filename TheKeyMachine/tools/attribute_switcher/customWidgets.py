@@ -1536,26 +1536,31 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
             dictionary_xforms = {}
             current_time = cmds.currentTime(q=True)
             interrupted = False
-            with toolCommon.AdaptiveProgress("Saving Positions", max_bar_value, interruptable=True) as progress:
-                for frame, targets in keyframes.items():
-                    if progress.cancelled:
-                        interrupted = True
-                        break
+            operation = toolCommon.current_tool_operation()
+            if operation:
+                operation.set_total(max_bar_value * 2, reset=True).set_status("Saving Positions")
+            for frame, targets in keyframes.items():
+                if operation and operation.cancelled:
+                    interrupted = True
+                    break
 
-                    cmds.currentTime(frame)
-                    dictionary_xforms[frame] = {}
-                    for t in targets:
-                        dictionary_xforms[frame][t] = cmds.xform(t, q=True, ws=True, matrix=True)
-                    progress.step()
+                cmds.currentTime(frame)
+                dictionary_xforms[frame] = {}
+                for t in targets:
+                    dictionary_xforms[frame][t] = cmds.xform(t, q=True, ws=True, matrix=True)
+                if operation:
+                    operation.step()
 
             if not interrupted:
-                with toolCommon.AdaptiveProgress("Applying Positions", max_bar_value, interruptable=False) as progress:
-                    for frame, targets in dictionary_xforms.items():
-                        cmds.currentTime(frame)
-                        for target, xform in targets.items():
-                            attr = target_attrs[target] if target_attrs else enum_attr
-                            self.do_xform(target, attr, enum_value, xform)
-                        progress.step()
+                if operation:
+                    operation.set_status("Applying Positions")
+                for frame, targets in dictionary_xforms.items():
+                    cmds.currentTime(frame)
+                    for target, xform in targets.items():
+                        attr = target_attrs[target] if target_attrs else enum_attr
+                        self.do_xform(target, attr, enum_value, xform)
+                    if operation:
+                        operation.step()
 
             cmds.currentTime(current_time)
 
@@ -1596,11 +1601,10 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
             operation_context = toolCommon.tool_operation(
                 tool_id="attribute_switcher",
                 label="Attribute Switcher",
-                progress=False,
+                progress=True,
                 undo=True,
             )
             operation_context.__enter__()
-            cmds.refresh(suspend=True)
             self._disconnect_runtime_manager()
 
             # Save temporary keys
@@ -1641,8 +1645,6 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
                 self.apply_euler_filter(sorted_targets)
 
         finally:
-            cmds.refresh(suspend=False)
-
             # Remove temporary keys if created
             for target, attributes in temp_keyframes.items():
                 for attr, keys in attributes.items():

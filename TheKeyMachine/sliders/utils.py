@@ -125,13 +125,30 @@ def lerp_towards(left, right, t, current):
     return current
 
 
-def resolve_keyframe_targets():
+def _has_key_at_time(target, time):
+    """Return whether a plug or anim curve has a key at the given time."""
+    try:
+        return bool(cmds.keyframe(target, query=True, time=(time, time), timeChange=True))
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return False
+
+
+def resolve_keyframe_targets(session=None):
     """Unified entry for resolving attribute plugs and affected times."""
-    plugs, _src, time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
+    plugs, src, time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
     if not plugs:
         return {}, time_range
 
     curr = cmds.currentTime(q=True)
+
+    # With only an object selection, operate on the channels that are keyed now.
+    # Explicit graph-editor, channel-box, and time-range contexts retain their
+    # normal targeting behavior.
+    if src == "keyable_scalar" and not time_range:
+        plugs = [plug for plug in plugs if _has_key_at_time(plug, curr)]
+        if not plugs:
+            return {}, time_range
+
     affected = {}
     tangent_fs = set()
     if has_graph_keys:
@@ -151,13 +168,21 @@ def resolve_keyframe_targets():
     return affected, time_range
 
 
-def resolve_curve_targets():
+def resolve_curve_targets(session=None):
     """Unified entry for resolving whole curves and affected times."""
-    curves, _src, time_range, has_graph_keys = selectionMod.resolve_target_curves()
+    curves, src, time_range, has_graph_keys = selectionMod.resolve_target_curves()
     if not curves:
         return [], {}, time_range, has_graph_keys
 
     curr = cmds.currentTime(q=True)
+
+    # Keep curve-based slider modes consistent with plug-based modes: absent
+    # a more specific selection, only curves keyed at the current time qualify.
+    if src == "keyable_scalar" and not time_range:
+        curves = [curve for curve in curves if _has_key_at_time(curve, curr)]
+        if not curves:
+            return [], {}, time_range, has_graph_keys
+
     times_map = {}
     for c in curves:
         if has_graph_keys:

@@ -11,7 +11,7 @@ from . import utils
 def _resolve_targets_for_session(session):
     """Reuse centralized resolution logic."""
     if not session.targets.resolved:
-        curves, times_map, time_range, has_graph_keys = utils.resolve_curve_targets()
+        curves, times_map, time_range, has_graph_keys = utils.resolve_curve_targets(session)
         session.targets.curves = curves
         session.targets.affected_map = times_map
         session.targets.time_range = time_range

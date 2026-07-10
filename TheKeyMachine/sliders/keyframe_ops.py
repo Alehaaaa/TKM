@@ -32,7 +32,7 @@ def _right_frame_from_time_range(time_range):
 def _resolve_keyframe_targets_for_session(session):
     """Cache the resolved keyframe target map on the session."""
     if not session.targets.resolved:
-        affected_map, time_range = utils.resolve_keyframe_targets()
+        affected_map, time_range = utils.resolve_keyframe_targets(session)
         session.targets.affected_map = affected_map
         session.targets.time_range = time_range
         session.targets.resolved = True
@@ -109,7 +109,7 @@ def prepare_tween_data(session, objs=None, attrs=None, attr_plugs=None, time_ran
             affected_map = {p: t for p in attr_plugs}
     else:
         # Resolve from scratch
-        affected_map, _tr = utils.resolve_keyframe_targets()
+        affected_map, _tr = utils.resolve_keyframe_targets(session)
         if time_range is None:
             time_range = _tr
 
