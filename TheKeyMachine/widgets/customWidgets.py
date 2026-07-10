@@ -159,15 +159,26 @@ def _tool_status_description(data):
 
 def _tooltip_state_from_data(data, *, display_text=None):
     data = dict(data or {})
+    tooltip = data.get("tooltip")
+    description = data.get("description")
+    tooltip_template = data.get("tooltip_template")
+    if isinstance(tooltip, str):
+        description = description or tooltip
+    elif tooltip is not None:
+        tooltip_template = tooltip_template or tooltip
     title = _tool_command_label(data)
     state = {
         "text": title,
-        "description": data.get("description"),
+        "description": description,
         "shortcuts": data.get("shortcuts"),
-        "tooltip_template": data.get("tooltip_template"),
+        "tooltip_template": tooltip_template,
         "icon": data.get("icon"),
         "status_title": title,
-        "status_description": _tool_status_description(data),
+        "status_description": _status_description(
+            description=description,
+            status_description=data.get("status_description"),
+            tooltip_template=tooltip_template,
+        ),
         "command_id": data.get("id"),
         "command_label": title,
         "command_icon": data.get("icon"),
@@ -429,6 +440,17 @@ class MenuWidget(QtWidgets.QMenu):
                 label = arg
                 break
 
+        if command_id:
+            try:
+                from TheKeyMachine.core import toolbox
+
+                toolbox_tooltip = toolbox.get_tool(command_id).get("tooltip")
+            except Exception:
+                toolbox_tooltip = None
+            if isinstance(toolbox_tooltip, str):
+                description = toolbox_tooltip
+                tooltip_template = None
+
         title = label_override or toolCommon.get_tooltip_title(tooltip_template) or label or action.text()
         if command_id is None:
             command_id = self._trigger_command_from_callback(metadata_callback)
@@ -437,7 +459,7 @@ class MenuWidget(QtWidgets.QMenu):
             def _invoke_menu_callback(
                 checked=False,
                 cb=metadata_callback,
-                pass_checked=bool(positional_callback and self._callback_accepts_checked(positional_callback)),
+                pass_checked=self._callback_accepts_checked(metadata_callback),
             ):
                 def _run():
                     call_args = (checked,) if pass_checked else ()
@@ -451,7 +473,19 @@ class MenuWidget(QtWidgets.QMenu):
 
                 QtCore.QTimer.singleShot(0, _run)
 
-            action.triggered.connect(_invoke_menu_callback)
+            # Menu builders commonly call setCheckable/setChecked immediately
+            # after addAction returns.  Defer choosing the signal until those
+            # properties have been initialized; this also prevents setChecked
+            # from executing the action callback while the menu is built.
+            def _connect_menu_callback(target=action):
+                if not QtCompat.isValid(target):
+                    return
+                if not target.isCheckable():
+                    target.triggered.connect(_invoke_menu_callback)
+                else:
+                    target.toggled.connect(lambda checked: _invoke_menu_callback(checked))
+
+            QtCore.QTimer.singleShot(0, _connect_menu_callback)
 
         resolved_description = _status_description(
             description=description or "",
@@ -471,6 +505,15 @@ class MenuWidget(QtWidgets.QMenu):
         action = item.menuAction() if hasattr(item, "menuAction") else item
 
         label = action.text()
+        if command_id:
+            try:
+                from TheKeyMachine.core import toolbox
+
+                toolbox_tooltip = toolbox.get_tool(command_id).get("tooltip")
+            except Exception:
+                toolbox_tooltip = None
+            if isinstance(toolbox_tooltip, str):
+                description = toolbox_tooltip
         self._set_action_help(action, label, description, command_id=command_id, command_icon=command_icon)
         return item
 
@@ -1892,11 +1935,20 @@ class QFlowContainer(QtWidgets.QWidget):
     columnLayout wrapper doesn't propagate Qt's heightForWidth protocol.
     """
 
+    heightChanged = QtCore.Signal(int)
+
     def sizeHint(self):
-        return self.minimumSize()
+        lay = self.layout()
+        if lay is None:
+            return super().sizeHint()
+        width = max(1, self.width())
+        height = lay.heightForWidth(width) if lay.hasHeightForWidth() else lay.sizeHint().height()
+        return QtCore.QSize(lay.sizeHint().width(), max(0, height))
 
     def minimumSizeHint(self):
-        return self.minimumSize()
+        # Do not feed the previous setFixedHeight() back into Maya's dock
+        # layout. The flow layout is the sole source of the current height.
+        return QtCore.QSize(0, 0)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1905,9 +1957,13 @@ class QFlowContainer(QtWidgets.QWidget):
     def _update_height(self):
         lay = self.layout()
         if lay is not None and lay.hasHeightForWidth():
-            new_h = lay.heightForWidth(self.width())
+            lay.invalidate()
+            lay.activate()
+            new_h = lay.heightForWidth(max(1, self.contentsRect().width()))
             if new_h > 0 and self.height() != new_h:
                 self.setFixedHeight(new_h)
+                self.updateGeometry()
+                self.heightChanged.emit(new_h)
 
 
 class QFlatToolbar(QFlowContainer):
@@ -1916,7 +1972,16 @@ class QFlatToolbar(QFlowContainer):
     multiple QFlatSectionWidgets and dynamically updates its height.
     """
 
-    def __init__(self, parent=None, settings_namespace=None, margin=2, spacing_w=10, spacing_h=6, alignment=None):
+    def __init__(
+        self,
+        parent=None,
+        settings_namespace=None,
+        margin=2,
+        vertical_margin=6,
+        spacing_w=10,
+        spacing_h=6,
+        alignment=None,
+    ):
         super().__init__(parent)
         self.setObjectName("tkm_flat_toolbar")
         self._tkm_sections = []
@@ -1929,6 +1994,12 @@ class QFlatToolbar(QFlowContainer):
             Wspacing=spacing_w,
             Hspacing=spacing_h,
             alignment=alignment or QtCore.Qt.AlignLeft
+        )
+        layout.setContentsMargins(
+            margin,
+            DPI(vertical_margin),
+            margin,
+            DPI(vertical_margin),
         )
         self.setLayout(layout)
 
@@ -2110,7 +2181,9 @@ class QFlatSectionWidget(QtWidgets.QWidget):
     def __init__(self, parent=None, spacing=0, hiddeable=True, settings_namespace=None, color=None):
         super().__init__(parent)
         self.setLayout(QtWidgets.QHBoxLayout())
-        self.layout().setContentsMargins(0, 3, 0, 3)
+        # Vertical padding belongs to QFlatToolbar's flow layout. Keeping it
+        # here as well creates a second, harder-to-reason-about margin layer.
+        self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(spacing)
         self._hiddeable = hiddeable
         self._settings_namespace = settings_namespace
@@ -2859,35 +2932,130 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 class QFlatShelfPainter(QtWidgets.QWidget):
     def __init__(self, parent=None):
         QtWidgets.QWidget.__init__(self, parent)
+        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+        self.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
         self.tabbar_width = DPI(16)
         self.line_thickness = DPI(1)
         self.line_color = QtGui.QColor(130, 130, 130)
         self.margin = DPI(4)
         self.center = DPI(5)
         self.offset = DPI(1.5)
+        self._tab_handle = None
+        self._tab_bar = None
+        self._height_source = None
+        self._geometry_sync_pending = False
+        self._source_geometry = None
+        self._geometry_timer = QtCore.QTimer(self)
+        self._geometry_timer.setInterval(50)
+        self._geometry_timer.timeout.connect(self._syncToWorkspaceGeometry)
+
+    def attach(self, tab_handle, tab_bar, height_source):
+        """Track the workspace-control height and tab-handle position."""
+        self._tab_handle = tab_handle
+        self._tab_bar = tab_bar
+        self._height_source = height_source
+        for watched in (tab_handle, tab_bar, height_source):
+            if watched and QtCompat.isValid(watched):
+                watched.installEventFilter(self)
+        self.syncGeometry()
+        self._geometry_timer.start()
+
+    def _syncToWorkspaceGeometry(self):
+        """Follow native Maya geometry changes that do not emit Qt signals."""
+        if not all(
+            widget and QtCompat.isValid(widget)
+            for widget in (self._tab_handle, self._tab_bar, self._height_source)
+        ):
+            self._geometry_timer.stop()
+            return
+        geometry = self._height_source.geometry()
+        workspace_bottom = self._height_source.mapTo(
+            self._tab_handle,
+            QtCore.QPoint(0, self._height_source.height()),
+        ).y()
+        tab_position = self._tab_bar.mapTo(self._tab_handle, QtCore.QPoint(0, 0))
+        signature = (
+            geometry.x(), geometry.y(), geometry.width(), geometry.height(),
+            workspace_bottom, tab_position.x(), self._tab_bar.width(),
+        )
+        if signature != self._source_geometry:
+            self.syncGeometry()
+
+    def syncGeometry(self):
+        if not all(
+            widget and QtCompat.isValid(widget)
+            for widget in (self._tab_handle, self._tab_bar, self._height_source)
+        ):
+            return
+        # Anchor the top to the dock pane and the bottom directly to the mapped
+        # workspaceControl geometry. Only x/width come from Maya's tab bar.
+        tab_top_left = self._tab_bar.mapTo(self._tab_handle, QtCore.QPoint(0, 0))
+        workspace_bottom = self._height_source.mapTo(
+            self._tab_handle,
+            QtCore.QPoint(0, self._height_source.height()),
+        ).y()
+        source_geometry = self._height_source.geometry()
+        self._source_geometry = (
+            source_geometry.x(), source_geometry.y(),
+            source_geometry.width(), source_geometry.height(),
+            workspace_bottom, tab_top_left.x(), self._tab_bar.width(),
+        )
+        tab_width = max(1, self._tab_bar.width())
+        self.setGeometry(
+            tab_top_left.x(),
+            0,
+            tab_width,
+            max(1, workspace_bottom),
+        )
+        self.tabbar_width = tab_width
+        self.raise_()
+        self.update()
+
+    def eventFilter(self, watched, event):
+        if watched in (self._tab_handle, self._tab_bar, self._height_source) and event.type() in (
+            QtCore.QEvent.Resize,
+            QtCore.QEvent.Move,
+            QtCore.QEvent.LayoutRequest,
+            QtCore.QEvent.Show,
+        ):
+            self._queueGeometrySync()
+        return super().eventFilter(watched, event)
+
+    def _queueGeometrySync(self):
+        if self._geometry_sync_pending:
+            return
+        self._geometry_sync_pending = True
+
+        def apply_geometry():
+            self._geometry_sync_pending = False
+            if QtCompat.isValid(self):
+                self.syncGeometry()
+
+        QtCore.QTimer.singleShot(0, apply_geometry)
 
     def paintEvent(self, event):
-        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
-
         color = self.palette().color(self.backgroundRole())
         painter = QtGui.QPainter(self)
         painter.setPen(QtGui.QPen(color, self.tabbar_width))
         painter.drawLine(self.tabbar_width // 2, 0, self.tabbar_width // 2, self.height())
 
         pen = QtGui.QPen(self.line_color)
-        pen.setWidth(1)  # Line width of 1 pixel
-        pen.setStyle(QtCore.Qt.CustomDashLine)  # Enable custom dash pattern
-        pen.setDashPattern([0.01, DPI(3)])  # 1 pixel dot, 1 pixel space
+        pen.setWidth(max(1, self.line_thickness))
+        pen.setCapStyle(QtCore.Qt.RoundCap)
         painter.setPen(pen)
 
-        painter.drawLine(
-            QtCore.QPointF(self.center - self.offset, self.margin / 3),
-            QtCore.QPointF(self.center - self.offset, self.height() - self.margin),
-        )
-        painter.drawLine(
-            QtCore.QPointF(self.center + self.offset, self.margin / 3),
-            QtCore.QPointF(self.center + self.offset, self.height() - self.margin),
-        )
+        top = float(self.margin)
+        bottom = float(self.height() - self.margin)
+        available = max(0.0, bottom - top)
+        dot_count = max(2, int(available // max(1, DPI(3))) + 1)
+        spacing = available / float(dot_count - 1)
+        for index in range(dot_count):
+            y = top + spacing * index
+            painter.drawPoint(QtCore.QPointF(self.center - self.offset, y))
+            painter.drawPoint(QtCore.QPointF(self.center + self.offset, y))
 
     def resizeEvent(self, event):
         self.update()

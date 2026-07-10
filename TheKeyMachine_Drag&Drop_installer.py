@@ -27,9 +27,9 @@ except Exception:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
 
-__version__ = "0.1.21"
+__version__ = "0.1.22"
 __stage__ = "beta"
-__build__ = "327"
+__build__ = "328"
 __codename__ = "Flat White"
 
 WINDOW_NAME = "TheKeyMachineInstaller"
@@ -154,6 +154,14 @@ def load_thekeymachine():
 
     TheKeyMachine = importlib.reload(TheKeyMachine)
     TheKeyMachine.welcome()
+
+
+def reload_installer_module():
+    module = sys.modules.get(__name__)
+    if module is None:
+        return None
+    importlib.invalidate_caches()
+    return importlib.reload(module)
 
 
 def install_thekeymachine(parent, install_button, status_label):
@@ -350,20 +358,26 @@ class TheKeyMachineInstallerDialog(QtWidgets.QDialog):
         self.install_button.setStyleSheet(
             """
             QPushButton {
-                background-color: #444;
-                color: #eee;
+                background-color: #224422;
+                color: #f2fff2;
                 border-radius: 5px;
                 font-weight: bold;
             }
-            QPushButton:hover {
-                background-color: #555;
+            QPushButton:enabled:hover {
+                background-color: #2f6b2f;
             }
-            QPushButton:pressed {
-                background-color: #333;
+            QPushButton:enabled:pressed {
+                background-color: #1d521d;
             }
             QPushButton:disabled {
                 background-color: #2a2a2a;
                 color: #666;
+            }
+            QPushButton:disabled:hover {
+                background-color: #2a2a2a;
+            }
+            QPushButton:disabled:pressed {
+                background-color: #2a2a2a;
             }
             """
         )
@@ -461,6 +475,10 @@ def onMayaDroppedPythonFile(*args, **kwargs):
     Some versions/tools may pass none or extra args.
     Keep *args/**kwargs so drag and drop never fails because of signature mismatch.
     """
+    try:
+        reload_installer_module()
+    except Exception:
+        traceback.print_exc()
     return TheKeyMachine_installer()
 
 

@@ -154,13 +154,18 @@ def filterMode_sync_off():
 # ---------------------------------------------------- STARTUP SCRIPT ----------------------------------------------------------------------------
 
 
+def _user_setup_path():
+    maya_app_dir = os.getenv("MAYA_APP_DIR") or cmds.internalVar(userAppDir=True)
+    return os.path.realpath(os.path.join(maya_app_dir, "scripts", "userSetup.py"))
+
+
 def check_userSetup():
-    userSetupFile = os.path.join(os.getenv("MAYA_APP_DIR"), "scripts", "userSetup.py")
+    user_setup_file = _user_setup_path()
 
     startCode = "# start TheKeyMachine"
 
     try:
-        with open(userSetupFile, "r") as input_file:
+        with open(user_setup_file, "r") as input_file:
             lines = input_file.readlines()
             for line in lines:
                 if line.strip() == startCode:
@@ -172,14 +177,14 @@ def check_userSetup():
 
 
 def install_userSetup(install=True):
-    userSetupFile = os.path.join(os.getenv("MAYA_APP_DIR"), "scripts", "userSetup.py")
+    user_setup_file = _user_setup_path()
 
     cmds_import = "from maya import cmds\n"
     newUserSetup = ""
     startCode, endCode = "# start TheKeyMachine", "# end TheKeyMachine"
 
     try:
-        with open(userSetupFile, "r") as input_file:
+        with open(user_setup_file, "r") as input_file:
             lines = input_file.readlines()
 
             # Remove existing block between startCode and endCode
@@ -213,7 +218,7 @@ def install_userSetup(install=True):
         newUserSetup += tkm_run_code
 
     # Write the updated userSetup file
-    with open(userSetupFile, "w") as output_file:
+    with open(user_setup_file, "w") as output_file:
         output_file.write(newUserSetup)
 
 

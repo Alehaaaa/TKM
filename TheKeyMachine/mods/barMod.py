@@ -1529,13 +1529,10 @@ def depth_mover(*args):
 
 def bake_animation_custom_window(*args):
     def on_bake(value, dialog):
-        try:
-            bake_interval = float(value)
-        except ValueError:
-            return wutil.make_inViewMessage("Please enter a valid number for bake interval.")
-
-        keyTools.bake_animation(bake_interval=bake_interval, window=dialog)
-        dialog.close()
+        # QFlatNumberInput supplies an integer spin-box value. Validation and
+        # dialog closing are owned by bake_animation so every entry point uses
+        # the same interval rules and lifecycle.
+        return keyTools.bake_animation(bake_interval=value, window=dialog)
 
     # close previous instances
     for widget in QtWidgets.QApplication.topLevelWidgets():

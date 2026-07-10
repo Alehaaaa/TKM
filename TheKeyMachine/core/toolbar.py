@@ -76,6 +76,8 @@ from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import customDialogs as customDialogs  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 
+QT_WIDGET_SIZE_MAX = 16777215
+
 
 mods = [
     general,
@@ -209,6 +211,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self._runtime_manager.graph_editor_opened.connect(self._on_graph_editor_opened)
 
         self.shelf_painter = None
+        self._height_update_pending = False
         self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
 
         # Initial state variables from settingsMod
@@ -417,25 +420,119 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             return tab_handle.tabBar().setVisible(False)
 
         self.shelf_painter = cw.QFlatShelfPainter(tab_handle)
-        self.shelf_painter.setGeometry(tab_handle.geometry())
-        self.shelf_painter.updateDrawingParameters(tabbar_width=tab_handle.tabBar().geometry())
-        self.shelf_painter.move(tab_handle.tabBar().pos())
+        self.shelf_painter.attach(tab_handle, tab_handle.tabBar(), control)
 
         self.shelf_painter.show()
         # tab_handle.tabBar().setVisible(True)
 
     def update_height(self):
-        if not self.isFloating():
-            tkm_widget = mui.MQtUtil.findControl(WORKSPACE_CONTROL_NAME)
-            if not tkm_widget:
-                return
-            tkm_ui = wutil.get_maya_qt(tkm_widget, QtWidgets.QWidget)
-            tkm_ui = tkm_ui.parent().parent()
+        if not QtCompat.isValid(self):
+            return
+        tkm_widget = mui.MQtUtil.findControl(WORKSPACE_CONTROL_NAME)
+        if not tkm_widget:
+            return
+        workspace_widget = wutil.get_maya_qt(tkm_widget, QtWidgets.QWidget)
+        if workspace_widget is None or not QtCompat.isValid(workspace_widget):
+            return
 
-            self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        try:
+            parent = workspace_widget.parentWidget()
+            dock_container = parent.parentWidget() if parent and QtCompat.isValid(parent) else None
+
+            if self.isFloating():
+                for widget in (self, workspace_widget, dock_container):
+                    self._set_qt_height(widget)
+                return
+
             self.main_toolbar_widget._update_height()
-            tkm_ui.resize(tkm_ui.width(), wutil.DPI(self.main_toolbar_widget.height() + 4))
-            # tkm_ui.setFixedHeight(wutil.DPI(self.main_toolbar_widget.height() + 4))
+            # QFlowLayout already includes its equal top and bottom contents
+            # margins. Extra outer height collects below the fixed flow widget
+            # and makes the bottom padding appear larger than the top.
+            target_height = max(1, int(self.main_toolbar_widget.height()))
+
+            # Keep Maya's workspaceControl sizing policy untouched. Lock only the
+            # hosted Qt widgets; setFixedHeight can then be revised whenever the
+            # flow container reports a different content height.
+            self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+            for widget in (self, workspace_widget):
+                self._set_qt_height(widget, target_height)
+
+            # Maya places the workspace child below a small native frame/tab
+            # inset. Give the dock pane the same allowance below the child so
+            # the flow layout's bottom margin is not clipped by that frame.
+            dock_height = target_height
+            if dock_container is not None and QtCompat.isValid(dock_container):
+                workspace_top = workspace_widget.mapTo(
+                    dock_container,
+                    QtCore.QPoint(0, 0),
+                ).y()
+                dock_height += max(0, int(workspace_top) * 2)
+                self._set_qt_height(dock_container, dock_height)
+            self._resize_dock_splitter(workspace_widget, dock_height)
+            if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
+                self.shelf_painter.syncGeometry()
+        except RuntimeError:
+            # Maya may destroy/rebuild a workspaceControl between a deferred
+            # validity check and the following Qt call. A later layout event
+            # will reacquire the current control and apply the height again.
+            return
+
+    @staticmethod
+    def _set_qt_height(widget, height=None):
+        """Set or release a Qt height without touching workspaceControl flags."""
+        if widget is None or not QtCompat.isValid(widget):
+            return
+        if height is None:
+            widget.setMinimumHeight(0)
+            widget.setMaximumHeight(QT_WIDGET_SIZE_MAX)
+        else:
+            widget.setFixedHeight(int(height))
+
+    @staticmethod
+    def _resize_dock_splitter(workspace_widget, target_height):
+        """Make Maya's vertical dock splitter honor a content-driven height."""
+        if workspace_widget is None or not QtCompat.isValid(workspace_widget):
+            return
+        child = workspace_widget
+        parent = child.parentWidget()
+        while parent is not None and QtCompat.isValid(parent):
+            if isinstance(parent, QtWidgets.QSplitter) and parent.orientation() == QtCore.Qt.Vertical:
+                direct_child = child
+                while direct_child.parentWidget() is not parent:
+                    direct_child = direct_child.parentWidget()
+                    if direct_child is None:
+                        return
+                index = parent.indexOf(direct_child)
+                sizes = parent.sizes()
+                if index < 0 or index >= len(sizes):
+                    return
+
+                difference = int(target_height) - sizes[index]
+                sizes[index] = int(target_height)
+                other_indices = [i for i in range(len(sizes)) if i != index]
+                if other_indices:
+                    # Exchange space with the largest neighboring pane. This
+                    # works for both growth and shrinkage without resizing the
+                    # Maya main window itself.
+                    donor = max(other_indices, key=lambda i: sizes[i])
+                    sizes[donor] = max(1, sizes[donor] - difference)
+                parent.setSizes(sizes)
+                parent.updateGeometry()
+                return
+            child = parent
+            parent = parent.parentWidget()
+
+    def _on_toolbar_content_height_changed(self, _height):
+        if self._height_update_pending:
+            return
+        self._height_update_pending = True
+
+        def _apply_height():
+            self._height_update_pending = False
+            if QtCompat.isValid(self):
+                self.update_height()
+
+        QtCore.QTimer.singleShot(0, _apply_height)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -675,6 +772,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             spacing_h=6,
             alignment=toolbar_alignment,
         )
+        self.main_toolbar_widget.heightChanged.connect(self._on_toolbar_content_height_changed)
         self.main_layout.addWidget(self.main_toolbar_widget)
 
         def new_section(spacing=0, hiddeable=True, color=None):

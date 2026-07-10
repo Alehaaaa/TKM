@@ -13,6 +13,7 @@ except ImportError:
     om = None
 
 import TheKeyMachine.core.openMayaUtils as omutils
+from TheKeyMachine.core import curveFitting
 from . import mode_values, utils
 
 
@@ -439,17 +440,6 @@ def _selected_tint_range(target_times_per_curve):
     return min(frames), max(frames)
 
 
-def _connect_neighbor_tint_range(direction, current_time, neighbor_times):
-    candidates = [time for time in neighbor_times if time is not None]
-    if not candidates:
-        return None
-    if direction < 0:
-        neighbor = min(candidates)
-    else:
-        neighbor = max(candidates)
-    return min(current_time, neighbor), max(current_time, neighbor)
-
-
 def _implicit_connect_block(direction, current_time, all_keys):
     left_keys = [time for time in all_keys if time < current_time]
     right_keys = [time for time in all_keys if time > current_time]
@@ -457,17 +447,15 @@ def _implicit_connect_block(direction, current_time, all_keys):
     if direction < 0:
         if not left_keys:
             return [], None
-        next_time = right_keys[0] if right_keys else current_time
-        block = [current_time]
-        block.extend(time for time in all_keys if current_time < time <= next_time)
-        return sorted(set(block)), left_keys[-1]
+        # The target is left of the current key, so shift the current key and
+        # the entire opposite (right) side by one uniform offset.
+        return [time for time in all_keys if time >= current_time], left_keys[-1]
 
     if not right_keys:
         return [], None
-    previous_time = left_keys[-1] if left_keys else current_time
-    block = [time for time in all_keys if previous_time <= time < current_time]
-    block.append(current_time)
-    return sorted(set(block)), right_keys[0]
+    # The target is right of the current key, so shift the current key and the
+    # entire opposite (left) side by one uniform offset.
+    return [time for time in all_keys if time <= current_time], right_keys[0]
 
 
 def apply_connect_neighbors(session, curves, amount):
@@ -477,10 +465,7 @@ def apply_connect_neighbors(session, curves, amount):
     factor = min(1.0, max(0.0, abs(amount)))
     current_time = float(cmds.currentTime(query=True))
     has_selected_range = bool(session.targets.has_graph_keys or session.targets.time_range)
-    neighbor_tint_times = []
-
-    if has_selected_range:
-        session.show_tint(session.targets.time_range or _selected_tint_range(target_times_per_curve))
+    affected_tint_times = []
 
     for curve in resolved_curves:
         resolved_keys = sorted(float(t) for t in (target_times_per_curve.get(curve, []) or []))
@@ -515,9 +500,7 @@ def apply_connect_neighbors(session, curves, amount):
         if anchor_value is None or neighbor_value is None:
             continue
 
-        if not has_selected_range:
-            neighbor_tint_times.append(neighbor_time)
-
+        affected_tint_times.extend(keys)
         offset = (neighbor_value - anchor_value) * factor
         for time in keys:
             value = _cached_value_at_time(session, curve, time)
@@ -525,8 +508,8 @@ def apply_connect_neighbors(session, curves, amount):
                 continue
             _set_connect_value(session, curve, time, value + offset)
 
-    if not has_selected_range:
-        session.show_tint(_connect_neighbor_tint_range(direction, current_time, neighbor_tint_times))
+    if affected_tint_times:
+        session.show_tint((min(affected_tint_times), max(affected_tint_times)))
 
 
 def apply_gap_stitcher(session, curves, amount):
@@ -534,13 +517,97 @@ def apply_gap_stitcher(session, curves, amount):
 
 
 def apply_simplify(session, curves, amount):
-    apply_smooth(session, curves, min(1.0, max(0.0, amount)))
+    """Progressively remove keys and refit each surviving cubic span."""
+    resolved_curves, affected_map = _resolve_targets_for_session(session)
+    amount = min(1.0, max(0.0, float(amount)))
+    for curve in resolved_curves:
+        keys = sorted(set(float(time) for time in affected_map.get(curve, [])))
+        if len(keys) <= 2:
+            continue
+
+        priority_cache_key = (curve, "simplify_detail_priority", tuple(keys))
+        priority_data = session.cache.frame_data.get(priority_cache_key)
+        if priority_data is None:
+            priority_data = curveFitting.detail_priority_with_scores(curve, keys)
+            session.cache.frame_data[priority_cache_key] = priority_data
+        priority, detail_scores = priority_data
+
+        removable = len(keys) - 2
+        steady_count = sum(1 for frame in priority if detail_scores.get(frame, 0.0) <= 0.01)
+        if steady_count:
+            steady_phase_end = 0.35
+            if amount <= steady_phase_end:
+                remove_count = int(round(steady_count * amount / steady_phase_end))
+            else:
+                detail_progress = (amount - steady_phase_end) / (1.0 - steady_phase_end)
+                remove_count = steady_count + int(round((removable - steady_count) * detail_progress))
+        else:
+            remove_count = int(round(removable * amount))
+        keep_count = max(2, len(keys) - min(removable, remove_count))
+        if keep_count == len(keys):
+            continue
+
+        kept_set = {keys[0], keys[-1]}
+        kept_set.update(priority[: max(0, keep_count - 2)])
+        kept = sorted(kept_set)
+        removed = [time for time in keys if time not in kept_set]
+        shape = curveFitting.capture([curve], kept)
+        if session.preview and session.anim_change is not None:
+            curve_fn = omutils.anim_curve_fn(curve)
+            # Remove backwards so API key indices remain stable.
+            for time in reversed(removed):
+                omutils.remove_anim_curve_key(curve_fn, time, change=session.anim_change)
+            curveFitting.apply(
+                shape,
+                set_values=False,
+                change=session.anim_change,
+                preserve_tangent_types=True,
+            )
+        else:
+            for time in removed:
+                cmds.cutKey(curve, time=(time, time), clear=True)
+            curveFitting.apply(shape, set_values=False, preserve_tangent_types=True)
+
+    if session.targets.time_range:
+        session.show_tint(session.targets.time_range)
 
 
 def apply_bake(session, curves, amount):
-    count = max(1, int(round(abs(amount) * 4.0)))
-    for _ in range(count):
-        add_random_keys(session, curves, amount)
+    """Progressively insert uniform, shape-preserving keys up to every frame."""
+    resolved_curves, affected_map = _resolve_targets_for_session(session)
+    amount = min(1.0, max(0.0, float(amount)))
+    if amount <= 0.0:
+        return
+    for curve in resolved_curves:
+        keys = sorted(set(float(time) for time in affected_map.get(curve, [])))
+        if len(keys) < 2:
+            continue
+        existing = set(cmds.keyframe(curve, query=True, time=(keys[0], keys[-1]), timeChange=True) or [])
+        full_frame_targets = curveFitting.sample_times(keys[0], keys[-1], 1)
+        missing = [frame for frame in full_frame_targets if frame not in existing]
+        add_count = min(len(missing), int(round(len(missing) * amount)))
+        if add_count <= 0:
+            continue
+        if add_count == len(missing):
+            targets = missing
+        elif add_count == 1:
+            targets = [missing[len(missing) // 2]]
+        else:
+            target_indices = {
+                int(round(index * (len(missing) - 1) / float(add_count - 1)))
+                for index in range(add_count)
+            }
+            targets = [frame for index, frame in enumerate(missing) if index in target_indices]
+        if session.preview and session.anim_change is not None:
+            curve_fn = omutils.anim_curve_fn(curve)
+            for frame in targets:
+                omutils.add_anim_curve_key(curve_fn, frame, change=session.anim_change)
+        else:
+            for frame in targets:
+                cmds.setKeyframe(curve, time=(frame,), insert=True)
+
+    if session.targets.time_range:
+        session.show_tint(session.targets.time_range)
 
 
 # ---------------------------------------------------------------------------------------------------------------------

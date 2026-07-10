@@ -78,6 +78,7 @@ def apply_attr_curve_value(
     use_direct_attr=False,
     curve=None,
     key_index=None,
+    create_key=False,
 ):
     attr_value = clamp_attr_value(attr_full, omutils.anim_curve_value_to_attr_value(curve, value))
     if use_direct_attr:
@@ -93,6 +94,8 @@ def apply_attr_curve_value(
         return
 
     if curve and key_index is not None and not key_exists(omutils.anim_curve_fn(curve), current_time):
+        if not create_key:
+            return
         _set_curve_key_value_with_cmds(curve, current_time, value)
         return
 

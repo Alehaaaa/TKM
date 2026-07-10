@@ -28,39 +28,115 @@ import TheKeyMachine.widgets.customWidgets as cw
 from TheKeyMachine.widgets import util as wutil
 
 
-TOOLBAR_ALIGNMENT_NAMES = ("Left", "Center", "Right")
+TOOLBAR_ALIGNMENTS = {
+    "Left": QtCore.Qt.AlignLeft,
+    "Center": QtCore.Qt.AlignHCenter,
+    "Right": QtCore.Qt.AlignRight,
+}
+TOOLBAR_ALIGNMENT_NAMES = tuple(TOOLBAR_ALIGNMENTS)
 
 
 def toolbar_alignment_map():
-    return {
-        "Left": QtCore.Qt.AlignLeft,
-        "Center": QtCore.Qt.AlignHCenter,
-        "Right": QtCore.Qt.AlignRight,
-    }
+    return dict(TOOLBAR_ALIGNMENTS)
 
 
 def toolbar_alignment_value(alignment_name):
-    return toolbar_alignment_map().get(alignment_name, QtCore.Qt.AlignHCenter)
+    return TOOLBAR_ALIGNMENTS.get(alignment_name, QtCore.Qt.AlignHCenter)
 
 
 TOOLBAR_ALIGNMENT_LABEL = "Align %s"
 TOOLBAR_ALIGNMENT_DESC = "Align toolbar icons to the %s."
 
 
+def update_show_tooltips(value):
+    """Persist and immediately apply the shared tooltip preference."""
+    from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
+
+    enabled = bool(value)
+    settings.set_setting("show_tooltips", enabled)
+    QFlatTooltipManager.enabled = enabled
+
+
 def _source_tool_key(source_widget):
     return getattr(source_widget, "_section_key", None) if source_widget else None
+
+
+def _qicon(icon):
+    return icon if isinstance(icon, QtGui.QIcon) else QtGui.QIcon(icon or "")
+
+
+def _toolbox_tooltip(tool_id):
+    if not tool_id:
+        return ""
+    try:
+        from TheKeyMachine.core import toolbox
+
+        tooltip = toolbox.get_tool(tool_id).get("tooltip")
+    except Exception:
+        tooltip = ""
+    return tooltip if isinstance(tooltip, str) else ""
+
+
+def _add_action(
+    menu,
+    label,
+    callback=None,
+    *,
+    icon=None,
+    description="",
+    tooltip_template=None,
+    command_id=None,
+    command_icon=None,
+    open_menu=False,
+):
+    if command_id:
+        description = _toolbox_tooltip(command_id) or description
+    args = (_qicon(icon), label) if icon is not None else (label,)
+    return menu.addAction(
+        *args,
+        callback=callback,
+        description=description or "",
+        tooltip_template=tooltip_template,
+        command_id=command_id,
+        command_icon=command_icon,
+        open=open_menu,
+    )
+
+
+def _add_checkable_action(menu, label, callback, checked=False, group=None, **kwargs):
+    action = _add_action(menu, label, callback=callback, **kwargs)
+    action.setCheckable(True)
+    if group is not None:
+        group.addAction(action)
+    action.setChecked(bool(checked))
+    return action
+
+
+def _add_action_specs(menu, specs):
+    actions = []
+    for spec in specs:
+        if spec is None or spec == "separator":
+            menu.addSeparator()
+            continue
+        actions.append(_add_action(menu, **spec))
+    return actions
+
+
+def _apply_checked_value(setter, value, checked):
+    if checked:
+        return setter(value)
+    return None
 
 
 def _add_toolbox_action(menu, tool_id):
     from TheKeyMachine.core import toolbox
 
     tool = toolbox.get_tool(tool_id)
-    action = menu.addAction(
-        QtGui.QIcon(tool.get("icon") or ""),
+    action = _add_action(
+        menu,
         tool.get("menu_label") or tool.get("label", tool_id),
         callback=None if tool.get("setting_toggle") else tool.get("callback"),
-        tooltip_template=tool.get("tooltip_template"),
-        description=tool.get("description") or "",
+        icon=tool.get("icon"),
         command_id=tool.get("id", tool_id),
         command_icon=tool.get("icon"),
     )
@@ -94,13 +170,13 @@ def _register_menu_builder(command_id, builder):
         pass
 
 
-def _add_registered_menu(parent_menu, menu, *, command_id, command_icon, description, builder):
+def _add_registered_menu(parent_menu, builder, *, command_id, command_icon, description=""):
     _register_menu_builder(command_id, builder)
     return parent_menu.addMenu(
-        menu,
-        description=description,
+        builder(),
         command_id=command_id,
         command_icon=command_icon,
+        description=_toolbox_tooltip(command_id) or description,
     )
 
 
@@ -111,11 +187,14 @@ def _add_exclusive_setting_actions(menu, specs, current_value, setter, group_att
         setattr(menu, group_attr, group)
 
     for label, value, description in specs:
-        action = menu.addAction(label, description=description)
-        action.setCheckable(True)
-        action.setChecked(value == current_value)
-        action.toggled.connect(lambda checked=False, v=value: setter(v) if checked else None)
-        group.addAction(action)
+        _add_checkable_action(
+            menu,
+            label,
+            partial(_apply_checked_value, setter, value),
+            checked=value == current_value,
+            group=group,
+            description=description,
+        )
     return group
 
 def _command_callback(command, is_python):
@@ -197,30 +276,26 @@ def build_custom_scripts_menu(menu, source_widget=None):
 
 
 def build_background_runners_menu(menu, source_widget=None):
-    specs = backgroundRunners.get_runner_specs()
-    for runner_id, spec in specs.items():
-        action = menu.addAction(
-            QtGui.QIcon(spec.get("icon") or ""),
-            spec.get("menu_label") or spec.get("label", runner_id),
-            description=spec.get("description") or "",
-            open=True,
-        )
-        action.setCheckable(True)
+    _ = source_widget
+    for runner_id, spec in backgroundRunners.get_runner_specs().items():
         getter = spec.get("get_enabled")
-        if callable(getter):
-            toolCommon.set_checked_safely(action, getter())
-        action.toggled.connect(lambda checked, rid=runner_id: backgroundRunners.set_runner_enabled(rid, checked))
+        action = _add_checkable_action(
+            menu,
+            spec.get("menu_label") or spec.get("label", runner_id),
+            partial(backgroundRunners.set_runner_enabled, runner_id),
+            checked=getter() if callable(getter) else False,
+            icon=spec.get("icon"),
+            description=spec.get("description") or "",
+            open_menu=True,
+        )
 
         signal = spec.get("changed_signal")
         if signal is not None and callable(getter):
-            def _sync(*_args, target=action, state_fn=getter):
-                toolCommon.set_checked_safely(target, state_fn())
-
             toolCommon.replace_tracked_connection(
                 action,
                 "_tkm_background_runner_action_sync",
                 signal,
-                _sync,
+                lambda *_args, target=action, state_fn=getter: toolCommon.set_checked_safely(target, state_fn()),
                 parent=action,
             )
     return False
@@ -359,16 +434,15 @@ def build_tangent_menu(menu, tangent_type, tangent_label, icon=None, source_widg
 
 
 def build_cycle_matcher_menu(menu, icon=None, source_widget=None):
-    def _add_action(target_key, label):
-        menu.addAction(
-            QtGui.QIcon(icon or ""),
+    _ = source_widget
+    for target_key, label in (("first", "First Key"), ("last", "Last Key")):
+        _add_action(
+            menu,
             label,
-            lambda _checked=False, k=target_key: keyTools.match_curve_cycle(target_key=k),
+            partial(keyTools.match_curve_cycle, target_key=target_key),
+            icon=icon,
             description="Match the cycle on the {}.".format(label.lower()),
         )
-
-    _add_action("first", "First Key")
-    _add_action("last", "Last Key")
 
 
 def build_tracer_menu(menu, source_widget=None):
@@ -408,45 +482,55 @@ def build_tracer_menu(menu, source_widget=None):
     menu.aboutToShow.connect(_sync_auto_update_action)
 
     menu.addSeparator()
-    menu.addAction(
-        QtGui.QIcon(icons.refresh),
-        "Refresh Tracer",
-        bar.tracer_refresh,
-        tooltip_template=helper.tracer_refresh_tooltip_text,
-    )
-    menu.addAction(
-        QtGui.QIcon(icons.tracer_show_hide),
-        "Toggle Tracer",
-        bar.tracer_show_hide,
-        tooltip_template=helper.tracer_toggle_tooltip_text,
-    )
-    menu.addAction(
-        QtGui.QIcon(icons.tracer_select_offset),
-        "Select Offset Object",
-        bar.select_tracer_offset_node,
-        tooltip_template=helper.tracer_offset_tooltip_text,
+    _add_action_specs(
+        menu,
+        (
+            {
+                "label": "Refresh Tracer",
+                "icon": icons.refresh,
+                "callback": bar.tracer_refresh,
+                "tooltip_template": helper.tracer_refresh_tooltip_text,
+            },
+            {
+                "label": "Toggle Tracer",
+                "icon": icons.tracer_show_hide,
+                "callback": bar.tracer_show_hide,
+                "tooltip_template": helper.tracer_toggle_tooltip_text,
+            },
+            {
+                "label": "Select Offset Object",
+                "icon": icons.tracer_select_offset,
+                "callback": bar.select_tracer_offset_node,
+                "tooltip_template": helper.tracer_offset_tooltip_text,
+            },
+        ),
     )
 
     menu.addSeparator()
     style_menu = cw.MenuWidget(QtGui.QIcon(icons.tracer), "Style", menu, description="Choose the active tracer trail display style.")
     menu.addMenu(style_menu, description="Choose the active tracer trail display style.")
-    style_menu.addAction(
-        QtGui.QIcon(icons.tracer_grey),
-        "Tracer Style: Grey",
-        bar.set_tracer_grey_color,
-        tooltip_template=helper.tracer_grey_tooltip_text,
-    )
-    style_menu.addAction(
-        QtGui.QIcon(icons.tracer_red),
-        "Tracer Style: Red",
-        bar.set_tracer_red_color,
-        tooltip_template=helper.tracer_red_tooltip_text,
-    )
-    style_menu.addAction(
-        QtGui.QIcon(icons.tracer_blue),
-        "Tracer Style: Blue",
-        bar.set_tracer_blue_color,
-        tooltip_template=helper.tracer_blue_tooltip_text,
+    _add_action_specs(
+        style_menu,
+        (
+            {
+                "label": "Tracer Style: Grey",
+                "icon": icons.tracer_grey,
+                "callback": bar.set_tracer_grey_color,
+                "tooltip_template": helper.tracer_grey_tooltip_text,
+            },
+            {
+                "label": "Tracer Style: Red",
+                "icon": icons.tracer_red,
+                "callback": bar.set_tracer_red_color,
+                "tooltip_template": helper.tracer_red_tooltip_text,
+            },
+            {
+                "label": "Tracer Style: Blue",
+                "icon": icons.tracer_blue,
+                "callback": bar.set_tracer_blue_color,
+                "tooltip_template": helper.tracer_blue_tooltip_text,
+            },
+        ),
     )
 
     menu.addSeparator()
@@ -493,32 +577,47 @@ def sync_main_dock_menu(toolbar):
             action.setEnabled(wutil.check_visible_layout(layout))
 
 
+def _dock_toolbar(toolbar, checked, **target):
+    if checked:
+        toolbar.dock_to_ui(**target)
+
+
 def build_main_dock_menu(toolbar):
     toolbar.dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the toolbar to a different Maya area.")
 
     toolbar.pos_ac_group = QActionGroup(toolbar)
+    toolbar.pos_ac_group.setExclusive(True)
     for orient, name in toolbar.docking_orients.items():
-        ori_btn = toolbar.dock_menu.addAction(name, description="Place the toolbar on the {} side.".format(name.lower()))
-        ori_btn.setCheckable(True)
-        toolbar.pos_ac_group.addAction(ori_btn)
-        ori_btn.triggered.connect(partial(toolbar.dock_to_ui, orient=orient))
-        if orient == toolbar.docking_position[1]:
-            ori_btn.setChecked(True)
+        is_current = orient == toolbar.docking_position[1]
+        ori_btn = _add_checkable_action(
+            toolbar.dock_menu,
+            name,
+            partial(_dock_toolbar, toolbar, orient=orient),
+            checked=is_current,
+            group=toolbar.pos_ac_group,
+            description="Place the toolbar on the {} side.".format(name.lower()),
+        )
+        if is_current:
             ori_btn.setEnabled(False)
 
     toolbar.dock_menu.addSeparator()
 
     toolbar.dock_ac_group = QActionGroup(toolbar)
+    toolbar.dock_ac_group.setExclusive(True)
     for layout, name in toolbar.docking_layouts.items():
-        dock_btn = toolbar.dock_menu.addAction(name, description="Dock the toolbar in {}.".format(name))
-        dock_btn.setCheckable(True)
-        toolbar.dock_ac_group.addAction(dock_btn)
-        dock_btn.triggered.connect(partial(toolbar.dock_to_ui, layout=layout))
-        if layout == toolbar.docking_position[0]:
-            dock_btn.setChecked(True)
+        is_current = layout == toolbar.docking_position[0]
+        dock_btn = _add_checkable_action(
+            toolbar.dock_menu,
+            name,
+            partial(_dock_toolbar, toolbar, layout=layout),
+            checked=is_current,
+            group=toolbar.dock_ac_group,
+            description="Dock the toolbar in {}.".format(name),
+        )
+        if is_current:
             dock_btn.setEnabled(False)
 
-    toolbar.dock_menu.aboutToShow.connect(lambda: sync_main_dock_menu(toolbar))
+    toolbar.dock_menu.aboutToShow.connect(partial(sync_main_dock_menu, toolbar))
     return toolbar.dock_menu
 
 
@@ -620,31 +719,33 @@ def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alig
         toolbar_widget.update()
 
 
+def _add_alignment_actions(menu, current_alignment, apply_alignment_fn, names=TOOLBAR_ALIGNMENT_NAMES):
+    group = QActionGroup(menu)
+    group.setExclusive(True)
+    actions = {}
+    for label in names:
+        actions[label] = _add_checkable_action(
+            menu,
+            TOOLBAR_ALIGNMENT_LABEL % label,
+            partial(_apply_checked_value, apply_alignment_fn, label),
+            checked=label == current_alignment,
+            group=group,
+            description=TOOLBAR_ALIGNMENT_DESC % label.lower(),
+        )
+    return group, actions
+
+
 def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
     menu.addSeparator()
 
     setting_key, apply_alignment_fn = _toolbar_alignment_context(toolbar_widget)
-    align_group = QActionGroup(menu)
-    align_group.setExclusive(True)
-    menu._tkm_alignment_group = align_group
-    align_actions = {}
-
     current_align = settings.get_setting(setting_key, "Center")
-
-    for alignment_label in ("Left", "Right", "Center"):
-        action = menu.addAction(
-            TOOLBAR_ALIGNMENT_LABEL % alignment_label,
-            description=TOOLBAR_ALIGNMENT_DESC % alignment_label.lower(),
-        )
-        action.setCheckable(True)
-        action.setChecked(alignment_label == current_align)
-        action.toggled.connect(
-            lambda checked=False, label=alignment_label: apply_alignment_fn(label) if checked else None
-        )
-        align_group.addAction(action)
-        align_actions[alignment_label] = action
-
-    menu._tkm_alignment_actions = align_actions
+    menu._tkm_alignment_group, menu._tkm_alignment_actions = _add_alignment_actions(
+        menu,
+        current_align,
+        apply_alignment_fn,
+        names=("Left", "Right", "Center"),
+    )
 
     menu.addSeparator()
     menu.addAction(
@@ -706,24 +807,22 @@ def build_other_sources_help_menu():
     help_menu = cw.MenuWidget(QtGui.QIcon(icons.help), "Help")
     _add_toolbox_actions(help_menu, ("bug_report_window",))
     help_menu.addSeparator()
-
-    help_menu.addAction(
-        QtGui.QIcon(icons.discord),
-        "Discord",
-        lambda: general.open_url("https://discord.gg/G2J5yyjz"),
-        description="Open the community server.",
+    links = (
+        ("Discord", icons.discord, "https://discord.gg/G2J5yyjz", "Open the community server."),
+        ("Documentation", icons.help, "https://thekeymachine.gitbook.io/base", "Open the docs."),
+        ("YouTube", icons.youtube, "https://www.youtube.com/@TheKeyMachineAnimationTools", "Watch tutorials and demos."),
     )
-    help_menu.addAction(
-        QtGui.QIcon(icons.help),
-        "Documentation",
-        lambda: general.open_url("https://thekeymachine.gitbook.io/base"),
-        description="Open the docs.",
-    )
-    help_menu.addAction(
-        QtGui.QIcon(icons.youtube),
-        "YouTube",
-        lambda: general.open_url("https://www.youtube.com/@TheKeyMachineAnimationTools"),
-        description="Watch tutorials and demos.",
+    _add_action_specs(
+        help_menu,
+        (
+            {
+                "label": label,
+                "icon": icon,
+                "callback": partial(general.open_url, url),
+                "description": description,
+            }
+            for label, icon, url, description in links
+        ),
     )
     return help_menu
 
@@ -731,44 +830,50 @@ def build_other_sources_help_menu():
 def add_other_sources_help_menu(parent_menu):
     return _add_registered_menu(
         parent_menu,
-        build_other_sources_help_menu(),
+        build_other_sources_help_menu,
         command_id="help_menu",
         command_icon=icons.help,
-        description="Docs, support, and community links.",
-        builder=build_other_sources_help_menu,
     )
 
 
 def build_main_system_menu(toolbar):
     system_menu = cw.MenuWidget(QtGui.QIcon(icons.system), "System")
-    system_menu.addAction(
-        QtGui.QIcon(icons.reload),
-        "Reload",
-        toolbar.reload,
-        description="Refresh the TKM interface.",
-        command_id="toolbar_reload",
-        command_icon=icons.reload,
+    _add_action_specs(
+        system_menu,
+        (
+            {
+                "label": "Reload",
+                "icon": icons.reload,
+                "callback": toolbar.reload,
+                "description": "Refresh the TKM interface.",
+                "command_id": "toolbar_reload",
+                "command_icon": icons.reload,
+            },
+            {
+                "label": "Unload",
+                "icon": icons.close,
+                "callback": toolbar.unload,
+                "description": "Close TheKeyMachine and remove callbacks.",
+                "command_id": "toolbar_unload",
+                "command_icon": icons.close,
+            },
+            {
+                "label": "Uninstall",
+                "icon": icons.remove,
+                "callback": ui.uninstall,
+                "description": "Remove TheKeyMachine from Maya.",
+            },
+        ),
     )
-    system_menu.addAction(
-        QtGui.QIcon(icons.close),
-        "Unload",
-        toolbar.unload,
-        description="Close TheKeyMachine and remove callbacks.",
-        command_id="toolbar_unload",
-        command_icon=icons.close,
-    )
-    system_menu.addAction(QtGui.QIcon(icons.remove), "Uninstall", ui.uninstall, description="Remove TheKeyMachine from Maya.")
     return system_menu
 
 
 def add_main_system_menu(toolbar, parent_menu):
     return _add_registered_menu(
         parent_menu,
-        build_main_system_menu(toolbar),
+        partial(build_main_system_menu, toolbar),
         command_id="main_system_menu",
         command_icon=icons.system,
-        description="Maintenance actions.",
-        builder=lambda: build_main_system_menu(toolbar),
     )
 
 
@@ -776,46 +881,46 @@ def build_main_preferences_menu(
     toolbar,
     show_tooltips,
     toolbar_alignment,
-    update_show_tooltips,
     update_toolbar_icon_alignment,
 ):
     preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(icons.settings), "Preferences")
     preferences_menu.addSection("Startup")
-    preferences_menu.addAction(
-        QtGui.QIcon(icons.tkm_main),
+    _add_action(
+        preferences_menu,
         "Create a Shelf Button",
         toolbar.create_shelf_icon,
-        description="Add a shelf button for showing or hiding the toolbar.",
+        icon=icons.tkm_main,
         command_id="toolbar_add_shelf_button",
         command_icon=icons.tkm_main,
     )
 
-    run_on_startup_action = preferences_menu.addAction(
-        "Start with Maya", ui.install_userSetup, description="Load TheKeyMachine automatically when Maya starts."
+    _add_checkable_action(
+        preferences_menu,
+        "Start with Maya",
+        ui.install_userSetup,
+        checked=ui.check_userSetup(),
     )
-    run_on_startup_action.setCheckable(True)
-    run_on_startup_action.setChecked(ui.check_userSetup())
 
-    show_tooltips_action = preferences_menu.addAction("Show Tooltips", description="Show tooltip popups.")
-    show_tooltips_action.setCheckable(True)
-    show_tooltips_action.setChecked(show_tooltips)
-    show_tooltips_action.toggled.connect(update_show_tooltips)
+    _add_checkable_action(
+        preferences_menu,
+        "Show Tooltips",
+        update_show_tooltips,
+        checked=show_tooltips,
+    )
 
     preferences_menu.addSection("Alignment")
     align_group = QActionGroup(preferences_menu)
-    for align_name, align_value in toolbar_alignment_map().items():
-        action = preferences_menu.addAction(
+    align_group.setExclusive(True)
+    for align_name, align_value in TOOLBAR_ALIGNMENTS.items():
+        _add_checkable_action(
+            preferences_menu,
             TOOLBAR_ALIGNMENT_LABEL % align_name,
-            description=TOOLBAR_ALIGNMENT_DESC % align_name.lower(),
+            partial(_apply_checked_value, update_toolbar_icon_alignment, align_name),
+            checked=align_value == toolbar_alignment,
+            group=align_group,
         )
-        action.setCheckable(True)
-        align_group.addAction(action)
-        if align_value == toolbar_alignment:
-            action.setChecked(True)
-        action.triggered.connect(lambda _checked=False, n=align_name: update_toolbar_icon_alignment(n))
 
     preferences_menu.addSection("Display")
-    _add_toolbox_actions(preferences_menu, ("overshoot_sliders", "attribute_switcher_euler_filter", "custom_graph"))
     return preferences_menu
 
 
@@ -824,90 +929,81 @@ def add_main_preferences_menu(
     parent_menu,
     show_tooltips,
     toolbar_alignment,
-    update_show_tooltips,
     update_toolbar_icon_alignment,
 ):
-    builder = lambda: build_main_preferences_menu(
+    builder = partial(
+        build_main_preferences_menu,
         toolbar,
         show_tooltips=show_tooltips,
         toolbar_alignment=toolbar_alignment,
-        update_show_tooltips=update_show_tooltips,
         update_toolbar_icon_alignment=update_toolbar_icon_alignment,
     )
     return _add_registered_menu(
         parent_menu,
-        builder(),
+        builder,
         command_id="main_preferences_menu",
         command_icon=icons.settings,
         description="General toolbar options.",
-        builder=builder,
     )
 
 
-def build_menu_for_shelf(command_id):
-    if command_id == "help_menu":
-        return build_other_sources_help_menu()
-
+def _current_main_toolbar():
     try:
-        from TheKeyMachine.core import toolbar as toolbarMod
+        from TheKeyMachine.core import toolbar as toolbar_module
 
-        toolbar = toolbarMod.get_toolbar()
+        return toolbar_module.get_toolbar()
     except Exception:
-        toolbar = None
+        return None
 
-    if toolbar and command_id == "main_system_menu":
-        return build_main_system_menu(toolbar)
-    if toolbar and command_id == "main_dock_menu":
-        return build_main_dock_menu(toolbar)
-    if toolbar and command_id == "TKM":
-        from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
-        def update_show_tooltips(value):
-            settings.set_setting("show_tooltips", value)
-            QFlatTooltipManager.enabled = value
-
-        def update_toolbar_icon_alignment(alignment_name):
-            toolWidgets.set_main_toolbar_icon_alignment(toolbar, alignment_name)
-
-        return build_main_settings_menu(
+def _main_menu_builders(toolbar):
+    alignment_callback = partial(toolWidgets.set_main_toolbar_icon_alignment, toolbar)
+    common = {
+        "show_tooltips": settings.get_setting("show_tooltips", True),
+        "toolbar_alignment": toolWidgets.get_main_toolbar_icon_alignment(),
+        "update_toolbar_icon_alignment": alignment_callback,
+    }
+    return {
+        "TKM": partial(
+            build_main_settings_menu,
             toolbar,
             None,
-            show_tooltips=settings.get_setting("show_tooltips", True),
-            toolbar_alignment=toolWidgets.get_main_toolbar_icon_alignment(),
-            update_show_tooltips=update_show_tooltips,
-            update_toolbar_icon_alignment=update_toolbar_icon_alignment,
             internet_connection=general.config.get("INTERNET_CONNECTION", True),
-        )
-    if toolbar and command_id == "main_preferences_menu":
-        from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
+            **common
+        ),
+        "main_preferences_menu": partial(build_main_preferences_menu, toolbar, **common),
+        "main_system_menu": partial(build_main_system_menu, toolbar),
+        "main_dock_menu": partial(build_main_dock_menu, toolbar),
+    }
 
-        def update_show_tooltips(value):
-            settings.set_setting("show_tooltips", value)
-            QFlatTooltipManager.enabled = value
 
-        def update_toolbar_icon_alignment(alignment_name):
-            toolWidgets.set_main_toolbar_icon_alignment(toolbar, alignment_name)
+def _graph_menu_builders():
+    from TheKeyMachine.core import customGraph
 
-        return build_main_preferences_menu(
-            toolbar,
-            show_tooltips=settings.get_setting("show_tooltips", True),
-            toolbar_alignment=toolWidgets.get_main_toolbar_icon_alignment(),
-            update_show_tooltips=update_show_tooltips,
-            update_toolbar_icon_alignment=update_toolbar_icon_alignment,
-        )
-
-    if command_id in ("graph_settings_menu", "graph_dock_menu"):
-        from TheKeyMachine.core import customGraph
-
-        if command_id == "graph_settings_menu":
-            return build_graph_settings_submenu(customGraph.applyCustomGraphAlignment)
-        return build_graph_dock_menu(
+    return {
+        "graph_settings_menu": partial(build_graph_settings_submenu, customGraph.applyCustomGraphAlignment),
+        "graph_dock_menu": partial(
+            build_graph_dock_menu,
             customGraph._DOCK_OPTIONS,
             customGraph._GRAPH_TOOLBAR_DOCK_SETTING,
             customGraph._DOCK_BOTTOM_GRAPH,
             customGraph.moveCustomGraphDock,
-        )
-    return None
+        ),
+    }
+
+
+def build_menu_for_shelf(command_id):
+    builders = {"help_menu": build_other_sources_help_menu}
+
+    toolbar = _current_main_toolbar()
+    if toolbar:
+        builders.update(_main_menu_builders(toolbar))
+
+    if command_id in ("graph_settings_menu", "graph_dock_menu"):
+        builders.update(_graph_menu_builders())
+
+    builder = builders.get(command_id)
+    return builder() if builder else None
 
 
 def build_main_settings_menu(
@@ -915,7 +1011,6 @@ def build_main_settings_menu(
     parent_button,
     show_tooltips,
     toolbar_alignment,
-    update_show_tooltips,
     update_toolbar_icon_alignment,
     internet_connection=False,
 ):
@@ -926,24 +1021,20 @@ def build_main_settings_menu(
         toolbar_menu,
         show_tooltips=show_tooltips,
         toolbar_alignment=toolbar_alignment,
-        update_show_tooltips=update_show_tooltips,
         update_toolbar_icon_alignment=update_toolbar_icon_alignment,
     )
     toolbar_menu.addAction(
         QtGui.QIcon(icons.hotkeys),
         "Hotkeys",
         hotkeys.show_hotkeys_window,
-        description="Edit keyboard shortcuts for TheKeyMachine tools.",
         command_id="hotkeys_window",
         command_icon=icons.hotkeys,
     )
     _add_registered_menu(
         toolbar_menu,
-        build_main_dock_menu(toolbar),
+        partial(build_main_dock_menu, toolbar),
         command_id="main_dock_menu",
         command_icon=icons.dock,
-        description="Move the toolbar to a different Maya area.",
-        builder=lambda: build_main_dock_menu(toolbar),
     )
     add_main_system_menu(toolbar, toolbar_menu)
     toolbar_menu.addSeparator()
@@ -955,7 +1046,6 @@ def build_main_settings_menu(
             QtGui.QIcon(icons.check_updates),
             "Check for updates",
             lambda: updater.check_for_updates(parent_button, force=True),
-            description="Look for a new version.",
             command_id="check_for_updates",
             command_icon=icons.check_updates,
         )
@@ -963,7 +1053,6 @@ def build_main_settings_menu(
         QtGui.QIcon(icons.about),
         "About",
         ui.about_window,
-        description="Show version info and credits.",
         command_id="about_window",
         command_icon=icons.about,
     )
@@ -987,20 +1076,12 @@ def build_graph_settings_submenu(apply_alignment_fn):
     )
 
     settings_menu.addSection("Toolbar's icons alignment")
-    align_group = QActionGroup(settings_menu)
-    align_actions = {
-        label: settings_menu.addAction(
-            TOOLBAR_ALIGNMENT_LABEL % label,
-            description=TOOLBAR_ALIGNMENT_DESC % label.lower(),
-        )
-        for label in TOOLBAR_ALIGNMENT_NAMES
-    }
     current_align = settings.get_setting("graph_toolbar_alignment", "Center")
-    for label, action in align_actions.items():
-        action.setCheckable(True)
-        align_group.addAction(action)
-        action.setChecked(label == current_align)
-        action.toggled.connect(lambda state, alignment_label=label: apply_alignment_fn(alignment_label) if state else None)
+    settings_menu._tkm_alignment_group, settings_menu._tkm_alignment_actions = _add_alignment_actions(
+        settings_menu,
+        current_align,
+        apply_alignment_fn,
+    )
 
     settings_menu.addSection("General")
     settings_menu.addAction(
@@ -1019,17 +1100,19 @@ def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, mov
 
     dock_actions = {}
     for position, label, description in dock_options:
-        action = dock_menu.addAction(label, description=description)
-        action.setCheckable(True)
-        dock_group.addAction(action)
-        action.triggered.connect(lambda checked=False, p=position: move_dock_fn(p))
-        dock_actions[position] = action
+        dock_actions[position] = _add_checkable_action(
+            dock_menu,
+            label,
+            partial(_apply_checked_value, move_dock_fn, position),
+            group=dock_group,
+            description=description,
+        )
 
     current_position = settings.get_setting(dock_setting, default_dock_position)
     if current_position not in dock_actions:
         current_position = default_dock_position
     for position, action in dock_actions.items():
-        action.setChecked(position == current_position)
+        toolCommon.set_checked_safely(action, position == current_position)
     return dock_menu
 
 
@@ -1043,8 +1126,9 @@ def build_graph_settings_menu(
 ):
     menu = cw.MenuWidget(parent=parent_button)
     menu.addAction(cw.LogoAction(menu))
-    build_settings_submenu = lambda: build_graph_settings_submenu(apply_alignment_fn)
-    build_dock_submenu = lambda: build_graph_dock_menu(
+    build_settings_submenu = partial(build_graph_settings_submenu, apply_alignment_fn)
+    build_dock_submenu = partial(
+        build_graph_dock_menu,
         dock_options,
         dock_setting,
         default_dock_position,
@@ -1053,19 +1137,17 @@ def build_graph_settings_menu(
 
     _add_registered_menu(
         menu,
-        build_settings_submenu(),
+        build_settings_submenu,
         command_id="graph_settings_menu",
         command_icon=icons.settings,
         description="Tool configuration and preferences.",
-        builder=build_settings_submenu,
     )
     _add_registered_menu(
         menu,
-        build_dock_submenu(),
+        build_dock_submenu,
         command_id="graph_dock_menu",
         command_icon=icons.dock,
         description="Move the Graph Editor toolbar.",
-        builder=build_dock_submenu,
     )
 
     menu.addAction(

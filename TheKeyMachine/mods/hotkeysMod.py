@@ -712,6 +712,9 @@ def _command_row_from_data(command_name, primary_data, fallback_data=None, title
         return None
     primary_data = primary_data or {}
     fallback_data = fallback_data or {}
+    tooltip = primary_data.get("tooltip", fallback_data.get("tooltip"))
+    tooltip_description = tooltip if isinstance(tooltip, str) else None
+    tooltip_template = None if isinstance(tooltip, str) else tooltip
     icon = primary_data.get("icon") or fallback_data.get("icon")
     title = (
         title_override
@@ -735,10 +738,12 @@ def _command_row_from_data(command_name, primary_data, fallback_data=None, title
             or primary_data.get("description")
             or fallback_data.get("status_description")
             or fallback_data.get("description")
+            or tooltip_description
         ),
         "tooltip_template": (
             primary_data.get("tooltip_template")
             or fallback_data.get("tooltip_template")
+            or tooltip_template
         ),
         "shortcuts": primary_data.get("shortcuts", fallback_data.get("shortcuts", [])),
         "checkable": bool(primary_data.get("checkable", primary_data.get("type") == "check")),
@@ -877,6 +882,8 @@ def _iter_slider_percentage_rows(slider_type, mode):
             "title": value_title,
             "icon": mode_icon,
             "badge_text": None if mode_icon else mode_badge,
+            "description": mode.get("description") or "Set {} to {} percent.".format(mode["label"], value),
+            "tooltip_template": mode.get("tooltip_template"),
         }
 
 

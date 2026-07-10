@@ -29,7 +29,6 @@ from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import customDialogs  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
-from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
 from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
 
@@ -53,6 +52,16 @@ GRAPH_SPECIAL_TOOL_KEYS = {
     "selector",
     "TKM",
 }
+
+
+def _tooltip_description(data):
+    tooltip = (data or {}).get("tooltip")
+    return (data or {}).get("description") or (tooltip if isinstance(tooltip, str) else "")
+
+
+def _tooltip_template(data):
+    tooltip = (data or {}).get("tooltip")
+    return (data or {}).get("tooltip_template") or (None if isinstance(tooltip, str) else tooltip)
 
 
 def setting_toggle_specs():
@@ -105,8 +114,8 @@ def setting_toggle_specs():
             "menu_label": tool.get("menu_label") or tool.get("label", tool_id),
             "text": tool.get("text"),
             "icon": tool.get("icon"),
-            "description": tool.get("description", ""),
-            "tooltip_template": tool.get("tooltip_template"),
+            "description": _tooltip_description(tool),
+            "tooltip_template": _tooltip_template(tool),
         }
         spec.update(behavior)
         specs[tool_id] = spec
@@ -174,8 +183,8 @@ def add_tool_button(section, item_data, *, overrides=None):
         data.get("label", ""),
         tool_id or "",
         default=data.get("default", True),
-        description=data.get("description"),
-        tooltip_template=data.get("tooltip_template"),
+        description=_tooltip_description(data),
+        tooltip_template=_tooltip_template(data),
         pinnable=data.get("pinnable", True),
     )
     return btn
@@ -254,8 +263,8 @@ def add_selector_button(section, item_data):
     selector_tool = toolbox.get_tool("selector", **{k: v for k, v in item_data.items() if k not in {"id", "shortcuts"}})
     btn = cw.QFlatSelectorButton(
         icon=selector_tool.get("icon"),
-        tooltip_template=selector_tool.get("tooltip_template"),
-        description=selector_tool.get("description"),
+        tooltip_template=_tooltip_template(selector_tool),
+        description=_tooltip_description(selector_tool),
     )
 
     callback = selector_tool.get("callback")
@@ -271,8 +280,8 @@ def add_selector_button(section, item_data):
         selector_tool.get("label", "Selector"),
         selector_tool.get("id", "selector"),
         default=selector_tool.get("default", True),
-        description=selector_tool.get("description"),
-        tooltip_template=selector_tool.get("tooltip_template"),
+        description=_tooltip_description(selector_tool),
+        tooltip_template=_tooltip_template(selector_tool),
         pinnable=selector_tool.get("pinnable", True),
     )
 
@@ -504,8 +513,8 @@ def create_widget_from_data(section, item_data, owner=None):
             item_data.get("label", "Nudge Value"),
             widget_key,
             default=item_data.get("default", True),
-            description=item_data.get("description"),
-            tooltip_template=item_data.get("tooltip_template"),
+            description=_tooltip_description(item_data),
+            tooltip_template=_tooltip_template(item_data),
             pinnable=item_data.get("pinnable", True),
         )
         if owner is not None:
@@ -525,7 +534,7 @@ def create_widget_from_data(section, item_data, owner=None):
         "text": resolved.get("text"),
         "icon": resolved.get("icon"),
         "description": resolved.get("description", ""),
-        "tooltip_template": resolved.get("tooltip_template"),
+        "tooltip_template": _tooltip_template(resolved),
         "checkable": True,
         "set_checked_fn": spec["get_checked"],
         "bind_checked_fn": lambda widget, s=spec: bind_setting_toggle(widget, s),
@@ -537,8 +546,8 @@ def create_widget_from_data(section, item_data, owner=None):
         data["label"],
         data["id"],
         default=resolved.get("default", True),
-        description=data.get("description"),
-        tooltip_template=data.get("tooltip_template"),
+        description=_tooltip_description(data),
+        tooltip_template=_tooltip_template(data),
         pinnable=resolved.get("pinnable", True),
     )
     return btn
@@ -558,8 +567,8 @@ def add_animation_offset_button(section, item_data, owner):
         tool.get("label", "Anim Offset"),
         tool.get("id", "animation_offset"),
         default=tool.get("default", True),
-        description=tool.get("description"),
-        tooltip_template=tool.get("tooltip_template"),
+        description=_tooltip_description(tool),
+        tooltip_template=_tooltip_template(tool),
         pinnable=tool.get("pinnable", True),
     )
     return btn
@@ -578,8 +587,8 @@ def add_micro_move_button(section, item_data, owner):
         tool.get("label", "Micro Move"),
         tool.get("id", "micro_move"),
         default=tool.get("default", True),
-        description=tool.get("description"),
-        tooltip_template=tool.get("tooltip_template"),
+        description=_tooltip_description(tool),
+        tooltip_template=_tooltip_template(tool),
         pinnable=tool.get("pinnable", True),
     )
     return btn
@@ -775,10 +784,6 @@ def add_main_settings_button(section, item_data, owner):
     toolbar_alignment = get_main_toolbar_icon_alignment()
     internet_connection = general.config.get("INTERNET_CONNECTION", True)
 
-    def update_show_tooltips(value):
-        settings.set_setting("show_tooltips", value)
-        QFlatTooltipManager.enabled = value
-
     def update_toolbar_icon_alignment(alignment_name):
         set_main_toolbar_icon_alignment(owner, alignment_name)
 
@@ -788,7 +793,6 @@ def add_main_settings_button(section, item_data, owner):
             source_widget or btn,
             show_tooltips=show_tooltips,
             toolbar_alignment=toolbar_alignment,
-            update_show_tooltips=update_show_tooltips,
             update_toolbar_icon_alignment=update_toolbar_icon_alignment,
             internet_connection=internet_connection,
         )

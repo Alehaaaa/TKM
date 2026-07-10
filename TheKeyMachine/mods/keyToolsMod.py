@@ -39,6 +39,7 @@ from collections import Counter
 from contextlib import contextmanager
 
 import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.core import curveFitting
 
 
 import TheKeyMachine.widgets.util as wutil
@@ -197,14 +198,15 @@ def set_share_keys_mode(mode):
 
 
 def get_bake_tangent_mode():
-    mode = settings.get_setting(BAKE_TANGENT_MODE_SETTING, BAKE_TANGENT_MODE_STEP)
-    return mode if mode in BAKE_TANGENT_MODES else BAKE_TANGENT_MODE_STEP
+    mode = settings.get_setting(BAKE_TANGENT_MODE_SETTING, BAKE_TANGENT_MODE_KEEP_TYPE)
+    return mode if mode in BAKE_TANGENT_MODES else BAKE_TANGENT_MODE_KEEP_TYPE
 
 
 def set_bake_tangent_mode(mode):
     if mode not in BAKE_TANGENT_MODES:
-        mode = BAKE_TANGENT_MODE_STEP
+        mode = BAKE_TANGENT_MODE_KEEP_TYPE
     settings.set_setting(BAKE_TANGENT_MODE_SETTING, mode)
+    return mode
 
 
 def _most_common_tangent_type(values):
@@ -588,7 +590,7 @@ def _frames_from_last_selected(time_context=None):
     return source, targets, frames
 
 
-def _bake_curves_to_source_frames(curves, frames, operation=None):
+def _bake_curves_to_source_frames(curves, frames, operation=None, preserve_shape=False):
     curves = _unique(curves)
     frames = _normalize_key_frames(frames)
     if not curves or not frames:
@@ -596,18 +598,24 @@ def _bake_curves_to_source_frames(curves, frames, operation=None):
 
     frame_lookup = set(frames)
     time_range = (frames[0], frames[-1])
+    shape_data = curveFitting.capture(curves, frames) if preserve_shape else {}
     for curve in curves:
         if operation and operation.cancelled:
             return
         for frame in frames:
-            cmds.currentTime(frame)
-            cmds.setKeyframe(curve, time=(frame,))
+            sampled = (shape_data.get(curve) or {}).get(float(frame))
+            if sampled:
+                cmds.setKeyframe(curve, time=(frame,), value=sampled["value"])
+            else:
+                cmds.setKeyframe(curve, time=(frame,))
         existing_frames = _normalize_key_frames(cmds.keyframe(curve, query=True, time=time_range, timeChange=True) or [])
         for frame in existing_frames:
             if frame not in frame_lookup:
                 cmds.cutKey(curve, time=(frame, frame), option="keys")
         if operation:
             operation.step()
+    if preserve_shape:
+        curveFitting.apply(shape_data)
 
 
 def share_keys_from_last_selected(*args):
@@ -741,7 +749,26 @@ def reblock_insert(*args):
 # ___________________________ BAKE ANIM  _____________________________________
 
 
+def _validate_bake_interval(value):
+    try:
+        interval = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("Bake interval must be a number")
+    if not math.isfinite(interval) or interval <= 0:
+        raise ValueError("Bake interval must be greater than zero")
+    return int(interval) if interval.is_integer() else interval
+
+
+def _bake_sample_times(start_frame, end_frame, interval):
+    return curveFitting.sample_times(start_frame, end_frame, interval)
+
+
 def bake_animation(bake_interval=1, window=None):
+    try:
+        bake_interval = _validate_bake_interval(bake_interval)
+    except ValueError as error:
+        return wutil.make_inViewMessage(str(error))
+
     bake_title, bake_tooltip = BAKE_UNDO_HELP.get(bake_interval, ("Bake Animation", helper.bake_animation_custom_tooltip_text))
     tool_key = "bake_animation_{}".format(bake_interval) if bake_interval in BAKE_UNDO_HELP else "bake_animation_custom"
 
@@ -761,6 +788,7 @@ def bake_animation(bake_interval=1, window=None):
             curves_to_update = _anim_curves_for_objects(selected_objects)
 
         tangent_types_by_curve = {}
+        curve_shape_data = {}
         if bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_TYPE:
             for curve in curves_to_update:
                 in_tangent = _most_common_tangent_type(
@@ -771,6 +799,9 @@ def bake_animation(bake_interval=1, window=None):
                 )
                 if in_tangent or out_tangent:
                     tangent_types_by_curve[curve] = (in_tangent, out_tangent)
+        elif bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_SHAPE:
+            sample_times = _bake_sample_times(start_frame, end_frame, bake_interval)
+            curve_shape_data = curveFitting.capture(curves_to_update, sample_times)
 
         with toolCommon.tool_operation(
             tool_id=tool_key,
@@ -789,7 +820,11 @@ def bake_animation(bake_interval=1, window=None):
                 time=(start_frame, end_frame),
                 sampleBy=bake_interval,
                 preserveOutsideKeys=True,
-                sparseAnimCurveBake=bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_SHAPE,
+                # A sparse bake can legitimately add no keys to an existing
+                # anim curve.  Keep-shape mode still needs a key at every
+                # sample; bakeResults samples the evaluated curve before it
+                # replaces the animation, preserving those full-frame values.
+                sparseAnimCurveBake=False,
                 removeBakedAttributeFromLayer=False,
                 bakeOnOverrideLayer=False,
                 controlPoints=False,
@@ -811,6 +846,8 @@ def bake_animation(bake_interval=1, window=None):
                         tangent_kwargs["outTangentType"] = out_tangent
                     if tangent_kwargs:
                         cmds.keyTangent(curve, edit=True, time=(start_frame, end_frame), **tangent_kwargs)
+            elif bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_SHAPE:
+                curveFitting.apply(curve_shape_data)
 
     except Exception as e:
         cmds.warning("An error occurred: {}".format(e))
@@ -842,9 +879,15 @@ def bake_animation_from_last_selected(*args):
                 if operation.cancelled:
                     return
                 curves = curves_by_target[target]
-                _bake_curves_to_source_frames(curves, frames, operation=operation)
+                tangent_mode = get_bake_tangent_mode()
+                _bake_curves_to_source_frames(
+                    curves,
+                    frames,
+                    operation=operation,
+                    preserve_shape=tangent_mode == BAKE_TANGENT_MODE_KEEP_SHAPE,
+                )
 
-                if get_bake_tangent_mode() == BAKE_TANGENT_MODE_STEP:
+                if tangent_mode == BAKE_TANGENT_MODE_STEP:
                     _apply_step_tangents(curves, (frames[0], frames[-1]))
     finally:
         cmds.currentTime(current_time)
@@ -1792,7 +1835,10 @@ def _snap_curve_key(curve, key_time):
         return False
 
     try:
-        values = cmds.keyframe(curve, time=(key_time, key_time), query=True, valueChange=True) or []
+        # Sample the curve at the destination frame.  Reusing the sub-frame
+        # key's value would effectively move the key and change the curve's
+        # pose at the closest full frame.
+        values = cmds.keyframe(curve, time=(rounded_time, rounded_time), query=True, eval=True) or []
         in_tangents = cmds.keyTangent(curve, time=(key_time,), query=True, inTangentType=True) or []
         out_tangents = cmds.keyTangent(curve, time=(key_time,), query=True, outTangentType=True) or []
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
@@ -1801,8 +1847,14 @@ def _snap_curve_key(curve, key_time):
     if not values:
         return False
 
-    cmds.cutKey(curve, time=(key_time, key_time), clear=True)
-    cmds.setKeyframe(curve, time=(rounded_time,), value=values[0])
+    try:
+        # Create/replace the destination first.  Cutting the only key from an
+        # anim curve can make Maya delete the curve node, leaving a stale name
+        # for setKeyframe (for example, "...rotateX15").
+        cmds.setKeyframe(curve, time=(rounded_time,), value=values[0])
+        cmds.cutKey(curve, time=(key_time, key_time), clear=True)
+    except (RuntimeError, ValueError, TypeError):
+        return False
 
     tangent_kwargs = {}
     if in_tangents:
@@ -1810,7 +1862,12 @@ def _snap_curve_key(curve, key_time):
     if out_tangents:
         tangent_kwargs["outTangentType"] = out_tangents[0]
     if tangent_kwargs:
-        cmds.keyTangent(curve, time=(rounded_time,), edit=True, **tangent_kwargs)
+        try:
+            cmds.keyTangent(curve, time=(rounded_time,), edit=True, **tangent_kwargs)
+        except (RuntimeError, ValueError, TypeError):
+            # The sampled key is still valid when Maya cannot apply a tangent
+            # type (for example on a curve with restricted tangent settings).
+            pass
     return True
 
 
@@ -1823,11 +1880,31 @@ def snapKeyframes():
     if not curves:
         return wutil.make_inViewMessage("No animation curves found")
 
+    curve_key_times = [
+        (curve, list(_key_times_for_curve_context(curve, target_info)))
+        for curve in curves
+    ]
+    work_items = sum(len(key_times) for _curve, key_times in curve_key_times)
+
     snapped = False
-    with _animation_command_context("Snap Keyframes", "snap", tint=False):
-        for curve in curves:
-            for key_time in _key_times_for_curve_context(curve, target_info):
+    with toolCommon.tool_operation(
+        tool_id="snap",
+        label="Snap Keyframes",
+        progress=True,
+        progress_max=work_items,
+        undo=True,
+        tint="context",
+        default_mode="all_animation",
+        tint_key="snap",
+        tint_color=_timeline_tint_color("snap"),
+    ) as operation:
+        operation.start()
+        for curve, key_times in curve_key_times:
+            for key_time in key_times:
+                if operation.cancelled:
+                    return
                 snapped = _snap_curve_key(curve, key_time) or snapped
+                operation.step()
 
     if not snapped:
         return wutil.make_inViewMessage("No sub-frame keys found")
@@ -2521,7 +2598,11 @@ def mirror(*args):
             label="Mirror",
             progress=True,
             progress_max=len(selected_controls),
-            undo=True
+            undo=True,
+            tint="context",
+            default_mode="current_frame",
+            tint_key="mirror",
+            tint_color=_timeline_tint_color("mirror"),
         )
         operation_context.__enter__()
         operation_context.start()
@@ -2869,7 +2950,11 @@ def mirror_to_right(*args):
         label="Mirror To Right",
         progress=True,
         progress_max=len(selected_controls) if selected_controls else 0,
-        undo=True
+        undo=True,
+        tint="context",
+        default_mode="current_frame",
+        tint_key="mirror_to_right",
+        tint_color=_timeline_tint_color("mirror_to_right"),
     ) as operation:
         operation.start()
         return _mirror_current_values(target_side="right", operation=operation)
@@ -2882,7 +2967,11 @@ def mirror_to_left(*args):
         label="Mirror To Left",
         progress=True,
         progress_max=len(selected_controls) if selected_controls else 0,
-        undo=True
+        undo=True,
+        tint="context",
+        default_mode="current_frame",
+        tint_key="mirror_to_left",
+        tint_color=_timeline_tint_color("mirror_to_left"),
     ) as operation:
         operation.start()
         return _mirror_current_values(target_side="left", operation=operation)
@@ -3151,6 +3240,7 @@ ANIMATION_VALUE_KEY = "v"
 ANIMATION_STATIC_VALUE_KEY = "sv"
 ANIMATION_TANGENT_KEY = "t"
 ANIMATION_LAYERS_KEY = "ly"
+ANIMATION_LAYER_WEIGHT_KEY = "w"
 TANGENT_KEYS = {
     "itt": "inTangentType",
     "ott": "outTangentType",
@@ -3177,6 +3267,21 @@ def _copy_paste_targets(saved_data, selected_objects):
     return [control for control in data.keys() if cmds.objExists(control)]
 
 
+def _animation_layer_items(channel_data):
+    layers = channel_data.get(ANIMATION_LAYERS_KEY) or []
+    if isinstance(layers, dict):
+        return [(layer_name, layer_data, layer_data.get(ANIMATION_LAYER_WEIGHT_KEY) or {}) for layer_name, layer_data in layers.items()]
+    items = []
+    for entry in layers:
+        if isinstance(entry, dict):
+            items.append((entry.get("layer"), entry.get("data") or {}, entry.get("weight") or {}))
+    return items
+
+
+def _animation_layer_names(channel_data):
+    return [layer_name for layer_name, _layer_data, _weight_data in _animation_layer_items(channel_data) if layer_name]
+
+
 def _animation_data_key_count(animation_data, targets=None):
     count = 0
     controls = _animation_controls(animation_data)
@@ -3186,8 +3291,9 @@ def _animation_data_key_count(animation_data, targets=None):
             continue
         for anim_data in (channels or {}).values():
             count += len(anim_data.get(ANIMATION_FRAME_KEY) or [])
-            for layer_data in (anim_data.get(ANIMATION_LAYERS_KEY) or {}).values():
+            for _layer_name, layer_data, weight_data in _animation_layer_items(anim_data):
                 count += len(layer_data.get(ANIMATION_FRAME_KEY) or [])
+                count += len(weight_data.get(ANIMATION_FRAME_KEY) or [])
     return count
 
 
@@ -3228,8 +3334,9 @@ def _animation_data_timerange(animation_data):
     for channels in _animation_controls(animation_data).values():
         for anim_data in (channels or {}).values():
             frames.extend(anim_data.get(ANIMATION_FRAME_KEY) or [])
-            for layer_data in (anim_data.get(ANIMATION_LAYERS_KEY) or {}).values():
+            for _layer_name, layer_data, weight_data in _animation_layer_items(anim_data):
                 frames.extend(layer_data.get(ANIMATION_FRAME_KEY) or [])
+                frames.extend(weight_data.get(ANIMATION_FRAME_KEY) or [])
     return timelineWidgets.get_frames_timerange(frames)
 
 
@@ -3263,6 +3370,15 @@ def _query_static_channel_value(plug):
     return {ANIMATION_STATIC_VALUE_KEY: value}
 
 
+def _anim_layer_is_muted(layer_name):
+    if not layer_name:
+        return False
+    try:
+        return bool(cmds.animLayer(layer_name, query=True, mute=True))
+    except Exception:
+        return False
+
+
 def _query_layered_anim_channel_data(plug, time_context):
     try:
         from TheKeyMachine.core import animlayers
@@ -3274,17 +3390,20 @@ def _query_layered_anim_channel_data(plug, time_context):
         return _query_anim_channel_data(plug, time_context)
 
     channel_data = {}
-    layer_data = {}
+    layer_data = []
     for entry in layer_entries:
         curve = entry.get("curve")
         if not curve:
             continue
+        layer_name = entry.get("layer")
+        if _anim_layer_is_muted(layer_name):
+            continue
         data = _query_anim_channel_data(curve, time_context)
         if not data.get(ANIMATION_FRAME_KEY):
             continue
-        layer_name = entry.get("layer")
+        weight_data = _query_anim_layer_weight_data(layer_name, time_context)
         if layer_name:
-            layer_data[layer_name] = data
+            layer_data.append({"layer": layer_name, "data": data, "weight": weight_data})
         else:
             channel_data.update(data)
 
@@ -3293,34 +3412,92 @@ def _query_layered_anim_channel_data(plug, time_context):
     return channel_data
 
 
+def _query_anim_layer_weight_data(layer_name, time_context):
+    if not layer_name:
+        return {}
+    weight_plug = "{}.weight".format(layer_name)
+    if not cmds.objExists(weight_plug):
+        return {}
+    data = _query_anim_channel_data(weight_plug, time_context)
+    return data if data else {}
+
+
 def _ensure_anim_layer_for_plug(layer_name, target, channel):
     if not layer_name:
         return None
     try:
-        if not cmds.objExists(layer_name):
+        existing = cmds.ls(type="animLayer") or []
+        if layer_name not in existing:
             cmds.animLayer(layer_name)
     except Exception:
         return None
 
     plug = "{}.{}".format(target, channel)
+    previous_selection = None
     for add_call in (
         lambda: cmds.animLayer(layer_name, edit=True, attribute=plug),
-        lambda: cmds.animLayer(layer_name, edit=True, addSelectedObjects=True),
+        lambda: cmds.select(target, replace=True) or cmds.animLayer(layer_name, edit=True, addSelectedObjects=True),
+        lambda: cmds.animLayer(layer_name, edit=True, attribute=plug),
     ):
         try:
+            if previous_selection is None:
+                try:
+                    previous_selection = cmds.ls(selection=True, long=True) or []
+                except Exception:
+                    previous_selection = []
             add_call()
             break
         except Exception:
             continue
+    if previous_selection is not None:
+        try:
+            cmds.select(previous_selection, replace=True)
+        except Exception:
+            pass
     return layer_name
+
+
+def _ensure_anim_layers_for_channel(target, channel, channel_data):
+    for layer_name, _layer_data, _weight_data in _animation_layer_items(channel_data):
+        if not layer_name:
+            continue
+        _ensure_anim_layer_for_plug(layer_name, target, channel)
+
+
+def _apply_anim_layer_weight_data(layer_name, target, weight_data, progress=None):
+    if not layer_name or not weight_data:
+        return 0
+    applied = 0
+    try:
+        layer_plug = "{}.weight".format(layer_name)
+        if not cmds.objExists(layer_plug):
+            return 0
+        keyframes = weight_data.get(ANIMATION_FRAME_KEY) or []
+        values = weight_data.get(ANIMATION_VALUE_KEY) or []
+        if not keyframes or not values:
+            return 0
+        for key_time, value in zip(keyframes, values):
+            try:
+                cmds.setKeyframe(layer_name, time=(key_time,), attribute="weight", value=value)
+                applied += 1
+            except Exception:
+                pass
+            if progress and progress.step():
+                return applied
+    except Exception:
+        return 0
+    return applied
 
 
 def _transform_channel_values(channel_data, transform_value):
     transformed = dict(channel_data or {})
     transformed[ANIMATION_VALUE_KEY] = [transform_value(v) for v in channel_data.get(ANIMATION_VALUE_KEY) or []]
-    layers = {}
-    for layer_name, layer_data in (channel_data.get(ANIMATION_LAYERS_KEY) or {}).items():
-        layers[layer_name] = _transform_channel_values(layer_data, transform_value)
+    layers = []
+    for layer_name, layer_data, weight_data in _animation_layer_items(channel_data):
+        layer_entry = {"layer": layer_name, "data": _transform_channel_values(layer_data, transform_value)}
+        if weight_data:
+            layer_entry["weight"] = _transform_channel_values(weight_data, transform_value)
+        layers.append(layer_entry)
     if layers:
         transformed[ANIMATION_LAYERS_KEY] = layers
     return transformed
@@ -3357,6 +3534,22 @@ def _maybe_apply_paste_range(paste_range, anchor_widget=None):
             animationStartTime=start_frame,
             animationEndTime=end_frame,
         )
+
+
+def _refresh_animation_view():
+    try:
+        current_time = cmds.currentTime(query=True)
+        cmds.currentTime(current_time, edit=True)
+    except Exception:
+        pass
+    try:
+        cmds.dgdirty(allPlugs=True)
+    except Exception:
+        pass
+    try:
+        cmds.refresh(force=True)
+    except Exception:
+        pass
 
 
 def _query_key_tangent_data(plug, keyframes):
@@ -3600,6 +3793,8 @@ def _apply_animation_channels_to_targets(
                 if not attr_settable_cache[cache_key]:
                     continue
 
+                _ensure_anim_layers_for_channel(target, channel, anim_data)
+
                 if replace:
                     try:
                         cmds.cutKey(target, time=replace_range, attribute=channel, option="keys")
@@ -3619,10 +3814,11 @@ def _apply_animation_channels_to_targets(
                         progress.step()
 
                 keys_set += _apply_channel_data(target, channel, anim_data)
-                for layer_name, layer_data in (anim_data.get(ANIMATION_LAYERS_KEY) or {}).items():
+                for layer_name, layer_data, weight_data in _animation_layer_items(anim_data):
                     if progress and progress.cancelled:
                         return keys_set
                     keys_set += _apply_channel_data(target, channel, layer_data, layer_name=layer_name)
+                    keys_set += _apply_anim_layer_weight_data(layer_name, target, weight_data, progress=progress)
 
     return keys_set
 
@@ -3796,6 +3992,7 @@ def paste_animation(*args, anchor_widget=None):
             operation["timerange"] = paste_range
             operation["success"] = True
             _select_existing_targets(pasted_targets)
+            _refresh_animation_view()
             prompt_range = paste_range
         else:
             cmds.warning("No matching animation targets found")
@@ -3826,6 +4023,7 @@ def paste_insert_animation(*args, anchor_widget=None):
             operation["timerange"] = paste_range
             operation["success"] = True
             _select_existing_targets(pasted_targets)
+            _refresh_animation_view()
             prompt_range = paste_range
         else:
             cmds.warning("No matching animation targets found")
@@ -3906,6 +4104,7 @@ def paste_opposite_animation(*args, anchor_widget=None):
             operation["timerange"] = paste_range
             operation["success"] = True
             _select_existing_targets(pasted_targets)
+            _refresh_animation_view()
             prompt_range = paste_range
         else:
             cmds.warning("No matching animation targets found")
@@ -3968,6 +4167,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             operation["timerange"] = paste_range or _animation_data_timerange(animation_data)
             operation["success"] = True
             _select_existing_targets(pasted_targets)
+            _refresh_animation_view()
             prompt_range = operation["timerange"]
         _maybe_apply_paste_range(prompt_range, anchor_widget=anchor_widget)
         return True

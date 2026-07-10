@@ -71,8 +71,6 @@ COMMAND_ONLY_PREVIEW_MODES = {
 def _can_preview_with_openmaya(type_key, mode, value, world_space=False):
     if world_space or type_key in COMMAND_ONLY_PREVIEW_TYPES or mode in COMMAND_ONLY_PREVIEW_MODES:
         return False
-    if mode == "simplify_bake" and value > 0:
-        return False
     return True
 
 
@@ -142,6 +140,11 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
                     session.ensure_undo_open()
                 sliderMod.execute_tweener(session, value, world_space=world_space)
             return session
+
+        if session.preview and mode == "simplify_bake":
+            # Structural previews are rebuilt from the untouched drag-start
+            # curve on every value change instead of accumulating edits.
+            session.undo_preview_changes()
 
         if not session.preview:
             session.ensure_undo_open()

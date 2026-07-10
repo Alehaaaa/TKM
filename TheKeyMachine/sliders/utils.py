@@ -141,10 +141,9 @@ def resolve_keyframe_targets(session=None):
 
     curr = cmds.currentTime(q=True)
 
-    # With only an object selection, operate on the channels that are keyed now.
-    # Explicit graph-editor, channel-box, and time-range contexts retain their
-    # normal targeting behavior.
-    if src == "keyable_scalar" and not time_range:
+    # With no time range and no graph selection, operate only on channels that
+    # already have a key on the current frame.
+    if not time_range and not has_graph_keys:
         plugs = [plug for plug in plugs if _has_key_at_time(plug, curr)]
         if not plugs:
             return {}, time_range
@@ -176,9 +175,10 @@ def resolve_curve_targets(session=None):
 
     curr = cmds.currentTime(q=True)
 
-    # Keep curve-based slider modes consistent with plug-based modes: absent
-    # a more specific selection, only curves keyed at the current time qualify.
-    if src == "keyable_scalar" and not time_range:
+    # Keep curve-based slider modes consistent with plug-based modes: absent a
+    # time range or graph selection, only curves keyed at the current time
+    # qualify.
+    if not time_range and not has_graph_keys:
         curves = [curve for curve in curves if _has_key_at_time(curve, curr)]
         if not curves:
             return [], {}, time_range, has_graph_keys
@@ -213,7 +213,7 @@ class SliderSession:
         self._is_open = False
         self.preview = False
         self.committing_preview = False
-        self.anim_change = oma.MAnimCurveChange() if oma is not None else None
+        self.anim_change = self._new_anim_change()
         self._tint_key = "slider_{}_range".format(self.mode)
         self._tint_range = None
 
@@ -262,8 +262,18 @@ class SliderSession:
         self.cache.clear(keep_pose=True)
         self._tint_range = None
 
+    @staticmethod
+    def _new_anim_change():
+        change = oma.MAnimCurveChange() if oma is not None else None
+        if change is not None:
+            try:
+                change.setInteractive(True)
+            except Exception:
+                pass
+        return change
+
     def reset_anim_change(self):
-        self.anim_change = oma.MAnimCurveChange() if oma is not None else None
+        self.anim_change = self._new_anim_change()
 
     def undo_preview_changes(self):
         if self.anim_change is None:

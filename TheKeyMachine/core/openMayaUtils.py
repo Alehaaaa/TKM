@@ -172,6 +172,36 @@ def add_anim_curve_key(fn, time, change=None):
         return None
 
 
+def remove_anim_curve_key(fn, time, change=None):
+    index = anim_curve_key_index(fn, time)
+    if fn is None or index is None:
+        return False
+    try:
+        if change is not None:
+            fn.remove(index, change=change)
+        else:
+            fn.remove(index)
+        return True
+    except Exception:
+        return False
+
+
+def set_anim_curve_tangents(fn, time, in_angle, out_angle, change=None):
+    """Set broken fixed tangents using Maya API angle/weight representation."""
+    index = anim_curve_key_index(fn, time)
+    if fn is None or index is None or om is None or oma is None:
+        return False
+    try:
+        fn.setInTangentType(index, oma.MFnAnimCurve.kTangentFixed, change=change)
+        fn.setOutTangentType(index, oma.MFnAnimCurve.kTangentFixed, change=change)
+        fn.setTangentsLocked(index, False, change=change)
+        fn.setTangent(index, om.MAngle(float(in_angle), om.MAngle.kDegrees), 1.0, True, change=change)
+        fn.setTangent(index, om.MAngle(float(out_angle), om.MAngle.kDegrees), 1.0, False, change=change)
+        return True
+    except Exception:
+        return False
+
+
 def set_anim_curve_value_by_index(fn, index, value, change=None):
     if fn is None or index is None:
         return False

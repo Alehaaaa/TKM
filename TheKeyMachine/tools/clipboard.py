@@ -87,7 +87,8 @@ def save(slot: str, data: Any) -> None:
     _MEMORY[slot] = data
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, separators=(",", ":"))
+        json.dump(data, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
 
 
 def load(slot: str, missing_warning: Optional[str] = None) -> Optional[Any]:
