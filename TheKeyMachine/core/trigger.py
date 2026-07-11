@@ -62,6 +62,18 @@ _MODULE_COMMANDS = {
     "custom_graph": ("TheKeyMachine.tools.graph_toolbar.api", "toggle_graph_toolbar_enabled"),
     "overshoot_sliders": ("TheKeyMachine.core.toolbox", "toggle_overshoot_sliders_enabled"),
     "attribute_switcher_euler_filter": ("TheKeyMachine.tools.attribute_switcher.api", "toggle_euler_filter_enabled"),
+    "background_runner_channelbox_selection_highlight": (
+        "TheKeyMachine.core.backgroundRunners",
+        "toggle_channelbox_selection_highlight",
+    ),
+    "background_runner_channelbox_clear_on_selection_change": (
+        "TheKeyMachine.core.backgroundRunners",
+        "toggle_channelbox_clear_on_selection_change",
+    ),
+    "background_runner_camera_orbit_selection": (
+        "TheKeyMachine.core.backgroundRunners",
+        "toggle_camera_orbit_selection",
+    ),
     "custom_tools": ("TheKeyMachine.mods.generalMod", "open_file", ("TheKeyMachine_user_data/connect/tools", "tools.py")),
     "custom_scripts": ("TheKeyMachine.mods.generalMod", "open_file", ("TheKeyMachine_user_data/connect/scripts", "scripts.py")),
     "about_window": ("TheKeyMachine.mods.uiMod", "about_window"),

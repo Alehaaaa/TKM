@@ -780,8 +780,6 @@ def populate_main_toolbar_from_layout(layout_id, new_section_fn, owner):
 def add_main_settings_button(section, item_data, owner):
     import TheKeyMachine.core.toolbox as toolbox
 
-    show_tooltips = settings.get_setting("show_tooltips", True)
-    toolbar_alignment = get_main_toolbar_icon_alignment()
     internet_connection = general.config.get("INTERNET_CONNECTION", True)
 
     def update_toolbar_icon_alignment(alignment_name):
@@ -791,8 +789,8 @@ def add_main_settings_button(section, item_data, owner):
         return toolMenus.build_main_settings_menu(
             owner,
             source_widget or btn,
-            show_tooltips=show_tooltips,
-            toolbar_alignment=toolbar_alignment,
+            show_tooltips=settings.get_setting("show_tooltips", True),
+            toolbar_alignment=get_main_toolbar_icon_alignment(),
             update_toolbar_icon_alignment=update_toolbar_icon_alignment,
             internet_connection=internet_connection,
         )

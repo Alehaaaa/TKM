@@ -32,6 +32,7 @@ QSvgRenderer = getattr(QtSvg, "QSvgRenderer", None)
 from TheKeyMachine.widgets import util as wutil
 from TheKeyMachine.data import icons
 from TheKeyMachine.data.movies import TooltipMedia, TooltipMovieWidget
+import TheKeyMachine.mods.settingsMod as settings
 
 
 IS_MAC = sys.platform == "darwin"
@@ -824,7 +825,9 @@ class QFlatTooltipManager(object):
     _mouse_filter = None
     _current_source_key = None
     _pending_source_key = None
-    enabled = True
+    # Initialize from persistence here so every tooltip-enabled surface starts
+    # with the same state, even when the main toolbar/settings button is absent.
+    enabled = bool(settings.get_setting("show_tooltips", True))
 
     @classmethod
     def is_active(cls):

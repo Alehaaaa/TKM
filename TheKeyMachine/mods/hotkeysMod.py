@@ -913,6 +913,37 @@ def _build_slider_hotkey_section(section_id, section_data):
     return section
 
 
+def _append_background_runner_rows(section, seen, title_lookup, icon_lookup, trigger_commands):
+    """Add the individual entries exposed by the Background Runners menu."""
+    from TheKeyMachine.core import backgroundRunners
+
+    command_overrides = {
+        backgroundRunners.CHANNELBOX_HIGHLIGHT_ID: "background_runner_channelbox_selection_highlight",
+        backgroundRunners.CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID: "background_runner_channelbox_clear_on_selection_change",
+        backgroundRunners.CAMERA_ORBIT_SELECTION_ID: "background_runner_camera_orbit_selection",
+    }
+    for runner_id, spec in backgroundRunners.get_runner_specs().items():
+        command_name = command_overrides.get(runner_id, runner_id)
+        _append_section_row(
+            section,
+            seen,
+            title_lookup,
+            icon_lookup,
+            trigger_commands,
+            {
+                "command": command_name,
+                "title": spec.get("menu_label") or spec.get("label") or _humanize(runner_id),
+                "icon": spec.get("icon"),
+                "description": spec.get("description") or "Toggle this background runner.",
+                "checkable": True,
+                "get_checked": spec.get("get_enabled"),
+                "set_checked": lambda enabled, rid=runner_id: backgroundRunners.set_runner_enabled(rid, enabled),
+                "changed_signal": spec.get("changed_signal"),
+                "state_key": "background_runner:{}".format(runner_id),
+            },
+        )
+
+
 def _iter_hotkey_tool_sections():
     seen = set()
 
@@ -952,6 +983,9 @@ def _build_command_catalog():
 
             for item in section_data.get("items", []):
                 _append_toolbox_item_rows(section, seen, title_lookup, icon_lookup, trigger_commands, item)
+
+            if section_id == "background_runner_tools":
+                _append_background_runner_rows(section, seen, title_lookup, icon_lookup, trigger_commands)
 
         filtered = [row for row in section["commands"] if row["command"] in trigger_commands]
         if not filtered:
@@ -1252,6 +1286,8 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
                 checkable=True,
                 getter=self._check_state_getter(),
                 setter=self.command_data.get("set_checked"),
+                changed_signal=self.command_data.get("changed_signal"),
+                bind_fn=self.command_data.get("bind_checked_fn"),
                 state_key=self.command_data.get("state_key"),
             )
             layout.addWidget(self.check_box, 0)

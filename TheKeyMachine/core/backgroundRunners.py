@@ -17,8 +17,6 @@ from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.core.openMayaUtils as omutils
 from TheKeyMachine.data import icons
-import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
-import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
 from TheKeyMachine.widgets import timeline as timelineWidgets
 
 
@@ -44,6 +42,29 @@ def set_runner_enabled(runner_id, enabled):
     controller.set_enabled(runner_id, enabled)
 
 
+def toggle_runner_enabled(runner_id):
+    """Toggle one registered runner and return its new state."""
+    spec = get_runner_specs().get(runner_id)
+    if not spec:
+        raise KeyError("Unknown background runner: {}".format(runner_id))
+    getter = spec.get("get_enabled")
+    enabled = not bool(getter()) if callable(getter) else True
+    set_runner_enabled(runner_id, enabled)
+    return enabled
+
+
+def toggle_channelbox_selection_highlight():
+    return toggle_runner_enabled(CHANNELBOX_HIGHLIGHT_ID)
+
+
+def toggle_channelbox_clear_on_selection_change():
+    return toggle_runner_enabled(CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID)
+
+
+def toggle_camera_orbit_selection():
+    return toggle_runner_enabled(CAMERA_ORBIT_SELECTION_ID)
+
+
 def _emit_runner_triggered(manager, runner_id):
     try:
         manager.backgroundRunnerTriggered.emit(runner_id)
@@ -58,17 +79,6 @@ def _is_playing(manager=None):
         return bool(cmds.play(query=True, state=True))
     except Exception:
         return False
-
-
-def _get_overshoot_enabled():
-    return bool(settings.get_setting("sliders_overshoot", False))
-
-
-def _set_overshoot_enabled(enabled):
-    import TheKeyMachine.core.runtimeManager as runtime
-
-    settings.set_setting("sliders_overshoot", bool(enabled))
-    runtime.get_runtime_manager().overshootChanged.emit(bool(enabled))
 
 
 def _get_channelbox_name():
@@ -617,35 +627,5 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
                 namespace=RUNNER_SETTINGS_NAMESPACE,
             ),
             "changed_signal": _background_runner_signal(CAMERA_ORBIT_SELECTION_ID),
-        },
-        "attribute_switcher_euler_filter": {
-            "id": "attribute_switcher_euler_filter",
-            "label": "Auto Euler Filter",
-            "menu_label": "Auto Euler Filter",
-            "icon": icons.euler_filter,
-            "description": "Apply Euler filtering after Attribute Switcher changes rotation order.",
-            "get_enabled": attributeSwitcherApi.is_euler_filter_enabled,
-            "set_enabled": attributeSwitcherApi.set_euler_filter_enabled,
-            "changed_signal": manager.eulerFilterChanged,
-        },
-        "overshoot_sliders": {
-            "id": "overshoot_sliders",
-            "label": "Overshoot Sliders",
-            "menu_label": "Overshoot Sliders",
-            "icon": icons.sliders_overshoot,
-            "description": "Set slider ranges to -150/150 instead of -100/100.",
-            "get_enabled": _get_overshoot_enabled,
-            "set_enabled": _set_overshoot_enabled,
-            "changed_signal": manager.overshootChanged,
-        },
-        "custom_graph": {
-            "id": "custom_graph",
-            "label": "Graph Editor Toolbar",
-            "menu_label": "Show Graph Editor Toolbar",
-            "icon": icons.customGraph,
-            "description": "Show the TKM toolbar in the Graph Editor.",
-            "get_enabled": graphToolbarApi.get_graph_toolbar_checkbox_state,
-            "set_enabled": lambda enabled: graphToolbarApi.set_graph_toolbar_enabled(bool(enabled), apply=True),
-            "changed_signal": graphToolbarApi.custom_graph_bus.graph_toolbar_enabled_changed,
         },
     }

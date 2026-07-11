@@ -55,6 +55,8 @@ def update_show_tooltips(value):
     enabled = bool(value)
     settings.set_setting("show_tooltips", enabled)
     QFlatTooltipManager.enabled = enabled
+    if not enabled:
+        QFlatTooltipManager.hide()
 
 
 def _source_tool_key(source_widget):
@@ -931,13 +933,16 @@ def add_main_preferences_menu(
     toolbar_alignment,
     update_toolbar_icon_alignment,
 ):
-    builder = partial(
-        build_main_preferences_menu,
-        toolbar,
-        show_tooltips=show_tooltips,
-        toolbar_alignment=toolbar_alignment,
-        update_toolbar_icon_alignment=update_toolbar_icon_alignment,
-    )
+    # Registered menu builders can outlive the menu that registered them.
+    # Resolve mutable preferences when the builder is invoked, not here.
+    def builder():
+        return build_main_preferences_menu(
+            toolbar,
+            show_tooltips=settings.get_setting("show_tooltips", True),
+            toolbar_alignment=toolWidgets.get_main_toolbar_icon_alignment(),
+            update_toolbar_icon_alignment=update_toolbar_icon_alignment,
+        )
+
     return _add_registered_menu(
         parent_menu,
         builder,
