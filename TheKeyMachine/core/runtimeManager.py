@@ -797,6 +797,13 @@ class RuntimeManager(QtCore.QObject):
     def _safe_delete_widget(self, widget) -> None:
         if widget is None:
             return
+        delete_tint = getattr(widget, "delete_tint", None)
+        if callable(delete_tint):
+            try:
+                delete_tint()
+                return
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
         try:
             widget.hide()
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):

@@ -7,6 +7,7 @@ import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import colors as toolColors
 from TheKeyMachine.tools import common as toolCommon
+from TheKeyMachine.tools.animation_offset import customWidgets as offsetWidgets
 import TheKeyMachine.widgets.timeline as timelineWidgets
 
 
@@ -100,6 +101,10 @@ class AnimationOffsetController(QtCore.QObject):
 
     def _resolve_tint_color(self):
         return self._tint_color
+
+    def _on_tint_range_changed(self, timerange):
+        self._time_range = tuple(timerange)
+        self._resnapshot(update_range=False)
 
     def _is_in_locked_range(self):
         if not self._time_range:
@@ -493,15 +498,15 @@ class AnimationOffsetController(QtCore.QObject):
         cmds.select(selectionMod.get_selected_objects())
         self._connect_runtime_manager()
         self._resnapshot(update_range=self._time_range is None)
-        timelineWidgets.show_timeline_tint(
+        offsetWidgets.show_animation_offset_tint(
             timerange=self._time_range,
             color=self._resolve_tint_color(),
-            duration_ms=None,
             owner=self._owner,
             key=self._tint_key,
             center_line=True,
             icon=icons.animation_offset,
             icon_scale=1.15,
+            range_changed=self._on_tint_range_changed,
         )
         self._poll_timer.start()
 
