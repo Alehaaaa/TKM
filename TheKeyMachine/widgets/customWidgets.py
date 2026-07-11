@@ -2936,12 +2936,27 @@ class QFlatTabBarPainter(QtWidgets.QWidget):
         super().__init__(tab_bar)
         self._tab_bar = tab_bar
         self._background_source = background_source or tab_bar
+        # Maya owns the surrounding QTabWidget and may delete it while a paint
+        # event for this child is still queued.  Do not dereference that wrapper
+        # from paintEvent: PySide raises if its underlying C++ object is gone.
+        self._background_color = self._resolve_background_color()
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
         tab_bar.installEventFilter(self)
         self.setGeometry(tab_bar.rect())
         self.show()
         self.raise_()
+
+    def _resolve_background_color(self):
+        source = self._background_source
+        if source is not None and QtCompat.isValid(source):
+            try:
+                return QtGui.QColor(
+                    source.palette().color(source.backgroundRole())
+                )
+            except RuntimeError:
+                pass
+        return QtGui.QColor(self.palette().color(self.backgroundRole()))
 
     def syncGeometry(self):
         """Keep compatibility with the toolbar's existing resize callback."""
@@ -2963,10 +2978,7 @@ class QFlatTabBarPainter(QtWidgets.QWidget):
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
-        background = self._background_source.palette().color(
-            self._background_source.backgroundRole()
-        )
-        painter.fillRect(self.rect(), background)
+        painter.fillRect(self.rect(), self._background_color)
 
         pen = QtGui.QPen(QtGui.QColor(130, 130, 130))
         pen.setWidth(max(1, DPI(1)))
