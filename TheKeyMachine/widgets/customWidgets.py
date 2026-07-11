@@ -2929,6 +2929,62 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         super().leaveEvent(event)
 
 
+class QFlatTabBarPainter(QtWidgets.QWidget):
+    """Paint the shelf texture over the native tab bar only."""
+
+    def __init__(self, tab_bar, background_source=None):
+        super().__init__(tab_bar)
+        self._tab_bar = tab_bar
+        self._background_source = background_source or tab_bar
+        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        tab_bar.installEventFilter(self)
+        self.setGeometry(tab_bar.rect())
+        self.show()
+        self.raise_()
+
+    def syncGeometry(self):
+        """Keep compatibility with the toolbar's existing resize callback."""
+        if self._tab_bar and QtCompat.isValid(self._tab_bar):
+            self.setGeometry(self._tab_bar.rect())
+            self.raise_()
+            self.update()
+
+    def eventFilter(self, watched, event):
+        if watched is self._tab_bar and event.type() in (
+            QtCore.QEvent.Resize,
+            QtCore.QEvent.Show,
+            QtCore.QEvent.LayoutRequest,
+        ):
+            self.setGeometry(self._tab_bar.rect())
+            self.raise_()
+            self.update()
+        return super().eventFilter(watched, event)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        background = self._background_source.palette().color(
+            self._background_source.backgroundRole()
+        )
+        painter.fillRect(self.rect(), background)
+
+        pen = QtGui.QPen(QtGui.QColor(130, 130, 130))
+        pen.setWidth(max(1, DPI(1)))
+        pen.setCapStyle(QtCore.Qt.RoundCap)
+        painter.setPen(pen)
+
+        center = DPI(5) - 1
+        offset = DPI(1.5)
+        top = 0.0
+        bottom = float(self.height() - 1)
+        dot_count = max(2, int(bottom // max(1, DPI(3))) + 1)
+        spacing = bottom / float(dot_count - 1)
+        for index in range(dot_count):
+            y = top + spacing * index
+            painter.drawPoint(QtCore.QPointF(center - offset, y))
+            painter.drawPoint(QtCore.QPointF(center + offset, y))
+
+
 class QFlatShelfPainter(QtWidgets.QWidget):
     def __init__(self, parent=None):
         QtWidgets.QWidget.__init__(self, parent)

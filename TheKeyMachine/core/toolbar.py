@@ -210,7 +210,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self._runtime_manager.scene_new.connect(self._on_scene_opened)
         self._runtime_manager.graph_editor_opened.connect(self._on_graph_editor_opened)
 
-        self.shelf_painter = None
+        self.tabbar_painter = None
         self._height_update_pending = False
         self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
 
@@ -281,16 +281,18 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 pass
             self.link_obj_pulse_thread = None
 
-        # Cleanup painter
-        if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
-            try:
-                self.shelf_painter.setParent(None)
-                self.shelf_painter.deleteLater()
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
-            self.shelf_painter = None
+        self._delete_tabbar_painter()
 
         super().closeEvent(event)
+
+    def _delete_tabbar_painter(self):
+        if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
+            try:
+                self.tabbar_painter.setParent(None)
+                self.tabbar_painter.deleteLater()
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+        self.tabbar_painter = None
 
     def _on_scene_opened(self, *_args):
         if not QtCompat.isValid(self):
@@ -366,8 +368,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 if QtCompat.isValid(self):
                     cmds.evalDeferred(show, lowestPriority=True)
 
-                if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
-                    self.shelf_painter.show()
+                if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
+                    self.tabbar_painter.show()
                 else:
                     cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
                 return
@@ -387,13 +389,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     )
                 )
                 timer.start(100)
-            if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
-                self.shelf_painter.show()
+            if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
+                self.tabbar_painter.show()
             else:
                 cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
         else:
-            if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
-                self.shelf_painter.hide()
+            if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
+                self.tabbar_painter.hide()
 
         self.update_height()
 
@@ -401,14 +403,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if not QtCompat.isValid(self):
             return
 
-        if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
-            try:
-                self.shelf_painter.setParent(None)
-                self.shelf_painter.deleteLater()
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
-
-            self.shelf_painter = None
+        self._delete_tabbar_painter()
 
         qctrl = mui.MQtUtil.findControl(WORKSPACE_CONTROL_NAME)
         control = wutil.get_maya_qt(qctrl)
@@ -416,14 +411,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         control.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
 
+        tab_bar = tab_handle.tabBar()
         if self.isFloating():
-            return tab_handle.tabBar().setVisible(False)
+            return tab_bar.setVisible(False)
 
-        self.shelf_painter = cw.QFlatShelfPainter(tab_handle)
-        self.shelf_painter.attach(tab_handle, tab_handle.tabBar(), control)
+        # Temporary tab-bar experiment: paint the shelf treatment directly on
+        # Maya's tab bar instead of creating the full-height shelf overlay.
+        tab_bar.setVisible(True)
+        tab_bar.setFixedHeight(wutil.DPI(1000))
 
-        self.shelf_painter.show()
-        # tab_handle.tabBar().setVisible(True)
+        self.tabbar_painter = cw.QFlatTabBarPainter(tab_bar, tab_handle)
 
     def update_height(self):
         if not QtCompat.isValid(self):
@@ -469,8 +466,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 dock_height += max(0, int(workspace_top) * 2)
                 self._set_qt_height(dock_container, dock_height)
             self._resize_dock_splitter(workspace_widget, dock_height)
-            if self.shelf_painter and QtCompat.isValid(self.shelf_painter):
-                self.shelf_painter.syncGeometry()
+            if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
+                self.tabbar_painter.syncGeometry()
         except RuntimeError:
             # Maya may destroy/rebuild a workspaceControl between a deferred
             # validity check and the following Qt call. A later layout event
