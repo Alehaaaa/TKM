@@ -229,6 +229,13 @@ TOOL_DEFINITIONS = {
         "icon": icons.close,
         "tooltip": "Unload the TheKeyMachine toolbar and stop its runtime tools.",
     },
+    "toolbar_uninstall": {
+        "type": "tool",
+        "label": "Uninstall",
+        "icon": icons.remove,
+        "callback": ui.uninstall,
+        "tooltip": "Remove TheKeyMachine from Maya.",
+    },
     "check_for_updates": {
         "type": "tool",
         "label": "Check for Updates",
@@ -241,6 +248,18 @@ TOOL_DEFINITIONS = {
         "icon": icons.settings,
         "tooltip": "Open general toolbar options.",
     },
+    "start_with_maya": {
+        "type": "check",
+        "label": "Start with Maya",
+        "callback": ui.install_userSetup,
+        "tooltip": "Load TheKeyMachine automatically when Maya starts.",
+    },
+    "show_tooltips": {
+        "type": "check",
+        "label": "Show Tooltips",
+        "callback": toolMenus.update_show_tooltips,
+        "tooltip": "Show detailed help when hovering over tools and menu actions.",
+    },
     "main_dock_menu": {
         "type": "menu",
         "label": "Dock",
@@ -252,6 +271,18 @@ TOOL_DEFINITIONS = {
         "label": "System",
         "icon": icons.system,
         "tooltip": "Open maintenance actions.",
+    },
+    "graph_settings_menu": {
+        "type": "menu",
+        "label": "Settings",
+        "icon": icons.settings,
+        "tooltip": "Open Graph Editor toolbar settings.",
+    },
+    "graph_dock_menu": {
+        "type": "menu",
+        "label": "Dock",
+        "icon": icons.dock,
+        "tooltip": "Move the Graph Editor toolbar.",
     },
     "help_menu": {
         "type": "menu",
@@ -549,7 +580,7 @@ TOOL_DEFINITIONS = {
     "nudge_value": {
         "type": "widget",
         "label": "Nudge Value",
-        "tooltip": helper.move_keyframes_intField_widget_tooltip_text,
+        "tooltip": "Set the number of frames used by the Nudge and Inbetween tools.",
         "default": True,
     },
     "nudge_left": {
@@ -1042,6 +1073,7 @@ TOOL_DEFINITIONS = {
         "label": "Copy Pose",
         "icon": icons.copy_pose,
         "callback": keyTools.copy_pose,
+        "menu": toolMenus.build_copy_pose_menu,
         "tooltip": helper.copy_pose_tooltip_text,
     },
     "paste_pose": {
@@ -1076,6 +1108,7 @@ TOOL_DEFINITIONS = {
         "label": "Copy Animation",
         "icon": icons.copy_animation,
         "callback": keyTools.copy_animation,
+        "menu": toolMenus.build_copy_animation_menu,
         "tooltip": helper.copy_animation_tooltip_text,
     },
 
@@ -1257,7 +1290,7 @@ TOOL_DEFINITIONS = {
     "tracer_refresh": {
         "type": "tool",
         "label": "Refresh Tracer",
-        "icon": icons.refresh,
+        "icon": icons.tracer_refresh,
         "callback": bar.tracer_refresh,
         "tooltip": helper.tracer_refresh_tooltip_text,
     },
@@ -1299,7 +1332,7 @@ TOOL_DEFINITIONS = {
     "tracer_remove": {
         "type": "tool",
         "label": "Remove Tracer",
-        "icon": icons.remove,
+        "icon": icons.tracer_remove,
         "callback": bar.remove_tracer_node,
         "tooltip": helper.tracer_remove_tooltip_text,
     },
@@ -1387,6 +1420,12 @@ TOOL_DEFINITIONS = {
         "label": "Paste Opposite",
         "icon": icons.paste_opposite_animation,
         "callback": keyTools.paste_opposite_animation,
+    },
+    "paste_mirror_pose": {
+        "type": "tool",
+        "label": "Paste Mirror Pose",
+        "icon": icons.paste_opposite_animation,
+        "callback": keyTools.paste_mirror_pose,
     },
 
 # ---------------------------------------------------------------  LINK OBJECTS --------------------------------------------------------------
@@ -1663,6 +1702,7 @@ TOOL_SECTION_DEFINITIONS = {
     "system": {
         "label": "TKM Menu",
         "hiddeable": False,
+        "toolbar_ids": ("main",),
         "items": [
             {
                 "id": "TKM",
@@ -1676,6 +1716,7 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "toolbar_add_shelf_button", "default": False},
             {"id": "toolbar_reload", "default": False},
             {"id": "toolbar_unload", "default": False},
+            {"id": "toolbar_uninstall", "default": False},
             {"id": "check_for_updates", "default": False},
             {"id": "hotkeys_window", "default": False},
             {"id": "about_window", "default": False},
@@ -2333,14 +2374,6 @@ TOOLBAR_DEFAULT_SLIDER_MODES = {
     },
 }
 
-
-def _descriptor_overrides(item, *, include_keys=True):
-    ignored = {"id", "section", "shortcuts"}
-    if not include_keys:
-        ignored.add("keys")
-    return {key: value for key, value in item.items() if key not in ignored}
-
-
 def _apply_shortcuts(tool, item):
     shortcut_items = item.get("shortcuts") or []
     if not shortcut_items:
@@ -2368,7 +2401,11 @@ def _apply_shortcuts(tool, item):
         tool_id = shortcut_item.get("id")
         if not tool_id:
             continue
-        overrides = _descriptor_overrides(shortcut_item, include_keys=False)
+        overrides = {
+            key: value
+            for key, value in shortcut_item.items()
+            if key not in {"id", "section", "shortcuts", "keys"}
+        }
         if shortcut_item.get("callback") is not None:
             variant = dict(tool)
             variant.update(overrides)
@@ -2412,24 +2449,6 @@ def get_tool(tool_id, **overrides):
     return tool
 
 
-def _resolve_section_item(item, toolbar_id=None):
-    if isinstance(item, str):
-        return item
-
-    section_ref = item.get("section")
-    if section_ref:
-        section = get_tool_section(section_ref, toolbar_id=toolbar_id)
-        if section:
-            return {"type": "group", "items": section.get("items", []), "label": section.get("label")}
-        return []
-
-    tool_id = item.get("id")
-    if tool_id:
-        return _apply_shortcuts(get_tool(tool_id, **_descriptor_overrides(item)), item)
-
-    return None
-
-
 def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
     section_def = TOOL_SECTION_DEFINITIONS.get(section_id)
     if not section_def:
@@ -2445,13 +2464,20 @@ def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
 
     resolved = []
     for item in section_def.get("items", []):
-        resolved_item = _resolve_section_item(item, toolbar_id=toolbar_id)
-        if resolved_item is None:
+        if isinstance(item, str):
+            resolved.append(item)
             continue
-        if isinstance(resolved_item, list):
-            resolved.extend(resolved_item)
-        else:
-            resolved.append(resolved_item)
+        section_ref = item.get("section")
+        if section_ref:
+            nested = get_tool_section(section_ref, toolbar_id=toolbar_id)
+            if nested:
+                resolved.append({"type": "group", "items": nested.get("items", []), "label": nested.get("label")})
+            continue
+        tool_id = item.get("id")
+        if not tool_id:
+            continue
+        overrides = {key: value for key, value in item.items() if key not in {"id", "section", "shortcuts"}}
+        resolved.append(_apply_shortcuts(get_tool(tool_id, **overrides), item))
     section["items"] = resolved
     return section
 
@@ -2518,20 +2544,20 @@ def get_tool_tint_color(tool_id, default=None):
 
 
 def get_toolbar_sections(layout_id, resolve_items=True):
-    if layout_id not in {"main", "graph"}:
+    if layout_id not in ("main", "graph"):
         return []
-
-    section_ids = list(TOOL_SECTION_DEFINITIONS.keys())
-    if layout_id == "graph":
-        section_ids = [section_id for section_id in section_ids if section_id != "system"]
+    section_ids = [
+        section_id
+        for section_id, definition in TOOL_SECTION_DEFINITIONS.items()
+        if not definition.get("hotkeys")
+        and definition.get("toolbar") is not False
+        and layout_id in definition.get("toolbar_ids", ("main", "graph"))
+    ]
     return [
         section
         for section in (
             get_tool_section(section_id, resolve_items=resolve_items, toolbar_id=layout_id)
             for section_id in section_ids
-            if not TOOL_SECTION_DEFINITIONS[section_id].get("hotkeys")
-            and TOOL_SECTION_DEFINITIONS[section_id].get("toolbar") is not False
-            and layout_id in TOOL_SECTION_DEFINITIONS[section_id].get("toolbar_ids", ("main", "graph"))
         )
         if section is not None
     ]

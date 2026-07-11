@@ -62,7 +62,7 @@ class SliderMode:
         worldSpace=False,
         frameButtons=False,
         shortcut=None,
-        tooltip_template=None,
+        tooltip=None,
     ):
         self.key = key
         self.label = label or key.replace("_", " ").title()
@@ -71,7 +71,7 @@ class SliderMode:
         self.worldSpace = worldSpace
         self.frameButtons = frameButtons
         self.shortcut = list(shortcut or [])
-        self.tooltip_template = tooltip_template
+        self.tooltip = tooltip
 
     def __repr__(self):
         return f"<SliderMode {self.key}>"
@@ -159,12 +159,12 @@ class SliderButton(cw.TooltipMixin, QPushButton):
     def _update_tooltip(self):
         title = self._tooltip_title or "Value"
         value_label = "Set Frame" if self._frameButton else f"{self._percent}%"
-        self.setToolTipData(text=f"{title}: {value_label}", description=self._tooltip_description, tooltip_template=getattr(self, "_tooltip_template", None))
+        self.setToolTipData(text=f"{title}: {value_label}", description=self._tooltip_description, tooltip=getattr(self, "_tooltip", None))
 
-    def setTooltipInfo(self, title: str, description: str = "", tooltip_template=None):
+    def setTooltipInfo(self, title: str, description: str = "", tooltip=None):
         self._tooltip_title = title
         self._tooltip_description = description
-        self._tooltip_template = tooltip_template
+        self._tooltip = tooltip
         self._update_tooltip()
 
     @property
@@ -313,10 +313,10 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
         self._apply_stylesheet(thick=False)
 
-    def setTooltipInfo(self, title: str, description: str = "", tooltip_template=None):
+    def setTooltipInfo(self, title: str, description: str = "", tooltip=None):
         self._tooltip_title = title
         self._tooltip_description = description
-        self._tooltip_template = tooltip_template
+        self._tooltip = tooltip
         self._update_self_tooltip()
 
     def enterEvent(self, e):
@@ -338,7 +338,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
     def _update_self_tooltip(self, _v=None):
         title = self._tooltip_title or self._text
-        self.setToolTipData(text=title, description=self._tooltip_description, tooltip_template=getattr(self, "_tooltip_template", None))
+        self.setToolTipData(text=title, description=self._tooltip_description, tooltip=getattr(self, "_tooltip", None))
 
     @staticmethod
     def _looks_like_icon(value: str) -> bool:
@@ -634,7 +634,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         dragCommand: Optional[callable] = None,
         tooltipTitle: str = "",
         tooltipDescription: str = "",
-        tooltipTemplate = None,
+        tooltip=None,
         p: Optional[QLayout] = None,
     ):
         super().__init__(None)
@@ -648,7 +648,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._frameButtons = False
         self._tooltipTitle = tooltipTitle
         self._tooltipDescription = tooltipDescription
-        self._tooltipTemplate = tooltipTemplate
+        self._tooltip = tooltip
         self._dragCommand = None
         self._sliderSession = None
 
@@ -757,7 +757,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         # initial geometry & tooltip sync
         if tooltipTitle:
-            self.setTooltipInfo(tooltipTitle, tooltipDescription, tooltipTemplate)
+            self.setTooltipInfo(tooltipTitle, tooltipDescription, tooltip)
         else:
             self._slider._update_self_tooltip()
 
@@ -949,19 +949,19 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self.modeRequested.emit(self._current_mode.key, True)
         return True
 
-    def setTooltipInfo(self, title: str, description: str = "", tooltip_template=None):
+    def setTooltipInfo(self, title: str, description: str = "", tooltip=None):
         """Sets tooltip and status tip info for the widget and all its components."""
         self._tooltipTitle = title
         self._tooltipDescription = description
-        self._tooltipTemplate = tooltip_template
+        self._tooltip = tooltip
 
         # Update the mixin state for the main widget (handles statusTip)
-        cw.TooltipMixin.setTooltipInfo(self, title, description, tooltip_template=tooltip_template)
+        cw.TooltipMixin.setTooltipInfo(self, title, description, tooltip=tooltip)
 
         # Update inner components
-        self._slider.setTooltipInfo(title, description, tooltip_template)
+        self._slider.setTooltipInfo(title, description, tooltip)
         for b in self._leftButtons + self._rightButtons:
-            b.setTooltipInfo(title, description, tooltip_template)
+            b.setTooltipInfo(title, description, tooltip)
 
     ################################ GETTERS ################################
 
@@ -1007,7 +1007,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if mode.icon:
             self.setText(mode.icon)
 
-        self.setTooltipInfo(mode.label, mode.description, mode.tooltip_template)
+        self.setTooltipInfo(mode.label, mode.description, mode.tooltip)
         self.setWorldSpace(mode.worldSpace)
         self.setFrameButtonsVisible(mode.frameButtons)
         self._refresh_toolTipData()
@@ -1054,7 +1054,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             if shortcut_text:
                 label = "{}\t{}".format(mode.label, shortcut_text)
 
-            act = menu.addAction(label, description=mode.description, tooltip_template=getattr(mode, "tooltip_template", None), label=mode.label)
+            act = menu.addAction(label, description=mode.description, tooltip=getattr(mode, "tooltip", None), label=mode.label)
             act.setCheckable(True)
             act.setActionGroup(group)
 
@@ -1185,7 +1185,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                 mode.key,
                 title=mode.label,
                 description=mode.description,
-                tooltip_template=getattr(mode, "tooltip_template", None),
+                tooltip=getattr(mode, "tooltip", None),
             )
 
         if preview:

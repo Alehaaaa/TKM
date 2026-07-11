@@ -50,11 +50,9 @@ def app_instance():
 
 
 def dpi(value):
-    try:
-        ratio = app_instance().devicePixelRatio()
-    except Exception:
-        ratio = 1.0
-    return int(value * ratio)
+    # Qt uses device-independent logical pixels when high-DPI scaling is active.
+    # Multiplying by devicePixelRatio makes the installer oversized on Retina/4K displays.
+    return int(value)
 
 
 def installer_dir():
@@ -66,6 +64,19 @@ def installer_dir():
 
 def source_dir():
     return os.path.join(installer_dir(), "TheKeyMachine")
+
+
+def license_file_path():
+    return os.path.join(installer_dir(), "license_gpl-3.0.txt")
+
+
+def full_license_text():
+    path = license_file_path()
+    try:
+        with open(path, "r", encoding="utf-8") as license_file:
+            return license_file.read()
+    except Exception:
+        return "GNU GPL-3.0 license file could not be loaded from:\n{0}".format(path)
 
 
 def scripts_dir():
@@ -107,17 +118,8 @@ def confirm(parent, title, message):
     return result == QtWidgets.QMessageBox.Yes
 
 
-def remove_old_install(path):
-    if not os.path.exists(path):
-        return
-
-    if not os.path.isdir(path):
-        raise RuntimeError("Destination exists but is not a folder: {0}".format(path))
-
-    shutil.rmtree(path)
-
-
-def copy_install(src, dst):
+def replace_install(src, dst):
+    """Stage a complete copy, then swap it into place with rollback support."""
     if not os.path.exists(src):
         raise RuntimeError(
             "Source folder not found:\n{0}\n\n"
@@ -131,7 +133,37 @@ def copy_install(src, dst):
     if not os.path.exists(parent):
         os.makedirs(parent)
 
-    shutil.copytree(src, dst)
+    staging = dst + ".installing"
+    backup = dst + ".backup"
+    for temporary_path in (staging, backup):
+        if os.path.isdir(temporary_path):
+            shutil.rmtree(temporary_path)
+        elif os.path.exists(temporary_path):
+            os.remove(temporary_path)
+
+    had_previous_install = os.path.exists(dst)
+    previous_install_moved = False
+    try:
+        shutil.copytree(src, staging)
+        if had_previous_install:
+            if not os.path.isdir(dst):
+                raise RuntimeError("Destination exists but is not a folder: {0}".format(dst))
+            os.rename(dst, backup)
+            previous_install_moved = True
+        os.rename(staging, dst)
+    except Exception:
+        if previous_install_moved and os.path.isdir(backup) and not os.path.exists(dst):
+            os.rename(backup, dst)
+        if os.path.isdir(staging):
+            shutil.rmtree(staging)
+        raise
+
+    # The new install is active. Backup cleanup must not invalidate a successful swap.
+    if os.path.isdir(backup):
+        try:
+            shutil.rmtree(backup)
+        except Exception:
+            traceback.print_exc()
 
 
 def unload_tkm_modules():
@@ -164,12 +196,12 @@ def reload_installer_module():
     return importlib.reload(module)
 
 
-def install_thekeymachine(parent, install_button, status_label):
+def install_thekeymachine(parent):
     src = source_dir()
     dst = destination_dir()
 
-    install_button.setEnabled(False)
-    status_label.setText("Installing...")
+    parent.set_installing(True)
+    parent.set_status("Installing...")
     QtWidgets.QApplication.processEvents()
 
     try:
@@ -183,19 +215,15 @@ def install_thekeymachine(parent, install_button, status_label):
             )
 
             if not ok:
-                status_label.setText(version_string())
-                install_button.setEnabled(True)
+                parent.set_installing(False)
+                parent._refresh_state()
                 return
 
-            status_label.setText("Removing old installation...")
-            QtWidgets.QApplication.processEvents()
-            remove_old_install(dst)
-
-        status_label.setText("Copying files...")
+        parent.set_status("Copying and validating files...")
         QtWidgets.QApplication.processEvents()
-        copy_install(src, dst)
+        replace_install(src, dst)
 
-        status_label.setText("Installation completed. Loading TheKeyMachine...")
+        parent.set_status("Installation completed. Loading TheKeyMachine...")
         QtWidgets.QApplication.processEvents()
 
         try:
@@ -208,11 +236,11 @@ def install_thekeymachine(parent, install_button, status_label):
                 "TheKeyMachine was installed, but Maya could not load it automatically.",
                 traceback.format_exc(),
             )
-            status_label.setText("Installed, but automatic load failed.")
-            install_button.setEnabled(True)
+            parent.set_installing(False)
+            parent.set_status("Installed, but automatic load failed.")
             return
 
-        status_label.setText("Installation completed successfully.")
+        parent.set_status("Installation completed successfully.")
         show_info(
             parent,
             "Installation Complete",
@@ -230,8 +258,8 @@ def install_thekeymachine(parent, install_button, status_label):
             "TheKeyMachine could not be installed.",
             traceback.format_exc(),
         )
-        status_label.setText("Installation failed.")
-        install_button.setEnabled(True)
+        parent.set_installing(False)
+        parent.set_status("Installation failed.")
 
 
 class TheKeyMachineInstallerDialog(QtWidgets.QDialog):
@@ -240,55 +268,82 @@ class TheKeyMachineInstallerDialog(QtWidgets.QDialog):
 
         self.setObjectName(WINDOW_NAME)
         self.setWindowTitle("TheKeyMachine Installer")
-        self.setMinimumWidth(dpi(520))
-        self.setMinimumHeight(dpi(640))
 
-        self.setWindowFlags(
-            self.windowFlags()
-            | QtCore.Qt.Window
-            | QtCore.Qt.WindowCloseButtonHint
-        )
+        window_type = QtCore.Qt.Tool if sys.platform == "darwin" else QtCore.Qt.Window
+        base_flags = self.windowFlags() & ~QtCore.Qt.WindowType_Mask
+        self.setWindowFlags(base_flags | window_type | QtCore.Qt.WindowCloseButtonHint)
 
         self._build_ui()
+        self._fit_to_screen()
         self._refresh_state()
 
+    def _fit_to_screen(self):
+        cursor_pos = QtGui.QCursor.pos()
+        screen = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
+        if screen is None:
+            self.resize(dpi(500), dpi(680))
+            return
+
+        available = screen.availableGeometry()
+        edge_margin = dpi(24)
+        max_width = max(1, available.width() - edge_margin * 2)
+        max_height = max(1, available.height() - edge_margin * 2)
+        width = min(dpi(500), max_width)
+        height = min(dpi(680), max_height)
+        self.setMinimumSize(min(dpi(390), width), min(dpi(460), height))
+        self.resize(width, height)
+        self.move(available.center() - self.rect().center())
+
     def _build_ui(self):
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(dpi(28), dpi(24), dpi(28), dpi(24))
-        layout.setSpacing(dpi(14))
+        window_layout = QtWidgets.QVBoxLayout(self)
+        window_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll_area = QtWidgets.QScrollArea(self)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        window_layout.addWidget(scroll_area)
+
+        content = QtWidgets.QWidget(scroll_area)
+        scroll_area.setWidget(content)
+        layout = QtWidgets.QVBoxLayout(content)
+        layout.setContentsMargins(dpi(20), dpi(16), dpi(20), dpi(18))
+        layout.setSpacing(dpi(10))
 
         header = QtWidgets.QVBoxLayout()
         header.setAlignment(QtCore.Qt.AlignCenter)
         header.setSpacing(dpi(8))
 
         logo_path = os.path.join(
-            source_dir(),
+            installer_dir(),
+            "TheKeyMachine",
             "data",
-            "img",
-            "TheKeyMachine_logo_250.png",
+            "icons",
+            "TheKeyMachine_logo_500.png",
         )
 
+        logo_loaded = False
         if os.path.exists(logo_path):
-            logo = QtWidgets.QLabel()
-            logo.setAlignment(QtCore.Qt.AlignCenter)
-
             pixmap = QtGui.QPixmap(logo_path)
             if not pixmap.isNull():
+                logo = QtWidgets.QLabel()
+                logo.setAlignment(QtCore.Qt.AlignCenter)
                 logo.setPixmap(
                     pixmap.scaled(
-                        dpi(210),
-                        dpi(210),
+                        dpi(190),
+                        dpi(190),
                         QtCore.Qt.KeepAspectRatio,
                         QtCore.Qt.SmoothTransformation,
                     )
                 )
+                header.addWidget(logo)
+                logo_loaded = True
 
-            header.addWidget(logo)
-
-        title = QtWidgets.QLabel("TheKeyMachine")
-        title.setAlignment(QtCore.Qt.AlignCenter)
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
-        header.addWidget(title)
+        if not logo_loaded:
+            title = QtWidgets.QLabel("TheKeyMachine")
+            title.setAlignment(QtCore.Qt.AlignCenter)
+            title.setStyleSheet("font-size: 22px; font-weight: bold;")
+            header.addWidget(title)
 
         subtitle = QtWidgets.QLabel("Animation toolset for Maya animators")
         subtitle.setAlignment(QtCore.Qt.AlignCenter)
@@ -306,6 +361,8 @@ class TheKeyMachineInstallerDialog(QtWidgets.QDialog):
         paths_layout = QtWidgets.QFormLayout(paths_box)
         paths_layout.setLabelAlignment(QtCore.Qt.AlignRight)
         paths_layout.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        paths_layout.setRowWrapPolicy(QtWidgets.QFormLayout.WrapLongRows)
+        paths_layout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
 
         self.source_path_label = QtWidgets.QLabel(source_dir())
         self.source_path_label.setWordWrap(True)
@@ -329,16 +386,10 @@ class TheKeyMachineInstallerDialog(QtWidgets.QDialog):
 
         self.license_text = QtWidgets.QTextEdit()
         self.license_text.setReadOnly(True)
-        self.license_text.setMinimumHeight(dpi(145))
-        self.license_text.setHtml(
-            """
-            <b>GPL-3.0 license summary</b><br><br>
-            1. You may use, modify, and distribute this software.<br><br>
-            2. Modified versions must remain open source under the same license.<br><br>
-            3. The software is provided as-is, without warranty.<br><br>
-            4. By installing, you accept these terms.
-            """
-        )
+        self.license_text.setAcceptRichText(False)
+        self.license_text.setLineWrapMode(QtWidgets.QTextEdit.WidgetWidth)
+        self.license_text.setMinimumHeight(dpi(125))
+        self.license_text.setPlainText(full_license_text())
         self.license_text.setStyleSheet(
             "QTextEdit {"
             "background-color: #2b2b2b;"
@@ -349,7 +400,11 @@ class TheKeyMachineInstallerDialog(QtWidgets.QDialog):
         )
         layout.addWidget(self.license_text)
 
-        self.accept_checkbox = QtWidgets.QCheckBox("I accept the terms and conditions")
+        self.accept_checkbox = QtWidgets.QCheckBox("I have read and accept the GNU GPL-3.0 license")
+        self.accept_checkbox.setStyleSheet(
+            "QCheckBox { color: #c8cec9; spacing: 7px; padding: 3px 0; }"
+            "QCheckBox:hover { color: #ffffff; }"
+        )
         layout.addWidget(self.accept_checkbox)
 
         self.install_button = QtWidgets.QPushButton("Install TheKeyMachine")
@@ -358,20 +413,25 @@ class TheKeyMachineInstallerDialog(QtWidgets.QDialog):
         self.install_button.setStyleSheet(
             """
             QPushButton {
-                background-color: #224422;
-                color: #f2fff2;
+                background-color: #456f4b;
+                color: #eeeeee;
+                border: 1px solid #587d5d;
                 border-radius: 5px;
                 font-weight: bold;
+                font-size: 13px;
             }
             QPushButton:enabled:hover {
-                background-color: #2f6b2f;
+                background-color: #527f59;
+                border-color: #6b916f;
             }
             QPushButton:enabled:pressed {
-                background-color: #1d521d;
+                background-color: #395f40;
+                border-color: #4d7052;
             }
             QPushButton:disabled {
                 background-color: #2a2a2a;
                 color: #666;
+                border-color: #383838;
             }
             QPushButton:disabled:hover {
                 background-color: #2a2a2a;
@@ -385,11 +445,20 @@ class TheKeyMachineInstallerDialog(QtWidgets.QDialog):
 
         self.open_scripts_button = QtWidgets.QPushButton("Open Maya scripts folder")
         self.open_scripts_button.setFixedHeight(dpi(32))
-        layout.addWidget(self.open_scripts_button)
+        self.cancel_button = QtWidgets.QPushButton("Cancel")
+        self.cancel_button.setFixedHeight(dpi(32))
+
+        secondary_actions = QtWidgets.QHBoxLayout()
+        secondary_actions.setContentsMargins(0, 0, 0, 0)
+        secondary_actions.setSpacing(dpi(8))
+        secondary_actions.addWidget(self.open_scripts_button, 2)
+        secondary_actions.addWidget(self.cancel_button, 1)
+        layout.addLayout(secondary_actions)
 
         self.accept_checkbox.toggled.connect(self._refresh_state)
         self.install_button.clicked.connect(self._install)
         self.open_scripts_button.clicked.connect(self._open_scripts_folder)
+        self.cancel_button.clicked.connect(self.reject)
 
     def _refresh_state(self):
         src_exists = os.path.isdir(source_dir())
@@ -404,12 +473,22 @@ class TheKeyMachineInstallerDialog(QtWidgets.QDialog):
             self.status_label.setText(version_string())
             self.status_label.setStyleSheet("color: #888; font-size: 10px;")
 
+    def set_status(self, text):
+        self.status_label.setText(text)
+        self.status_label.setStyleSheet("color: #888; font-size: 10px;")
+
+    def set_installing(self, installing):
+        installing = bool(installing)
+        self.accept_checkbox.setEnabled(not installing)
+        self.open_scripts_button.setEnabled(not installing)
+        self.cancel_button.setEnabled(not installing)
+        if installing:
+            self.install_button.setEnabled(False)
+        else:
+            self._refresh_state()
+
     def _install(self):
-        install_thekeymachine(
-            self,
-            self.install_button,
-            self.status_label,
-        )
+        install_thekeymachine(self)
 
     def _open_scripts_folder(self):
         path = scripts_dir()

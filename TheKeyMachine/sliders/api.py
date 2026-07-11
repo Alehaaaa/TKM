@@ -87,11 +87,11 @@ def _resolve_type_key(type_key, mode):
 def create_session(mode):
     """Create a per-interaction slider session for the given mode."""
     mode_def = manager.get_slider_mode(mode)
-    tooltip_template = mode_def.get("tooltip_template") if mode_def else None
+    tooltip = mode_def.get("tooltip") if mode_def else None
     return utils.SliderSession(
         mode,
         title=toolCommon.humanize_tool_name(mode),
-        tooltip_template=tooltip_template,
+        tooltip=tooltip,
     )
 
 
@@ -100,11 +100,11 @@ def _resolve_session(mode, session):
     if session is None:
         return create_session(mode), True
     mode_def = manager.get_slider_mode(mode)
-    tooltip_template = mode_def.get("tooltip_template") if mode_def else None
+    tooltip = mode_def.get("tooltip") if mode_def else None
     session.switch_mode(
         mode,
         title=toolCommon.humanize_tool_name(mode),
-        tooltip_template=tooltip_template,
+        tooltip=tooltip,
     )
     return session, False
 

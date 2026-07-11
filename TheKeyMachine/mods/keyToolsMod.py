@@ -4274,6 +4274,70 @@ def paste_pose(*args):
             cmds.warning("No matching pose targets found")
 
 
+def paste_mirror_pose(*args):
+    """Paste copied pose values onto opposite controls using mirror exceptions."""
+    mirror_exceptions_file_path = general.get_mirror_exceptions_file()
+    try:
+        with open(mirror_exceptions_file_path, "r") as exceptions_file:
+            exceptions = json.load(exceptions_file)
+    except (OSError, ValueError, TypeError):
+        exceptions = {}
+
+    pose_data = _load_pose_json()
+    if not pose_data:
+        return
+
+    def opposite_name(control_name):
+        for pattern, opposite_pattern in MIRROR_PATTERNS:
+            if pattern in control_name:
+                return control_name.replace(pattern, opposite_pattern, 1)
+        return None
+
+    def inverted(value):
+        if isinstance(value, (int, float)):
+            return -value
+        if isinstance(value, list):
+            return [inverted(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(inverted(item) for item in value)
+        return value
+
+    attrs_set = 0
+    pasted_targets = []
+    with _copy_paste_operation("paste_mirror_pose", "Pose Pasted", undo=True, tint="current") as operation:
+        scene_nodes = cmds.ls() or []
+        for control_name, attributes in pose_data.items():
+            mirror_name = opposite_name(control_name)
+            if not mirror_name:
+                continue
+            mirror_control = next((node for node in scene_nodes if node.endswith(mirror_name)), None)
+            if not mirror_control:
+                continue
+
+            control_attrs_set = 0
+            for attr, value in attributes.items():
+                if not _is_valid_pose_attribute_value(value) or not _attr_exists_and_settable(mirror_control, attr):
+                    continue
+                exception_type = exceptions.get(control_name, {}).get(attr)
+                mirrored_value = inverted(value) if exception_type == "invert" else value
+                try:
+                    _set_attr_value("{}.{}".format(mirror_control, attr), mirrored_value)
+                    attrs_set += 1
+                    control_attrs_set += 1
+                except RuntimeError as error:
+                    import TheKeyMachine.mods.reportMod as report
+
+                    report.report_detected_exception(error, context="paste mirror pose attribute set")
+            if control_attrs_set:
+                pasted_targets.append(mirror_control)
+
+        if attrs_set:
+            operation["success"] = True
+            _select_existing_targets(pasted_targets)
+        else:
+            cmds.warning("No matching mirror pose targets found")
+
+
 # ______________________________________________ TANGENTS
 
 

@@ -46,6 +46,34 @@ def toolbar_alignment_value(alignment_name):
 
 TOOLBAR_ALIGNMENT_LABEL = "Align %s"
 TOOLBAR_ALIGNMENT_DESC = "Align toolbar icons to the %s."
+UNSET = object()
+
+
+def _resolve_action_fields(command_id=None, tool_lookup=None, **overrides):
+    fields = {}
+    if command_id:
+        if not callable(tool_lookup):
+            raise TypeError("tool_lookup must be callable for command-backed actions")
+        tool = tool_lookup(command_id)
+        tooltip = tool.get("tooltip")
+        fields.update(
+            {
+                "label": tool.get("menu_label") or tool.get("label") or command_id,
+                "callback": None if tool.get("setting_toggle") else tool.get("callback"),
+                "icon": tool.get("icon"),
+                "description": tooltip if isinstance(tooltip, str) else "",
+                "tooltip": tooltip,
+                "command_icon": tool.get("icon"),
+            }
+        )
+    fields.update(overrides)
+    fields.setdefault("label", command_id or "")
+    fields.setdefault("callback", None)
+    fields.setdefault("icon", None)
+    fields.setdefault("description", "")
+    fields.setdefault("tooltip", None)
+    fields.setdefault("command_icon", fields.get("icon"))
+    return fields
 
 
 def update_show_tooltips(value):
@@ -67,45 +95,47 @@ def _qicon(icon):
     return icon if isinstance(icon, QtGui.QIcon) else QtGui.QIcon(icon or "")
 
 
-def _toolbox_tooltip(tool_id):
-    if not tool_id:
-        return ""
-    try:
-        from TheKeyMachine.core import toolbox
-
-        tooltip = toolbox.get_tool(tool_id).get("tooltip")
-    except Exception:
-        tooltip = ""
-    return tooltip if isinstance(tooltip, str) else ""
-
-
 def _add_action(
     menu,
-    label,
-    callback=None,
+    label=UNSET,
+    callback=UNSET,
     *,
-    icon=None,
-    description="",
-    tooltip_template=None,
+    icon=UNSET,
+    description=UNSET,
+    tooltip=UNSET,
     command_id=None,
-    command_icon=None,
+    command_icon=UNSET,
     open_menu=False,
 ):
-    if command_id:
-        description = _toolbox_tooltip(command_id) or description
-    args = (_qicon(icon), label) if icon is not None else (label,)
+    from TheKeyMachine.core import toolbox
+
+    explicit = {
+        key: value
+        for key, value in {
+            "label": label,
+            "callback": callback,
+            "icon": icon,
+            "description": description,
+            "tooltip": tooltip,
+            "command_icon": command_icon,
+        }.items()
+        if value is not UNSET
+    }
+    fields = _resolve_action_fields(command_id, toolbox.get_tool if command_id else None, **explicit)
+
+    args = (_qicon(fields["icon"]), fields["label"]) if fields["icon"] is not None else (fields["label"],)
     return menu.addAction(
         *args,
-        callback=callback,
-        description=description or "",
-        tooltip_template=tooltip_template,
+        callback=fields["callback"],
+        description=fields["description"] or "",
+        tooltip=fields["tooltip"],
         command_id=command_id,
-        command_icon=command_icon,
+        command_icon=fields["command_icon"],
         open=open_menu,
     )
 
 
-def _add_checkable_action(menu, label, callback, checked=False, group=None, **kwargs):
+def _add_checkable_action(menu, label=UNSET, callback=UNSET, checked=False, group=None, **kwargs):
     action = _add_action(menu, label, callback=callback, **kwargs)
     action.setCheckable(True)
     if group is not None:
@@ -124,6 +154,42 @@ def _add_action_specs(menu, specs):
     return actions
 
 
+def build_copy_pose_menu(menu, source_widget=None):
+    """Populate the focused right-click menu for the Copy Pose button."""
+    _add_action_specs(
+        menu,
+        [
+            {"command_id": "paste_pose"},
+            {"command_id": "paste_mirror_pose"},
+            "separator",
+            {"command_id": "paste_pose_to", "label": "Paste Pose To..."},
+            "separator",
+            {"command_id": "import_pose_file", "label": "Import Pose"},
+            {"command_id": "export_pose_file", "label": "Export Pose"},
+        ],
+    )
+    # This menu replaces the generic actions supplied by the toolbar group.
+    return False
+
+
+def build_copy_animation_menu(menu, source_widget=None):
+    """Populate the focused right-click menu for the Copy Animation button."""
+    _add_action_specs(
+        menu,
+        [
+            {"command_id": "paste_insert_animation", "label": "Paste Insert"},
+            {"command_id": "paste_animation", "label": "Paste Replace"},
+            {"command_id": "paste_opposite_animation", "label": "Paste Mirror Animation"},
+            "separator",
+            {"command_id": "paste_animation_to", "label": "Paste Animation To..."},
+            "separator",
+            {"command_id": "import_animation_file", "label": "Import Animation"},
+            {"command_id": "export_animation_file", "label": "Export Animation"},
+        ],
+    )
+    return False
+
+
 def _apply_checked_value(setter, value, checked):
     if checked:
         return setter(value)
@@ -134,14 +200,7 @@ def _add_toolbox_action(menu, tool_id):
     from TheKeyMachine.core import toolbox
 
     tool = toolbox.get_tool(tool_id)
-    action = _add_action(
-        menu,
-        tool.get("menu_label") or tool.get("label", tool_id),
-        callback=None if tool.get("setting_toggle") else tool.get("callback"),
-        icon=tool.get("icon"),
-        command_id=tool.get("id", tool_id),
-        command_icon=tool.get("icon"),
-    )
+    action = _add_action(menu, command_id=tool.get("id", tool_id))
     if tool.get("setting_toggle"):
         spec = toolWidgets.setting_toggle_specs().get(tool_id)
         if spec:
@@ -172,13 +231,21 @@ def _register_menu_builder(command_id, builder):
         pass
 
 
-def _add_registered_menu(parent_menu, builder, *, command_id, command_icon, description=""):
+def _add_registered_menu(parent_menu, builder, *, command_id, command_icon=UNSET, description=UNSET):
     _register_menu_builder(command_id, builder)
+    from TheKeyMachine.core import toolbox
+
+    explicit = {}
+    if command_icon is not UNSET:
+        explicit["command_icon"] = command_icon
+    if description is not UNSET:
+        explicit["description"] = description
+    fields = _resolve_action_fields(command_id, toolbox.get_tool, **explicit)
     return parent_menu.addMenu(
         builder(),
         command_id=command_id,
-        command_icon=command_icon,
-        description=_toolbox_tooltip(command_id) or description,
+        command_icon=fields["command_icon"],
+        description=fields["description"],
     )
 
 
@@ -466,7 +533,7 @@ def build_tracer_menu(menu, source_widget=None):
         QtGui.QIcon(icons.tracer),
         "Auto Update",
         description="Keep the tracer connected for live updates.",
-        tooltip_template=helper.tracer_connected_tooltip_text,
+        tooltip=helper.tracer_connected_tooltip_text,
     )
     auto_update_action.setCheckable(True)
 
@@ -487,24 +554,9 @@ def build_tracer_menu(menu, source_widget=None):
     _add_action_specs(
         menu,
         (
-            {
-                "label": "Refresh Tracer",
-                "icon": icons.refresh,
-                "callback": bar.tracer_refresh,
-                "tooltip_template": helper.tracer_refresh_tooltip_text,
-            },
-            {
-                "label": "Toggle Tracer",
-                "icon": icons.tracer_show_hide,
-                "callback": bar.tracer_show_hide,
-                "tooltip_template": helper.tracer_toggle_tooltip_text,
-            },
-            {
-                "label": "Select Offset Object",
-                "icon": icons.tracer_select_offset,
-                "callback": bar.select_tracer_offset_node,
-                "tooltip_template": helper.tracer_offset_tooltip_text,
-            },
+            {"command_id": "tracer_refresh"},
+            {"command_id": "tracer_show_hide"},
+            {"command_id": "tracer_offset_node"},
         ),
     )
 
@@ -514,34 +566,14 @@ def build_tracer_menu(menu, source_widget=None):
     _add_action_specs(
         style_menu,
         (
-            {
-                "label": "Tracer Style: Grey",
-                "icon": icons.tracer_grey,
-                "callback": bar.set_tracer_grey_color,
-                "tooltip_template": helper.tracer_grey_tooltip_text,
-            },
-            {
-                "label": "Tracer Style: Red",
-                "icon": icons.tracer_red,
-                "callback": bar.set_tracer_red_color,
-                "tooltip_template": helper.tracer_red_tooltip_text,
-            },
-            {
-                "label": "Tracer Style: Blue",
-                "icon": icons.tracer_blue,
-                "callback": bar.set_tracer_blue_color,
-                "tooltip_template": helper.tracer_blue_tooltip_text,
-            },
+            {"command_id": "tracer_grey"},
+            {"command_id": "tracer_red"},
+            {"command_id": "tracer_blue"},
         ),
     )
 
     menu.addSeparator()
-    menu.addAction(
-        QtGui.QIcon(icons.remove),
-        "Remove Tracer",
-        bar.remove_tracer_node,
-        tooltip_template=helper.tracer_remove_tooltip_text,
-    )
+    _add_action(menu, command_id="tracer_remove")
 
 
 def _build_nudge_menu(menu, direction):
@@ -834,7 +866,6 @@ def add_other_sources_help_menu(parent_menu):
         parent_menu,
         build_other_sources_help_menu,
         command_id="help_menu",
-        command_icon=icons.help,
     )
 
 
@@ -844,27 +875,14 @@ def build_main_system_menu(toolbar):
         system_menu,
         (
             {
-                "label": "Reload",
-                "icon": icons.reload,
                 "callback": toolbar.reload,
-                "description": "Refresh the TKM interface.",
                 "command_id": "toolbar_reload",
-                "command_icon": icons.reload,
             },
             {
-                "label": "Unload",
-                "icon": icons.close,
                 "callback": toolbar.unload,
-                "description": "Close TheKeyMachine and remove callbacks.",
                 "command_id": "toolbar_unload",
-                "command_icon": icons.close,
             },
-            {
-                "label": "Uninstall",
-                "icon": icons.remove,
-                "callback": ui.uninstall,
-                "description": "Remove TheKeyMachine from Maya.",
-            },
+            {"command_id": "toolbar_uninstall"},
         ),
     )
     return system_menu
@@ -875,7 +893,6 @@ def add_main_system_menu(toolbar, parent_menu):
         parent_menu,
         partial(build_main_system_menu, toolbar),
         command_id="main_system_menu",
-        command_icon=icons.system,
     )
 
 
@@ -891,22 +908,18 @@ def build_main_preferences_menu(
         preferences_menu,
         "Create a Shelf Button",
         toolbar.create_shelf_icon,
-        icon=icons.tkm_main,
         command_id="toolbar_add_shelf_button",
-        command_icon=icons.tkm_main,
     )
 
     _add_checkable_action(
         preferences_menu,
-        "Start with Maya",
-        ui.install_userSetup,
+        command_id="start_with_maya",
         checked=ui.check_userSetup(),
     )
 
     _add_checkable_action(
         preferences_menu,
-        "Show Tooltips",
-        update_show_tooltips,
+        command_id="show_tooltips",
         checked=show_tooltips,
     )
 
@@ -947,8 +960,6 @@ def add_main_preferences_menu(
         parent_menu,
         builder,
         command_id="main_preferences_menu",
-        command_icon=icons.settings,
-        description="General toolbar options.",
     )
 
 
@@ -1028,18 +1039,11 @@ def build_main_settings_menu(
         toolbar_alignment=toolbar_alignment,
         update_toolbar_icon_alignment=update_toolbar_icon_alignment,
     )
-    toolbar_menu.addAction(
-        QtGui.QIcon(icons.hotkeys),
-        "Hotkeys",
-        hotkeys.show_hotkeys_window,
-        command_id="hotkeys_window",
-        command_icon=icons.hotkeys,
-    )
+    _add_action(toolbar_menu, callback=hotkeys.show_hotkeys_window, command_id="hotkeys_window")
     _add_registered_menu(
         toolbar_menu,
         partial(build_main_dock_menu, toolbar),
         command_id="main_dock_menu",
-        command_icon=icons.dock,
     )
     add_main_system_menu(toolbar, toolbar_menu)
     toolbar_menu.addSeparator()
@@ -1047,20 +1051,12 @@ def build_main_settings_menu(
     
     _add_toolbox_actions(toolbar_menu, ("donate_window",))
     if internet_connection:
-        toolbar_menu.addAction(
-            QtGui.QIcon(icons.check_updates),
-            "Check for updates",
-            lambda: updater.check_for_updates(parent_button, force=True),
+        _add_action(
+            toolbar_menu,
+            callback=lambda: updater.check_for_updates(parent_button, force=True),
             command_id="check_for_updates",
-            command_icon=icons.check_updates,
         )
-    toolbar_menu.addAction(
-        QtGui.QIcon(icons.about),
-        "About",
-        ui.about_window,
-        command_id="about_window",
-        command_icon=icons.about,
-    )
+    _add_action(toolbar_menu, callback=ui.about_window, command_id="about_window")
     return toolbar_menu
 
 
@@ -1144,34 +1140,16 @@ def build_graph_settings_menu(
         menu,
         build_settings_submenu,
         command_id="graph_settings_menu",
-        command_icon=icons.settings,
-        description="Tool configuration and preferences.",
     )
     _add_registered_menu(
         menu,
         build_dock_submenu,
         command_id="graph_dock_menu",
-        command_icon=icons.dock,
-        description="Move the Graph Editor toolbar.",
     )
 
-    menu.addAction(
-        QtGui.QIcon(icons.hotkeys),
-        "Hotkeys",
-        hotkeys.show_hotkeys_window,
-        description="Manage trigger hotkeys.",
-        command_id="hotkeys_window",
-        command_icon=icons.hotkeys,
-    )
+    _add_action(menu, callback=hotkeys.show_hotkeys_window, command_id="hotkeys_window")
     menu.addSeparator()
     add_other_sources_help_menu(menu)
 
-    menu.addAction(
-        QtGui.QIcon(icons.about),
-        "About",
-        ui.about_window,
-        description="Show version info and credits.",
-        command_id="about_window",
-        command_icon=icons.about,
-    )
+    _add_action(menu, callback=ui.about_window, command_id="about_window")
     return menu

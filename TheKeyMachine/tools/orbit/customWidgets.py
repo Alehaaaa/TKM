@@ -317,12 +317,12 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
     def _create_orbit_tool_button(self, tool_data, default):
         label = tool_data.get("label") or tool_data.get("id")
         action_identifier = tool_data["id"]
-        tooltip_text = tool_data.get("tooltip_template") or label
+        tooltip_text = tool_data.get("tooltip") or label
         description = tool_data.get("description") or tooltip_text
 
         btn = cw.create_tool_button_from_data(
             tool_data,
-            tooltip_template=tooltip_text,
+            tooltip=tooltip_text,
             description=description,
             status_title=tool_data.get("status_title", label),
             status_description=tool_data.get("status_description", description),
@@ -338,6 +338,6 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
             key=action_identifier,
             default=default,
             description=description,
-            tooltip_template=tooltip_text,
+            tooltip=tooltip_text,
         )
         return btn

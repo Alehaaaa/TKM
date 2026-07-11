@@ -134,6 +134,7 @@ _KEYTOOLS_COMMANDS = {
     "mirror_all_keys": "mirror_all_keys",
     "copy_pose": "copy_pose",
     "paste_pose": "paste_pose",
+    "paste_mirror_pose": "paste_mirror_pose",
     "paste_pose_to": "paste_pose_to",
     "export_pose_file": "export_pose_file",
     "import_pose_file": "import_pose_file",

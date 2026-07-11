@@ -614,16 +614,16 @@ def _humanize_compound_word(raw):
 
 
 def _tooltip_parts(raw):
-    """Extract (title, first_line) from a TooltipTemplate (mods.tooltipsMod).
+    """Extract (title, first_line) from a Tooltip (mods.tooltipsMod).
 
     Uses attribute access rather than isinstance to avoid a circular import
-    (tooltipsMod already imports this module). Expects a TooltipTemplate;
+    (tooltipsMod already imports this module). Expects a Tooltip;
     falls back gracefully to a plain string.
     """
     if not raw:
         return "", ""
 
-    # TooltipTemplate (from mods.tooltipsMod) exposes .title and .first_line
+    # Tooltip (from mods.tooltipsMod) exposes .title and .first_line
     if hasattr(raw, "title") and hasattr(raw, "first_line"):
         return clean_tool_text(raw.title), clean_tool_text(raw.first_line)
 
@@ -683,13 +683,13 @@ def get_tooltip_summary(raw):
     return get_tool_summary(raw)
 
 
-def resolve_status_metadata(title="", description="", tooltip_template=None, status_title=None, status_description=None, fallback_title=""):
+def resolve_status_metadata(title="", description="", tooltip=None, status_title=None, status_description=None, fallback_title=""):
     resolved_title = clean_tool_text(
-        status_title or title or get_tooltip_title(tooltip_template) or fallback_title
+        status_title or title or get_tooltip_title(tooltip) or fallback_title
     )
     resolved_description = status_description
     if resolved_description is None:
-        resolved_description = description or get_tooltip_summary(tooltip_template) or ""
+        resolved_description = description or get_tooltip_summary(tooltip) or ""
     return resolved_title, resolved_description
 
 
@@ -712,7 +712,7 @@ def _get_tool_definition(tool_id):
         return None
 
 
-def resolve_undo_metadata(tool_id=None, title=None, description="", tooltip_template=None):
+def resolve_undo_metadata(tool_id=None, title=None, description="", tooltip=None):
     resolved_title = title or ""
     resolved_description = description or ""
 
@@ -729,13 +729,13 @@ def resolve_undo_metadata(tool_id=None, title=None, description="", tooltip_temp
             or tool.get("description")
             or resolved_description
         )
-        tooltip_template = tool.get("tooltip_template") or tooltip_template
+        tooltip = tool.get("tooltip") or tooltip
 
-    if tooltip_template:
+    if tooltip:
         resolved_title, resolved_description = resolve_status_metadata(
             title=resolved_title,
             description=resolved_description,
-            tooltip_template=tooltip_template,
+            tooltip=tooltip,
             status_title=resolved_title or None,
             status_description=resolved_description or None,
             fallback_title=tool_id or "tool",
@@ -745,12 +745,12 @@ def resolve_undo_metadata(tool_id=None, title=None, description="", tooltip_temp
     return resolved_title, resolved_description
 
 
-def make_undo_chunk_name(tool_id=None, title=None, description="", tooltip_template=None):
+def make_undo_chunk_name(tool_id=None, title=None, description="", tooltip=None):
     resolved_title, _resolved_description = resolve_undo_metadata(
         tool_id=tool_id,
         title=title,
         description=description,
-        tooltip_template=tooltip_template,
+        tooltip=tooltip,
     )
     return format_tool_label(resolved_title)
 

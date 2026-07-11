@@ -59,11 +59,6 @@ def _tooltip_description(data):
     return (data or {}).get("description") or (tooltip if isinstance(tooltip, str) else "")
 
 
-def _tooltip_template(data):
-    tooltip = (data or {}).get("tooltip")
-    return (data or {}).get("tooltip_template") or (None if isinstance(tooltip, str) else tooltip)
-
-
 def setting_toggle_specs():
     manager = runtime.get_runtime_manager()
 
@@ -115,7 +110,7 @@ def setting_toggle_specs():
             "text": tool.get("text"),
             "icon": tool.get("icon"),
             "description": _tooltip_description(tool),
-            "tooltip_template": _tooltip_template(tool),
+            "tooltip": tool.get("tooltip"),
         }
         spec.update(behavior)
         specs[tool_id] = spec
@@ -184,7 +179,7 @@ def add_tool_button(section, item_data, *, overrides=None):
         tool_id or "",
         default=data.get("default", True),
         description=_tooltip_description(data),
-        tooltip_template=_tooltip_template(data),
+        tooltip=data.get("tooltip"),
         pinnable=data.get("pinnable", True),
     )
     return btn
@@ -263,7 +258,7 @@ def add_selector_button(section, item_data):
     selector_tool = toolbox.get_tool("selector", **{k: v for k, v in item_data.items() if k not in {"id", "shortcuts"}})
     btn = cw.QFlatSelectorButton(
         icon=selector_tool.get("icon"),
-        tooltip_template=_tooltip_template(selector_tool),
+        tooltip=selector_tool.get("tooltip"),
         description=_tooltip_description(selector_tool),
     )
 
@@ -281,7 +276,7 @@ def add_selector_button(section, item_data):
         selector_tool.get("id", "selector"),
         default=selector_tool.get("default", True),
         description=_tooltip_description(selector_tool),
-        tooltip_template=_tooltip_template(selector_tool),
+        tooltip=selector_tool.get("tooltip"),
         pinnable=selector_tool.get("pinnable", True),
     )
 
@@ -514,7 +509,7 @@ def create_widget_from_data(section, item_data, owner=None):
             widget_key,
             default=item_data.get("default", True),
             description=_tooltip_description(item_data),
-            tooltip_template=_tooltip_template(item_data),
+            tooltip=item_data.get("tooltip"),
             pinnable=item_data.get("pinnable", True),
         )
         if owner is not None:
@@ -534,7 +529,7 @@ def create_widget_from_data(section, item_data, owner=None):
         "text": resolved.get("text"),
         "icon": resolved.get("icon"),
         "description": resolved.get("description", ""),
-        "tooltip_template": _tooltip_template(resolved),
+        "tooltip": resolved.get("tooltip"),
         "checkable": True,
         "set_checked_fn": spec["get_checked"],
         "bind_checked_fn": lambda widget, s=spec: bind_setting_toggle(widget, s),
@@ -547,7 +542,7 @@ def create_widget_from_data(section, item_data, owner=None):
         data["id"],
         default=resolved.get("default", True),
         description=_tooltip_description(data),
-        tooltip_template=_tooltip_template(data),
+        tooltip=data.get("tooltip"),
         pinnable=resolved.get("pinnable", True),
     )
     return btn
@@ -568,7 +563,7 @@ def add_animation_offset_button(section, item_data, owner):
         tool.get("id", "animation_offset"),
         default=tool.get("default", True),
         description=_tooltip_description(tool),
-        tooltip_template=_tooltip_template(tool),
+        tooltip=tool.get("tooltip"),
         pinnable=tool.get("pinnable", True),
     )
     return btn
@@ -588,7 +583,7 @@ def add_micro_move_button(section, item_data, owner):
         tool.get("id", "micro_move"),
         default=tool.get("default", True),
         description=_tooltip_description(tool),
-        tooltip_template=_tooltip_template(tool),
+        tooltip=tool.get("tooltip"),
         pinnable=tool.get("pinnable", True),
     )
     return btn

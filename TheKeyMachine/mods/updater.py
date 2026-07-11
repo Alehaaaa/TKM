@@ -389,7 +389,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
             result = QFlatTooltipConfirm.question(
                 anchor_widget,
                 title="Update available",
-                tooltip_template=template,
+                tooltip=template,
                 icon=icons.tkm_main_update,
                 buttons=_update_buttons(QFlatTooltipConfirm),
                 highlight="Install",
@@ -400,7 +400,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 "Update available",
                 title="",
                 message="",
-                tooltip_template=template,
+                tooltip=template,
                 icon=icons.tkm_main_update,
                 buttons=_update_buttons(QFlatConfirmDialog),
                 highlight="Install",

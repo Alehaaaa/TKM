@@ -38,10 +38,6 @@ remove_inbetween_tooltip_text = [
 ]
 
 
-move_keyframes_intField_widget_tooltip_text = [
-    "Set the number of frames to move when using the Nudge tool.",
-]
-
 insert_inbetween_tooltip_text = [
     "Add inbetweens using the current nudge step value..",
 ]

@@ -241,7 +241,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
                 "key": f"selection_set_color{color.suffix}",
                 "label": tooltip,
                 "icon": icons.selection_set_color_icons.get(color.suffix),
-                "tooltip_template": tooltip,
+                "tooltip": tooltip,
             },
             callback=None,
         )
@@ -413,7 +413,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
                 "key": key,
                 "label": tooltip,
                 "icon": icon,
-                "tooltip_template": tooltip,
+                "tooltip": tooltip,
                 "description": description,
             },
             callback=None,
@@ -428,7 +428,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
                 key=key,
                 default=default,
                 description=description or tooltip,
-                tooltip_template=tooltip,
+                tooltip=tooltip,
             )
         return btn
 

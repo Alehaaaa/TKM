@@ -315,13 +315,13 @@ class QFlatTooltipContent(QFlatWindowMixin, QtWidgets.QWidget):
     TEXT_COLOR = "#bbbbbb"
     HEADER_ICON_SIZE = 60
 
-    def __init__(self, tooltip_template, icon=None, title="", parent=None):
+    def __init__(self, tooltip, icon=None, title="", parent=None):
         QtWidgets.QWidget.__init__(self, parent)
-        self.tooltip_template = tooltip_template or ""
-        if icon and "<icon>" not in self.tooltip_template:
-            self.tooltip_template = "<icon>{}</icon>{}".format(icon, self.tooltip_template)
-        if title and "<title>" not in self.tooltip_template:
-            self.tooltip_template = "<title>{}</title>{}".format(title, self.tooltip_template)
+        self.tooltip = tooltip or ""
+        if icon and "<icon>" not in self.tooltip:
+            self.tooltip = "<icon>{}</icon>{}".format(icon, self.tooltip)
+        if title and "<title>" not in self.tooltip:
+            self.tooltip = "<title>{}</title>{}".format(title, self.tooltip)
 
         self.content_layout = QtWidgets.QVBoxLayout(self)
         self.content_layout.setContentsMargins(0, 0, 0, 0)
@@ -330,10 +330,10 @@ class QFlatTooltipContent(QFlatWindowMixin, QtWidgets.QWidget):
 
     def _build_content(self):
         try:
-            safe_tooltip_template = self.tooltip_template.replace("&", "&amp;")
-            if "<br>" in safe_tooltip_template.lower():
-                safe_tooltip_template = re.sub(r"(?i)<br\s*>", "<br/>", safe_tooltip_template)
-            root = ET.fromstring("<root>{}</root>".format(safe_tooltip_template))
+            safe_tooltip = self.tooltip.replace("&", "&amp;")
+            if "<br>" in safe_tooltip.lower():
+                safe_tooltip = re.sub(r"(?i)<br\s*>", "<br/>", safe_tooltip)
+            root = ET.fromstring("<root>{}</root>".format(safe_tooltip))
         except Exception as e:
             root = ET.fromstring("<root><text>Invalid XML: {}</text></root>".format(e))
 
@@ -465,7 +465,7 @@ class QFlatConfirmDialog(QFlatDialog):
         closeButton=True,
         highlight=None,
         icon=None,
-        tooltip_template=None,
+        tooltip=None,
         exclusive=True,
         parent=None,
         **kwargs,
@@ -491,8 +491,8 @@ class QFlatConfirmDialog(QFlatDialog):
         self.setMinimumWidth(0)
         self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
 
-        if tooltip_template:
-            self.root_layout.addWidget(QFlatTooltipContent(tooltip_template, icon=icon, title=title, parent=self))
+        if tooltip:
+            self.root_layout.addWidget(QFlatTooltipContent(tooltip, icon=icon, title=title, parent=self))
         else:
             content_widget = QtWidgets.QWidget(self)
             content_layout = QtWidgets.QHBoxLayout(content_widget)
@@ -624,7 +624,7 @@ class QFlatConfirmDialog(QFlatDialog):
 
 class QFlatTooltipConfirm(QFlatDialog):
     """
-    A hybrid widget combining the visual style of a QFlatTooltip (arrow, rounded, dark, XML tooltip_template)
+    A hybrid widget combining the visual style of a QFlatTooltip (arrow, rounded, dark, XML tooltip)
     with the logic and button handling of a QFlatConfirmDialog.
     """
 
@@ -635,8 +635,8 @@ class QFlatTooltipConfirm(QFlatDialog):
     ARROW_H = 8
     HEADER_ICON_SIZE = 60
 
-    def __init__(self, parent=None, title="", message="", buttons=None, icon=None, tooltip_template=None, highlight=None, **kwargs):
-        tooltip_template = tooltip_template
+    def __init__(self, parent=None, title="", message="", buttons=None, icon=None, tooltip=None, highlight=None, **kwargs):
+        tooltip = tooltip
         QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, **kwargs)
 
         # Tooltip-like window setup
@@ -644,22 +644,22 @@ class QFlatTooltipConfirm(QFlatDialog):
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.clicked_button = None
 
-        # Build tooltip_template if not provided (compatibility with standard title/message/icon)
-        if tooltip_template is None:
-            tooltip_template = ""
+        # Build tooltip if not provided (compatibility with standard title/message/icon)
+        if tooltip is None:
+            tooltip = ""
             if icon:
-                tooltip_template += "<icon>{}</icon>".format(icon)
+                tooltip += "<icon>{}</icon>".format(icon)
             if title:
-                tooltip_template += "<title>{}</title>".format(title)
+                tooltip += "<title>{}</title>".format(title)
             if message:
-                tooltip_template += "<text>{}</text>".format(message)
+                tooltip += "<text>{}</text>".format(message)
         else:
-            # If tooltip_template provided, ensure icon/title are included if passed as args and missing in xml
-            if icon and "<icon>" not in tooltip_template:
-                tooltip_template = "<icon>{}</icon>{}".format(icon, tooltip_template)
-            if title and "<title>" not in tooltip_template:
-                tooltip_template = "<title>{}</title>{}".format(title, tooltip_template)
-        self.tooltip_template = tooltip_template
+            # If tooltip provided, ensure icon/title are included if passed as args and missing in xml
+            if icon and "<icon>" not in tooltip:
+                tooltip = "<icon>{}</icon>{}".format(icon, tooltip)
+            if title and "<title>" not in tooltip:
+                tooltip = "<title>{}</title>{}".format(title, tooltip)
+        self.tooltip = tooltip
 
         # Style the frame
         self.setStyleSheet(
@@ -675,7 +675,7 @@ class QFlatTooltipConfirm(QFlatDialog):
         self.bg_layout.setSpacing(0)
         self.root_layout.addWidget(self.bg_frame)
 
-        self.bg_layout.addWidget(QFlatTooltipContent(self.tooltip_template, parent=self.bg_frame))
+        self.bg_layout.addWidget(QFlatTooltipContent(self.tooltip, parent=self.bg_frame))
 
         # Add the interactive buttons at the bottom
         self.setBottomBar(buttons, margins=12, spacing=DPI(6), highlight=highlight)

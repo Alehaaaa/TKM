@@ -202,11 +202,11 @@ class SliderSession:
     It is finished on release, which closes the undo chunk and clears its data.
     """
 
-    def __init__(self, mode, title=None, description="", tooltip_template=None):
+    def __init__(self, mode, title=None, description="", tooltip=None):
         self.mode = mode
         self.title = title or "Slider Operation"
         self.description = description
-        self.tooltip_template = tooltip_template
+        self.tooltip = tooltip
 
         self.targets = SliderTargetContext()
         self.cache = SliderCaches()
@@ -236,19 +236,19 @@ class SliderSession:
             tool_id=self.mode,
             title=self.title,
             description=self.description,
-            tooltip_template=self.tooltip_template,
+            tooltip=self.tooltip,
         )
         cmds.undoInfo(openChunk=True, chunkName=chunk_name)
         self._is_open = True
 
-    def switch_mode(self, mode, title=None, description="", tooltip_template=None):
+    def switch_mode(self, mode, title=None, description="", tooltip=None):
         if mode == self.mode:
             return
         self.clear_tint()
         self.mode = mode
         self.title = title or self.title
         self.description = description
-        self.tooltip_template = tooltip_template
+        self.tooltip = tooltip
         self._tint_key = "slider_{}_range".format(self.mode)
         
         # If we switch modes mid-session, we keep the undo chunk open

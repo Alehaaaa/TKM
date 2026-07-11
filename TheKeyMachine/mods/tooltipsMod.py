@@ -45,7 +45,7 @@ SHORTCUT_KEY_MAP = {
 SHORTCUT_KEY_ORDER = [Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift, Qt.MiddleButton]
 
 
-class TooltipTemplate(str):
+class Tooltip(str):
     def __new__(cls, text, title="", body_lines=(), icon=None):
         obj = str.__new__(cls, text)
         obj.title = title
@@ -94,7 +94,7 @@ def tooltip_body(*paragraphs):
     return tuple(lines)
 
 
-def _tooltip_template_from_body(body):
+def _tooltip_from_body(body):
     body_lines = tooltip_body(*(body if isinstance(body, (list, tuple)) else [body]))
     text_lines = []
     for item in body_lines:
@@ -104,12 +104,12 @@ def _tooltip_template_from_body(body):
             text_lines.append(item.path)
         else:
             text_lines.append(str(item))
-    return TooltipTemplate("\n\n".join(line for line in text_lines if line), title="", body_lines=body_lines, icon=None)
+    return Tooltip("\n\n".join(line for line in text_lines if line), title="", body_lines=body_lines, icon=None)
 
 
-def _tooltip_template_from_data(raw, fallback_title="", fallback_description="", fallback_icon=None):
-    if isinstance(raw, TooltipTemplate):
-        return TooltipTemplate(
+def _tooltip_from_data(raw, fallback_title="", fallback_description="", fallback_icon=None):
+    if isinstance(raw, Tooltip):
+        return Tooltip(
             str(raw),
             title="",
             body_lines=getattr(raw, "body_lines", ()),
@@ -117,19 +117,19 @@ def _tooltip_template_from_data(raw, fallback_title="", fallback_description="",
         )
 
     if isinstance(raw, (list, tuple)):
-        return _tooltip_template_from_body(raw)
+        return _tooltip_from_body(raw)
 
-    # Fallback: plain string passed directly as a tooltip template
+    # Fallback: plain string passed directly as tooltip content.
     if isinstance(raw, str) and raw:
         lines = list(_string_body_lines(raw))
         if fallback_title and lines and lines[0].lower() == fallback_title.lower():
             lines = lines[1:]
-        return TooltipTemplate(raw, title="", body_lines=lines, icon=None)
+        return Tooltip(raw, title="", body_lines=lines, icon=None)
 
     if fallback_description:
-        return _tooltip_template_from_body(fallback_description)
+        return _tooltip_from_body(fallback_description)
 
-    return TooltipTemplate("", title="", body_lines=(), icon=None)
+    return Tooltip("", title="", body_lines=(), icon=None)
 
 
 def format_tooltip_shortcut(keys_list, include_click_suffix=False):
@@ -181,7 +181,7 @@ class QFlatTooltip(QWidget):
         icon=None,
         shortcuts=None,
         description=None,
-        tooltip_template=None,
+        tooltip=None,
         icon_obj=None,
         command_id=None,
         command_label=None,
@@ -206,8 +206,8 @@ class QFlatTooltip(QWidget):
         self.icon = icon  # Store for reference
         self._shortcut_min_width = 0
 
-        self.tooltip_template = _tooltip_template_from_data(
-            tooltip_template,
+        self.tooltip = _tooltip_from_data(
+            tooltip,
             fallback_title=text.strip() if text else "",
             fallback_description=description.strip() if isinstance(description, str) else description,
             fallback_icon=icon,
@@ -294,9 +294,9 @@ class QFlatTooltip(QWidget):
 
     def _build_content(self):
         self.has_header = False
-        header_title = getattr(self.tooltip_template, "title", "") or self.text
+        header_title = getattr(self.tooltip, "title", "") or self.text
         header_pixmap = self.icon_obj if self.icon_obj and not self.icon_obj.isNull() else None
-        body_items = tuple(getattr(self.tooltip_template, "body_lines", ()) or ())
+        body_items = tuple(getattr(self.tooltip, "body_lines", ()) or ())
         if not body_items and self.description:
             body_items = tooltip_body(self.description)
         has_body = bool(body_items)
@@ -407,7 +407,8 @@ class QFlatTooltip(QWidget):
     def _create_command_shortcut_label(self, shortcut_text, width):
         label = QLabel(shortcut_text)
         label.setObjectName("TooltipCommandShortcutLabel")
-        label.setAlignment(Qt.AlignCenter)
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        label.setContentsMargins(0, 0, wutil.DPI(3), 0)
         label.setWordWrap(False)
         label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         label.setToolTip(self.command_id or "")
@@ -881,7 +882,7 @@ class QFlatTooltipManager(object):
         icon=None,
         shortcuts=None,
         description=None,
-        tooltip_template=None,
+        tooltip=None,
         action_rect=None,
         icon_obj=None,
         target_rect=None,
@@ -917,7 +918,7 @@ class QFlatTooltipManager(object):
             icon=icon,
             shortcuts=shortcuts,
             description=description,
-            tooltip_template=tooltip_template,
+            tooltip=tooltip,
             icon_obj=icon_obj,
             command_id=command_id,
             command_label=command_label,
@@ -960,10 +961,10 @@ class QFlatTooltipManager(object):
         cls._timer.start()
 
 
-def parse_tt(template):
-    if not template:
+def parse_tt(tooltip):
+    if not tooltip:
         return "", ""
-    normalized = _tooltip_template_from_data(template)
+    normalized = _tooltip_from_data(tooltip)
     header = toolCommon.clean_tool_text(getattr(normalized, "title", ""))
     description = toolCommon.clean_tool_text(getattr(normalized, "first_line", ""))
     return header, description

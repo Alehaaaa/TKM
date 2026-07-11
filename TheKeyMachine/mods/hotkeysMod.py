@@ -162,8 +162,18 @@ def _combo_owners(mapping):
     return owners
 
 
-def _duplicate_combo_owners(mapping):
-    return {ckey: names for ckey, names in _combo_owners(mapping).items() if len(names) > 1}
+def _unique_hotkey_mapping(mapping):
+    """Return a single-owner mapping, with the latest command taking precedence."""
+    items = list(_iter_mapping_combos(mapping))
+    claimed = set()
+    unique = {}
+    for command_name, combo in reversed(items):
+        combo_key = _combo_key(combo)
+        if combo_key in claimed:
+            continue
+        claimed.add(combo_key)
+        unique[command_name] = [combo]
+    return {command_name: unique[command_name] for command_name, _combo in items if command_name in unique}
 
 
 def _iter_assign_command_entries():
@@ -714,7 +724,7 @@ def _command_row_from_data(command_name, primary_data, fallback_data=None, title
     fallback_data = fallback_data or {}
     tooltip = primary_data.get("tooltip", fallback_data.get("tooltip"))
     tooltip_description = tooltip if isinstance(tooltip, str) else None
-    tooltip_template = None if isinstance(tooltip, str) else tooltip
+    tooltip = None if isinstance(tooltip, str) else tooltip
     icon = primary_data.get("icon") or fallback_data.get("icon")
     title = (
         title_override
@@ -740,10 +750,10 @@ def _command_row_from_data(command_name, primary_data, fallback_data=None, title
             or fallback_data.get("description")
             or tooltip_description
         ),
-        "tooltip_template": (
-            primary_data.get("tooltip_template")
-            or fallback_data.get("tooltip_template")
-            or tooltip_template
+        "tooltip": (
+            primary_data.get("tooltip")
+            or fallback_data.get("tooltip")
+            or tooltip
         ),
         "shortcuts": primary_data.get("shortcuts", fallback_data.get("shortcuts", [])),
         "checkable": bool(primary_data.get("checkable", primary_data.get("type") == "check")),
@@ -883,7 +893,7 @@ def _iter_slider_percentage_rows(slider_type, mode):
             "icon": mode_icon,
             "badge_text": None if mode_icon else mode_badge,
             "description": mode.get("description") or "Set {} to {} percent.".format(mode["label"], value),
-            "tooltip_template": mode.get("tooltip_template"),
+            "tooltip": mode.get("tooltip"),
         }
 
 
@@ -1382,7 +1392,7 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
             "text": self.command_data.get("title"),
             "description": self.command_data.get("description"),
             "shortcuts": self.command_data.get("shortcuts", []),
-            "tooltip_template": self.command_data.get("tooltip_template"),
+            "tooltip": self.command_data.get("tooltip"),
             "icon": self.command_data.get("icon"),
             "command_id": self.command_data.get("command_id") or self.command_name(),
             "command_label": self.command_data.get("command_label") or self.command_data.get("title"),
@@ -1393,7 +1403,7 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         if not QFlatTooltipManager.enabled:
             return
         data = self._tooltip_data()
-        if not (data.get("text") or data.get("description") or data.get("tooltip_template")):
+        if not (data.get("text") or data.get("description") or data.get("tooltip")):
             return
         if QFlatTooltipManager.is_current_source(self._tooltip_source_key):
             return
@@ -1781,9 +1791,14 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
 
     def _on_row_combo_changed(self, command_name, combo):
         if combo:
+            combo_key = _combo_key(combo)
+            for owner, owner_combo in list(_iter_mapping_combos(self._draft_mapping)):
+                if owner != command_name and _combo_key(owner_combo) == combo_key:
+                    self._draft_mapping.pop(owner, None)
             self._draft_mapping[command_name] = [combo]
         else:
             self._draft_mapping.pop(command_name, None)
+        self._sync_all_views_from_draft()
         self._refresh_all_view_statuses()
 
     def _is_dirty(self):
@@ -1863,13 +1878,7 @@ class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
         """
         Applies all hotkeys in the current draft to Maya.
         """
-        pending = self._pending_mapping()
-
-        duplicates = _duplicate_combo_owners(pending)
-        if duplicates:
-            cmds.warning("Duplicate hotkeys found. Resolve conflicts before applying.")
-            self._refresh_all_view_statuses()
-            return False
+        pending = _unique_hotkey_mapping(self._pending_mapping())
 
         writable_set = _ensure_writable_hotkey_set()
         if writable_set:
