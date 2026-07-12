@@ -4375,16 +4375,7 @@ def match_curve_cycle(*args, target_key="last"):
             _copy_curve_key_state(curve, firstKeyTime, lastKeyTime)
 
 
-# Bouncy Tangent tangets
-
-
-def calculateTangentAngle(curve, time1, value1, time2, value2):
-    # Calcula el ángulo de la tangente entre dos keyframes
-    if time2 - time1 == 0:
-        return 0  # Evitar división por cero
-    angle_radians = math.atan2(value2 - value1, time2 - time1)
-    angle_degrees = math.degrees(angle_radians)
-    return angle_degrees
+# Bouncy tangents
 
 
 def _collect_bouncy_target_curves(target_info):
@@ -4490,8 +4481,7 @@ def bouncy_tangets(*args, angle_adjustment_factor=1.3, handle_mode="both", key_s
     try:
         for curve, time in target_keyframes:
             keyTimes = cmds.keyframe(curve, query=True, timeChange=True) or []
-            keyValues = cmds.keyframe(curve, query=True, valueChange=True) or []
-            if not keyTimes or not keyValues:
+            if not keyTimes:
                 continue
 
             currentIndex = None
@@ -4502,22 +4492,9 @@ def bouncy_tangets(*args, angle_adjustment_factor=1.3, handle_mode="both", key_s
             if currentIndex is None:
                 continue
 
-            if currentIndex > 0:
-                inAngle = calculateTangentAngle(
-                    curve, keyTimes[currentIndex - 1], keyValues[currentIndex - 1], time, keyValues[currentIndex]
-                )
-            else:
-                inAngle = 0
-
-            if currentIndex < len(keyTimes) - 1:
-                outAngle = calculateTangentAngle(
-                    curve, time, keyValues[currentIndex], keyTimes[currentIndex + 1], keyValues[currentIndex + 1]
-                )
-            else:
-                outAngle = 0
-
-            adjusted_in_angle = max(-85, min(85, inAngle * angle_adjustment_factor))
-            adjusted_out_angle = max(-85, min(85, outAngle * angle_adjustment_factor))
+            adjusted_in_angle, adjusted_out_angle = curveFitting.bouncy_tangent_angles(
+                curve, time, angle_adjustment_factor=angle_adjustment_factor
+            )
 
             tangent_kwargs = {
                 "time": (time, time),

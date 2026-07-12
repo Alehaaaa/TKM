@@ -243,7 +243,7 @@ BLEND_MODES = [
         "tooltip": helper.pull_push_tooltip_text,
         "icon": "PP",
         "shortcut": [ALT],
-        "description": "Pulls keys toward the average value or pushes them away for exaggerating motion.",
+        "description": "Pulls keys toward the interpolated neighbor trend or pushes them away to exaggerate motion.",
     },
     {
         "label": "Simplify | Bake Keys",
@@ -267,7 +267,7 @@ BLEND_MODES = [
         "tooltip": helper.blend_tooltip_text,
         "icon": "TO",
         "shortcut": [CTRL, ALT],
-        "description": "Shifts the timing of the selected keyframes forward or backward.",
+        "description": "Offsets the animation shape forward or backward while preserving the existing key times.",
     },
     {
         "label": "Time Offsetter Stagger",
@@ -275,7 +275,7 @@ BLEND_MODES = [
         "tooltip": helper.blend_tooltip_text,
         "icon": "TS",
         "shortcut": [CTRL, ALT, MID],
-        "description": "Applies a staggered time offset across multiple selected objects.",
+        "description": "Moves whole-object key times to create a stagger across the selected objects.",
     },
     "separator",
     {
@@ -301,7 +301,7 @@ BLEND_MODES = [
         "icon": "SF",
         "shortcut": [CTRL],
         "frameButtons": True,
-        "description": "Scales the curve relative to the value at the current frame.",
+        "description": "Scales the curve relative to picked left/right frame values, falling back to the current frame.",
     },
     {
         "label": "Scale From Neighbor Left",

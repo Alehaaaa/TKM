@@ -48,6 +48,7 @@ class SliderCaches:
     frame_data: Dict[Tuple[str, float], Any] = field(default_factory=dict)
     tween_frame_data: Dict[Tuple[str, float], Any] = field(default_factory=dict)
     pose_buffer: Dict[Tuple[str, float], float] = field(default_factory=dict)
+    auxiliary: Dict[Any, Any] = field(default_factory=dict)
 
     def clear(self, keep_pose=False):
         self.is_cached = False
@@ -56,6 +57,7 @@ class SliderCaches:
         self.initial_noise.clear()
         self.frame_data.clear()
         self.tween_frame_data.clear()
+        self.auxiliary.clear()
         if not keep_pose:
             self.pose_buffer.clear()
 
@@ -125,14 +127,6 @@ def lerp_towards(left, right, t, current):
     return current
 
 
-def _has_key_at_time(target, time):
-    """Return whether a plug or anim curve has a key at the given time."""
-    try:
-        return bool(cmds.keyframe(target, query=True, time=(time, time), timeChange=True))
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return False
-
-
 def resolve_keyframe_targets(session=None):
     """Unified entry for resolving attribute plugs and affected times."""
     plugs, src, time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
@@ -140,13 +134,6 @@ def resolve_keyframe_targets(session=None):
         return {}, time_range
 
     curr = cmds.currentTime(q=True)
-
-    # With no time range and no graph selection, operate only on channels that
-    # already have a key on the current frame.
-    if not time_range and not has_graph_keys:
-        plugs = [plug for plug in plugs if _has_key_at_time(plug, curr)]
-        if not plugs:
-            return {}, time_range
 
     affected = {}
     tangent_fs = set()
@@ -175,14 +162,6 @@ def resolve_curve_targets(session=None):
 
     curr = cmds.currentTime(q=True)
 
-    # Keep curve-based slider modes consistent with plug-based modes: absent a
-    # time range or graph selection, only curves keyed at the current time
-    # qualify.
-    if not time_range and not has_graph_keys:
-        curves = [curve for curve in curves if _has_key_at_time(curve, curr)]
-        if not curves:
-            return [], {}, time_range, has_graph_keys
-
     times_map = {}
     for c in curves:
         if has_graph_keys:
@@ -193,6 +172,18 @@ def resolve_curve_targets(session=None):
             ks = [curr]
         times_map[c] = sorted(list(set(float(t) for t in ks)))
     return curves, times_map, time_range, has_graph_keys
+
+
+def resolve_curve_targets_for_session(session):
+    """Resolve curve targets once and cache them for an interaction."""
+    if not session.targets.resolved:
+        curves, times_map, time_range, has_graph_keys = resolve_curve_targets(session)
+        session.targets.curves = curves
+        session.targets.affected_map = times_map
+        session.targets.time_range = time_range
+        session.targets.has_graph_keys = has_graph_keys
+        session.targets.resolved = True
+    return session.targets.curves, session.targets.affected_map
 
 
 class SliderSession:
@@ -213,6 +204,7 @@ class SliderSession:
         self._is_open = False
         self.preview = False
         self.committing_preview = False
+        self.command_preview = False
         self.anim_change = self._new_anim_change()
         self._tint_key = "slider_{}_range".format(self.mode)
         self._tint_range = None
@@ -223,7 +215,10 @@ class SliderSession:
     def begin_commit(self):
         was_previewing = self.preview
         self.preview = False
-        self.committing_preview = False
+        # The preview MAnimCurveChange is undone before the final command write.
+        # Keep this flag through the commit so shared writers know that a cached
+        # key index may refer to a temporary preview key that must be recreated.
+        self.committing_preview = was_previewing
         if was_previewing:
             self.undo_preview_changes()
         self.ensure_undo_open()
@@ -324,6 +319,7 @@ class SliderSession:
 
     def finish(self):
         """Close the undo chunk and clear all session-owned state."""
+        cancel_command_preview = self.preview and self.command_preview and self._is_open
         if self.preview:
             self.undo_preview_changes()
         self.preview = False
@@ -335,5 +331,12 @@ class SliderSession:
             except Exception:
                 pass
             self._is_open = False
+        if cancel_command_preview:
+            try:
+                with runtime.suppress_undo_notifications():
+                    cmds.undo()
+            except Exception:
+                pass
+        self.command_preview = False
         self.targets.clear()
         self.cache.clear()

@@ -59,7 +59,6 @@ DISPATCH_MAPS = {
     },
 }
 
-COMMAND_ONLY_PREVIEW_TYPES = {"tangent", "time"}
 COMMAND_ONLY_PREVIEW_MODES = {
     "blend_to_frame_ws",
     "blend_to_neighbors_ws",
@@ -68,10 +67,8 @@ COMMAND_ONLY_PREVIEW_MODES = {
 }
 
 
-def _can_preview_with_openmaya(type_key, mode, value, world_space=False):
-    if world_space or type_key in COMMAND_ONLY_PREVIEW_TYPES or mode in COMMAND_ONLY_PREVIEW_MODES:
-        return False
-    return True
+def _can_preview(mode, world_space=False):
+    return not (world_space or mode in COMMAND_ONLY_PREVIEW_MODES)
 
 
 def _resolve_type_key(type_key, mode):
@@ -127,7 +124,7 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
     type_key = _resolve_type_key(type_key, mode)
     session, should_finish = _resolve_session(mode, session)
     try:
-        if session.preview and not _can_preview_with_openmaya(type_key, mode, value, world_space=world_space):
+        if session.preview and not _can_preview(mode, world_space=world_space):
             return session
 
         dispatch = DISPATCH_MAPS.get(type_key, {})
@@ -145,6 +142,17 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
             # Structural previews are rebuilt from the untouched drag-start
             # curve on every value change instead of accumulating edits.
             session.undo_preview_changes()
+
+        if session.preview and mode == "time_offsetter":
+            # Re-evaluate every drag position from the untouched curve shape.
+            session.undo_preview_changes()
+
+        # Tangent angles/types are edited through Maya commands. Keep their
+        # entire live drag in one undo chunk so preview and final commit undo as
+        # one operation while still updating continuously.
+        if session.preview and (type_key == "tangent" or mode == "time_offsetter_stagger"):
+            session.ensure_undo_open()
+            session.command_preview = True
 
         if not session.preview:
             session.ensure_undo_open()

@@ -9,6 +9,7 @@ Centralized Maya runtime manager for TheKeyMachine.
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional
 
 from maya import cmds
@@ -131,6 +132,18 @@ def get_modifier_state() -> Dict[str, bool]:
     }
 
 
+@contextmanager
+def suppress_undo_notifications():
+    """Prevent tool-owned Undo sampling from cancelling active interactions."""
+    manager = get_runtime_manager()
+    suppression_count = getattr(manager, "_undo_notification_suppression", 0)
+    manager._undo_notification_suppression = suppression_count + 1
+    try:
+        yield
+    finally:
+        manager._undo_notification_suppression = max(0, manager._undo_notification_suppression - 1)
+
+
 class RuntimeManager(QtCore.QObject):
     callback_fired = QtCore.Signal(str)
 
@@ -175,6 +188,7 @@ class RuntimeManager(QtCore.QObject):
         self._shift_pressed = False
         self._alt_pressed = False
         self._playback_active = False
+        self._undo_notification_suppression = 0
 
         self._event_filter_installed = False
         self._background_runner_controller = None
@@ -495,6 +509,8 @@ class RuntimeManager(QtCore.QObject):
             return
 
         def _on_undo(*_args):
+            if getattr(self, "_undo_notification_suppression", 0):
+                return
             self._emit("undo_performed")
             try:
                 self.undo_performed.emit()

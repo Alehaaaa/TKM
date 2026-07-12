@@ -29,6 +29,42 @@ def sample_times(start, end, interval):
     return sorted(set(int(value) if int(value) == value else value for value in frames))
 
 
+def bouncy_tangent_angles(curve, time, angle_adjustment_factor=1.3):
+    """Return contextual bounce angles in Maya's native tangent units.
+
+    Maya tangent vectors use seconds for x and attribute-specific internal
+    units for y. Asking Maya for the Linear target avoids incorrect frame/value
+    slope conversions, then scaling tan(angle) amplifies the actual slope.
+    """
+    time_range = (float(time), float(time))
+    in_types = cmds.keyTangent(curve, query=True, time=time_range, inTangentType=True) or []
+    out_types = cmds.keyTangent(curve, query=True, time=time_range, outTangentType=True) or []
+    locks = cmds.keyTangent(curve, query=True, time=time_range, lock=True) or []
+    if not in_types or not out_types:
+        return 0.0, 0.0
+    was_locked = bool(locks[0]) if locks else False
+    in_angles = cmds.keyTangent(curve, query=True, time=time_range, inAngle=True) or [0.0]
+    out_angles = cmds.keyTangent(curve, query=True, time=time_range, outAngle=True) or [0.0]
+    try:
+        cmds.keyTangent(curve, edit=True, time=time_range, lock=False)
+        cmds.keyTangent(curve, edit=True, time=time_range, inTangentType="linear", outTangentType="linear")
+        in_angles = cmds.keyTangent(curve, query=True, time=time_range, inAngle=True) or [0.0]
+        out_angles = cmds.keyTangent(curve, query=True, time=time_range, outAngle=True) or [0.0]
+    except Exception:
+        pass
+    finally:
+        cmds.keyTangent(
+            curve, edit=True, time=time_range,
+            inTangentType=in_types[0], outTangentType=out_types[0], lock=was_locked,
+        )
+
+    def _amplify(angle):
+        slope = math.tan(math.radians(float(angle)))
+        return math.degrees(math.atan(slope * float(angle_adjustment_factor)))
+
+    return _amplify(in_angles[0]), _amplify(out_angles[0])
+
+
 def fit_hermite_span(curve, start, end, start_value, end_value):
     """Fit endpoint slopes for a cubic Hermite span by constrained least squares."""
     duration = float(end) - float(start)

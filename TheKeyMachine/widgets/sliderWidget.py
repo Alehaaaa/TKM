@@ -39,6 +39,7 @@ import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.sliders import api as slider_api
 import TheKeyMachine.core.runtimeManager as runtime
+import TheKeyMachine.widgets.timeline as timelineWidgets
 from TheKeyMachine.tools import colors as toolColors
 
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager, format_tooltip_shortcut
@@ -136,12 +137,15 @@ class SliderButton(cw.TooltipMixin, QPushButton):
         self._percent = percent
         self._color = color
         self._frameButton = bool(frameButton)
+        self._frameValue = None
+        self.setCheckable(self._frameButton)
         self._box_sz = wutil.DPI(7) if (self._frameButton or abs(percent) == 100) else wutil.DPI(3)
         self.setFixedHeight(parent.height())
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         self.setStyleSheet(
-            f"QPushButton {{ background: none; border-radius: 0; }}QPushButton:pressed {{ background-color: {self._color}; border-radius: 0; }}"
+            f"QPushButton {{ background: none; border-radius: 0; }}"
+            f"QPushButton:pressed, QPushButton:checked {{ background-color: {self._color}; border-radius: 0; }}"
         )
 
         self._worldSpace = worldSpace
@@ -173,6 +177,10 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
     def setWorldSpace(self, enabled: int):
         self._worldSpace = enabled
+        self.update()
+
+    def setFrameValue(self, frame):
+        self._frameValue = frame
         self.update()
 
     def enterEvent(self, e):
@@ -250,6 +258,15 @@ class SliderButton(cw.TooltipMixin, QPushButton):
                 p.drawRect(QRect(x, y, s, s))
 
             p.restore()
+
+        if self._frameButton and self._frameValue is not None:
+            font = QFont(self.font())
+            font.setPixelSize(max(wutil.DPI(7), min(wutil.DPI(9), y)))
+            font.setBold(False)
+            p.setFont(font)
+            p.setPen(main_color)
+            label_rect = QRect(0, -wutil.DPI(1), w, max(1, y + wutil.DPI(1)))
+            p.drawText(label_rect, Qt.AlignHCenter | Qt.AlignTop, str(int(self._frameValue)))
         p.end()
 
 
@@ -651,6 +668,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._tooltip = tooltip
         self._dragCommand = None
         self._sliderSession = None
+        self._framePicker = None
+        self._pickedFrames = {}
 
         self._section_parent = None
         self._section_prefix = ""
@@ -1010,6 +1029,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self.setTooltipInfo(mode.label, mode.description, mode.tooltip)
         self.setWorldSpace(mode.worldSpace)
         self.setFrameButtonsVisible(mode.frameButtons)
+        self._update_frame_button_tooltips()
         self._refresh_toolTipData()
 
     def on_added_to_section(self, section, key: str):
@@ -1126,6 +1146,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def _on_drag_started(self):
         QFlatTooltipManager.hide()
+        self._cancel_frame_picker()
         self._finish_active_session()
         self._start_slider_interaction(preview=True)
 
@@ -1155,6 +1176,9 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._rightOverlay.show()
 
     def _on_button_clicked(self, btn: SliderButton):
+        if btn in (self._leftFrameButton, self._rightFrameButton):
+            self._begin_frame_picker(-1 if btn is self._leftFrameButton else 1)
+            return
         self._finish_active_session()
         try:
             self.valueSet.emit(float(btn.percent))
@@ -1162,6 +1186,55 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         finally:
             self.dragFinished.emit()
             self._finish_active_session()
+
+    def _begin_frame_picker(self, side):
+        self._cancel_frame_picker()
+        mode = self.currentMode()
+        if mode is None:
+            return
+        active_button = self._leftFrameButton if side < 0 else self._rightFrameButton
+        active_button.setChecked(True)
+
+        def _picked(frame):
+            frames = list(self._pickedFrames.get(mode.key, (None, None)))
+            frames[0 if side < 0 else 1] = int(frame)
+            self._pickedFrames[mode.key] = tuple(frames)
+            self._framePicker = None
+            active_button.setChecked(False)
+            self._update_frame_button_tooltips()
+
+        def _cancelled():
+            self._framePicker = None
+            active_button.setChecked(False)
+
+        self._framePicker = timelineWidgets.begin_frame_picker(_picked, owner=self, cancel_callback=_cancelled)
+
+    def _cancel_frame_picker(self):
+        if self._framePicker is not None:
+            self._framePicker.cancel()
+            self._framePicker = None
+        if self._leftFrameButton:
+            self._leftFrameButton.setChecked(False)
+        if self._rightFrameButton:
+            self._rightFrameButton.setChecked(False)
+
+    def _update_frame_button_tooltips(self):
+        mode = self.currentMode()
+        if mode is None:
+            return
+        left, right = self._pickedFrames.get(mode.key, (None, None))
+        if self._leftFrameButton:
+            self._leftFrameButton.setFrameValue(left)
+            left_description = "Pick left target frame"
+            if left is not None:
+                left_description += ": {}".format(left)
+            self._leftFrameButton.setTooltipInfo(mode.label, left_description, mode.tooltip)
+        if self._rightFrameButton:
+            self._rightFrameButton.setFrameValue(right)
+            right_description = "Pick right target frame"
+            if right is not None:
+                right_description += ": {}".format(right)
+            self._rightFrameButton.setTooltipInfo(mode.label, right_description, mode.tooltip)
 
     def _finish_active_session(self):
         if self._sliderSession is not None:
@@ -1190,6 +1263,9 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
         if preview:
             self._sliderSession.begin_preview()
+
+        frames = self._pickedFrames.get(mode.key, (None, None))
+        self._sliderSession.left_target_frame, self._sliderSession.right_target_frame = frames
 
         return self._sliderSession
 

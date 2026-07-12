@@ -14,6 +14,14 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.23:
+  - new: Frame-based sliders can pick and display independent timeline targets
+  - changed: Buffer and Undo sliders blend animation curve shapes without moving keys
+  - changed: Tangent sliders use contextual targets, mirrored blending and exact modes at full strength
+  - changed: Time Offset preserves key timing while Stagger moves complete object animation
+  - polish: Gap Stitcher, Noise, Wave, Infinity and World Space sliders produce more natural results
+  - bugfix: Slider previews, generated keys, timeline picking and Undo now finish reliably
+
 0.1.22:
   - changed: TKM menu commands now live in the main TKM Menu section
   - changed: Global Tools now appears before Background Runners in the toolbar

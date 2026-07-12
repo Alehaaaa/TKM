@@ -4,8 +4,15 @@ TheKeyMachine - Keyframe-level Slider Operations
 Tweening and blending operations translated from keyToolsMod.
 """
 
-import maya.cmds as cmds
+import math
 
+import maya.cmds as cmds
+try:
+    from maya.api import OpenMaya as om
+except ImportError:
+    om = None
+
+import TheKeyMachine.core.runtimeManager as runtime
 from . import mode_values, utils
 from .utils import TweenFrameData, BlendFrameData
 
@@ -39,24 +46,6 @@ def _resolve_keyframe_targets_for_session(session):
     return session.targets.affected_map, session.targets.time_range
 
 
-def _ensure_keys_at_times(attr_plugs, times):
-    """Ensures keys exist at specified times for all given attribute plugs."""
-    if isinstance(attr_plugs, str):
-        attr_plugs = [attr_plugs]
-
-    for attr in attr_plugs:
-        if not cmds.objExists(attr) or cmds.getAttr(attr, lock=True) or not cmds.getAttr(attr, settable=True):
-            continue
-        if cmds.getAttr(attr, type=True) in ("enum", "string", "message"):
-            continue
-
-        for t in times:
-            try:
-                cmds.setKeyframe(attr, time=t)
-            except Exception:
-                pass
-
-
 # ---------------------------------------------------------------------------------------------------------------------
 #                                              Keyframe Value Helpers                                                 #
 # ---------------------------------------------------------------------------------------------------------------------
@@ -70,6 +59,7 @@ def _has_keyframes(attr_full):
 
 
 def _apply_world_space_blend(attr_full, time, target_frame, blend):
+    initial_time = cmds.currentTime(query=True)
     try:
         obj = attr_full.split(".")[0]
         if target_frame is None:
@@ -83,11 +73,122 @@ def _apply_world_space_blend(attr_full, time, target_frame, blend):
         return True
     except Exception:
         return False
+    finally:
+        if cmds.currentTime(query=True) != initial_time:
+            cmds.currentTime(initial_time, edit=True)
 
 
 def _interpolate_matrix(prev_mat, next_mat, t):
-    # Simple linear interpolation for world matrices (sufficient for most poses)
-    return [prev_mat[i] + (next_mat[i] - prev_mat[i]) * t for i in range(16)]
+    """Interpolate decomposed transforms with quaternion rotation."""
+    prev_values = list(prev_mat[0]) if len(prev_mat) == 1 and hasattr(prev_mat[0], "__iter__") else list(prev_mat)
+    next_values = list(next_mat[0]) if len(next_mat) == 1 and hasattr(next_mat[0], "__iter__") else list(next_mat)
+    if om is None or len(prev_values) != 16 or len(next_values) != 16:
+        return [prev_values[i] + (next_values[i] - prev_values[i]) * t for i in range(min(len(prev_values), len(next_values)))]
+    try:
+        previous = om.MTransformationMatrix(om.MMatrix(prev_values))
+        following = om.MTransformationMatrix(om.MMatrix(next_values))
+        result = om.MTransformationMatrix()
+        prev_translation = previous.translation(om.MSpace.kWorld)
+        next_translation = following.translation(om.MSpace.kWorld)
+        result.setTranslation(prev_translation + (next_translation - prev_translation) * t, om.MSpace.kWorld)
+        prev_rotation = previous.rotation(asQuaternion=True)
+        next_rotation = following.rotation(asQuaternion=True)
+        rotation = om.MQuaternion.slerp(prev_rotation, next_rotation, t)
+        result.setRotationQuaternion(rotation.x, rotation.y, rotation.z, rotation.w)
+        prev_scale = previous.scale(om.MSpace.kWorld)
+        next_scale = following.scale(om.MSpace.kWorld)
+        result.setScale(tuple(utils.lerp(a, b, t) for a, b in zip(prev_scale, next_scale)), om.MSpace.kWorld)
+        prev_shear = previous.shear(om.MSpace.kWorld)
+        next_shear = following.shear(om.MSpace.kWorld)
+        result.setShear(tuple(utils.lerp(a, b, t) for a, b in zip(prev_shear, next_shear)), om.MSpace.kWorld)
+        return list(result.asMatrix())
+    except Exception:
+        return [prev_values[i] + (next_values[i] - prev_values[i]) * t for i in range(16)]
+
+
+def _remap_time(time, target_times, source_start, source_end):
+    target_start, target_end = min(target_times), max(target_times)
+    if target_end == target_start:
+        return max(source_start, min(source_end, float(time)))
+    ratio = (float(time) - target_start) / float(target_end - target_start)
+    return source_start + ratio * (source_end - source_start)
+
+
+def _scaled_angle(angle, source_span, target_span):
+    if angle is None or source_span <= 0.0 or target_span <= 0.0:
+        return angle
+    return math.degrees(math.atan(math.tan(math.radians(float(angle))) * source_span / target_span))
+
+
+def _capture_buffer_curve_targets(curve, target_times):
+    """Sample a Maya buffer curve onto existing target times without moving keys."""
+    target_times = sorted(set(float(time) for time in target_times or []))
+    if not curve or not target_times:
+        return {}
+    try:
+        if not cmds.bufferCurve(curve, query=True, exists=True):
+            return {}
+    except Exception:
+        return {}
+
+    swapped = False
+    try:
+        cmds.bufferCurve(curve, swap=True)
+        swapped = True
+        source_keys = sorted(float(time) for time in (cmds.keyframe(curve, query=True, timeChange=True) or []))
+        if not source_keys:
+            return {}
+        source_start, source_end = source_keys[0], source_keys[-1]
+        source_times = [_remap_time(time, target_times, source_start, source_end) for time in target_times]
+        from TheKeyMachine.core import curveFitting
+
+        source_shape = curveFitting.capture([curve], source_times).get(curve, {})
+        source_span = max(0.0, source_end - source_start)
+        target_span = max(0.0, max(target_times) - min(target_times))
+        result = {}
+        for target_time, source_time in zip(target_times, source_times):
+            sample = source_shape.get(float(source_time))
+            if not sample:
+                continue
+            result[target_time] = {
+                "value": sample.get("value"),
+                "in_angle": _scaled_angle(sample.get("in_angle"), source_span, target_span),
+                "out_angle": _scaled_angle(sample.get("out_angle"), source_span, target_span),
+            }
+        return result
+    finally:
+        if swapped:
+            try:
+                cmds.bufferCurve(curve, swap=True)
+            except Exception:
+                pass
+
+
+def _apply_preserved_blended_tangents(curve, time, target, blend):
+    """Rotate already-manual tangents toward a fitted target without changing types."""
+    if not curve or not target:
+        return
+    try:
+        in_types = cmds.keyTangent(curve, query=True, time=(time, time), inTangentType=True) or []
+        out_types = cmds.keyTangent(curve, query=True, time=(time, time), outTangentType=True) or []
+        in_angles = cmds.keyTangent(curve, query=True, time=(time, time), inAngle=True) or []
+        out_angles = cmds.keyTangent(curve, query=True, time=(time, time), outAngle=True) or []
+        amount = min(1.0, max(0.0, abs(float(blend))))
+        kwargs = {"absolute": True}
+        if in_types and in_types[0] == "fixed" and in_angles and target.get("in_angle") is not None:
+            target_angle = float(target["in_angle"])
+            if blend < 0.0:
+                target_angle = (2.0 * float(in_angles[0])) - target_angle
+            kwargs["inAngle"] = utils.lerp(in_angles[0], target_angle, amount)
+        if out_types and out_types[0] == "fixed" and out_angles and target.get("out_angle") is not None:
+            target_angle = float(target["out_angle"])
+            if blend < 0.0:
+                target_angle = (2.0 * float(out_angles[0])) - target_angle
+            kwargs["outAngle"] = utils.lerp(out_angles[0], target_angle, amount)
+        if len(kwargs) > 1:
+            cmds.keyTangent(curve, edit=True, time=(time, time), **kwargs)
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -275,6 +376,7 @@ def apply_tween(session, value, world_space=False):
 
     t = (float(value) + 100.0) / 200.0
     initial_time = cmds.currentTime(query=True)
+    processed_world_targets = set()
 
     try:
         for (attr_full, time), cache in session.cache.tween_frame_data.items():
@@ -287,6 +389,9 @@ def apply_tween(session, value, world_space=False):
 
             if world_space:
                 obj = attr_full.split(".")[0]
+                world_target = (obj, float(time))
+                if world_target in processed_world_targets:
+                    continue
                 prev_m = cmds.getAttr(f"{obj}.worldMatrix[0]", time=cache.prev_f if cache.prev_f is not None else time)
                 next_m = cmds.getAttr(f"{obj}.worldMatrix[0]", time=cache.next_f if cache.next_f is not None else time)
                 new_m = _interpolate_matrix(prev_m, next_m, t)
@@ -295,6 +400,7 @@ def apply_tween(session, value, world_space=False):
                     cmds.currentTime(time, edit=True)
                 cmds.xform(obj, matrix=new_m, ws=True)
                 cmds.setKeyframe(obj, time=time, respectKeyable=True)
+                processed_world_targets.add(world_target)
             else:
                 new_v = utils.lerp(prev_v, next_v, t)
                 mode_values.apply_attr_curve_value(
@@ -360,6 +466,18 @@ def apply_blend_to_neighbors(session, percentage, world_space=False):
         cache_neighbor_keyframe_data(session, affected_map, time_range=time_range)
         session.cache.is_cached = True
 
+    # Preview the first applicable neighbor on the active side. This is also
+    # the visual fallback used by Blend to Frame before either side is picked.
+    target_frames = []
+    for cache in session.cache.frame_data.values():
+        frame = cache.next_f if percentage > 0 else cache.prev_f
+        if frame is not None:
+            target_frames.append(frame)
+    if target_frames:
+        target_frame = sorted(target_frames)[0]
+        session.show_tint((target_frame, target_frame), color=(245, 245, 245, 125), center_line=False)
+
+    processed_world_targets = set()
     for (attr_full, time), cache in session.cache.frame_data.items():
         if cmds.getAttr(attr_full, lock=True) or not cmds.getAttr(attr_full, settable=True):
             continue
@@ -378,8 +496,12 @@ def apply_blend_to_neighbors(session, percentage, world_space=False):
         t = float(percentage) / 100.0
 
         if world_space:
+            world_target = (attr_full.split(".")[0], float(time))
+            if world_target in processed_world_targets:
+                continue
             target_f = cache.next_f if percentage > 0 else cache.prev_f
             if _apply_world_space_blend(attr_full, time, target_f, t):
+                processed_world_targets.add(world_target)
                 continue
 
         new_v = utils.lerp_towards(left_target, right_target, t, orig)
@@ -509,14 +631,21 @@ def apply_blend_to_key(session, percentage, objs=None):
 
 def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None, objs=None, world_space=False):
     """Blends current values toward values at specific frames, for all affected keys."""
+    if left_frame is None:
+        left_frame = getattr(session, "left_target_frame", None)
+    if right_frame is None:
+        right_frame = getattr(session, "right_target_frame", None)
+    if left_frame is None and right_frame is None:
+        return apply_blend_to_neighbors(session, percentage, world_space=world_space)
     if not session.cache.is_cached:
         affected_map, _tr = _resolve_keyframe_targets_for_session(session)
         if not affected_map:
             return
         session.snapshot_pose_buffer(affected_map)
 
-        if left_frame is None or right_frame is None:
-            return apply_blend_to_neighbors(session, percentage)
+        # A single picked side is useful on both halves until the other side is set.
+        left_frame = left_frame if left_frame is not None else right_frame
+        right_frame = right_frame if right_frame is not None else left_frame
 
         session.cache.frame_data.clear()
         for attr_full, times in affected_map.items():
@@ -551,6 +680,11 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
                     pass
         session.cache.is_cached = True
 
+    target_frame = right_frame if percentage > 0 else left_frame
+    if target_frame is not None:
+        session.show_tint((target_frame, target_frame), color=(245, 245, 245, 125), center_line=False)
+
+    processed_world_targets = set()
     for (attr_full, time), cache in session.cache.frame_data.items():
         orig = cache.original_value
         target_v = cache.rightValue if percentage > 0 else cache.leftValue
@@ -560,8 +694,12 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
 
         t = float(percentage) / 100.0
         if world_space:
+            world_target = (attr_full.split(".")[0], float(time))
+            if world_target in processed_world_targets:
+                continue
             target_f = cache.rightFrame if percentage > 0 else cache.leftFrame
             if _apply_world_space_blend(attr_full, time, target_f, t):
+                processed_world_targets.add(world_target)
                 continue
         new_v = utils.lerp_towards(cache.leftValue, cache.rightValue, t, orig)
         mode_values.apply_attr_curve_value(
@@ -576,39 +714,58 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
 
 
 def apply_blend_to_infinity(session, percentage, world_space=False):
-    """Blend toward simple pre/post-infinity extrapolated values."""
+    """Blend toward the curve's evaluated pre/post-infinity shape."""
     if not session.cache.is_cached:
-        affected_map, time_range = _resolve_keyframe_targets_for_session(session)
+        affected_map, _time_range = _resolve_keyframe_targets_for_session(session)
         if not affected_map:
             return
         session.snapshot_pose_buffer(affected_map)
-        cache_neighbor_keyframe_data(session, affected_map, time_range=time_range)
+        session.cache.frame_data.clear()
+        for attr_full, times in affected_map.items():
+            curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
+            key_times = sorted(float(time) for time in (cmds.keyframe(attr_full, query=True, timeChange=True) or []))
+            if not curve or not key_times:
+                continue
+            first_frame, last_frame = key_times[0], key_times[-1]
+            span = max(1.0, last_frame - first_frame)
+            pre_frame, post_frame = first_frame - span, last_frame + span
+            try:
+                pre_value = mode_values.curve_value_at_time(curve_fn, pre_frame, cmds.getAttr(attr_full, time=pre_frame))
+                post_value = mode_values.curve_value_at_time(curve_fn, post_frame, cmds.getAttr(attr_full, time=post_frame))
+            except Exception:
+                continue
+            has_keys = _has_keyframes(attr_full)
+            for current_time in times:
+                original = mode_values.curve_value_at_time(
+                    curve_fn, current_time, cmds.getAttr(attr_full, time=current_time)
+                )
+                key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
+                if key_index is not None:
+                    original = mode_values.curve_value(curve_fn, key_index, original)
+                session.cache.frame_data[(attr_full, current_time)] = BlendFrameData(
+                    original_value=original, leftValue=pre_value, rightValue=post_value,
+                    leftFrame=pre_frame, rightFrame=post_frame, use_direct_attr=not has_keys,
+                    curve=curve, keyIndex=key_index,
+                )
         session.cache.is_cached = True
 
     t = float(percentage) / 100.0
+    processed_world_targets = set()
     for (attr_full, time), cache in session.cache.frame_data.items():
         orig = cache.original_value
-        prev_v = cache.previousValue
-        next_v = cache.nextValue
         if not isinstance(orig, (int, float)):
             continue
-
-        left_target = None
-        right_target = None
-        if isinstance(prev_v, (int, float)) and isinstance(next_v, (int, float)):
-            delta = next_v - prev_v
-            left_target = prev_v - delta
-            right_target = next_v + delta
-        elif isinstance(prev_v, (int, float)):
-            left_target = prev_v
-            right_target = prev_v
-        elif isinstance(next_v, (int, float)):
-            left_target = next_v
-            right_target = next_v
-        if left_target is None and right_target is None:
+        if not isinstance(cache.leftValue, (int, float)) or not isinstance(cache.rightValue, (int, float)):
             continue
-
-        new_v = utils.lerp_towards(left_target, right_target, t, orig)
+        if world_space:
+            world_target = (attr_full.split(".")[0], float(time))
+            if world_target in processed_world_targets:
+                continue
+            target_frame = cache.rightFrame if percentage > 0 else cache.leftFrame
+            if _apply_world_space_blend(attr_full, time, target_frame, t):
+                processed_world_targets.add(world_target)
+                continue
+        new_v = utils.lerp_towards(cache.leftValue, cache.rightValue, t, orig)
         mode_values.apply_attr_curve_value(
             session,
             attr_full,
@@ -621,7 +778,7 @@ def apply_blend_to_infinity(session, percentage, world_space=False):
 
 
 def apply_blend_to_buffer(session, percentage, world_space=False):
-    """Blend toward the last stored pose snapshot from a previous slider interaction."""
+    """Blend existing keys toward the normalized shape of Maya buffer curves."""
     affected_map, _time_range = _resolve_keyframe_targets_for_session(session)
     if not affected_map:
         return
@@ -631,6 +788,7 @@ def apply_blend_to_buffer(session, percentage, world_space=False):
         for attr_full, times in affected_map.items():
             has_keys = _has_keyframes(attr_full)
             curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
+            buffer_targets = _capture_buffer_curve_targets(curve, times)
             for current_time in times:
                 try:
                     orig = mode_values.curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
@@ -639,7 +797,10 @@ def apply_blend_to_buffer(session, percentage, world_space=False):
                 key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
                 if key_index is not None:
                     orig = mode_values.curve_value(curve_fn, key_index, orig)
-                buffer_value = session.cache.pose_buffer.get((attr_full, current_time), orig)
+                target = buffer_targets.get(float(current_time), {})
+                buffer_value = target.get("value")
+                if not isinstance(buffer_value, (int, float)):
+                    continue
                 session.cache.frame_data[(attr_full, current_time)] = BlendFrameData(
                     original_value=orig,
                     bufferValue=buffer_value,
@@ -647,10 +808,14 @@ def apply_blend_to_buffer(session, percentage, world_space=False):
                     curve=curve,
                     keyIndex=key_index,
                 )
+                session.cache.auxiliary[(attr_full, current_time, "buffer_shape")] = target
         session.cache.is_cached = True
 
     t = max(-1.0, min(1.0, float(percentage) / 100.0))
-    for (attr_full, current_time), cache in session.cache.frame_data.items():
+    for key, cache in session.cache.frame_data.items():
+        if not isinstance(key, tuple) or len(key) != 2 or not isinstance(cache, BlendFrameData):
+            continue
+        attr_full, current_time = key
         orig = cache.original_value
         buffer_value = cache.bufferValue
         if not isinstance(orig, (int, float)) or not isinstance(buffer_value, (int, float)):
@@ -666,11 +831,86 @@ def apply_blend_to_buffer(session, percentage, world_space=False):
             curve=cache.curve,
             key_index=cache.keyIndex,
         )
+        if not session.preview:
+            target = session.cache.auxiliary.get((attr_full, current_time, "buffer_shape"))
+            _apply_preserved_blended_tangents(cache.curve, current_time, target, t)
 
 
 def apply_blend_to_undo(session, percentage, world_space=False):
-    """Blend back toward the last pose snapshot, acting like a soft undo target."""
-    return apply_blend_to_buffer(session, percentage, world_space=world_space)
+    """Blend toward a curve-shape snapshot captured through Maya Undo/Redo."""
+    affected_map, _time_range = _resolve_keyframe_targets_for_session(session)
+    if not affected_map:
+        return
+    if not session.cache.is_cached:
+        session.cache.frame_data.clear()
+        current_data = {}
+        for attr_full, times in affected_map.items():
+            curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
+            for current_time in times:
+                current_data[(attr_full, current_time)] = {
+                    "curve": curve,
+                    "value": mode_values.curve_value_at_time(
+                        curve_fn, current_time, cmds.getAttr(attr_full, time=current_time)
+                    ),
+                    "has_keys": _has_keyframes(attr_full),
+                }
+
+        undone_values = {}
+        undone_shapes = {}
+        did_undo = False
+        with runtime.suppress_undo_notifications():
+            try:
+                if cmds.undoInfo(query=True, undoQueueEmpty=True):
+                    return
+                cmds.undo()
+                did_undo = True
+                from TheKeyMachine.core import curveFitting
+
+                for attr_full, times in affected_map.items():
+                    undone_curve, undone_curve_fn = mode_values.curve_fn_for_attr(attr_full)
+                    if undone_curve:
+                        shape = curveFitting.capture([undone_curve], times).get(undone_curve, {})
+                    else:
+                        shape = {}
+                    for current_time in times:
+                        fallback = cmds.getAttr(attr_full, time=current_time)
+                        undone_values[(attr_full, current_time)] = mode_values.curve_value_at_time(
+                            undone_curve_fn, current_time, fallback
+                        )
+                        undone_shapes[(attr_full, current_time)] = shape.get(float(current_time), {})
+            finally:
+                if did_undo:
+                    cmds.redo()
+
+        for (attr_full, current_time), current in current_data.items():
+            target_value = undone_values.get((attr_full, current_time))
+            if not isinstance(target_value, (int, float)):
+                continue
+            curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
+            key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
+            session.cache.frame_data[(attr_full, current_time)] = BlendFrameData(
+                original_value=current["value"], bufferValue=target_value,
+                use_direct_attr=not current["has_keys"], curve=curve, keyIndex=key_index,
+            )
+            session.cache.auxiliary[(attr_full, current_time, "undo_shape")] = undone_shapes.get(
+                (attr_full, current_time), {}
+            )
+        session.cache.is_cached = True
+
+    t = max(-1.0, min(1.0, float(percentage) / 100.0))
+    for key, cache in session.cache.frame_data.items():
+        if not isinstance(key, tuple) or len(key) != 2 or not isinstance(cache, BlendFrameData):
+            continue
+        attr_full, current_time = key
+        mirror_value = (2.0 * cache.original_value) - cache.bufferValue
+        new_value = utils.lerp_towards(mirror_value, cache.bufferValue, t, cache.original_value)
+        mode_values.apply_attr_curve_value(
+            session, attr_full, new_value, current_time, use_direct_attr=cache.use_direct_attr,
+            curve=cache.curve, key_index=cache.keyIndex,
+        )
+        if not session.preview:
+            target = session.cache.auxiliary.get((attr_full, current_time, "undo_shape"))
+            _apply_preserved_blended_tangents(cache.curve, current_time, target, t)
 
 
 def blend_slider_reset(session, slider_name=None):

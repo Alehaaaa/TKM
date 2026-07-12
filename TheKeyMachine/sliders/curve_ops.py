@@ -5,6 +5,7 @@ Operations that work directly on animation curves and their keys.
 """
 
 import maya.cmds as cmds
+import math
 import random
 
 try:
@@ -24,32 +25,51 @@ from . import mode_values, utils
 
 def _resolve_targets_for_session(session):
     """Resolve and cache curve targets on the session for the lifetime of one drag."""
-    if not session.targets.resolved:
-        curves, times_map, time_range, has_graph_keys = utils.resolve_curve_targets(session)
-        session.targets.curves = curves
-        session.targets.affected_map = times_map
-        session.targets.time_range = time_range
-        session.targets.has_graph_keys = has_graph_keys
-        session.targets.resolved = True
-    return session.targets.curves, session.targets.affected_map
+    return utils.resolve_curve_targets_for_session(session)
 
 
 def _ensure_curve_value_cache(session, curve, keys):
     """Caches original values for ALL keyframes on a curve for stable dragging."""
     if curve not in session.cache.original_keyframes:
+        cached = None
         curve_fn = omutils._anim_curve_fn(curve)
         if curve_fn is not None:
             try:
                 num_keys = curve_fn.numKeys() if callable(curve_fn.numKeys) else curve_fn.numKeys
-                session.cache.original_keyframes[curve] = {
+                cached = {
                     float(curve_fn.input(i).value): curve_fn.value(i)
                     for i in range(num_keys)
                 }
-                return
             except Exception:
                 pass
-        data = cmds.keyframe(curve, query=True, timeChange=True, valueChange=True) or []
-        session.cache.original_keyframes[curve] = {float(data[i]): data[i + 1] for i in range(0, len(data), 2)}
+        if cached is None:
+            data = cmds.keyframe(curve, query=True, timeChange=True, valueChange=True) or []
+            cached = {float(data[i]): data[i + 1] for i in range(0, len(data), 2)}
+        session.cache.original_keyframes[curve] = cached
+
+    # Current-frame targets are valid even without an existing key. Cache the
+    # evaluated drag-start value so every value slider treats that virtual key
+    # exactly like an existing selected key, then creates it through _apply_value.
+    original_data = session.cache.original_keyframes[curve]
+    curve_fn = omutils._anim_curve_fn(curve)
+    for time in keys or []:
+        time = float(time)
+        if time in original_data:
+            continue
+        value = None
+        if curve_fn is not None and om is not None:
+            try:
+                value = curve_fn.evaluate(om.MTime(time, _time_unit()))
+            except Exception:
+                pass
+        if value is None:
+            try:
+                values = cmds.keyframe(curve, query=True, eval=True, time=(time, time)) or []
+                value = float(values[0]) if values else None
+            except Exception:
+                pass
+        if value is not None:
+            original_data[time] = value
 
 
 def _cached_curve_values(session, curve, keys):
@@ -227,7 +247,7 @@ def apply_rough(session, curves=None, factor=1.0):
 
 
 def apply_noise(session, curves=None, factor=1.0):
-    """Adds random noise to the keys."""
+    """Add stable random noise scaled to each curve's value range."""
     resolved_curves, target_times_per_curve = _resolve_targets_for_session(session)
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
@@ -235,6 +255,9 @@ def apply_noise(session, curves=None, factor=1.0):
             continue
 
         original_data = _cached_curve_values(session, curve, keys)
+        curve_values = list(original_data.values())
+        value_range = (max(curve_values) - min(curve_values)) if curve_values else 0.0
+        amplitude = max(value_range * 0.15, 0.001) * max(0.0, min(1.0, factor))
         if curve not in session.cache.initial_noise:
             session.cache.initial_noise[curve] = [random.uniform(-1, 1) for _ in keys]
 
@@ -243,12 +266,12 @@ def apply_noise(session, curves=None, factor=1.0):
         for i, time in enumerate(keys):
             if time in original_data:
                 init_val = original_data[time]
-                noise = noise_seeds[i] * factor
+                noise = noise_seeds[i] * amplitude
                 _apply_value(session, curve, time, init_val + noise)
 
 
 def apply_wave(session, curves=None, factor=1.0):
-    """Applies a wave pattern to the keys."""
+    """Add one smooth sine cycle across the selected key span."""
     resolved_curves, target_times_per_curve = _resolve_targets_for_session(session)
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
@@ -256,12 +279,17 @@ def apply_wave(session, curves=None, factor=1.0):
             continue
 
         original_data = _cached_curve_values(session, curve, keys)
+        curve_values = list(original_data.values())
+        value_range = (max(curve_values) - min(curve_values)) if curve_values else 0.0
+        amplitude = max(value_range * 0.15, 0.001) * max(0.0, min(1.0, factor))
+        first_time, last_time = min(keys), max(keys)
+        duration = last_time - first_time
 
-        for i, time in enumerate(keys):
+        for time in keys:
             if time in original_data:
                 init_val = original_data[time]
-                direction = 1 if i % 2 == 0 else -1
-                _apply_value(session, curve, time, init_val + direction * factor)
+                phase = ((time - first_time) / duration) * (math.pi * 2.0) if duration else (math.pi * 0.5)
+                _apply_value(session, curve, time, init_val + math.sin(phase) * amplitude)
 
 
 def apply_linear(session, curve_list=None, blend_factor=1.0):
@@ -431,15 +459,6 @@ def apply_pull_push(session, curves=None, amount=0.0):
                 _apply_value(session, curve, t, new_v)
 
 
-def _selected_tint_range(target_times_per_curve):
-    frames = []
-    for keys in (target_times_per_curve or {}).values():
-        frames.extend(keys or [])
-    if not frames:
-        return None
-    return min(frames), max(frames)
-
-
 def _implicit_connect_block(direction, current_time, all_keys):
     left_keys = [time for time in all_keys if time < current_time]
     right_keys = [time for time in all_keys if time > current_time]
@@ -513,7 +532,43 @@ def apply_connect_neighbors(session, curves, amount):
 
 
 def apply_gap_stitcher(session, curves, amount):
-    apply_linear(session, curves, min(1.0, max(0.0, amount) * 1.35))
+    """Close a boundary gap and feather its offset across the selected block."""
+    resolved_curves, target_times_per_curve = _resolve_targets_for_session(session)
+    direction = -1 if amount < 0.0 else 1
+    blend = min(1.0, max(0.0, abs(float(amount))))
+    affected_times = []
+    for curve in resolved_curves:
+        keys = sorted(float(time) for time in (target_times_per_curve.get(curve, []) or []))
+        if not keys:
+            continue
+        original_data = _cached_curve_values(session, curve, keys)
+        all_keys = sorted(original_data)
+        selected_set = set(keys)
+        anchor = keys[0] if direction < 0 else keys[-1]
+        previous_time, next_time = utils.get_block_neighbors(anchor, selected_set, all_keys)
+        neighbor = previous_time if direction < 0 else next_time
+        if neighbor is None or neighbor == anchor:
+            continue
+        anchor_value = _cached_value_at_time(session, curve, anchor)
+        neighbor_value = _cached_value_at_time(session, curve, neighbor)
+        if anchor_value is None or neighbor_value is None:
+            continue
+        full_offset = neighbor_value - anchor_value
+        count = len(keys)
+        for index, time in enumerate(keys):
+            value = _cached_value_at_time(session, curve, time)
+            if value is None:
+                continue
+            if count == 1:
+                feather = 1.0
+            elif direction < 0:
+                feather = 1.0 - (index / float(count - 1))
+            else:
+                feather = index / float(count - 1)
+            _apply_value(session, curve, time, value + full_offset * feather * blend)
+            affected_times.append(time)
+    if affected_times:
+        session.show_tint((min(affected_times), max(affected_times)))
 
 
 def apply_simplify(session, curves, amount):
@@ -526,10 +581,10 @@ def apply_simplify(session, curves, amount):
             continue
 
         priority_cache_key = (curve, "simplify_detail_priority", tuple(keys))
-        priority_data = session.cache.frame_data.get(priority_cache_key)
+        priority_data = session.cache.auxiliary.get(priority_cache_key)
         if priority_data is None:
             priority_data = curveFitting.detail_priority_with_scores(curve, keys)
-            session.cache.frame_data[priority_cache_key] = priority_data
+            session.cache.auxiliary[priority_cache_key] = priority_data
         priority, detail_scores = priority_data
 
         removable = len(keys) - 2
@@ -620,11 +675,19 @@ def apply_scale_default(session, curves, factor):
 
 
 def apply_scale_frame(session, curves, factor):
+    left_frame = getattr(session, "left_target_frame", None)
+    right_frame = getattr(session, "right_target_frame", None)
     current_time = cmds.currentTime(query=True)
+    target_time = right_frame if factor >= 1.0 else left_frame
+    if target_time is None:
+        target_time = left_frame if left_frame is not None else right_frame
+    if target_time is None:
+        target_time = current_time
+    session.show_tint((target_time, target_time), color=(245, 245, 245, 125), center_line=False)
 
     def _pivot(curve, keys, selected):
         try:
-            return float(cmds.keyframe(curve, query=True, eval=True, time=(current_time,))[0])
+            return float(cmds.keyframe(curve, query=True, eval=True, time=(target_time,))[0])
         except Exception:
             return None
 

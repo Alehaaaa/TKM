@@ -34,7 +34,7 @@ def execute_blend_to_key(session, percentage, objs=None):
     return keyframe_ops.apply_blend_to_key(session, percentage, objs=objs)
 
 
-def execute_blend_to_frame(session, percentage, left_frame=None, right_frame=None, objs=None, world_space=False):
+def execute_blend_to_frame(session, percentage, world_space=False, left_frame=None, right_frame=None, objs=None):
     return keyframe_ops.apply_blend_to_frame(
         session,
         percentage,
@@ -71,13 +71,13 @@ def execute_ease_in_out(session, curves, value):
 
 
 def execute_gap_stitcher(session, curves, value):
-    return curve_ops.apply_gap_stitcher(session, curves, abs(value) / 100.0)
+    return curve_ops.apply_gap_stitcher(session, curves, value / 100.0)
 
 
 def execute_noise_wave(session, curves, value):
     if value < 0:
-        return curve_ops.apply_noise(session, curves, abs(value) / 60.0)
-    return curve_ops.apply_wave(session, curves, value / 30.0)
+        return curve_ops.apply_noise(session, curves, abs(value) / 100.0)
+    return curve_ops.apply_wave(session, curves, value / 100.0)
 
 
 def execute_pull_push(session, curves, value):
@@ -134,7 +134,7 @@ def execute_blend_polished(session, curves, value):
 
 
 def execute_blend_bounce(session, curves, value):
-    return tangent_ops.apply_tangent_type_blend(session, curves, "step", value)
+    return tangent_ops.apply_tangent_type_blend(session, curves, "bounce", value)
 
 
 def execute_blend_auto(session, curves, value):

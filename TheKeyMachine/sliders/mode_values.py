@@ -94,7 +94,11 @@ def apply_attr_curve_value(
         return
 
     if curve and key_index is not None and not key_exists(omutils.anim_curve_fn(curve), current_time):
-        if not create_key:
+        # A live preview can add a temporary key and cache its index. Releasing
+        # the slider first undoes that preview, so the common commit path must
+        # restore the key instead of treating the now-stale index as a no-op.
+        should_create = create_key or getattr(session, "committing_preview", False)
+        if not should_create:
             return
         _set_curve_key_value_with_cmds(curve, current_time, value)
         return
