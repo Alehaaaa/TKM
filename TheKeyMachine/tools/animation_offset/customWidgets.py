@@ -86,7 +86,8 @@ class AnimationOffsetTimelineTint(timeline.TimelineTint):
             return
         span = float(playback_end - playback_start + 1)
         normalized_x = (float(x) - width * 0.005) / usable_width
-        frame = int(math.floor(playback_start + normalized_x * span))
+        frame_position = playback_start + normalized_x * span
+        frame = int(math.ceil(frame_position - 0.5)) - self._drag_edge
         frame = max(playback_start, min(playback_end, frame))
         start_frame, end_frame = self.timerange
         minimum_span = self.MINIMUM_FRAME_COUNT - 1

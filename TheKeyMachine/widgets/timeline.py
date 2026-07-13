@@ -59,6 +59,7 @@ def get_animation_data_timerange(animation_data, frame_key="keyframes"):
 
 
 _active_frame_picker = None
+FRAME_PICKER_COLOR = (235, 235, 235, 125)
 
 
 class TimelineFramePicker(QtCore.QObject):
@@ -66,11 +67,11 @@ class TimelineFramePicker(QtCore.QObject):
 
     TINT_KEY = "slider_frame_picker"
 
-    def __init__(self, callback, owner=None, color=(245, 245, 245, 125), cancel_callback=None):
+    def __init__(self, callback, owner=None, color=None, cancel_callback=None):
         super().__init__(owner or runtime.get_runtime_manager())
         self._callback = callback
         self._cancel_callback = cancel_callback
-        self._color = color
+        self._color = color or FRAME_PICKER_COLOR
         self._timeline = TimelineTint.get_timeline_widget()
         self._frame = None
         self._selection_made = False
@@ -186,7 +187,7 @@ class TimelineFramePicker(QtCore.QObject):
         return False
 
 
-def begin_frame_picker(callback, owner=None, color=(245, 245, 245, 125), cancel_callback=None):
+def begin_frame_picker(callback, owner=None, color=None, cancel_callback=None):
     """Begin picking a snapped playback frame and return the picker controller."""
     global _active_frame_picker
     if _active_frame_picker is not None:
@@ -341,6 +342,8 @@ class TimelineTint(QtWidgets.QWidget):
             QtCore.QEvent.Move,
             QtCore.QEvent.Show,
             QtCore.QEvent.LayoutRequest,
+            QtCore.QEvent.Paint,
+            QtCore.QEvent.UpdateRequest,
         ):
             self._sync_geometry()
         return super().eventFilter(watched, event)

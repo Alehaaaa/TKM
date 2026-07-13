@@ -1094,14 +1094,14 @@ TOOL_DEFINITIONS = {
     },
     "export_pose_file": {
         "type": "tool",
-        "label": "Export Pose File",
+        "label": "Export Pose",
         "icon": icons.export,
         "callback": keyTools.export_pose_file,
         "tooltip": "Export the copied pose data to a JSON file.",
     },
     "import_pose_file": {
         "type": "tool",
-        "label": "Import Pose File",
+        "label": "Import Pose",
         "icon": icons.import_icon if hasattr(icons, "import_icon") else icons.get("import"),
         "callback": keyTools.import_pose_file,
         "tooltip": "Import copied pose data from a JSON file.",
@@ -1137,14 +1137,14 @@ TOOL_DEFINITIONS = {
     },
     "export_animation_file": {
         "type": "tool",
-        "label": "Export Animation File",
+        "label": "Export Animation",
         "icon": icons.export,
         "callback": keyTools.export_animation_file,
         "tooltip": "Export the copied animation data to a JSON file.",
     },
     "import_animation_file": {
         "type": "tool",
-        "label": "Import Animation File",
+        "label": "Import Animation",
         "icon": icons.import_icon if hasattr(icons, "import_icon") else icons.get("import"),
         "callback": keyTools.import_animation_file,
         "tooltip": "Import copied animation data from a JSON file.",
@@ -1883,7 +1883,6 @@ TOOL_SECTION_DEFINITIONS = {
     # --- Scene Tools ---
     "pointer_tools": {
         "label": "Pointer",
-        "color": toolColors.TOOLBAR_GRAY,
         "items": [
             "separator",
             {"id": "depth_mover"},
@@ -1891,7 +1890,6 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "isolate_tools": {
         "label": "Isolate Tools",
-        "color": toolColors.TOOLBAR_GRAY,
         "items": [
             {
                 "id": "isolate_master",
@@ -2289,7 +2287,6 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "global_tools": {
         "label": "Global Tools",
-        "color": toolColors.TOOLBAR_GRAY,
         "toolbar_ids": ("main",),
         "items": [
             {"type": "widget", "id": "attribute_switcher_euler_filter", "default": True},
@@ -2299,7 +2296,6 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "background_runner_tools": {
         "label": "Background Runners",
-        "color": toolColors.TOOLBAR_GRAY,
         "items": [
             {"id": "background_runners", "default": True},
         ],
@@ -2343,7 +2339,6 @@ TOOL_SECTION_DEFINITIONS = {
     },
     "anim_curve_tools": {
         "label": "Anim Curve Tools",
-        "color": toolColors.TOOLBAR_BLUE,
         "items": [
             {"id": "apply_smart_euler_filter"},
             {"id": "clear_animation"},
@@ -2459,6 +2454,7 @@ def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
 
     section = dict(section_def)
     section["id"] = section_id
+    section.setdefault("color", toolColors.TOOLBAR_GRAY)
     if toolbar_id and section.get("type") == "slider":
         section["default_modes"] = list(TOOLBAR_DEFAULT_SLIDER_MODES.get(toolbar_id, {}).get(section_id, []))
     if not resolve_items:
@@ -2521,7 +2517,7 @@ def get_tool_tint_color(tool_id, default=None):
             section = TOOL_SECTION_DEFINITIONS.get(section_ref)
             if not section:
                 return None
-            section_color = section.get("color") or inherited_color
+            section_color = section.get("color", toolColors.TOOLBAR_GRAY)
             for child in section.get("items", []):
                 color = find_tint(child, inherited_color=section_color)
                 if color is not None:
@@ -2538,7 +2534,7 @@ def get_tool_tint_color(tool_id, default=None):
         return None
 
     for section in TOOL_SECTION_DEFINITIONS.values():
-        section_color = section.get("color")
+        section_color = section.get("color", toolColors.TOOLBAR_GRAY)
         for item in section.get("items", []):
             color = find_tint(item, inherited_color=section_color)
             if color is not None:

@@ -89,6 +89,7 @@ def create_session(mode):
         mode,
         title=toolCommon.humanize_tool_name(mode),
         tooltip=tooltip,
+        tint_color=manager.get_slider_color(mode),
     )
 
 
@@ -102,6 +103,7 @@ def _resolve_session(mode, session):
         mode,
         title=toolCommon.humanize_tool_name(mode),
         tooltip=tooltip,
+        tint_color=manager.get_slider_color(mode),
     )
     return session, False
 

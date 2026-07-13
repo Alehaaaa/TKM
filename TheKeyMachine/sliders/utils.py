@@ -193,11 +193,12 @@ class SliderSession:
     It is finished on release, which closes the undo chunk and clears its data.
     """
 
-    def __init__(self, mode, title=None, description="", tooltip=None):
+    def __init__(self, mode, title=None, description="", tooltip=None, tint_color=None):
         self.mode = mode
         self.title = title or "Slider Operation"
         self.description = description
         self.tooltip = tooltip
+        self.tint_color = tint_color or toolColors.TOOLBAR_GREEN
 
         self.targets = SliderTargetContext()
         self.cache = SliderCaches()
@@ -236,7 +237,7 @@ class SliderSession:
         cmds.undoInfo(openChunk=True, chunkName=chunk_name)
         self._is_open = True
 
-    def switch_mode(self, mode, title=None, description="", tooltip=None):
+    def switch_mode(self, mode, title=None, description="", tooltip=None, tint_color=None):
         if mode == self.mode:
             return
         self.clear_tint()
@@ -244,6 +245,8 @@ class SliderSession:
         self.title = title or self.title
         self.description = description
         self.tooltip = tooltip
+        if tint_color is not None:
+            self.tint_color = tint_color
         self._tint_key = "slider_{}_range".format(self.mode)
         
         # If we switch modes mid-session, we keep the undo chunk open
@@ -296,6 +299,9 @@ class SliderSession:
             key=self._tint_key,
             center_line=center_line,
         )
+
+    def show_target_tint(self, timerange):
+        self.show_tint(timerange, color=self.tint_color, center_line=False)
 
     def clear_tint(self):
         if not self._tint_range:

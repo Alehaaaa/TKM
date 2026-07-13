@@ -475,7 +475,7 @@ def apply_blend_to_neighbors(session, percentage, world_space=False):
             target_frames.append(frame)
     if target_frames:
         target_frame = sorted(target_frames)[0]
-        session.show_tint((target_frame, target_frame), color=(245, 245, 245, 125), center_line=False)
+        session.show_target_tint((target_frame, target_frame))
 
     processed_world_targets = set()
     for (attr_full, time), cache in session.cache.frame_data.items():
@@ -682,7 +682,7 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
 
     target_frame = right_frame if percentage > 0 else left_frame
     if target_frame is not None:
-        session.show_tint((target_frame, target_frame), color=(245, 245, 245, 125), center_line=False)
+        session.show_target_tint((target_frame, target_frame))
 
     processed_world_targets = set()
     for (attr_full, time), cache in session.cache.frame_data.items():

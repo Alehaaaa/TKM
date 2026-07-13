@@ -4468,7 +4468,7 @@ def bouncy_tangets(*args, angle_adjustment_factor=1.3, handle_mode="both", key_s
     target_keyframes = _collect_bouncy_target_keyframes(target_info, key_scope=key_scope)
 
     if not target_keyframes:
-        return wutil.make_inViewMessage("No animation keys available to set tangents.")
+        return wutil.make_inViewMessage("No animation curves available to set tangents.")
 
     time_context = target_info.get("time_context")
     if target_info.get("selected_keyframes"):

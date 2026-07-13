@@ -1207,7 +1207,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._framePicker = None
             active_button.setChecked(False)
 
-        self._framePicker = timelineWidgets.begin_frame_picker(_picked, owner=self, cancel_callback=_cancelled)
+        self._framePicker = timelineWidgets.begin_frame_picker(
+            _picked,
+            owner=self,
+            cancel_callback=_cancelled,
+        )
 
     def _cancel_frame_picker(self):
         if self._framePicker is not None:

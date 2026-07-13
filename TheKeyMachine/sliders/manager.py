@@ -6,6 +6,7 @@ Slider mode metadata and dispatch dictionaries.
 
 import TheKeyMachine.mods.helperMod as helper
 from TheKeyMachine.data import icons
+from TheKeyMachine.tools import colors as toolColors
 
 from TheKeyMachine.Qt import QtCore
 
@@ -331,3 +332,15 @@ def get_slider_mode(key):
             if isinstance(mode, dict) and mode.get("key") == key:
                 return mode
     return None
+
+
+def get_slider_color(key):
+    """Return the toolbar color for the slider family containing a mode."""
+    for modes, color in (
+        (TWEEN_MODES, toolColors.TOOLBAR_YELLOW),
+        (BLEND_MODES, toolColors.TOOLBAR_GREEN),
+        (TANGENT_MODES, toolColors.TOOLBAR_ORANGE),
+    ):
+        if any(isinstance(mode, dict) and mode.get("key") == key for mode in modes):
+            return color
+    return toolColors.TOOLBAR_GREEN

@@ -683,7 +683,7 @@ def apply_scale_frame(session, curves, factor):
         target_time = left_frame if left_frame is not None else right_frame
     if target_time is None:
         target_time = current_time
-    session.show_tint((target_time, target_time), color=(245, 245, 245, 125), center_line=False)
+    session.show_target_tint((target_time, target_time))
 
     def _pivot(curve, keys, selected):
         try:
