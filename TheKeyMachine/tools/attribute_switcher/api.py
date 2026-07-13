@@ -32,10 +32,6 @@ _attribute_switcher_instance = None
 attribute_switcher_window_bus = toolCommon.WindowStateBus()
 
 
-def _parent_widget():
-    return wutil.get_maya_qt(qt=QtWidgets.QWidget)
-
-
 def _emit_attribute_switcher_window_state(is_open):
     state = bool(is_open)
     try:
@@ -141,7 +137,7 @@ def attribute_switcher_window(reuse_existing=True, popup=True, anchor_button=Non
     dlg = get_attribute_switcher_window()
     if not (reuse_existing and dlg and wutil.is_valid_widget(dlg)):
         close_attribute_switcher_window()
-        dlg = AttributeSwitcherWindow(parent=_parent_widget(), popup=popup)
+        dlg = AttributeSwitcherWindow(parent=wutil.get_maya_qt(qt=QtWidgets.QWidget), popup=popup)
 
         def _on_destroyed(*_):
             global _attribute_switcher_instance

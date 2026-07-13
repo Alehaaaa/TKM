@@ -47,10 +47,6 @@ def _members_dialog_class():
     return SelectionSetMembersDialog
 
 
-def _parent_widget():
-    return wutil.get_maya_qt(qt=QtWidgets.QWidget)
-
-
 def _emit_selection_sets_window_state(is_open):
     state = bool(is_open)
     try:
@@ -144,7 +140,7 @@ def selection_sets_window(*args, controller=None, reuse_existing=True):
         _emit_selection_sets_window_state(True)
         return win
 
-    win = _window_class()(controller=controller, parent=_parent_widget())
+    win = _window_class()(controller=controller, parent=wutil.get_maya_qt(qt=QtWidgets.QWidget))
 
     def _on_destroyed(*_):
         _emit_selection_sets_window_state(False)
@@ -203,7 +199,7 @@ def _maybe_convert_animbot_selection_sets(controller=None):
         return True
 
     clicked = customDialogs.QFlatConfirmDialog.question(
-        parent=_parent_widget(),
+        parent=wutil.get_maya_qt(qt=QtWidgets.QWidget),
         window="Selection Sets",
         title="Convert animBot selection sets?",
         message=(
@@ -440,7 +436,7 @@ def open_selection_set_creation_dialog(controller=None, parent=None, on_created=
             return None
 
     if parent is None or not wutil.is_valid_widget(parent):
-        parent = _parent_widget()
+        parent = wutil.get_maya_qt(qt=QtWidgets.QWidget)
 
     if _selection_set_creation_dialog and wutil.is_valid_widget(_selection_set_creation_dialog):
         _selection_set_creation_dialog.close()
@@ -466,7 +462,7 @@ def open_selection_set_creation_dialog(controller=None, parent=None, on_created=
 
 
 def open_selection_set_members(set_name):
-    dlg = _members_dialog_class()(set_name=set_name, parent=_parent_widget())
+    dlg = _members_dialog_class()(set_name=set_name, parent=wutil.get_maya_qt(qt=QtWidgets.QWidget))
     dlg.show()
     return dlg
 

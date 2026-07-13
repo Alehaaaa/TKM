@@ -1,12 +1,6 @@
-try:
-    from importlib import reload
-except ImportError:
-    from imp import reload
-
 from functools import partial
-import os
 
-from maya import cmds, mel
+from maya import cmds
 
 from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
 
@@ -21,6 +15,7 @@ import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.core.toolWidgets as toolWidgets
 import TheKeyMachine.core.backgroundRunners as backgroundRunners
+import TheKeyMachine.core.connectEntries as connectEntries
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.customWidgets as cw
@@ -198,6 +193,8 @@ def _apply_checked_value(setter, value, checked):
 def _add_toolbox_action(menu, tool_id):
     from TheKeyMachine.core import toolbox
 
+    if not toolbox.is_tool_available(tool_id):
+        return None
     tool = toolbox.get_tool(tool_id)
     action = _add_action(menu, command_id=tool.get("id", tool_id))
     if tool.get("setting_toggle"):
@@ -265,82 +262,36 @@ def _add_exclusive_setting_actions(menu, specs, current_value, setter, group_att
         )
     return group
 
-def _command_callback(command, is_python):
-    if is_python:
-        return lambda: exec(command)
-    return lambda: mel.eval(command)
-
-
-def _resolve_dot_image(image):
-    name = os.path.splitext(image or "")[0]
-    return icons.get(name, icons.path(image))
-
-
-def _populate_connect_menu(menu, module, order_attr, id_prefix, config_folder, config_file):
-    reload(module)
+def _populate_connect_menu(menu, kind):
+    spec = connectEntries.source_spec(kind)
+    entries = connectEntries.load_entries(kind, notify=True)
     menu.clear()
 
-    name_to_id = {}
-    for index in range(1, 100):
-        item_id = "{}{}".format(id_prefix, str(index).zfill(2))
-        try:
-            name_to_id[getattr(module, "{}_name".format(item_id))] = item_id
-        except AttributeError:
-            break
-
-    for item_name in getattr(module, order_attr, []):
-        if not item_name:
+    for entry in entries:
+        if entry["type"] == "separator":
             continue
-        item_id = name_to_id.get(item_name)
-        if not item_id:
-            continue
-        try:
-            name = getattr(module, "{}_name".format(item_id))
-            image = _resolve_dot_image(getattr(module, "{}_image".format(item_id)))
-            is_python = getattr(module, "{}_is_python".format(item_id))
-            command = getattr(module, "{}_command".format(item_id))
-        except AttributeError:
-            continue
-
-        if not name:
-            continue
-        if name == "separator":
-            menu.addSeparator()
-        else:
-            menu.addAction(QtGui.QIcon(image), name, callback=_command_callback(command, is_python))
+        menu.addAction(
+            QtGui.QIcon(entry["icon"]) if entry["icon"] else QtGui.QIcon(),
+            entry["label"],
+            callback=entry["callback"],
+            tooltip_enabled=False,
+        )
 
     menu.addSeparator()
     menu.addAction(
         QtGui.QIcon(icons.settings),
         "Open config file",
-        callback=lambda: general.open_file(config_folder, config_file),
+        callback=lambda: general.open_file(spec["folder"], spec["file"]),
+        description="Open the {} configuration file.".format(spec["label"]),
     )
 
 
 def build_custom_tools_menu(menu, source_widget=None):
-    import TheKeyMachine_user_data.connect.tools.tools as connectToolBox
-
-    _populate_connect_menu(
-        menu,
-        connectToolBox,
-        order_attr="tool_order",
-        id_prefix="t",
-        config_folder="TheKeyMachine_user_data/connect/tools",
-        config_file="tools.py",
-    )
+    _populate_connect_menu(menu, "tools")
 
 
 def build_custom_scripts_menu(menu, source_widget=None):
-    import TheKeyMachine_user_data.connect.scripts.scripts as cbScripts
-
-    _populate_connect_menu(
-        menu,
-        cbScripts,
-        order_attr="scripts_order",
-        id_prefix="s",
-        config_folder="TheKeyMachine_user_data/connect/scripts",
-        config_file="scripts.py",
-    )
+    _populate_connect_menu(menu, "scripts")
 
 
 def build_background_runners_menu(menu, source_widget=None):
@@ -349,7 +300,7 @@ def build_background_runners_menu(menu, source_widget=None):
         getter = spec.get("get_enabled")
         action = _add_checkable_action(
             menu,
-            spec.get("menu_label") or spec.get("label", runner_id),
+            spec.get("label", runner_id),
             partial(backgroundRunners.set_runner_enabled, runner_id),
             checked=getter() if callable(getter) else False,
             icon=spec.get("icon"),
@@ -838,8 +789,9 @@ def should_show_toolbar_pinning_menu(toolbar_widget, pos):
 
 def build_other_sources_help_menu():
     help_menu = cw.MenuWidget(QtGui.QIcon(icons.help), "Help")
-    _add_toolbox_actions(help_menu, ("bug_report_window",))
-    help_menu.addSeparator()
+    if general.config.get("BUG_REPORT", True):
+        _add_toolbox_actions(help_menu, ("bug_report_window",))
+        help_menu.addSeparator()
     links = (
         ("Discord", icons.discord, "https://discord.gg/G2J5yyjz", "Open the community server."),
         ("Documentation", icons.help, "https://thekeymachine.gitbook.io/base", "Open the docs."),

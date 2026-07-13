@@ -21,26 +21,15 @@ Modified by: Alehaaaa / alehaaaa.github.io
 from maya import cmds, mel, OpenMayaUI as mui
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin  # type: ignore
 
-from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.Qt import QtCompat, QtCore, QtWidgets  # type: ignore
 
 
 # Standard library imports
 import os
-import time
-import shutil
 
 from functools import partial
 
-try:
-    from importlib import reload, import_module, invalidate_caches
-except ImportError:
-    import_module = None
-    invalidate_caches = None
-    from imp import reload
-except ImportError:
-    import_module = None
-    invalidate_caches = None
-    pass
+from importlib import import_module, reload
 
 # -----------------------------------------------------------------------------------------------------------------------------
 #                                    We load the necessary modules for TheKeyMachine                                          #
@@ -68,7 +57,6 @@ import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi  # type: ignore
 import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
 import TheKeyMachine.tools.isolate_bookmarks.api as isolateBookmarksApi  # type: ignore
 
-from TheKeyMachine.tools.link_objects.pulse_thread import LinkObjectPulseThread  # type: ignore
 from TheKeyMachine.tools.selection_sets.controller import SelectionSetsController  # type: ignore
 from TheKeyMachine.tools import colors as toolColors  # type: ignore
 
@@ -108,19 +96,6 @@ for m in mods:
         reload(m)
 
 # -----------------------------------------------------------------------------------------------------------------------------
-#              TheKeyMachine configuration is loaded from the JSON, or the default installation paths are used.               #
-# -----------------------------------------------------------------------------------------------------------------------------
-INSTALL_PATH = general.config["INSTALL_PATH"]
-USER_FOLDER_PATH = general.config["USER_FOLDER_PATH"]
-INTERNET_CONNECTION = general.config["INTERNET_CONNECTION"]
-BUG_REPORT = general.config["BUG_REPORT"]
-CUSTOM_TOOLS_MENU = general.config["CUSTOM_TOOLS_MENU"]
-CUSTOM_TOOLS_EDITABLE_BY_USER = general.config["CUSTOM_TOOLS_EDITABLE_BY_USER"]
-CUSTOM_SCRIPTS_MENU = general.config["CUSTOM_SCRIPTS_MENU"]
-CUSTOM_SCRIPTS_EDITABLE_BY_USER = general.config["CUSTOM_SCRIPTS_EDITABLE_BY_USER"]
-
-
-# -----------------------------------------------------------------------------------------------------------------------------
 #    It attempts to load the user_preferences. If this is a new installation, it won't exist and the file must be created     #
 # -----------------------------------------------------------------------------------------------------------------------------
 
@@ -130,57 +105,6 @@ try:
     from TheKeyMachine_user_data.preferences import user_preferences  # type: ignore
 except ImportError:
     user_preferences = None
-
-
-# -----------------------------------------------------------------------------------------------------------------------------
-#      It attempts to load the Connect modules. If this is a new installation, they need to be copied to the user folder      #
-# -----------------------------------------------------------------------------------------------------------------------------
-
-
-# Define module import paths
-origen_toolbox = os.path.join(INSTALL_PATH, "TheKeyMachine/connect/tools/tools.py")
-origen_scripts = os.path.join(INSTALL_PATH, "TheKeyMachine/connect/scripts/scripts.py")
-destino_toolbox = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/connect/tools/tools.py")
-destino_scripts = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/connect/scripts/scripts.py")
-
-# Define paths for __init__.py files in each directory
-init_paths = [
-    os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/__init__.py"),
-    os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/connect/__init__.py"),
-    os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/connect/tools/__init__.py"),
-    os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data/connect/scripts/__init__.py"),
-]
-
-# Ensure that destination directories exist
-os.makedirs(os.path.dirname(destino_toolbox), exist_ok=True)
-os.makedirs(os.path.dirname(destino_scripts), exist_ok=True)
-
-# Create empty __init__.py files if they don't already exist
-for init_path in init_paths:
-    if not os.path.isfile(init_path):
-        open(init_path, "a").close()
-
-# Check if files exist at the destination path
-toolbox_exists = os.path.isfile(destino_toolbox)
-scripts_exists = os.path.isfile(destino_scripts)
-
-# If they don't exist, copy them from the original source location
-if not toolbox_exists:
-    shutil.copyfile(origen_toolbox, destino_toolbox)
-    time.sleep(1)
-
-if not scripts_exists:
-    shutil.copyfile(origen_scripts, destino_scripts)
-    time.sleep(1)
-
-# Intentar importar los módulos
-try:
-    import TheKeyMachine_user_data  # type: ignore
-
-    reload(TheKeyMachine_user_data)  # type: ignore
-    import TheKeyMachine_user_data.connect  # type: ignore
-except ImportError:
-    reload(TheKeyMachine_user_data)
 
 
 # -----------------------------------------------------------------------------------------------------------------------------

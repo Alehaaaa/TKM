@@ -307,6 +307,9 @@ def _mark_exception_reported(exc=None):
 def report_detected_exception(exc=None, context=None, source_file=None, traceback_text=None):
     global _BUG_EXCEPTION_DIALOG_PENDING, _BUG_EXCEPTION_LAST_SIGNATURE, _BUG_EXCEPTION_LAST_TIME
 
+    if not general.config.get("BUG_REPORT", True):
+        return
+
     if _is_exception_already_reported(exc):
         return
 
@@ -421,6 +424,8 @@ def install_bug_exception_handler():
     global _BUG_EXCEPTION_HANDLER_INSTALLED, _PREVIOUS_EXCEPTHOOK, _PREVIOUS_THREADING_EXCEPTHOOK
 
     uninstall_bug_exception_handler()
+    if not general.config.get("BUG_REPORT", True):
+        return False
     previous_excepthook = sys.excepthook
     _PREVIOUS_EXCEPTHOOK = previous_excepthook
 
@@ -471,9 +476,12 @@ def install_bug_exception_handler():
         threading.excepthook = _tkm_threading_excepthook
 
     _BUG_EXCEPTION_HANDLER_INSTALLED = True
+    return True
 
 
 def bug_report_window(*args, dialog_title="Report a Bug", prefill_name="", prefill_explanation="", prefill_script_error=""):
+    if not general.config.get("BUG_REPORT", True):
+        return None
     existing_dialog = _get_open_bug_report_dialog()
     if existing_dialog:
         if hasattr(existing_dialog, "apply_prefill"):

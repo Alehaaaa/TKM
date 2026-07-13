@@ -1,0 +1,1 @@
+"""Custom script package template."""

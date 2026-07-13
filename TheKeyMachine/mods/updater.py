@@ -344,6 +344,10 @@ updater_worker = None
 
 def check_for_updates(anchor_widget=None, warning=True, force=False):
     global updater_worker
+    from TheKeyMachine.mods import generalMod as general
+
+    if not general.config.get("INTERNET_CONNECTION", True):
+        return None
     if updater_worker is not None and updater_worker.isRunning():
         return
 

@@ -9,11 +9,6 @@ from TheKeyMachine.core import curveFitting
 from . import utils
 
 
-def _resolve_targets_for_session(session):
-    """Reuse centralized resolution logic."""
-    return utils.resolve_curve_targets_for_session(session)
-
-
 def _ensure_tangent_cache(session, curve, keys):
     """Caches original tangent states using batched commands for performance."""
     if (curve, "tangents") in session.cache.auxiliary:
@@ -140,7 +135,7 @@ def _maya_type_targets(curve, keys, tangent_type):
 
 def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1.0):
     """Blend toward a contextual target, or its vertical mirror on the left."""
-    resolved_curves, affected_map = _resolve_targets_for_session(session)
+    resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
     
     for curve in resolved_curves:
         keys = affected_map.get(curve, [])

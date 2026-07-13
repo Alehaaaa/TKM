@@ -354,20 +354,6 @@ def _current_undo_operation(exclude=None):
     return None
 
 
-def current_progress():
-    if _ACTIVE_PROGRESS_STACK:
-        return _ACTIVE_PROGRESS_STACK[-1]
-    operation = current_tool_operation()
-    return operation.progress if operation else None
-
-
-def step_progress(amount=1, status=None):
-    progress = current_progress()
-    if not progress:
-        return False
-    return progress.step(amount=amount, status=status)
-
-
 def _begin_operation_tint(tint=None, timerange=None, default_mode="current_frame", tint_key=None, tint_color=None, owner=None):
     if not tint or tint == "none":
         return None
@@ -1362,13 +1348,6 @@ class ToolbarWindowToggle(QtCore.QObject):
 
     def _on_button_destroyed(self, button_id):
         self._buttons.pop(button_id, None)
-
-    def _disconnect_button(self, button):
-        if not button:
-            return
-        self._buttons.pop(id(button), None)
-        clear_tracked_connection(button, "_tkm_window_toggle_relay")
-        clear_tracked_connection(button, "_tkm_window_toggle_destroyed_relay")
 
     def open(self, source_button=None):
         import TheKeyMachine.mods.reportMod as report

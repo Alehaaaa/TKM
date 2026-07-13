@@ -14,7 +14,7 @@ __all__ = [
 
 from maya import cmds
 
-from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.Qt import QtGui, QtWidgets  # type: ignore
 
 from TheKeyMachine.data import icons
 from TheKeyMachine.core import trigger
@@ -138,9 +138,6 @@ def load_orbit_configuration():
 orbit_configuration = load_orbit_configuration()
 orbit_window_bus = toolCommon.WindowStateBus()
 
-def _parent_widget():
-    return wutil.get_maya_qt(qt=QtWidgets.QWidget)
-
 def _emit_orbit_window_state(is_open: bool) -> None:
     """Emit the window state change via the bus.
 
@@ -188,7 +185,12 @@ def orbit_window(*args, offset_x=0, offset_y=0, rebuild=False, reuse_existing=Fa
     if cmds.window("orbit_window", exists=True):
         cmds.deleteUI("orbit_window")
 
-    win = _window_class()(parent=_parent_widget(), offset_x=offset_x, offset_y=offset_y, rebuild=rebuild)
+    win = _window_class()(
+        parent=wutil.get_maya_qt(qt=QtWidgets.QWidget),
+        offset_x=offset_x,
+        offset_y=offset_y,
+        rebuild=rebuild,
+    )
 
     def _on_destroyed(*_):
         _emit_orbit_window_state(False)

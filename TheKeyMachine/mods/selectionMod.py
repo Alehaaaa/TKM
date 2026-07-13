@@ -298,11 +298,6 @@ def attribute_names_from_plugs(plugs):
     return _unique(attrs)
 
 
-_plugs_from_anim_curves = get_anim_curve_output_plugs
-_anim_curves_from_plugs = get_anim_curves_from_plugs
-_attribute_plugs_from_nodes = get_attribute_plugs_from_nodes
-
-
 def _selected_object_attribute_plugs():
     nodes = get_selected_objects()
     if not nodes:

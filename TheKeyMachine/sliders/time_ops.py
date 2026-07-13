@@ -10,11 +10,6 @@ from . import mode_values
 from . import utils
 
 
-def _resolve_targets_for_session(session):
-    """Resolve and cache curve targets on the session for the lifetime of one drag."""
-    return utils.resolve_curve_targets_for_session(session)
-
-
 def _curve_owner(curve):
     try:
         plugs = cmds.listConnections(
@@ -29,7 +24,7 @@ def _curve_owner(curve):
 
 def apply_time_offset(session, curves=None, amount=0.0):
     """Shift animation shape in time while preserving every destination key time."""
-    resolved_curves, affected_map = _resolve_targets_for_session(session)
+    resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
     for curve in resolved_curves:
         keys = affected_map.get(curve, [])
         if not keys:
@@ -72,7 +67,7 @@ def apply_time_offset(session, curves=None, amount=0.0):
 
 def apply_time_stagger(session, curves=None, amount=0.0):
     """Stagger whole-object key timing while keeping each object's channels together."""
-    resolved_curves, affected_map = _resolve_targets_for_session(session)
+    resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
     if not resolved_curves:
         return
         

@@ -4,7 +4,6 @@ from maya import cmds, utils
 from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.core.openMayaUtils as omutils
 import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.data import icons

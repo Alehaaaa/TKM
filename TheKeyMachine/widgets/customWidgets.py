@@ -157,14 +157,6 @@ def _tool_command_label(data, fallback=""):
     )
 
 
-def _tool_status_description(data):
-    return _status_description(
-        description=data.get("description"),
-        status_description=data.get("status_description"),
-        tooltip=data.get("tooltip"),
-    )
-
-
 def _tooltip_state_from_data(data, *, display_text=None):
     data = dict(data or {})
     tooltip = data.get("tooltip")
@@ -431,6 +423,7 @@ class MenuWidget(QtWidgets.QMenu):
     def addAction(self, *args, **kwargs):
         description = kwargs.pop("description", None)
         tooltip = kwargs.pop("tooltip", None)
+        tooltip_enabled = kwargs.pop("tooltip_enabled", True)
         callback = kwargs.pop("callback", None)
         label_override = kwargs.pop("label", None)
         keep_open = kwargs.pop("open", False)
@@ -447,6 +440,8 @@ class MenuWidget(QtWidgets.QMenu):
 
         if keep_open and hasattr(action, "setProperty"):
             action.setProperty("tkm_keep_menu_open", True)
+        if hasattr(action, "setProperty"):
+            action.setProperty("tkm_tooltip_enabled", bool(tooltip_enabled))
 
         label = ""
         for arg in args:
@@ -551,6 +546,9 @@ class MenuWidget(QtWidgets.QMenu):
 
     def _on_action_hovered(self, action):
         if action is None or not QtCompat.isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
+            QFlatTooltipManager.cancel_timer()
+            return
+        if action.property("tkm_tooltip_enabled") is False:
             QFlatTooltipManager.cancel_timer()
             return
 
@@ -1316,6 +1314,7 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
     def configure_from_data(self, data, *, display_text=None):
         state = _tooltip_state_from_data(data, display_text=display_text)
         self.setToolTipData(**state)
+        self._has_tooltip = bool(data.get("tooltip_enabled", True))
         if data.get("tint_color") is not None:
             self.set_tint_color(data.get("tint_color"))
         self.setShortcutVariants(data.get("shortcut_variants") or [])
@@ -1424,12 +1423,6 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
                 variant.get("status_title") or variant.get("label") or variant.get("menu_label"),
             )
         return toolCommon.run_tool_callback(self, callback, *args, **kwargs)
-
-    def _active_callback(self, base_callback=None):
-        variant = self._get_active_shortcut_variant()
-        if variant and variant.get("callback"):
-            return variant.get("callback")
-        return base_callback
 
     def _get_active_shortcut_variant(self):
         if not self._shortcut_variants:
@@ -1625,10 +1618,6 @@ def create_tool_button_from_data(tool_data, parent=None, **overrides):
 
 def _checked_state_fn(data):
     return toolCommon.checked_state_getter(data)
-
-
-def _sync_checked_from_setting(control, state_fn):
-    return toolCommon.sync_checked(control, state_fn)
 
 
 def _setup_setting_synced_checkable(control, data):
@@ -2350,7 +2339,17 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if widget_key in self._widgets and not hasattr(self._widgets[widget_key], "_current_mode"):
                 self._apply_widget_pin(widget_key, bool(value), publish=False)
 
-    def addWidget(self, widget, label, key, default=True, description=None, tooltip=None, pinnable=True):
+    def addWidget(
+        self,
+        widget,
+        label,
+        key,
+        default=True,
+        description=None,
+        tooltip=None,
+        tooltip_enabled=True,
+        pinnable=True,
+    ):
         """Add a widget to the section with a toggle key."""
         # Auto-extract help metadata from widget if not provided
         if (not tooltip or not description) and hasattr(widget, "get_toolTipData"):
@@ -2398,6 +2397,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                             "label": label,
                             "description": description,
                             "tooltip": tooltip,
+                            "tooltip_enabled": tooltip_enabled,
                             "default": default,
                         }
                     )
@@ -2409,6 +2409,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                             "label": label,
                             "description": description,
                             "tooltip": tooltip,
+                            "tooltip_enabled": tooltip_enabled,
                             "default": default,
                         }
                     )
@@ -2453,6 +2454,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 command_label=existing.get("command_label") or label,
                 command_icon=existing.get("command_icon") or existing.get("icon"),
             )
+            widget._has_tooltip = bool(tooltip_enabled)
         else:
             HelpSystem.push(widget, label, description or "")
 
@@ -2589,9 +2591,22 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._set_setting(f"pin_{key}", bool(visible))
         if publish:
             toolCommon.publish_control_state(self._pin_state_key(key), bool(visible))
-        self._sync_section_visibility()
+            self._sync_section_visibility()
         self.pinsChanged.emit()
         self._refresh_layout()
+
+    def removeWidgetByKey(self, key):
+        """Remove a dynamically discovered toolbar item without altering its pin setting."""
+        widget = self._widgets.pop(key, None)
+        if widget is None:
+            return False
+        self.layout().removeWidget(widget)
+        self._menu_metadata = [item for item in self._menu_metadata if item.get("id") != key]
+        self._default_keys = [item_key for item_key in self._default_keys if item_key != key]
+        widget.setParent(None)
+        widget.deleteLater()
+        self._sync_section_visibility()
+        return True
 
     def addSeparator(self):
         """Add a separator to the customization menu."""
@@ -2846,11 +2861,25 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         title=None,
         icon=None,
         tooltip=None,
+        tooltip_enabled=True,
     ):
         if icon and not icon.isNull():
-            action = menu.addAction(icon, label, description=description, tooltip=tooltip, label=title)
+            action = menu.addAction(
+                icon,
+                label,
+                description=description,
+                tooltip=tooltip,
+                tooltip_enabled=tooltip_enabled,
+                label=title,
+            )
         else:
-            action = menu.addAction(label, description=description, tooltip=tooltip, label=title)
+            action = menu.addAction(
+                label,
+                description=description,
+                tooltip=tooltip,
+                tooltip_enabled=tooltip_enabled,
+                label=title,
+            )
         action.setCheckable(True)
         action.setChecked(bool(checked))
         action.triggered.connect(handler)
@@ -2912,6 +2941,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                         description=item.get("description") or "",
                         title=item["label"],
                         tooltip=item.get("tooltip"),
+                        tooltip_enabled=item.get("tooltip_enabled", True),
                     )
                     self._bind_pin_menu_action(menu, action, key, not widget.isHidden())
         menu.addSeparator()
@@ -2943,9 +2973,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if not menu:
             return
         menu.exec_(global_pos)
-
-    def _show_menu(self):
-        self.open_menu(QtGui.QCursor.pos())
 
     def enterEvent(self, event):
         if self._hiddeable:

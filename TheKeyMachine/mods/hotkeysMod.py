@@ -14,7 +14,6 @@ from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.core.toolbox as toolbox
 import TheKeyMachine.core.trigger as trigger
-import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.data import icons
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 from TheKeyMachine.tools import common as toolCommon
@@ -23,7 +22,6 @@ from TheKeyMachine.widgets import util as wutil
 
 
 HOTKEYS_WINDOW_KEY = "tkm_hotkeys_window"
-HOTKEYS_EXPORT_DIR = os.path.join(general.USER_FOLDER_PATH, "TheKeyMachine_user_data", "tools", "hotkeys")
 HOTKEY_COMMAND_PREFIX = "TKMTriggerName_"
 STATUS_REFRESH_DELAY_MS = 100
 COMMAND_BATCH_SIZE = 18
@@ -106,15 +104,6 @@ PRINTABLE_KEY_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`-=[]\\;',./~!@#$
 SHORTCUT_DISPLAY_KEY_ALIASES = {
     "+": "Plus",
 }
-
-
-
-def _ensure_hotkey_folder():
-    folder = HOTKEYS_EXPORT_DIR
-    os.makedirs(folder, exist_ok=True)
-    return folder
-
-
 
 
 

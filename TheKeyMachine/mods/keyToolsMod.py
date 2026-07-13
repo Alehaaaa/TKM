@@ -34,7 +34,6 @@ import json
 import os
 import math
 import re
-import shutil
 from collections import Counter
 from contextlib import contextmanager
 
@@ -113,17 +112,6 @@ def clear_timeslider_selection():
     # fix temporal para limpiar el timeslider
     selection = selectionMod.get_selected_objects()
     cmds.select(selection)
-
-
-def _begin_timeline_context_tint(default_mode, key, owner=None, color=None):
-    import TheKeyMachine.mods.barMod as bar
-
-    return timelineWidgets.begin_timeline_context(
-        default_mode=default_mode,
-        color=color or bar._active_tint_color(key),
-        owner=owner,
-        key=key,
-    )
 
 
 def _begin_timeline_tint(timerange, key, owner=None, color=None):
@@ -239,12 +227,6 @@ def _set_missing_keys(curves, frames, insert=False, operation=None):
                 cmds.setKeyframe(curve, time=(frame,))
             if operation:
                 operation.step()
-
-
-def _set_keys_on_frames(curves, frames):
-    for curve in _unique(curves):
-        for frame in frames:
-            cmds.setKeyframe(curve, time=(frame,))
 
 
 def _normalize_key_frames(frames):
@@ -2006,10 +1988,6 @@ def flipCurves():
             return wutil.make_inViewMessage("No keys found")
 
 
-def flipKeyGroup():
-    return flipCurves()
-
-
 def flipFromKeyframe():
     selectedCurves = cmds.keyframe(n=1, sl=1, q=1)
 
@@ -2450,19 +2428,20 @@ MIRROR_PATTERNS = [
 # __________ Funcion para buscar control opuesto ___________________________________
 
 
-def find_opposite_name(name):
-    global MIRROR_PATTERNS
-    # Divide el nombre en partes (namespace y nombre del control)
+def _opposite_control_name(name):
+    """Return the configured opposite control name without querying the scene."""
     namespace, _, control_name = name.rpartition(":")
-
     for pattern, opposite_pattern in MIRROR_PATTERNS:
         if pattern in control_name:
             new_control_name = control_name.replace(pattern, opposite_pattern, 1)
-            possible_opposite_name = f"{namespace}:{new_control_name}" if namespace else new_control_name
-            if cmds.objExists(possible_opposite_name):
-                return possible_opposite_name
-
+            return f"{namespace}:{new_control_name}" if namespace else new_control_name
     return None
+
+
+def find_opposite_name(name):
+    """Return the configured opposite control when it exists in the scene."""
+    opposite_name = _opposite_control_name(name)
+    return opposite_name if opposite_name and cmds.objExists(opposite_name) else None
 
 
 # ___________________________ SELECT OPPOSITE _____________________________________
@@ -2513,25 +2492,8 @@ def copyOpposite(*args):
         )
         operation_context.__enter__()
         operation_context.start()
-        mirror_exceptions_file_path = general.get_mirror_exceptions_file()
         ATTRIBUTES_TO_IGNORE = {"tag"}
-
-        def load_exceptions(file_path):
-            if os.path.exists(file_path):
-                with open(file_path, "r") as file:
-                    return json.load(file)
-            else:
-                return {}
-
-        exceptions = load_exceptions(mirror_exceptions_file_path)
-
-        def apply_exception(control, attr, value):
-            control_name = control.rsplit(":", 1)[-1]
-            if control_name in exceptions and attr in exceptions[control_name]:
-                exception_type = exceptions[control_name][attr]
-                if exception_type == "invert":
-                    return -value
-            return value
+        exceptions = _load_mirror_exceptions()
 
         def replace_pattern_in_attribute(attr):
             for from_pattern, to_pattern in MIRROR_PATTERNS:
@@ -2557,7 +2519,7 @@ def copyOpposite(*args):
                     if not cmds.getAttr(f"{opposite_obj}.{opposite_attr}", lock=True):
                         try:
                             current_value = cmds.getAttr(f"{obj}.{attr}")
-                            current_value = apply_exception(obj, attr, current_value)
+                            current_value = _mirror_exception_value(exceptions, obj, attr, current_value)
                             cmds.setAttr(f"{opposite_obj}.{opposite_attr}", current_value)
                         except Exception as e:
                             import TheKeyMachine.mods.reportMod as report
@@ -2575,15 +2537,6 @@ def copyOpposite(*args):
 
 
 # ________________________________________________________________ MIRROR _______________________________________________________________________ #
-
-
-def load_exceptions():
-    mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-    if os.path.exists(mirror_exceptions_file_path):
-        with open(mirror_exceptions_file_path, "r") as file:
-            return json.load(file)
-    else:
-        return {}
 
 
 def mirror(*args):
@@ -2606,79 +2559,29 @@ def mirror(*args):
         )
         operation_context.__enter__()
         operation_context.start()
-        global MIRROR_PATTERNS
-        mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-
-        ATTRIBUTES_TO_IGNORE = {"tag"}
-
-        # Cargar excepciones
-        def load_exceptions(file_path):
-            if os.path.exists(file_path):
-                with open(file_path, "r") as file:
-                    return json.load(file)
-            else:
-                return {}
-
-        exceptions = load_exceptions(mirror_exceptions_file_path)
-
-        def find_pattern_in_name(name, patterns):
-            for pattern in patterns:
-                if pattern in name:
-                    return True
-            return False
-
-        def is_attribute_modifiable(control, attr):
-            return cmds.getAttr(f"{control}.{attr}", settable=True)
-
-        def find_opposite_name(name):
-            # Divide el nombre en partes (namespace y nombre del control)
-            namespace, _, control_name = name.rpartition(":")
-
-            for pattern, opposite_pattern in MIRROR_PATTERNS:
-                # Revisa si el patrón está en el nombre del control
-                if pattern in control_name:
-                    # Realiza el reemplazo solo para la primera aparición del patrón
-                    new_control_name = control_name.replace(pattern, opposite_pattern, 1)
-                    possible_opposite_name = f"{namespace}:{new_control_name}" if namespace else new_control_name
-                    # print(f"Intentando reemplazar {pattern} por {opposite_pattern} en {control_name}, resultado: {possible_opposite_name}")  # Impresión de depuración
-                    if cmds.objExists(possible_opposite_name):
-                        return possible_opposite_name
-
-            return None
-
-        def apply_exception(control, attr, value):
-            # Obtén el nombre del control sin el namespace
-            control_name = control.rsplit(":", 1)[-1]
-
-            if control_name in exceptions and attr in exceptions[control_name]:
-                exception_type = exceptions[control_name][attr]
-                if exception_type == "invert":
-                    return -value
-                elif exception_type == "keep":
-                    return value  # Mantener el mismo valor
-            return value
+        exceptions = _load_mirror_exceptions()
 
         def swap_control_values(control1, control2):
             if not cmds.objExists(control1):
                 return
 
-            attrs_to_swap = cmds.listAttr(control1, keyable=True)
+            attrs_to_swap = _mirror_keyable_attrs(control1)
             if not attrs_to_swap:
                 return
 
             for attr in attrs_to_swap:
-                if attr in ATTRIBUTES_TO_IGNORE or not is_attribute_modifiable(control1, attr):
+                if not _attr_settable(control1, attr):
                     continue
 
                 try:
                     value1 = cmds.getAttr(f"{control1}.{attr}")
 
                     # Aplicar excepciones si es necesario
-                    value1 = apply_exception(control1, attr, value1)
+                    value1 = _mirror_exception_value(exceptions, control1, attr, value1)
 
-                    if control2 and cmds.objExists(control2) and is_attribute_modifiable(control2, attr):
+                    if control2 and cmds.objExists(control2) and _attr_settable(control2, attr):
                         value2 = cmds.getAttr(f"{control2}.{attr}")
-                        value2 = apply_exception(control2, attr, value2)
+                        value2 = _mirror_exception_value(exceptions, control2, attr, value2)
 
                         cmds.setAttr(f"{control2}.{attr}", value1)
                         cmds.setAttr(f"{control1}.{attr}", value2)
@@ -2738,120 +2641,6 @@ def mirror(*args):
 # ------------------------------- mirror to opposite
 
 
-def mirror_to_opposite(*args):
-    global MIRROR_PATTERNS
-    mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-
-    ATTRIBUTES_TO_IGNORE = {"tag"}
-
-    # Cargar excepciones
-    def load_exceptions(file_path):
-        if os.path.exists(file_path):
-            with open(file_path, "r") as file:
-                return json.load(file)
-        else:
-            return {}
-
-    exceptions = load_exceptions(mirror_exceptions_file_path)
-
-    def find_pattern_in_name(name, patterns):
-        for pattern in patterns:
-            if pattern in name:
-                return True
-        return False
-
-    def is_attribute_modifiable(control, attr):
-        return cmds.getAttr(f"{control}.{attr}", settable=True)
-
-    def find_opposite_name(name):
-        # Divide el nombre en partes (namespace y nombre del control)
-        namespace, _, control_name = name.rpartition(":")
-
-        for pattern, opposite_pattern in MIRROR_PATTERNS:
-            # Revisa si el patrón está en el nombre del control
-            if pattern in control_name:
-                # Realiza el reemplazo solo para la primera aparición del patrón
-                new_control_name = control_name.replace(pattern, opposite_pattern, 1)
-                possible_opposite_name = f"{namespace}:{new_control_name}" if namespace else new_control_name
-                # print(f"Intentando reemplazar {pattern} por {opposite_pattern} en {control_name}, resultado: {possible_opposite_name}")  # Impresión de depuración
-                if cmds.objExists(possible_opposite_name):
-                    return possible_opposite_name
-
-        return None
-
-    def apply_exception(control, attr, value):
-        # Obtén el nombre del control sin el namespace
-        control_name = control.rsplit(":", 1)[-1]
-
-        if control_name in exceptions and attr in exceptions[control_name]:
-            exception_type = exceptions[control_name][attr]
-            if exception_type == "invert":
-                return -value
-        return value
-
-    def swap_control_values(control1, control2):
-        if not cmds.objExists(control1):
-            return
-
-        attrs_to_swap = cmds.listAttr(control1, keyable=True)
-        if not attrs_to_swap:
-            return
-
-        for attr in attrs_to_swap:
-            if attr in ATTRIBUTES_TO_IGNORE or not is_attribute_modifiable(control1, attr):
-                continue
-
-            try:
-                value1 = cmds.getAttr(f"{control1}.{attr}")
-
-                # Aplicar excepciones si es necesario
-                modified_value1 = apply_exception(control1, attr, value1)
-
-                if control2 and cmds.objExists(control2) and is_attribute_modifiable(control2, attr):
-                    # Aplicar los valores modificados de control1 a control2
-                    cmds.setAttr(f"{control2}.{attr}", modified_value1)
-                else:  # Solo un control (central o único)
-                    # Verificar si hay excepción para este control y atributo
-                    control_name = control1.rsplit(":", 1)[-1]
-                    if control_name in exceptions and attr in exceptions[control_name]:
-                        exception_type = exceptions[control_name][attr]
-                        if exception_type == "invert":
-                            cmds.setAttr(f"{control1}.{attr}", modified_value1)
-                    else:
-                        # Invertir solo los atributos específicos si no hay excepciones
-                        if attr in ["translateX", "rotateZ", "rotateY"]:
-                            cmds.setAttr(f"{control1}.{attr}", modified_value1)
-
-            except Exception as e:
-                cmds.warning(f"Could not process the attribute {attr} on {control1}: {str(e)}")
-
-    def mirror_controls():
-        selected_controls = selectionMod.get_selected_objects()
-
-        if not selected_controls:
-            return wutil.make_inViewMessage("Select at least one object")
-
-        processed_controls = set()
-
-        for control in selected_controls:
-            if control in processed_controls:
-                continue
-
-            opposite_name = find_opposite_name(control)
-            if opposite_name:
-                # Si el control opuesto no está seleccionado, aún así procede con el espejado
-                swap_control_values(control, opposite_name if cmds.objExists(opposite_name) else None)
-                processed_controls.add(control)
-                if opposite_name:
-                    processed_controls.add(opposite_name)
-            else:
-                # Tratar como control central o único si no se encuentra un opuesto
-                swap_control_values(control, None)
-                processed_controls.add(control)
-
-    mirror_controls()
-
-
 def _mirror_token_side(token):
     clean = str(token or "").strip("_").lower()
     if clean in {"r", "rt", "rg", "rf", "right"}:
@@ -2884,7 +2673,12 @@ def _mirror_exception_value(exceptions, control, attr, value):
     control_name = control.rsplit(":", 1)[-1]
     exception_type = (exceptions.get(control_name) or {}).get(attr)
     if exception_type == "invert":
-        return -value
+        if isinstance(value, list):
+            return [_mirror_exception_value(exceptions, control, attr, item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(_mirror_exception_value(exceptions, control, attr, item) for item in value)
+        if isinstance(value, (int, float)):
+            return -value
     return value
 
 
@@ -3044,193 +2838,47 @@ def mirror_all_keys(*args):
             cmds.warning("No mirrorable animation keys found")
 
 
-# _____________________________________ add exception
+def _update_mirror_exceptions(exception_type):
+    selected_controls = selectionMod.get_selected_objects()
+    selected_channels = selectionMod.get_selected_channels()
+    if not selected_controls or not selected_channels:
+        action = "create an exception" if exception_type else "remove exceptions"
+        return wutil.make_inViewMessage(f"Select controls and channels to {action}")
+
+    exceptions = _load_mirror_exceptions()
+    for control in selected_controls:
+        control_name = control.rsplit(":", 1)[-1]
+        control_exceptions = exceptions.setdefault(control_name, {})
+        for channel in selected_channels:
+            long_name = cmds.attributeQuery(channel, node=control, longName=True)
+            if exception_type:
+                control_exceptions[long_name] = exception_type
+            else:
+                control_exceptions.pop(long_name, None)
+        if not control_exceptions:
+            exceptions.pop(control_name, None)
+
+    json_path = general.get_mirror_exceptions_file()
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    with open(json_path, "w") as file:
+        json.dump(exceptions, file, indent=4)
+    cmds.warning("Exception created" if exception_type else "Exception removed")
 
 
 def add_mirror_invert_exception(*args):
-    def get_long_name(obj, short_name):
-        """Obtiene el nombre largo del atributo a partir de su nombre corto."""
-        return cmds.attributeQuery(short_name, node=obj, longName=True)
-
-    def add_exceptions_to_json(selected_controls, selected_channels, json_path):
-        # Asegurar que la carpeta donde se guardará el archivo exista
-        os.makedirs(os.path.dirname(json_path), exist_ok=True)
-
-        # Leer datos existentes del archivo JSON, si existe
-        if os.path.exists(json_path):
-            with open(json_path, "r") as file:
-                exceptions = json.load(file)
-        else:
-            exceptions = {}
-
-        # Añade las nuevas excepciones
-        for control in selected_controls:
-            control_name = control.rsplit(":", 1)[-1]
-            if control_name not in exceptions:
-                exceptions[control_name] = {}
-            for channel in selected_channels:
-                long_name = get_long_name(control, channel)
-                exceptions[control_name][long_name] = "invert"
-
-        # Guarda las excepciones actualizadas en el archivo JSON
-        with open(json_path, "w") as file:
-            json.dump(exceptions, file, indent=4)
-
-    def create_mirror_exception():
-        mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = selectionMod.get_selected_objects()
-        selected_channels = selectionMod.get_selected_channels()
-
-        if selected_controls and selected_channels:
-            add_exceptions_to_json(selected_controls, selected_channels, mirror_exceptions_file_path)
-            cmds.warning("Exception created")
-        else:
-            wutil.make_inViewMessage("Select controls and channels to create an exception")
-
-    create_mirror_exception()
+    return _update_mirror_exceptions("invert")
 
 
 def add_mirror_keep_exception(*args):
-    def get_long_name(obj, short_name):
-        """Obtiene el nombre largo del atributo a partir de su nombre corto."""
-        return cmds.attributeQuery(short_name, node=obj, longName=True)
-
-    def add_exceptions_to_json(selected_controls, selected_channels, json_path):
-        # Asegurar que la carpeta donde se guardará el archivo exista
-        os.makedirs(os.path.dirname(json_path), exist_ok=True)
-
-        # Leer datos existentes del archivo JSON, si existe
-        if os.path.exists(json_path):
-            with open(json_path, "r") as file:
-                exceptions = json.load(file)
-        else:
-            exceptions = {}
-
-        # Añade las nuevas excepciones
-        for control in selected_controls:
-            control_name = control.rsplit(":", 1)[-1]
-            if control_name not in exceptions:
-                exceptions[control_name] = {}
-            for channel in selected_channels:
-                long_name = get_long_name(control, channel)
-                exceptions[control_name][long_name] = "keep"
-
-        # Guarda las excepciones actualizadas en el archivo JSON
-        with open(json_path, "w") as file:
-            json.dump(exceptions, file, indent=4)
-
-    def create_mirror_exception():
-        mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = selectionMod.get_selected_objects()
-        selected_channels = selectionMod.get_selected_channels()
-
-        if selected_controls and selected_channels:
-            add_exceptions_to_json(selected_controls, selected_channels, mirror_exceptions_file_path)
-            cmds.warning("Exception created")
-        else:
-            wutil.make_inViewMessage("Select controls and channels to create an exception")
-
-    create_mirror_exception()
-
-
-# _____________________________________ remove exception
+    return _update_mirror_exceptions("keep")
 
 
 def remove_mirror_invert_exception(*args):
-    def get_long_name(obj, short_name):
-        """Obtiene el nombre largo del atributo a partir de su nombre corto."""
-        return cmds.attributeQuery(short_name, node=obj, longName=True)
-
-    def remove_exceptions_from_json(selected_controls, selected_channels, json_path):
-        if os.path.exists(json_path):
-            with open(json_path, "r") as file:
-                exceptions = json.load(file)
-        else:
-            exceptions = {}
-
-        # Elimina las excepciones para los controles y canales seleccionados
-        for control in selected_controls:
-            # Obtén el nombre del control sin el namespace
-            control_name = control.rsplit(":", 1)[-1]
-
-            if control_name in exceptions:
-                for channel in selected_channels:
-                    long_name = get_long_name(control, channel)
-                    if long_name in exceptions[control_name]:
-                        del exceptions[control_name][long_name]
-
-        # Guarda las excepciones actualizadas en el archivo JSON
-        with open(json_path, "w") as file:
-            json.dump(exceptions, file, indent=4)
-
-    def remove_mirror_exceptions():
-        mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-        selected_controls = selectionMod.get_selected_objects()
-        selected_channels = selectionMod.get_selected_channels()
-
-        if selected_controls and selected_channels:
-            remove_exceptions_from_json(selected_controls, selected_channels, mirror_exceptions_file_path)
-            print("Exception removed")
-        else:
-            wutil.make_inViewMessage("Select controls and channels to remove exceptions")
-
-    remove_mirror_exceptions()
+    return _update_mirror_exceptions(None)
 
 
 # ______________________________________________________COPY PASTE ANIMATION ______________________________________________________________________________#
 
-
-def _load_copy_paste_json(json_file_path, missing_warning):
-    """Load JSON from an explicit file path (kept for internal use)."""
-    return clipboard.load_raw(json_file_path, missing_warning)
-
-
-def _load_pose_json():
-    return clipboard.load("pose", "No pose file found. Please copy pose first")
-
-
-def _save_copy_paste_json(json_file_path, data):
-    """Save JSON to an explicit file path (kept for internal use)."""
-    os.makedirs(os.path.dirname(json_file_path), exist_ok=True)
-    with open(json_file_path, "w", encoding="utf-8") as json_file:
-        json.dump(data, json_file, indent=4)
-
-
-def _copy_paste_file_dialog(caption, file_mode):
-    result = cmds.fileDialog2(fileMode=file_mode, caption=caption, fileFilter="JSON Files (*.json)")
-    return result[0] if result else None
-
-
-def _export_copy_paste_file(slot_or_path, caption):
-    """Export clipboard slot (or explicit path) to a user-chosen file."""
-    # If it looks like a slot key, delegate to clipboard.export_dialog
-    if slot_or_path in ("animation", "pose", "worldspace", "worldspace_frame", "copy_link", "temp_pivot"):
-        return clipboard.export_dialog(slot_or_path, caption)
-    # Legacy: explicit file path
-    if not os.path.exists(slot_or_path):
-        return wutil.make_inViewMessage("No copied data found")
-    target_path = _copy_paste_file_dialog(caption, 0)
-    if not target_path:
-        return None
-    if not target_path.lower().endswith(".json"):
-        target_path += ".json"
-    os.makedirs(os.path.dirname(target_path), exist_ok=True)
-    shutil.copyfile(slot_or_path, target_path)
-    return wutil.make_inViewMessage("File exported")
-
-
-def _import_copy_paste_file(slot_or_path, caption):
-    """Import a user-chosen file into clipboard slot (or explicit path)."""
-    if slot_or_path in ("animation", "pose", "worldspace", "worldspace_frame", "copy_link", "temp_pivot"):
-        return clipboard.import_dialog(slot_or_path, caption)
-    source_path = _copy_paste_file_dialog(caption, 1)
-    if not source_path:
-        return None
-    data = clipboard.load_raw(source_path, "Could not import file")
-    if data is None:
-        return None
-    _save_copy_paste_json(slot_or_path, data)
-    return wutil.make_inViewMessage("File imported")
 
 ANIMATION_SCHEMA_VERSION = 3
 ANIMATION_CONTROLS_KEY = "controls"
@@ -3276,10 +2924,6 @@ def _animation_layer_items(channel_data):
         if isinstance(entry, dict):
             items.append((entry.get("layer"), entry.get("data") or {}, entry.get("weight") or {}))
     return items
-
-
-def _animation_layer_names(channel_data):
-    return [layer_name for layer_name, _layer_data, _weight_data in _animation_layer_items(channel_data) if layer_name]
 
 
 def _animation_data_key_count(animation_data, targets=None):
@@ -4034,33 +3678,7 @@ def paste_insert_animation(*args, anchor_widget=None):
 
 
 def paste_opposite_animation(*args, anchor_widget=None):
-    mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-
-    # ATTRIBUTES_TO_IGNORE = {"tag"}
-
-    def load_exceptions(file_path):
-        if os.path.exists(file_path):
-            with open(file_path, "r") as file:
-                return json.load(file)
-        else:
-            return {}
-
-    exceptions = load_exceptions(mirror_exceptions_file_path)
-
-    def find_mirror_control(control_name):
-        for pattern, opposite_pattern in MIRROR_PATTERNS:
-            if pattern in control_name:
-                return control_name.replace(pattern, opposite_pattern, 1)
-        return None
-
-    def mirror_value(attr, value):
-        if attr in exceptions.get(control_name, {}):
-            exception_type = exceptions[control_name][attr]
-            if exception_type == "invert":
-                return -value
-        if attr in [""]:
-            return -value
-        return value
+    exceptions = _load_mirror_exceptions()
 
     animation_data = clipboard.load("animation", "No animation file found. Please copy animation first")
     if not animation_data:
@@ -4077,7 +3695,7 @@ def paste_opposite_animation(*args, anchor_widget=None):
         for control_name, anim_data in controls.items():
             if processor.cancelled:
                 break
-            mirror_control_name = find_mirror_control(control_name)
+            mirror_control_name = _opposite_control_name(control_name)
 
             if mirror_control_name:
                 full_mirror_control_name = next((c for c in cmds.ls() if c.endswith(mirror_control_name)), None)
@@ -4088,7 +3706,9 @@ def paste_opposite_animation(*args, anchor_widget=None):
                 for channel, channel_data in anim_data.items():
                     mirrored_channels[channel] = _transform_channel_values(
                         channel_data,
-                        lambda value, attr=channel: mirror_value(attr, value),
+                        lambda value, attr=channel: _mirror_exception_value(
+                            exceptions, control_name, attr, value
+                        ),
                     )
                 applied = _apply_animation_channels_to_targets(
                     [full_mirror_control_name],
@@ -4176,10 +3796,18 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
     _paste_to_dialog.show()
 
 
+def export_animation_file(*args):
+    return clipboard.export_dialog("animation", "Export Animation")
+
+
+def import_animation_file(*args):
+    return clipboard.import_dialog("animation", "Import Animation")
+
+
 def paste_pose_to(*args, anchor_widget=None, **kwargs):
     global _paste_to_dialog
 
-    pose_data = _load_pose_json()
+    pose_data = clipboard.load("pose", "No pose file found. Please copy pose first")
     if not pose_data:
         return
 
@@ -4204,14 +3832,6 @@ def paste_pose_to(*args, anchor_widget=None, **kwargs):
 
     _paste_to_dialog = customWidgets.PasteToDialog(pose_data, _apply_mappings, data_label="pose")
     _paste_to_dialog.show()
-
-
-def export_animation_file(*args):
-    return clipboard.export_dialog("animation", "Export Animation")
-
-
-def import_animation_file(*args):
-    return clipboard.import_dialog("animation", "Import Animation")
 
 
 # COPY POSE ________________________________________________________________________
@@ -4261,7 +3881,7 @@ def import_pose_file(*args):
 def paste_pose(*args):
     selected_objects = selectionMod.get_selected_objects()
 
-    pose_data = _load_pose_json()
+    pose_data = clipboard.load("pose", "No pose file found. Please copy pose first")
     if not pose_data:
         return
 
@@ -4276,38 +3896,18 @@ def paste_pose(*args):
 
 def paste_mirror_pose(*args):
     """Paste copied pose values onto opposite controls using mirror exceptions."""
-    mirror_exceptions_file_path = general.get_mirror_exceptions_file()
-    try:
-        with open(mirror_exceptions_file_path, "r") as exceptions_file:
-            exceptions = json.load(exceptions_file)
-    except (OSError, ValueError, TypeError):
-        exceptions = {}
+    exceptions = _load_mirror_exceptions()
 
-    pose_data = _load_pose_json()
+    pose_data = clipboard.load("pose", "No pose file found. Please copy pose first")
     if not pose_data:
         return
-
-    def opposite_name(control_name):
-        for pattern, opposite_pattern in MIRROR_PATTERNS:
-            if pattern in control_name:
-                return control_name.replace(pattern, opposite_pattern, 1)
-        return None
-
-    def inverted(value):
-        if isinstance(value, (int, float)):
-            return -value
-        if isinstance(value, list):
-            return [inverted(item) for item in value]
-        if isinstance(value, tuple):
-            return tuple(inverted(item) for item in value)
-        return value
 
     attrs_set = 0
     pasted_targets = []
     with _copy_paste_operation("paste_mirror_pose", "Pose Pasted", undo=True, tint="current") as operation:
         scene_nodes = cmds.ls() or []
         for control_name, attributes in pose_data.items():
-            mirror_name = opposite_name(control_name)
+            mirror_name = _opposite_control_name(control_name)
             if not mirror_name:
                 continue
             mirror_control = next((node for node in scene_nodes if node.endswith(mirror_name)), None)
@@ -4318,8 +3918,7 @@ def paste_mirror_pose(*args):
             for attr, value in attributes.items():
                 if not _is_valid_pose_attribute_value(value) or not _attr_exists_and_settable(mirror_control, attr):
                     continue
-                exception_type = exceptions.get(control_name, {}).get(attr)
-                mirrored_value = inverted(value) if exception_type == "invert" else value
+                mirrored_value = _mirror_exception_value(exceptions, control_name, attr, value)
                 try:
                     _set_attr_value("{}.{}".format(mirror_control, attr), mirrored_value)
                     attrs_set += 1

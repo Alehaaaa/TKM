@@ -20,17 +20,18 @@ import TheKeyMachine.core.toolMenus as toolMenus  # type: ignore
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi  # type: ignore
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
+import TheKeyMachine.core.connectEntries as connectEntries
 import TheKeyMachine.tools.orbit.api as orbitApi  # type: ignore
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi  # type: ignore
 from TheKeyMachine.tools import common as toolCommon  # type: ignore
 from TheKeyMachine.tools.link_objects.pulse_thread import LinkObjectPulseThread  # type: ignore
-import TheKeyMachine.sliders as sliders  # type: ignore
+import TheKeyMachine.sliders.manager as sliderManager  # type: ignore
 from TheKeyMachine.widgets import sliderWidget as sw  # type: ignore
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import customDialogs  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 
-from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.Qt import QtCompat, QtCore, QtGui  # type: ignore
 
 
 MAIN_SPECIAL_TOOL_KEYS = {
@@ -180,9 +181,66 @@ def add_tool_button(section, item_data, *, overrides=None):
         default=data.get("default", True),
         description=_tooltip_description(data),
         tooltip=data.get("tooltip"),
+        tooltip_enabled=data.get("tooltip_enabled", True),
         pinnable=data.get("pinnable", True),
     )
     return btn
+
+
+def _refresh_connect_entry_section(section, kind):
+    if not wutil.is_valid_widget(section):
+        return
+
+    for entry_id in getattr(section, "_tkm_connect_entry_ids", ()):
+        section.removeWidgetByKey(entry_id)
+
+    entry_ids = []
+    for entry in connectEntries.load_entries(kind):
+        if entry.get("type") != "entry":
+            continue
+        item = {
+            "id": entry["id"],
+            "type": "tool",
+            "label": entry["label"],
+            "icon": entry["icon"],
+            "text": entry["text"],
+            "callback": entry["callback"],
+            "tooltip_enabled": False,
+            "default": False,
+        }
+        add_tool_button(section, item)
+        entry_ids.append(entry["id"])
+    section._tkm_connect_entry_ids = tuple(entry_ids)
+
+    parent = section.parentWidget()
+    if parent and hasattr(parent, "_update_height"):
+        QtCore.QTimer.singleShot(0, parent._update_height)
+
+
+def add_connect_entry_sections(new_section_fn):
+    import TheKeyMachine.core.toolbox as toolbox
+
+    for kind in ("tools", "scripts"):
+        spec = connectEntries.source_spec(kind)
+        section = new_section_fn()
+        section.set_settings_namespace(spec["namespace"])
+        folder_tool = toolbox.get_tool(spec["folder_tool_id"], default=True)
+        section.set_menu_identity(spec["label"], folder_tool.get("icon"))
+        add_tool_button(section, folder_tool)
+        section.addSeparator()
+        _refresh_connect_entry_section(section, kind)
+
+        def _on_entries_changed(changed_kind, target=section, source_kind=kind):
+            if changed_kind == source_kind:
+                _refresh_connect_entry_section(target, source_kind)
+
+        toolCommon.replace_tracked_connection(
+            section,
+            "_tkm_connect_entries_changed",
+            connectEntries.connect_entries_bus.entriesChanged,
+            _on_entries_changed,
+            parent=section,
+        )
 
 
 def bind_background_runners_activity_button(btn):
@@ -417,7 +475,7 @@ def add_slider_section(section, section_def, *, namespace, object_prefix):
     prefix = section_def["slider_type"]
     color = section_def["color"]
     icon_color = section_def.get("icon_color", color)
-    modes = getattr(sliders, section_def["modes_attr"])
+    modes = getattr(sliderManager, section_def["modes_attr"])
     default_keys = [f"{prefix}_{key}" for key in section_def.get("default_modes", [])]
 
     for mode in modes:
@@ -736,6 +794,10 @@ def populate_main_toolbar_from_layout(layout_id, new_section_fn, owner):
     sections = toolbox.get_toolbar_sections(layout_id, resolve_items=False)
     for section_def in sections:
         sec_id = section_def["id"]
+
+        if sec_id == "extension_tools":
+            add_connect_entry_sections(new_section_fn)
+            continue
 
         if section_def.get("type") == "slider":
             section = add_slider_section_from_data(

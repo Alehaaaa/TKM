@@ -74,8 +74,6 @@ _MODULE_COMMANDS = {
         "TheKeyMachine.core.backgroundRunners",
         "toggle_camera_orbit_selection",
     ),
-    "custom_tools": ("TheKeyMachine.mods.generalMod", "open_file", ("TheKeyMachine_user_data/connect/tools", "tools.py")),
-    "custom_scripts": ("TheKeyMachine.mods.generalMod", "open_file", ("TheKeyMachine_user_data/connect/scripts", "scripts.py")),
     "about_window": ("TheKeyMachine.mods.uiMod", "about_window"),
     "donate_window": ("TheKeyMachine.mods.uiMod", "donate_window"),
     "bug_report_window": ("TheKeyMachine.mods.reportMod", "bug_report_window"),
@@ -288,14 +286,14 @@ def command_string(name: str, *args) -> str:
 
 def execute_slider(prefix: str, mode: str, value: int = 0, session=None):
     """Execute a slider mode directly without a live slider widget."""
-    import TheKeyMachine.sliders as sliders
+    from TheKeyMachine.sliders import api as slider_api
 
     if prefix == "blend":
-        return sliders.execute_blend_slider(mode, value, session=session)
+        return slider_api.execute_blend_slider(mode, value, session=session)
     if prefix == "tween":
-        return sliders.execute_tween_slider(mode, value, session=session)
+        return slider_api.execute_tween_slider(mode, value, session=session)
     if prefix == "tangent":
-        return sliders.execute_tangent_slider(mode, value, session=session)
+        return slider_api.execute_tangent_slider(mode, value, session=session)
     raise ValueError("Unknown slider prefix: {}".format(prefix))
 
 
@@ -360,7 +358,7 @@ def _register_builtin_commands() -> None:
 
 
 def _register_slider_commands() -> None:
-    from TheKeyMachine.sliders import BLEND_MODES, TANGENT_MODES, TWEEN_MODES
+    from TheKeyMachine.sliders.manager import BLEND_MODES, TANGENT_MODES, TWEEN_MODES
 
     for prefix, modes in (("blend", BLEND_MODES), ("tween", TWEEN_MODES), ("tangent", TANGENT_MODES)):
         for mode in modes:

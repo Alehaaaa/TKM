@@ -20,26 +20,14 @@ def curve_fn_for_attr(attr_full):
     return curve, omutils.anim_curve_fn(curve)
 
 
-def find_key_index(curve_fn, time):
-    return omutils.anim_curve_key_index(curve_fn, time)
-
-
 def key_exists(curve_fn, time):
-    return find_key_index(curve_fn, time) is not None
+    return omutils.anim_curve_key_index(curve_fn, time) is not None
 
 
 def find_or_add_key_index(session, curve_fn, time):
     if not getattr(session, "preview", False) or session.anim_change is None:
-        return find_key_index(curve_fn, time)
+        return omutils.anim_curve_key_index(curve_fn, time)
     return omutils.add_anim_curve_key(curve_fn, time, change=session.anim_change)
-
-
-def curve_value(curve_fn, index, fallback=None):
-    return omutils.anim_curve_value(curve_fn, index, fallback=fallback)
-
-
-def curve_value_at_time(curve_fn, time, fallback=None):
-    return omutils.anim_curve_value_at_time(curve_fn, time, fallback=fallback)
 
 
 def clamp_attr_value(attr_full, value):

@@ -22,7 +22,7 @@ import maya.OpenMayaUI as mui # type: ignore
 
 import importlib
 
-from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtWidgets  # type: ignore
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -32,7 +32,6 @@ from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.keyToolsMod as keyTools
-import TheKeyMachine.mods.selSetsMod as selSets
 import TheKeyMachine.mods.styleMod as style
 import TheKeyMachine.core.toolMenus as toolMenus
 import TheKeyMachine.core.toolbox as toolbox
@@ -44,7 +43,7 @@ import TheKeyMachine.mods.helperMod as helper  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 
-mods = [general, ui, keyTools, selSets, style, cw, helper, toolMenus, toolbox, toolWidgets]
+mods = [general, ui, keyTools, style, cw, helper, toolMenus, toolbox, toolWidgets]
 
 for m in mods:
     importlib.reload(m)
@@ -71,18 +70,51 @@ def _graph_toolbar_alignment():
     return toolMenus.toolbar_alignment_value(align_str)
 
 
-def _find_graph_editor_widget():
+def _graph_editor_control_widget():
     graph_ptr = mui.MQtUtil.findControl("graphEditor1")
-    graph_qw = wutil.get_maya_qt(graph_ptr, QtWidgets.QWidget) if graph_ptr else None
-    if graph_qw:
-        for child in graph_qw.children():
-            if not isinstance(child, QtWidgets.QWidget):
-                continue
-            if isinstance(child, QtWidgets.QMenuBar) or child.objectName() == _GRAPH_TOOLBAR_OBJECT:
-                continue
-            if child.layout():
-                return child
-    return graph_qw
+    return wutil.get_maya_qt(graph_ptr, QtWidgets.QWidget) if graph_ptr else None
+
+
+def _layout_widgets(layout):
+    widgets = []
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        widget = item.widget() if item else None
+        if widget is not None:
+            widgets.append(widget)
+    return widgets
+
+
+def _graph_editor_layout_host():
+    """Return a box-layout host and the native graph content row it owns."""
+    graph_control = _graph_editor_control_widget()
+    if not graph_control:
+        return None, None, None
+
+    layout = graph_control.layout()
+    if isinstance(layout, QtWidgets.QBoxLayout):
+        native_widgets = [
+            widget
+            for widget in _layout_widgets(layout)
+            if widget.objectName() != _GRAPH_TOOLBAR_OBJECT and not isinstance(widget, QtWidgets.QMenuBar)
+        ]
+        if native_widgets:
+            return graph_control, layout, native_widgets[-1]
+
+    descendant = graph_control
+    parent = graph_control.parentWidget()
+    while parent is not None:
+        layout = parent.layout()
+        if isinstance(layout, QtWidgets.QBoxLayout) and layout.indexOf(descendant) >= 0:
+            return parent, layout, descendant
+        descendant = parent
+        parent = parent.parentWidget()
+    return None, None, None
+
+
+def _find_graph_editor_widget():
+    host, _layout, _content = _graph_editor_layout_host()
+    return host
 
 
 def getCustomGraphWidget():
@@ -134,32 +166,40 @@ def removeCustomGraph() -> None:
 # -----------------------------------------------------------------------------------------------------------------------------
 
 
-def _place_graph_toolbar_widget(toolbar_widget, dock_position=None, graph_qw=None):
+def _place_graph_toolbar_widget(toolbar_widget, dock_position=None):
     if dock_position is None:
         dock_position = settings.get_setting(_GRAPH_TOOLBAR_DOCK_SETTING, _DOCK_BOTTOM_GRAPH)
     if dock_position not in _DOCK_POSITION_IDS:
         dock_position = _DOCK_BOTTOM_GRAPH
 
-    if not graph_qw:
-        graph_qw = _find_graph_editor_widget()
-    graph_layout = graph_qw.layout() if graph_qw else None
+    host, graph_layout, graph_content = _graph_editor_layout_host()
+    if not host or not graph_layout or not graph_content:
+        return False
 
     parent = toolbar_widget.parentWidget()
     if parent and parent.layout():
         parent.layout().removeWidget(toolbar_widget)
-    toolbar_widget.setParent(graph_qw)
+    toolbar_widget.setParent(host)
+    toolbar_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
-    if hasattr(graph_layout, "insertWidget"):
-        if dock_position == _DOCK_BOTTOM_MENU:
-            graph_layout.insertWidget(0, toolbar_widget)
-        elif dock_position == _DOCK_TOP_GRAPH:
-            graph_layout.insertWidget(1, toolbar_widget)
-        else:  # _DOCK_BOTTOM_GRAPH
-            graph_layout.addWidget(toolbar_widget)
-    else:
-        graph_layout.addWidget(toolbar_widget)
+    graph_index = graph_layout.indexOf(graph_content)
+    if dock_position == _DOCK_BOTTOM_MENU:
+        menu_indices = [
+            graph_layout.indexOf(widget)
+            for widget in _layout_widgets(graph_layout)
+            if isinstance(widget, QtWidgets.QMenuBar)
+        ]
+        insert_index = max(menu_indices) + 1 if menu_indices else max(0, graph_index)
+    elif dock_position == _DOCK_TOP_GRAPH:
+        insert_index = max(0, graph_index)
+    else:  # _DOCK_BOTTOM_GRAPH
+        insert_index = graph_index + 1
+
+    graph_layout.insertWidget(insert_index, toolbar_widget)
 
     toolbar_widget.show()
+    graph_layout.invalidate()
+    graph_layout.activate()
     return True
 
 
@@ -272,5 +312,5 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     toolWidgets.populate_graph_toolbar_from_layout(new_section, _build_graph_settings_menu, toolbar_widget=flow_qw)
     toolWidgets.bind_toolbar_pinning_context(flow_qw)
 
-    _place_graph_toolbar_widget(flow_qw, graph_qw=graph_qw)
+    _place_graph_toolbar_widget(flow_qw)
     QtCore.QTimer.singleShot(50, flow_qw._update_height)

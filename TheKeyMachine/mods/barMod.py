@@ -23,8 +23,6 @@ from maya import OpenMaya as om
 from TheKeyMachine.Qt import QtWidgets
 
 
-import json
-import os
 import math
 import importlib
 
@@ -33,10 +31,7 @@ import importlib
 
 import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.helperMod as helper
-from TheKeyMachine.data import icons
 import TheKeyMachine.widgets.customDialogs as customDialogs
-import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.mods.selectionMod as selectionMod
@@ -74,10 +69,6 @@ def openCustomGraph():
 
     importlib.reload(TheKeyMachine.core.customGraph)
     TheKeyMachine.core.customGraph.openCustomGraph()
-
-
-def delete_animation():
-    return keyTools.clear_animation_keys()
 
 
 def createLocator():
@@ -1141,6 +1132,74 @@ def tracer_show_hide(*args):
 # FollowCam _________________________________________________________________
 
 followCam_original_camera = None
+FOLLOW_CAM_GROUP = "tkm_followCam"
+FOLLOW_CAM_ORIGINAL_CAMERA_ATTR = "tkmOriginalCamera"
+
+
+def _active_model_panel():
+    candidates = []
+    for query in (
+        lambda: cmds.getPanel(withFocus=True),
+        lambda: cmds.playblast(activeEditor=True),
+        lambda: cmds.getPanel(visiblePanels=True),
+    ):
+        try:
+            result = query()
+        except Exception:
+            continue
+        candidates.extend(result if isinstance(result, (list, tuple)) else [result])
+
+    for panel in candidates:
+        if not panel:
+            continue
+        try:
+            if cmds.getPanel(typeOf=panel) == "modelPanel":
+                return panel
+        except Exception:
+            continue
+    return None
+
+
+def _camera_transform(camera):
+    if not camera or not cmds.objExists(camera):
+        return None
+    try:
+        if cmds.nodeType(camera) == "camera":
+            parents = cmds.listRelatives(camera, parent=True, fullPath=True) or []
+            return parents[0] if parents else None
+    except Exception:
+        return None
+    return camera
+
+
+def _is_follow_camera(camera):
+    camera = _camera_transform(camera)
+    if not camera or not cmds.objExists("followCam"):
+        return False
+    camera_paths = cmds.ls(camera, long=True) or []
+    follow_paths = cmds.ls("followCam", long=True) or []
+    return bool(set(camera_paths).intersection(follow_paths))
+
+
+def _stored_follow_camera():
+    plug = "{}.{}".format(FOLLOW_CAM_GROUP, FOLLOW_CAM_ORIGINAL_CAMERA_ATTR)
+    if cmds.objExists(plug):
+        try:
+            camera = cmds.getAttr(plug)
+            if camera and cmds.objExists(camera):
+                return camera
+        except Exception:
+            pass
+    return None
+
+
+def _store_follow_camera(camera):
+    if not camera or not cmds.objExists(FOLLOW_CAM_GROUP):
+        return
+    plug = "{}.{}".format(FOLLOW_CAM_GROUP, FOLLOW_CAM_ORIGINAL_CAMERA_ATTR)
+    if not cmds.objExists(plug):
+        cmds.addAttr(FOLLOW_CAM_GROUP, longName=FOLLOW_CAM_ORIGINAL_CAMERA_ATTR, dataType="string")
+    cmds.setAttr(plug, camera, type="string")
 
 
 def create_follow_cam(translation=True, rotation=True, *args):
@@ -1159,9 +1218,18 @@ def create_follow_cam(translation=True, rotation=True, *args):
     target_object = selected_objects[0]
 
     # Obtén el panel con el foco actualmente y encuentra la cámara activa
-    panel = cmds.playblast(activeEditor=True)
-    camera = cmds.modelEditor(panel, query=True, camera=True)
-    followCam_original_camera = camera
+    panel = _active_model_panel()
+    if not panel:
+        return wutil.make_inViewMessage("Focus a model viewport before creating Follow Cam")
+    camera = _camera_transform(cmds.modelEditor(panel, query=True, camera=True))
+    if not camera:
+        return wutil.make_inViewMessage("The active viewport has no valid camera")
+    stored_camera = _stored_follow_camera()
+    viewing_follow_cam = _is_follow_camera(camera)
+    if not viewing_follow_cam:
+        followCam_original_camera = camera
+    elif stored_camera:
+        followCam_original_camera = stored_camera
 
     # Si ya existe el nodo "tkm_followCam", crea una cámara y grupo temporales
     if cmds.objExists("tkm_followCam"):
@@ -1202,8 +1270,10 @@ def create_follow_cam(translation=True, rotation=True, *args):
         cmds.rename("followCam_tmp", "followCam")
         follow_cam = "followCam"  # Asegura que follow_cam contenga el nombre correcto de la cámara
 
+    _store_follow_camera(followCam_original_camera or stored_camera or "persp")
+
     # Si la cámara activa en el panel no es 'followCam', cambia la vista a 'followCam'
-    if camera != "followCam":
+    if not viewing_follow_cam:
         cmds.lookThru(panel, follow_cam)
 
     cmds.select(selected_objects)
@@ -1211,18 +1281,19 @@ def create_follow_cam(translation=True, rotation=True, *args):
 
 def remove_followCam(*args):
     global followCam_original_camera
-    # Obtén el panel con el foco actualmente
-    panel = cmds.playblast(activeEditor=True)
-    # current_camera = cmds.modelEditor(panel, query=True, camera=True)
+    if not cmds.objExists(FOLLOW_CAM_GROUP):
+        return wutil.make_inViewMessage("No followCam in the scene")
 
-    if cmds.objExists("tkm_followCam"):
-        cmds.delete("tkm_followCam")
+    panel = _active_model_panel()
+    restore_camera = _stored_follow_camera() or followCam_original_camera
+    if not restore_camera or not cmds.objExists(restore_camera):
+        restore_camera = "persp" if cmds.objExists("persp") else None
 
-        # Si el nombre de la cámara actual no es "persp", cambia la vista a "persp"
-        print(followCam_original_camera)
-        cmds.lookThru(panel, followCam_original_camera)
-    else:
-        wutil.make_inViewMessage("No followCam in the scene")
+    cmds.delete(FOLLOW_CAM_GROUP)
+    followCam_original_camera = None
+
+    if panel and restore_camera:
+        cmds.lookThru(panel, restore_camera)
 
 
 # ________________________SELECTOR______________

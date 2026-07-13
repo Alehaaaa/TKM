@@ -4,58 +4,56 @@ TheKeyMachine - Sliders public API
 Public entry points used by toolbar widgets, hotkeys, and trigger commands.
 """
 
-from . import manager
-from . import sliderMod
-from . import utils
+from . import curve_ops, keyframe_ops, manager, tangent_ops, time_ops, utils
 from TheKeyMachine.tools import common as toolCommon
 
 
 # Dispatch maps for various slider types
 DISPATCH_MAPS = {
     "tween": {
-        "tweener": sliderMod.execute_tweener,
-        "tweener_worldspace": lambda s, v, ws: sliderMod.execute_tweener(s, v, world_space=True),
-        "blend_to_buffer": sliderMod.execute_blend_to_buffer,
-        "blend_to_default": sliderMod.execute_blend_to_default,
-        "blend_to_ease": sliderMod.execute_blend_to_ease,
-        "blend_to_frame": sliderMod.execute_blend_to_frame,
-        "blend_to_frame_ws": lambda s, v, ws: sliderMod.execute_blend_to_frame(s, v, world_space=True),
-        "blend_to_neighbors": sliderMod.execute_blend_to_neighbors,
-        "blend_to_neighbors_ws": lambda s, v, ws: sliderMod.execute_blend_to_neighbors(s, v, world_space=True),
-        "blend_to_infinity": sliderMod.execute_blend_to_infinity,
-        "blend_to_infinity_ws": lambda s, v, ws: sliderMod.execute_blend_to_infinity(s, v, world_space=True),
-        "blend_to_undo": sliderMod.execute_blend_to_undo,
+        "tweener": keyframe_ops.apply_tween,
+        "tweener_worldspace": keyframe_ops.apply_tween,
+        "blend_to_buffer": keyframe_ops.apply_blend_to_buffer,
+        "blend_to_default": keyframe_ops.apply_blend_to_default,
+        "blend_to_ease": keyframe_ops.apply_blend_to_ease,
+        "blend_to_frame": keyframe_ops.apply_blend_to_frame,
+        "blend_to_frame_ws": keyframe_ops.apply_blend_to_frame,
+        "blend_to_neighbors": keyframe_ops.apply_blend_to_neighbors,
+        "blend_to_neighbors_ws": keyframe_ops.apply_blend_to_neighbors,
+        "blend_to_infinity": keyframe_ops.apply_blend_to_infinity,
+        "blend_to_infinity_ws": keyframe_ops.apply_blend_to_infinity,
+        "blend_to_undo": keyframe_ops.apply_blend_to_undo,
     },
     "curve": {
-        "connect_neighbors": sliderMod.execute_connect_neighbors,
-        "ease_in_out": sliderMod.execute_ease_in_out,
-        "gap_stitcher": sliderMod.execute_gap_stitcher,
-        "noise_wave": sliderMod.execute_noise_wave,
-        "pull_push": sliderMod.execute_pull_push,
-        "simplify_bake": sliderMod.execute_simplify_bake,
-        "smooth_rough": sliderMod.execute_smooth_rough,
-        "scale_average": sliderMod.execute_scale_average,
-        "scale_selection": sliderMod.execute_scale_selection,
-        "scale_default": sliderMod.execute_scale_default,
-        "scale_frame": sliderMod.execute_scale_frame,
-        "scale_neighbor_left": sliderMod.execute_scale_neighbor_left,
-        "scale_neighbor_right": sliderMod.execute_scale_neighbor_right,
+        "connect_neighbors": (curve_ops.apply_connect_neighbors, "percent"),
+        "ease_in_out": (curve_ops.apply_ease, "ease"),
+        "gap_stitcher": (curve_ops.apply_gap_stitcher, "percent"),
+        "noise_wave": ((curve_ops.apply_noise, curve_ops.apply_wave), "signed_percent"),
+        "pull_push": (curve_ops.apply_pull_push, "percent"),
+        "simplify_bake": ((curve_ops.apply_simplify, curve_ops.apply_bake), "signed_percent"),
+        "smooth_rough": ((curve_ops.apply_smooth, curve_ops.apply_rough), "signed_percent"),
+        "scale_average": (curve_ops.apply_scale, "scale"),
+        "scale_selection": (curve_ops.apply_scale, "scale"),
+        "scale_default": (curve_ops.apply_scale_default, "scale"),
+        "scale_frame": (curve_ops.apply_scale_frame, "scale"),
+        "scale_neighbor_left": (curve_ops.apply_scale_neighbor_left, "scale"),
+        "scale_neighbor_right": (curve_ops.apply_scale_neighbor_right, "scale"),
     },
     "tangent": {
-        "blend_best_guess": sliderMod.execute_blend_best_guess,
-        "blend_polished": sliderMod.execute_blend_polished,
-        "blend_bounce": sliderMod.execute_blend_bounce,
-        "blend_auto": sliderMod.execute_blend_auto,
-        "blend_spline": sliderMod.execute_blend_spline,
-        "blend_clamped": sliderMod.execute_blend_clamped,
-        "blend_linear": sliderMod.execute_blend_linear,
-        "blend_flat": sliderMod.execute_blend_flat,
-        "blend_flow": sliderMod.execute_blend_flow,
-        "blend_plateau": sliderMod.execute_blend_plateau,
+        "blend_best_guess": "auto",
+        "blend_polished": "spline",
+        "blend_bounce": "bounce",
+        "blend_auto": "auto",
+        "blend_spline": "spline",
+        "blend_clamped": "clamped",
+        "blend_linear": "linear",
+        "blend_flat": "flat",
+        "blend_flow": "plateau",
+        "blend_plateau": "plateau",
     },
     "time": {
-        "time_offsetter": sliderMod.execute_time_offsetter,
-        "time_offsetter_stagger": sliderMod.execute_time_stagger,
+        "time_offsetter": time_ops.apply_time_offset,
+        "time_offsetter_stagger": time_ops.apply_time_stagger,
     },
 }
 
@@ -79,6 +77,21 @@ def _resolve_type_key(type_key, mode):
         if mode in dispatch:
             return candidate_type
     return type_key
+
+
+def _execute_curve_operation(operation_spec, session, value):
+    operation, value_mode = operation_spec
+    if value_mode == "signed_percent":
+        negative_operation, positive_operation = operation
+        operation = negative_operation if value < 0 else positive_operation
+        operation_value = abs(value) / 100.0 if value < 0 else value / 100.0
+    elif value_mode == "ease":
+        operation_value = (value + 100) / 200.0
+    elif value_mode == "scale":
+        operation_value = 1.0 + value / 100.0
+    else:
+        operation_value = value / 100.0
+    return operation(session, None, operation_value)
 
 
 def create_session(mode):
@@ -109,14 +122,14 @@ def _resolve_session(mode, session):
 
 
 def start_dragging(mode):
-    """Public entry to start a drag session."""
+    """Start a public slider drag session."""
     session = create_session(mode)
     session.begin_preview()
     return session
 
 
 def stop_dragging(session=None):
-    """Public entry to finalize a drag session."""
+    """Finish a public slider drag session."""
     if session:
         session.finish()
 
@@ -125,6 +138,7 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
     """Unified internal dispatcher for all slider operations."""
     type_key = _resolve_type_key(type_key, mode)
     session, should_finish = _resolve_session(mode, session)
+    world_space = world_space or mode in COMMAND_ONLY_PREVIEW_MODES
     try:
         if session.preview and not _can_preview(mode, world_space=world_space):
             return session
@@ -137,7 +151,7 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
             if type_key == "tween":
                 if not session.preview:
                     session.ensure_undo_open()
-                sliderMod.execute_tweener(session, value, world_space=world_space)
+                keyframe_ops.apply_tween(session, value, world_space=world_space)
             return session
 
         if session.preview and mode == "simplify_bake":
@@ -161,12 +175,16 @@ def _execute_slider_op(type_key, mode, value, world_space=False, session=None):
 
         # Call with appropriate signature based on type
         if type_key == "tween":
-            func(session, value, world_space)
+            if func is keyframe_ops.apply_blend_to_frame:
+                func(session, value, world_space=world_space)
+            else:
+                func(session, value, world_space)
+        elif type_key == "curve":
+            _execute_curve_operation(func, session, value)
         elif type_key == "tangent":
-            func(session, None, value / 100.0)
+            tangent_ops.apply_tangent_type_blend(session, None, func, value / 100.0)
         else:
-            # Curve and time ops both expect the raw slider percentage.
-            func(session, None, value)
+            func(session, None, value / 10.0)
 
         return session
     finally:
@@ -195,5 +213,5 @@ def execute_time_modifier(mode, value, session=None):
 
 
 def execute_blend_to_frame_with_button_values(value, session=None):
-    """Legacy helper for frame buttons."""
+    """Execute the frame-target tween from a value button."""
     return execute_tween_slider("blend_to_frame", value, session=session)

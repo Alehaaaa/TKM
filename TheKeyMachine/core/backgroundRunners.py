@@ -24,7 +24,12 @@ RUNNER_SETTINGS_NAMESPACE = "background_runners"
 CHANNELBOX_HIGHLIGHT_ID = "channelbox_selection_highlight"
 CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID = "channelbox_clear_on_selection_change"
 CAMERA_ORBIT_SELECTION_ID = "camera_orbit_selection"
+HIDE_STATIC_CURVES_ID = "hide_static_animation_curves"
 CHANNELBOX_TINT_KEY = "background_runner:channelbox_selection_highlight"
+
+GRAPH_EDITOR_PANEL = "graphEditor1"
+GRAPH_EDITOR = "graphEditor1GraphEd"
+GRAPH_EDITOR_CONNECTION = "graphEditor1FromOutliner"
 
 _CONTROLLER: Optional["BackgroundRunnerController"] = None
 
@@ -63,6 +68,10 @@ def toggle_channelbox_clear_on_selection_change():
 
 def toggle_camera_orbit_selection():
     return toggle_runner_enabled(CAMERA_ORBIT_SELECTION_ID)
+
+
+def toggle_hide_static_animation_curves():
+    return toggle_runner_enabled(HIDE_STATIC_CURVES_ID)
 
 
 def _emit_runner_triggered(manager, runner_id):
@@ -462,6 +471,127 @@ class CameraOrbitSelectionRunner(QtCore.QObject):
             self._updating = False
 
 
+class HideStaticAnimationCurvesRunner(QtCore.QObject):
+    """Select only non-flat channels in an open Graph Editor."""
+
+    RUNTIME_KEY = "background_runner:hide_static_animation_curves"
+
+    def __init__(self, manager, parent=None):
+        super().__init__(parent or manager)
+        self._manager = manager
+        self._running = False
+        self._sync_pending = False
+
+    def start(self):
+        if self._running:
+            self._schedule_sync()
+            return
+        self._running = True
+        for signal in (
+            self._manager.selection_changed,
+            self._manager.graph_editor_opened,
+        ):
+            self._manager.connect_signal(signal, self._schedule_sync, key=self.RUNTIME_KEY, unique=False)
+        self._schedule_sync()
+
+    def stop(self):
+        if not self._running:
+            return
+        self._running = False
+        self._manager.disconnect_callbacks(self.RUNTIME_KEY)
+        self._sync_pending = False
+        self.sync(include_flat=True)
+
+    def _schedule_sync(self, *_args):
+        if not self._running or self._sync_pending:
+            return
+        self._sync_pending = True
+        try:
+            cmds.evalDeferred(self._run_deferred_sync, lowestPriority=True)
+        except Exception:
+            QtCore.QTimer.singleShot(0, self._run_deferred_sync)
+
+    def _run_deferred_sync(self):
+        self._sync_pending = False
+        if self._running:
+            self.sync()
+
+    @staticmethod
+    def _graph_editor_visible():
+        try:
+            return GRAPH_EDITOR_PANEL in (cmds.getPanel(visiblePanels=True) or [])
+        except Exception:
+            return False
+
+    @staticmethod
+    def _is_flat_curve(curve):
+        try:
+            values = cmds.keyframe(curve, query=True, valueChange=True) or []
+        except Exception:
+            values = []
+        if len(values) < 2:
+            return bool(values)
+        first = values[0]
+        return all(abs(value - first) <= 1e-10 for value in values[1:])
+
+    @staticmethod
+    def _selected_curve_attributes():
+        try:
+            nodes = cmds.ls(selection=True, long=True) or []
+        except Exception:
+            nodes = []
+
+        lookup_nodes = list(nodes)
+        for node in nodes:
+            try:
+                lookup_nodes.extend(cmds.listRelatives(node, shapes=True, fullPath=True) or [])
+            except Exception:
+                pass
+
+        curve_attributes = []
+        seen = set()
+        for node in lookup_nodes:
+            try:
+                attributes = cmds.listAttr(node, keyable=True, scalar=True) or []
+                attributes.extend(cmds.listAttr(node, channelBox=True, scalar=True) or [])
+            except Exception:
+                attributes = []
+            for attribute in attributes:
+                plug = "{}.{}".format(node, attribute)
+                try:
+                    curves = cmds.keyframe(plug, query=True, name=True) or []
+                except Exception:
+                    curves = []
+                for curve in curves:
+                    pair = (curve, plug)
+                    if pair not in seen:
+                        curve_attributes.append(pair)
+                        seen.add(pair)
+        return curve_attributes
+
+    def sync(self, include_flat=False):
+        if not self._graph_editor_visible():
+            return
+
+        attributes = []
+        seen = set()
+        for curve, attribute in self._selected_curve_attributes():
+            if not include_flat and self._is_flat_curve(curve):
+                continue
+            if attribute and attribute not in seen:
+                attributes.append(attribute)
+                seen.add(attribute)
+
+        try:
+            cmds.selectionConnection(GRAPH_EDITOR_CONNECTION, edit=True, clear=True)
+            for attribute in attributes:
+                cmds.selectionConnection(GRAPH_EDITOR_CONNECTION, edit=True, select=attribute)
+            cmds.animCurveEditor(GRAPH_EDITOR, query=True, curvesShownForceUpdate=True)
+        except Exception:
+            return
+        _emit_runner_triggered(self._manager, HIDE_STATIC_CURVES_ID)
+
+
 class BackgroundRunnerController(QtCore.QObject):
     def __init__(self, manager):
         super().__init__(manager)
@@ -470,6 +600,7 @@ class BackgroundRunnerController(QtCore.QObject):
             CHANNELBOX_HIGHLIGHT_ID: ChannelBoxSelectionHighlightRunner(manager, parent=self),
             CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID: ChannelBoxClearOnSelectionChangeRunner(manager, parent=self),
             CAMERA_ORBIT_SELECTION_ID: CameraOrbitSelectionRunner(manager, parent=self),
+            HIDE_STATIC_CURVES_ID: HideStaticAnimationCurvesRunner(manager, parent=self),
         }
 
     def start_enabled(self):
@@ -583,25 +714,23 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
         return relay.changed
 
     return {
-        CHANNELBOX_HIGHLIGHT_ID: {
-            "id": CHANNELBOX_HIGHLIGHT_ID,
-            "label": "Highlight Channel Box Selection",
-            "menu_label": "Highlight Channel Box Selection",
-            "icon": icons.selector,
-            "description": "Tint the timeline while a Channel Box attribute is selected.",
-            "default": True,
-            "get_enabled": lambda: get_runner_enabled(CHANNELBOX_HIGHLIGHT_ID, True),
+        HIDE_STATIC_CURVES_ID: {
+            "id": HIDE_STATIC_CURVES_ID,
+            "label": "Auto Hide Static Animation Curves",
+            "icon": icons.remove_static_anim_curves,
+            "description": "Automatically hide flat animation curves in the Graph Editor.",
+            "default": False,
+            "get_enabled": lambda: get_runner_enabled(HIDE_STATIC_CURVES_ID, False),
             "set_enabled": lambda enabled: settings.set_setting(
-                _runner_setting_key(CHANNELBOX_HIGHLIGHT_ID),
+                _runner_setting_key(HIDE_STATIC_CURVES_ID),
                 bool(enabled),
                 namespace=RUNNER_SETTINGS_NAMESPACE,
             ),
-            "changed_signal": _background_runner_signal(CHANNELBOX_HIGHLIGHT_ID),
+            "changed_signal": _background_runner_signal(HIDE_STATIC_CURVES_ID),
         },
         CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID: {
             "id": CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID,
-            "label": "Clear Channel Box Selection",
-            "menu_label": "Clear Channel Box Selection",
+            "label": "Channel Box Clear Selection",
             "icon": icons.eraser,
             "description": "Clear selected Channel Box attributes when the Maya selection changes.",
             "default": False,
@@ -613,10 +742,23 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
             ),
             "changed_signal": _background_runner_signal(CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID),
         },
+        CHANNELBOX_HIGHLIGHT_ID: {
+            "id": CHANNELBOX_HIGHLIGHT_ID,
+            "label": "Channel Box Selection Timeline Highlight",
+            "icon": icons.selector,
+            "description": "Tint the timeline while a Channel Box attribute is selected.",
+            "default": True,
+            "get_enabled": lambda: get_runner_enabled(CHANNELBOX_HIGHLIGHT_ID, True),
+            "set_enabled": lambda enabled: settings.set_setting(
+                _runner_setting_key(CHANNELBOX_HIGHLIGHT_ID),
+                bool(enabled),
+                namespace=RUNNER_SETTINGS_NAMESPACE,
+            ),
+            "changed_signal": _background_runner_signal(CHANNELBOX_HIGHLIGHT_ID),
+        },
         CAMERA_ORBIT_SELECTION_ID: {
             "id": CAMERA_ORBIT_SELECTION_ID,
             "label": "Rotate Camera Around Selection",
-            "menu_label": "Rotate Camera Around Selection",
             "icon": icons.follow_cam,
             "description": "Set the active viewport camera rotation point to the center of the current selection.",
             "default": False,

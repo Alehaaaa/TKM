@@ -788,14 +788,14 @@ TOOL_DEFINITIONS = {
         "text": "M",
         "icon": icons.align,
         "tooltip": helper.graph_match_keys_tooltip_text,
-        "callback": lambda: keyTools.graph_match_keys(),
+        "callback": keyTools.graph_match_keys,
     },
     "graph_flip": {
         "type": "tool",
         "label": "Flip Curves",
         "text": "F",
         "tooltip": helper.flip_tooltip_text,
-        "callback": lambda: keyTools.flipCurves(),
+        "callback": keyTools.flipCurves,
     },
     "snap": {
         "type": "tool",
@@ -803,7 +803,7 @@ TOOL_DEFINITIONS = {
         "text": "SpK",
         "icon": icons.snap,
         "tooltip": helper.snap_tooltip_text,
-        "callback": lambda: keyTools.snapKeyframes(),
+        "callback": keyTools.snapKeyframes,
     },
     "graph_overlap_forward": {
         "type": "tool",
@@ -1504,7 +1504,6 @@ TOOL_DEFINITIONS = {
         "type": "menu",
         "label": "Custom Tools",
         "icon": icons.tools_folder,
-        "callback": trigger.make_command_callback("custom_tools"),
         "menu": _tool_menu_builder("build_custom_tools_menu"),
         "tooltip": helper.custom_tools_tooltip_text,
     },
@@ -1512,7 +1511,6 @@ TOOL_DEFINITIONS = {
         "type": "menu",
         "label": "Custom Scripts",
         "icon": icons.scripts_folder,
-        "callback": trigger.make_command_callback("custom_scripts"),
         "menu": _tool_menu_builder("build_custom_scripts_menu"),
         "tooltip": helper.custom_scripts_tooltip_text,
     },
@@ -2447,6 +2445,14 @@ def get_tool(tool_id, **overrides):
     return tool
 
 
+def is_tool_available(tool_id):
+    if tool_id == "check_for_updates":
+        return bool(general.config.get("INTERNET_CONNECTION", True))
+    if tool_id == "bug_report_window":
+        return bool(general.config.get("BUG_REPORT", True))
+    return True
+
+
 def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
     section_def = TOOL_SECTION_DEFINITIONS.get(section_id)
     if not section_def:
@@ -2473,7 +2479,7 @@ def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
                 resolved.append({"type": "group", "items": nested.get("items", []), "label": nested.get("label")})
             continue
         tool_id = item.get("id")
-        if not tool_id:
+        if not tool_id or not is_tool_available(tool_id):
             continue
         overrides = {key: value for key, value in item.items() if key not in {"id", "section", "shortcuts"}}
         resolved.append(_apply_shortcuts(get_tool(tool_id, **overrides), item))

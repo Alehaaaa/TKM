@@ -466,9 +466,6 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         if controller:
             selectionSetsApi.open_selection_set_creation_dialog(controller=controller, parent=self)
 
-    def _open_menu(self):
-        selectionSetsApi.build_selection_sets_context_menu(parent=self, controller=self.controller).exec_(QtGui.QCursor.pos())
-
     def _export_sets(self):
         controller = self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller and self._has_exportable_sets(controller):

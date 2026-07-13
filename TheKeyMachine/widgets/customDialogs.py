@@ -11,7 +11,7 @@ QRegularExpressionValidator = getattr(QtGui, "QRegularExpressionValidator", None
 QSvgRenderer = getattr(QtSvg, "QSvgRenderer", None)
 PYSIDE_VERSION = 6 if (IsPySide6 or IsPyQt6) else 2
 
-from TheKeyMachine.mods.selectionMod import get_selected_objects, get_valid_selected_objects
+from TheKeyMachine.mods.selectionMod import get_valid_selected_objects
 from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 

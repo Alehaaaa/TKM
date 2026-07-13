@@ -93,7 +93,7 @@ def set_numeric_plug_value(plug_name, value, tolerance=0.000001):
         return False
 
 
-def _anim_curve_fn(curve):
+def anim_curve_fn(curve):
     if om is None or oma is None or not curve:
         return None
     mobject = mobject_from_node(curve)
@@ -107,7 +107,7 @@ def _anim_curve_fn(curve):
         return None
 
 
-def _time_unit():
+def time_unit():
     if om is None:
         return None
     try:
@@ -119,15 +119,7 @@ def _time_unit():
 def mtime(time):
     if om is None:
         return None
-    return om.MTime(float(time), _time_unit())
-
-
-def anim_curve_fn(curve):
-    return _anim_curve_fn(curve)
-
-
-def anim_curve_key_index(fn, time):
-    return _find_anim_key_index(fn, time)
+    return om.MTime(float(time), time_unit())
 
 
 def anim_curve_value(fn, index, fallback=None):
@@ -248,11 +240,11 @@ def anim_curve_value_to_attr_value(curve, value):
     return value
 
 
-def _find_anim_key_index(fn, time):
+def anim_curve_key_index(fn, time):
     if om is None or fn is None:
         return None
     try:
-        target = om.MTime(float(time), _time_unit())
+        target = om.MTime(float(time), time_unit())
         num_keys = fn.numKeys() if callable(fn.numKeys) else fn.numKeys
         for index in range(num_keys):
             if abs(fn.input(index).value - target.value) <= 0.000001:
@@ -263,8 +255,8 @@ def _find_anim_key_index(fn, time):
 
 
 def set_anim_curve_key_value(curve, time, value, tolerance=0.000001):
-    fn = _anim_curve_fn(curve)
-    index = _find_anim_key_index(fn, time)
+    fn = anim_curve_fn(curve)
+    index = anim_curve_key_index(fn, time)
     if index is None:
         return False
     try:

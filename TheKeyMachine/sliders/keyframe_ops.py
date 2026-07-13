@@ -13,6 +13,7 @@ except ImportError:
     om = None
 
 import TheKeyMachine.core.runtimeManager as runtime
+import TheKeyMachine.core.openMayaUtils as omutils
 from . import mode_values, utils
 from .utils import TweenFrameData, BlendFrameData
 
@@ -225,18 +226,18 @@ def prepare_tween_data(session, objs=None, attrs=None, attr_plugs=None, time_ran
 
         for current_time in times:
             try:
-                current_v = mode_values.curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
+                current_v = omutils.anim_curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
             except Exception:
                 continue
             key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
             if key_index is not None:
-                current_v = mode_values.curve_value(curve_fn, key_index, current_v)
+                current_v = omutils.anim_curve_value(curve_fn, key_index, current_v)
 
             # Case A: Boundary-based Tweening (Selected Range)
             if time_range and right_frame is not None:
                 try:
-                    prev_v = mode_values.curve_value_at_time(curve_fn, time_range[0], cmds.getAttr(attr_full, time=time_range[0]))
-                    next_v = mode_values.curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
+                    prev_v = omutils.anim_curve_value_at_time(curve_fn, time_range[0], cmds.getAttr(attr_full, time=time_range[0]))
+                    next_v = omutils.anim_curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
                     session.cache.tween_frame_data[(attr_full, current_time)] = TweenFrameData(
                         previousValue=prev_v,
                         nextValue=next_v,
@@ -272,8 +273,8 @@ def prepare_tween_data(session, objs=None, attrs=None, attr_plugs=None, time_ran
             elif next_f is None:
                 next_f = prev_f
 
-            prev_v = mode_values.curve_value_at_time(curve_fn, prev_f, cmds.getAttr(attr_full, time=prev_f))
-            next_v = mode_values.curve_value_at_time(curve_fn, next_f, cmds.getAttr(attr_full, time=next_f))
+            prev_v = omutils.anim_curve_value_at_time(curve_fn, prev_f, cmds.getAttr(attr_full, time=prev_f))
+            next_v = omutils.anim_curve_value_at_time(curve_fn, next_f, cmds.getAttr(attr_full, time=next_f))
 
             session.cache.tween_frame_data[(attr_full, current_time)] = TweenFrameData(
                 previousValue=prev_v,
@@ -304,12 +305,12 @@ def cache_neighbor_keyframe_data(session, affected_map, time_range=None):
 
         for current_time in times:
             try:
-                original_value = mode_values.curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
+                original_value = omutils.anim_curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
             except Exception:
                 continue
             key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
             if key_index is not None:
-                original_value = mode_values.curve_value(curve_fn, key_index, original_value)
+                original_value = omutils.anim_curve_value(curve_fn, key_index, original_value)
 
             previous_value = None
             next_value = None
@@ -319,8 +320,8 @@ def cache_neighbor_keyframe_data(session, affected_map, time_range=None):
 
             if time_range and right_frame is not None:
                 try:
-                    previous_value = mode_values.curve_value_at_time(curve_fn, time_range[0], cmds.getAttr(attr_full, time=time_range[0]))
-                    next_value = mode_values.curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
+                    previous_value = omutils.anim_curve_value_at_time(curve_fn, time_range[0], cmds.getAttr(attr_full, time=time_range[0]))
+                    next_value = omutils.anim_curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
                     prev_f = time_range[0]
                     next_f = right_frame
                 except Exception:
@@ -334,14 +335,14 @@ def cache_neighbor_keyframe_data(session, affected_map, time_range=None):
 
                 if prev_f is not None:
                     try:
-                        previous_value = mode_values.curve_value_at_time(curve_fn, prev_f, cmds.getAttr(attr_full, time=prev_f))
+                        previous_value = omutils.anim_curve_value_at_time(curve_fn, prev_f, cmds.getAttr(attr_full, time=prev_f))
                         prev_tan_type = cmds.keyTangent(attr_full, query=True, time=(prev_f,), outTangentType=True)[0]
                     except Exception:
                         pass
 
                 if next_f is not None:
                     try:
-                        next_value = mode_values.curve_value_at_time(curve_fn, next_f, cmds.getAttr(attr_full, time=next_f))
+                        next_value = omutils.anim_curve_value_at_time(curve_fn, next_f, cmds.getAttr(attr_full, time=next_f))
                     except Exception:
                         pass
 
@@ -588,10 +589,10 @@ def apply_blend_to_default(session, percentage, world_space=False):
 
             for current_time in times:
                 try:
-                    original_value = mode_values.curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
+                    original_value = omutils.anim_curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
                     key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
                     if key_index is not None:
-                        original_value = mode_values.curve_value(curve_fn, key_index, original_value)
+                        original_value = omutils.anim_curve_value(curve_fn, key_index, original_value)
                     session.cache.frame_data[(attr_full, current_time)] = BlendFrameData(
                         original_value=original_value,
                         defaultValue=default_value,
@@ -625,10 +626,6 @@ def apply_blend_to_default(session, percentage, world_space=False):
         )
 
 
-def apply_blend_to_key(session, percentage, objs=None):
-    return apply_blend_to_neighbors(session, percentage)
-
-
 def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None, objs=None, world_space=False):
     """Blends current values toward values at specific frames, for all affected keys."""
     if left_frame is None:
@@ -654,18 +651,18 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
 
             try:
                 curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
-                l_val = mode_values.curve_value_at_time(curve_fn, left_frame, cmds.getAttr(attr_full, time=left_frame))
-                r_val = mode_values.curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
+                l_val = omutils.anim_curve_value_at_time(curve_fn, left_frame, cmds.getAttr(attr_full, time=left_frame))
+                r_val = omutils.anim_curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
             except Exception:
                 continue
 
             has_keys = _has_keyframes(attr_full)
             for t in times:
                 try:
-                    orig = mode_values.curve_value_at_time(curve_fn, t, cmds.getAttr(attr_full, time=t))
+                    orig = omutils.anim_curve_value_at_time(curve_fn, t, cmds.getAttr(attr_full, time=t))
                     key_index = mode_values.find_or_add_key_index(session, curve_fn, t)
                     if key_index is not None:
-                        orig = mode_values.curve_value(curve_fn, key_index, orig)
+                        orig = omutils.anim_curve_value(curve_fn, key_index, orig)
                     session.cache.frame_data[(attr_full, t)] = BlendFrameData(
                         original_value=orig,
                         leftValue=l_val,
@@ -730,18 +727,18 @@ def apply_blend_to_infinity(session, percentage, world_space=False):
             span = max(1.0, last_frame - first_frame)
             pre_frame, post_frame = first_frame - span, last_frame + span
             try:
-                pre_value = mode_values.curve_value_at_time(curve_fn, pre_frame, cmds.getAttr(attr_full, time=pre_frame))
-                post_value = mode_values.curve_value_at_time(curve_fn, post_frame, cmds.getAttr(attr_full, time=post_frame))
+                pre_value = omutils.anim_curve_value_at_time(curve_fn, pre_frame, cmds.getAttr(attr_full, time=pre_frame))
+                post_value = omutils.anim_curve_value_at_time(curve_fn, post_frame, cmds.getAttr(attr_full, time=post_frame))
             except Exception:
                 continue
             has_keys = _has_keyframes(attr_full)
             for current_time in times:
-                original = mode_values.curve_value_at_time(
+                original = omutils.anim_curve_value_at_time(
                     curve_fn, current_time, cmds.getAttr(attr_full, time=current_time)
                 )
                 key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
                 if key_index is not None:
-                    original = mode_values.curve_value(curve_fn, key_index, original)
+                    original = omutils.anim_curve_value(curve_fn, key_index, original)
                 session.cache.frame_data[(attr_full, current_time)] = BlendFrameData(
                     original_value=original, leftValue=pre_value, rightValue=post_value,
                     leftFrame=pre_frame, rightFrame=post_frame, use_direct_attr=not has_keys,
@@ -791,12 +788,12 @@ def apply_blend_to_buffer(session, percentage, world_space=False):
             buffer_targets = _capture_buffer_curve_targets(curve, times)
             for current_time in times:
                 try:
-                    orig = mode_values.curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
+                    orig = omutils.anim_curve_value_at_time(curve_fn, current_time, cmds.getAttr(attr_full, time=current_time))
                 except Exception:
                     continue
                 key_index = mode_values.find_or_add_key_index(session, curve_fn, current_time)
                 if key_index is not None:
-                    orig = mode_values.curve_value(curve_fn, key_index, orig)
+                    orig = omutils.anim_curve_value(curve_fn, key_index, orig)
                 target = buffer_targets.get(float(current_time), {})
                 buffer_value = target.get("value")
                 if not isinstance(buffer_value, (int, float)):
@@ -849,7 +846,7 @@ def apply_blend_to_undo(session, percentage, world_space=False):
             for current_time in times:
                 current_data[(attr_full, current_time)] = {
                     "curve": curve,
-                    "value": mode_values.curve_value_at_time(
+                    "value": omutils.anim_curve_value_at_time(
                         curve_fn, current_time, cmds.getAttr(attr_full, time=current_time)
                     ),
                     "has_keys": _has_keyframes(attr_full),
@@ -874,7 +871,7 @@ def apply_blend_to_undo(session, percentage, world_space=False):
                         shape = {}
                     for current_time in times:
                         fallback = cmds.getAttr(attr_full, time=current_time)
-                        undone_values[(attr_full, current_time)] = mode_values.curve_value_at_time(
+                        undone_values[(attr_full, current_time)] = omutils.anim_curve_value_at_time(
                             undone_curve_fn, current_time, fallback
                         )
                         undone_shapes[(attr_full, current_time)] = shape.get(float(current_time), {})
@@ -911,18 +908,3 @@ def apply_blend_to_undo(session, percentage, world_space=False):
         if not session.preview:
             target = session.cache.auxiliary.get((attr_full, current_time, "undo_shape"))
             _apply_preserved_blended_tangents(cache.curve, current_time, target, t)
-
-
-def blend_slider_reset(session, slider_name=None):
-    """Cleanup after slider interaction, handling tangent restoration."""
-    if session.cache.frame_data:
-        for (attr_full, time), cache in session.cache.frame_data.items():
-            if cache.prevTanType == "step":
-                try:
-                    cmds.keyTangent(attr_full, edit=True, time=(time,), inTangentType="stepnext", outTangentType="stepnext")
-                except Exception:
-                    pass
-
-    session.finish()
-    if slider_name and cmds.floatSlider(slider_name, exists=True):
-        cmds.floatSlider(slider_name, edit=True, value=0)
