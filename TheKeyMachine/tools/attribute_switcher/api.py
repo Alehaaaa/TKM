@@ -127,13 +127,6 @@ def is_attribute_switcher_window_open():
     return bool(dlg and dlg.isVisible())
 
 
-def _get_attribute_switcher_toolbar_button():
-    button = getattr(attribute_switcher_toolbar_toggle, "_button", None)
-    if button and wutil.is_valid_widget(button) and button.isVisible():
-        return button
-    return None
-
-
 def close_attribute_switcher_window():
     global _attribute_switcher_instance
     dlg = get_attribute_switcher_window()
@@ -143,43 +136,40 @@ def close_attribute_switcher_window():
     _emit_attribute_switcher_window_state(False)
 
 
-def attribute_switcher_window(reuse_existing=True, popup=True, anchor_to_toolbar=False):
+def attribute_switcher_window(reuse_existing=True, popup=True, anchor_button=None):
     global _attribute_switcher_instance
     dlg = get_attribute_switcher_window()
-    if reuse_existing and dlg and wutil.is_valid_widget(dlg):
-        if not dlg.isVisible():
-            dlg.show()
-        dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, is_stay_on_top())
-        dlg.show()
-        if anchor_to_toolbar:
-            dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=wutil.DPI(18))
-        elif popup:
-            dlg.place_near_cursor()
-        dlg.raise_()
-        dlg.activateWindow()
-        _emit_attribute_switcher_window_state(True)
-        return dlg
-    close_attribute_switcher_window()
-    dlg = AttributeSwitcherWindow(parent=_parent_widget(), popup=popup)
+    if not (reuse_existing and dlg and wutil.is_valid_widget(dlg)):
+        close_attribute_switcher_window()
+        dlg = AttributeSwitcherWindow(parent=_parent_widget(), popup=popup)
+
+        def _on_destroyed(*_):
+            global _attribute_switcher_instance
+            _attribute_switcher_instance = None
+            _emit_attribute_switcher_window_state(False)
+
+        dlg.destroyed.connect(_on_destroyed)
+        _attribute_switcher_instance = dlg
+
     dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, is_stay_on_top())
-    dlg.show()
-    if anchor_to_toolbar:
-        dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=wutil.DPI(18))
+    if anchor_button and wutil.is_valid_widget(anchor_button):
+        dlg.present_above_toolbar_button(anchor_button)
     elif popup:
-        dlg.place_near_cursor()
-    def _on_destroyed(*_):
-        global _attribute_switcher_instance
-        _attribute_switcher_instance = None
-        _emit_attribute_switcher_window_state(False)
-    dlg.destroyed.connect(_on_destroyed)
-    _attribute_switcher_instance = dlg
+        dlg.present_beside_cursor()
+    else:
+        dlg.present_floating_window()
+
     _emit_attribute_switcher_window_state(True)
     return dlg
 
 
 attribute_switcher_toolbar_toggle = ToolbarWindowToggle(
     is_attribute_switcher_window_open,
-    lambda: attribute_switcher_window(reuse_existing=True, popup=False, anchor_to_toolbar=True),
+    lambda anchor_button=None: attribute_switcher_window(
+        reuse_existing=True,
+        popup=anchor_button is None,
+        anchor_button=anchor_button,
+    ),
     close_attribute_switcher_window,
     attribute_switcher_window_bus.stateChanged,
 )
@@ -191,7 +181,7 @@ def restore_attribute_switcher_default_position():
     )
     dlg = get_attribute_switcher_window()
     if dlg and wutil.is_valid_widget(dlg):
-        dlg.place_above_toolbar_button(_get_attribute_switcher_toolbar_button(), gap=wutil.DPI(18))
+        dlg.present_above_toolbar_button(attribute_switcher_toolbar_toggle.anchor_button())
 
 
 def set_stay_on_top(enabled):
@@ -256,7 +246,7 @@ def toggle_attribute_switcher_window():
     elif is_attribute_switcher_window_open():
         close_attribute_switcher_window()
     else:
-        attribute_switcher_window(reuse_existing=True, popup=False, anchor_to_toolbar=True)
+        attribute_switcher_window(reuse_existing=True, popup=True)
 
 
 def show():

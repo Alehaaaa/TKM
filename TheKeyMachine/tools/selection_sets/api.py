@@ -284,17 +284,12 @@ def refresh_selection_sets_window():
         win.refresh()
 
 
-def _get_selection_sets_toolbar_button():
-    button = getattr(_selection_sets_toolbar_toggle, "_button", None)
-    if button and wutil.is_valid_widget(button) and button.isVisible():
-        return button
-    return None
-
-
 def _place_selection_sets_window_default(win):
     if not win or not wutil.is_valid_widget(win):
         return
-    win.place_above_toolbar_button(_get_selection_sets_toolbar_button())
+    win.present_above_toolbar_button(
+        _selection_sets_toolbar_toggle.anchor_button(), gap=wutil.DPI(18)
+    )
 
 
 def _selection_sets_quick_file():

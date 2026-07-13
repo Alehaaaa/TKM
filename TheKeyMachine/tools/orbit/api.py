@@ -194,6 +194,22 @@ def orbit_window(*args, offset_x=0, offset_y=0, rebuild=False, reuse_existing=Fa
         _emit_orbit_window_state(False)
 
     win.destroyed.connect(_on_destroyed)
+    if win.has_initial_toolbar_placement_pending():
+        win.move_above_toolbar_button(orbit_toolbar_toggle.anchor_button())
+
+    def _finish_initial_placement():
+        try:
+            win.initial_layout_ready.disconnect(_finish_initial_placement)
+        except (RuntimeError, TypeError):
+            pass
+        if not wutil.is_valid_widget(win):
+            return
+        if win.consume_initial_toolbar_placement():
+            win.present_above_toolbar_button(orbit_toolbar_toggle.anchor_button())
+        else:
+            win.clamp_to_current_screen()
+
+    win.initial_layout_ready.connect(_finish_initial_placement)
     win.show()
     _emit_orbit_window_state(True)
     return win
@@ -243,13 +259,6 @@ def _set_orbit_stays_on_top(enabled: bool):
     if win and wutil.is_valid_widget(win):
         win.apply_stay_on_top_setting()
 
-def _get_orbit_toolbar_button():
-    """Return the Orbit toolbar button widget if visible."""
-    button = getattr(orbit_toolbar_toggle, "_button", None)
-    if button and wutil.is_valid_widget(button) and button.isVisible():
-        return button
-    return None
-
 def restore_orbit_default_position():
     """Reset the floating Orbit window to its default geometry."""
     settings.set_setting(
@@ -259,7 +268,7 @@ def restore_orbit_default_position():
     )
     win = get_orbit_window()
     if win and wutil.is_valid_widget(win):
-        win.place_above_toolbar_button(_get_orbit_toolbar_button())
+        win.present_above_toolbar_button(orbit_toolbar_toggle.anchor_button())
 
 def build_orbit_context_menu(parent=None):
     menu = cw.OpenMenuWidget(parent)

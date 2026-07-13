@@ -12,7 +12,6 @@ from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
 
 QActionGroup = QtGui.QActionGroup
 
-import TheKeyMachine.mods.hotkeysMod as hotkeys
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.mods.keyToolsMod as keyTools
@@ -1039,7 +1038,7 @@ def build_main_settings_menu(
         toolbar_alignment=toolbar_alignment,
         update_toolbar_icon_alignment=update_toolbar_icon_alignment,
     )
-    _add_action(toolbar_menu, callback=hotkeys.show_hotkeys_window, command_id="hotkeys_window")
+    _add_action(toolbar_menu, command_id="hotkeys_window")
     _add_registered_menu(
         toolbar_menu,
         partial(build_main_dock_menu, toolbar),
@@ -1056,7 +1055,7 @@ def build_main_settings_menu(
             callback=lambda: updater.check_for_updates(parent_button, force=True),
             command_id="check_for_updates",
         )
-    _add_action(toolbar_menu, callback=ui.about_window, command_id="about_window")
+    _add_action(toolbar_menu, command_id="about_window")
     return toolbar_menu
 
 
@@ -1147,9 +1146,9 @@ def build_graph_settings_menu(
         command_id="graph_dock_menu",
     )
 
-    _add_action(menu, callback=hotkeys.show_hotkeys_window, command_id="hotkeys_window")
+    _add_action(menu, command_id="hotkeys_window")
     menu.addSeparator()
     add_other_sources_help_menu(menu)
 
-    _add_action(menu, callback=ui.about_window, command_id="about_window")
+    _add_action(menu, command_id="about_window")
     return menu

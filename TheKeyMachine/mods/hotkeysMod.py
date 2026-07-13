@@ -1280,6 +1280,7 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         if command_data.get("checkable"):
             self.check_box = QtWidgets.QCheckBox(self)
             self.check_box.setObjectName("HotkeyCommandCheckBox")
+            self.check_box.setProperty("tkm_window_anchor", False)
             self.check_box.setFixedSize(wutil.DPI(15), wutil.DPI(22))
             self.check_box.setFocusPolicy(QtCore.Qt.NoFocus)
             self.check_box.setStyleSheet(

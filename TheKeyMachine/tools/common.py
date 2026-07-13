@@ -12,6 +12,7 @@ from TheKeyMachine.mods import settingsMod as settings
 
 
 UNDO_PREFIX = "TKM"
+FLOATING_TOOL_ANCHOR_GAP = wutil.DPI(12)
 _ACTIVE_PROGRESS_STACK = []
 _TOOL_DURATION_ESTIMATES = {}
 _REFRESH_SUSPEND_DEPTH = 0
@@ -1273,13 +1274,32 @@ class ToolbarWindowToggle(QtCore.QObject):
         if state_signal is not None:
             state_signal.connect(self._on_window_state_changed)
 
-    @property
-    def _button(self):
-        """Compatibility anchor: return the most recently attached live control."""
-        for button in reversed(list(self._buttons.values())):
-            if wutil.is_valid_widget(button):
-                return button
+    @staticmethod
+    def _eligible_anchor(button):
+        if not button or not wutil.is_valid_widget(button):
+            return None
+        if button.property("tkm_window_anchor") is False:
+            return None
+        return button if button.isVisible() else None
+
+    def anchor_button(self):
+        """Return the latest visible control explicitly eligible as a window anchor."""
+        for button_id, button in reversed(list(self._buttons.items())):
+            if not wutil.is_valid_widget(button):
+                self._buttons.pop(button_id, None)
+                continue
+            anchor = self._eligible_anchor(button)
+            if anchor is not None:
+                return anchor
         return None
+
+    def _open_from_source(self, source_button=None):
+        call_kwargs = _supported_callback_kwargs(
+            self._open_fn,
+            {"anchor_button": self._eligible_anchor(source_button)},
+            injected_keys=("anchor_button",),
+        )
+        return self._open_fn(**call_kwargs)
 
     def attach_button(self, button):
         if not button:
@@ -1332,7 +1352,10 @@ class ToolbarWindowToggle(QtCore.QObject):
         import TheKeyMachine.mods.reportMod as report
 
         if checked:
-            report.safe_execute(self._open_fn, context="toolbar window toggle open")
+            report.safe_execute(
+                lambda: self._open_from_source(_button),
+                context="toolbar window toggle open",
+            )
         else:
             report.safe_execute(self._close_fn, context="toolbar window toggle close")
         self._reconcile_button_state()
@@ -1347,11 +1370,14 @@ class ToolbarWindowToggle(QtCore.QObject):
         clear_tracked_connection(button, "_tkm_window_toggle_relay")
         clear_tracked_connection(button, "_tkm_window_toggle_destroyed_relay")
 
-    def open(self):
+    def open(self, source_button=None):
         import TheKeyMachine.mods.reportMod as report
 
         if not self._is_open_fn():
-            result = report.safe_execute(self._open_fn, context="toolbar window toggle open")
+            result = report.safe_execute(
+                lambda: self._open_from_source(source_button),
+                context="toolbar window toggle open",
+            )
             self._reconcile_button_state()
             return result
 
@@ -1363,13 +1389,16 @@ class ToolbarWindowToggle(QtCore.QObject):
             self._reconcile_button_state()
             return result
 
-    def toggle(self):
+    def toggle(self, source_button=None):
         import TheKeyMachine.mods.reportMod as report
 
         if self._is_open_fn():
             result = report.safe_execute(self._close_fn, context="toolbar window toggle close")
         else:
-            result = report.safe_execute(self._open_fn, context="toolbar window toggle open")
+            result = report.safe_execute(
+                lambda: self._open_from_source(source_button),
+                context="toolbar window toggle open",
+            )
         self._reconcile_button_state()
         return result
 
@@ -1386,6 +1415,16 @@ class WindowStateBus(QtCore.QObject):
 
 
 class FloatingToolWindowMixin:
+    @staticmethod
+    def _clamped_window_origin(x, y, width, height, screen_geometry):
+        """Return a top-left position constrained to one screen's available area."""
+        max_x = screen_geometry.right() - min(width, screen_geometry.width()) + 1
+        max_y = screen_geometry.bottom() - min(height, screen_geometry.height()) + 1
+        return QtCore.QPoint(
+            max(screen_geometry.left(), min(x, max_x)),
+            max(screen_geometry.top(), min(y, max_y)),
+        )
+
     def _current_screen_geometry(self):
         if not wutil.is_valid_widget(self):
             return None
@@ -1396,30 +1435,33 @@ class FloatingToolWindowMixin:
             return None
         return screen.availableGeometry()
 
-    def clamp_to_current_screen(self):
+    def clamp_to_screen(self, screen_geometry):
         if not wutil.is_valid_widget(self):
             return False
-        geo = self._current_screen_geometry()
-        if geo is None:
+        if screen_geometry is None:
             return False
 
-        width = min(self.width(), geo.width())
-        height = min(self.height(), geo.height())
-        x = max(geo.left(), min(self.x(), geo.right() - width))
-        y = max(geo.top(), min(self.y(), geo.bottom() - height))
+        width = min(self.width(), screen_geometry.width())
+        height = min(self.height(), screen_geometry.height())
+        position = self._clamped_window_origin(
+            self.x(), self.y(), width, height, screen_geometry
+        )
 
         if width != self.width() or height != self.height():
-            self.setGeometry(x, y, width, height)
+            self.setGeometry(position.x(), position.y(), width, height)
         else:
-            self.move(x, y)
+            self.move(position)
         return True
 
-    def place_above_toolbar_button(self, button=None, gap=None):
+    def clamp_to_current_screen(self):
+        return self.clamp_to_screen(self._current_screen_geometry())
+
+    def move_above_toolbar_button(self, button=None, gap=None):
+        """Move above a toolbar button without changing window visibility."""
         if not wutil.is_valid_widget(self):
             return False
 
         if not button or not wutil.is_valid_widget(button) or not button.isVisible():
-            self.place_near_cursor()
             return False
 
         self.adjustSize()
@@ -1431,8 +1473,10 @@ class FloatingToolWindowMixin:
         anchor_point = button_rect.center()
 
         screen = QtGui.QGuiApplication.screenAt(anchor_point) or QtGui.QGuiApplication.primaryScreen()
+        if screen is None:
+            return False
         geo = screen.availableGeometry()
-        gap = wutil.DPI(18) if gap is None else gap
+        gap = FLOATING_TOOL_ANCHOR_GAP if gap is None else gap
 
         x = anchor_point.x() - width // 2
         y = button_rect.top() - height - gap
@@ -1440,15 +1484,58 @@ class FloatingToolWindowMixin:
         if y < geo.top():
             y = button_rect.bottom() + gap
 
-        x = max(geo.left(), min(x, geo.right() - width))
-        y = max(geo.top(), min(y, geo.bottom() - height))
+        position = self._clamped_window_origin(x, y, width, height, geo)
+        self.move(position)
+        return True
 
-        self.move(x, y)
-        self.clamp_to_current_screen()
+    def move_beside_cursor(self, gap=None):
+        """Move beside the cursor, preferring its right side on the active screen."""
+        if not wutil.is_valid_widget(self):
+            return False
+
+        self.adjustSize()
+        width = self.width()
+        height = self.height()
+        cursor_position = QtGui.QCursor.pos()
+        screen = (
+            QtGui.QGuiApplication.screenAt(cursor_position)
+            or QtGui.QGuiApplication.primaryScreen()
+        )
+        if screen is None:
+            return False
+
+        gap = FLOATING_TOOL_ANCHOR_GAP if gap is None else gap
+        screen_geometry = screen.availableGeometry()
+        x = cursor_position.x() + gap
+        if x + width - 1 > screen_geometry.right():
+            x = cursor_position.x() - width - gap
+        y = cursor_position.y() - height // 2
+        self.move(
+            self._clamped_window_origin(
+                x, y, width, height, screen_geometry
+            )
+        )
+        return True
+
+    def present_floating_window(self):
+        """Show and focus a floating tool after its geometry has been resolved."""
         self.show()
         self.raise_()
         self.activateWindow()
         return True
+
+    def present_above_toolbar_button(self, button=None, gap=None):
+        """Present at a toolbar anchor, falling back to the cursor when unavailable."""
+        placed = self.move_above_toolbar_button(button=button, gap=gap)
+        if not placed:
+            self.move_beside_cursor(gap=gap)
+        self.present_floating_window()
+        return placed
+
+    def present_beside_cursor(self, gap=None):
+        """Present beside the cursor using the shared screen-safe placement."""
+        self.move_beside_cursor(gap=gap)
+        return self.present_floating_window()
 
     def _init_floating_window_behavior(self):
         self._hovered = False

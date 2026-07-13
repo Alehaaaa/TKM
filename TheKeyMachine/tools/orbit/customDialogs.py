@@ -5,6 +5,8 @@ from TheKeyMachine.widgets import customDialogs
 from TheKeyMachine.tools.orbit.customWidgets import OrbitWindowMixin
 
 class OrbitWindow(OrbitWindowMixin, customDialogs.QFlatCloseableFloatingWidget):
+    initial_layout_ready = QtCore.Signal()
+
     def __init__(self, parent=None, offset_x=0, offset_y=0, rebuild=False):
         super().__init__(popup=False, parent=parent)
         self.setObjectName("orbit_window")
@@ -12,6 +14,7 @@ class OrbitWindow(OrbitWindowMixin, customDialogs.QFlatCloseableFloatingWidget):
 
         self._setup_orbit_ui()
         self._init_floating_window_behavior()
+        self._initial_toolbar_placement_pending = False
 
         saved_geom = orbitApi.settings.get_setting("orbit_geometry", namespace=orbitApi.ORBIT_SETTINGS_NAMESPACE)
 
@@ -30,11 +33,19 @@ class OrbitWindow(OrbitWindowMixin, customDialogs.QFlatCloseableFloatingWidget):
             if offset_x != 0 or offset_y != 0:
                 self.move(QtGui.QCursor.pos() + QtCore.QPoint(offset_x, offset_y))
             else:
-                self.place_above_toolbar_button(orbitApi._get_orbit_toolbar_button())
+                self._initial_toolbar_placement_pending = True
 
         self.update_orbit_layout_for_current_geometry()
         self.apply_stay_on_top_setting()
         self.update_transparency_state(False)
+
+    def has_initial_toolbar_placement_pending(self):
+        return self._initial_toolbar_placement_pending
+
+    def consume_initial_toolbar_placement(self):
+        pending = self._initial_toolbar_placement_pending
+        self._initial_toolbar_placement_pending = False
+        return pending
 
     def _auto_transparency_setting_enabled(self):
         return orbitApi._orbit_auto_transparency_enabled()

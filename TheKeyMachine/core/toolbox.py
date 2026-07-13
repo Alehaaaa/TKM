@@ -297,18 +297,21 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Orbit Window",
         "icon": icons.orbit_ui,
+        "callback": trigger.make_command_callback("orbit_window"),
     },
     "hotkeys_window": {
         "type": "tool",
         "label": "Hotkeys",
         "icon": icons.hotkeys,
         "tooltip": "Open the TheKeyMachine hotkey editor.",
+        "callback": trigger.make_command_callback("hotkeys_window"),
     },
     "about_window": {
         "type": "tool",
         "label": "About",
         "icon": icons.about,
         "tooltip": "Show TheKeyMachine version, credits, and project information.",
+        "callback": trigger.make_command_callback("about_window"),
     },
     "donate_window": {
         "type": "tool",

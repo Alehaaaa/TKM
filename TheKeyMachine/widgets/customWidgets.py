@@ -473,9 +473,12 @@ class MenuWidget(QtWidgets.QMenu):
             def _invoke_menu_callback(
                 checked=False,
                 cb=metadata_callback,
-                pass_checked=self._callback_accepts_checked(metadata_callback),
             ):
                 def _run():
+                    pass_checked = (
+                        action.isCheckable()
+                        and self._callback_accepts_checked(cb)
+                    )
                     call_args = (checked,) if pass_checked else ()
                     toolCommon.run_tool_callback(
                         action,

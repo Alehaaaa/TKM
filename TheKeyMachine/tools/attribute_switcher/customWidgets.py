@@ -206,17 +206,6 @@ class FloatingWidget(cd.QFlatDialog):
             self.setBottomBar(closeButton=True)
         self._disable_auto_close()
 
-    def place_near_cursor(self):
-        self.resize(self.sizeHint())
-        w, h = self.width(), self.height()
-        cursor_pos = QCursor.pos()
-        screen = QGuiApplication.screenAt(cursor_pos) or QGuiApplication.primaryScreen()
-        geo = screen.availableGeometry()
-
-        x = max(geo.left(), min(cursor_pos.x(), geo.right() - w))
-        y = max(geo.top(), min(cursor_pos.y() - h // 2, geo.bottom() - h))
-        self.move(x, y)
-
     def resizeEvent(self, event):
         s = self.grip.sizeHint()
         self.grip.setFixedSize(s)

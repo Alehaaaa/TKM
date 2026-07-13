@@ -216,7 +216,10 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
     def _finish_initial_orbit_flow_layout(self):
         self._update_orbit_flow(resize_window=False, force_layout=True)
         self._orbit_flow_can_resize_window = True
-        self._fit_orbit_window_to_flow_height()
+        self._fit_orbit_window_to_flow_height(clamp=False)
+        signal = getattr(self, "initial_layout_ready", None)
+        if signal is not None:
+            signal.emit()
 
     def update_orbit_layout_for_current_geometry(self):
         section = getattr(self, "tools_section", None)
@@ -282,7 +285,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
     def _update_height(self):
         self._update_orbit_flow(resize_window=self._orbit_flow_can_resize_window)
 
-    def _fit_orbit_window_to_flow_height(self, section_height=None):
+    def _fit_orbit_window_to_flow_height(self, section_height=None, clamp=True):
         section = getattr(self, "tools_section", None)
         if not section:
             return
@@ -299,7 +302,8 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
 
         if target_height > 0 and self.height() != target_height:
             self.setGeometry(self.x(), self.y(), self.width(), target_height)
-            self.clamp_to_current_screen()
+            if clamp:
+                self.clamp_to_current_screen()
 
     def _seed_orbit_visibility_settings(self):
         current_actions = set(orbitApi.load_orbit_configuration().values())
