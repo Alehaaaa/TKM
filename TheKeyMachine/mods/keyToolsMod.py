@@ -38,7 +38,7 @@ from collections import Counter
 from contextlib import contextmanager
 
 import TheKeyMachine.core.runtimeManager as runtime
-from TheKeyMachine.core import curveFitting
+from TheKeyMachine.core import animation_context, curveFitting, euler_filter
 
 
 import TheKeyMachine.widgets.util as wutil
@@ -108,12 +108,6 @@ def smart_translate_manipulator_release():
     mel.eval("destroySTRSMarkingMenu MoveTool")
 
 
-def clear_timeslider_selection():
-    # fix temporal para limpiar el timeslider
-    selection = selectionMod.get_selected_objects()
-    cmds.select(selection)
-
-
 def _begin_timeline_tint(timerange, key, owner=None, color=None):
     import TheKeyMachine.mods.barMod as bar
 
@@ -145,34 +139,6 @@ def _get_default_value_for_attribute(obj, attr, data):
     if default_value:
         return default_value[0]
     return None
-
-
-def resolve_tool_targets(default_mode="all_animation", ordered_selection=False, long_names=True):
-    selection_context = selectionMod.resolve_target_context()
-    target_plugs = selection_context["plugs"]
-    source = selection_context["source"]
-    has_graph_keys = selection_context["has_graph_keys"]
-    time_context = timelineWidgets.resolve_time_context(default_mode=default_mode)
-    selected_keyframes = selectionMod.get_graph_editor_selected_keyframes() if has_graph_keys else []
-
-    target_objects = selectionMod.object_names_from_plugs(target_plugs)
-
-    if not target_objects:
-        target_objects = selectionMod.get_selected_objects(orderedSelection=ordered_selection, long=long_names)
-
-    selected_channels = selectionMod.attribute_names_from_plugs(target_plugs)
-    selected_curves = selectionMod.get_anim_curves_from_plugs(target_plugs)
-
-    return {
-        "target_plugs": target_plugs,
-        "target_objects": target_objects,
-        "selected_channels": selected_channels,
-        "selected_curves": selected_curves,
-        "selected_keyframes": selected_keyframes,
-        "time_context": time_context,
-        "source": source,
-        "has_graph_keys": has_graph_keys,
-    }
 
 
 def get_share_keys_mode():
@@ -494,7 +460,7 @@ def remove_link_obj_callbacks(*args):
 
 
 def share_keys(*args):
-    target_info = resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
+    target_info = animation_context.resolve_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
     objetos = target_info["target_objects"]
     target_plugs = target_info["target_plugs"]
     time_context = target_info["time_context"]
@@ -755,7 +721,7 @@ def bake_animation(bake_interval=1, window=None):
     tool_key = "bake_animation_{}".format(bake_interval) if bake_interval in BAKE_UNDO_HELP else "bake_animation_custom"
 
     try:
-        target_info = resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
+        target_info = animation_context.resolve_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
         selected_objects = target_info["target_objects"]
         selected_channels = target_info["selected_channels"]
 
@@ -987,7 +953,7 @@ def _scene_anim_curves():
 
 
 def _target_anim_curves():
-    target_info = resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
+    target_info = animation_context.resolve_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
     curves = _unique(target_info.get("selected_curves"))
     if curves:
         return curves
@@ -1061,7 +1027,7 @@ def move_keyframes_in_range(*args):
         return
 
     current_time = cmds.currentTime(q=True)
-    target_info = resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
+    target_info = animation_context.resolve_targets(default_mode="all_animation", ordered_selection=True, long_names=True)
     selection = target_info["target_objects"]
     target_plugs = target_info["target_plugs"]
     target_curves = target_info["selected_curves"]
@@ -1144,21 +1110,6 @@ def move_keyframes_in_range(*args):
 # _____________________________________________________ Key Tools  Customgraph _______________________________________________________________#
 
 
-def deleteStaticCurves():
-    # Obtener los objetos seleccionados con sus nombres completos una sola vez
-    selected_objects = selectionMod.get_selected_objects(long=True)
-
-    curves_to_delete = []
-    for curve in selectionMod.get_anim_curves_for_nodes(selected_objects, include_shapes=True):
-        values = cmds.keyframe(curve, query=True, valueChange=True) or []
-        if len(set(values)) == 1:
-            curves_to_delete.append(curve)
-
-    # Eliminar todas las curvas recopiladas en un solo comando
-    if curves_to_delete:
-        cmds.delete(curves_to_delete)
-
-
 # --------------------------------------------------- Anim Curve hotkey helpers ---------------------------------------------------
 
 
@@ -1188,175 +1139,24 @@ def _animation_command_context(label, tint_key=None, default_mode="all_animation
         yield
 
 
-def _selection_time_kwargs(time_context):
-    if not time_context:
-        return {}
-    if time_context.mode in ("graph_editor_keys", "time_slider_range"):
-        return {"time": (time_context.start_frame, time_context.end_frame)}
-    return {}
-
-
-def _selected_key_times_for_curve(curve):
-    try:
-        return cmds.keyframe(curve, query=True, selected=True, timeChange=True) or []
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return []
-
-
-def _key_times_for_curve_context(curve, target_info):
-    time_context = (target_info or {}).get("time_context")
-    if time_context and time_context.mode == "graph_editor_keys":
-        return _selected_key_times_for_curve(curve)
-
-    query_kwargs = {"query": True, "timeChange": True}
-    if time_context and time_context.mode == "time_slider_range":
-        query_kwargs["time"] = time_context.timerange
-
-    try:
-        return cmds.keyframe(curve, **query_kwargs) or []
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return []
-
-
-def _resolve_key_command_targets(default_mode="all_animation", include_shapes=True):
-    """Return the selection context in the shapes most key-edit commands need."""
-    target_info = resolve_tool_targets(default_mode=default_mode, ordered_selection=True, long_names=True)
-    channel_plugs, channel_source = selectionMod.get_attribute_plugs_from_nodes(selectionMod.get_selected_objects(long=True))
-    if channel_source == "channel_box" and channel_plugs:
-        target_info = dict(target_info)
-        target_info["target_plugs"] = _unique(channel_plugs)
-        target_info["target_objects"] = selectionMod.object_names_from_plugs(channel_plugs)
-        target_info["selected_channels"] = selectionMod.attribute_names_from_plugs(channel_plugs)
-        target_info["selected_curves"] = selectionMod.get_anim_curves_from_plugs(channel_plugs)
-        target_info["selected_keyframes"] = []
-        target_info["source"] = "channel_box"
-        target_info["has_graph_keys"] = False
-
-    target_plugs = _unique(target_info.get("target_plugs"))
-    selected_objects = _unique(target_info.get("target_objects"))
-    selected_channels = _unique(target_info.get("selected_channels"))
-
-    if include_shapes and selected_objects:
-        shaped_objects = list(selected_objects)
-        for obj in selected_objects:
-            shaped_objects.extend(cmds.listRelatives(obj, shapes=True, fullPath=True) or [])
-        selected_objects = _unique(shaped_objects)
-
-    return target_info, target_plugs, selected_objects, selected_channels
-
-
-def _curves_for_key_selection(target_info=None, include_shapes=True):
-    if target_info is None:
-        target_info, _target_plugs, _selected_objects, _selected_channels = _resolve_key_command_targets(
-            include_shapes=include_shapes
-        )
-
-    curves = _unique(target_info.get("selected_curves"))
-    if curves:
-        return curves
-
-    target_plugs = _unique(target_info.get("target_plugs"))
-    curves.extend(selectionMod.get_anim_curves_from_plugs(target_plugs))
-    if _is_explicit_channel_source(target_info.get("source")):
-        return _unique(curves)
-
-    selected_objects = _unique(target_info.get("target_objects"))
-    curves.extend(selectionMod.get_anim_curves_for_nodes(selected_objects, include_shapes=include_shapes))
-    return _unique(curves)
-
-
-def _resolve_anim_curve_tool_context(default_mode="all_animation", include_shapes=True):
-    target_info, _target_plugs, _selected_objects, _selected_channels = _resolve_key_command_targets(
-        default_mode=default_mode,
-        include_shapes=include_shapes,
-    )
-    curves = _curves_for_key_selection(target_info, include_shapes=include_shapes)
-    return target_info, _unique(curves)
-
-
-def _key_selection_range(target_info, target_plugs=None, selected_objects=None, selected_channels=None):
-    time_context = target_info.get("time_context")
-    if time_context and time_context.mode == "graph_editor_keys" and time_context.frames:
-        return time_context.start_frame, time_context.end_frame
-
-    frames = []
-    query_kwargs = {"query": True, "timeChange": True}
-    if time_context and time_context.mode == "time_slider_range":
-        query_kwargs["time"] = time_context.timerange
-
-    if target_plugs:
-        for plug in target_plugs:
-            frames.extend(cmds.keyframe(plug, **query_kwargs) or [])
-    else:
-        kwargs = dict(query_kwargs)
-        if selected_channels:
-            kwargs["attribute"] = selected_channels
-        for obj in selected_objects or []:
-            frames.extend(cmds.keyframe(obj, **kwargs) or [])
-
-    if not frames:
-        return None
-    return min(frames), max(frames)
-
-
-def _capture_key_selection_context():
-    scene_selection = cmds.ls(selection=True, long=True) or []
-    key_selection = []
-    try:
-        selected_curves = cmds.keyframe(query=True, selected=True, name=True) or []
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        selected_curves = []
-
-    for curve in _unique(selected_curves):
-        try:
-            frames = cmds.keyframe(curve, query=True, selected=True, timeChange=True) or []
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            frames = []
-        key_selection.extend((curve, frame) for frame in frames)
-
-    return scene_selection, key_selection
-
-
-def _restore_key_selection_context(context):
-    scene_selection, key_selection = context
-
-    try:
-        cmds.selectKey(clear=True)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
-
-    for curve, frame in key_selection:
-        try:
-            if cmds.keyframe(curve, query=True, time=(frame, frame)):
-                cmds.selectKey(curve, add=True, keyframe=True, time=(frame, frame))
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            continue
-
-    try:
-        existing_selection = [item for item in scene_selection if cmds.objExists(item)]
-        if existing_selection:
-            cmds.select(existing_selection, replace=True)
-        else:
-            cmds.select(clear=True)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
-
-
 def _filter_curves_preserving_selection(curves, filter_name, command_label, target_info):
-    selection_context = _capture_key_selection_context()
-    time_kwargs = _selection_time_kwargs(target_info.get("time_context"))
-    try:
+    time_context = target_info.get("time_context")
+    filter_kwargs = {}
+    if time_context and time_context.mode == "graph_editor_keys":
+        filter_kwargs["selectedKeys"] = True
+    elif time_context and time_context.mode == "time_slider_range":
+        filter_kwargs.update(
+            startTime=time_context.start_frame,
+            endTime=time_context.end_frame,
+        )
+    with animation_context.preserve_key_selection():
         try:
-            if time_kwargs:
-                return cmds.filterCurve(curves, filter=filter_name, **time_kwargs)
-            return cmds.filterCurve(curves, filter=filter_name)
+            return cmds.filterCurve(curves, filter=filter_name, **filter_kwargs)
         except (RuntimeError, TypeError) as exc:
-            if time_kwargs:
+            if filter_kwargs:
                 cmds.warning("{} could not run on the selected time range: {}".format(command_label, exc))
                 return None
             raise
-    finally:
-        _restore_key_selection_context(selection_context)
 
 
 def _run_key_command(
@@ -1365,7 +1165,7 @@ def _run_key_command(
     default_mode="all_animation",
     **base_kwargs
 ):
-    target_info, target_plugs, selected_objects, _selected_channels = _resolve_key_command_targets(
+    target_info, target_plugs, selected_objects, _selected_channels = animation_context.resolve_command_targets(
         default_mode=default_mode,
         include_shapes=False,
     )
@@ -1393,7 +1193,7 @@ def _run_key_command(
             kwargs.setdefault("animation", "keys")
             return command(**kwargs)
 
-        kwargs.update(_selection_time_kwargs(time_context))
+        kwargs.update(animation_context.selection_time_kwargs(time_context))
 
         if default_mode == "current_frame" and not _has_key_time_filter(kwargs):
             frame = cmds.currentTime(query=True)
@@ -1440,9 +1240,9 @@ def _paste_key_targets(target_plugs, selected_objects, selected_channels, **kwar
 
 
 def apply_smart_euler_filter(*args):
-    target_info, _target_plugs, _selected_objects, _selected_channels = _resolve_key_command_targets(default_mode="all_animation")
+    target_info, _target_plugs, _selected_objects, _selected_channels = animation_context.resolve_command_targets(default_mode="all_animation")
     curves = []
-    for curve in _curves_for_key_selection(target_info):
+    for curve in animation_context.curves(target_info):
         if selectionMod.is_rotation_anim_curve(curve):
             curves.append(curve)
 
@@ -1450,7 +1250,7 @@ def apply_smart_euler_filter(*args):
         return wutil.make_inViewMessage("No rotation animation curves found")
 
     with _animation_command_context("Apply Smart Euler Filter", "apply_smart_euler_filter"):
-        return _filter_curves_preserving_selection(curves, "euler", "Apply Smart Euler Filter", target_info)
+        return euler_filter.apply(curves, target_info)
 
 
 def clear_animation_keys(*args):
@@ -1460,8 +1260,8 @@ def clear_animation_keys(*args):
 def copy_keys(*args):
     global _key_clipboard_start_frame
 
-    target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(default_mode="all_animation")
-    key_range = _key_selection_range(target_info, target_plugs, selected_objects, selected_channels)
+    target_info, target_plugs, selected_objects, selected_channels = animation_context.resolve_command_targets(default_mode="all_animation")
+    key_range = animation_context.key_range(target_info, target_plugs, selected_objects, selected_channels)
     _key_clipboard_start_frame = key_range[0] if key_range else None
     return _run_key_command(cmds.copyKey, "copy_keys", option="keys")
 
@@ -1469,8 +1269,8 @@ def copy_keys(*args):
 def cut_keys(*args):
     global _key_clipboard_start_frame
 
-    target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(default_mode="all_animation")
-    key_range = _key_selection_range(target_info, target_plugs, selected_objects, selected_channels)
+    target_info, target_plugs, selected_objects, selected_channels = animation_context.resolve_command_targets(default_mode="all_animation")
+    key_range = animation_context.key_range(target_info, target_plugs, selected_objects, selected_channels)
     _key_clipboard_start_frame = key_range[0] if key_range else None
     return _run_key_command(cmds.cutKey, "cut_keys", option="keys")
 
@@ -1485,7 +1285,7 @@ def delete_keys(*args):
 
 
 def paste_keys(*args):
-    target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(
+    target_info, target_plugs, selected_objects, selected_channels = animation_context.resolve_command_targets(
         default_mode="current_frame", include_shapes=False
     )
     if not target_plugs and not selected_objects:
@@ -1499,7 +1299,7 @@ def paste_keys(*args):
 def paste_keys_relative(*args):
     global _key_clipboard_start_frame
 
-    target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(
+    target_info, target_plugs, selected_objects, selected_channels = animation_context.resolve_command_targets(
         default_mode="current_frame", include_shapes=False
     )
     if not target_plugs and not selected_objects:
@@ -1515,13 +1315,13 @@ def paste_keys_relative(*args):
 
 
 def crop_animation(*args):
-    target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(default_mode="all_animation")
+    target_info, target_plugs, selected_objects, selected_channels = animation_context.resolve_command_targets(default_mode="all_animation")
     if not target_plugs and not selected_objects:
         return wutil.make_inViewMessage("Select at least one object or channel")
 
     time_context = target_info["time_context"]
     crop_range = (time_context.start_frame, time_context.end_frame)
-    curves = _curves_for_key_selection(target_info)
+    curves = animation_context.curves(target_info)
     if not curves:
         return wutil.make_inViewMessage("No animation curves found")
 
@@ -1534,8 +1334,8 @@ def crop_animation(*args):
 
 
 def remove_redundant_keys(*args):
-    target_info, _target_plugs, _selected_objects, _selected_channels = _resolve_key_command_targets(default_mode="all_animation")
-    curves = _curves_for_key_selection(target_info)
+    target_info, _target_plugs, _selected_objects, _selected_channels = animation_context.resolve_command_targets(default_mode="all_animation")
+    curves = animation_context.curves(target_info)
     if not curves:
         return wutil.make_inViewMessage("No animation curves found")
 
@@ -1546,55 +1346,23 @@ def remove_redundant_keys(*args):
         return _filter_curves_preserving_selection(curves, "simplify", "Remove Redundant Keys", target_info)
 
 
-def _is_scoped_key_context(target_info):
-    time_context = (target_info or {}).get("time_context")
-    return bool(time_context and time_context.mode in ("graph_editor_keys", "time_slider_range"))
-
-
-def _curve_values_for_context(curve, target_info):
-    values = []
-    for key_time in _key_times_for_curve_context(curve, target_info):
-        try:
-            key_values = cmds.keyframe(curve, time=(key_time, key_time), query=True, valueChange=True) or []
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            key_values = []
-        values.extend(key_values)
-    return values
-
-
-def _remove_static_curve_context(curve, target_info):
-    if not _is_scoped_key_context(target_info):
-        cmds.delete(curve)
-        return True
-
-    removed = False
-    time_context = target_info.get("time_context")
-    if time_context and time_context.mode == "graph_editor_keys":
-        for key_time in _selected_key_times_for_curve(curve):
-            cmds.cutKey(curve, time=(key_time, key_time), clear=True)
-            removed = True
-        return removed
-
-    time_kwargs = _selection_time_kwargs(time_context)
-    if time_kwargs:
-        cmds.cutKey(curve, clear=True, **time_kwargs)
-        removed = True
-    return removed
-
-
 def remove_static_anim_curves(*args):
-    target_info, _target_plugs, _selected_objects, _selected_channels = _resolve_key_command_targets(default_mode="all_animation")
-    curves = _curves_for_key_selection(target_info)
+    target_info, _target_plugs, _selected_objects, _selected_channels = animation_context.resolve_command_targets(default_mode="all_animation")
+    curves = animation_context.curves(target_info)
     if not curves:
         return wutil.make_inViewMessage("No animation curves found")
 
-    curves_to_delete = []
+    static_targets = {}
     for curve in curves:
-        values = _curve_values_for_context(curve, target_info)
-        if values and len(set(values)) == 1:
-            curves_to_delete.append(curve)
+        key_data = animation_context.key_data(curve, target_info)
+        if not key_data:
+            continue
+        values = [value for _time, value in key_data]
+        if max(values) - min(values) <= 1e-8:
+            key_times = tuple(time for time, _value in key_data)
+            static_targets.setdefault(key_times, []).append(curve)
 
-    if not curves_to_delete:
+    if not static_targets:
         return wutil.make_inViewMessage("No static animation curves found")
 
     time_context = target_info["time_context"]
@@ -1602,15 +1370,34 @@ def remove_static_anim_curves(*args):
 
     with _animation_command_context("Remove Static Anim Curves", "remove_static_anim_curves", timerange=_range, tint=False):
         removed = False
-        for curve in _unique(curves_to_delete):
-            removed = _remove_static_curve_context(curve, target_info) or removed
+        for key_times, grouped_curves in static_targets.items():
+            try:
+                cmds.cutKey(
+                    grouped_curves,
+                    time=[(key_time, key_time) for key_time in key_times],
+                    clear=True,
+                )
+                removed = True
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                # Isolate a bad curve without losing the rest of the batch.
+                for curve in grouped_curves:
+                    try:
+                        cmds.cutKey(
+                            curve,
+                            time=[(key_time, key_time) for key_time in key_times],
+                            clear=True,
+                        )
+                        removed = True
+                    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                        continue
         if not removed:
-            return wutil.make_inViewMessage("No static animation curves found")
+            return wutil.make_inViewMessage("Static animation curves could not be removed")
+        return True
 
 
 def reverse_animation(*args):
-    target_info, _target_plugs, _selected_objects, _selected_channels = _resolve_key_command_targets(default_mode="all_animation")
-    curves = _curves_for_key_selection(target_info)
+    target_info, _target_plugs, _selected_objects, _selected_channels = animation_context.resolve_command_targets(default_mode="all_animation")
+    curves = animation_context.curves(target_info)
     if not curves:
         return wutil.make_inViewMessage("No animation curves found")
 
@@ -1711,7 +1498,7 @@ def _set_selected_graph_editor_curves_current_time():
 
 
 def set_smart_key(*args):
-    target_info, target_plugs, selected_objects, selected_channels = _resolve_key_command_targets(
+    target_info, target_plugs, selected_objects, selected_channels = animation_context.resolve_command_targets(
         default_mode="current_frame",
         include_shapes=False,
     )
@@ -1743,7 +1530,7 @@ def set_smart_key(*args):
                     except (RuntimeError, ValueError, TypeError):
                         pass
             else:
-                curves = _curves_for_key_selection(target_info, include_shapes=False)
+                curves = animation_context.curves(target_info, include_shapes=False)
                 curve_frames = frames
                 if source in ("graph_editor", "graph_editor_outliner") and not target_info.get("selected_keyframes"):
                     curve_frames = (cmds.currentTime(query=True),)
@@ -1756,7 +1543,7 @@ def set_smart_key(*args):
             if not selected_objects:
                 return wutil.make_inViewMessage("Select at least one object")
 
-            curves = _curves_for_key_selection(target_info, include_shapes=False)
+            curves = animation_context.curves(target_info, include_shapes=False)
             for curve in curves:
                 for frame in frames:
                     keyed = _set_key_on_curve_preserving_tangent(curve, frame) or keyed
@@ -1778,7 +1565,7 @@ def set_smart_key(*args):
 
 
 def set_smart_key_all_channels(*args):
-    target_info, _target_plugs, selected_objects, _selected_channels = _resolve_key_command_targets(
+    target_info, _target_plugs, selected_objects, _selected_channels = animation_context.resolve_command_targets(
         default_mode="current_frame",
         include_shapes=False,
     )
@@ -1811,62 +1598,59 @@ def set_smart_key_all_channels(*args):
             return wutil.make_inViewMessage("No keyable channels found")
 
 
-def _snap_curve_key(curve, key_time):
+def _snap_curve_key(curve, key_time, target_value):
     rounded_time = round(key_time)
     if float(rounded_time) == float(key_time):
         return False
 
     try:
-        # Sample the curve at the destination frame.  Reusing the sub-frame
-        # key's value would effectively move the key and change the curve's
-        # pose at the closest full frame.
-        values = cmds.keyframe(curve, time=(rounded_time, rounded_time), query=True, eval=True) or []
-        in_tangents = cmds.keyTangent(curve, time=(key_time,), query=True, inTangentType=True) or []
-        out_tangents = cmds.keyTangent(curve, time=(key_time,), query=True, outTangentType=True) or []
+        # Move the existing key and set the value sampled at its destination in
+        # one edit. This keeps the full-frame animation intact while preserving
+        # tangent weights, locks, and breakdown state.
+        cmds.keyframe(
+            curve,
+            edit=True,
+            time=(key_time, key_time),
+            absolute=True,
+            option="over",
+            timeChange=rounded_time,
+            valueChange=target_value,
+        )
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return False
-
-    if not values:
-        return False
-
-    try:
-        # Create/replace the destination first.  Cutting the only key from an
-        # anim curve can make Maya delete the curve node, leaving a stale name
-        # for setKeyframe (for example, "...rotateX15").
-        cmds.setKeyframe(curve, time=(rounded_time,), value=values[0])
-        cmds.cutKey(curve, time=(key_time, key_time), clear=True)
-    except (RuntimeError, ValueError, TypeError):
-        return False
-
-    tangent_kwargs = {}
-    if in_tangents:
-        tangent_kwargs["inTangentType"] = in_tangents[0]
-    if out_tangents:
-        tangent_kwargs["outTangentType"] = out_tangents[0]
-    if tangent_kwargs:
-        try:
-            cmds.keyTangent(curve, time=(rounded_time,), edit=True, **tangent_kwargs)
-        except (RuntimeError, ValueError, TypeError):
-            # The sampled key is still valid when Maya cannot apply a tangent
-            # type (for example on a curve with restricted tangent settings).
-            pass
     return True
 
 
-def snapKeyframes():
-    target_info, _target_plugs, _selected_objects, _selected_channels = _resolve_key_command_targets(
+def snap_keyframes():
+    target_info, _target_plugs, _selected_objects, _selected_channels = animation_context.resolve_command_targets(
         default_mode="all_animation",
         include_shapes=True,
     )
-    curves = _curves_for_key_selection(target_info)
+    curves = animation_context.curves(target_info)
     if not curves:
         return wutil.make_inViewMessage("No animation curves found")
 
-    curve_key_times = [
-        (curve, list(_key_times_for_curve_context(curve, target_info)))
-        for curve in curves
-    ]
-    work_items = sum(len(key_times) for _curve, key_times in curve_key_times)
+    curve_key_times = []
+    for curve in curves:
+        snap_data = []
+        for key_time in animation_context.key_times(curve, target_info):
+            rounded_time = round(key_time)
+            if float(rounded_time) == float(key_time):
+                continue
+            try:
+                values = cmds.keyframe(
+                    curve, time=(rounded_time, rounded_time), query=True, eval=True
+                ) or []
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                values = []
+            if values:
+                snap_data.append((key_time, values[0]))
+        if snap_data:
+            curve_key_times.append((curve, snap_data))
+    work_items = sum(len(snap_data) for _curve, snap_data in curve_key_times)
+
+    if not work_items:
+        return wutil.make_inViewMessage("No sub-frame keys found")
 
     snapped = False
     with toolCommon.tool_operation(
@@ -1881,72 +1665,31 @@ def snapKeyframes():
         tint_color=_timeline_tint_color("snap"),
     ) as operation:
         operation.start()
-        for curve, key_times in curve_key_times:
-            for key_time in key_times:
+        for curve, snap_data in curve_key_times:
+            for key_time, target_value in snap_data:
                 if operation.cancelled:
                     return
-                snapped = _snap_curve_key(curve, key_time) or snapped
+                snapped = _snap_curve_key(curve, key_time, target_value) or snapped
                 operation.step()
 
     if not snapped:
         return wutil.make_inViewMessage("No sub-frame keys found")
 
 
-def shareKeys():
-    # Obtener los keyframes de todas las curvas
-    all_times = cmds.keyframe(query=True, timeChange=True)
-
-    # Obtener las curvas seleccionadas
-    selected_curves = cmds.keyframe(selected=True, query=True, name=True)
-
-    # Verificar si hay al menos una curva seleccionada
-    if selected_curves:
-        for curve in selected_curves:
-            # Obtener el valor del primer y último keyframe de la curva seleccionada
-            first_frame_value = cmds.keyframe(curve, query=True, time=(all_times[0], all_times[0]), valueChange=True)
-            last_frame_value = cmds.keyframe(curve, query=True, time=(all_times[-1], all_times[-1]), valueChange=True)
-
-            # Si la curva tiene keyframes, establecer todos los keyframes con el valor del primer y último frame
-            if first_frame_value and last_frame_value:
-                first_frame_value = first_frame_value[0]
-                last_frame_value = last_frame_value[0]
-
-                # Crear todos los keyframes con el mismo valor del primer y último frame
-                for time in all_times:
-                    if time == all_times[0] or time == all_times[-1]:
-                        cmds.setKeyframe(curve, time=time, value=first_frame_value)
-                    else:
-                        # Obtener la lista de los keyframes actuales de la curva
-                        curve_times = cmds.keyframe(curve, query=True, timeChange=True)
-                        if time in curve_times:
-                            # Si el frame actual ya tiene un keyframe, usar su valor
-                            frame_value = cmds.keyframe(curve, query=True, time=(time, time), valueChange=True)[0]
-                        else:
-                            # Si no, usar el valor del primer keyframe
-                            frame_value = first_frame_value
-
-                        cmds.setKeyframe(curve, time=time, value=frame_value)
-
-
 def graph_match_keys():
-    target_info, selected_curves = _resolve_anim_curve_tool_context()
+    target_info, selected_curves = animation_context.resolve_curve_context()
     if len(selected_curves) < 2:
         return wutil.make_inViewMessage("Select at least two animation curves")
 
     source_curve = selected_curves[-1]
-    source_times = _key_times_for_curve_context(source_curve, target_info)
-    source_values = [
-        (time, (cmds.keyframe(source_curve, query=True, time=(time, time), valueChange=True) or [None])[0])
-        for time in source_times
-    ]
-    source_values = [(time, value) for time, value in source_values if value is not None]
+    source_values = animation_context.key_data(source_curve, target_info)
     if not source_values:
         return wutil.make_inViewMessage("No source keys found")
 
     source_time_set = {time for time, _value in source_values}
     with _animation_command_context("Match Keys", "graph_match_keys", tint=False):
         for curve in selected_curves[:-1]:
-            curve_times = set(_key_times_for_curve_context(curve, target_info))
+            curve_times = set(animation_context.key_times(curve, target_info))
             for frame in curve_times - source_time_set:
                 cmds.cutKey(curve, time=(frame, frame), clear=True)
             for time, value in source_values:
@@ -1954,29 +1697,25 @@ def graph_match_keys():
 
 
 def _flip_curve_context(curve, target_info):
-    values = _curve_values_for_context(curve, target_info)
-    if not values:
+    key_data = animation_context.key_data(curve, target_info)
+    if not key_data:
         return False
 
+    values = [value for _time, value in key_data]
     pivot = (min(values) + max(values)) / 2.0
     time_context = target_info.get("time_context")
     if time_context and time_context.mode == "graph_editor_keys":
-        flipped = False
-        for key_time in _selected_key_times_for_curve(curve):
-            value = (cmds.keyframe(curve, query=True, time=(key_time, key_time), valueChange=True) or [None])[0]
-            if value is None:
-                continue
+        for key_time, value in key_data:
             cmds.keyframe(curve, edit=True, time=(key_time, key_time), valueChange=pivot + (pivot - value))
-            flipped = True
-        return flipped
+        return True
 
-    kwargs = _selection_time_kwargs(time_context)
+    kwargs = animation_context.selection_time_kwargs(time_context)
     cmds.scaleKey(curve, valueScale=-1, valuePivot=pivot, **kwargs)
     return True
 
 
-def flipCurves():
-    target_info, selected_curves = _resolve_anim_curve_tool_context()
+def flip_curves():
+    target_info, selected_curves = animation_context.resolve_curve_context()
     if not selected_curves:
         return wutil.make_inViewMessage("Select at least one animation curve")
 
@@ -1988,7 +1727,7 @@ def flipCurves():
             return wutil.make_inViewMessage("No keys found")
 
 
-def flipFromKeyframe():
+def flip_from_keyframe():
     selectedCurves = cmds.keyframe(n=1, sl=1, q=1)
 
     if selectedCurves is not None:
@@ -2005,11 +1744,11 @@ def flipFromKeyframe():
 
 
 def _overlap_curves(frames_to_move, label, tint_key):
-    target_info, selected_curves = _resolve_anim_curve_tool_context()
+    target_info, selected_curves = animation_context.resolve_curve_context()
     if not selected_curves:
         return wutil.make_inViewMessage("Select animation curves, channels, or animated objects")
 
-    time_kwargs = _selection_time_kwargs(target_info.get("time_context"))
+    time_kwargs = animation_context.selection_time_kwargs(target_info.get("time_context"))
     with _animation_command_context(label, tint_key, tint=False):
         for index, curve in enumerate(selected_curves):
             cmds.keyframe(
@@ -2034,7 +1773,7 @@ def overlap_backward(*args):
 # __________________________________________________ Iso / Mute / Lock ____________________________________________________________#
 
 
-def isolateCurve():
+def isolate_curve():
     # Obtén las curvas seleccionadas en el Graph Editor
     selected_objects = selectionMod.get_graph_editor_outliner_items()
 
@@ -2045,7 +1784,7 @@ def isolateCurve():
             mel.eval("isolateAnimCurve true {} {};".format(selectionMod.GRAPH_EDITOR_OUTLINER, selectionMod.GRAPH_EDITOR))
 
 
-def toggleMute():
+def toggle_mute():
     # Obtener las curvas seleccionadas en el Graph Editor
     selected_curves = selectionMod.get_graph_editor_outliner_items()
 
@@ -2065,7 +1804,7 @@ def toggleMute():
                 cmds.mute(curve)
 
 
-def toggleLock():
+def toggle_lock():
     # Obtén las curvas seleccionadas en el Graph Editor
     selected_objects = selectionMod.get_graph_editor_outliner_items()
 
@@ -2234,7 +1973,7 @@ def default_object_values(default_translations=False, default_rotations=False, d
         else:
             data = {}
 
-        target_info = resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=True)
+        target_info = animation_context.resolve_targets(default_mode="current_frame", ordered_selection=True, long_names=True)
         time_context = target_info["time_context"]
         operation_context = toolCommon.tool_operation(
             tool_id=tool_id,
@@ -2446,7 +2185,7 @@ def find_opposite_name(name):
 
 # ___________________________ SELECT OPPOSITE _____________________________________
 
-def selectOpposite(*args):
+def select_opposite(*args):
     global MIRROR_PATTERNS
 
     selected_objects = selectionMod.get_selected_objects()
@@ -2461,7 +2200,7 @@ def selectOpposite(*args):
         cmds.select(opposite_controls)
 
 
-def addSelectOpposite(*args):
+def add_select_opposite(*args):
     global MIRROR_PATTERNS
 
     selected_objects = selectionMod.get_selected_objects()
@@ -2479,7 +2218,7 @@ def addSelectOpposite(*args):
 # ___________________________ Copy Opposite _____________________________________
 
 
-def copyOpposite(*args):
+def copy_opposite(*args):
     operation_context = None
     try:
         selected_objects = selectionMod.get_selected_objects()
@@ -3602,7 +3341,7 @@ def copy_animation(*args):
                     processor.step()
 
             if time_context.mode == "time_slider_range":
-                clear_timeslider_selection()
+                timelineWidgets.clear_time_slider_selection()
             elif time_context.mode not in ("all_animation", "graph_editor_keys"):
                 tint_range = _animation_data_timerange(animation_data)
 
@@ -3977,45 +3716,6 @@ def match_curve_cycle(*args, target_key="last"):
 # Bouncy tangents
 
 
-def _collect_bouncy_target_curves(target_info):
-    curves = []
-    seen = set()
-
-    for curve in target_info.get("selected_curves") or []:
-        if curve and curve not in seen:
-            seen.add(curve)
-            curves.append(curve)
-
-    if curves:
-        return curves
-
-    for curve in selectionMod.get_anim_curves_from_plugs(target_info.get("target_plugs") or []):
-        if curve and curve not in seen:
-            seen.add(curve)
-            curves.append(curve)
-
-    if curves:
-        return curves
-
-    target_objects = target_info.get("target_objects") or []
-    selected_channels = target_info.get("selected_channels") or None
-    time_context = target_info.get("time_context")
-    query_kwargs = {"query": True, "name": True}
-    if selected_channels:
-        query_kwargs["attribute"] = selected_channels
-    if time_context and time_context.mode == "time_slider_range":
-        query_kwargs["time"] = time_context.timerange
-
-    for obj in target_objects:
-        obj_curves = cmds.keyframe(obj, **query_kwargs) or []
-        for curve in obj_curves:
-            if curve and curve not in seen:
-                seen.add(curve)
-                curves.append(curve)
-
-    return curves
-
-
 def _filter_bouncy_keyframes_by_scope(target_keyframes, key_scope):
     if key_scope not in ("first", "last"):
         return target_keyframes
@@ -4036,22 +3736,12 @@ def _collect_bouncy_target_keyframes(target_info, key_scope="selection"):
             key_scope,
         )
 
-    time_context = target_info.get("time_context")
-    curves = _collect_bouncy_target_curves(target_info)
+    curves = animation_context.curves(target_info)
     targets = []
     seen = set()
 
-    if not time_context:
-        return targets
-
     for curve in curves:
-        if time_context.mode == "time_slider_range":
-            key_times = cmds.keyframe(curve, query=True, time=time_context.timerange, timeChange=True) or []
-        else:
-            current_frame = time_context.timerange[0]
-            key_times = cmds.keyframe(curve, query=True, time=(current_frame, current_frame), timeChange=True) or []
-
-        for frame in key_times:
+        for frame in animation_context.key_times(curve, target_info):
             item = (curve, float(frame))
             if item in seen:
                 continue
@@ -4061,9 +3751,12 @@ def _collect_bouncy_target_keyframes(target_info, key_scope="selection"):
     return _filter_bouncy_keyframes_by_scope(targets, key_scope)
 
 
-def bouncy_tangets(*args, angle_adjustment_factor=1.3, handle_mode="both", key_scope="selection", tint_color=None):  # Ajuste de ángulo
+def bouncy_tangents(*args, angle_adjustment_factor=1.3, handle_mode="both", key_scope="selection", tint_color=None):  # Ajuste de ángulo
     default_mode = "all_animation" if key_scope == "all" else "current_frame"
-    target_info = resolve_tool_targets(default_mode=default_mode, ordered_selection=True, long_names=False)
+    target_info, _plugs, _objects, _channels = animation_context.resolve_command_targets(
+        default_mode=default_mode,
+        include_shapes=True,
+    )
     target_keyframes = _collect_bouncy_target_keyframes(target_info, key_scope=key_scope)
 
     if not target_keyframes:

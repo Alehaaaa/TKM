@@ -4,8 +4,6 @@ TheKeyMachine - Keyframe-level Slider Operations
 Tweening and blending operations translated from keyToolsMod.
 """
 
-import math
-
 import maya.cmds as cmds
 try:
     from maya.api import OpenMaya as om
@@ -107,22 +105,8 @@ def _interpolate_matrix(prev_mat, next_mat, t):
         return [prev_values[i] + (next_values[i] - prev_values[i]) * t for i in range(16)]
 
 
-def _remap_time(time, target_times, source_start, source_end):
-    target_start, target_end = min(target_times), max(target_times)
-    if target_end == target_start:
-        return max(source_start, min(source_end, float(time)))
-    ratio = (float(time) - target_start) / float(target_end - target_start)
-    return source_start + ratio * (source_end - source_start)
-
-
-def _scaled_angle(angle, source_span, target_span):
-    if angle is None or source_span <= 0.0 or target_span <= 0.0:
-        return angle
-    return math.degrees(math.atan(math.tan(math.radians(float(angle))) * source_span / target_span))
-
-
 def _capture_buffer_curve_targets(curve, target_times):
-    """Sample a Maya buffer curve onto existing target times without moving keys."""
+    """Sample a Maya buffer curve at the current curve's key times."""
     target_times = sorted(set(float(time) for time in target_times or []))
     if not curve or not target_times:
         return {}
@@ -136,25 +120,29 @@ def _capture_buffer_curve_targets(curve, target_times):
     try:
         cmds.bufferCurve(curve, swap=True)
         swapped = True
-        source_keys = sorted(float(time) for time in (cmds.keyframe(curve, query=True, timeChange=True) or []))
-        if not source_keys:
+        if not (cmds.keyframe(curve, query=True, timeChange=True) or []):
             return {}
-        source_start, source_end = source_keys[0], source_keys[-1]
-        source_times = [_remap_time(time, target_times, source_start, source_end) for time in target_times]
         from TheKeyMachine.core import curveFitting
 
-        source_shape = curveFitting.capture([curve], source_times).get(curve, {})
-        source_span = max(0.0, source_end - source_start)
-        target_span = max(0.0, max(target_times) - min(target_times))
+        # A Maya buffer belongs to this curve and already uses the same time
+        # axis. Remapping a selected range over the buffer's full range scales
+        # the animation instead of blending to the buffered curve.
+        source_shape = curveFitting.capture([curve], target_times).get(curve, {})
         result = {}
-        for target_time, source_time in zip(target_times, source_times):
-            sample = source_shape.get(float(source_time))
+        for target_time in target_times:
+            sample = source_shape.get(target_time)
             if not sample:
                 continue
+
+            # When the buffer has a key at this exact time its native tangent
+            # angle is the most faithful shape target. Fitted angles are only
+            # needed when sampling the buffer between its keys.
+            in_angle = sample.get("original_in_angle")
+            out_angle = sample.get("original_out_angle")
             result[target_time] = {
                 "value": sample.get("value"),
-                "in_angle": _scaled_angle(sample.get("in_angle"), source_span, target_span),
-                "out_angle": _scaled_angle(sample.get("out_angle"), source_span, target_span),
+                "in_angle": in_angle if in_angle is not None else sample.get("in_angle"),
+                "out_angle": out_angle if out_angle is not None else sample.get("out_angle"),
             }
         return result
     finally:
@@ -165,29 +153,67 @@ def _capture_buffer_curve_targets(curve, target_times):
                 pass
 
 
-def _apply_preserved_blended_tangents(curve, time, target, blend):
-    """Rotate already-manual tangents toward a fitted target without changing types."""
-    if not curve or not target:
-        return
+def _capture_tangent_state(curve, time):
+    """Capture manual tangent state before slider values start changing."""
+    if not curve:
+        return {}
     try:
         in_types = cmds.keyTangent(curve, query=True, time=(time, time), inTangentType=True) or []
         out_types = cmds.keyTangent(curve, query=True, time=(time, time), outTangentType=True) or []
         in_angles = cmds.keyTangent(curve, query=True, time=(time, time), inAngle=True) or []
         out_angles = cmds.keyTangent(curve, query=True, time=(time, time), outAngle=True) or []
+        locks = cmds.keyTangent(curve, query=True, time=(time, time), lock=True) or []
+        return {
+            "original_in_type": in_types[0] if in_types else None,
+            "original_out_type": out_types[0] if out_types else None,
+            "original_in_angle": in_angles[0] if in_angles else None,
+            "original_out_angle": out_angles[0] if out_angles else None,
+            "original_tangents_locked": bool(locks[0]) if locks else False,
+        }
+    except Exception:
+        return {}
+
+
+def _apply_preserved_blended_tangents(curve, time, target, blend):
+    """Rotate only manual tangents, using the drag-start curve as the origin."""
+    if not curve or not target:
+        return
+    try:
         amount = min(1.0, max(0.0, abs(float(blend))))
         kwargs = {"absolute": True}
-        if in_types and in_types[0] == "fixed" and in_angles and target.get("in_angle") is not None:
+        result_angles = {}
+        in_angle = target.get("original_in_angle")
+        if target.get("original_in_type") == "fixed" and in_angle is not None and target.get("in_angle") is not None:
             target_angle = float(target["in_angle"])
             if blend < 0.0:
-                target_angle = (2.0 * float(in_angles[0])) - target_angle
-            kwargs["inAngle"] = utils.lerp(in_angles[0], target_angle, amount)
-        if out_types and out_types[0] == "fixed" and out_angles and target.get("out_angle") is not None:
+                target_angle = (2.0 * float(in_angle)) - target_angle
+            result_angles["inAngle"] = utils.lerp(float(in_angle), target_angle, amount)
+        out_angle = target.get("original_out_angle")
+        if target.get("original_out_type") == "fixed" and out_angle is not None and target.get("out_angle") is not None:
             target_angle = float(target["out_angle"])
             if blend < 0.0:
-                target_angle = (2.0 * float(out_angles[0])) - target_angle
-            kwargs["outAngle"] = utils.lerp(out_angles[0], target_angle, amount)
-        if len(kwargs) > 1:
-            cmds.keyTangent(curve, edit=True, time=(time, time), **kwargs)
+                target_angle = (2.0 * float(out_angle)) - target_angle
+            result_angles["outAngle"] = utils.lerp(float(out_angle), target_angle, amount)
+
+        # Avoid touching manual handles whose angle is already correct. Auto,
+        # spline, plateau, etc. keep their type and let Maya update naturally.
+        tolerance = 0.1
+        if "inAngle" in result_angles and abs(result_angles["inAngle"] - float(in_angle)) > tolerance:
+            kwargs["inAngle"] = result_angles["inAngle"]
+        if "outAngle" in result_angles and abs(result_angles["outAngle"] - float(out_angle)) > tolerance:
+            kwargs["outAngle"] = result_angles["outAngle"]
+        if len(kwargs) == 1:
+            return
+
+        # A locked handle can stay locked only if the requested sides still
+        # share one angle. Break the lock only when matching the buffer shape
+        # actually requires independent rotations.
+        if target.get("original_tangents_locked"):
+            final_in = result_angles.get("inAngle", in_angle)
+            final_out = result_angles.get("outAngle", out_angle)
+            if final_in is not None and final_out is not None and abs(float(final_in) - float(final_out)) > tolerance:
+                cmds.keyTangent(curve, edit=True, time=(time, time), lock=False)
+        cmds.keyTangent(curve, edit=True, time=(time, time), **kwargs)
     except Exception:
         pass
 
@@ -775,7 +801,7 @@ def apply_blend_to_infinity(session, percentage, world_space=False):
 
 
 def apply_blend_to_buffer(session, percentage, world_space=False):
-    """Blend existing keys toward the normalized shape of Maya buffer curves."""
+    """Blend existing keys toward their own Maya buffer at matching times."""
     affected_map, _time_range = _resolve_keyframe_targets_for_session(session)
     if not affected_map:
         return
@@ -798,6 +824,7 @@ def apply_blend_to_buffer(session, percentage, world_space=False):
                 buffer_value = target.get("value")
                 if not isinstance(buffer_value, (int, float)):
                     continue
+                target.update(_capture_tangent_state(curve, current_time))
                 session.cache.frame_data[(attr_full, current_time)] = BlendFrameData(
                     original_value=orig,
                     bufferValue=buffer_value,

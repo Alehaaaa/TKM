@@ -56,7 +56,7 @@ from TheKeyMachine.tools.attribute_switcher.common import (
     ATTRIBUTE_SWITCHER_GLOBE_IMAGE,
     UI_COLOR,
 )
-from TheKeyMachine.tools.gimbal_fixer.analyzer import GimbalAnalyzer
+import TheKeyMachine.tools.gimbal_fixer.api as gimbal_fixer
 from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import customDialogs as cd
 from TheKeyMachine.widgets import customWidgets as cw
@@ -1020,7 +1020,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         self._popup_timer.timeout.connect(self._show_pending_popup)
         self._load_persistent_settings()
 
-        self.analyzer = GimbalAnalyzer()
+        self.analyzer = gimbal_fixer.GimbalAnalyzer()
         self._runtime_manager = runtime.get_runtime_manager()
         self._callbacks_connected = False
 

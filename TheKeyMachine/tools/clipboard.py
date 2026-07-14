@@ -134,7 +134,7 @@ def export_dialog(slot: str, caption: str) -> Optional[str]:
     Returns the exported path, or None if the user cancelled / no data exists.
     """
     import maya.cmds as cmds
-    from TheKeyMachine.widgets import customWidgets as wutil
+    from TheKeyMachine.widgets import util as wutil
 
     file_path = _resolve(slot)
     if not os.path.exists(file_path):
@@ -158,7 +158,7 @@ def import_dialog(slot: str, caption: str) -> Optional[Any]:
     Returns the loaded data, or None if the user cancelled / the file was invalid.
     """
     import maya.cmds as cmds
-    from TheKeyMachine.widgets import customWidgets as wutil
+    from TheKeyMachine.widgets import util as wutil
 
     result = cmds.fileDialog2(fileMode=1, caption=caption, fileFilter="JSON Files (*.json)")
     if not result:

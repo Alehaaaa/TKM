@@ -13,7 +13,7 @@ from TheKeyMachine.tools.gimbal_fixer.controller import (
     rotate_gimbal_state,
     selected_control,
 )
-from TheKeyMachine.tools.gimbal_fixer.customWidgets import GimbalOrderButton
+from TheKeyMachine.tools.gimbal_fixer.custom_widgets import GimbalOrderButton
 from TheKeyMachine.widgets import customDialogs
 from TheKeyMachine.widgets import util as wutil
 
@@ -223,10 +223,6 @@ gimbal_fixer_toolbar_toggle = toolCommon.ToolbarWindowToggle(
     close_gimbal_fixer_window,
     gimbal_fixer_window_bus.stateChanged,
 )
-
-
-def toggle_gimbal_fixer_window(*_args):
-    return gimbal_fixer_toolbar_toggle.toggle()
 
 
 def bind_gimbal_fixer_toolbar_button(button):

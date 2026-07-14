@@ -4,13 +4,14 @@ import maya.cmds as cmds
 
 from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
 
-from TheKeyMachine.data import icons
+from TheKeyMachine.data import colors, icons
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
+from TheKeyMachine.tools.selection_sets import common as selectionSetCommon
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
-from TheKeyMachine.tools.selection_sets.customWidgets import SelectionSetButton
+from TheKeyMachine.tools.selection_sets.custom_widgets import SelectionSetButton
 
 
 class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
@@ -549,7 +550,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         split_name = subset.split("_")
         color_suffix = split_name[-1] if len(split_name) >= 2 else ""
         set_name = "_".join(split_name[:-1]) if len(split_name) >= 2 else subset
-        color = selectionSetsApi.get_selection_set_color(f"_{color_suffix}", fallback=None)
+        color = colors.get_selection_set_color(f"_{color_suffix}", fallback=None)
         order = color.order if color else 999
         return order, set_name.lower(), subset.lower()
 
@@ -569,7 +570,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         button.customContextMenuRequested.connect(lambda *_: self._show_set_menu(controller, subset))
 
-        color = selectionSetsApi.get_selection_set_color(f"_{color_suffix}")
+        color = colors.get_selection_set_color(f"_{color_suffix}")
         button.setProperty("tkm_base_color", color.base.hex)
         button.setProperty("tkm_hover_color", color.hover.hex)
         button.setProperty("tkm_text_color", color.text.hex)
@@ -634,14 +635,8 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         self._schedule_selection_match_refresh()
         super().showEvent(event)
 
-    def _normalize_scene_objects(self, items):
-        if not items:
-            return set()
-        normalized = cmds.ls(items, long=True) or []
-        return set(normalized or items)
-
     def _update_button_match_states(self):
-        current_selection = self._normalize_scene_objects(selectionMod.get_selected_objects(long=True))
+        current_selection = selectionSetCommon.normalize_scene_items(selectionMod.get_selected_objects(long=True))
         for subset, button in list(self._set_buttons.items()):
             if not wutil.is_valid_widget(button):
                 self._set_buttons.pop(subset, None)
@@ -649,7 +644,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             if not cmds.objExists(subset):
                 self._apply_set_button_style(button, match_state="none")
                 continue
-            set_members = self._normalize_scene_objects(cmds.sets(subset, q=True) or [])
+            set_members = selectionSetCommon.normalize_scene_items(cmds.sets(subset, q=True) or [])
             if current_selection == set_members:
                 match_state = "exact"
             elif current_selection and set_members and current_selection.intersection(set_members):
@@ -688,10 +683,6 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             f"Delete All {current_color_label}",
         ).triggered.connect(lambda: controller.delete_sets_by_color_suffix(current_color_suffix))
         menu.exec_(QtGui.QCursor.pos())
-
-
-def make_selection_set_creation_dialog(controller, parent=None, on_created=None, on_rejected=None):
-    return SelectionSetCreationDialog(controller=controller, parent=parent, on_created=on_created, on_rejected=on_rejected)
 
 
 def make_selection_set_members_dialog(set_name):

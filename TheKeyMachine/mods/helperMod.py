@@ -243,7 +243,7 @@ isolate_bookmarks_window_tooltip_text = [
 ]
 
 
-createLocator_tooltip_text = [
+create_locator_tooltip_text = [
     "Create temporary locators from the current selection.",
     "Useful for marking positions or building quick references during blocking and cleanup.",
 ]
@@ -306,12 +306,12 @@ default_values_tooltip_text = [
     "Tip: Select channels in the Channel Box to default only specific attributes.",
 ]
 
-delete_animation_tooltip_text = [
-    "Delete animation from the current selection.",
-    "Select channels in the Channel Box to limit the deletion to specific attributes.",
+clear_animation_tooltip_text = [
+    "Remove animation keys from the selected objects, channels, or curves.",
+    "Uses the active Graph Editor selection, Channel Box selection, or Time Slider range when available.",
     movie.delete_all_animation,
     separator,
-    "Tip: You can select a time range to delete keys only inside that range.",
+    "Tip: Select a time range to remove only the keys inside that range.",
     movie.delete_all_animation_selection,
 ]
 
@@ -498,11 +498,6 @@ insert_inbetween_tooltip_text = [
 apply_smart_euler_filter_tooltip_text = [
     "Run an Euler filter on selected rotation animation curves.",
     "Use this to clean rotation flips while preserving the current key selection.",
-]
-
-clear_animation_keys_tooltip_text = [
-    "Remove animation keys from the selected objects, channels, or curves.",
-    "Uses the active Graph Editor selection, Channel Box selection, or Time Slider range when available.",
 ]
 
 copy_keys_tooltip_text = [

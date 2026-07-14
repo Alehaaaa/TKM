@@ -9,6 +9,7 @@ from TheKeyMachine.Qt import QtCore, QtWidgets
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools.selection_sets import api as selectionSetsApi
+from TheKeyMachine.tools.selection_sets import common as selectionSetCommon
 from TheKeyMachine.widgets import util as wutil
 
 
@@ -117,7 +118,7 @@ class SelectionSetsController:
             for set_info in set_group_data.get("sets", []):
                 self._import_selection_set(set_info, set_group_name_with_suffix)
 
-        QtCore.QTimer.singleShot(500, self.create_buttons_for_sel_sets)
+        QtCore.QTimer.singleShot(500, selectionSetsApi.refresh_selection_sets_window)
 
     def rename_setgroup(self, old_setgroup_name, new_setgroup_name, *args):
         new_setgroup_name = new_setgroup_name.strip()
@@ -134,7 +135,7 @@ class SelectionSetsController:
         except Exception as e:
             return wutil.make_inViewMessage(f"Error renaming set group: {e}")
 
-        cmds.evalDeferred(self.create_buttons_for_sel_sets)
+        cmds.evalDeferred(selectionSetsApi.refresh_selection_sets_window)
 
     def rename_set(self, old_set_name, new_set_name, set_group=None, *args):
         if not new_set_name.strip():
@@ -147,7 +148,7 @@ class SelectionSetsController:
             return wutil.make_inViewMessage(f"A set named '{new_set_name_with_color}' already exists. Please choose a different name")
 
         cmds.evalDeferred(lambda: cmds.rename(old_set_name, new_set_name_with_color))
-        cmds.evalDeferred(self.create_buttons_for_sel_sets)
+        cmds.evalDeferred(selectionSetsApi.refresh_selection_sets_window)
 
     def set_set_color(self, set_name, color_suffix, *args):
         set_node = cmds.ls(set_name)
@@ -165,7 +166,7 @@ class SelectionSetsController:
 
         cmds.rename(set_node[0], new_set_name)
 
-        cmds.evalDeferred(self.create_buttons_for_sel_sets)
+        cmds.evalDeferred(selectionSetsApi.refresh_selection_sets_window)
 
     def update_set_group_menu(self, combo_widget):
         combo_widget.clear()
@@ -208,21 +209,15 @@ class SelectionSetsController:
             _append(node)
         return selection_sets
 
-    def _normalize_scene_members(self, items):
-        if not items:
-            return set()
-        normalized = cmds.ls(items, long=True) or []
-        return set(normalized or items)
-
     def _find_matching_selection_set(self, selection):
-        target_members = self._normalize_scene_members(selection)
+        target_members = selectionSetCommon.normalize_scene_items(selection)
         if not target_members:
             return None
 
         for subset in self.get_selection_sets():
             if not cmds.objExists(subset):
                 continue
-            subset_members = self._normalize_scene_members(cmds.sets(subset, q=True) or [])
+            subset_members = selectionSetCommon.normalize_scene_items(cmds.sets(subset, q=True) or [])
             if subset_members == target_members:
                 return subset
         return None
@@ -315,7 +310,7 @@ class SelectionSetsController:
         cmds.sets(new_set, add=sel_set_name)
 
         if refresh:
-            self.create_buttons_for_sel_sets()
+            selectionSetsApi.refresh_selection_sets_window()
         return new_set
 
     def _animbot_root(self):
@@ -387,7 +382,7 @@ class SelectionSetsController:
             if new_set:
                 created.append(new_set)
         if created:
-            self.create_buttons_for_sel_sets()
+            selectionSetsApi.refresh_selection_sets_window()
         return created
 
     def _delete_empty_set_groups(self):
@@ -435,7 +430,7 @@ class SelectionSetsController:
             cmds.sets(selectionMod.get_selected_objects(), add=new_set)
 
         cmds.sets(new_set, add=sel_set_name)
-        self.create_buttons_for_sel_sets()
+        selectionSetsApi.refresh_selection_sets_window()
         set_name_field.clear()
         return True
 
@@ -497,7 +492,7 @@ class SelectionSetsController:
 
         if removed_any:
             self._delete_empty_set_groups()
-            cmds.evalDeferred(self.create_buttons_for_sel_sets)
+            cmds.evalDeferred(selectionSetsApi.refresh_selection_sets_window)
 
     def clear_selection_sets(self, *args):
         removed_any = False
@@ -534,9 +529,6 @@ class SelectionSetsController:
             selectionSetsApi.refresh_selection_sets_window()
             wutil.make_inViewMessage("All selection sets cleared")
 
-    def create_buttons_for_sel_sets(self, *args):
-        selectionSetsApi.refresh_selection_sets_window()
-
     def remove_set_and_update_buttons(self, set_name, set_group=None, *args):
         if cmds.objExists(set_name):
             if cmds.objExists(SELECTION_SETS_ROOT):
@@ -546,7 +538,7 @@ class SelectionSetsController:
                     pass
             cmds.delete(set_name)
 
-        cmds.evalDeferred(self.create_buttons_for_sel_sets)
+        cmds.evalDeferred(selectionSetsApi.refresh_selection_sets_window)
 
     def toggle_selection_sets_workspace(self, *args):
         selectionSetsApi.toggle_selection_sets_window(controller=self)

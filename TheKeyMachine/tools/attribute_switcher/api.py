@@ -10,7 +10,7 @@ from TheKeyMachine.tools.attribute_switcher.common import (
     ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
     ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
 )
-from TheKeyMachine.tools.attribute_switcher.customDialogs import AttributeSwitcherWindow
+from TheKeyMachine.tools.attribute_switcher.custom_dialogs import AttributeSwitcherWindow
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
 from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
 
@@ -200,7 +200,7 @@ def build_attribute_switcher_context_menu(parent=None):
         QtGui.QIcon(icons.reblock),
         "Gimbal Fixer",
         description="Open the Gimbal Fixer rotation-order analyzer.",
-        callback=lambda *_: gimbalFixerApi.gimbal_fixer_window(),
+        callback=lambda *_: gimbalFixerApi.show_gimbal_fixer_window(),
     )
 
     menu.addSeparator()

@@ -315,80 +315,6 @@ def _anim_curve_for_layer(plug, layer):
     return None
 
 
-def _anim_curve_for_specific_layer(plug, layer):
-    if om is None or plug is None or layer is None:
-        return None
-
-    is_root = bool(cache.root.layer and layer == cache.root.layer)
-    scene_layers = cache.scene_layers
-
-    try:
-        iterator = om.MItDependencyGraph(
-            plug,
-            om.MFn.kInvalid,
-            direction=om.MItDependencyGraph.kUpstream,
-            traversal=om.MItDependencyGraph.kBreadthFirst,
-            level=om.MItDependencyGraph.kNodeLevel,
-        )
-    except Exception:
-        return None
-
-    target_blend = None
-    while not iterator.isDone():
-        current_node = iterator.currentNode()
-        if current_node in scene_layers:
-            iterator.prune()
-        iterator.next()
-
-        if current_node.apiType() not in BLEND_NODE_TYPES:
-            continue
-
-        if is_root:
-            target_blend = current_node
-            continue
-
-        try:
-            node_fn = om.MFnDependencyNode(current_node)
-            layer_plug = node_fn.findPlug("wa", True)
-            if layer_plug and layer == layer_plug.source().node():
-                target_blend = current_node
-                break
-        except Exception:
-            pass
-
-    if target_blend is None:
-        return None
-
-    try:
-        node_fn = om.MFnDependencyNode(target_blend)
-        input_plug = node_fn.findPlug("ia" if is_root else "ib", True)
-    except Exception:
-        return None
-
-    if target_blend.apiType() in BLEND_NODE_ROTATION_TYPES:
-        child_index = 0
-        try:
-            if plug.isChild:
-                parent = plug.parent()
-                for index in range(parent.numChildren()):
-                    if parent.child(index) == plug:
-                        child_index = index
-                        break
-            if input_plug.isCompound and child_index < input_plug.numChildren():
-                input_plug = input_plug.child(child_index)
-        except Exception:
-            return None
-
-    try:
-        source = input_plug.source()
-        curve_node = source.node()
-        if curve_node and curve_node.apiType() in ANIM_CURVE_TYPES:
-            return _mobject_name(curve_node)
-    except Exception:
-        pass
-    return None
-
-
 def get_anim_curve_for_plug(plug_name):
     """Return the best animCurve for a plug, respecting selected/unlocked layers."""
     if om is None:
@@ -433,7 +359,7 @@ def get_anim_curves_by_layer_for_plug(plug_name):
     entries = []
     root_layer = cache.root.layer
     for layer in cache.scene_layers:
-        curve = _anim_curve_for_specific_layer(plug, layer)
+        curve = _anim_curve_for_layer(plug, layer)
         if not curve:
             continue
         is_root = bool(root_layer and layer == root_layer)

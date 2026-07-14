@@ -13,12 +13,10 @@ from __future__ import annotations
 
 import os
 
-import TheKeyMachine.tools.colors as toolColors
-from TheKeyMachine.mods.generalMod import config
+from TheKeyMachine.data import colors
 
 
-INSTALL_PATH = config["INSTALL_PATH"]
-IMAGE_ROOT = os.path.join(INSTALL_PATH, "TheKeyMachine", "data", "icons")
+IMAGE_ROOT = os.path.join(os.path.dirname(__file__), "icons")
 SELECTION_SETS_ROOT = os.path.join(IMAGE_ROOT, "selection_sets")
 ICON_EXTENSIONS = (".svg", ".png", ".jpg", ".jpeg")
 
@@ -68,7 +66,7 @@ def _selection_set_icon_filename(color):
     return "_{}{}_set.svg".format(color.family, shade)
 
 
-selection_set_color_icon_names = {color.suffix: _selection_set_icon_filename(color) for color in toolColors.SELECTION_SET_COLORS}
+selection_set_color_icon_names = {color.suffix: _selection_set_icon_filename(color) for color in colors.SELECTION_SET_COLORS}
 selection_set_color_icons = {suffix: selection_set_path(filename) for suffix, filename in selection_set_color_icon_names.items()}
 selection_set_color_trash_icons = {
     suffix: selection_set_path(filename.replace(".svg", "_trash.svg")) for suffix, filename in selection_set_color_icon_names.items()

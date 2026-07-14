@@ -473,7 +473,7 @@ def tool_operation(
                     pass
             if show_success_message:
                 try:
-                    from TheKeyMachine.widgets import customWidgets as wutil
+                    from TheKeyMachine.widgets import util as wutil
                     wutil.make_inViewMessage(operation.success_message or label or "Operation Successful")
                 except Exception:
                     pass

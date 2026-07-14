@@ -5,9 +5,9 @@ from TheKeyMachine.Qt import QtCompat, QtCore, QtWidgets
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.data import icons
-from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.data import colors as toolColors
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.tools.animation_offset import customWidgets as offsetWidgets
+from TheKeyMachine.tools.animation_offset import custom_widgets as offset_widgets
 import TheKeyMachine.widgets.timeline as timelineWidgets
 
 
@@ -91,13 +91,7 @@ class AnimationOffsetController(QtCore.QObject):
         return int(cmds.currentTime(query=True))
 
     def _resolve_locked_time_range(self):
-        graph_range = selectionMod.get_graph_editor_selected_range()
-        if graph_range:
-            return graph_range
-        selected_range = selectionMod.get_selected_time_slider_range()
-        if selected_range:
-            return selected_range
-        return timelineWidgets.get_playback_range()
+        return timelineWidgets.resolve_time_context(default_mode="all_animation").timerange
 
     def _resolve_tint_color(self):
         return self._tint_color
@@ -141,9 +135,9 @@ class AnimationOffsetController(QtCore.QObject):
             self,
             "_runtime_manager_relays",
             (
-                (manager.selection_changed, self._on_selection_changed),
-                (manager.time_changed, self._on_time_changed),
-                (manager.undo_performed, self._on_undo_performed),
+                (manager.selection_changed, self._on_context_changed),
+                (manager.time_changed, self._on_context_changed),
+                (manager.undo_performed, self._on_context_changed),
                 (manager.scene_opened, self._on_scene_reset),
                 (manager.scene_new, self._on_scene_reset),
             ),
@@ -153,17 +147,7 @@ class AnimationOffsetController(QtCore.QObject):
     def _disconnect_runtime_manager(self):
         toolCommon.clear_tracked_connections(self, "_runtime_manager_relays")
 
-    def _on_selection_changed(self):
-        if not self._can_resnapshot_from_event():
-            return
-        self._request_resnapshot(update_range=False)
-
-    def _on_time_changed(self):
-        if not self._can_resnapshot_from_event():
-            return
-        self._request_resnapshot(update_range=False)
-
-    def _on_undo_performed(self):
+    def _on_context_changed(self):
         if not self._can_resnapshot_from_event():
             return
         self._request_resnapshot(update_range=False)
@@ -498,7 +482,7 @@ class AnimationOffsetController(QtCore.QObject):
         cmds.select(selectionMod.get_selected_objects())
         self._connect_runtime_manager()
         self._resnapshot(update_range=self._time_range is None)
-        offsetWidgets.show_animation_offset_tint(
+        offset_widgets.show_animation_offset_tint(
             timerange=self._time_range,
             color=self._resolve_tint_color(),
             owner=self._owner,

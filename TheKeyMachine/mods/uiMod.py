@@ -42,7 +42,7 @@ import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.mods.selectionMod as selectionMod
-import TheKeyMachine.tools.colors as toolColors
+from TheKeyMachine.data import colors as toolColors
 import TheKeyMachine.tools.orbit.api as orbitApi
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
@@ -87,7 +87,6 @@ bind_attribute_switcher_toolbar_button = attributeSwitcherApi.bind_attribute_swi
 toggle_attribute_switcher_window = attributeSwitcherApi.toggle_attribute_switcher_window
 
 open_selection_set_creation_dialog = selectionSetsApi.open_selection_set_creation_dialog
-open_selection_sets_toolbar_action = selectionSetsApi.open_selection_sets_toolbar_action
 toggle_selection_sets_window = selectionSetsApi.toggle_selection_sets_window
 refresh_selection_sets_window = selectionSetsApi.refresh_selection_sets_window
 close_selection_sets_window = selectionSetsApi.close_selection_sets_window

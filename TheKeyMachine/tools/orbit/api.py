@@ -29,7 +29,7 @@ ORBIT_AUTO_TRANSPARENCY_KEY = "orbit_auto_transparency"
 ORBIT_BUTTON_CONFIGURATION_KEY = "button_configuration"
 
 def _window_class():
-    from TheKeyMachine.tools.orbit.customDialogs import OrbitWindow
+    from TheKeyMachine.tools.orbit.custom_dialogs import OrbitWindow
     return OrbitWindow
 
 # Default actions for the Orbit toolbar
@@ -231,7 +231,7 @@ def _orbit_auto_transparency_enabled():
         namespace=ORBIT_SETTINGS_NAMESPACE,
     )
 
-def _set_orbit_auto_transparency_enabled(enabled: bool):
+def set_orbit_auto_transparency(enabled: bool):
     """Enable or disable auto‑transparency and update the window if open."""
     settings.set_setting(
         ORBIT_AUTO_TRANSPARENCY_KEY,
@@ -250,7 +250,7 @@ def _orbit_stays_on_top():
         namespace=ORBIT_SETTINGS_NAMESPACE,
     )
 
-def _set_orbit_stays_on_top(enabled: bool):
+def set_orbit_stay_on_top(enabled: bool):
     """Set stay‑on‑top setting and apply to window if open."""
     settings.set_setting(
         "orbit_stay_on_top",
@@ -283,7 +283,7 @@ def build_orbit_context_menu(parent=None):
     toolCommon.connect_checkable_action(
         auto_transparency_action,
         _orbit_auto_transparency_enabled,
-        _set_orbit_auto_transparency_enabled,
+        set_orbit_auto_transparency,
     )
 
     menu.addSeparator()
@@ -293,7 +293,7 @@ def build_orbit_context_menu(parent=None):
         "Stay on Top",
         description="Keep the floating Orbit tool palette above other Maya windows.",
     )
-    toolCommon.connect_checkable_action(stays_on_top_action, _orbit_stays_on_top, _set_orbit_stays_on_top)
+    toolCommon.connect_checkable_action(stays_on_top_action, _orbit_stays_on_top, set_orbit_stay_on_top)
 
     restore_position_action = menu.addAction(
         QtGui.QIcon(icons.orbit_ui),
@@ -324,6 +324,3 @@ def toggle_orbit_window():
         close_orbit_window()
     else:
         orbit_window(reuse_existing=True)
-
-set_orbit_auto_transparency = _set_orbit_auto_transparency_enabled
-set_orbit_stay_on_top = _set_orbit_stays_on_top

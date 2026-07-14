@@ -38,6 +38,7 @@ import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools import clipboard
 import TheKeyMachine.core.toolbox as toolbox
+from TheKeyMachine.core import animation_context
 
 
 # -------------------------------------------------------------------------
@@ -71,7 +72,7 @@ def openCustomGraph():
     TheKeyMachine.core.customGraph.openCustomGraph()
 
 
-def createLocator():
+def create_locator():
     selection = selectionMod.get_selected_objects()
     if selection:
         # Verificar si el grupo 'TheKeyMachine' existe, si no, crearlo
@@ -154,95 +155,6 @@ def _normalize_curve_frames(curve_frames):
     return sorted(set(frames))
 
 
-def _collect_target_curves(target_info):
-    curves = []
-    seen = set()
-
-    for curve in target_info.get("selected_curves") or []:
-        if curve and curve not in seen:
-            seen.add(curve)
-            curves.append(curve)
-
-    target_plugs = target_info.get("target_plugs") or []
-    if target_plugs:
-        for curve in selectionMod.get_anim_curves_from_plugs(target_plugs):
-            if curve and curve not in seen:
-                seen.add(curve)
-                curves.append(curve)
-        return curves
-
-    target_objects = target_info.get("target_objects") or []
-    selected_channels = target_info.get("selected_channels") or None
-    time_context = target_info.get("time_context")
-    query_kwargs = {"query": True, "name": True}
-    if selected_channels:
-        query_kwargs["attribute"] = selected_channels
-    if time_context and time_context.mode == "time_slider_range":
-        query_kwargs["time"] = time_context.timerange
-
-    for obj in target_objects:
-        obj_curves = cmds.keyframe(obj, **query_kwargs) or []
-        for curve in obj_curves:
-            if curve and curve not in seen:
-                seen.add(curve)
-                curves.append(curve)
-
-    return curves
-
-
-def _resolve_tangent_target_info():
-    target_objects = selectionMod.get_selected_objects(orderedSelection=True, long=False)
-    selected_channels = selectionMod.get_selected_channels() or []
-
-    target_plugs = []
-    selected_curves = []
-    seen_curves = set()
-
-    if selected_channels:
-        for obj in target_objects:
-            for attr in selected_channels:
-                plug = "{}.{}".format(obj, attr)
-                if not cmds.objExists(plug):
-                    continue
-                target_plugs.append(plug)
-                for curve in selectionMod.get_anim_curves_from_plugs([plug]):
-                    if curve and curve not in seen_curves:
-                        seen_curves.add(curve)
-                        selected_curves.append(curve)
-
-    return {
-        "target_plugs": target_plugs,
-        "target_objects": target_objects,
-        "selected_channels": selected_channels,
-        "selected_curves": selected_curves,
-    }
-
-
-def _curve_frames_in_time_context(curve, time_context):
-    if not curve or not time_context:
-        return []
-
-    if time_context.mode == "current_frame":
-        return [int(cmds.currentTime(query=True))]
-
-    try:
-        curve_frames = cmds.keyframe(curve, query=True, time=time_context.timerange, timeChange=True) or []
-    except Exception:
-        curve_frames = []
-
-    frames = _normalize_curve_frames(curve_frames)
-    if time_context.mode == "graph_editor_keys":
-        selected_frames = {int(frame) for frame in (time_context.frames or ())}
-        if selected_frames:
-            frames = [frame for frame in frames if frame in selected_frames]
-    return frames
-
-
-def _resolve_tangent_time_context(key_scope):
-    default_mode = "all_animation" if key_scope == "all" else "current_frame"
-    return timelineWidgets.resolve_time_context(default_mode=default_mode)
-
-
 def _filter_tangent_targets_by_scope(targets, key_scope):
     scoped_targets = {curve: list(frames or []) for curve, frames in (targets or {}).items() if frames}
     if not scoped_targets:
@@ -260,8 +172,12 @@ def _filter_tangent_targets_by_scope(targets, key_scope):
 
 
 def _collect_tangent_targets(key_scope="selection"):
-    time_context = _resolve_tangent_time_context(key_scope)
-    target_info = _resolve_tangent_target_info()
+    default_mode = "all_animation" if key_scope == "all" else "current_frame"
+    target_info, _plugs, _objects, _channels = animation_context.resolve_command_targets(
+        default_mode=default_mode,
+        include_shapes=True,
+    )
+    time_context = target_info["time_context"]
     if not target_info.get("target_objects") and not target_info.get("target_plugs"):
         return {}
 
@@ -275,10 +191,10 @@ def _collect_tangent_targets(key_scope="selection"):
             frames_by_curve.setdefault(curve, set()).add(int(frame))
         return _filter_tangent_targets_by_scope({curve: sorted(frames) for curve, frames in frames_by_curve.items() if frames}, key_scope)
 
-    curves = _collect_target_curves(target_info)
+    curves = animation_context.curves(target_info)
     targets = {}
     for curve in curves:
-        frames = _curve_frames_in_time_context(curve, time_context)
+        frames = _normalize_curve_frames(animation_context.key_times(curve, target_info))
         if frames:
             targets[curve] = frames
     return _filter_tangent_targets_by_scope(targets, key_scope)
@@ -291,8 +207,9 @@ def _tangent_target_range(targets):
     return frames[0], frames[-1]
 
 
-def setTangent(tangent_type, handle_mode="both", key_scope="selection", tint_color=None):
-    time_context = _resolve_tangent_time_context(key_scope)
+def set_tangent(tangent_type, handle_mode="both", key_scope="selection", tint_color=None):
+    default_mode = "all_animation" if key_scope == "all" else "current_frame"
+    time_context = timelineWidgets.resolve_time_context(default_mode=default_mode)
     targets = _collect_tangent_targets(key_scope=key_scope)
     if not targets:
         return wutil.make_inViewMessage("No animation curves available to set tangents.")
@@ -342,9 +259,6 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False, key_scope="sele
     target_obj = sel[-1]
     source_objs = sel[:-1]  # Todos los objetos excepto el último (objeto destino)
 
-    # Obtener el tiempo actual
-    current_time = cmds.currentTime(query=True)
-
     with toolCommon.suspend_maya_refresh():
         frames_to_align = []
         set_keyframes = False
@@ -354,12 +268,9 @@ def align_selected_objects(*args, pos=True, rot=True, scl=False, key_scope="sele
                 return wutil.make_inViewMessage("No animation keys available to align objects.")
             set_keyframes = True
         else:
-            # Obtener el rango de tiempo seleccionado
-            time_range = selectionMod.get_selected_time_slider_range()
-            # Si hay un rango de tiempo seleccionado y no es igual al tiempo actual
-            if time_range and time_range[0] != current_time:
-                start_frame, end_frame = time_range[0], time_range[1]
-                frames_to_align = list(range(int(start_frame), int(end_frame) + 1))
+            time_context = timelineWidgets.resolve_time_context(default_mode="current_frame")
+            if time_context.mode in ("graph_editor_keys", "time_slider_range"):
+                frames_to_align = list(time_context.frames)
                 set_keyframes = True
 
         if frames_to_align:
@@ -606,7 +517,7 @@ def select_curves_with_ctrl(obj):
                 continue
 
 
-def selectHierarchy():
+def select_hierarchy():
     # Obtener la selección actual
     selection = selectionMod.get_selected_objects()
 
@@ -618,7 +529,7 @@ def selectHierarchy():
 # ---------------------------------------------------  COPY/PASTE WORLDSPACE ANIMATION  ------------------------------------------------------#
 
 def worldspace_copy_animation(*args):
-    target_info = keyTools.resolve_tool_targets(default_mode="all_animation", ordered_selection=True, long_names=False)
+    target_info = animation_context.resolve_targets(default_mode="all_animation", ordered_selection=True, long_names=False)
     selected_objects = target_info["target_objects"]
     if not selected_objects:
         return
@@ -687,7 +598,7 @@ def worldspace_copy_animation(*args):
 
 
 def copy_range_worldspace_animation(*args):
-    target_info = keyTools.resolve_tool_targets(default_mode="current_frame", ordered_selection=True, long_names=False)
+    target_info = animation_context.resolve_targets(default_mode="current_frame", ordered_selection=True, long_names=False)
     selected_objects = target_info["target_objects"]
     if not selected_objects:
         return
@@ -742,7 +653,7 @@ def copy_range_worldspace_animation(*args):
             clipboard.save("worldspace", payload)
             operation.success = True
     finally:
-        keyTools.clear_timeslider_selection()
+        timelineWidgets.clear_time_slider_selection()
         cmds.currentTime(original_time)
 
 

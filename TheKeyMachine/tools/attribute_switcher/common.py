@@ -1,5 +1,5 @@
 from TheKeyMachine.data import icons
-from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.data import colors as toolColors
 
 
 ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE = "attribute_switcher_window"

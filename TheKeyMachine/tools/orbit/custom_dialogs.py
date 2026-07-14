@@ -2,7 +2,7 @@ from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
 
 import TheKeyMachine.tools.orbit.api as orbitApi
 from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.tools.orbit.customWidgets import OrbitWindowMixin
+from TheKeyMachine.tools.orbit.custom_widgets import OrbitWindowMixin
 
 class OrbitWindow(OrbitWindowMixin, customDialogs.QFlatCloseableFloatingWidget):
     initial_layout_ready = QtCore.Signal()

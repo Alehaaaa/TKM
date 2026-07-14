@@ -58,7 +58,7 @@ import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
 import TheKeyMachine.tools.isolate_bookmarks.api as isolateBookmarksApi  # type: ignore
 
 from TheKeyMachine.tools.selection_sets.controller import SelectionSetsController  # type: ignore
-from TheKeyMachine.tools import colors as toolColors  # type: ignore
+from TheKeyMachine.data import colors as toolColors  # type: ignore
 
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.widgets import customDialogs as customDialogs  # type: ignore

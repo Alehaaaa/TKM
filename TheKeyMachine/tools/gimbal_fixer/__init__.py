@@ -2,5 +2,5 @@
 
 from .api import (
     convert_rotation_order,
-    gimbal_fixer_window,
+    show_gimbal_fixer_window,
 )

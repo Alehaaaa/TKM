@@ -1,5 +1,5 @@
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
-from TheKeyMachine.tools.attribute_switcher.customWidgets import AttributeSwitcherWidget
+from TheKeyMachine.tools.attribute_switcher.custom_widgets import AttributeSwitcherWidget
 
 
 class AttributeSwitcherWindow(AttributeSwitcherWidget):

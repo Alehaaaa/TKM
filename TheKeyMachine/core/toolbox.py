@@ -18,7 +18,7 @@ import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
 import TheKeyMachine.tools.orbit.api as orbitApi
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 import TheKeyMachine.tools.temp_pivot.api as tempPivotApi
-from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.data import colors as toolColors
 
 """
 TheKeyMachine Toolbox
@@ -32,8 +32,8 @@ icons, callbacks, and documentation across different UI contexts
 def _tangent_shortcuts(tool_id, tangent_type, tangent_label, *, maya_default=True, all_keys_callback=None):
     def _set_tangent(handle_mode="both", key_scope="selection"):
         if tangent_type == "bouncy":
-            return keyTools.bouncy_tangets(handle_mode=handle_mode, key_scope=key_scope)
-        return bar.setTangent(tangent_type, handle_mode=handle_mode, key_scope=key_scope)
+            return keyTools.bouncy_tangents(handle_mode=handle_mode, key_scope=key_scope)
+        return bar.set_tangent(tangent_type, handle_mode=handle_mode, key_scope=key_scope)
 
     shortcuts = []
     if maya_default:
@@ -151,7 +151,7 @@ def _set_attribute_switcher_window_open(enabled):
 
 
 def _set_gimbal_fixer_window_open(enabled):
-    return gimbalFixerApi.gimbal_fixer_window() if enabled else gimbalFixerApi.close_gimbal_fixer_window()
+    return gimbalFixerApi.show_gimbal_fixer_window() if enabled else gimbalFixerApi.close_gimbal_fixer_window()
 
 
 def _set_selection_sets_window_open(enabled):
@@ -472,7 +472,7 @@ TOOL_DEFINITIONS = {
         "label": "Gimbal Fixer",
         "text": "Gim",
         "icon": icons.reblock,
-        "callback": gimbalFixerApi.toggle_gimbal_fixer_window,
+        "callback": gimbalFixerApi.gimbal_fixer_toolbar_toggle.toggle,
         "get_checked": gimbalFixerApi.is_gimbal_fixer_window_open,
         "set_checked": _set_gimbal_fixer_window_open,
         "bind_checked_fn": gimbalFixerApi.bind_gimbal_fixer_toolbar_button,
@@ -702,7 +702,7 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Clear Animation",
         "icon": icons.delete_animation,
-        "tooltip": helper.clear_animation_keys_tooltip_text,
+        "tooltip": helper.clear_animation_tooltip_text,
         "callback": trigger.make_command_callback("clear_animation"),
     },
     "copy_keys": {
@@ -795,7 +795,7 @@ TOOL_DEFINITIONS = {
         "label": "Flip Curves",
         "text": "F",
         "tooltip": helper.flip_tooltip_text,
-        "callback": keyTools.flipCurves,
+        "callback": keyTools.flip_curves,
     },
     "snap": {
         "type": "tool",
@@ -803,7 +803,7 @@ TOOL_DEFINITIONS = {
         "text": "SpK",
         "icon": icons.snap,
         "tooltip": helper.snap_tooltip_text,
-        "callback": keyTools.snapKeyframes,
+        "callback": keyTools.snap_keyframes,
     },
     "graph_overlap_forward": {
         "type": "tool",
@@ -900,7 +900,7 @@ TOOL_DEFINITIONS = {
         "label": "Clear Animation",
         "icon": icons.delete_animation,
         "callback": trigger.make_command_callback("clear_animation"),
-        "tooltip": helper.delete_animation_tooltip_text,
+        "tooltip": helper.clear_animation_tooltip_text,
     },
 
     "default_set_defaults": {
@@ -951,7 +951,7 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Select Opposite",
         "icon": icons.opposite_select,
-        "callback": keyTools.selectOpposite,
+        "callback": keyTools.select_opposite,
         "tooltip": helper.opposite_select_tooltip_text,
     },
 
@@ -1033,7 +1033,7 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Select Hierarchy",
         "icon": icons.select_hierarchy,
-        "callback": bar.selectHierarchy,
+        "callback": bar.select_hierarchy,
         "tooltip": helper.select_hierarchy_tooltip_text,
     },
     "selector": {
@@ -1051,8 +1051,8 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Create Locator",
         "icon": icons.cube,
-        "callback": bar.createLocator,
-        "tooltip": helper.createLocator_tooltip_text,
+        "callback": bar.create_locator,
+        "tooltip": helper.create_locator_tooltip_text,
     },
     "locator_select_temp": {
         "type": "tool",
@@ -1408,14 +1408,14 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Add Opposite",
         "icon": icons.opposite_add,
-        "callback": keyTools.addSelectOpposite,
+        "callback": keyTools.add_select_opposite,
         "tooltip": helper.opposite_add_tooltip_text,
     },
     "opposite_copy": {
         "type": "tool",
         "label": "Copy Opposite",
         "icon": icons.opposite_copy,
-        "callback": keyTools.copyOpposite,
+        "callback": keyTools.copy_opposite,
         "tooltip": helper.opposite_copy_tooltip_text,
     },
     "paste_opposite_animation": {
@@ -1531,7 +1531,7 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Isolate Curves",
         "icon": icons.isolate,
-        "callback": keyTools.isolateCurve,
+        "callback": keyTools.isolate_curve,
         "tooltip": helper.graph_isolate_curves_tooltip_text,
     },
     "graph_select_object_from_curve": {
@@ -1544,14 +1544,14 @@ TOOL_DEFINITIONS = {
         "type": "tool",
         "label": "Mute Curves",
         "text": "Mt",
-        "callback": keyTools.toggleMute,
+        "callback": keyTools.toggle_mute,
         "tooltip": helper.graph_mute_tooltip_text,
     },
     "graph_toggle_lock": {
         "type": "tool",
         "label": "Lock Curves",
         "text": "Lk",
-        "callback": keyTools.toggleLock,
+        "callback": keyTools.toggle_lock,
         "tooltip": helper.graph_lock_tooltip_text,
     },
     "enable_graph_filter": {
@@ -1586,7 +1586,7 @@ TOOL_DEFINITIONS = {
         "label": "Bouncy Tangent",
         "text": "BO",
         "icon": icons.tangent_bouncy,
-        "callback": keyTools.bouncy_tangets,
+        "callback": keyTools.bouncy_tangents,
         "menu": _tool_menu_builder(
             "build_tangent_menu", tangent_type="bouncy", tangent_label="Bouncy Tangent", icon=icons.tangent_bouncy
         ),
@@ -1597,7 +1597,7 @@ TOOL_DEFINITIONS = {
         "label": "Auto Tangent",
         "text": "AU",
         "icon": icons.tangent_auto,
-        "callback": lambda: bar.setTangent("auto"),
+        "callback": lambda: bar.set_tangent("auto"),
         "menu": _tool_menu_builder(
             "build_tangent_menu",
             tangent_type="auto",
@@ -1612,7 +1612,7 @@ TOOL_DEFINITIONS = {
         "label": "Spline Tangent",
         "text": "SP",
         "icon": icons.tangent_spline,
-        "callback": lambda: bar.setTangent("spline"),
+        "callback": lambda: bar.set_tangent("spline"),
         "menu": _tool_menu_builder(
             "build_tangent_menu",
             tangent_type="spline",
@@ -1627,7 +1627,7 @@ TOOL_DEFINITIONS = {
         "label": "Clamped Tangent",
         "text": "CL",
         "icon": icons.tangent_clamped,
-        "callback": lambda: bar.setTangent("clamped"),
+        "callback": lambda: bar.set_tangent("clamped"),
         "menu": _tool_menu_builder(
             "build_tangent_menu",
             tangent_type="clamped",
@@ -1642,7 +1642,7 @@ TOOL_DEFINITIONS = {
         "label": "Linear Tangent",
         "text": "LI",
         "icon": icons.tangent_linear,
-        "callback": lambda: bar.setTangent("linear"),
+        "callback": lambda: bar.set_tangent("linear"),
         "menu": _tool_menu_builder(
             "build_tangent_menu",
             tangent_type="linear",
@@ -1657,7 +1657,7 @@ TOOL_DEFINITIONS = {
         "label": "Flat Tangent",
         "text": "FT",
         "icon": icons.tangent_flat,
-        "callback": lambda: bar.setTangent("flat"),
+        "callback": lambda: bar.set_tangent("flat"),
         "menu": _tool_menu_builder(
             "build_tangent_menu",
             tangent_type="flat",
@@ -1672,7 +1672,7 @@ TOOL_DEFINITIONS = {
         "label": "Step Tangent",
         "text": "ST",
         "icon": icons.tangent_step,
-        "callback": lambda: bar.setTangent("step"),
+        "callback": lambda: bar.set_tangent("step"),
         "menu": _tool_menu_builder(
             "build_tangent_menu",
             tangent_type="step",
@@ -1687,7 +1687,7 @@ TOOL_DEFINITIONS = {
         "label": "Plateau Tangent",
         "text": "PT",
         "icon": icons.tangent_plateau,
-        "callback": lambda: bar.setTangent("plateau"),
+        "callback": lambda: bar.set_tangent("plateau"),
         "menu": _tool_menu_builder(
             "build_tangent_menu",
             tangent_type="plateau",
@@ -2068,7 +2068,7 @@ TOOL_SECTION_DEFINITIONS = {
                     "bouncy",
                     "Bouncy Tangent",
                     maya_default=False,
-                    all_keys_callback=lambda: keyTools.bouncy_tangets(key_scope="all"),
+                    all_keys_callback=lambda: keyTools.bouncy_tangents(key_scope="all"),
                 ),
             },
             "separator",

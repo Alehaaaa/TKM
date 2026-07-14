@@ -6,7 +6,7 @@ Slider mode metadata and dispatch dictionaries.
 
 import TheKeyMachine.mods.helperMod as helper
 from TheKeyMachine.data import icons
-from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.data import colors as toolColors
 
 from TheKeyMachine.Qt import QtCore
 
@@ -236,7 +236,7 @@ BLEND_MODES = [
         "tooltip": helper.blend_tooltip_text,
         "icon": "NW",
         "shortcut": [CTRL, ALT, SHIFT, MID],
-        "description": "Adds procedural noise (drag left) or sine waves (drag right) to the curve.",
+        "description": "Adds procedural noise (drag left) or alternating positive/negative key offsets (drag right).",
     },
     {
         "label": "Pull | Push",

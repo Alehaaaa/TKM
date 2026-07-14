@@ -1,3 +1,5 @@
+"""Declarative color values shared by UI and tool modules."""
+
 from dataclasses import dataclass
 
 

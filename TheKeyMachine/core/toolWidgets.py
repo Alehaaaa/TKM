@@ -319,6 +319,7 @@ def add_selector_button(section, item_data):
         tooltip=selector_tool.get("tooltip"),
         description=_tooltip_description(selector_tool),
     )
+    btn.configure_from_data(selector_tool)
 
     callback = selector_tool.get("callback")
     if callback:
@@ -862,21 +863,7 @@ def add_main_settings_button(section, item_data, owner):
 
     toolbar_widget = owner.main_toolbar_widget
 
-    def _on_toolbar_context_menu(pos):
-        if not toolMenus.should_show_toolbar_pinning_menu(toolbar_widget, pos):
-            return
-        pinning_menu = toolMenus.build_toolbar_pinning_menu(toolbar_widget, toolbar_widget)
-        if pinning_menu.actions():
-            pinning_menu.exec_(toolbar_widget.mapToGlobal(pos))
-
-    toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-    toolCommon.replace_tracked_connection(
-        toolbar_widget,
-        "_tkm_toolbar_pinning_context",
-        toolbar_widget.customContextMenuRequested,
-        _on_toolbar_context_menu,
-        parent=toolbar_widget,
-    )
+    bind_toolbar_pinning_context(toolbar_widget)
 
     if internet_connection:
         updater.check_for_updates(btn, warning=False, force=False)

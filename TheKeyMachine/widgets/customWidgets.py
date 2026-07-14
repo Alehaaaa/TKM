@@ -5,7 +5,7 @@ from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 from TheKeyMachine.data import icons
 import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
-from TheKeyMachine.tools import colors as toolColors  # type: ignore
+from TheKeyMachine.data import colors as toolColors  # type: ignore
 from TheKeyMachine.tools import common as toolCommon  # type: ignore
 
 from .util import DPI
@@ -309,9 +309,9 @@ class MenuWidget(QtWidgets.QMenu):
             HelpSystem.push(self, self.title(), description)
 
         self.hovered.connect(self._on_action_hovered)
-        # Python-side store for Tooltip objects: Qt setProperty/property
-        # cannot round-trip subclass attributes (body_lines, icon, etc.)
-        self._tooltip_store = {}
+        # Python-side store for rich action help. Qt properties cannot safely
+        # round-trip Tooltip subclasses or shortcut descriptor collections.
+        self._action_help_store = {}
 
     def _action_tooltip_key(self, action):
         if action is None or not QtCompat.isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
@@ -342,7 +342,16 @@ class MenuWidget(QtWidgets.QMenu):
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
-    def _set_action_help(self, action, title, description="", tooltip=None, command_id=None, command_icon=None):
+    def _set_action_help(
+        self,
+        action,
+        title,
+        description="",
+        tooltip=None,
+        shortcuts=None,
+        command_id=None,
+        command_icon=None,
+    ):
         if action is None or not QtCompat.isValid(action):
             return
         if isinstance(action, QtWidgets.QWidgetAction):
@@ -352,8 +361,10 @@ class MenuWidget(QtWidgets.QMenu):
             # Store the full Tooltip in a Python dict (not via Qt property)
             # so that body_lines / TooltipMedia objects survive the round-trip.
             action_id = id(action)
-            if tooltip is not None:
-                self._tooltip_store[action_id] = tooltip
+            self._action_help_store[action_id] = {
+                "tooltip": tooltip,
+                "shortcuts": list(shortcuts or ()),
+            }
             action.setProperty("tkm_tooltip_source_key", "menu-action:{}".format(action_id))
             action.setProperty("tkm_command_id", command_id)
             action.setProperty("tkm_command_label", title)
@@ -427,6 +438,7 @@ class MenuWidget(QtWidgets.QMenu):
         callback = kwargs.pop("callback", None)
         label_override = kwargs.pop("label", None)
         keep_open = kwargs.pop("open", False)
+        shortcuts = kwargs.pop("shortcuts", None)
         command_id = kwargs.pop("command_id", None)
         command_icon = kwargs.pop("command_icon", None)
         positional_callback = self._callback_from_args(args)
@@ -504,7 +516,15 @@ class MenuWidget(QtWidgets.QMenu):
             tooltip=tooltip,
         )
         if title or resolved_description or tooltip:
-            self._set_action_help(action, title, resolved_description, tooltip, command_id=command_id, command_icon=command_icon)
+            self._set_action_help(
+                action,
+                title,
+                resolved_description,
+                tooltip,
+                shortcuts=shortcuts,
+                command_id=command_id,
+                command_icon=command_icon,
+            )
         else:
             self._clear_native_action_tips(action)
         return action
@@ -512,6 +532,7 @@ class MenuWidget(QtWidgets.QMenu):
     def addMenu(self, *args, **kwargs):
         description = kwargs.pop("description", None)
         tooltip = kwargs.pop("tooltip", None)
+        shortcuts = kwargs.pop("shortcuts", None)
         command_id = kwargs.pop("command_id", None)
         command_icon = kwargs.pop("command_icon", None)
         item = QtWidgets.QMenu.addMenu(self, *args, **kwargs)
@@ -539,6 +560,7 @@ class MenuWidget(QtWidgets.QMenu):
             label,
             resolved_description,
             tooltip,
+            shortcuts=shortcuts,
             command_id=command_id,
             command_icon=command_icon,
         )
@@ -561,8 +583,10 @@ class MenuWidget(QtWidgets.QMenu):
         try:
             title = action.property("tkm_title") or action.text()
             desc = action.property("tkm_description") or ""
-            # Retrieve from Python-side store to preserve Tooltip body_lines / TooltipMedia
-            tooltip = self._tooltip_store.get(id(action))
+            # Retrieve Python-side data to preserve Tooltip objects and shortcut descriptors.
+            action_help = self._action_help_store.get(id(action), {})
+            tooltip = action_help.get("tooltip")
+            shortcuts = action_help.get("shortcuts", ())
             command_id = action.property("tkm_command_id") or None
             command_label = action.property("tkm_command_label") or title
             command_icon = action.property("tkm_command_icon") or None
@@ -590,6 +614,7 @@ class MenuWidget(QtWidgets.QMenu):
                 target_pos=cursor_pos,
                 description=desc,
                 tooltip=display_tooltip,
+                shortcuts=shortcuts,
                 icon_obj=icon,
                 command_id=command_id,
                 command_label=command_label,
@@ -672,6 +697,10 @@ class TooltipMixin:
 
     def get_toolTipData(self):
         return getattr(self, "_toolTipData", {})
+
+    def get_base_tooltip_data(self):
+        """Return stable action help for controls without modifier variants."""
+        return dict(self.get_toolTipData())
 
     def setToolTipData(self, **kwargs):
         self._has_tooltip = True
@@ -1360,6 +1389,10 @@ class QFlatToolButton(TooltipMixin, QtWidgets.QToolButton):
             for key in TOOLTIP_STATE_KEYS:
                 if key != "text":
                     self._base_state[key] = kwargs.get(key, self._base_state.get(key))
+
+    def get_base_tooltip_data(self):
+        """Return stable base tool identity, not a hovered shortcut variant."""
+        return dict(self._base_state)
 
     def setShortcutVariants(self, variants):
         self._shortcut_variants = list(variants or [])
@@ -2339,6 +2372,19 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if widget_key in self._widgets and not hasattr(self._widgets[widget_key], "_current_mode"):
                 self._apply_widget_pin(widget_key, bool(value), publish=False)
 
+    @staticmethod
+    def _widget_help_data(widget):
+        """Read stable tool identity without coupling sections to toolbox descriptors."""
+        getter = getattr(widget, "get_base_tooltip_data", None)
+        if not callable(getter):
+            getter = getattr(widget, "get_toolTipData", None)
+        if not callable(getter):
+            return {}
+        try:
+            return dict(getter() or {})
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return {}
+
     def addWidget(
         self,
         widget,
@@ -2351,11 +2397,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         pinnable=True,
     ):
         """Add a widget to the section with a toggle key."""
+        widget_help = self._widget_help_data(widget)
+
         # Auto-extract help metadata from widget if not provided
-        if (not tooltip or not description) and hasattr(widget, "get_toolTipData"):
-            data = widget.get_toolTipData()
-            tooltip = tooltip or data.get("tooltip") or data.get("text")
-            description = description or data.get("description")
+        if not tooltip or not description:
+            tooltip = tooltip or widget_help.get("tooltip") or widget_help.get("text")
+            description = description or widget_help.get("description")
 
         self.layout().addWidget(widget)
         self._widgets[key] = widget
@@ -2390,29 +2437,19 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if self._hiddeable:
             if pinnable is not False:
                 # Avoid duplicate metadata entries for the same key
+                menu_metadata = {
+                    "label": label,
+                    "description": description,
+                    "tooltip": tooltip,
+                    "tooltip_enabled": tooltip_enabled,
+                    "default": default,
+                }
                 existing_entry = next((m for m in self._menu_metadata if m.get("id") == key), None)
                 if existing_entry:
-                    existing_entry.update(
-                        {
-                            "label": label,
-                            "description": description,
-                            "tooltip": tooltip,
-                            "tooltip_enabled": tooltip_enabled,
-                            "default": default,
-                        }
-                    )
+                    existing_entry.update(menu_metadata)
                 else:
-                    self._menu_metadata.append(
-                        {
-                            "type": "widget",
-                            "id": key,
-                            "label": label,
-                            "description": description,
-                            "tooltip": tooltip,
-                            "tooltip_enabled": tooltip_enabled,
-                            "default": default,
-                        }
-                    )
+                    menu_metadata.update({"type": "widget", "id": key})
+                    self._menu_metadata.append(menu_metadata)
                 visible = self._get_setting(f"pin_{key}", default)
             else:
                 visible = default
@@ -2450,7 +2487,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 icon=existing.get("icon"),
                 status_title=existing.get("status_title") or label,
                 status_description=status_description,
-                command_id=existing.get("command_id") or key,
+                command_id=existing.get("command_id"),
                 command_label=existing.get("command_label") or label,
                 command_icon=existing.get("command_icon") or existing.get("icon"),
             )
@@ -2862,23 +2899,30 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         icon=None,
         tooltip=None,
         tooltip_enabled=True,
+        shortcuts=None,
+        command_id=None,
+        command_icon=None,
     ):
-        if icon and not icon.isNull():
+        menu_icon = icon if isinstance(icon, QtGui.QIcon) else QtGui.QIcon(icon or "")
+        action_kwargs = {
+            "description": description,
+            "tooltip": tooltip,
+            "tooltip_enabled": tooltip_enabled,
+            "shortcuts": shortcuts,
+            "label": title,
+            "command_id": command_id,
+            "command_icon": command_icon,
+        }
+        if not menu_icon.isNull():
             action = menu.addAction(
-                icon,
+                menu_icon,
                 label,
-                description=description,
-                tooltip=tooltip,
-                tooltip_enabled=tooltip_enabled,
-                label=title,
+                **action_kwargs,
             )
         else:
             action = menu.addAction(
                 label,
-                description=description,
-                tooltip=tooltip,
-                tooltip_enabled=tooltip_enabled,
-                label=title,
+                **action_kwargs,
             )
         action.setCheckable(True)
         action.setChecked(bool(checked))
@@ -2932,16 +2976,32 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     widget = self._widgets.get(key)
                     if widget is None or not QtCompat.isValid(widget):
                         continue
+                    action_help = dict(item)
+                    widget_help = self._widget_help_data(widget)
+                    for field in (
+                        "description",
+                        "tooltip",
+                        "shortcuts",
+                        "icon",
+                        "command_id",
+                        "command_icon",
+                    ):
+                        if field in widget_help and widget_help[field] is not None:
+                            action_help[field] = widget_help[field]
                     action = self._add_checkable_menu_action(
                         menu,
                         key,
                         item["label"],
                         not widget.isHidden(),
                         self._make_toggle_handler(key),
-                        description=item.get("description") or "",
+                        description=action_help.get("description") or "",
                         title=item["label"],
-                        tooltip=item.get("tooltip"),
+                        tooltip=action_help.get("tooltip"),
                         tooltip_enabled=item.get("tooltip_enabled", True),
+                        shortcuts=action_help.get("shortcuts"),
+                        icon=action_help.get("icon"),
+                        command_id=action_help.get("command_id"),
+                        command_icon=action_help.get("command_icon") or action_help.get("icon"),
                     )
                     self._bind_pin_menu_action(menu, action, key, not widget.isHidden())
         menu.addSeparator()

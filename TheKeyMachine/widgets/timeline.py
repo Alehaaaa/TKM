@@ -6,7 +6,7 @@ from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.data import colors as toolColors
 from TheKeyMachine.widgets import util as wutil
 
 
@@ -229,6 +229,12 @@ def resolve_time_context(default_mode="all_animation"):
         end_frame=end_frame,
         frames=tuple(range(start_frame, end_frame + 1)),
     )
+
+
+def clear_time_slider_selection():
+    """Clear Maya's highlighted time range without changing object selection."""
+    selected_objects = selectionMod.get_selected_objects()
+    cmds.select(selected_objects, replace=True) if selected_objects else cmds.select(clear=True)
 
 
 class TimelineTint(QtWidgets.QWidget):

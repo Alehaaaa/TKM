@@ -31,7 +31,8 @@ QSvgRenderer = getattr(QtSvg, "QSvgRenderer", None)
 
 from TheKeyMachine.widgets import util as wutil
 from TheKeyMachine.data import icons
-from TheKeyMachine.data.movies import TooltipMedia, TooltipMovieWidget
+from TheKeyMachine.data.movies import TooltipMedia
+from TheKeyMachine.widgets.tooltip_media import TooltipMovieWidget
 import TheKeyMachine.mods.settingsMod as settings
 
 

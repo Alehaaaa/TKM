@@ -5,7 +5,6 @@ Operations that work directly on animation curves and their keys.
 """
 
 import maya.cmds as cmds
-import math
 import random
 
 try:
@@ -215,25 +214,30 @@ def apply_noise(session, curves=None, factor=1.0):
 
 
 def apply_wave(session, curves=None, factor=1.0):
-    """Add one smooth sine cycle across the selected key span."""
+    """Offset consecutive keys with an alternating positive/negative wave."""
     resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
     for curve in resolved_curves:
-        keys = target_times_per_curve.get(curve, [])
+        keys = sorted(set(target_times_per_curve.get(curve, [])))
         if not keys:
             continue
 
         original_data = _cached_curve_values(session, curve, keys)
-        curve_values = list(original_data.values())
-        value_range = (max(curve_values) - min(curve_values)) if curve_values else 0.0
-        amplitude = max(value_range * 0.15, 0.001) * max(0.0, min(1.0, factor))
-        first_time, last_time = min(keys), max(keys)
-        duration = last_time - first_time
+        target_values = [original_data[time] for time in keys if time in original_data]
+        if not target_values:
+            continue
 
-        for time in keys:
-            if time in original_data:
-                init_val = original_data[time]
-                phase = ((time - first_time) / duration) * (math.pi * 2.0) if duration else (math.pi * 0.5)
-                _apply_value(session, curve, time, init_val + math.sin(phase) * amplitude)
+        value_range = max(target_values) - min(target_values)
+        if abs(value_range) <= 0.000001:
+            max_amplitude = omutils.anim_curve_attr_value_to_curve_value(curve, 1.0)
+        else:
+            max_amplitude = value_range * 3.0
+        amplitude = max_amplitude * max(0.0, min(1.0, factor))
+
+        for index, time in enumerate(keys):
+            if time not in original_data:
+                continue
+            direction = 1.0 if index % 2 == 0 else -1.0
+            _apply_value(session, curve, time, original_data[time] + direction * amplitude)
 
 
 def apply_ease(session, curve_list=None, factor=0.5):

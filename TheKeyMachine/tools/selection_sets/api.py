@@ -7,7 +7,7 @@ import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.data import colors as toolColors
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
@@ -22,27 +22,23 @@ SELECTION_SET_DEFAULT_COLOR = toolColors.SELECTION_SET_DEFAULT_COLOR
 selection_set_color_names = {color.suffix: color.label for color in SELECTION_SET_COLORS}
 
 
-def get_selection_set_color(suffix, fallback=None):
-    return toolColors.get_selection_set_color(suffix, fallback=fallback)
-
-
 _selection_set_creation_dialog = None
 
 
 def _window_class():
-    from TheKeyMachine.tools.selection_sets.customDialogs import SelectionSetsWindow
+    from TheKeyMachine.tools.selection_sets.custom_dialogs import SelectionSetsWindow
 
     return SelectionSetsWindow
 
 
 def _creation_dialog_class():
-    from TheKeyMachine.tools.selection_sets.customDialogs import SelectionSetCreationDialog
+    from TheKeyMachine.tools.selection_sets.custom_dialogs import SelectionSetCreationDialog
 
     return SelectionSetCreationDialog
 
 
 def _members_dialog_class():
-    from TheKeyMachine.tools.selection_sets.customDialogs import SelectionSetMembersDialog
+    from TheKeyMachine.tools.selection_sets.custom_dialogs import SelectionSetMembersDialog
 
     return SelectionSetMembersDialog
 
@@ -230,7 +226,7 @@ def _maybe_convert_animbot_selection_sets(controller=None):
     return False
 
 
-def _open_selection_sets_from_toolbar(controller=None):
+def open_selection_sets_toolbar_action(controller=None):
     controller = _resolve_toolbar_controller(controller)
     if not _maybe_convert_animbot_selection_sets(controller):
         _emit_selection_sets_window_state(False)
@@ -248,11 +244,7 @@ def _open_selection_sets_from_toolbar(controller=None):
     selection_sets_window(controller=controller, reuse_existing=True)
 
 
-def open_selection_sets_toolbar_action(controller=None):
-    _open_selection_sets_from_toolbar(controller=controller)
-
-
-_selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=None)
+_selection_sets_open_fn = lambda: open_selection_sets_toolbar_action(controller=None)
 _selection_sets_toolbar_toggle = ToolbarWindowToggle(
     is_selection_sets_window_open,
     lambda: _selection_sets_open_fn(),
@@ -265,13 +257,13 @@ def toggle_selection_sets_window(controller=None):
     global _selection_sets_open_fn
     controller = _resolve_toolbar_controller(controller)
     if controller is not None:
-        _selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=controller)
+        _selection_sets_open_fn = lambda: open_selection_sets_toolbar_action(controller=controller)
     if _selection_sets_toolbar_toggle:
         _selection_sets_toolbar_toggle.toggle()
     elif is_selection_sets_window_open():
         close_selection_sets_window()
     else:
-        _open_selection_sets_from_toolbar(controller=controller)
+        open_selection_sets_toolbar_action(controller=controller)
 
 
 def refresh_selection_sets_window():
@@ -471,7 +463,7 @@ def bind_selection_sets_toolbar_button(button, controller=None):
     global _selection_sets_open_fn
     controller = _resolve_toolbar_controller(controller)
     if controller is not None:
-        _selection_sets_open_fn = lambda: _open_selection_sets_from_toolbar(controller=controller)
+        _selection_sets_open_fn = lambda: open_selection_sets_toolbar_action(controller=controller)
     if button:
 
         def _selection_sets_mouse_press(event, b=button, c=controller):

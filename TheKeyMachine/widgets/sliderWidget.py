@@ -40,7 +40,7 @@ import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.sliders import api as slider_api
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.widgets.timeline as timelineWidgets
-from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.data import colors as toolColors
 
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager, format_tooltip_shortcut
 

@@ -62,6 +62,25 @@ def values_match(current, target, tolerance=0.000001):
         return False
 
 
+def closest_euler_angle_cut(value, reference):
+    """Return value's full-turn-equivalent angle closest to reference.
+
+    Inputs and output use Maya's current UI angle unit. MEulerRotation performs
+    the closest-cut calculation in radians.
+    """
+    if om is None:
+        return None
+    try:
+        source_radians = om.MAngle(float(value), om.MAngle.uiUnit()).asRadians()
+        reference_radians = om.MAngle(float(reference), om.MAngle.uiUnit()).asRadians()
+        source = om.MEulerRotation(source_radians, 0.0, 0.0, om.MEulerRotation.kXYZ)
+        target = om.MEulerRotation(reference_radians, 0.0, 0.0, om.MEulerRotation.kXYZ)
+        closest = source.closestCut(target)
+        return om.MAngle(closest.x, om.MAngle.kRadians).asUnits(om.MAngle.uiUnit())
+    except Exception:
+        return None
+
+
 def set_plug_double(node, attr, value, tolerance=0.000001):
     plug = find_plug(node, attr)
     if plug is None:
@@ -235,6 +254,25 @@ def anim_curve_value_to_attr_value(curve, value):
     try:
         if curve_type == oma.MFnAnimCurve.kAnimCurveTL:
             return om.MDistance(float(value)).asUnits(om.MDistance.uiUnit())
+    except Exception:
+        pass
+    return value
+
+
+def anim_curve_attr_value_to_curve_value(curve, value):
+    """Convert a displayed Maya attribute value to MFnAnimCurve units."""
+    if om is None or oma is None or curve is None:
+        return value
+    fn = anim_curve_fn(curve)
+    curve_type = _anim_curve_type(fn)
+    try:
+        if curve_type == oma.MFnAnimCurve.kAnimCurveTA:
+            return om.MAngle(float(value), om.MAngle.uiUnit()).asRadians()
+    except Exception:
+        pass
+    try:
+        if curve_type == oma.MFnAnimCurve.kAnimCurveTL:
+            return om.MDistance(float(value), om.MDistance.uiUnit()).asCentimeters()
     except Exception:
         pass
     return value

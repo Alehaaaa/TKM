@@ -409,13 +409,13 @@ def build_tangent_menu(menu, tangent_type, tangent_label, icon=None, source_widg
 
     def _set_tangent(handle_mode, key_scope, tint):
         if tangent_type == "bouncy":
-            return keyTools.bouncy_tangets(
+            return keyTools.bouncy_tangents(
                 handle_mode=handle_mode,
                 key_scope=key_scope,
                 tint_color=tint,
             )
 
-        return bar.setTangent(
+        return bar.set_tangent(
             tangent_type,
             handle_mode=handle_mode,
             key_scope=key_scope,

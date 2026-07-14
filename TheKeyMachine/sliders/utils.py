@@ -17,7 +17,7 @@ import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.widgets.timeline as timelineWidgets
-from TheKeyMachine.tools import colors as toolColors
+from TheKeyMachine.data import colors as toolColors
 
 
 @dataclass
