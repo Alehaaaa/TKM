@@ -4,11 +4,13 @@
 
 # TheKeyMachine, animation toolbar
 
-![Version](https://img.shields.io/badge/version-0.1.26-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.27-blue.svg)
 
 TheKeyMachine (TKM) is an open source Maya animation toolset built for faster key editing, cleaner selection workflows, smarter copy/paste utilities, floating tools, and timeline-aware operations.
 
 It is designed for 3D animators working in Autodesk Maya and supports Maya 2022 and up on Windows, Linux, and macOS.
+
+The native Micro Move and Depth Mover viewport plug-ins currently build automatically on macOS; the rest of the toolset remains cross-platform.
 
 TKM was developed by <b>Rodrigo Torres</b> (<a href="https://www.rodritorres.com">rodritorres.com</a>).
 
@@ -65,7 +67,8 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 
 - `Animation Offset` to protect the current frame while offsetting the surrounding range
 - `Temp Pivot` to create or reuse a temporary manipulation pivot
-- `Micro Move` for precise transform stepping
+- `Micro Move` for live, object-oriented precision translation and rotation with cursor acceleration
+- `Depth Mover` to push selected controls toward or away from the camera with drag-adjusted sensitivity
 
 ### Linking And Space
 
@@ -77,9 +80,8 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 
 - `Selection Sets`
 - `Orbit`
+- `Search`
 - `Graph Editor Toolbar`
-- `Custom Tools`
-- `Custom Scripts`
 - `Isolate Bookmarks`
 
 ## Timeline Feedback
@@ -89,6 +91,8 @@ Many tools tint the Maya time slider while they run. Full-range tools tint the f
 ## Tooltips And Menus
 
 Tooltips use the active tool labels and icons, including torn-off menus and shelf buttons. Menu actions keep their full rich tooltip content while hovering, so videos, media, and multi-line help remain available from menu-driven tools.
+
+The `Custom Tools` menu loads manifest-defined commands, folders, Maya resource icons, toolbar pins, hotkeys, and shelf buttons.
 
 ## Selection Sets
 
@@ -107,11 +111,13 @@ Dedicated tools live under `TheKeyMachine/tools/` for:
 
 - `animation_offset`
 - `attribute_switcher`
+- `depth_mover`
 - `gimbal_fixer`
 - `graph_toolbar`
 - `isolate_bookmarks`
 - `micro_move`
 - `orbit`
+- `search`
 - `selection_sets`
 
 <img width="200px" src="./TheKeyMachine/data/icons/install_example.png" />

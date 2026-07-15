@@ -14,6 +14,10 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.27:
+  - new: Depth Mover pushes selected controls through camera depth with drag-adjusted sensitivity
+  - new: Micro Move uses translate and rotate manipulators with Maya tool switching, cursor acceleration and modifiers
+
 0.1.26:
   - new: Search finds and runs any TheKeyMachine tool
 
@@ -26,7 +30,7 @@
   - bugfix: Static and redundant key cleanup stays scoped, and pin menus retain tool icons, hotkeys and shelf actions
 
 0.1.24:
-  - new: Custom Tools and Scripts support folders, local icons, toolbar pinning and button-triggered refresh
+  - new: Custom Tools supports folders, local icons, toolbar pinning and button-triggered refresh
   - new: Auto Hide Static Animation Curves keeps the Graph Editor focused on animated channels
   - changed: Attribute Switcher and Orbit popups open beside their trigger on the correct screen
   - changed: Animation Offset and frame-based slider handles snap and tint accurately as the timeline changes

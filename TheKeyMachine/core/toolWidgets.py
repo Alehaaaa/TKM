@@ -9,6 +9,7 @@ build the same controls from the same definitions.
 import random
 
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
+import TheKeyMachine.mods.shelfMod as shelf  # type: ignore
 import TheKeyMachine.mods.generalMod as general  # type: ignore
 import TheKeyMachine.mods.keyToolsMod as keyTools  # type: ignore
 from TheKeyMachine.data import icons
@@ -17,9 +18,12 @@ import TheKeyMachine.core.trigger as trigger  # type: ignore
 import TheKeyMachine.mods.selectionMod as selectionMod  # type: ignore
 import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
 import TheKeyMachine.core.toolMenus as toolMenus  # type: ignore
+import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi  # type: ignore
+import TheKeyMachine.tools.depth_mover.api as depthMoverApi  # type: ignore
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
+import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
 import TheKeyMachine.core.connectEntries as connectEntries
 import TheKeyMachine.tools.orbit.api as orbitApi  # type: ignore
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi  # type: ignore
@@ -35,8 +39,6 @@ from TheKeyMachine.Qt import QtCompat, QtCore, QtGui  # type: ignore
 
 
 MAIN_SPECIAL_TOOL_KEYS = {
-    "animation_offset",
-    "micro_move",
     "orbit",
     "selection_sets",
     "attribute_switcher",
@@ -171,6 +173,12 @@ def add_tool_button(section, item_data, *, overrides=None):
     if overrides:
         data.update(overrides)
     tool_id = item_key(data)
+    if tool_id == "animation_offset":
+        data["changed_signal"] = animationOffsetApi.get_controller().stateChanged
+    elif tool_id == "depth_mover":
+        data["changed_signal"] = depthMoverApi.get_controller().stateChanged
+    elif tool_id == "micro_move":
+        data["changed_signal"] = microMoveApi.get_controller().stateChanged
     btn = cw.create_tool_button_from_data(data)
     if tool_id == "background_runners":
         bind_background_runners_activity_button(btn)
@@ -217,13 +225,16 @@ def _refresh_connect_entry_section(section, kind):
         QtCore.QTimer.singleShot(0, parent._update_height)
 
 
-def add_connect_entry_sections(new_section_fn):
+def add_connect_entries_section(new_section_fn, toolbar_id):
     import TheKeyMachine.core.toolbox as toolbox
 
-    for kind in ("tools", "scripts"):
+    for kind in connectEntries.SOURCES:
         spec = connectEntries.source_spec(kind)
         section = new_section_fn()
-        section.set_settings_namespace(spec["namespace"])
+        namespace = spec["namespace"]
+        if toolbar_id != "main":
+            namespace = "{}_{}".format(namespace, toolbar_id)
+        section.set_settings_namespace(namespace)
         folder_tool = toolbox.get_tool(spec["folder_tool_id"], default=True)
         section.set_menu_identity(spec["label"], folder_tool.get("icon"))
         add_tool_button(section, folder_tool)
@@ -607,47 +618,6 @@ def create_widget_from_data(section, item_data, owner=None):
     return btn
 
 
-def add_animation_offset_button(section, item_data, owner):
-    import TheKeyMachine.core.toolbox as toolbox
-
-    tool = toolbox.get_tool("animation_offset", **{k: v for k, v in item_data.items() if k != "id"})
-    btn = cw.create_tool_button_from_data(tool)
-    btn.setObjectName("anim_offset_button")
-    btn.setCheckable(True)
-    btn.setChecked(bool(getattr(owner, "toggleAnimOffsetButtonState", False)))
-    owner.animation_offset_button_widget = btn
-    section.addWidget(
-        btn,
-        tool.get("label", "Anim Offset"),
-        tool.get("id", "animation_offset"),
-        default=tool.get("default", True),
-        description=_tooltip_description(tool),
-        tooltip=tool.get("tooltip"),
-        pinnable=tool.get("pinnable", True),
-    )
-    return btn
-
-
-def add_micro_move_button(section, item_data, owner):
-    import TheKeyMachine.core.toolbox as toolbox
-
-    tool = toolbox.get_tool("micro_move", **{k: v for k, v in item_data.items() if k != "id"})
-    btn = cw.create_tool_button_from_data(tool)
-    btn.setObjectName("micro_move_button")
-    btn.setCheckable(True)
-    btn.setChecked(owner.micro_move_controller.is_enabled())
-    section.addWidget(
-        btn,
-        tool.get("label", "Micro Move"),
-        tool.get("id", "micro_move"),
-        default=tool.get("default", True),
-        description=_tooltip_description(tool),
-        tooltip=tool.get("tooltip"),
-        pinnable=tool.get("pinnable", True),
-    )
-    return btn
-
-
 def add_setting_toggle_widget(section, item_data, spec_key, owner=None):
     data = dict(item_data)
     data["id"] = spec_key
@@ -666,10 +636,6 @@ def create_main_widget_from_data(section, item_data, owner):
         return create_widget_from_data(section, item_data, owner=owner)
     if widget_key == "selector":
         return add_selector_button(section, item_data)
-    if widget_key == "animation_offset":
-        return add_animation_offset_button(section, item_data, owner)
-    if widget_key == "micro_move":
-        return add_micro_move_button(section, item_data, owner)
     if widget_key == "custom_graph":
         return add_setting_toggle_widget(section, item_data, "custom_graph", owner=owner)
     return create_widget_from_data(section, item_data, owner=owner)
@@ -679,10 +645,6 @@ def add_main_tool_item(section, item_data, owner):
     key = item_key(item_data)
     if key == "selector":
         return add_selector_button(section, item_data)
-    if key == "animation_offset":
-        return add_animation_offset_button(section, item_data, owner)
-    if key == "micro_move":
-        return add_micro_move_button(section, item_data, owner)
     if key == "custom_graph":
         return add_setting_toggle_widget(section, item_data, "custom_graph", owner=owner)
     if key == "TKM":
@@ -796,8 +758,8 @@ def populate_main_toolbar_from_layout(layout_id, new_section_fn, owner):
     for section_def in sections:
         sec_id = section_def["id"]
 
-        if sec_id == "extension_tools":
-            add_connect_entry_sections(new_section_fn)
+        if section_def.get("type") == "connect_entries":
+            add_connect_entries_section(new_section_fn, "main")
             continue
 
         if section_def.get("type") == "slider":
@@ -871,7 +833,7 @@ def add_main_settings_button(section, item_data, owner):
     return btn
 
 
-def show_welcome_shelf_prompt(anchor_button, owner):
+def show_welcome_shelf_prompt(anchor_button):
     if not wutil.is_valid_widget(anchor_button):
         return
 
@@ -886,10 +848,7 @@ def show_welcome_shelf_prompt(anchor_button, owner):
         highlight=add_button,
     )
     if clicked and clicked.get("positive"):
-        try:
-            owner.create_shelf_icon()
-        except Exception:
-            pass
+        shelf.create_main_shelf_button()
 
 
 def get_main_toolbar_icon_alignment():
@@ -955,6 +914,10 @@ def populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn, t
 
     sections = toolbox.get_toolbar_sections("graph", resolve_items=False)
     for section_def in sections:
+        if section_def.get("type") == "connect_entries":
+            add_connect_entries_section(new_section_fn, "graph")
+            continue
+
         if section_def.get("type") == "slider":
             section = add_slider_section_from_data(
                 section_def,

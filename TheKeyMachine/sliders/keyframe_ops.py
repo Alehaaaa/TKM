@@ -128,10 +128,14 @@ def _capture_buffer_curve_targets(curve, target_times):
         # axis. Remapping a selected range over the buffer's full range scales
         # the animation instead of blending to the buffered curve.
         source_shape = curveFitting.capture([curve], target_times).get(curve, {})
+        curve_fn = omutils.anim_curve_fn(curve)
         result = {}
         for target_time in target_times:
             sample = source_shape.get(target_time)
             if not sample:
+                continue
+            value = omutils.anim_curve_value_at_time(curve_fn, target_time)
+            if not isinstance(value, (int, float)):
                 continue
 
             # When the buffer has a key at this exact time its native tangent
@@ -140,7 +144,7 @@ def _capture_buffer_curve_targets(curve, target_times):
             in_angle = sample.get("original_in_angle")
             out_angle = sample.get("original_out_angle")
             result[target_time] = {
-                "value": sample.get("value"),
+                "value": value,
                 "in_angle": in_angle if in_angle is not None else sample.get("in_angle"),
                 "out_angle": out_angle if out_angle is not None else sample.get("out_angle"),
             }
@@ -492,17 +496,6 @@ def apply_blend_to_neighbors(session, percentage, world_space=False):
         session.snapshot_pose_buffer(affected_map)
         cache_neighbor_keyframe_data(session, affected_map, time_range=time_range)
         session.cache.is_cached = True
-
-    # Preview the first applicable neighbor on the active side. This is also
-    # the visual fallback used by Blend to Frame before either side is picked.
-    target_frames = []
-    for cache in session.cache.frame_data.values():
-        frame = cache.next_f if percentage > 0 else cache.prev_f
-        if frame is not None:
-            target_frames.append(frame)
-    if target_frames:
-        target_frame = sorted(target_frames)[0]
-        session.show_target_tint((target_frame, target_frame))
 
     processed_world_targets = set()
     for (attr_full, time), cache in session.cache.frame_data.items():

@@ -1,22 +1,31 @@
 """Public API for the Search tool."""
 
-from TheKeyMachine.Qt import QtWidgets  # type: ignore
+from TheKeyMachine.Qt import QtCore, QtWidgets  # type: ignore
 
 import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.mods import settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
-from TheKeyMachine.tools.search.constants import SEARCH_WINDOW_KEY
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.tools.search.constants import (
+    SEARCH_POSITION_KEY,
+    SEARCH_SETTINGS_NAMESPACE,
+    SEARCH_STAYS_ON_TOP_KEY,
+    SEARCH_WINDOW_KEY,
+)
+from TheKeyMachine.widgets import customWidgets as cw, util as wutil
 
 
 __all__ = [
     "show_search_window",
     "close_search_window",
-    "toggle_search_window",
+    "toggle",
     "set_search_window_open",
     "is_search_window_open",
     "bind_search_toolbar_button",
     "get_search_window",
+    "is_search_stays_on_top",
+    "set_search_stays_on_top",
+    "restore_search_default_position",
 ]
 
 
@@ -53,6 +62,55 @@ def is_search_window_open():
     return bool(window and window.isVisible())
 
 
+def is_search_stays_on_top():
+    return bool(
+        settings.get_setting(
+            SEARCH_STAYS_ON_TOP_KEY,
+            False,
+            namespace=SEARCH_SETTINGS_NAMESPACE,
+        )
+    )
+
+
+def set_search_stays_on_top(enabled):
+    settings.set_setting(
+        SEARCH_STAYS_ON_TOP_KEY,
+        bool(enabled),
+        namespace=SEARCH_SETTINGS_NAMESPACE,
+    )
+    window = get_search_window()
+    if not window:
+        return
+    was_visible = window.isVisible()
+    geometry = window.geometry()
+    window.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, bool(enabled))
+    window.setGeometry(geometry)
+    if was_visible:
+        window.focus_search()
+
+
+def restore_search_default_position():
+    settings.set_setting(
+        SEARCH_POSITION_KEY,
+        None,
+        namespace=SEARCH_SETTINGS_NAMESPACE,
+    )
+    window = get_search_window()
+    if window:
+        window.restore_default_position()
+
+
+def build_search_context_menu(parent=None):
+    menu = cw.OpenMenuWidget(parent)
+    toolCommon.add_floating_window_actions(
+        menu,
+        is_search_stays_on_top,
+        set_search_stays_on_top,
+        restore_search_default_position,
+    )
+    return menu
+
+
 def show_search_window(*_args):
     existing = get_search_window()
     if existing:
@@ -62,6 +120,7 @@ def show_search_window(*_args):
 
     manager = runtime.get_runtime_manager()
     dialog = _window_class()(parent=wutil.get_maya_qt())
+    dialog.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, is_search_stays_on_top())
     manager.register_managed_widget(dialog, key=SEARCH_WINDOW_KEY)
     dialog.destroyed.connect(lambda *_: _emit_search_window_state(False))
     dialog.focus_search()
@@ -90,14 +149,19 @@ search_toolbar_toggle = ToolbarWindowToggle(
 )
 
 
-def toggle_search_window(*_args):
+def toggle(checked=None, *_args):
+    if isinstance(checked, bool):
+        return set_search_window_open(checked)
     return search_toolbar_toggle.toggle()
 
 
 def bind_search_toolbar_button(button):
-    connect_window_toggle = getattr(button, "connect_window_toggle", None)
-    if callable(connect_window_toggle):
-        connect_window_toggle(search_toolbar_toggle)
-    else:
-        search_toolbar_toggle.attach_button(button)
+    from TheKeyMachine.tools.common_toolbar_utils import bind_toolbar_button_common
+
+    bind_toolbar_button_common(
+        search_toolbar_toggle,
+        button,
+        "_tkm_search_context_menu_slot",
+        lambda parent: build_search_context_menu(parent=parent),
+    )
     return True

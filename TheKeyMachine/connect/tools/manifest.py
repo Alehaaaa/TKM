@@ -8,8 +8,11 @@ RULES
 4. Each entry needs either ``run`` for Python or ``mel`` for MEL.
 5. ``run`` may contain ``"module:function"`` or a short Python command.
 6. ``icon`` is optional but recommended. It may contain ``icons.<tkm_icon>``,
-   ``"icons.<tkm_icon>"``, or an image path relative to this folder. Without
-   an icon, the toolbar button displays the first three letters of the name.
+   ``"icons.<tkm_icon>"``, an image path relative to this folder, or a Maya
+   Qt resource such as ``":/mel_tab.png"``. Paths beginning with ``:/`` are
+   built into Maya, so they need no local image file or path resolution.
+   Without an icon, the toolbar button displays the first three letters of
+   the name.
 7. Add ``"enabled": False`` to keep an entry without displaying it.
 
 ADDING A MODULE TOOL
@@ -31,12 +34,20 @@ from TheKeyMachine.data import icons
 TOOLS = {
     # Run a function from any module/subfolder in this package.
     "Example: Create Locator": {
-        "icon": icons.selection_sets,
+        "icon": icons.add,
         "run": "examples.locators:create_locator",
+    },
+    "Example: Show Selection Count": {
+        "icon": "example_tool.svg",
+        "run": "examples.scene_info:show_selection_count",
     },
     # Or write short Python directly. ``cmds`` and ``mel`` are ready to use.
     "Example: Inline Python": {
-        "icon": "example_tool.svg",
+        "icon": ":/py_tab.png",
         "run": "cmds.warning('Custom tool ran')",
+    },
+    "Example: Inline MEL": {
+        "icon": ":/mel_tab.png",
+        "mel": 'warning "Custom MEL tool ran";',
     },
 }

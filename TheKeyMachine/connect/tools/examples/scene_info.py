@@ -1,10 +1,10 @@
-"""Example module referenced by the custom scripts manifest."""
+"""Scene-query examples for the custom tools manifest."""
 
 from maya import cmds
 
 
 def show_selection_count():
-    """Report the current selection using normal module-based Python."""
+    """Report the current Maya selection count."""
     count = len(cmds.ls(selection=True) or [])
     cmds.warning("Selected objects: {}".format(count))
     return count

@@ -11,6 +11,7 @@ import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.mods.keyToolsMod as keyTools
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
+import TheKeyMachine.mods.shelfMod as shelf
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.core.toolWidgets as toolWidgets
@@ -288,10 +289,6 @@ def _populate_connect_menu(menu, kind):
 
 def build_custom_tools_menu(menu, source_widget=None):
     _populate_connect_menu(menu, "tools")
-
-
-def build_custom_scripts_menu(menu, source_widget=None):
-    _populate_connect_menu(menu, "scripts")
 
 
 def build_background_runners_menu(menu, source_widget=None):
@@ -858,7 +855,7 @@ def build_main_preferences_menu(
     _add_action(
         preferences_menu,
         "Create a Shelf Button",
-        toolbar.create_shelf_icon,
+        shelf.create_main_shelf_button,
         command_id="toolbar_add_shelf_button",
     )
 

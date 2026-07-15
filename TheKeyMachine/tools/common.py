@@ -7,6 +7,7 @@ import maya.mel as mel  # type: ignore
 
 from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
 
+from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import util as wutil
 from TheKeyMachine.mods import settingsMod as settings
 
@@ -867,6 +868,28 @@ def connect_checkable_action(action, getter=None, setter=None, signal=None):
     return action
 
 
+def add_floating_window_actions(menu, stays_on_top_getter, stays_on_top_setter, restore_position):
+    """Add the standard floating-window actions to a tool context menu."""
+    always_on_top_action = menu.addAction(
+        QtGui.QIcon(icons.settings),
+        "Always on Top",
+        description="Keep this floating window above other Maya windows.",
+    )
+    connect_checkable_action(
+        always_on_top_action,
+        stays_on_top_getter,
+        stays_on_top_setter,
+    )
+
+    restore_position_action = menu.addAction(
+        QtGui.QIcon(icons.refresh),
+        "Restore Position",
+        description="Restore this floating window to its default position.",
+    )
+    connect_action(restore_position_action, lambda *_: restore_position())
+    return always_on_top_action, restore_position_action
+
+
 def checked_state_getter(data):
     if not isinstance(data, dict):
         return None
@@ -906,6 +929,24 @@ def publish_control_state(state_key, value):
         return runtime.get_runtime_manager().set_control_state(str(state_key), value)
     except Exception:
         return value
+
+
+def deactivate_other_manipulator_tools(active_tool):
+    """Deactivate other checkable TKM tools that own Maya manipulation state."""
+    from TheKeyMachine.tools.depth_mover import api as depthMoverApi
+    from TheKeyMachine.tools.micro_move import api as microMoveApi
+    from TheKeyMachine.tools.temp_pivot import api as tempPivotApi
+
+    tools = (
+        ("micro_move", microMoveApi.is_enabled, microMoveApi.toggle),
+        ("depth_mover", depthMoverApi.is_enabled, depthMoverApi.toggle),
+        ("temp_pivot", tempPivotApi.is_temp_pivot_active, tempPivotApi.toggle),
+    )
+    for tool_id, is_enabled, toggle in tools:
+        if tool_id == active_tool:
+            continue
+        if is_enabled():
+            toggle(False)
 
 
 def bind_control_state(control, state_key, apply_fn, attr_name="_tkm_control_state_sync"):

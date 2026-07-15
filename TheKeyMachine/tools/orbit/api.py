@@ -6,7 +6,7 @@ Provides functions to open/close the Orbit window, toggle settings, and bind the
 __all__ = [
     "orbit_window",
     "close_orbit_window",
-    "toggle_orbit_window",
+    "toggle",
     "set_orbit_auto_transparency",
     "set_orbit_stay_on_top",
     "bind_orbit_toolbar_button",
@@ -227,7 +227,7 @@ def _orbit_auto_transparency_enabled():
     """Return whether auto‑transparency is enabled for the Orbit palette."""
     return settings.get_setting(
         ORBIT_AUTO_TRANSPARENCY_KEY,
-        False,
+        True,
         namespace=ORBIT_SETTINGS_NAMESPACE,
     )
 
@@ -240,7 +240,8 @@ def set_orbit_auto_transparency(enabled: bool):
     )
     win = get_orbit_window()
     if win and wutil.is_valid_widget(win):
-        win.update_transparency_state(bool(enabled))
+        win._auto_transparency = bool(enabled)
+        win.update_transparency_state(win._hovered)
 
 def _orbit_stays_on_top():
     """Return whether the Orbit window should stay on top."""
@@ -288,19 +289,12 @@ def build_orbit_context_menu(parent=None):
 
     menu.addSeparator()
 
-    stays_on_top_action = menu.addAction(
-        QtGui.QIcon(icons.settings),
-        "Stay on Top",
-        description="Keep the floating Orbit tool palette above other Maya windows.",
+    toolCommon.add_floating_window_actions(
+        menu,
+        _orbit_stays_on_top,
+        set_orbit_stay_on_top,
+        restore_orbit_default_position,
     )
-    toolCommon.connect_checkable_action(stays_on_top_action, _orbit_stays_on_top, set_orbit_stay_on_top)
-
-    restore_position_action = menu.addAction(
-        QtGui.QIcon(icons.orbit_ui),
-        "Restore Position",
-        description="Reset the floating Orbit tool palette to its default position above the Orbit toolbar button.",
-    )
-    toolCommon.connect_action(restore_position_action, lambda *_: restore_orbit_default_position())
 
     return menu
 
@@ -316,11 +310,12 @@ def bind_orbit_toolbar_button(button):
     )
     return True
 
-def toggle_orbit_window():
+def toggle(checked=None, *_args):
     """Toggle the Orbit window via the toolbar toggle."""
+    if isinstance(checked, bool):
+        return orbit_window(reuse_existing=True) if checked else close_orbit_window()
     if orbit_toolbar_toggle:
-        orbit_toolbar_toggle.toggle()
+        return orbit_toolbar_toggle.toggle()
     elif is_orbit_window_open():
-        close_orbit_window()
-    else:
-        orbit_window(reuse_existing=True)
+        return close_orbit_window()
+    return orbit_window(reuse_existing=True)

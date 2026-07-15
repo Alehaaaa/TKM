@@ -21,7 +21,10 @@ from TheKeyMachine.widgets import util as wutil
 
 class SearchDialog(customDialogs.QFlatFloatingWidget):
     def __init__(self, parent=None):
-        super().__init__(popup=False, closeButton=False, parent=parent or wutil.get_maya_qt())
+        super().__init__(popup=True, closeButton=False, parent=parent or wutil.get_maya_qt())
+        # A real Qt popup owns focus while open and consumes the first click
+        # outside it. That click dismisses Search instead of also operating Maya.
+        self.setWindowFlags(QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
         # The shared floating shell sizes itself to content by default. Search
         # owns two explicit size states and must remain user-resizable while
         # expanded, so disable that automatic min/max constraint here.
@@ -84,7 +87,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         self.search_input.setStyleSheet(
             "QLineEdit{background:#252525;border:1px solid #4b4b4b;border-radius:%spx;"
             "padding:0 %spx;color:#eeeeee;selection-background-color:#5f88a8;}"
-            % (wutil.DPI(7), wutil.DPI(12))
+            % (wutil.DPI(7), wutil.DPI(8))
         )
         search_row_layout.addWidget(self.search_input, 1)
         layout.addWidget(search_row)
@@ -194,7 +197,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
             item.setData(QtCore.Qt.UserRole + 1, title)
             item.setData(QtCore.Qt.UserRole + 2, row.get("icon"))
             item.setData(QtCore.Qt.UserRole + 3, row.get("badge_text") or title[:2])
-            item.setSizeHint(QtCore.QSize(0, wutil.DPI(22)))
+            item.setSizeHint(QtCore.QSize(0, wutil.DPI(20)))
             self.results.addItem(item)
             widget = SearchResultItemWidget(row, row_index=row_index, parent=self.results)
             widget.clicked.connect(lambda target=item: self._select_result_item(target))
@@ -316,13 +319,23 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
                 self.move(int(saved[0]), int(saved[1]))
                 self._clamp_to_screen()
                 return
-            parent = self.parentWidget() or wutil.get_maya_qt()
-            geometry = parent.frameGeometry() if parent else QtGui.QGuiApplication.primaryScreen().availableGeometry()
-            self.move(
-                int(geometry.x() + (geometry.width() - self.width()) / 2),
-                int(geometry.y() + (geometry.height() - self.height()) / 2),
-            )
-            self._clamp_to_screen()
+            self._move_to_default_position()
+        finally:
+            self._restoring_position = False
+
+    def _move_to_default_position(self):
+        parent = self.parentWidget() or wutil.get_maya_qt()
+        geometry = parent.frameGeometry() if parent else QtGui.QGuiApplication.primaryScreen().availableGeometry()
+        self.move(
+            int(geometry.x() + (geometry.width() - self.width()) / 2),
+            int(geometry.y() + (geometry.height() / 3.0) - (self.height() / 2.0)),
+        )
+        self._clamp_to_screen()
+
+    def restore_default_position(self):
+        self._restoring_position = True
+        try:
+            self._move_to_default_position()
         finally:
             self._restoring_position = False
 
@@ -363,20 +376,13 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         )
         self._position_save_timer.stop()
         self._save_position()
+        super().closeEvent(event)
+
+    def hideEvent(self, event):
         from TheKeyMachine.tools.search import api as searchApi
 
         searchApi._emit_search_window_state(False)
-        super().closeEvent(event)
-
-    def event(self, event):
-        result = super().event(event)
-        if event.type() == QtCore.QEvent.WindowDeactivate and self.isVisible():
-            QtCore.QTimer.singleShot(0, self._close_if_deactivated)
-        return result
-
-    def _close_if_deactivated(self):
-        if wutil.is_valid_widget(self) and self.isVisible() and not self.isActiveWindow():
-            self.close()
+        super().hideEvent(event)
 
     def resizeEvent(self, event):
         customDialogs.QFlatDialog.resizeEvent(self, event)

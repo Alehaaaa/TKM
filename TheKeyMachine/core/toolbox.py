@@ -11,10 +11,13 @@ import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.core.toolMenus as toolMenus
+import TheKeyMachine.tools.animation_offset.api as animationOffsetApi
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
+import TheKeyMachine.tools.depth_mover.api as depthMoverApi
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
 import TheKeyMachine.tools.isolate_bookmarks.api as isolateBookmarksApi
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
+import TheKeyMachine.tools.micro_move.api as microMoveApi
 import TheKeyMachine.tools.orbit.api as orbitApi
 import TheKeyMachine.tools.search.api as searchApi
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
@@ -108,55 +111,6 @@ def _tool_menu_builder(builder_name, **pdefault_kwargs):
         return builder(menu, source_widget=source_widget, **pdefault_kwargs)
 
     return _build
-
-
-def _toolbar_controller_enabled(controller_attr):
-    try:
-        from TheKeyMachine.core.toolbar import get_toolbar
-    except Exception:
-        return False
-    toolbar = get_toolbar()
-    controller = getattr(toolbar, controller_attr, None) if toolbar else None
-    is_enabled = getattr(controller, "is_enabled", None)
-    return bool(is_enabled()) if callable(is_enabled) else False
-
-
-def _set_animation_offset_enabled(enabled):
-    try:
-        from TheKeyMachine.core.toolbar import get_toolbar
-    except Exception:
-        return None
-    toolbar = get_toolbar()
-    if toolbar:
-        return toolbar.toggleAnimOffsetButton(bool(enabled))
-    return None
-
-
-def _set_micro_move_enabled(enabled):
-    try:
-        from TheKeyMachine.core.toolbar import get_toolbar
-    except Exception:
-        return None
-    toolbar = get_toolbar()
-    if toolbar:
-        return toolbar.toggle_micro_move_button(bool(enabled))
-    return None
-
-
-def _set_orbit_window_open(enabled):
-    return orbitApi.orbit_window(reuse_existing=True) if enabled else orbitApi.close_orbit_window()
-
-
-def _set_attribute_switcher_window_open(enabled):
-    return attributeSwitcherApi.attribute_switcher_window(reuse_existing=True, popup=False) if enabled else attributeSwitcherApi.close_attribute_switcher_window()
-
-
-def _set_gimbal_fixer_window_open(enabled):
-    return gimbalFixerApi.show_gimbal_fixer_window() if enabled else gimbalFixerApi.close_gimbal_fixer_window()
-
-
-def _set_selection_sets_window_open(enabled):
-    return selectionSetsApi.selection_sets_window(reuse_existing=True) if enabled else selectionSetsApi.close_selection_sets_window()
 
 
 def _get_overshoot_sliders_enabled():
@@ -320,7 +274,7 @@ TOOL_DEFINITIONS = {
         "label": "Search",
         "icon": icons.search,
         "tooltip": "Find and run any TheKeyMachine tool. Type to search, use Up or Down to choose a result, then press Enter to run it.",
-        "callback": searchApi.toggle_search_window,
+        "callback": searchApi.toggle,
         "get_checked": searchApi.is_search_window_open,
         "set_checked": searchApi.set_search_window_open,
         "bind_checked_fn": searchApi.bind_search_toolbar_button,
@@ -372,9 +326,14 @@ TOOL_DEFINITIONS = {
 
 
     "depth_mover": {
-        "type": "tool",
+        "type": "check",
+        "state_key": "depth_mover",
         "label": "Depth Mover",
         "icon": icons.depth_mover,
+        "callback": trigger.make_command_callback("depth_mover"),
+        "get_checked": depthMoverApi.is_enabled,
+        "set_checked": depthMoverApi.toggle,
+        "tooltip": helper.depth_mover_tooltip_text,
     },
 
     # ---------------------------------------------------------------  SHARE KEYS  --------------------------------------------------------------
@@ -467,9 +426,9 @@ TOOL_DEFINITIONS = {
         "label": "Orbit",
         "text": "Orb",
         "icon": icons.orbit_ui,
-        "callback": orbitApi.toggle_orbit_window,
+        "callback": orbitApi.toggle,
         "get_checked": orbitApi.is_orbit_window_open,
-        "set_checked": _set_orbit_window_open,
+        "set_checked": orbitApi.toggle,
         "bind_checked_fn": orbitApi.bind_orbit_toolbar_button,
         "tooltip": helper.orbit_tooltip_text,
     },
@@ -479,9 +438,9 @@ TOOL_DEFINITIONS = {
         "label": "Attribute Switcher",
         "text": "SSw",
         "icon": icons.attribute_switcher,
-        "callback": attributeSwitcherApi.toggle_attribute_switcher_window,
+        "callback": attributeSwitcherApi.toggle_window,
         "get_checked": attributeSwitcherApi.is_attribute_switcher_window_open,
-        "set_checked": _set_attribute_switcher_window_open,
+        "set_checked": attributeSwitcherApi.toggle_window,
         "bind_checked_fn": attributeSwitcherApi.bind_attribute_switcher_toolbar_button,
         "tooltip": helper.attribute_switcher_tooltip_text,
     },
@@ -491,9 +450,9 @@ TOOL_DEFINITIONS = {
         "label": "Gimbal Fixer",
         "text": "Gim",
         "icon": icons.reblock,
-        "callback": gimbalFixerApi.gimbal_fixer_toolbar_toggle.toggle,
+        "callback": gimbalFixerApi.toggle,
         "get_checked": gimbalFixerApi.is_gimbal_fixer_window_open,
-        "set_checked": _set_gimbal_fixer_window_open,
+        "set_checked": gimbalFixerApi.toggle,
         "bind_checked_fn": gimbalFixerApi.bind_gimbal_fixer_toolbar_button,
         "tooltip": helper.gimbal_fixer_tooltip_text,
     },
@@ -506,9 +465,9 @@ TOOL_DEFINITIONS = {
         "label": "Temp Pivot",
         "text": "TP",
         "icon": icons.temp_pivot,
-        "callback": tempPivotApi.toggle_temp_pivot,
+        "callback": tempPivotApi.toggle,
         "get_checked": tempPivotApi.is_temp_pivot_active,
-        "set_checked": tempPivotApi.toggle_temp_pivot,
+        "set_checked": tempPivotApi.toggle,
         "bind_checked_fn": tempPivotApi.bind_temp_pivot_toolbar_button,
         "tooltip": helper.temp_pivot_tooltip_text,
     },
@@ -563,8 +522,8 @@ TOOL_DEFINITIONS = {
         "text": "MM",
         "icon": icons.ruler,
         "callback": trigger.make_command_callback("micro_move"),
-        "get_checked": lambda: _toolbar_controller_enabled("micro_move_controller"),
-        "set_checked": _set_micro_move_enabled,
+        "get_checked": microMoveApi.is_enabled,
+        "set_checked": microMoveApi.toggle,
         "tooltip": helper.micro_move_tooltip_text,
     },
 
@@ -982,9 +941,9 @@ TOOL_DEFINITIONS = {
         "label": "Selection Sets",
         "text": "SS",
         "icon": icons.selection_sets,
-        "callback": selectionSetsApi.toggle_selection_sets_window,
+        "callback": selectionSetsApi.toggle,
         "get_checked": selectionSetsApi.is_selection_sets_window_open,
-        "set_checked": _set_selection_sets_window_open,
+        "set_checked": selectionSetsApi.toggle,
         "bind_checked_fn": selectionSetsApi.bind_selection_sets_toolbar_button,
         "tooltip": helper.selection_sets_tooltip_text,
     },
@@ -1220,11 +1179,11 @@ TOOL_DEFINITIONS = {
     "animation_offset": {
         "type": "check",
         "state_key": "animation_offset",
-        "label": "Anim Offset",
+        "label": "Animation Offset",
         "icon": icons.animation_offset,
         "callback": trigger.make_command_callback("animation_offset"),
-        "get_checked": lambda: _toolbar_controller_enabled("animation_offset_controller"),
-        "set_checked": _set_animation_offset_enabled,
+        "get_checked": animationOffsetApi.is_enabled,
+        "set_checked": animationOffsetApi.toggle,
         "tooltip": helper.animation_offset_tooltip_text,
     },
     "ws_copy_frame": {
@@ -1525,13 +1484,6 @@ TOOL_DEFINITIONS = {
         "icon": icons.custom_tools,
         "menu": _tool_menu_builder("build_custom_tools_menu"),
         "tooltip": helper.custom_tools_tooltip_text,
-    },
-    "custom_scripts": {
-        "type": "menu",
-        "label": "Custom Scripts",
-        "icon": icons.custom_scripts,
-        "menu": _tool_menu_builder("build_custom_scripts_menu"),
-        "tooltip": helper.custom_scripts_tooltip_text,
     },
     "background_runners": {
         "type": "menu",
@@ -1899,13 +1851,6 @@ TOOL_SECTION_DEFINITIONS = {
         "default_modes": ["blend_best_guess"],
     },
     # --- Scene Tools ---
-    "pointer_tools": {
-        "label": "Pointer",
-        "items": [
-            "separator",
-            {"id": "depth_mover"},
-        ],
-    },
     "isolate_tools": {
         "label": "Isolate Tools",
         "items": [
@@ -2133,7 +2078,6 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "smart_rotation_release"},
             {"id": "smart_translation"},
             {"id": "smart_translation_release"},
-            {"id": "depth_mover"},
         ],
     },
     # --- Special Tools ---
@@ -2149,6 +2093,13 @@ TOOL_SECTION_DEFINITIONS = {
         "color": toolColors.TOOLBAR_PURPLE,
         "items": [
             {"id": "micro_move"},
+        ],
+    },
+    "depth_mover_tools": {
+        "label": "Depth Mover",
+        "color": toolColors.TOOLBAR_PURPLE,
+        "items": [
+            {"id": "depth_mover"},
         ],
     },
     "temp_pivot_tools": {
@@ -2203,6 +2154,8 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "animation_offset"},
             "separator",
             {"id": "micro_move"},
+            "separator",
+            {"id": "depth_mover"},
             "separator",
             {"section": "temp_pivot_tools"},
             {"section": "follow_cam_tools"},
@@ -2361,16 +2314,17 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "snap", "default": True},
         ],
     },
-    "extension_tools": {
-        "label": "Extensions",
+    "custom_tools_section": {
+        "label": "Custom Tools",
+        "type": "connect_entries",
         "toolbar": True,
         "items": [
             {"id": "custom_tools"},
-            {"id": "custom_scripts"},
         ],
     },
     "background_runner_tools": {
         "label": "Background Runners",
+        "toolbar_ids": ("main",),
         "items": [
             {"id": "background_runners", "default": True},
         ],

@@ -1116,11 +1116,17 @@ class QFlatToolBarPopupDialog(QFlatToolBarDialog):
     Toolbar-style popup dialog that closes after activation changes.
     """
 
-    def __init__(self, parent=None, *args, **kwargs):
-        super().__init__(parent=parent, *args, **kwargs)
+    def __init__(self, parent=None, native_popup=False, *args, **kwargs):
+        self._native_popup = bool(native_popup)
         self._opened = False
+        super().__init__(parent=parent, *args, **kwargs)
+        if self._native_popup:
+            self.setWindowFlags(QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
 
     def changeEvent(self, event):
+        if self._native_popup:
+            super().changeEvent(event)
+            return
         if event.type() == QtCore.QEvent.ActivationChange:
             if self._opened:
                 self.close()
@@ -1139,7 +1145,7 @@ class QFlatSelectorDialog(QFlatToolBarPopupDialog):
     def __init__(self, parent=None):
         self.title = "Selector"
         self.icon = icons.selector
-        super().__init__(parent=parent)
+        super().__init__(parent=parent, native_popup=True)
         self.title_label.setText("0")
 
         self._refresh_timer = QtCore.QTimer(self)
@@ -1817,7 +1823,12 @@ class QFlatNumberInput(QFlatToolBarPopupDialog):
 
         self.COLOR_BG_TRACK = self.DARK_BG_COLOR
 
-        super().__init__(parent=parent, popup=popup, closeButton=closeButton)
+        super().__init__(
+            parent=parent,
+            popup=popup,
+            closeButton=closeButton,
+            native_popup=True,
+        )
 
         self.setMinimumWidth(width)
         self.title_label.setText(self.title)

@@ -217,7 +217,11 @@ select_rig_controls_animated_tooltip_text = [
 ]
 
 depth_mover_tooltip_text = [
-    "Adjust object depth without changing its apparent camera-space framing.",
+    "Toggle the viewport Depth Mover context.",
+    "Drag vertically to move selected objects toward or away from the active camera.",
+    "During the same drag, move left for finer control or right for faster movement.",
+    "Hold Control for 0.3x speed or Shift for 3x speed.",
+    "Movement slows near the camera without stopping, then returns to normal after crossing it.",
 ]
 
 
@@ -464,6 +468,7 @@ temp_pivot_tooltip_text = [
 micro_move_tooltip_text = [
     "Make precise move and rotate adjustments directly in the viewport.",
     "Slow cursor drags stay precise; faster movement increases transform speed.",
+    "Hold Control for 0.3x speed or Shift for 3x speed.",
     "While enabled, W and E switch custom Micro Move variants; Q exits.",
     "Selection stays active, so you can click another control without leaving Micro Move.",
 ]
@@ -698,11 +703,6 @@ customGraph_tooltip_text = [
 ]
 
 custom_tools_tooltip_text = [
-    "Open your custom pipeline tool shortcuts from a single menu.",
-    "Configure these entries carefully to avoid broken tool definitions.",
-]
-
-custom_scripts_tooltip_text = [
-    "Open your personal and third-party script shortcuts from one menu.",
-    "Useful when you want quick access without relying on Maya shelves.",
+    "Open your custom tools and script shortcuts from a single menu.",
+    "Configure Python, MEL, and callable entries without relying on Maya shelves.",
 ]

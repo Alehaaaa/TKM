@@ -35,6 +35,7 @@ MANIP_CONTEXT_TOKENS = (
     "scale",
     "manip",
 )
+_CONTROLLER = None
 
 
 class AnimationOffsetController(QtCore.QObject):
@@ -49,10 +50,10 @@ class AnimationOffsetController(QtCore.QObject):
     POLL_INTERVAL_MS = 70
     RESNAPSHOT_DELAY_MS = 120
 
-    def __init__(self, owner):
-        super().__init__(owner)
-        self._owner = owner
-        self._runtime_manager = runtime.get_runtime_manager()
+    def __init__(self, manager):
+        super().__init__(manager)
+        self._owner = manager
+        self._runtime_manager = manager
         self._enabled = False
         self._state = self.STATE_IDLE
         self._time_range = None
@@ -61,7 +62,6 @@ class AnimationOffsetController(QtCore.QObject):
         self._snapshot_time = None
         self._baseline = {}
         self._pending_manip_plugs = set()
-        self._tint_color = toolColors.TOOLBAR_PURPLE
         self._pending_resnapshot_update_range = False
         self._settling_after_resnapshot = False
 
@@ -92,9 +92,6 @@ class AnimationOffsetController(QtCore.QObject):
 
     def _resolve_locked_time_range(self):
         return timelineWidgets.resolve_time_context(default_mode="all_animation").timerange
-
-    def _resolve_tint_color(self):
-        return self._tint_color
 
     def _on_tint_range_changed(self, timerange):
         self._time_range = tuple(timerange)
@@ -484,7 +481,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._resnapshot(update_range=self._time_range is None)
         offset_widgets.show_animation_offset_tint(
             timerange=self._time_range,
-            color=self._resolve_tint_color(),
+            color=toolColors.TOOLBAR_PURPLE,
             owner=self._owner,
             key=self._tint_key,
             center_line=True,
@@ -499,7 +496,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._disconnect_runtime_manager()
         self._poll_timer.stop()
         self._resnapshot_timer.stop()
-        runtime.get_runtime_manager().clear_managed_widget(self._tint_key)
+        self._runtime_manager.clear_managed_widget(self._tint_key)
         self._state = self.STATE_IDLE
         self._selection_signature = ()
         self._snapshot_time = None
@@ -509,32 +506,62 @@ class AnimationOffsetController(QtCore.QObject):
         self._settling_after_resnapshot = False
         self._time_range = None
         self.stateChanged.emit(False)
-        runtime.get_runtime_manager().set_tool_state("animation_offset", False)
+        self._runtime_manager.set_tool_state("animation_offset", False)
 
-    def toggle(self, checked=None, button_widget=None):
+    def toggle(self, checked=None):
         if checked is None:
             checked = not self._enabled
 
         checked = bool(checked)
         self._enabled = checked
 
-        if button_widget and QtCompat.isValid(button_widget) and hasattr(button_widget, "get_tint_color"):
-            try:
-                tint_color = button_widget.get_tint_color()
-            except Exception:
-                tint_color = None
-            if tint_color is not None:
-                self._tint_color = tint_color
-
         if checked:
             self._chunk_opened = toolCommon.open_undo_chunk()
-            self.activate()
-            self.stateChanged.emit(self.is_enabled())
-            runtime.get_runtime_manager().set_tool_state("animation_offset", self.is_enabled())
-        else:
-            self.deactivate()
             try:
-                if self._chunk_opened:
-                    toolCommon.close_undo_chunk()
+                self.activate()
             except Exception:
-                pass
+                self._enabled = False
+                try:
+                    if self._chunk_opened:
+                        toolCommon.close_undo_chunk()
+                finally:
+                    self._chunk_opened = False
+                raise
+            self.stateChanged.emit(self.is_enabled())
+            self._runtime_manager.set_tool_state("animation_offset", self.is_enabled())
+        else:
+            try:
+                self.deactivate()
+            finally:
+                try:
+                    if self._chunk_opened:
+                        toolCommon.close_undo_chunk()
+                finally:
+                    self._chunk_opened = False
+
+
+def get_controller(create=True):
+    global _CONTROLLER
+    if _CONTROLLER is not None and not QtCompat.isValid(_CONTROLLER):
+        _CONTROLLER = None
+    if _CONTROLLER is None and create:
+        _CONTROLLER = AnimationOffsetController(runtime.get_runtime_manager())
+    return _CONTROLLER
+
+
+def is_enabled():
+    controller = get_controller(create=False)
+    return bool(controller and controller.is_enabled())
+
+
+def toggle(checked=None, *_args):
+    return get_controller().toggle(checked)
+
+
+def cleanup():
+    global _CONTROLLER
+    controller = get_controller(create=False)
+    _CONTROLLER = None
+    if controller is not None:
+        controller.toggle(False)
+        controller.deleteLater()

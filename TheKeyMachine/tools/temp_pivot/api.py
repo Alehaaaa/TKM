@@ -660,13 +660,15 @@ def reset_temp_pivot(*args):
     _reset_pivot_to_current_preference(select_pivot=True, clear_pivot_edits=True)
 
 
-def toggle_temp_pivot(checked=None, *args):
+def toggle(checked=None, *args):
     if checked is False:
         end_temp_pivot()
         return
     if is_temp_pivot_active():
-        end_temp_pivot()
+        if checked is None:
+            end_temp_pivot()
         return
+    toolCommon.deactivate_other_manipulator_tools("temp_pivot")
     return create_temp_pivot(*args)
 
 

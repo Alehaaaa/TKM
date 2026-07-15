@@ -25,21 +25,21 @@ def normalize_query(text):
 
 
 def match_rank(row, query):
-    """Return a stable relevance rank, or None when the row does not match."""
+    """Return a relevance tier, or None when the row does not match."""
     title = str(row.get("title") or "")
     command = str(row.get("command") or "")
     title_lower = title.lower()
     command_lower = command.lower().replace("_", " ")
     if not query:
-        return (0, title_lower)
+        return 0
     if title_lower.startswith(query):
-        return (0, len(title), title_lower)
+        return 0
     if any(word.startswith(query) for word in title_lower.split()):
-        return (1, len(title), title_lower)
+        return 1
     if query in title_lower:
-        return (2, title_lower.index(query), len(title), title_lower)
+        return 2
     if query in command_lower:
-        return (3, command_lower.index(query), len(title), title_lower)
+        return 3
     return None
 
 
@@ -51,6 +51,8 @@ def ranked_command_rows(rows, text):
         rank = match_rank(row, query)
         if rank is not None:
             matches.append((rank, row))
+    # Python's sort is stable, so equal-relevance matches retain the catalog's
+    # section, tool, variant, and slider-value order.
     matches.sort(key=lambda entry: entry[0])
     return [row for _rank, row in matches]
 

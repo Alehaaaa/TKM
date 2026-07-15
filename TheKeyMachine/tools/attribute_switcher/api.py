@@ -18,7 +18,8 @@ from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
 __all__ = [
     "attribute_switcher_window",
     "close_attribute_switcher_window",
-    "toggle_attribute_switcher_window",
+    "toggle",
+    "toggle_window",
     "show",
     "popup",
     "is_euler_filter_enabled",
@@ -101,7 +102,7 @@ def set_euler_filter_enabled(enabled):
     emit_attribute_switcher_euler_filter_state()
 
 
-def toggle_euler_filter_enabled(*_args, **_kwargs):
+def toggle(*_args, **_kwargs):
     state = not is_euler_filter_enabled()
     set_euler_filter_enabled(state)
     return state
@@ -205,21 +206,11 @@ def build_attribute_switcher_context_menu(parent=None):
 
     menu.addSeparator()
 
-    stays_on_top_action = menu.addAction(
-        QtGui.QIcon(icons.settings),
-        "Stay on Top",
-        description="Keep the floating Attribute Switcher window above other Maya windows.",
-    )
-    toolCommon.connect_checkable_action(
-        stays_on_top_action, is_stay_on_top, set_stay_on_top
-    )
-    restore_position_action = menu.addAction(
-        QtGui.QIcon(icons.attribute_switcher),
-        "Restore Position",
-        description="Reset the Attribute Switcher position above its toolbar button.",
-    )
-    toolCommon.connect_action(
-        restore_position_action, lambda *_: restore_attribute_switcher_default_position()
+    toolCommon.add_floating_window_actions(
+        menu,
+        is_stay_on_top,
+        set_stay_on_top,
+        restore_attribute_switcher_default_position,
     )
     return menu
 
@@ -236,13 +227,18 @@ def bind_attribute_switcher_toolbar_button(button):
     return True
 
 
-def toggle_attribute_switcher_window():
+def toggle_window(checked=None, *_args):
+    if isinstance(checked, bool):
+        return (
+            attribute_switcher_window(reuse_existing=True, popup=False)
+            if checked
+            else close_attribute_switcher_window()
+        )
     if attribute_switcher_toolbar_toggle:
-        attribute_switcher_toolbar_toggle.toggle()
+        return attribute_switcher_toolbar_toggle.toggle()
     elif is_attribute_switcher_window_open():
-        close_attribute_switcher_window()
-    else:
-        attribute_switcher_window(reuse_existing=True, popup=True)
+        return close_attribute_switcher_window()
+    return attribute_switcher_window(reuse_existing=True, popup=True)
 
 
 def show():

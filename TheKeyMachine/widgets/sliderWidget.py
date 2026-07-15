@@ -128,6 +128,15 @@ def _shortcut_requires_mid_click(shortcut) -> bool:
     return Qt.MiddleButton in (shortcut or [])
 
 
+def _slider_command_name(prefix: str, mode: str, value: int) -> str:
+    base_command_name = "slider_{}_{}".format(prefix, mode)
+    value = int(value)
+    if value == 0:
+        return base_command_name
+    suffix = "neg{}".format(abs(value)) if value < 0 else str(value)
+    return "{}_{}".format(base_command_name, suffix)
+
+
 # --- tiny button with centered square ------------------------------------------
 class SliderButton(cw.TooltipMixin, QPushButton):
     """Flat square-indicator button that emits its signed percent on click."""
@@ -153,6 +162,9 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
         self._tooltip_title = ""
         self._tooltip_description = ""
+        self._tooltip_command_id = None
+        self._tooltip_command_label = None
+        self._tooltip_command_icon = None
         # Initial tooltip
         self._update_tooltip()
 
@@ -163,12 +175,30 @@ class SliderButton(cw.TooltipMixin, QPushButton):
     def _update_tooltip(self):
         title = self._tooltip_title or "Value"
         value_label = "Set Frame" if self._frameButton else f"{self._percent}%"
-        self.setToolTipData(text=f"{title}: {value_label}", description=self._tooltip_description, tooltip=getattr(self, "_tooltip", None))
+        self.setToolTipData(
+            text=f"{title}: {value_label}",
+            description=self._tooltip_description,
+            tooltip=getattr(self, "_tooltip", None),
+            command_id=self._tooltip_command_id,
+            command_label=self._tooltip_command_label,
+            command_icon=self._tooltip_command_icon,
+        )
 
-    def setTooltipInfo(self, title: str, description: str = "", tooltip=None):
+    def setTooltipInfo(
+        self,
+        title: str,
+        description: str = "",
+        tooltip=None,
+        command_id=None,
+        command_label=None,
+        command_icon=None,
+    ):
         self._tooltip_title = title
         self._tooltip_description = description
         self._tooltip = tooltip
+        self._tooltip_command_id = command_id
+        self._tooltip_command_label = command_label
+        self._tooltip_command_icon = command_icon
         self._update_tooltip()
 
     @property
@@ -313,6 +343,9 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._handle_hover = False
         self._tooltip_title = ""
         self._tooltip_description = ""
+        self._tooltip_command_id = None
+        self._tooltip_command_label = None
+        self._tooltip_command_icon = None
         self._icon = text if self._looks_like_icon(text) else None
 
         self._wheel_count = 0
@@ -330,10 +363,21 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
         self._apply_stylesheet(thick=False)
 
-    def setTooltipInfo(self, title: str, description: str = "", tooltip=None):
+    def setTooltipInfo(
+        self,
+        title: str,
+        description: str = "",
+        tooltip=None,
+        command_id=None,
+        command_label=None,
+        command_icon=None,
+    ):
         self._tooltip_title = title
         self._tooltip_description = description
         self._tooltip = tooltip
+        self._tooltip_command_id = command_id
+        self._tooltip_command_label = command_label
+        self._tooltip_command_icon = command_icon
         self._update_self_tooltip()
 
     def enterEvent(self, e):
@@ -355,7 +399,14 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
     def _update_self_tooltip(self, _v=None):
         title = self._tooltip_title or self._text
-        self.setToolTipData(text=title, description=self._tooltip_description, tooltip=getattr(self, "_tooltip", None))
+        self.setToolTipData(
+            text=title,
+            description=self._tooltip_description,
+            tooltip=getattr(self, "_tooltip", None),
+            command_id=self._tooltip_command_id,
+            command_label=self._tooltip_command_label,
+            command_icon=self._tooltip_command_icon,
+        )
 
     @staticmethod
     def _looks_like_icon(value: str) -> bool:
@@ -974,13 +1025,61 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._tooltipDescription = description
         self._tooltip = tooltip
 
-        # Update the mixin state for the main widget (handles statusTip)
-        cw.TooltipMixin.setTooltipInfo(self, title, description, tooltip=tooltip)
+        handle_command = self._tooltip_command_metadata(0)
+        cw.TooltipMixin.setToolTipData(
+            self,
+            text=title,
+            description=description,
+            tooltip=tooltip,
+            command_id=handle_command[0],
+            command_label=handle_command[1],
+            command_icon=handle_command[2],
+        )
 
         # Update inner components
-        self._slider.setTooltipInfo(title, description, tooltip)
+        self._slider.setTooltipInfo(
+            title,
+            description,
+            tooltip,
+            command_id=handle_command[0],
+            command_label=handle_command[1],
+            command_icon=handle_command[2],
+        )
         for b in self._leftButtons + self._rightButtons:
-            b.setTooltipInfo(title, description, tooltip)
+            if b in (self._leftFrameButton, self._rightFrameButton):
+                b.setTooltipInfo(title, description, tooltip)
+                continue
+            button_command = self._tooltip_command_metadata(b.percent)
+            b.setTooltipInfo(
+                title,
+                description,
+                tooltip,
+                command_id=button_command[0],
+                command_label=button_command[1],
+                command_icon=button_command[2],
+            )
+
+    def _tooltip_command_metadata(self, value):
+        mode = self.currentMode()
+        if mode is None:
+            return None, None, None
+
+        command_id = None
+        if self._section_prefix:
+            command_id = _slider_command_name(
+                self._section_prefix,
+                mode.key,
+                value,
+            )
+
+        value = int(value)
+        if value:
+            value_text = "+{}%".format(value) if value > 0 else "{}%".format(value)
+            command_label = "{} {}".format(mode.label, value_text)
+        else:
+            command_label = mode.label
+        command_icon = mode.icon if SliderHandle._looks_like_icon(mode.icon) else None
+        return command_id, command_label, command_icon
 
     ################################ GETTERS ################################
 
@@ -1042,6 +1141,9 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._section_prefix = parts[0]
         else:
             self._section_prefix = ""
+        mode = self.currentMode()
+        if mode is not None:
+            self.setTooltipInfo(mode.label, mode.description, mode.tooltip)
 
     def _is_pointer_over_widget(self) -> bool:
         try:

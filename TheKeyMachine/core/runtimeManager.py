@@ -270,8 +270,15 @@ class RuntimeManager(QtCore.QObject):
     def shutdown(self) -> None:
         self._shutdown_background_runners()
         self._remove_event_filter()
+        self._shutdown_tool_controllers()
         self._clear_managed_widgets()
         cleanup_orphaned_widgets()
+        # Native tool contexts must be removed before their plug-ins unload.
+        try:
+            from TheKeyMachine.tools import plugins
+            plugins.shutdown_all()
+        except Exception:
+            pass
         self._remove_all()
         self._started = False
         _clear_state()
@@ -279,6 +286,30 @@ class RuntimeManager(QtCore.QObject):
         if app is not None and getattr(app, _APP_RUNTIME_ATTRIBUTE, None) is self:
             try:
                 delattr(app, _APP_RUNTIME_ATTRIBUTE)
+            except Exception:
+                pass
+
+    def _shutdown_tool_controllers(self) -> None:
+        cleanups = []
+        try:
+            from TheKeyMachine.tools.animation_offset import api as animationOffsetApi
+            cleanups.append(animationOffsetApi.cleanup)
+        except Exception:
+            pass
+        try:
+            from TheKeyMachine.tools.micro_move import api as microMoveApi
+            cleanups.append(microMoveApi.cleanup)
+        except Exception:
+            pass
+        try:
+            from TheKeyMachine.tools.depth_mover import api as depthMoverApi
+            cleanups.append(depthMoverApi.cleanup)
+        except Exception:
+            pass
+
+        for cleanup in cleanups:
+            try:
+                cleanup()
             except Exception:
                 pass
 

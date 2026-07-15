@@ -83,7 +83,7 @@ def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
             customGraph.removeCustomGraph()
 
 
-def toggle_graph_toolbar_enabled(state=None, *args, **kwargs):
+def toggle(state=None, *args, **kwargs):
     if state is None:
         state = not get_graph_toolbar_checkbox_state()
     return set_graph_toolbar_enabled(bool(state), apply=kwargs.get("apply", True))

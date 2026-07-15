@@ -17,7 +17,7 @@ class SearchLineEdit(QtWidgets.QLineEdit):
         self._result_icon_visible = False
         self._result_icon = QtWidgets.QLabel(self)
         self._result_icon.setAlignment(QtCore.Qt.AlignCenter)
-        self._result_icon.setFixedSize(wutil.DPI(38), wutil.DPI(38))
+        self._result_icon.setFixedSize(wutil.DPI(42), wutil.DPI(42))
         self._result_icon.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         self._result_icon.hide()
 
@@ -35,16 +35,16 @@ class SearchLineEdit(QtWidgets.QLineEdit):
         self._result_icon.clear()
         if icon_path:
             self._result_icon.setPixmap(
-                QtGui.QIcon(icon_path).pixmap(wutil.DPI(30), wutil.DPI(30))
+                QtGui.QIcon(icon_path).pixmap(wutil.DPI(36), wutil.DPI(36))
             )
             self._result_icon.setStyleSheet("background:transparent;")
         elif fallback_text:
             self._result_icon.setText(str(fallback_text)[:2].upper())
             self._result_icon.setStyleSheet(
-                "background:transparent;color:#aeb8c0;font-size:%spx;" % wutil.DPI(9)
+                "background:transparent;color:#aeb8c0;font-size:%spx;" % wutil.DPI(11)
             )
         self._result_icon.setVisible(self._result_icon_visible)
-        self.setTextMargins(0, 0, wutil.DPI(42) if self._result_icon_visible else 0, 0)
+        self.setTextMargins(0, 0, wutil.DPI(46) if self._result_icon_visible else 0, 0)
         self._position_result_icon()
         self.update()
 
@@ -128,7 +128,7 @@ class SearchResultItemWidget(QtWidgets.QWidget):
         self.icon_label.setAlignment(QtCore.Qt.AlignCenter)
         icon_path = row.get("icon")
         if icon_path:
-            self.icon_label.setPixmap(QtGui.QIcon(icon_path).pixmap(wutil.DPI(18), wutil.DPI(18)))
+            self.icon_label.setPixmap(QtGui.QIcon(icon_path).pixmap(wutil.DPI(19), wutil.DPI(19)))
         else:
             title = str(row.get("title") or row.get("command") or "")
             fallback = str(row.get("badge_text") or title[:2]).upper()
@@ -141,7 +141,7 @@ class SearchResultItemWidget(QtWidgets.QWidget):
             self.check_box = QtWidgets.QCheckBox(self)
             self.check_box.setObjectName("SearchResultCheckBox")
             self.check_box.setProperty("tkm_window_anchor", False)
-            self.check_box.setFixedSize(wutil.DPI(15), wutil.DPI(22))
+            self.check_box.setFixedSize(wutil.DPI(15), wutil.DPI(18))
             self.check_box.setFocusPolicy(QtCore.Qt.NoFocus)
             self.check_box.setStyleSheet(
                 "#SearchResultCheckBox{background:transparent;spacing:0px;}"
@@ -164,7 +164,7 @@ class SearchResultItemWidget(QtWidgets.QWidget):
             layout.addWidget(self.check_box)
 
         self.title_label = QtWidgets.QLabel(str(row.get("title") or row.get("command") or ""), self)
-        self.title_label.setStyleSheet("background:transparent;color:#d0d0d0;font-size:%spx;" % wutil.DPI(10))
+        self.title_label.setStyleSheet("background:transparent;color:#d0d0d0;")
         layout.addWidget(self.title_label, 1)
 
         for watched in (self.icon_label, self.title_label):
@@ -174,8 +174,8 @@ class SearchResultItemWidget(QtWidgets.QWidget):
         self._selected = bool(selected)
         self.setProperty("rowSelected", self._selected)
         self.title_label.setStyleSheet(
-            "background:transparent;color:%s;font-size:%spx;"
-            % ("#ffffff" if selected else "#d0d0d0", wutil.DPI(10))
+            "background:transparent;color:%s;"
+            % ("#ffffff" if selected else "#d0d0d0")
         )
         self.style().unpolish(self)
         self.style().polish(self)

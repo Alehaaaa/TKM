@@ -10,6 +10,7 @@ import weakref
 from maya import cmds
 
 from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
+from TheKeyMachine.data import icons
 
 
 _MENU_BUILDERS = {}
@@ -78,9 +79,30 @@ def create_tool_shelf_button(tool_id, tool_name, icon=None):
         return None
 
     _dedupe_shelf_button(parent, label, command)
+    button_kwargs = {
+        "parent": parent,
+        "command": command,
+        "label": label,
+        "annotation": label,
+        "style": "iconOnly",
+    }
+    normalized_icon = _normalize_icon(icon)
+    if normalized_icon:
+        button_kwargs["image"] = normalized_icon
+    return cmds.shelfButton(**button_kwargs)
+
+
+def create_main_shelf_button(*_args):
+    parent = _current_shelf()
+    if not parent:
+        return None
+
+    label = "TheKeyMachine"
+    command = "import TheKeyMachine;TheKeyMachine.toggle()"
+    _dedupe_shelf_button(parent, label, command)
     return cmds.shelfButton(
         parent=parent,
-        image=_normalize_icon(icon),
+        image=_normalize_icon(icons.tkm_main),
         command=command,
         label=label,
         annotation=label,

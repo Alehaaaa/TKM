@@ -54,14 +54,14 @@ _MODULE_COMMANDS = {
     "toolbar_toggle": ("TheKeyMachine.core.toolbar", "toggle"),
     "toolbar_reload": ("TheKeyMachine.core.toolbar", "reload_current"),
     "toolbar_unload": ("TheKeyMachine.core.toolbar", "unload_current"),
-    "toolbar_add_shelf_button": ("TheKeyMachine.core.toolbar", "create_shelf_icon_current"),
+    "toolbar_add_shelf_button": ("TheKeyMachine.mods.shelfMod", "create_main_shelf_button"),
     "check_for_updates": ("TheKeyMachine.mods.updater", "check_for_updates", (), {"force": True}),
-    "selection_sets": ("TheKeyMachine.core.toolbar", "toggle_selection_sets_workspace"),
-    "animation_offset": ("TheKeyMachine.core.toolbar", "toggle_animation_offset"),
-    "micro_move": ("TheKeyMachine.core.toolbar", "toggle_micro_move"),
-    "custom_graph": ("TheKeyMachine.tools.graph_toolbar.api", "toggle_graph_toolbar_enabled"),
+    "selection_sets": ("TheKeyMachine.tools.selection_sets.api", "toggle"),
+    "animation_offset": ("TheKeyMachine.tools.animation_offset.api", "toggle"),
+    "micro_move": ("TheKeyMachine.tools.micro_move.api", "toggle"),
+    "custom_graph": ("TheKeyMachine.tools.graph_toolbar.api", "toggle"),
     "overshoot_sliders": ("TheKeyMachine.core.toolbox", "toggle_overshoot_sliders_enabled"),
-    "attribute_switcher_euler_filter": ("TheKeyMachine.tools.attribute_switcher.api", "toggle_euler_filter_enabled"),
+    "attribute_switcher_euler_filter": ("TheKeyMachine.tools.attribute_switcher.api", "toggle"),
     "background_runner_channelbox_selection_highlight": (
         "TheKeyMachine.core.backgroundRunners",
         "toggle_channelbox_selection_highlight",
@@ -77,16 +77,16 @@ _MODULE_COMMANDS = {
     "about_window": ("TheKeyMachine.mods.uiMod", "about_window"),
     "donate_window": ("TheKeyMachine.mods.uiMod", "donate_window"),
     "bug_report_window": ("TheKeyMachine.mods.reportMod", "bug_report_window"),
-    "orbit_window": ("TheKeyMachine.mods.uiMod", "toggle_orbit_window"),
+    "orbit_window": ("TheKeyMachine.tools.orbit.api", "toggle"),
     "hotkeys_window": ("TheKeyMachine.mods.hotkeysMod", "show_hotkeys_window"),
     "version_history_window": ("TheKeyMachine.widgets.customDialogs", "show_version_history_dialog"),
-    "search_window": ("TheKeyMachine.tools.search.api", "toggle_search_window"),
+    "search_window": ("TheKeyMachine.tools.search.api", "toggle"),
     "smart_rotation": ("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator"),
     "smart_rotation_release": ("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator_release"),
     "smart_translation": ("TheKeyMachine.mods.keyToolsMod", "smart_translate_manipulator"),
     "smart_translation_release": ("TheKeyMachine.mods.keyToolsMod", "smart_translate_manipulator_release"),
     "create_locator": ("TheKeyMachine.mods.barMod", "create_locator"),
-    "depth_mover": ("TheKeyMachine.mods.barMod", "depth_mover"),
+    "depth_mover": ("TheKeyMachine.tools.depth_mover.api", "toggle"),
     "isolate_master": ("TheKeyMachine.mods.barMod", "isolate_master"),
     "select_rig_controls": ("TheKeyMachine.mods.barMod", "select_rig_controls"),
     "select_rig_controls_animated": ("TheKeyMachine.mods.barMod", "select_rig_controls_animated"),
@@ -99,7 +99,7 @@ _MODULE_COMMANDS = {
     "ws_copy_range": ("TheKeyMachine.mods.barMod", "copy_range_worldspace_animation"),
     "ws_paste": ("TheKeyMachine.mods.barMod", "worldspace_paste_animation"),
     "follow_cam": ("TheKeyMachine.mods.barMod", "create_follow_cam", (), {"translation": True, "rotation": True}),
-    "temp_pivot": ("TheKeyMachine.tools.temp_pivot.api", "toggle_temp_pivot"),
+    "temp_pivot": ("TheKeyMachine.tools.temp_pivot.api", "toggle"),
     "temp_pivot_last_object": ("TheKeyMachine.tools.temp_pivot.api", "create_last_object_temp_pivot"),
     "temp_pivot_centered": ("TheKeyMachine.tools.temp_pivot.api", "create_centered_temp_pivot"),
     "temp_pivot_worldspace": ("TheKeyMachine.tools.temp_pivot.api", "create_worldspace_temp_pivot"),
@@ -291,19 +291,28 @@ def execute_slider(prefix: str, mode: str, value: int = 0, session=None):
     from TheKeyMachine.sliders import api as slider_api
 
     if prefix == "blend":
-        return slider_api.execute_blend_slider(mode, value, session=session)
-    if prefix == "tween":
-        return slider_api.execute_tween_slider(mode, value, session=session)
-    if prefix == "tangent":
-        return slider_api.execute_tangent_slider(mode, value, session=session)
-    raise ValueError("Unknown slider prefix: {}".format(prefix))
+        slider_api.execute_blend_slider(mode, value, session=session)
+    elif prefix == "tween":
+        slider_api.execute_tween_slider(mode, value, session=session)
+    elif prefix == "tangent":
+        slider_api.execute_tangent_slider(mode, value, session=session)
+    else:
+        raise ValueError("Unknown slider prefix: {}".format(prefix))
+    return None
 
 
 def register_slider_mode(prefix: str, mode: str) -> None:
-    base_command_name = "slider_{}_{}".format(prefix, mode)
     for slider_value in SLIDER_BUTTON_VALUES:
-        command_name = "{}_{}".format(base_command_name, _slider_value_suffix(slider_value))
+        command_name = slider_command_name(prefix, mode, slider_value)
         register_command(command_name, lambda p=prefix, m=mode, v=slider_value: execute_slider(p, m, v))
+
+
+def slider_command_name(prefix: str, mode: str, value: int = 0) -> str:
+    base_command_name = "slider_{}_{}".format(prefix, mode)
+    value = int(value)
+    if value == 0:
+        return base_command_name
+    return "{}_{}".format(base_command_name, _slider_value_suffix(value))
 
 
 def _ensure_builtin_commands() -> None:

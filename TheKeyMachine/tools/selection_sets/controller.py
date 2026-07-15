@@ -539,6 +539,3 @@ class SelectionSetsController:
             cmds.delete(set_name)
 
         cmds.evalDeferred(selectionSetsApi.refresh_selection_sets_window)
-
-    def toggle_selection_sets_workspace(self, *args):
-        selectionSetsApi.toggle_selection_sets_window(controller=self)

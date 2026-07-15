@@ -319,12 +319,6 @@ def _humanize(name):
     return str(name).replace("_", " ").strip().title()
 
 
-def _slider_value_suffix(value):
-    if value < 0:
-        return "neg{}".format(abs(value))
-    return str(value)
-
-
 def _slider_value_label(value):
     if value > 0:
         return "+{}%".format(value)
@@ -943,9 +937,9 @@ def _iter_slider_percentage_rows(slider_type, mode):
     mode_badge = str(mode.get("icon") or "")
 
     for value in trigger.SLIDER_BUTTON_VALUES:
-        value_title = mode["label"] if int(value) == 0 else "{} {}".format(mode["label"], _slider_value_label(value))
+        value_title = "{}: {}".format(mode["label"], _slider_value_label(value))
         yield {
-            "command": "slider_{}_{}_{}".format(slider_type, mode["key"], _slider_value_suffix(value)),
+            "command": trigger.slider_command_name(slider_type, mode["key"], value),
             "title": value_title,
             "icon": mode_icon,
             "badge_text": None if mode_icon else mode_badge,
@@ -1286,7 +1280,7 @@ class HotkeySectionItemWidget(HotkeySelectableItemWidget):
 
         self.title_label = QtWidgets.QLabel(section["title"], self)
         self.title_label.setObjectName("HotkeySectionTitle")
-        self.title_label.setStyleSheet("#HotkeySectionTitle{background:transparent;color:#d0d0d0;font-size:%spx;}" % wutil.DPI(11))
+        self.title_label.setStyleSheet("#HotkeySectionTitle{background:transparent;color:#d0d0d0;}")
         layout.addWidget(self.title_label, 1)
         for watched in (icon_label, self.title_label):
             watched.installEventFilter(self)
@@ -1294,8 +1288,8 @@ class HotkeySectionItemWidget(HotkeySelectableItemWidget):
     def set_selected(self, selected):
         super().set_selected(selected)
         self.title_label.setStyleSheet(
-            "#HotkeySectionTitle{background:transparent;color:%s;font-size:%spx;}"
-            % ("#ffffff" if selected else "#d0d0d0", wutil.DPI(11))
+            "#HotkeySectionTitle{background:transparent;color:%s;}"
+            % ("#ffffff" if selected else "#d0d0d0")
         )
 
     def eventFilter(self, watched, event):
@@ -1309,7 +1303,7 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
     requestSelect = QtCore.Signal(str)
     invokeRequested = QtCore.Signal(str)
     TITLE_STYLESHEET = (
-        "QPushButton#HotkeyCommandTitle{background:transparent;border:none;border-radius:0px;color:#d0d0d0;font-size:%spx;text-align:left;padding:0px %spx;}"
+        "QPushButton#HotkeyCommandTitle{background:transparent;border:none;border-radius:0px;color:#d0d0d0;text-align:left;padding:0px %spx;}"
         "QPushButton#HotkeyCommandTitle:pressed{background-color:#1f1f1f;border:none;border-radius:0px;}"
     )
 
@@ -1365,7 +1359,7 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
         self.hotkey_button.setFlat(True)
         self.hotkey_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.hotkey_button.setObjectName("HotkeyCommandTitle")
-        self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % (wutil.DPI(12), wutil.DPI(6)))
+        self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % wutil.DPI(6))
         self.hotkey_button.setMinimumHeight(wutil.DPI(22))
         self.hotkey_button.clicked.connect(lambda: self.invokeRequested.emit(self.command_name()))
         layout.addWidget(self.hotkey_button, 1)
@@ -1422,7 +1416,7 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
 
     def set_selected(self, selected):
         super().set_selected(selected)
-        self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % (wutil.DPI(12), wutil.DPI(6)))
+        self.hotkey_button.setStyleSheet(self.TITLE_STYLESHEET % wutil.DPI(6))
 
     def _hover_targets(self):
         return (self.hotkey_button,)

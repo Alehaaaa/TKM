@@ -23,6 +23,7 @@ selection_set_color_names = {color.suffix: color.label for color in SELECTION_SE
 
 
 _selection_set_creation_dialog = None
+_CONTROLLER = None
 
 
 def _window_class():
@@ -56,15 +57,20 @@ def _emit_selection_sets_window_state(is_open):
         pass
 
 
+def get_controller(owner=None):
+    global _CONTROLLER
+    if _CONTROLLER is None:
+        from TheKeyMachine.tools.selection_sets.controller import SelectionSetsController
+        _CONTROLLER = SelectionSetsController(owner=owner)
+    elif owner is not None:
+        _CONTROLLER.owner = owner
+    return _CONTROLLER
+
+
 def _resolve_toolbar_controller(controller=None):
     if controller:
         return controller
-    try:
-        from TheKeyMachine.core.toolbar import get_toolbar
-    except Exception:
-        return None
-    toolbar = get_toolbar()
-    return getattr(toolbar, "selection_sets_controller", toolbar)
+    return get_controller()
 
 
 def _selection_sets_auto_transparency_enabled():
@@ -253,7 +259,7 @@ _selection_sets_toolbar_toggle = ToolbarWindowToggle(
 )
 
 
-def toggle_selection_sets_window(controller=None):
+def _toggle_window(controller=None):
     global _selection_sets_open_fn
     controller = _resolve_toolbar_controller(controller)
     if controller is not None:
@@ -264,6 +270,17 @@ def toggle_selection_sets_window(controller=None):
         close_selection_sets_window()
     else:
         open_selection_sets_toolbar_action(controller=controller)
+
+
+def toggle(checked=None, *_args, controller=None):
+    controller = _resolve_toolbar_controller(controller)
+    if checked is None:
+        return _toggle_window(controller=controller)
+    if bool(checked):
+        if not is_selection_sets_window_open():
+            return open_selection_sets_toolbar_action(controller=controller)
+        return None
+    return close_selection_sets_window()
 
 
 def refresh_selection_sets_window():
@@ -330,9 +347,8 @@ def clear_all_selection_sets(controller=None, parent=None, menu=None):
         controller.clear_selection_sets()
 
 
-def restore_selection_sets_default_settings(controller=None):
+def restore_selection_sets_default_position():
     settings.set_setting("selection_sets_geometry", None, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
-    settings.set_setting(ANIMBOT_CONVERSION_PROMPT_KEY, None, namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
     win = get_selection_sets_window()
     if win and wutil.is_valid_widget(win):
         _place_selection_sets_window_default(win)
@@ -386,20 +402,12 @@ def build_selection_sets_context_menu(parent=None, controller=None):
 
     menu.addSeparator()
 
-    stays_on_top_action = menu.addAction(
-        QtGui.QIcon(icons.settings),
-        "Stay on Top",
-        description="Keep the floating Selection Sets palette above other Maya windows.",
+    toolCommon.add_floating_window_actions(
+        menu,
+        _selection_sets_stays_on_top,
+        _set_selection_sets_stays_on_top,
+        restore_selection_sets_default_position,
     )
-    stays_on_top_action.setCheckable(True)
-    stays_on_top_action.setChecked(_selection_sets_stays_on_top())
-    stays_on_top_action.triggered.connect(_set_selection_sets_stays_on_top)
-
-    menu.addAction(
-        QtGui.QIcon(icons.selection_sets_reload),
-        "Restore Settings",
-        description="Reset the floating Selection Sets palette to its default position above the Selection Sets toolbar button.",
-    ).triggered.connect(lambda *_: restore_selection_sets_default_settings(controller=controller))
 
     return menu
 
@@ -470,7 +478,7 @@ def bind_selection_sets_toolbar_button(button, controller=None):
             if event.button() == QtCore.Qt.LeftButton:
                 variant = getattr(b, "_get_active_shortcut_variant", lambda: None)()
                 if variant and int(variant.get("mask", 0)):
-                    b.triggerToolCallback(lambda: toggle_selection_sets_window(controller=c))
+                    b.triggerToolCallback(lambda: _toggle_window(controller=c))
                     event.accept()
                     return True
             return False

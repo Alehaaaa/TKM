@@ -24,9 +24,6 @@ from maya.app.general.mayaMixin import MayaQWidgetDockableMixin  # type: ignore
 from TheKeyMachine.Qt import QtCompat, QtCore, QtWidgets  # type: ignore
 
 
-# Standard library imports
-import os
-
 from functools import partial
 
 from importlib import import_module, reload
@@ -41,7 +38,6 @@ import TheKeyMachine.mods.uiMod as ui  # type: ignore
 import TheKeyMachine.mods.reportMod as report  # type: ignore
 import TheKeyMachine.mods.keyToolsMod as keyTools  # type: ignore
 import TheKeyMachine.mods.helperMod as helper  # type: ignore
-from TheKeyMachine.data import icons
 import TheKeyMachine.mods.styleMod as style  # type: ignore
 import TheKeyMachine.mods.barMod as bar  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
@@ -51,13 +47,11 @@ import TheKeyMachine.core.toolMenus as toolMenus  # type: ignore
 import TheKeyMachine.core.toolbox as toolbox  # type: ignore
 import TheKeyMachine.core.toolWidgets as toolWidgets  # type: ignore
 import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
-import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi  # type: ignore
-import TheKeyMachine.tools.micro_move.api as microMoveApi  # type: ignore
 import TheKeyMachine.tools.isolate_bookmarks.api as isolateBookmarksApi  # type: ignore
 
-from TheKeyMachine.tools.selection_sets.controller import SelectionSetsController  # type: ignore
+import TheKeyMachine.tools.selection_sets.api as selectionSetsApi  # type: ignore
 from TheKeyMachine.data import colors as toolColors  # type: ignore
 
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
@@ -84,10 +78,8 @@ mods = [
     toolMenus,
     toolbox,
     toolWidgets,
-    animationOffsetApi,
     graphToolbarApi,
     gimbalFixerApi,
-    microMoveApi,
     isolateBookmarksApi,
 ]
 
@@ -97,16 +89,6 @@ for m in mods:
 
 # -----------------------------------------------------------------------------------------------------------------------------
 #    It attempts to load the user_preferences. If this is a new installation, it won't exist and the file must be created     #
-# -----------------------------------------------------------------------------------------------------------------------------
-
-
-# Attempt to import the user preferences module
-try:
-    from TheKeyMachine_user_data.preferences import user_preferences  # type: ignore
-except ImportError:
-    user_preferences = None
-
-
 # -----------------------------------------------------------------------------------------------------------------------------
 #                                          Creation of the toolbar and UI class                                               #
 # -----------------------------------------------------------------------------------------------------------------------------
@@ -125,7 +107,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.setWindowTitle("TheKeyMachine")
         self.setObjectName(WORKSPACE_NAME)
         self.setContextMenuPolicy(QtCore.Qt.PreventContextMenu)
-        self.selection_sets_controller = SelectionSetsController(owner=self)
+        self.selection_sets_controller = selectionSetsApi.get_controller(owner=self)
 
         self._runtime_manager = runtime.get_runtime_manager()
         report.install_bug_exception_handler()
@@ -139,7 +121,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
 
         # Initial state variables from settingsMod
-        self.toggleAnimOffsetButtonState = False
         self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
         self.orbit_button_widget = None
 
@@ -158,9 +139,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             "Shelf": "Shelf",
         }
 
-        self.animation_offset_controller = animationOffsetApi.AnimationOffsetController(self)
-        self.micro_move_controller = microMoveApi.MicroMoveController(self)
-        self.animation_offset_button_widget = None
         self.setgroup_states = {}
         self.setgroup_buttons = {}
 
@@ -185,16 +163,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             runtime.shutdown_runtime_manager()
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
-
-        was_anim_offset_active = self.toggleAnimOffsetButtonState
-        self.animation_offset_controller.deactivate()
-        if was_anim_offset_active:
-            try:
-                cmds.undoInfo(closeChunk=True)
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
-
-        self.micro_move_controller.deactivate()
 
         # Stop link objects button pulse thread
         if hasattr(self, "link_obj_pulse_thread") and self.link_obj_pulse_thread:
@@ -221,10 +189,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def _on_scene_opened(self, *_args):
         if not QtCompat.isValid(self):
             return
-        self.update_isolate_bookmarks_menu()
-
-    def toggle_selection_sets_workspace(self, *args):
-        return self.selection_sets_controller.toggle_selection_sets_workspace(*args)
+        isolateBookmarksApi.update_isolate_popup_menu()
 
     def _on_graph_editor_opened(self, *_args):
         if not QtCompat.isValid(self):
@@ -506,31 +471,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Make the workspaceControl call just once
         cmds.workspaceControl(WORKSPACE_CONTROL_NAME, **kwargs)
 
-    def create_shelf_icon(self, *args):
-        button_name = "TheKeyMachine"
-        command = "import TheKeyMachine;TheKeyMachine.toggle()"
-        icon = icons.tkm_main
-        icon = os.path.normpath(icon)
-        current_shelf_tab = cmds.tabLayout("ShelfLayout", query=True, selectTab=True)
-
-        for child in cmds.shelfLayout(current_shelf_tab, query=True, childArray=True) or []:
-            if cmds.objectTypeUI(child) != "shelfButton":
-                continue
-
-            if (
-                cmds.shelfButton(child, query=True, label=True) == button_name
-                or cmds.shelfButton(child, query=True, command=True) == command
-            ):
-                cmds.deleteUI(child)
-
-        cmds.shelfButton(parent=current_shelf_tab, image=icon, command=command, label=button_name)
-
-    # Update the isolate_bookmarks menu when scene changes
-    def update_isolate_bookmarks_menu(self, *args):
-        if not QtCompat.isValid(self):
-            return
-        isolateBookmarksApi.update_isolate_popup_menu()
-
     # For use with toggle functionality on Shelf or Launcher
     def toggle(self, *args):
         self.showWindow()
@@ -627,43 +567,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 self.deleteLater()
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
-
-    # ---------------------------------------- ANIMATION OFFSET ------------------------------------------------------#
-
-    def toggleAnimOffsetButton(self, checked=None):
-        button_widget = self.sender() if hasattr(self, "sender") else None
-        report.safe_execute(
-            self.animation_offset_controller.toggle,
-            checked,
-            button_widget=button_widget or self.animation_offset_button_widget,
-            context="animation offset toggle",
-        )
-        self.toggleAnimOffsetButtonState = self.animation_offset_controller.is_enabled()
-        target_button = button_widget or self.animation_offset_button_widget
-        if target_button:
-            blocked = target_button.blockSignals(True)
-            try:
-                target_button.setChecked(bool(self.toggleAnimOffsetButtonState))
-            finally:
-                target_button.blockSignals(blocked)
-
-    # ---------------------------------------------------------------
-
-    def toggle_micro_move_button(self, checked=None):
-        button_widget = self.sender() if hasattr(self, "sender") else None
-        report.safe_execute(
-            self.micro_move_controller.toggle,
-            checked,
-            button_widget=button_widget,
-            context="micro move toggle",
-        )
-        current_state = self.micro_move_controller.is_enabled()
-        if button_widget:
-            blocked = button_widget.blockSignals(True)
-            try:
-                button_widget.setChecked(bool(current_state))
-            finally:
-                button_widget.blockSignals(blocked)
 
     def _populate_toolbar_from_layout(self, layout_id, new_section_fn):
         return toolWidgets.populate_main_toolbar_from_layout(layout_id, new_section_fn, self)
@@ -767,7 +670,7 @@ def welcome():
         anchor = toolbar_instance.findChild(QtWidgets.QWidget, "TKM_toolbar_button")
         if not wutil.is_valid_widget(anchor):
             return
-        toolWidgets.show_welcome_shelf_prompt(anchor, toolbar_instance)
+        toolWidgets.show_welcome_shelf_prompt(anchor)
 
     QtCore.QTimer.singleShot(700, _show_welcome_prompt)
 
@@ -788,21 +691,3 @@ def reload_current(*args, **kwargs):
 
 def unload_current(*args, **kwargs):
     return _call_toolbar_method("unload", *args, **kwargs)
-
-
-def create_shelf_icon_current(*args, **kwargs):
-    return _call_toolbar_method("create_shelf_icon", *args, **kwargs)
-
-
-def toggle_animation_offset(checked=None, *args, **kwargs):
-    state = args[0] if args else kwargs.get("checked", checked)
-    return _call_toolbar_method("toggleAnimOffsetButton", state)
-
-
-def toggle_micro_move(checked=None, *args, **kwargs):
-    state = args[0] if args else kwargs.get("checked", checked)
-    return _call_toolbar_method("toggle_micro_move_button", state)
-
-
-def toggle_selection_sets_workspace(*args, **kwargs):
-    return _call_toolbar_method("toggle_selection_sets_workspace", *args, **kwargs)

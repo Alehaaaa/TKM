@@ -16,5 +16,12 @@ __all__ = [
     "show_gimbal_fixer_window",
     "is_gimbal_fixer_window_open",
     "gimbal_fixer_toolbar_toggle",
+    "toggle",
     "GimbalAnalyzer",
 ]
+
+
+def toggle(checked=None, *_args):
+    if isinstance(checked, bool):
+        return show_gimbal_fixer_window() if checked else close_gimbal_fixer_window()
+    return gimbal_fixer_toolbar_toggle.toggle()

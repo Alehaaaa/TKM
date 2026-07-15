@@ -43,9 +43,6 @@ import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.data import colors as toolColors
-import TheKeyMachine.tools.orbit.api as orbitApi
-import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi
-import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 from TheKeyMachine.mods import settingsMod as settings
@@ -61,36 +58,13 @@ mods = [
     settings,
     report,
     toolColors,
-    orbitApi,
-    attributeSwitcherApi,
-    selectionSetsApi,
 ]
 
 for m in mods:
     reload(m)
 
-ORBIT_SETTINGS_NAMESPACE = orbitApi.ORBIT_SETTINGS_NAMESPACE
-ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE = attributeSwitcherApi.ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE
-SELECTION_SETS_SETTINGS_NAMESPACE = selectionSetsApi.SELECTION_SETS_SETTINGS_NAMESPACE
-
 INSTALL_PATH = general.config["INSTALL_PATH"]
 USER_FOLDER_PATH = general.config["USER_FOLDER_PATH"]
-
-
-orbit_window = orbitApi.orbit_window
-close_orbit_window = orbitApi.close_orbit_window
-bind_orbit_toolbar_button = orbitApi.bind_orbit_toolbar_button
-
-attribute_switcher_window = attributeSwitcherApi.attribute_switcher_window
-close_attribute_switcher_window = attributeSwitcherApi.close_attribute_switcher_window
-bind_attribute_switcher_toolbar_button = attributeSwitcherApi.bind_attribute_switcher_toolbar_button
-toggle_attribute_switcher_window = attributeSwitcherApi.toggle_attribute_switcher_window
-
-open_selection_set_creation_dialog = selectionSetsApi.open_selection_set_creation_dialog
-toggle_selection_sets_window = selectionSetsApi.toggle_selection_sets_window
-refresh_selection_sets_window = selectionSetsApi.refresh_selection_sets_window
-close_selection_sets_window = selectionSetsApi.close_selection_sets_window
-bind_selection_sets_toolbar_button = selectionSetsApi.bind_selection_sets_toolbar_button
 
 
 class Color:

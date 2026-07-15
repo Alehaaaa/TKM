@@ -47,8 +47,6 @@ def load_config():
         "BUG_REPORT": True,
         "CUSTOM_TOOLS_MENU": True,
         "CUSTOM_TOOLS_EDITABLE_BY_USER": True,
-        "CUSTOM_SCRIPTS_MENU": True,
-        "CUSTOM_SCRIPTS_EDITABLE_BY_USER": True,
     }
 
     for key, default_value in default_config.items():

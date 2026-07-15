@@ -1,4 +1,4 @@
-"""Manifest discovery and execution for user-defined tools and scripts."""
+"""Manifest discovery and execution for user-defined tools."""
 
 from importlib import import_module, invalidate_caches, reload
 import os
@@ -27,16 +27,6 @@ SOURCES = {
         "label": "Custom Tools",
         "namespace": "custom_tools_toolbar",
         "folder_tool_id": "custom_tools",
-    },
-    "scripts": {
-        "package": USER_CONNECT_PACKAGE + ".scripts",
-        "module": USER_CONNECT_PACKAGE + ".scripts.manifest",
-        "registry": "SCRIPTS",
-        "folder": "TheKeyMachine_user_data/connect/scripts",
-        "file": "manifest.py",
-        "label": "Custom Scripts",
-        "namespace": "custom_scripts_toolbar",
-        "folder_tool_id": "custom_scripts",
     },
 }
 
@@ -117,6 +107,9 @@ def _resolve_icon(kind, icon):
     if not icon:
         return None
     if not isinstance(icon, str):
+        return icon
+    # Maya exposes built-in Qt resources with paths such as :/mel_tab.png.
+    if icon.startswith(":/"):
         return icon
     if icon.startswith("icons."):
         return icons.get(icon.split(".", 1)[1])
