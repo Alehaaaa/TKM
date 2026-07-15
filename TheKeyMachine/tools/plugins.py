@@ -3,6 +3,7 @@
 import hashlib
 import os
 import platform
+import shutil
 import subprocess
 import sys
 
@@ -44,11 +45,16 @@ class NativePluginSpec(object):
         self.compile_flags = tuple(compile_flags)
         self.context_fallbacks = dict(context_fallbacks or {})
 
-        extension = ".bundle" if sys.platform == "darwin" else ".so"
+        extension = {
+            "darwin": ".bundle",
+            "win32": ".mll",
+        }.get(sys.platform, ".so")
         self.build_directory = os.path.join(
             os.path.dirname(self.source_paths[0]),
             "_native",
-            "maya{}_{}".format(cmds.about(version=True), platform.machine()),
+            "maya{}_{}_{}".format(
+                cmds.about(version=True), sys.platform, platform.machine()
+            ),
         )
         self.path = os.path.join(self.build_directory, self.output_name + extension)
         self.stamp_path = self.path + ".sha256"
@@ -117,6 +123,74 @@ def _maya_native_paths(spec):
     return os.path.join(maya_location, "include"), os.path.join(maya_location, "lib")
 
 
+def _compiler(executable):
+    """Resolve a compiler while still allowing CXX to select a custom one."""
+    configured = os.environ.get("CXX") or executable
+    resolved = shutil.which(configured)
+    if resolved:
+        return resolved
+    # subprocess provides the most useful platform-native error for an absolute
+    # path or a compiler that is expected to be configured by Maya's shell.
+    return configured
+
+
+def _build_command(spec, output_path, include_directory, library_directory):
+    if sys.platform == "win32":
+        command = [
+            _compiler("cl"),
+            "/nologo",
+            "/std:c++17",
+            "/EHsc",
+            "/LD",
+            "/MD",
+            "/O2",
+            "/DNT_PLUGIN",
+            "/DREQUIRE_IOSTREAM",
+            "/I{}".format(include_directory),
+            "/Fo{}{}".format(os.path.dirname(output_path), os.sep),
+        ]
+        command.extend(spec.compile_flags)
+        command.extend(spec.source_paths)
+        command.extend(("/link", "/LIBPATH:{}".format(library_directory)))
+        command.extend("{}.lib".format(library) for library in spec.libraries)
+        command.append("/IMPLIB:{}.lib".format(output_path))
+        command.append("/OUT:{}".format(output_path))
+        return command
+
+    if sys.platform == "darwin":
+        command = [
+            "xcrun", "clang++", "-std=c++17", "-arch", platform.machine(),
+            "-dynamiclib", "-fPIC", "-O2", "-Wno-nontrivial-memcall",
+            "-DOSMac_", "-DCC_GNU_", "-DBits64_", "-DREQUIRE_IOSTREAM",
+            "-I{}".format(include_directory), "-L{}".format(library_directory),
+            "-Wl,-rpath,{}".format(library_directory),
+        ]
+        command.extend(spec.compile_flags)
+        command.extend(spec.source_paths)
+        command.extend("-l{}".format(library) for library in spec.libraries)
+        for framework in spec.frameworks:
+            command.extend(("-framework", framework))
+        command.extend(("-o", output_path))
+        return command
+
+    if not sys.platform.startswith("linux"):
+        raise RuntimeError(
+            "{} native builds do not support {}.".format(spec.label, sys.platform)
+        )
+    command = [
+        _compiler("g++"), "-std=c++17", "-shared", "-fPIC", "-O2", "-m64",
+        "-DBits64_", "-DUNIX", "-D_BOOL", "-DLINUX", "-DFUNCPROTO",
+        "-D_GNU_SOURCE", "-DREQUIRE_IOSTREAM",
+        "-I{}".format(include_directory), "-L{}".format(library_directory),
+        "-Wl,-rpath,{}".format(library_directory),
+    ]
+    command.extend(spec.compile_flags)
+    command.extend(spec.source_paths)
+    command.extend("-l{}".format(library) for library in spec.libraries)
+    command.extend(("-o", output_path))
+    return command
+
+
 def source_digest(spec):
     digest = hashlib.sha256()
     build_inputs = (
@@ -159,25 +233,12 @@ def build(spec):
         )
     if not needs_build(spec):
         return spec.path
-    if sys.platform != "darwin":
-        raise RuntimeError("{} native builds currently support Maya on macOS.".format(spec.label))
-
     include_directory, library_directory = _maya_native_paths(spec)
     os.makedirs(spec.build_directory, exist_ok=True)
     temporary_path = spec.path + ".tmp"
-    command = [
-        "xcrun", "clang++", "-std=c++17", "-arch", platform.machine(),
-        "-dynamiclib", "-fPIC", "-O2", "-Wno-nontrivial-memcall",
-        "-DOSMac_", "-DCC_GNU_", "-DBits64_", "-DREQUIRE_IOSTREAM",
-        "-I{}".format(include_directory), "-L{}".format(library_directory),
-        "-Wl,-rpath,{}".format(library_directory),
-    ]
-    command.extend(spec.compile_flags)
-    command.extend("-l{}".format(library) for library in spec.libraries)
-    for framework in spec.frameworks:
-        command.extend(("-framework", framework))
-    command.extend(("-o", temporary_path))
-    command.extend(spec.source_paths)
+    command = _build_command(
+        spec, temporary_path, include_directory, library_directory
+    )
 
     try:
         result = subprocess.run(
@@ -187,7 +248,11 @@ def build(spec):
             text=True,
         )
     except OSError as error:
-        raise RuntimeError("{} could not start the native compiler: {}".format(spec.label, error))
+        raise RuntimeError(
+            "{} could not start the native compiler on {}. Install the "
+            "compiler supported by this Maya version or set CXX to its "
+            "executable: {}".format(spec.label, sys.platform, error)
+        )
     if result.returncode != 0:
         try:
             os.unlink(temporary_path)
@@ -195,7 +260,16 @@ def build(spec):
             pass
         raise RuntimeError("{} native plug-in build failed:\n{}".format(spec.label, result.stdout))
 
+    # Windows locks loaded DLLs. Compile first so a compiler failure leaves the
+    # working tool untouched, then unload only for the atomic replacement.
+    if sys.platform == "win32" and loaded_plugin(spec):
+        unload(spec, restore_context=True)
     os.replace(temporary_path, spec.path)
+    for sidecar in (temporary_path + ".lib", temporary_path + ".exp"):
+        try:
+            os.unlink(sidecar)
+        except OSError:
+            pass
     try:
         with open(spec.stamp_path, "w", encoding="utf-8") as stream:
             stream.write(source_digest(spec))

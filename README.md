@@ -10,7 +10,7 @@ TheKeyMachine (TKM) is an open source Maya animation toolset built for faster ke
 
 It is designed for 3D animators working in Autodesk Maya and supports Maya 2022 and up on Windows, Linux, and macOS.
 
-The native Micro Move and Depth Mover viewport plug-ins currently build automatically on macOS; the rest of the toolset remains cross-platform.
+The native Micro Move and Depth Mover viewport plug-ins build automatically on Windows, Linux, and macOS.
 
 TKM was developed by <b>Rodrigo Torres</b> (<a href="https://www.rodritorres.com">rodritorres.com</a>).
 

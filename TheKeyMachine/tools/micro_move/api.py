@@ -30,7 +30,7 @@ PLUGIN_SPEC = plugins.NativePluginSpec(
     source_paths=(PLUGIN_SOURCE_PATH,),
     output_name="tkmMicroMove",
     registry_name="tkmMicroMovePlugin",
-    build_recipe="macos-clang-cpp17-coregraphics-v1",
+    build_recipe="cross-platform-cpp17-maya-image-v1",
     required_commands=(
         MOVE_CONTEXT_COMMAND,
         ROTATE_CONTEXT_COMMAND,
@@ -40,7 +40,6 @@ PLUGIN_SPEC = plugins.NativePluginSpec(
     ),
     build_command=BUILD_COMMAND,
     expected_build=EXPECTED_PLUGIN_BUILD,
-    frameworks=("CoreFoundation", "CoreGraphics", "ImageIO"),
     context_fallbacks={
         MICRO_MOVE_CONTEXT: MOVE_CONTEXT,
         MICRO_ROTATE_CONTEXT: ROTATE_CONTEXT,

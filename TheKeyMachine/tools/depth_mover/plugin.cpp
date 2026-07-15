@@ -22,6 +22,12 @@
 #include <maya/MSelectionList.h>
 #include <maya/MVector.h>
 
+#if defined(_WIN32)
+#define TKM_PLUGIN_EXPORT __declspec(dllexport)
+#else
+#define TKM_PLUGIN_EXPORT __attribute__((visibility("default")))
+#endif
+
 namespace {
 
 const char* kContextCommand = "tkmDepthMoverNativeContextCmd";
@@ -299,7 +305,7 @@ public:
 
 }  // namespace
 
-__attribute__((visibility("default")))
+TKM_PLUGIN_EXPORT
 MStatus initializePlugin(MObject pluginObject) {
     MFnPlugin plugin(pluginObject, "TheKeyMachine", "1.0", "Any");
     MStatus status = plugin.registerCommand(
@@ -319,7 +325,7 @@ MStatus initializePlugin(MObject pluginObject) {
     return status;
 }
 
-__attribute__((visibility("default")))
+TKM_PLUGIN_EXPORT
 MStatus uninitializePlugin(MObject pluginObject) {
     MFnPlugin plugin(pluginObject);
     MStatus contextStatus = plugin.deregisterContextCommand(kContextCommand);

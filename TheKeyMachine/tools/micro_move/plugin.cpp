@@ -2,12 +2,7 @@
 #include <chrono>
 #include <cmath>
 #include <memory>
-#include <string>
 #include <vector>
-
-#include <CoreFoundation/CoreFoundation.h>
-#include <CoreGraphics/CoreGraphics.h>
-#include <ImageIO/ImageIO.h>
 
 #include <maya/MArgList.h>
 #include <maya/MDagPath.h>
@@ -23,6 +18,7 @@
 #include <maya/MFnRotateManip.h>
 #include <maya/MFnTransform.h>
 #include <maya/MGlobal.h>
+#include <maya/MImage.h>
 #include <maya/MItSelectionList.h>
 #include <maya/MManipData.h>
 #include <maya/MMatrix.h>
@@ -35,6 +31,12 @@
 #include <maya/MSelectionList.h>
 #include <maya/MTransformationMatrix.h>
 #include <maya/MVector.h>
+
+#if defined(_WIN32)
+#define TKM_PLUGIN_EXPORT __declspec(dllexport)
+#else
+#define TKM_PLUGIN_EXPORT __attribute__((visibility("default")))
+#endif
 
 namespace {
 
@@ -70,6 +72,7 @@ CursorAsset gOpenCursor;
 CursorAsset gPinchedCursor;
 MString gToolIcon;
 double gCursorGain = kMinGain;
+double gModifierGain = 1.0;
 short gPreviousCursorX = 0;
 short gPreviousCursorY = 0;
 std::chrono::steady_clock::time_point gPreviousCursorTime;
@@ -78,60 +81,29 @@ bool loadCursorImage(
         const MString& path,
         CursorAsset& asset,
         MString& error) {
-    const std::string pathString = path.asChar();
-    CFURLRef url = CFURLCreateFromFileSystemRepresentation(
-        nullptr,
-        reinterpret_cast<const UInt8*>(pathString.c_str()),
-        pathString.size(),
-        false);
-    if (url == nullptr) {
-        error = "Could not create a URL for cursor image: ";
-        error += pathString.c_str();
-        return false;
-    }
-
-    CGImageSourceRef source = CGImageSourceCreateWithURL(url, nullptr);
-    CFRelease(url);
-    if (source == nullptr) {
+    MImage image;
+    MStatus status = image.readFromFile(path, MImage::kByte);
+    if (!status) {
         error = "Could not read cursor image: ";
-        error += pathString.c_str();
+        error += path;
         return false;
     }
-
-    CGImageRef image = CGImageSourceCreateImageAtIndex(source, 0, nullptr);
-    CFRelease(source);
-    if (image == nullptr) {
-        error = "Could not decode cursor image: ";
-        error += pathString.c_str();
+    status = image.resize(kCursorSize, kCursorSize, false);
+    if (!status) {
+        error = "Could not resize cursor image: ";
+        error += path;
         return false;
     }
+    image.verticalFlip();
 
     constexpr size_t channels = 4;
     const size_t rgbaRowBytes = kCursorSize * channels;
-    std::vector<unsigned char> rgba(rgbaRowBytes * kCursorSize, 0);
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    CGContextRef context = CGBitmapContextCreate(
-        rgba.data(),
-        kCursorSize,
-        kCursorSize,
-        8,
-        rgbaRowBytes,
-        colorSpace,
-        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-    CGColorSpaceRelease(colorSpace);
-    if (context == nullptr) {
-        CGImageRelease(image);
-        error = "Could not allocate the Micro Move cursor bitmap.";
+    const unsigned char* rgba = image.pixels();
+    if (rgba == nullptr) {
+        error = "Could not access cursor image pixels: ";
+        error += path;
         return false;
     }
-
-    CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
-    CGContextDrawImage(
-        context,
-        CGRectMake(0.0, 0.0, kCursorSize, kCursorSize),
-        image);
-    CGContextRelease(context);
-    CGImageRelease(image);
 
     const size_t monoRowBytes = (kCursorSize + 7) / 8;
     asset.bits.assign(monoRowBytes * kCursorSize, 0);
@@ -169,6 +141,9 @@ void beginCursorSample(const MEvent& event) {
     event.getPosition(gPreviousCursorX, gPreviousCursorY);
     gPreviousCursorTime = std::chrono::steady_clock::now();
     gCursorGain = kMinGain;
+    gModifierGain = 1.0;
+    if (event.isModifierControl()) gModifierGain *= 0.3;
+    if (event.isModifierShift()) gModifierGain *= 3.0;
 }
 
 void updateCursorGain(const MEvent& event) {
@@ -191,15 +166,13 @@ void updateCursorGain(const MEvent& event) {
     gPreviousCursorX = x;
     gPreviousCursorY = y;
     gPreviousCursorTime = now;
+    gModifierGain = 1.0;
+    if (event.isModifierControl()) gModifierGain *= 0.3;
+    if (event.isModifierShift()) gModifierGain *= 3.0;
 }
 
 double keyboardModifierGain() {
-    const CGEventFlags flags = CGEventSourceFlagsState(
-        kCGEventSourceStateCombinedSessionState);
-    double gain = 1.0;
-    if ((flags & kCGEventFlagMaskControl) != 0) gain *= 0.3;
-    if ((flags & kCGEventFlagMaskShift) != 0) gain *= 3.0;
-    return gain;
+    return gModifierGain;
 }
 
 MVector plugVector(const MPlug& plug) {
@@ -627,7 +600,7 @@ public:
 
 }  // namespace
 
-__attribute__((visibility("default")))
+TKM_PLUGIN_EXPORT
 MStatus initializePlugin(MObject pluginObject) {
     MFnPlugin plugin(pluginObject, "TheKeyMachine", "1.0", "Any");
     MStatus status = plugin.registerCommand(
@@ -691,7 +664,7 @@ MStatus initializePlugin(MObject pluginObject) {
     return status;
 }
 
-__attribute__((visibility("default")))
+TKM_PLUGIN_EXPORT
 MStatus uninitializePlugin(MObject pluginObject) {
     MFnPlugin plugin(pluginObject);
     MStatus result = MS::kSuccess;
