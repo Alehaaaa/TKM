@@ -202,7 +202,69 @@ def _load_hotkeys_from_maya():
     if stale_assignments:
         _clear_stale_hotkey_assignments(stale_assignments)
 
+    _migrate_literal_symbol_assignments(mapping)
     return _copy_hotkey_mapping(mapping)
+
+
+def _migrate_literal_symbol_assignments(mapping):
+    """Move TKM's old Shift+number bindings to Maya's literal ASCII keys."""
+    migrated = False
+    for command_name, shortcut in _iter_mapping_combos(mapping):
+        combo = _normalize_combo(shortcut)
+        symbol = str(combo.get("key") or "")
+        base_key = SHIFTED_SYMBOL_BASE_KEYS.get(symbol)
+        if not base_key:
+            continue
+
+        expected_name = _name_command_name(command_name)
+        common = {
+            "alt": bool(combo.get("alt")),
+            "ctl": bool(combo.get("ctrl")),
+        }
+        try:
+            legacy_name = _first_assignment_result(
+                cmds.hotkey(
+                    keyShortcut=base_key,
+                    sht=True,
+                    query=True,
+                    name=True,
+                    **common
+                )
+            )
+            literal_name = _first_assignment_result(
+                cmds.hotkey(
+                    keyShortcut=symbol,
+                    sht=False,
+                    query=True,
+                    name=True,
+                    **common
+                )
+            )
+        except Exception:
+            continue
+        if legacy_name != expected_name or literal_name not in (None, expected_name):
+            continue
+
+        try:
+            cmds.hotkey(
+                keyShortcut=base_key,
+                sht=True,
+                name="",
+                releaseName="",
+                **common
+            )
+            cmds.hotkey(
+                keyShortcut=symbol,
+                sht=False,
+                name=expected_name,
+                **common
+            )
+            migrated = True
+        except Exception:
+            continue
+
+    if migrated:
+        _save_hotkeys_to_maya()
 
 
 def shortcut_for_command(command_name):
@@ -393,8 +455,6 @@ def _maya_key_shortcut(combo):
     if not combo:
         return ""
     key = str(combo.get("key") or "")
-    if key in SHIFTED_SYMBOL_BASE_KEYS:
-        return SHIFTED_SYMBOL_BASE_KEYS[key]
     if len(key) == 1 and key.isalpha():
         return key.lower()
     return key
@@ -404,16 +464,20 @@ def _maya_shift_required(combo):
     combo = _normalize_combo(combo)
     if not combo:
         return False
-    return bool(combo.get("shift")) or str(combo.get("key") or "") in SHIFTED_SYMBOL_BASE_KEYS
+    return bool(combo.get("shift"))
 
 
-def _maya_key_shortcut_candidates(combo):
+def _maya_hotkey_candidates(combo):
+    """Return Maya's literal ASCII binding and its legacy physical form."""
     combo = _normalize_combo(combo)
     if not combo:
         return []
     display_key = str(combo.get("key") or "")
-    candidates = [_maya_key_shortcut(combo), display_key, SHIFTED_SYMBOL_BASE_KEYS.get(display_key)]
-    return list(dict.fromkeys(candidate for candidate in candidates if candidate))
+    candidates = [(_maya_key_shortcut(combo), _maya_shift_required(combo))]
+    base_key = SHIFTED_SYMBOL_BASE_KEYS.get(display_key)
+    if base_key:
+        candidates.append((base_key, True))
+    return list(dict.fromkeys(candidate for candidate in candidates if candidate[0]))
 
 
 def _hotkey_flag_kwargs(combo):
@@ -465,9 +529,10 @@ def _query_hotkey_assignment(combo):
     combo = _normalize_combo(combo)
     if not combo:
         return None
-    for key_shortcut in _maya_key_shortcut_candidates(combo):
+    for key_shortcut, shift_required in _maya_hotkey_candidates(combo):
         flags = _hotkey_flag_kwargs(combo)
         flags["keyShortcut"] = key_shortcut
+        flags["sht"] = shift_required
         for query_flag in ("name", "releaseName"):
             try:
                 kwargs = dict(flags)
@@ -484,12 +549,12 @@ def _query_hotkey_check_assignment(combo):
     combo = _normalize_combo(combo)
     if not combo:
         return None
-    modifier_kwargs = {
-        "altModifier": bool(combo.get("alt")),
-        "ctrlModifier": bool(combo.get("ctrl")),
-        "shiftModifier": _maya_shift_required(combo),
-    }
-    for key_shortcut in _maya_key_shortcut_candidates(combo):
+    for key_shortcut, shift_required in _maya_hotkey_candidates(combo):
+        modifier_kwargs = {
+            "altModifier": bool(combo.get("alt")),
+            "ctrlModifier": bool(combo.get("ctrl")),
+            "shiftModifier": shift_required,
+        }
         try:
             result = _first_assignment_result(cmds.hotkeyCheck(keyString=key_shortcut, **modifier_kwargs))
             if result:
@@ -513,14 +578,17 @@ def _clear_hotkey(combo):
     combo = _normalize_combo(combo)
     if not combo:
         return
-    flags = _hotkey_flag_kwargs(combo)
-    for command_flag in ("name", "releaseName"):
-        try:
-            kwargs = dict(flags)
-            kwargs[command_flag] = ""
-            cmds.hotkey(**kwargs)
-        except Exception:
-            pass
+    for key_shortcut, shift_required in _maya_hotkey_candidates(combo):
+        flags = _hotkey_flag_kwargs(combo)
+        flags["keyShortcut"] = key_shortcut
+        flags["sht"] = shift_required
+        for command_flag in ("name", "releaseName"):
+            try:
+                kwargs = dict(flags)
+                kwargs[command_flag] = ""
+                cmds.hotkey(**kwargs)
+            except Exception:
+                pass
 
 
 def _ensure_name_command_binding(command_name, title):

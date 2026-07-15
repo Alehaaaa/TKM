@@ -1,5 +1,7 @@
 import math
 import os
+import platform
+import subprocess
 import sys
 import time
 
@@ -21,7 +23,7 @@ SELECT_CONTEXT = "selectSuperContext"
 MOVE_CONTEXT_COMMAND = "tkmMicroMoveContextCmd"
 ROTATE_CONTEXT_COMMAND = "tkmMicroRotateContextCmd"
 BUILD_COMMAND = "tkmMicroMoveBuild"
-EXPECTED_PLUGIN_BUILD = "2026_07_15_native_converter_4"
+EXPECTED_PLUGIN_BUILD = "2026_07_15_native_cpp_1"
 LEGACY_HELPERS_GROUP = "tkm_microMove_helpers"
 
 MICRO_MIN_GAIN = 1.0 / 6.0
@@ -31,7 +33,17 @@ MICRO_ACCEL_FULL_PX_PER_SECOND = 1400.0
 MICRO_DRAG_THRESHOLD = 3
 MICRO_ROTATE_DEGREES_PER_PIXEL = 0.35
 
-PLUGIN_PATH = os.path.join(os.path.dirname(__file__), "plugin.py")
+PLUGIN_SOURCE_PATH = os.path.join(os.path.dirname(__file__), "plugin.cpp")
+_PLUGIN_EXTENSION = ".bundle" if sys.platform == "darwin" else ".so"
+PLUGIN_BUILD_DIRECTORY = os.path.join(
+    os.path.dirname(__file__),
+    "_native",
+    "maya{}_{}".format(cmds.about(version=True), platform.machine()),
+)
+PLUGIN_PATH = os.path.join(
+    PLUGIN_BUILD_DIRECTORY,
+    "tkmMicroMove{}".format(_PLUGIN_EXTENSION),
+)
 PLUGIN_REGISTRY_NAME = "tkmMicroMovePlugin"
 CONTROLLER_APP_ATTRIBUTE = "_tkm_micro_move_controller"
 
@@ -241,19 +253,66 @@ def _unload_micro_move_plugin():
         pass
 
 
-def _purge_micro_move_plugin_module_cache():
-    """Remove only Python modules loaded from this exact plugin.py path."""
-    expected_path = _normalized_path(PLUGIN_PATH)
-    for module_name, module in list(sys.modules.items()):
-        module_path = getattr(module, "__file__", None)
-        if not module_path:
-            continue
-        try:
-            matches = _normalized_path(module_path) == expected_path
-        except (TypeError, ValueError, OSError):
-            matches = False
-        if matches:
-            sys.modules.pop(module_name, None)
+def _maya_native_paths():
+    maya_location = os.environ.get("MAYA_LOCATION")
+    if not maya_location:
+        raise RuntimeError("MAYA_LOCATION is unavailable; cannot build Micro Move.")
+    if sys.platform == "darwin":
+        maya_root = os.path.dirname(os.path.dirname(maya_location))
+        return os.path.join(maya_root, "include"), os.path.join(maya_location, "MacOS")
+    return os.path.join(maya_location, "include"), os.path.join(maya_location, "lib")
+
+
+def _build_micro_move_plugin():
+    """Compile the tiny C++ MPx plug-in when its source is newer."""
+    if (
+        os.path.isfile(PLUGIN_PATH)
+        and os.path.getmtime(PLUGIN_PATH) >= os.path.getmtime(PLUGIN_SOURCE_PATH)
+    ):
+        return PLUGIN_PATH
+
+    if sys.platform != "darwin":
+        raise RuntimeError(
+            "This Micro Move native build currently supports Maya on macOS."
+        )
+
+    include_directory, library_directory = _maya_native_paths()
+    os.makedirs(PLUGIN_BUILD_DIRECTORY, exist_ok=True)
+    command = [
+        "xcrun",
+        "clang++",
+        "-std=c++17",
+        "-arch",
+        platform.machine(),
+        "-dynamiclib",
+        "-fPIC",
+        "-O2",
+        "-Wno-nontrivial-memcall",
+        "-DOSMac_",
+        "-DCC_GNU_",
+        "-DBits64_",
+        "-DREQUIRE_IOSTREAM",
+        "-I{}".format(include_directory),
+        "-L{}".format(library_directory),
+        "-Wl,-rpath,{}".format(library_directory),
+        "-lOpenMaya",
+        "-lOpenMayaUI",
+        "-lFoundation",
+        "-o",
+        PLUGIN_PATH,
+        PLUGIN_SOURCE_PATH,
+    ]
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Micro Move native plug-in build failed:\n{}".format(result.stdout)
+        )
+    return PLUGIN_PATH
 
 
 def _load_micro_move_plugin(force_reload=False):
@@ -277,13 +336,11 @@ def _load_micro_move_plugin(force_reload=False):
     if plugin_name and commands_ready and build_ready and not force_reload:
         return plugin_name
 
-    # Reload an earlier copy of this exact plug-in if it did not register the
-    # expected commands. A generic basename check is deliberately avoided:
-    # many Maya tools contain a file named plugin.py.
+    # Reload an earlier copy of this exact native plug-in if required.
     if plugin_name:
         _unload_micro_move_plugin()
 
-    _purge_micro_move_plugin_module_cache()
+    _build_micro_move_plugin()
 
     loaded_names = cmds.loadPlugin(
         PLUGIN_PATH,
