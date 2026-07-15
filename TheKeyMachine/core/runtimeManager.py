@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from maya import cmds
 
-from TheKeyMachine.Qt import QtCore, QtWidgets  # type: ignore
+from TheKeyMachine.Qt import QtCompat, QtCore, QtWidgets  # type: ignore
 import TheKeyMachine.core.openMayaUtils as omutils
 
 try:
@@ -24,6 +24,8 @@ except ImportError:  # pragma: no cover
 
 
 _OPTIONVAR_NAME = "TKM_RuntimeManager"
+_APP_RUNTIME_ATTRIBUTE = "_tkm_runtime_manager"
+_TRANSIENT_WIDGET_PROPERTY = "tkm_managed_transient"
 _MANAGER: Optional["RuntimeManager"] = None
 
 
@@ -88,6 +90,51 @@ def cleanup_orphaned_callbacks() -> None:
         _kill_scriptjob(int(job_id))
 
     _clear_state()
+
+
+def cleanup_orphaned_widgets() -> None:
+    """Delete transient TKM widgets that survived an interrupted reload."""
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return
+    for widget in list(app.allWidgets()):
+        try:
+            is_managed = bool(widget.property(_TRANSIENT_WIDGET_PROPERTY))
+            is_legacy_tint = widget.__class__.__name__ == "TimelineTint"
+            if not (is_managed or is_legacy_tint):
+                continue
+            delete_tint = getattr(widget, "delete_tint", None)
+            if callable(delete_tint):
+                delete_tint()
+            else:
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
+        except Exception:
+            pass
+
+
+def cleanup_previous_runtime(current=None) -> None:
+    """Shut down the runtime retained by Maya's QApplication across reloads."""
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return
+    previous = getattr(app, _APP_RUNTIME_ATTRIBUTE, None)
+    if previous is None or previous is current:
+        return
+    if QtCompat.isValid(previous):
+        try:
+            previous.shutdown()
+        except Exception:
+            pass
+        try:
+            previous.deleteLater()
+        except Exception:
+            pass
+    try:
+        delattr(app, _APP_RUNTIME_ATTRIBUTE)
+    except Exception:
+        pass
 
 
 def _qt_modifiers_to_mask(modifiers) -> int:
@@ -200,7 +247,13 @@ class RuntimeManager(QtCore.QObject):
         if self._started:
             return
 
+        cleanup_previous_runtime(current=self)
         cleanup_orphaned_callbacks()
+        cleanup_orphaned_widgets()
+
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            setattr(app, _APP_RUNTIME_ATTRIBUTE, self)
 
         # Built-in, long-lived callbacks while the tool is loaded.
         self._install_scene_callbacks()
@@ -218,9 +271,16 @@ class RuntimeManager(QtCore.QObject):
         self._shutdown_background_runners()
         self._remove_event_filter()
         self._clear_managed_widgets()
+        cleanup_orphaned_widgets()
         self._remove_all()
         self._started = False
         _clear_state()
+        app = QtWidgets.QApplication.instance()
+        if app is not None and getattr(app, _APP_RUNTIME_ATTRIBUTE, None) is self:
+            try:
+                delattr(app, _APP_RUNTIME_ATTRIBUTE)
+            except Exception:
+                pass
 
     # ----------------------------
     # Registration helpers
@@ -362,6 +422,11 @@ class RuntimeManager(QtCore.QObject):
     def register_managed_widget(self, widget, key: Optional[str] = None, owner=None):
         if widget is None:
             return None
+
+        try:
+            widget.setProperty(_TRANSIENT_WIDGET_PROPERTY, True)
+        except Exception:
+            pass
 
         if key:
             existing = self._managed_widgets.get(key)
@@ -553,13 +618,13 @@ class RuntimeManager(QtCore.QObject):
         try:
             if self._background_runner_controller is not None:
                 self._background_runner_controller.shutdown()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        except Exception:
             pass
         try:
             import TheKeyMachine.core.backgroundRunners as backgroundRunners
 
             backgroundRunners.shutdown_controller()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        except Exception:
             pass
         self._background_runner_controller = None
 
@@ -841,6 +906,8 @@ class RuntimeManager(QtCore.QObject):
 
 def get_runtime_manager(start: bool = True) -> RuntimeManager:
     global _MANAGER
+    if _MANAGER is not None and not QtCompat.isValid(_MANAGER):
+        _MANAGER = None
     if _MANAGER is None:
         _MANAGER = RuntimeManager()
     if start:
@@ -851,12 +918,16 @@ def get_runtime_manager(start: bool = True) -> RuntimeManager:
 def shutdown_runtime_manager() -> None:
     global _MANAGER
     if _MANAGER is not None:
-        try:
-            _MANAGER.shutdown()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-        try:
-            _MANAGER.deleteLater()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
+        if QtCompat.isValid(_MANAGER):
+            try:
+                _MANAGER.shutdown()
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+            try:
+                _MANAGER.deleteLater()
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
         _MANAGER = None
+    cleanup_previous_runtime()
+    cleanup_orphaned_callbacks()
+    cleanup_orphaned_widgets()

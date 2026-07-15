@@ -610,7 +610,10 @@ class BackgroundRunnerController(QtCore.QObject):
 
     def shutdown(self):
         for runner_id in self.runner_ids():
-            self._stop_service(runner_id)
+            try:
+                self._stop_service(runner_id)
+            except Exception:
+                pass
 
     def runner_ids(self):
         return tuple(get_runner_specs().keys())

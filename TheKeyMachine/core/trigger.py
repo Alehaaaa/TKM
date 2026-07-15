@@ -79,6 +79,8 @@ _MODULE_COMMANDS = {
     "bug_report_window": ("TheKeyMachine.mods.reportMod", "bug_report_window"),
     "orbit_window": ("TheKeyMachine.mods.uiMod", "toggle_orbit_window"),
     "hotkeys_window": ("TheKeyMachine.mods.hotkeysMod", "show_hotkeys_window"),
+    "version_history_window": ("TheKeyMachine.widgets.customDialogs", "show_version_history_dialog"),
+    "search_window": ("TheKeyMachine.tools.search.api", "toggle_search_window"),
     "smart_rotation": ("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator"),
     "smart_rotation_release": ("TheKeyMachine.mods.keyToolsMod", "smart_rotation_manipulator_release"),
     "smart_translation": ("TheKeyMachine.mods.keyToolsMod", "smart_translate_manipulator"),

@@ -462,9 +462,10 @@ temp_pivot_tooltip_text = [
 
 
 micro_move_tooltip_text = [
-    "Move and rotate controls at a much slower rate for precision adjustments.",
-    "Especially useful for facial work and fine control tweaks.",
-    "Works with rotations in Gimbal mode and translations in Local or World mode.",
+    "Make precise move and rotate adjustments directly in the viewport.",
+    "Slow cursor drags stay precise; faster movement increases transform speed.",
+    "While enabled, W and E switch custom Micro Move variants; Q exits.",
+    "Selection stays active, so you can click another control without leaving Micro Move.",
 ]
 
 temp_pivot_last_object_tooltip_text = [

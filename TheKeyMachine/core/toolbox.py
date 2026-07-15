@@ -16,6 +16,7 @@ import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
 import TheKeyMachine.tools.isolate_bookmarks.api as isolateBookmarksApi
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
 import TheKeyMachine.tools.orbit.api as orbitApi
+import TheKeyMachine.tools.search.api as searchApi
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 import TheKeyMachine.tools.temp_pivot.api as tempPivotApi
 from TheKeyMachine.data import colors as toolColors
@@ -305,6 +306,24 @@ TOOL_DEFINITIONS = {
         "icon": icons.hotkeys,
         "tooltip": "Open the TheKeyMachine hotkey editor.",
         "callback": trigger.make_command_callback("hotkeys_window"),
+    },
+    "version_history_window": {
+        "type": "tool",
+        "label": "Version History",
+        "icon": icons.about,
+        "tooltip": "Open the TheKeyMachine version history.",
+        "callback": trigger.make_command_callback("version_history_window"),
+    },
+    "search_window": {
+        "type": "check",
+        "state_key": "search",
+        "label": "Search",
+        "icon": icons.search,
+        "tooltip": "Find and run any TheKeyMachine tool. Type to search, use Up or Down to choose a result, then press Enter to run it.",
+        "callback": searchApi.toggle_search_window,
+        "get_checked": searchApi.is_search_window_open,
+        "set_checked": searchApi.set_search_window_open,
+        "bind_checked_fn": searchApi.bind_search_toolbar_button,
     },
     "about_window": {
         "type": "tool",
@@ -1503,14 +1522,14 @@ TOOL_DEFINITIONS = {
     "custom_tools": {
         "type": "menu",
         "label": "Custom Tools",
-        "icon": icons.tools_folder,
+        "icon": icons.custom_tools,
         "menu": _tool_menu_builder("build_custom_tools_menu"),
         "tooltip": helper.custom_tools_tooltip_text,
     },
     "custom_scripts": {
         "type": "menu",
         "label": "Custom Scripts",
-        "icon": icons.scripts_folder,
+        "icon": icons.custom_scripts,
         "menu": _tool_menu_builder("build_custom_scripts_menu"),
         "tooltip": helper.custom_scripts_tooltip_text,
     },
@@ -1720,6 +1739,7 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "toolbar_uninstall", "default": False},
             {"id": "check_for_updates", "default": False},
             {"id": "hotkeys_window", "default": False},
+            {"id": "version_history_window", "default": False},
             {"id": "about_window", "default": False},
             {"id": "donate_window", "default": False},
             {"id": "bug_report_window", "default": False},
@@ -2292,20 +2312,6 @@ TOOL_SECTION_DEFINITIONS = {
             {"type": "widget", "id": "custom_graph", "default": True},
         ],
     },
-    "background_runner_tools": {
-        "label": "Background Runners",
-        "items": [
-            {"id": "background_runners", "default": True},
-        ],
-    },
-    "extension_tools": {
-        "label": "Extensions",
-        "toolbar": True,
-        "items": [
-            {"id": "custom_tools"},
-            {"id": "custom_scripts"},
-        ],
-    },
     # --- Extra Specific ---
     "extra_tools": {
         "label": "Extra Tools",
@@ -2353,6 +2359,29 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "set_smart_key_all_channels"},
             "separator",
             {"id": "snap", "default": True},
+        ],
+    },
+    "extension_tools": {
+        "label": "Extensions",
+        "toolbar": True,
+        "items": [
+            {"id": "custom_tools"},
+            {"id": "custom_scripts"},
+        ],
+    },
+    "background_runner_tools": {
+        "label": "Background Runners",
+        "items": [
+            {"id": "background_runners", "default": True},
+        ],
+    },
+    # Kept last so Search remains a separate trailing toolbar section.
+    "search_tools": {
+        "label": "Search",
+        "hiddeable": True,
+        "toolbar_ids": ("main",),
+        "items": [
+            {"id": "search_window", "default": True},
         ],
     },
 }
