@@ -82,11 +82,22 @@ def _plugin_cursor_paths():
 class _ColorCursorFilter(QtCore.QObject):
     """Keep the Micro Move cursor in full-color Qt image form."""
 
+    _CURSOR_SIZE = 32
+
     def __init__(self, open_path, pinched_path, parent=None):
         super().__init__(parent)
+        def load_cursor(path):
+            pixmap = QtGui.QPixmap(path).scaled(
+                self._CURSOR_SIZE,
+                self._CURSOR_SIZE,
+                QtCore.Qt.KeepAspectRatio,
+                QtCore.Qt.SmoothTransformation,
+            )
+            return QtGui.QCursor(pixmap, 3, 3)
+
         self._cursors = {
-            False: QtGui.QCursor(QtGui.QPixmap(open_path), 3, 3),
-            True: QtGui.QCursor(QtGui.QPixmap(pinched_path), 3, 3),
+            False: load_cursor(open_path),
+            True: load_cursor(pinched_path),
         }
         self._override_active = False
 
