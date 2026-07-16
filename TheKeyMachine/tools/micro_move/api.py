@@ -125,7 +125,10 @@ class _ColorCursorFilter(QtCore.QObject):
         while widget is not None:
             if widget in self._viewport_roots:
                 return True
-            widget = widget.parentWidget()
+            parent_widget = getattr(widget, "parentWidget", None)
+            if not callable(parent_widget):
+                return False
+            widget = parent_widget()
         return False
 
     def _clear_cursor(self):
