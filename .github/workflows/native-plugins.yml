@@ -65,6 +65,7 @@ jobs:
           -DMAYA_DEVKIT_ROOT="${{ steps.devkit.outputs.devkit-path }}"
           -DTKM_PLATFORM=${{ matrix.platform }}
           -DTKM_ARCH=${{ matrix.arch }}
+          -DTKM_BUILD_ID=${{ github.sha }}
           -DTKM_OUTPUT_ROOT="${{ github.workspace }}/builds-package"
           -DCMAKE_BUILD_TYPE=Release
       - name: Build both plug-ins
@@ -114,6 +115,7 @@ jobs:
                 -DMAYA_DEVKIT_ROOT=/maya-devkit \
                 -DTKM_PLATFORM=linux \
                 -DTKM_ARCH=x86_64 \
+                -DTKM_BUILD_ID=${{ github.sha }} \
                 -DTKM_OUTPUT_ROOT=/workspace/builds-package \
                 -DCMAKE_BUILD_TYPE=Release &&
               /opt/python/cp39-cp39/bin/cmake --build build/native --config Release --parallel

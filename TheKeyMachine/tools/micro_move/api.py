@@ -21,7 +21,6 @@ ROTATE_CONTEXT_COMMAND = "tkmMicroRotateContextCmd"
 BUILD_COMMAND = "tkmMicroMoveBuild"
 CONFIGURE_COMMAND = "tkmMicroMoveConfigure"
 REFRESH_COMMAND = "tkmMicroMoveRefresh"
-EXPECTED_PLUGIN_BUILD = "2026_07_15_native_cpp_13"
 LEGACY_HELPERS_GROUP = "tkm_microMove_helpers"
 
 PLUGIN_SPEC = plugins.NativePluginSpec(
@@ -37,7 +36,6 @@ PLUGIN_SPEC = plugins.NativePluginSpec(
         REFRESH_COMMAND,
     ),
     build_command=BUILD_COMMAND,
-    expected_build=EXPECTED_PLUGIN_BUILD,
     context_fallbacks={
         MICRO_MOVE_CONTEXT: MOVE_CONTEXT,
         MICRO_ROTATE_CONTEXT: ROTATE_CONTEXT,

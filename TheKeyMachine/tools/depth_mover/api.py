@@ -16,7 +16,6 @@ DEPTH_CONTEXT = "tkmDepthMoverCtx"
 DEPTH_CONTEXT_COMMAND = "tkmDepthMoverNativeContextCmd"
 BUILD_COMMAND = "tkmDepthMoverNativeBuild"
 CONFIGURE_COMMAND = "tkmDepthMoverNativeConfigure"
-EXPECTED_PLUGIN_BUILD = "2026_07_15_native_cpp_9"
 SELECT_CONTEXT = "selectSuperContext"
 
 PLUGIN_SPEC = plugins.NativePluginSpec(
@@ -26,7 +25,6 @@ PLUGIN_SPEC = plugins.NativePluginSpec(
     registry_name="tkmDepthMoverNativePlugin",
     required_commands=(DEPTH_CONTEXT_COMMAND, BUILD_COMMAND, CONFIGURE_COMMAND),
     build_command=BUILD_COMMAND,
-    expected_build=EXPECTED_PLUGIN_BUILD,
     context_fallbacks={DEPTH_CONTEXT: SELECT_CONTEXT},
 )
 RUNTIME_CALLBACK_KEY = "depth_mover:tool_changed"

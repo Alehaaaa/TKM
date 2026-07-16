@@ -33,7 +33,10 @@ namespace {
 const char* kContextCommand = "tkmDepthMoverNativeContextCmd";
 const char* kBuildCommand = "tkmDepthMoverNativeBuild";
 const char* kConfigureCommand = "tkmDepthMoverNativeConfigure";
-const char* kBuildId = "2026_07_15_native_cpp_9";
+#ifndef TKM_BUILD_ID
+#define TKM_BUILD_ID "development"
+#endif
+const char* kBuildId = TKM_BUILD_ID;
 constexpr double kDistancePerPixel = 0.07;
 constexpr double kSensitivityPixelsPerDoubling = 160.0;
 constexpr double kMinimumSensitivity = 0.125;

@@ -59,7 +59,8 @@ def validate(root):
             errors.append("Empty: {}".format(path))
             continue
         with open(path, "rb") as stream:
-            header = stream.read(4)
+            data = stream.read()
+        header = data[:4]
         if platform_name == "macos":
             valid_header = header in MACHO_MAGICS
         else:
@@ -67,6 +68,13 @@ def validate(root):
         if not valid_header:
             errors.append("Wrong binary format: {}".format(path))
             continue
+        manifest = os.path.join(os.path.dirname(path), "build-id.txt")
+        if os.path.isfile(manifest):
+            with open(manifest, "rb") as stream:
+                expected_build_id = stream.read().strip()
+            if not expected_build_id or expected_build_id not in data:
+                errors.append("Build ID manifest does not match binary: {}".format(path))
+                continue
         checked += 1
     return checked, errors
 

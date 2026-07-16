@@ -52,6 +52,7 @@ class NativePluginSpec(object):
         required_commands=(),
         build_command=None,
         expected_build=None,
+        expected_build_file="build-id.txt",
         context_fallbacks=None,
     ):
         self.label = str(label)
@@ -61,6 +62,7 @@ class NativePluginSpec(object):
         self.required_commands = tuple(required_commands)
         self.build_command = build_command
         self.expected_build = expected_build
+        self.expected_build_file = expected_build_file
         self.context_fallbacks = dict(context_fallbacks or {})
 
         current_platform = platform_name()
@@ -77,6 +79,11 @@ class NativePluginSpec(object):
             "maya{}".format(maya_major_version()),
         )
         self.path = os.path.join(self.build_directory, self.output_name + extension)
+        if self.expected_build is None and self.expected_build_file:
+            manifest = os.path.join(self.build_directory, self.expected_build_file)
+            if os.path.isfile(manifest):
+                with open(manifest, "r") as stream:
+                    self.expected_build = stream.read().strip() or None
         _PLUGIN_SPECS[self.registry_name] = self
 
 

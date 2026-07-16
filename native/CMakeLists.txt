@@ -6,6 +6,7 @@ set(MAYA_VERSION "" CACHE STRING "Four-digit Maya release, for example 2025")
 set(MAYA_DEVKIT_ROOT "" CACHE PATH "Root of the extracted Maya devkit")
 set(TKM_PLATFORM "" CACHE STRING "TKM platform key: windows, linux, or macos")
 set(TKM_ARCH "" CACHE STRING "TKM architecture key: x86_64 or arm64")
+set(TKM_BUILD_ID "development" CACHE STRING "Build provenance identifier embedded in native plug-ins")
 set(
     TKM_OUTPUT_ROOT
     "${CMAKE_BINARY_DIR}/builds-package"
@@ -25,6 +26,9 @@ endif()
 if(NOT TKM_ARCH MATCHES "^(x86_64|arm64)$")
     message(FATAL_ERROR "TKM_ARCH must be x86_64 or arm64")
 endif()
+
+configure_file("${CMAKE_CURRENT_LIST_DIR}/build-id.txt.in" "${CMAKE_CURRENT_BINARY_DIR}/build-id.txt" @ONLY)
+add_compile_definitions(TKM_BUILD_ID=\"${TKM_BUILD_ID}\")
 
 find_path(
     MAYA_INCLUDE_DIR
@@ -95,6 +99,9 @@ function(tkm_add_maya_plugin target tool output_name source)
         BUILD_RPATH ""
         INSTALL_RPATH ""
     )
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_BINARY_DIR}/build-id.txt" "${_output_directory}/build-id.txt")
 endfunction()
 
 get_filename_component(TKM_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
