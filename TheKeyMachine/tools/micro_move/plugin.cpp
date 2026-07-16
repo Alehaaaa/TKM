@@ -521,26 +521,17 @@ public:
     void toolOnSetup(MEvent&) override {
         activeContext_ = this;
         setAllowPreSelectHilight();
-        setCursor(
-            gOpenCursor.cursor
-                ? *gOpenCursor.cursor
-                : MCursor::defaultCursor);
         rebuild(this);
     }
 
     void toolOffCleanup() override {
         deleteManipulators();
         if (activeContext_ == this) activeContext_ = nullptr;
-        setCursor(MCursor::defaultCursor);
         MPxSelectionContext::toolOffCleanup();
     }
 
     MStatus doPress(MEvent& event) override {
         beginCursorSample(event);
-        setCursor(
-            gPinchedCursor.cursor
-                ? *gPinchedCursor.cursor
-                : MCursor::defaultCursor);
         return MPxSelectionContext::doPress(event);
     }
 
@@ -551,10 +542,6 @@ public:
 
     MStatus doRelease(MEvent& event) override {
         MStatus status = MPxSelectionContext::doRelease(event);
-        setCursor(
-            gOpenCursor.cursor
-                ? *gOpenCursor.cursor
-                : MCursor::defaultCursor);
         return status;
     }
 
