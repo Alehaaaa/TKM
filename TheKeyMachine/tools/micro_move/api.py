@@ -100,16 +100,31 @@ class _ColorCursorFilter(QtCore.QObject):
             True: load_cursor(pinched_path),
         }
         self._override_active = False
+        self._pinched = False
+        self._poll_timer = QtCore.QTimer(self)
+        self._poll_timer.setInterval(16)
+        self._poll_timer.timeout.connect(self._poll_mouse_buttons)
 
     def _set_cursor(self, pinched=False):
         application = QtWidgets.QApplication.instance()
         if application is None:
             return
+        pinched = bool(pinched)
+        if self._override_active and pinched == self._pinched:
+            return
+        self._pinched = pinched
         if not self._override_active:
             application.setOverrideCursor(self._cursors[bool(pinched)])
             self._override_active = True
         else:
             application.changeOverrideCursor(self._cursors[bool(pinched)])
+
+    def _poll_mouse_buttons(self):
+        application = QtWidgets.QApplication.instance()
+        if application is None:
+            return
+        buttons = application.mouseButtons()
+        self._set_cursor(bool(buttons & QtCore.Qt.LeftButton))
 
     def eventFilter(self, _obj, event):
         event_type = event.type()
@@ -124,9 +139,11 @@ class _ColorCursorFilter(QtCore.QObject):
         if application is not None:
             application.installEventFilter(self)
             self._set_cursor()
+            self._poll_timer.start()
 
     def uninstall(self):
         application = QtWidgets.QApplication.instance()
+        self._poll_timer.stop()
         if application is not None:
             application.removeEventFilter(self)
             if self._override_active:
