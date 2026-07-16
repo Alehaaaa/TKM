@@ -24,13 +24,11 @@ REFRESH_COMMAND = "tkmMicroMoveRefresh"
 EXPECTED_PLUGIN_BUILD = "2026_07_15_native_cpp_13"
 LEGACY_HELPERS_GROUP = "tkm_microMove_helpers"
 
-PLUGIN_SOURCE_PATH = os.path.join(os.path.dirname(__file__), "plugin.cpp")
 PLUGIN_SPEC = plugins.NativePluginSpec(
     label="Micro Move",
-    source_paths=(PLUGIN_SOURCE_PATH,),
+    plugin_directory=os.path.dirname(__file__),
     output_name="tkmMicroMove",
     registry_name="tkmMicroMovePlugin",
-    build_recipe="cross-platform-cpp17-maya-image-v1",
     required_commands=(
         MOVE_CONTEXT_COMMAND,
         ROTATE_CONTEXT_COMMAND,

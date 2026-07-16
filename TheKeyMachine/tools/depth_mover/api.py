@@ -19,13 +19,11 @@ CONFIGURE_COMMAND = "tkmDepthMoverNativeConfigure"
 EXPECTED_PLUGIN_BUILD = "2026_07_15_native_cpp_9"
 SELECT_CONTEXT = "selectSuperContext"
 
-PLUGIN_SOURCE_PATH = os.path.join(os.path.dirname(__file__), "plugin.cpp")
 PLUGIN_SPEC = plugins.NativePluginSpec(
     label="Depth Mover",
-    source_paths=(PLUGIN_SOURCE_PATH,),
+    plugin_directory=os.path.dirname(__file__),
     output_name="tkmDepthMoverNative",
     registry_name="tkmDepthMoverNativePlugin",
-    build_recipe="cross-platform-cpp17-depth-mover-native-v1",
     required_commands=(DEPTH_CONTEXT_COMMAND, BUILD_COMMAND, CONFIGURE_COMMAND),
     build_command=BUILD_COMMAND,
     expected_build=EXPECTED_PLUGIN_BUILD,

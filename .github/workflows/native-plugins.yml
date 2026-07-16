@@ -1,0 +1,196 @@
+name: Native plug-ins
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/native-plugins.yml"
+      - "native/**"
+      - "TheKeyMachine/tools/depth_mover/plugin.cpp"
+      - "TheKeyMachine/tools/micro_move/plugin.cpp"
+  push:
+    branches: [main, master, test]
+    tags: ["v*"]
+    paths:
+      - ".github/workflows/native-plugins.yml"
+      - "native/**"
+      - "TheKeyMachine/tools/depth_mover/plugin.cpp"
+      - "TheKeyMachine/tools/micro_move/plugin.cpp"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-plugins-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-macos:
+    name: Maya ${{ matrix.maya }} / ${{ matrix.platform }}-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {maya: 2022, update: 5, runner: windows-2022, platform: windows, arch: x86_64, cmake_arch: "-A x64 -T v142"}
+          - {maya: 2023, update: 3, runner: windows-2022, platform: windows, arch: x86_64, cmake_arch: "-A x64 -T v142"}
+          - {maya: 2024, update: 2, runner: windows-2022, platform: windows, arch: x86_64, cmake_arch: "-A x64"}
+          - {maya: 2025, update: 3, runner: windows-2022, platform: windows, arch: x86_64, cmake_arch: "-A x64"}
+          - {maya: 2026, update: 3, runner: windows-2022, platform: windows, arch: x86_64, cmake_arch: "-A x64"}
+          - {maya: 2027, update: 1, runner: windows-2022, platform: windows, arch: x86_64, cmake_arch: "-A x64"}
+          - {maya: 2022, update: 5, runner: macos-15-intel, platform: macos, arch: x86_64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=x86_64"}
+          - {maya: 2023, update: 3, runner: macos-15-intel, platform: macos, arch: x86_64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=x86_64"}
+          - {maya: 2024, update: 2, runner: macos-15-intel, platform: macos, arch: x86_64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=x86_64"}
+          - {maya: 2025, update: 3, runner: macos-15-intel, platform: macos, arch: x86_64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=x86_64"}
+          - {maya: 2026, update: 3, runner: macos-15-intel, platform: macos, arch: x86_64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=x86_64"}
+          - {maya: 2027, update: 1, runner: macos-15-intel, platform: macos, arch: x86_64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=x86_64"}
+          - {maya: 2024, update: 2, runner: macos-15-intel, platform: macos, arch: arm64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=arm64"}
+          - {maya: 2025, update: 3, runner: macos-15-intel, platform: macos, arch: arm64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=arm64"}
+          - {maya: 2026, update: 3, runner: macos-15-intel, platform: macos, arch: arm64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=arm64"}
+          - {maya: 2027, update: 1, runner: macos-15-intel, platform: macos, arch: arm64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=arm64"}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Maya devkit
+        id: devkit
+        uses: blurstudio/mayaModuleActions/getMayaDevkit@v1
+        with:
+          maya: ${{ matrix.maya }}
+          update: ${{ matrix.update }}
+          cache: true
+      - name: Configure
+        run: >-
+          cmake -S native -B build/native
+          ${{ matrix.cmake_arch }}
+          -DMAYA_VERSION=${{ matrix.maya }}
+          -DMAYA_DEVKIT_ROOT="${{ steps.devkit.outputs.devkit-path }}"
+          -DTKM_PLATFORM=${{ matrix.platform }}
+          -DTKM_ARCH=${{ matrix.arch }}
+          -DTKM_OUTPUT_ROOT="${{ github.workspace }}/builds-package"
+          -DCMAKE_BUILD_TYPE=Release
+      - name: Build both plug-ins
+        run: cmake --build build/native --config Release --parallel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: builds-${{ matrix.maya }}-${{ matrix.platform }}-${{ matrix.arch }}
+          path: builds-package
+          if-no-files-found: error
+
+  build-linux:
+    name: Maya ${{ matrix.maya }} / linux-x86_64
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {maya: 2022, update: 5}
+          - {maya: 2023, update: 3}
+          - {maya: 2024, update: 2}
+          - {maya: 2025, update: 3}
+          - {maya: 2026, update: 3}
+          - {maya: 2027, update: 1}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Maya devkit
+        id: devkit
+        uses: blurstudio/mayaModuleActions/getMayaDevkit@v1
+        with:
+          maya: ${{ matrix.maya }}
+          update: ${{ matrix.update }}
+          cache: true
+      - name: Build both plug-ins against the oldest Linux ABI
+        env:
+          DEVKIT_PATH: ${{ steps.devkit.outputs.devkit-path }}
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$DEVKIT_PATH:/maya-devkit:ro" \
+            -w /workspace \
+            quay.io/pypa/manylinux2014_x86_64 \
+            bash -lc '
+              yum install -y mesa-libGLU-devel &&
+              /opt/python/cp39-cp39/bin/python -m pip install --disable-pip-version-check cmake==3.27.9 &&
+              /opt/python/cp39-cp39/bin/cmake -S native -B build/native \
+                -DMAYA_VERSION=${{ matrix.maya }} \
+                -DMAYA_DEVKIT_ROOT=/maya-devkit \
+                -DTKM_PLATFORM=linux \
+                -DTKM_ARCH=x86_64 \
+                -DTKM_OUTPUT_ROOT=/workspace/builds-package \
+                -DCMAKE_BUILD_TYPE=Release &&
+              /opt/python/cp39-cp39/bin/cmake --build build/native --config Release --parallel
+            '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: builds-${{ matrix.maya }}-linux-x86_64
+          path: builds-package
+          if-no-files-found: error
+
+  package:
+    name: Package complete cross-platform release
+    needs: [build-windows-macos, build-linux]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: builds-*
+          path: builds-package
+          merge-multiple: true
+      - name: Validate complete binary matrix
+        run: python3 native/validate_matrix.py builds-package
+      - name: Replace release builds with generated matrix
+        run: |
+          rm -rf \
+            TheKeyMachine/tools/depth_mover/__builds__ \
+            TheKeyMachine/tools/micro_move/__builds__
+          cp -R builds-package/TheKeyMachine/. TheKeyMachine/
+      - name: Commit generated builds to main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A \
+            TheKeyMachine/tools/depth_mover/__builds__ \
+            TheKeyMachine/tools/micro_move/__builds__
+          if git diff --cached --quiet; then
+            echo "The committed builds already match this source revision."
+            exit 0
+          fi
+          git commit -m "Update prebuilt Maya plug-ins"
+          git push origin HEAD:main
+      - name: Assemble one release containing every target
+        run: |
+          mkdir -p dist
+          version="${GITHUB_REF_NAME//\//-}"
+          zip -r "dist/TheKeyMachine-${version}.zip" \
+            TheKeyMachine \
+            'TheKeyMachine_Drag&Drop_installer.py' \
+            README.md \
+            how_to_install.txt \
+            license_gpl-3.0.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TheKeyMachine-complete-release
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish tagged release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: TheKeyMachine-complete-release
+          path: dist
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
+          gh release upload "$GITHUB_REF_NAME" dist/*.zip --clobber
