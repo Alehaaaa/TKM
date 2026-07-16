@@ -13,12 +13,12 @@ The C++ sources remain next to their Python APIs under `TheKeyMachine/tools/`.
 To make an explicit development build, configure this directory with CMake:
 
 ```shell
-cmake -S native -B build/native \
+cmake -S native_plugins -B build/native_plugins \
   -DMAYA_VERSION=2025 \
   -DMAYA_DEVKIT_ROOT=/path/to/devkit \
   -DTKM_PLATFORM=linux \
   -DTKM_ARCH=x86_64
-cmake --build build/native --config Release
+cmake --build build/native_plugins --config Release
 ```
 
 This CMake project is the only supported build path. Maya never compiles native
