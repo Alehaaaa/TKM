@@ -3,7 +3,7 @@ import os
 from maya.api import OpenMaya as om
 from maya import cmds, utils
 
-from TheKeyMachine.Qt import QtCompat, QtCore
+from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets
 from TheKeyMachine.data import icons
 
 import TheKeyMachine.core.runtimeManager as runtime
@@ -79,6 +79,50 @@ def _plugin_cursor_paths():
     return cursor_paths
 
 
+class _ColorCursorFilter(QtCore.QObject):
+    """Keep the Micro Move cursor in full-color Qt image form."""
+
+    def __init__(self, open_path, pinched_path, parent=None):
+        super().__init__(parent)
+        self._cursors = {
+            False: QtGui.QCursor(QtGui.QPixmap(open_path), 3, 3),
+            True: QtGui.QCursor(QtGui.QPixmap(pinched_path), 3, 3),
+        }
+        self._override_active = False
+
+    def _set_cursor(self, pinched=False):
+        application = QtWidgets.QApplication.instance()
+        if application is None:
+            return
+        if not self._override_active:
+            application.setOverrideCursor(self._cursors[bool(pinched)])
+            self._override_active = True
+        else:
+            application.changeOverrideCursor(self._cursors[bool(pinched)])
+
+    def eventFilter(self, _obj, event):
+        event_type = event.type()
+        if event_type == QtCore.QEvent.MouseButtonPress:
+            self._set_cursor(pinched=True)
+        elif event_type == QtCore.QEvent.MouseButtonRelease:
+            self._set_cursor(pinched=False)
+        return False
+
+    def install(self):
+        application = QtWidgets.QApplication.instance()
+        if application is not None:
+            application.installEventFilter(self)
+            self._set_cursor()
+
+    def uninstall(self):
+        application = QtWidgets.QApplication.instance()
+        if application is not None:
+            application.removeEventFilter(self)
+            if self._override_active:
+                application.restoreOverrideCursor()
+        self._override_active = False
+
+
 def _ensure_micro_contexts():
     """Load the native plug-in and recreate its MPx contexts."""
     _remove_legacy_helpers()
@@ -104,6 +148,7 @@ class MicroMoveController(QtCore.QObject):
         self._refresh_pending = False
         self._changing_context = False
         self._last_micro_context = MICRO_MOVE_CONTEXT
+        self._color_cursor_filter = None
         current_context = cmds.currentCtx()
         self._previous_context = (
             current_context
@@ -265,6 +310,10 @@ class MicroMoveController(QtCore.QObject):
             return
         toolCommon.deactivate_other_manipulator_tools("micro_move")
         _ensure_micro_contexts()
+        open_path, pinched_path, _ = _plugin_cursor_paths()
+        self._color_cursor_filter = _ColorCursorFilter(
+            open_path, pinched_path, parent=self)
+        self._color_cursor_filter.install()
         self._enabled = True
         try:
             self._install_tool_changed_callback()
@@ -284,6 +333,10 @@ class MicroMoveController(QtCore.QObject):
         self._sync_pending = False
         self._refresh_pending = False
         self._disconnect_runtime_events()
+        if self._color_cursor_filter is not None:
+            self._color_cursor_filter.uninstall()
+            self._color_cursor_filter.deleteLater()
+            self._color_cursor_filter = None
 
         if restore_standard_context and was_enabled:
             current_context = cmds.currentCtx()
