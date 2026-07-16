@@ -9,10 +9,10 @@ from TheKeyMachine.data import icons
 from TheKeyMachine.mods import settingsMod as settings
 from TheKeyMachine.tools.search import logic
 from TheKeyMachine.tools.search.constants import (
-    SEARCH_POSITION_KEY,
     SEARCH_SETTINGS_NAMESPACE,
     SEARCH_TEXT_KEY,
 )
+from TheKeyMachine.tools.search import session_state
 from TheKeyMachine.tools.search.custom_widgets import SearchLineEdit, SearchResultItemWidget
 from TheKeyMachine.tools.search.workers import SearchCatalogThread
 from TheKeyMachine.widgets import customDialogs
@@ -310,9 +310,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         QtCore.QTimer.singleShot(0, lambda name=str(command): trigger.execute_command(name))
 
     def _restore_or_center(self):
-        saved = settings.get_setting(
-            SEARCH_POSITION_KEY, None, namespace=SEARCH_SETTINGS_NAMESPACE
-        )
+        saved = session_state.get_position()
         self._restoring_position = True
         try:
             if isinstance(saved, (list, tuple)) and len(saved) >= 2:
@@ -328,7 +326,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         geometry = parent.frameGeometry() if parent else QtGui.QGuiApplication.primaryScreen().availableGeometry()
         self.move(
             int(geometry.x() + (geometry.width() - self.width()) / 2),
-            int(geometry.y() + (geometry.height() / 3.0) - (self.height() / 2.0)),
+            int(geometry.y() + (geometry.height() / 3.0)),
         )
         self._clamp_to_screen()
 
@@ -364,11 +362,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
             self._position_save_timer.start(150)
 
     def _save_position(self):
-        settings.set_setting(
-            SEARCH_POSITION_KEY,
-            [self.pos().x(), self.pos().y()],
-            namespace=SEARCH_SETTINGS_NAMESPACE,
-        )
+        session_state.set_position(self.pos().x(), self.pos().y())
 
     def closeEvent(self, event):
         settings.set_setting(

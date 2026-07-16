@@ -7,11 +7,11 @@ from TheKeyMachine.mods import settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools.search.constants import (
-    SEARCH_POSITION_KEY,
     SEARCH_SETTINGS_NAMESPACE,
     SEARCH_STAYS_ON_TOP_KEY,
     SEARCH_WINDOW_KEY,
 )
+from TheKeyMachine.tools.search import session_state
 from TheKeyMachine.widgets import customWidgets as cw, util as wutil
 
 
@@ -90,11 +90,7 @@ def set_search_stays_on_top(enabled):
 
 
 def restore_search_default_position():
-    settings.set_setting(
-        SEARCH_POSITION_KEY,
-        None,
-        namespace=SEARCH_SETTINGS_NAMESPACE,
-    )
+    session_state.clear_position()
     window = get_search_window()
     if window:
         window.restore_default_position()
