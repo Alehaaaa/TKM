@@ -74,6 +74,7 @@ jobs:
         with:
           name: builds-${{ matrix.maya }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: builds-package
+          retention-days: 1
           if-no-files-found: error
 
   build-linux:
@@ -124,6 +125,7 @@ jobs:
         with:
           name: builds-${{ matrix.maya }}-linux-x86_64
           path: builds-package
+          retention-days: 1
           if-no-files-found: error
 
   package:
@@ -182,6 +184,7 @@ jobs:
         with:
           name: TheKeyMachine-complete-release
           path: dist/*.zip
+          retention-days: 7
           if-no-files-found: error
 
   release:
