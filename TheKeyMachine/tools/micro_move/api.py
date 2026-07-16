@@ -303,6 +303,13 @@ class MicroMoveController(QtCore.QObject):
             except Exception:
                 pass
 
+    def _remove_color_cursor_filter(self):
+        if self._color_cursor_filter is None:
+            return
+        self._color_cursor_filter.uninstall()
+        self._color_cursor_filter.deleteLater()
+        self._color_cursor_filter = None
+
     def _preferred_context(self):
         return (
             self._last_micro_context
@@ -361,6 +368,7 @@ class MicroMoveController(QtCore.QObject):
             self._sync_context(initial=True)
         except Exception:
             self._enabled = False
+            self._remove_color_cursor_filter()
             self._remove_tool_changed_callback()
             self._disconnect_runtime_events()
             self._publish_state()
@@ -373,10 +381,7 @@ class MicroMoveController(QtCore.QObject):
         self._sync_pending = False
         self._refresh_pending = False
         self._disconnect_runtime_events()
-        if self._color_cursor_filter is not None:
-            self._color_cursor_filter.uninstall()
-            self._color_cursor_filter.deleteLater()
-            self._color_cursor_filter = None
+        self._remove_color_cursor_filter()
 
         if restore_standard_context and was_enabled:
             current_context = cmds.currentCtx()
