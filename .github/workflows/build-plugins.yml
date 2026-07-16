@@ -49,7 +49,7 @@ jobs:
           - {maya: 2027, update: 1, runner: macos-15-intel, platform: macos, arch: arm64, cmake_arch: "-DCMAKE_OSX_ARCHITECTURES=arm64"}
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Download Maya devkit
         id: devkit
         uses: blurstudio/mayaModuleActions/getMayaDevkit@v1
@@ -70,7 +70,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
       - name: Build both plug-ins
         run: cmake --build build/native_plugins --config Release --parallel
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: builds-${{ matrix.maya }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: builds-package
@@ -90,7 +90,7 @@ jobs:
           - {maya: 2027, update: 1}
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Download Maya devkit
         id: devkit
         uses: blurstudio/mayaModuleActions/getMayaDevkit@v1
@@ -120,7 +120,7 @@ jobs:
                 -DCMAKE_BUILD_TYPE=Release &&
               /opt/python/cp39-cp39/bin/cmake --build build/native_plugins --config Release --parallel
             '
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: builds-${{ matrix.maya }}-linux-x86_64
           path: builds-package
@@ -133,8 +133,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: builds-*
           path: builds-package
@@ -178,7 +178,7 @@ jobs:
             README.md \
             how_to_install.txt \
             license_gpl-3.0.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: TheKeyMachine-complete-release
           path: dist/*.zip
@@ -192,7 +192,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: TheKeyMachine-complete-release
           path: dist
