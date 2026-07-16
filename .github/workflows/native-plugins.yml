@@ -69,7 +69,7 @@ jobs:
           -DTKM_OUTPUT_ROOT="${{ github.workspace }}/builds-package"
           -DCMAKE_BUILD_TYPE=Release
       - name: Build both plug-ins
-        run: cmake --build build/native --config Release --parallel
+        run: cmake --build build/native_plugins --config Release --parallel
       - uses: actions/upload-artifact@v4
         with:
           name: builds-${{ matrix.maya }}-${{ matrix.platform }}-${{ matrix.arch }}
@@ -118,7 +118,7 @@ jobs:
                 -DTKM_BUILD_ID=${{ github.sha }} \
                 -DTKM_OUTPUT_ROOT=/workspace/builds-package \
                 -DCMAKE_BUILD_TYPE=Release &&
-              /opt/python/cp39-cp39/bin/cmake --build build/native --config Release --parallel
+              /opt/python/cp39-cp39/bin/cmake --build build/native_plugins --config Release --parallel
             '
       - uses: actions/upload-artifact@v4
         with:
