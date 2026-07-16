@@ -110,14 +110,21 @@ class _ColorCursorFilter(QtCore.QObject):
         if application is None:
             return
         pinched = bool(pinched)
-        if self._override_active and pinched == self._pinched:
+        desired = self._cursors[pinched]
+        current = application.overrideCursor()
+        if (
+                self._override_active
+                and pinched == self._pinched
+                and current is not None
+                and current.pixmap().cacheKey() == desired.pixmap().cacheKey()
+        ):
             return
         self._pinched = pinched
         if not self._override_active:
-            application.setOverrideCursor(self._cursors[bool(pinched)])
+            application.setOverrideCursor(desired)
             self._override_active = True
         else:
-            application.changeOverrideCursor(self._cursors[bool(pinched)])
+            application.changeOverrideCursor(desired)
 
     def _clear_cursor(self):
         application = QtWidgets.QApplication.instance()
@@ -138,6 +145,8 @@ class _ColorCursorFilter(QtCore.QObject):
             self._set_cursor(pinched=True)
         elif event_type == QtCore.QEvent.MouseButtonRelease:
             self._set_cursor(pinched=False)
+        elif event_type == QtCore.QEvent.CursorChange:
+            self._poll_mouse_buttons()
         return False
 
     def install(self):
