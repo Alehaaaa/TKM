@@ -1,7 +1,6 @@
 import os
 
 from maya.api import OpenMaya as om
-from maya import OpenMayaUI as omui
 from maya import cmds, utils
 
 from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets
@@ -102,7 +101,6 @@ class _ColorCursorFilter(QtCore.QObject):
         }
         self._override_active = False
         self._pinched = False
-        self._viewport_roots = set()
         self._poll_timer = QtCore.QTimer(self)
         self._poll_timer.setInterval(16)
         self._poll_timer.timeout.connect(self._poll_mouse_buttons)
@@ -121,16 +119,6 @@ class _ColorCursorFilter(QtCore.QObject):
         else:
             application.changeOverrideCursor(self._cursors[bool(pinched)])
 
-    def _is_viewport_widget(self, widget):
-        while widget is not None:
-            if widget in self._viewport_roots:
-                return True
-            parent_widget = getattr(widget, "parentWidget", None)
-            if not callable(parent_widget):
-                return False
-            widget = parent_widget()
-        return False
-
     def _clear_cursor(self):
         application = QtWidgets.QApplication.instance()
         if application is not None and self._override_active:
@@ -141,35 +129,20 @@ class _ColorCursorFilter(QtCore.QObject):
         application = QtWidgets.QApplication.instance()
         if application is None:
             return
-        widget = application.widgetAt(QtGui.QCursor.pos())
-        if not self._is_viewport_widget(widget):
-            self._clear_cursor()
-            return
         buttons = application.mouseButtons()
         self._set_cursor(bool(buttons & QtCore.Qt.LeftButton))
 
     def eventFilter(self, _obj, event):
-        if not self._is_viewport_widget(_obj):
-            self._clear_cursor()
-            return False
         event_type = event.type()
         if event_type == QtCore.QEvent.MouseButtonPress:
             self._set_cursor(pinched=True)
         elif event_type == QtCore.QEvent.MouseButtonRelease:
             self._set_cursor(pinched=False)
-        elif event_type == QtCore.QEvent.CursorChange:
-            self._poll_mouse_buttons()
         return False
 
     def install(self):
         application = QtWidgets.QApplication.instance()
         if application is not None:
-            for panel in cmds.getPanel(type="modelPanel") or ():
-                control = cmds.modelPanel(panel, query=True, control=True)
-                pointer = omui.MQtUtil.findControl(control)
-                if pointer:
-                    self._viewport_roots.add(
-                        QtCompat.wrapInstance(int(pointer), QtWidgets.QWidget))
             application.installEventFilter(self)
             self._poll_timer.start()
 
@@ -179,7 +152,6 @@ class _ColorCursorFilter(QtCore.QObject):
         if application is not None:
             application.removeEventFilter(self)
         self._clear_cursor()
-        self._viewport_roots.clear()
 
 
 def _ensure_micro_contexts():
