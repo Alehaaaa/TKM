@@ -14,6 +14,13 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.28:
+  - changed: Micro Move and Depth Mover are ready to use across supported Maya versions and platforms
+  - changed: Micro Move keeps its full-color open and pinched cursors while switching tools
+  - changed: Shift speeds up Micro Move and Depth Mover, while Control provides finer movement
+  - bugfix: Middle-button Micro Move drags now move the selected object instead of only its pivot
+  - bugfix: Mover plug-ins load the matching Maya and platform build reliably
+
 0.1.27:
   - new: Depth Mover pushes selected controls through camera depth with drag-adjusted sensitivity
   - new: Micro Move uses translate and rotate manipulators with Maya tool switching, cursor acceleration and modifiers
