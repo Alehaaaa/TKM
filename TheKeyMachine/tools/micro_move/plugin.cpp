@@ -47,7 +47,10 @@ const char* kRotateContextCommand = "tkmMicroRotateContextCmd";
 const char* kBuildCommand = "tkmMicroMoveBuild";
 const char* kConfigureCommand = "tkmMicroMoveConfigure";
 const char* kRefreshCommand = "tkmMicroMoveRefresh";
-const char* kBuildId = "2026_07_15_native_cpp_13";
+#ifndef TKM_BUILD_ID
+#define TKM_BUILD_ID "development"
+#endif
+const char* kBuildId = TKM_BUILD_ID;
 
 // Manipulator node IDs must remain stable. Before public third-party
 // distribution, replace these only with IDs assigned to TKM by Autodesk.
@@ -141,8 +144,7 @@ void beginCursorSample(const MEvent& event) {
     event.getPosition(gPreviousCursorX, gPreviousCursorY);
     gPreviousCursorTime = std::chrono::steady_clock::now();
     gCursorGain = kMinGain;
-    gModifierGain = 1.0;
-    if (event.isModifierControl()) gModifierGain *= 0.3;
+    gModifierGain = event.isModifierControl() ? 0.3 : 1.0;
     if (event.isModifierShift()) gModifierGain *= 3.0;
 }
 
@@ -166,8 +168,7 @@ void updateCursorGain(const MEvent& event) {
     gPreviousCursorX = x;
     gPreviousCursorY = y;
     gPreviousCursorTime = now;
-    gModifierGain = 1.0;
-    if (event.isModifierControl()) gModifierGain *= 0.3;
+    gModifierGain = event.isModifierControl() ? 0.3 : 1.0;
     if (event.isModifierShift()) gModifierGain *= 3.0;
 }
 
@@ -322,7 +323,18 @@ public:
         return MPxManipContainer::doPress();
     }
 
-    MStatus doDrag() override { return MPxManipContainer::doDrag(); }
+    MStatus doDrag() override {
+        // Maya can begin a middle-button drag without dispatching doPress to
+        // the custom manipulator. Initialize here as a fallback so the drag
+        // changes the connected translate plug instead of only the handle.
+        if (!dragging_) {
+            dragging_ = true;
+            if (!getConverterManipValue(pointIndex_, previousPoint_)) {
+                previousPoint_ = MPoint::origin;
+            }
+        }
+        return MPxManipContainer::doDrag();
+    }
 
     MStatus doRelease() override {
         MStatus status = MPxManipContainer::doRelease();
@@ -434,7 +446,16 @@ public:
         return MPxManipContainer::doPress();
     }
 
-    MStatus doDrag() override { return MPxManipContainer::doDrag(); }
+    MStatus doDrag() override {
+        if (!dragging_) {
+            dragging_ = true;
+            MEulerRotation raw;
+            previousRawRotation_ = getConverterManipValue(rotationIndex_, raw)
+                ? raw.asQuaternion()
+                : outputRotation_;
+        }
+        return MPxManipContainer::doDrag();
+    }
 
     MStatus doRelease() override {
         MStatus status = MPxManipContainer::doRelease();

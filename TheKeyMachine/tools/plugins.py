@@ -1,10 +1,8 @@
-"""Shared build, load, context setup, validation, and cleanup for native Maya plug-ins."""
+"""Prebuilt native Maya plug-in selection, loading, validation, and cleanup."""
 
-import hashlib
 import os
 import platform
-import shutil
-import subprocess
+import re
 import sys
 
 from maya import cmds, mel
@@ -13,51 +11,79 @@ from maya import cmds, mel
 _PLUGIN_SPECS = {}
 
 
+def maya_major_version(value=None):
+    """Return the four-digit Maya release used by the native binary matrix."""
+    value = cmds.about(version=True) if value is None else value
+    match = re.search(r"\d{4}", str(value))
+    if not match:
+        raise RuntimeError("Could not determine the Maya version from {!r}.".format(value))
+    return match.group(0)
+
+
+def platform_name(value=None):
+    value = sys.platform if value is None else str(value)
+    if value == "win32":
+        return "windows"
+    if value == "darwin":
+        return "macos"
+    if value.startswith("linux"):
+        return "linux"
+    raise RuntimeError("Native plug-ins do not support platform {!r}.".format(value))
+
+
+def architecture_name(value=None):
+    value = platform.machine() if value is None else value
+    normalized = str(value).strip().lower()
+    if normalized in ("amd64", "x64", "x86_64"):
+        return "x86_64"
+    if normalized in ("aarch64", "arm64"):
+        return "arm64"
+    raise RuntimeError("Native plug-ins do not support architecture {!r}.".format(value))
+
+
 class NativePluginSpec(object):
     def __init__(
         self,
         *,
         label,
-        source_paths,
+        plugin_directory,
         output_name,
         registry_name,
-        build_recipe,
         required_commands=(),
         build_command=None,
         expected_build=None,
-        libraries=("OpenMaya", "OpenMayaUI", "Foundation"),
-        frameworks=(),
-        compile_flags=(),
+        expected_build_file="build-id.txt",
         context_fallbacks=None,
     ):
         self.label = str(label)
-        self.source_paths = tuple(os.path.realpath(path) for path in source_paths)
-        if not self.source_paths:
-            raise ValueError("A native plug-in requires at least one source file.")
+        self.plugin_directory = os.path.realpath(plugin_directory)
         self.output_name = str(output_name)
         self.registry_name = str(registry_name)
-        self.build_recipe = str(build_recipe)
         self.required_commands = tuple(required_commands)
         self.build_command = build_command
         self.expected_build = expected_build
-        self.libraries = tuple(libraries)
-        self.frameworks = tuple(frameworks)
-        self.compile_flags = tuple(compile_flags)
+        self.expected_build_file = expected_build_file
         self.context_fallbacks = dict(context_fallbacks or {})
 
+        current_platform = platform_name()
+        current_architecture = architecture_name()
         extension = {
-            "darwin": ".bundle",
-            "win32": ".mll",
-        }.get(sys.platform, ".so")
+            "macos": ".bundle",
+            "windows": ".mll",
+            "linux": ".so",
+        }[current_platform]
         self.build_directory = os.path.join(
-            os.path.dirname(self.source_paths[0]),
-            "_native",
-            "maya{}_{}_{}".format(
-                cmds.about(version=True), sys.platform, platform.machine()
-            ),
+            self.plugin_directory,
+            "__builds__",
+            "{}-{}".format(current_platform, current_architecture),
+            "maya{}".format(maya_major_version()),
         )
         self.path = os.path.join(self.build_directory, self.output_name + extension)
-        self.stamp_path = self.path + ".sha256"
+        if self.expected_build is None and self.expected_build_file:
+            manifest = os.path.join(self.build_directory, self.expected_build_file)
+            if os.path.isfile(manifest):
+                with open(manifest, "r") as stream:
+                    self.expected_build = stream.read().strip() or None
         _PLUGIN_SPECS[self.registry_name] = self
 
 
@@ -113,171 +139,6 @@ def loaded_plugin(spec):
     return None
 
 
-def _maya_native_paths(spec):
-    maya_location = os.environ.get("MAYA_LOCATION")
-    if not maya_location:
-        raise RuntimeError("MAYA_LOCATION is unavailable; cannot build {}.".format(spec.label))
-    if sys.platform == "darwin":
-        maya_root = os.path.dirname(os.path.dirname(maya_location))
-        return os.path.join(maya_root, "include"), os.path.join(maya_location, "MacOS")
-    return os.path.join(maya_location, "include"), os.path.join(maya_location, "lib")
-
-
-def _compiler(executable):
-    """Resolve a compiler while still allowing CXX to select a custom one."""
-    configured = os.environ.get("CXX") or executable
-    resolved = shutil.which(configured)
-    if resolved:
-        return resolved
-    # subprocess provides the most useful platform-native error for an absolute
-    # path or a compiler that is expected to be configured by Maya's shell.
-    return configured
-
-
-def _build_command(spec, output_path, include_directory, library_directory):
-    if sys.platform == "win32":
-        command = [
-            _compiler("cl"),
-            "/nologo",
-            "/std:c++17",
-            "/EHsc",
-            "/LD",
-            "/MD",
-            "/O2",
-            "/DNT_PLUGIN",
-            "/DREQUIRE_IOSTREAM",
-            "/I{}".format(include_directory),
-            "/Fo{}{}".format(os.path.dirname(output_path), os.sep),
-        ]
-        command.extend(spec.compile_flags)
-        command.extend(spec.source_paths)
-        command.extend(("/link", "/LIBPATH:{}".format(library_directory)))
-        command.extend("{}.lib".format(library) for library in spec.libraries)
-        command.append("/IMPLIB:{}.lib".format(output_path))
-        command.append("/OUT:{}".format(output_path))
-        return command
-
-    if sys.platform == "darwin":
-        command = [
-            "xcrun", "clang++", "-std=c++17", "-arch", platform.machine(),
-            "-dynamiclib", "-fPIC", "-O2", "-Wno-nontrivial-memcall",
-            "-DOSMac_", "-DCC_GNU_", "-DBits64_", "-DREQUIRE_IOSTREAM",
-            "-I{}".format(include_directory), "-L{}".format(library_directory),
-            "-Wl,-rpath,{}".format(library_directory),
-        ]
-        command.extend(spec.compile_flags)
-        command.extend(spec.source_paths)
-        command.extend("-l{}".format(library) for library in spec.libraries)
-        for framework in spec.frameworks:
-            command.extend(("-framework", framework))
-        command.extend(("-o", output_path))
-        return command
-
-    if not sys.platform.startswith("linux"):
-        raise RuntimeError(
-            "{} native builds do not support {}.".format(spec.label, sys.platform)
-        )
-    command = [
-        _compiler("g++"), "-std=c++17", "-shared", "-fPIC", "-O2", "-m64",
-        "-DBits64_", "-DUNIX", "-D_BOOL", "-DLINUX", "-DFUNCPROTO",
-        "-D_GNU_SOURCE", "-DREQUIRE_IOSTREAM",
-        "-I{}".format(include_directory), "-L{}".format(library_directory),
-        "-Wl,-rpath,{}".format(library_directory),
-    ]
-    command.extend(spec.compile_flags)
-    command.extend(spec.source_paths)
-    command.extend("-l{}".format(library) for library in spec.libraries)
-    command.extend(("-o", output_path))
-    return command
-
-
-def source_digest(spec):
-    digest = hashlib.sha256()
-    build_inputs = (
-        ("recipe", spec.build_recipe),
-        ("platform", sys.platform),
-        ("machine", platform.machine()),
-        ("maya", str(cmds.about(version=True))),
-        ("output", spec.output_name),
-        ("libraries", spec.libraries),
-        ("frameworks", spec.frameworks),
-        ("compile_flags", spec.compile_flags),
-    )
-    for name, value in build_inputs:
-        digest.update(name.encode("utf-8"))
-        digest.update(repr(value).encode("utf-8"))
-    for index, path in enumerate(spec.source_paths):
-        digest.update("source:{}:".format(index).encode("utf-8"))
-        digest.update(os.path.basename(path).encode("utf-8"))
-        with open(path, "rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(chunk)
-    return digest.hexdigest()
-
-
-def needs_build(spec):
-    if not os.path.isfile(spec.path) or not os.path.isfile(spec.stamp_path):
-        return True
-    try:
-        with open(spec.stamp_path, "r", encoding="utf-8") as stream:
-            return stream.read().strip() != source_digest(spec)
-    except OSError:
-        return True
-
-
-def build(spec):
-    missing_sources = [path for path in spec.source_paths if not os.path.isfile(path)]
-    if missing_sources:
-        raise RuntimeError(
-            "{} native source is missing: {}".format(spec.label, ", ".join(missing_sources))
-        )
-    if not needs_build(spec):
-        return spec.path
-    include_directory, library_directory = _maya_native_paths(spec)
-    os.makedirs(spec.build_directory, exist_ok=True)
-    temporary_path = spec.path + ".tmp"
-    command = _build_command(
-        spec, temporary_path, include_directory, library_directory
-    )
-
-    try:
-        result = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-    except OSError as error:
-        raise RuntimeError(
-            "{} could not start the native compiler on {}. Install the "
-            "compiler supported by this Maya version or set CXX to its "
-            "executable: {}".format(spec.label, sys.platform, error)
-        )
-    if result.returncode != 0:
-        try:
-            os.unlink(temporary_path)
-        except OSError:
-            pass
-        raise RuntimeError("{} native plug-in build failed:\n{}".format(spec.label, result.stdout))
-
-    # Windows locks loaded DLLs. Compile first so a compiler failure leaves the
-    # working tool untouched, then unload only for the atomic replacement.
-    if sys.platform == "win32" and loaded_plugin(spec):
-        unload(spec, restore_context=True)
-    os.replace(temporary_path, spec.path)
-    for sidecar in (temporary_path + ".lib", temporary_path + ".exp"):
-        try:
-            os.unlink(sidecar)
-        except OSError:
-            pass
-    try:
-        with open(spec.stamp_path, "w", encoding="utf-8") as stream:
-            stream.write(source_digest(spec))
-    except OSError as error:
-        raise RuntimeError("{} could not update its native build cache: {}".format(spec.label, error))
-    return spec.path
-
-
 def plugin_build_id(spec):
     if not spec.build_command:
         return None
@@ -328,18 +189,22 @@ def unload(spec, restore_context=True):
 
 
 def load(spec, force_reload=False):
-    rebuild = needs_build(spec)
-    if is_ready(spec) and not force_reload and not rebuild:
+    if is_ready(spec) and not force_reload:
         return loaded_plugin(spec)
 
-    # Compile to an atomic replacement before disturbing the currently loaded
-    # tool. If compilation fails, Maya keeps the last working plug-in/context.
-    if rebuild:
-        build(spec)
+    if not os.path.isfile(spec.path):
+        raise RuntimeError(
+            "{} has no prebuilt plug-in for Maya {} on {}-{}. "
+            "Install a complete TKM release containing the native binary matrix.".format(
+                spec.label,
+                maya_major_version(),
+                platform_name(),
+                architecture_name(),
+            )
+        )
+
     if loaded_plugin(spec):
         unload(spec, restore_context=True)
-    if not rebuild:
-        build(spec)
     loaded_names = cmds.loadPlugin(spec.path, name=spec.registry_name, quiet=True)
     plugin_name = loaded_names[0] if loaded_names else loaded_plugin(spec)
 

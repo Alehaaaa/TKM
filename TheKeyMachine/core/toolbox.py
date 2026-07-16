@@ -2088,17 +2088,11 @@ TOOL_SECTION_DEFINITIONS = {
             {"id": "animation_offset", "default": True},
         ],
     },
-    "micro_move_tools": {
-        "label": "Micro Move",
+    "movers_tools": {
+        "label": "Movers",
         "color": toolColors.TOOLBAR_PURPLE,
         "items": [
             {"id": "micro_move"},
-        ],
-    },
-    "depth_mover_tools": {
-        "label": "Depth Mover",
-        "color": toolColors.TOOLBAR_PURPLE,
-        "items": [
             {"id": "depth_mover"},
         ],
     },
@@ -2153,9 +2147,7 @@ TOOL_SECTION_DEFINITIONS = {
         "items": [
             {"id": "animation_offset"},
             "separator",
-            {"id": "micro_move"},
-            "separator",
-            {"id": "depth_mover"},
+            {"section": "movers_tools"},
             "separator",
             {"section": "temp_pivot_tools"},
             {"section": "follow_cam_tools"},
