@@ -1,9 +1,9 @@
-name: Native plug-ins
+name: Build plug-ins
 
 on:
   pull_request:
     paths:
-      - ".github/workflows/native-plugins.yml"
+      - ".github/workflows/build-plugins.yml"
       - "native_plugins/**"
       - "TheKeyMachine/tools/depth_mover/plugin.cpp"
       - "TheKeyMachine/tools/micro_move/plugin.cpp"
@@ -11,7 +11,7 @@ on:
     branches: [main, master, plugin_build]
     tags: ["v*"]
     paths:
-      - ".github/workflows/native-plugins.yml"
+      - ".github/workflows/build-plugins.yml"
       - "native_plugins/**"
       - "TheKeyMachine/tools/depth_mover/plugin.cpp"
       - "TheKeyMachine/tools/micro_move/plugin.cpp"
