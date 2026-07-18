@@ -1,0 +1,5 @@
+{
+  "create": ["Create temporary locators from the selected objects for positioning and motion reference."],
+  "select_temp": ["Select every temporary locator created by TheKeyMachine in the current scene."],
+  "remove_temp": ["Delete every temporary locator created by TheKeyMachine in the current scene."]
+}

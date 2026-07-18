@@ -1,0 +1,6 @@
+{
+  "micro_move": [
+    "Move and rotate selected controls with fine viewport precision.",
+    "Disable the tool to restore Maya's normal move and rotate contexts."
+  ]
+}

@@ -1,13 +1,13 @@
 from maya import cmds
 
-from TheKeyMachine.Qt import QtCompat, QtCore, QtWidgets
+from TheKeyMachine.core.Qt import QtCompat, QtCore, QtWidgets
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.data import icons
 from TheKeyMachine.data import colors as toolColors
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.tools.animation_offset import custom_widgets as offset_widgets
+from TheKeyMachine.tools.animation_offset import widgets as offset_widgets
 import TheKeyMachine.widgets.timeline as timelineWidgets
 
 
@@ -74,7 +74,8 @@ class AnimationOffsetController(QtCore.QObject):
         self._resnapshot_timer.setInterval(self.RESNAPSHOT_DELAY_MS)
         self._resnapshot_timer.timeout.connect(self._perform_deferred_resnapshot)
         
-        self._chunk_opened = False
+        self._offset_operation_context = None
+        self._offset_operation = None
 
     def is_enabled(self):
         return self._enabled
@@ -152,11 +153,38 @@ class AnimationOffsetController(QtCore.QObject):
     def _on_scene_reset(self):
         if not self._enabled:
             return
-        self.deactivate()
         try:
-            toolCommon.close_undo_chunk()
+            self._finish_offset_operation()
         except Exception:
             pass
+        self.deactivate()
+
+    def _begin_offset_operation(self):
+        if self._offset_operation_context is not None:
+            return True
+        context = toolCommon.tool_operation(
+            tool_id="animation_offset",
+            label="Animation Offset",
+            progress=False,
+            undo=True,
+            undo_name="Animation Offset",
+            suspend_refresh=False,
+            show_success_message=False,
+        )
+        operation = context.__enter__()
+        self._offset_operation_context = context
+        self._offset_operation = operation
+        return True
+
+    def _finish_offset_operation(self):
+        context = self._offset_operation_context
+        if context is None:
+            return
+        try:
+            context.__exit__(None, None, None)
+        finally:
+            self._offset_operation_context = None
+            self._offset_operation = None
 
     def _iter_candidate_attrs(self, obj):
         seen = set()
@@ -324,6 +352,7 @@ class AnimationOffsetController(QtCore.QObject):
         return self._enabled and self._state != self.STATE_APPLYING
 
     def _request_resnapshot(self, update_range=False):
+        self._finish_offset_operation()
         self._pending_resnapshot_update_range = self._pending_resnapshot_update_range or bool(update_range)
         self._pending_manip_plugs.clear()
         self._settling_after_resnapshot = False
@@ -368,55 +397,60 @@ class AnimationOffsetController(QtCore.QObject):
         if not self._is_in_locked_range():
             return False
 
+        self._begin_offset_operation()
         self._state = self.STATE_APPLYING
         current_time = self._current_time()
         any_applied = False
 
         try:
-            for obj, attr in sorted(changed_plugs):
-                if not cmds.objExists(obj):
-                    continue
-
-                baseline_data = self._baseline.get(obj, {}).get(attr)
-                if not baseline_data:
-                    continue
-
-                plug = self._plug_name(obj, attr)
-                if not self._is_supported_plug(plug):
-                    continue
-
-                current_value, ok = self._get_plug_value(plug)
-                if not ok:
-                    continue
-
-                baseline_current = baseline_data.get("current")
-                if baseline_current is None:
-                    continue
-
-                delta = current_value - baseline_current
-                if abs(delta) <= 1e-6:
-                    continue
-
-                self._ensure_driver_key(obj, attr, current_value)
-
-                keyed_values = dict(baseline_data.get("keys") or {})
-                other_frames = [
-                    frame for frame in keyed_values.keys() if self._time_range[0] <= frame <= self._time_range[1] and frame != current_time
-                ]
-
-                for frame in sorted(other_frames):
-                    base_value = keyed_values.get(frame)
-                    if base_value is None:
+            with toolCommon.suppress_undo_notifications():
+                for obj, attr in sorted(changed_plugs):
+                    if not cmds.objExists(obj):
                         continue
-                    try:
-                        cmds.setKeyframe(obj, attribute=attr, time=(frame,), value=base_value + delta)
-                        any_applied = True
-                    except Exception:
+
+                    baseline_data = self._baseline.get(obj, {}).get(attr)
+                    if not baseline_data:
                         continue
+
+                    plug = self._plug_name(obj, attr)
+                    if not self._is_supported_plug(plug):
+                        continue
+
+                    current_value, ok = self._get_plug_value(plug)
+                    if not ok:
+                        continue
+
+                    baseline_current = baseline_data.get("current")
+                    if baseline_current is None:
+                        continue
+
+                    delta = current_value - baseline_current
+                    if abs(delta) <= 1e-6:
+                        continue
+
+                    self._ensure_driver_key(obj, attr, current_value)
+
+                    keyed_values = dict(baseline_data.get("keys") or {})
+                    other_frames = [
+                        frame for frame in keyed_values.keys() if self._time_range[0] <= frame <= self._time_range[1] and frame != current_time
+                    ]
+
+                    for frame in sorted(other_frames):
+                        base_value = keyed_values.get(frame)
+                        if base_value is None:
+                            continue
+                        try:
+                            cmds.setKeyframe(obj, attribute=attr, time=(frame,), value=base_value + delta)
+                            any_applied = True
+                        except Exception:
+                            continue
         finally:
             self._state = self.STATE_ARMED if self._enabled else self.STATE_IDLE
 
-        self._resnapshot(update_range=False)
+        try:
+            self._resnapshot(update_range=False)
+        finally:
+            self._finish_offset_operation()
         return any_applied
 
     def _poll(self):
@@ -453,18 +487,23 @@ class AnimationOffsetController(QtCore.QObject):
 
         if self._state == self.STATE_TRACKING_MANIP:
             if changed_plugs:
+                self._begin_offset_operation()
                 self._pending_manip_plugs.update(changed_plugs)
 
             if not self._is_manip_edit_active():
                 pending_plugs = set(self._pending_manip_plugs or changed_plugs)
                 self._pending_manip_plugs.clear()
-                self._apply_changes(pending_plugs)
+                if pending_plugs:
+                    self._apply_changes(pending_plugs)
+                else:
+                    self._finish_offset_operation()
             return
 
         if not changed_plugs:
             return
 
         if self._is_manip_edit_active():
+            self._begin_offset_operation()
             self._state = self.STATE_TRACKING_MANIP
             self._pending_manip_plugs.update(changed_plugs)
             return
@@ -505,6 +544,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._pending_resnapshot_update_range = False
         self._settling_after_resnapshot = False
         self._time_range = None
+        self._finish_offset_operation()
         self.stateChanged.emit(False)
         self._runtime_manager.set_tool_state("animation_offset", False)
 
@@ -516,16 +556,11 @@ class AnimationOffsetController(QtCore.QObject):
         self._enabled = checked
 
         if checked:
-            self._chunk_opened = toolCommon.open_undo_chunk()
             try:
                 self.activate()
             except Exception:
                 self._enabled = False
-                try:
-                    if self._chunk_opened:
-                        toolCommon.close_undo_chunk()
-                finally:
-                    self._chunk_opened = False
+                self._finish_offset_operation()
                 raise
             self.stateChanged.emit(self.is_enabled())
             self._runtime_manager.set_tool_state("animation_offset", self.is_enabled())
@@ -533,11 +568,7 @@ class AnimationOffsetController(QtCore.QObject):
             try:
                 self.deactivate()
             finally:
-                try:
-                    if self._chunk_opened:
-                        toolCommon.close_undo_chunk()
-                finally:
-                    self._chunk_opened = False
+                self._finish_offset_operation()
 
 
 def get_controller(create=True):

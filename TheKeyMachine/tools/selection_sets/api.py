@@ -1,7 +1,7 @@
 import os
 
 
-from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
 import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.data import icons
@@ -27,19 +27,19 @@ _CONTROLLER = None
 
 
 def _window_class():
-    from TheKeyMachine.tools.selection_sets.custom_dialogs import SelectionSetsWindow
+    from TheKeyMachine.tools.selection_sets.widgets import SelectionSetsWindow
 
     return SelectionSetsWindow
 
 
 def _creation_dialog_class():
-    from TheKeyMachine.tools.selection_sets.custom_dialogs import SelectionSetCreationDialog
+    from TheKeyMachine.tools.selection_sets.widgets import SelectionSetCreationDialog
 
     return SelectionSetCreationDialog
 
 
 def _members_dialog_class():
-    from TheKeyMachine.tools.selection_sets.custom_dialogs import SelectionSetMembersDialog
+    from TheKeyMachine.tools.selection_sets.widgets import SelectionSetMembersDialog
 
     return SelectionSetMembersDialog
 
@@ -489,18 +489,9 @@ def bind_selection_sets_toolbar_button(button, controller=None):
             _selection_sets_mouse_press,
         )
         menu_factory = lambda parent, c=controller: build_selection_sets_context_menu(parent=parent, controller=c)
-        connect_window_toggle = getattr(button, "connect_window_toggle", None)
-        if callable(connect_window_toggle):
-            button.connect_window_toggle(
-                _selection_sets_toolbar_toggle,
-                context_attr="_tkm_selection_sets_context_menu_slot",
-                menu_factory=menu_factory,
-            )
-        else:
-            toolCommon.bind_toolbar_button_context_menu(
-                _selection_sets_toolbar_toggle,
-                button,
-                "_tkm_selection_sets_context_menu_slot",
-                menu_factory,
-            )
+        button.connect_window_toggle(
+            _selection_sets_toolbar_toggle,
+            context_attr="_tkm_selection_sets_context_menu_slot",
+            menu_factory=menu_factory,
+        )
         return True

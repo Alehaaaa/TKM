@@ -1,7 +1,7 @@
 import sys
 from TheKeyMachine.tools import common as toolCommon
 
-from TheKeyMachine.Qt import QtCore, QtGui, QtSvg, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtSvg, QtWidgets  # type: ignore
 
 QWidget = QtWidgets.QWidget
 QHBoxLayout = QtWidgets.QHBoxLayout
@@ -769,12 +769,24 @@ class _TooltipMouseFilter(QtCore.QObject):
         self._pressed_button = None
 
     def eventFilter(self, obj, event):
+        event_type = event.type()
+        unavailable_events = (QtCore.QEvent.Hide, QtCore.QEvent.Close, QtCore.QEvent.Destroy)
+        if event_type == QtCore.QEvent.ApplicationDeactivate or event_type in unavailable_events:
+            if event_type == QtCore.QEvent.ApplicationDeactivate:
+                self.manager.hide()
+            else:
+                self.manager.source_left(anchor_widget=obj, anchor_unavailable=True)
+            return False
+
+        if event_type in (QtCore.QEvent.MouseMove, QtCore.QEvent.HoverMove, QtCore.QEvent.Leave):
+            self.manager.validate_pointer()
+
         tooltip = self.manager._current_tooltip
         if not tooltip or not tooltip.isVisible():
             self._pressed_button = None
             return False
 
-        if event.type() not in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonRelease, QtCore.QEvent.MouseButtonDblClick):
+        if event_type not in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonRelease, QtCore.QEvent.MouseButtonDblClick):
             return False
 
         global_pos = self._event_global_pos(event)
@@ -783,13 +795,13 @@ class _TooltipMouseFilter(QtCore.QObject):
             return False
 
         button = self._tooltip_button_at(tooltip, global_pos)
-        if event.type() == QtCore.QEvent.MouseButtonPress:
+        if event_type == QtCore.QEvent.MouseButtonPress:
             self._pressed_button = button
             if button:
                 button.setDown(True)
             return True
 
-        if event.type() == QtCore.QEvent.MouseButtonRelease:
+        if event_type == QtCore.QEvent.MouseButtonRelease:
             pressed_button = self._pressed_button
             self._pressed_button = None
             if pressed_button:
@@ -827,6 +839,8 @@ class QFlatTooltipManager(object):
     _mouse_filter = None
     _current_source_key = None
     _pending_source_key = None
+    _pending_request = None
+    _request_serial = 0
     # Initialize from persistence here so every tooltip-enabled surface starts
     # with the same state, even when the main toolbar/settings button is absent.
     enabled = bool(settings.get_setting("show_tooltips", True))
@@ -848,6 +862,7 @@ class QFlatTooltipManager(object):
     @classmethod
     def _clear_pending(cls):
         cls._pending_source_key = None
+        cls._pending_request = None
 
     @classmethod
     def _ensure_mouse_filter(cls):
@@ -860,9 +875,86 @@ class QFlatTooltipManager(object):
 
     @classmethod
     def cancel_timer(cls):
+        cls._request_serial += 1
         if cls._timer:
             cls._timer.stop()
         cls._clear_pending()
+
+    @classmethod
+    def _global_widget_rect(cls, widget):
+        if widget is None or not wutil.is_valid_widget(widget) or not widget.isVisible():
+            return None
+        try:
+            rect = widget.rect()
+            rect.moveTo(widget.mapToGlobal(QPoint(0, 0)))
+            return rect
+        except (RuntimeError, ValueError, TypeError, AttributeError):
+            return None
+
+    @classmethod
+    def _request_contains_cursor(cls, request):
+        if not request:
+            return False
+        cursor_pos = QCursor.pos()
+        target_rect = request.get("target_rect")
+        if callable(target_rect):
+            try:
+                target_rect = target_rect()
+            except Exception:
+                target_rect = None
+        if target_rect is not None:
+            try:
+                return bool(target_rect.contains(cursor_pos))
+            except (RuntimeError, ValueError, TypeError, AttributeError):
+                return False
+        anchor_rect = cls._global_widget_rect(request.get("anchor_widget"))
+        return bool(anchor_rect and anchor_rect.contains(cursor_pos))
+
+    @classmethod
+    def validate_pointer(cls):
+        if cls._timer and cls._timer.isActive() and not cls._request_contains_cursor(cls._pending_request):
+            cls.cancel_timer()
+        tooltip = cls._current_tooltip
+        if tooltip and tooltip.isVisible():
+            check_auto_close = getattr(tooltip, "_check_auto_close", None)
+            if callable(check_auto_close):
+                QTimer.singleShot(0, check_auto_close)
+            else:
+                cls._current_tooltip = None
+                cls._current_source_key = None
+
+    @classmethod
+    def source_left(cls, source_key=None, anchor_widget=None, anchor_unavailable=False):
+        pending = cls._pending_request or {}
+        pending_matches = (
+            (source_key is not None and cls._pending_source_key == source_key)
+            or (anchor_widget is not None and pending.get("anchor_widget") is anchor_widget)
+        )
+        if pending_matches:
+            cls.cancel_timer()
+
+        tooltip = cls._current_tooltip
+        current_matches = bool(
+            tooltip
+            and (
+                (source_key is not None and cls._current_source_key == source_key)
+                or (
+                    anchor_widget is not None
+                    and getattr(tooltip, "anchor_widget", None) is anchor_widget
+                )
+            )
+        )
+        if not current_matches:
+            return
+        if anchor_unavailable:
+            cls.hide()
+            return
+        check_auto_close = getattr(tooltip, "_check_auto_close", None)
+        if callable(check_auto_close):
+            QTimer.singleShot(0, check_auto_close)
+        else:
+            cls._current_tooltip = None
+            cls._current_source_key = None
 
     @classmethod
     def hide(cls):
@@ -932,11 +1024,11 @@ class QFlatTooltipManager(object):
     def delayed_show(cls, delay=1200, **kwargs):
         if not cls.enabled:
             return
+        cls._ensure_mouse_filter()
         source_key = kwargs.get("source_key")
         if cls.is_current_source(source_key):
             return
-        if cls._timer and cls._timer.isActive():
-            cls._timer.stop()
+        cls.cancel_timer()
 
         if not cls._timer:
             cls._timer = QTimer()
@@ -944,9 +1036,16 @@ class QFlatTooltipManager(object):
 
         anchor = kwargs.get("anchor_widget")
         cls._pending_source_key = source_key
+        cls._pending_request = dict(kwargs)
+        request_serial = cls._request_serial
 
         def _safe_show():
+            if request_serial != cls._request_serial:
+                return
             if anchor is not None and not wutil.is_valid_widget(anchor):
+                cls._clear_pending()
+                return
+            if not cls._request_contains_cursor(kwargs):
                 cls._clear_pending()
                 return
             cls.show(**kwargs)

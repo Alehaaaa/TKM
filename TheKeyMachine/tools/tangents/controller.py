@@ -1,0 +1,182 @@
+from maya import cmds
+
+from TheKeyMachine.core import animation_context, curveFitting
+from TheKeyMachine.mods import selectionMod
+from TheKeyMachine.widgets import timeline
+from TheKeyMachine.widgets import util as wutil
+
+
+def _tint_color(tool_id, explicit=None):
+    if explicit:
+        return explicit
+    try:
+        from TheKeyMachine.core import toolbox
+
+        return toolbox.get_tool_tint_color(tool_id)
+    except Exception:
+        return None
+
+
+def _normalize_frames(frames):
+    normalized = []
+    for frame in frames or ():
+        try:
+            normalized.append(int(round(frame)))
+        except (TypeError, ValueError):
+            continue
+    return sorted(set(normalized))
+
+
+def _filter_targets_by_scope(targets, key_scope):
+    targets = {curve: list(frames or ()) for curve, frames in (targets or {}).items() if frames}
+    if key_scope not in ("first", "last") or not targets:
+        return targets
+    all_frames = sorted({frame for frames in targets.values() for frame in frames})
+    if not all_frames:
+        return {}
+    target_frame = all_frames[0] if key_scope == "first" else all_frames[-1]
+    return {curve: [target_frame] for curve, frames in targets.items() if target_frame in frames}
+
+
+def _collect_targets(key_scope="selection"):
+    default_mode = "all_animation" if key_scope == "all" else "current_frame"
+    target_info, _plugs, _objects, _channels = animation_context.resolve_command_targets(
+        default_mode=default_mode,
+        include_shapes=True,
+    )
+    if not target_info.get("target_objects") and not target_info.get("target_plugs"):
+        return {}, target_info.get("time_context")
+
+    selected = []
+    time_context = target_info.get("time_context")
+    if key_scope != "all" and time_context and time_context.mode == "graph_editor_keys":
+        selected = selectionMod.get_graph_editor_selected_keyframes()
+    if selected:
+        by_curve = {}
+        for curve, frame in selected:
+            by_curve.setdefault(curve, set()).add(int(frame))
+        targets = {curve: sorted(frames) for curve, frames in by_curve.items()}
+    else:
+        targets = {
+            curve: _normalize_frames(animation_context.key_times(curve, target_info))
+            for curve in animation_context.curves(target_info)
+        }
+    return _filter_targets_by_scope(targets, key_scope), time_context
+
+
+def _target_range(targets):
+    frames = sorted({frame for curve_frames in targets.values() for frame in curve_frames})
+    return (frames[0], frames[-1]) if frames else None
+
+
+def _set_tangent_on_target(target, tangent_type, frame, handle_mode="both"):
+    kwargs = {"time": (frame, frame)}
+    if handle_mode in ("both", "out"):
+        kwargs["ott"] = tangent_type
+    if handle_mode in ("both", "in"):
+        if tangent_type == "step":
+            if handle_mode == "in":
+                kwargs["itt"] = "stepnext"
+        else:
+            kwargs["itt"] = tangent_type
+    if len(kwargs) > 1:
+        cmds.keyTangent(target, **kwargs)
+
+
+def set_maya_default(tangent_type):
+    cmds.keyTangent(**{"global": True, "inTangentType": tangent_type, "outTangentType": tangent_type})
+
+
+def set_tangent(tangent_type, handle_mode="both", key_scope="selection", tint_color=None):
+    targets, time_context = _collect_targets(key_scope)
+    if not targets:
+        return wutil.make_inViewMessage("No animation curves available to set tangents.")
+    timerange = _target_range(targets) or (time_context.timerange if time_context else None)
+    tint = timeline.begin_timeline_tint(
+        timerange=timerange,
+        color=_tint_color("tangent_{}".format(tangent_type), tint_color),
+        key="tangent_{}".format(tangent_type),
+    ) if timerange else None
+    try:
+        for curve, frames in targets.items():
+            for frame in frames:
+                _set_tangent_on_target(curve, tangent_type, frame, handle_mode)
+    finally:
+        if tint:
+            tint.finish()
+
+
+def _filter_bouncy_targets(targets, key_scope):
+    if key_scope not in ("first", "last"):
+        return targets
+    frames = sorted({float(frame) for _curve, frame in targets})
+    if not frames:
+        return []
+    target = frames[0] if key_scope == "first" else frames[-1]
+    return [(curve, frame) for curve, frame in targets if float(frame) == target]
+
+
+def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle_adjustment_factor=1.3):
+    default_mode = "all_animation" if key_scope == "all" else "current_frame"
+    target_info, _plugs, _objects, _channels = animation_context.resolve_command_targets(
+        default_mode=default_mode,
+        include_shapes=True,
+    )
+    selected = target_info.get("selected_keyframes") or []
+    if selected and key_scope != "all":
+        targets = [(curve, float(frame)) for curve, frame in selected]
+    else:
+        targets = []
+        seen = set()
+        for curve in animation_context.curves(target_info):
+            for frame in animation_context.key_times(curve, target_info):
+                item = (curve, float(frame))
+                if item not in seen:
+                    seen.add(item)
+                    targets.append(item)
+    targets = _filter_bouncy_targets(targets, key_scope)
+    if not targets:
+        return wutil.make_inViewMessage("No animation curves available to set tangents.")
+
+    frames = sorted({int(frame) for _curve, frame in targets})
+    timerange = (frames[0], frames[-1]) if frames else None
+    tint = timeline.begin_timeline_tint(
+        timerange=timerange,
+        color=_tint_color("tangent_bouncy", tint_color),
+        key="tangent_bouncy",
+    ) if timerange else None
+    try:
+        for curve, frame in targets:
+            in_angle, out_angle = curveFitting.bouncy_tangent_angles(
+                curve, frame, angle_adjustment_factor=angle_adjustment_factor
+            )
+            kwargs = {"time": (frame, frame), "edit": True, "lock": False, "absolute": True}
+            if handle_mode in ("both", "in"):
+                kwargs["inAngle"] = in_angle
+            if handle_mode in ("both", "out"):
+                kwargs["outAngle"] = out_angle
+            cmds.keyTangent(curve, **kwargs)
+    finally:
+        if tint:
+            tint.finish()
+
+
+def _copy_key_state(curve, source_time, target_time):
+    value = cmds.keyframe(curve, time=(source_time, source_time), query=True, valueChange=True)[0]
+    in_type = cmds.keyTangent(curve, time=(source_time,), query=True, inTangentType=True)[0]
+    out_type = cmds.keyTangent(curve, time=(source_time,), query=True, outTangentType=True)[0]
+    in_angle = cmds.keyTangent(curve, time=(source_time,), query=True, inAngle=True)[0]
+    out_angle = cmds.keyTangent(curve, time=(source_time,), query=True, outAngle=True)[0]
+    cmds.keyframe(curve, time=(target_time, target_time), valueChange=value)
+    cmds.keyTangent(curve, time=(target_time,), edit=True, inTangentType=in_type, outTangentType=out_type)
+    cmds.keyTangent(curve, time=(target_time,), edit=True, inAngle=in_angle, outAngle=out_angle)
+
+
+def match_cycle(target_key="last"):
+    for curve in selectionMod.get_graph_editor_selected_curves():
+        first = cmds.findKeyframe(curve, which="first")
+        last = cmds.findKeyframe(curve, which="last")
+        if target_key == "first":
+            _copy_key_state(curve, last, first)
+        else:
+            _copy_key_state(curve, first, last)

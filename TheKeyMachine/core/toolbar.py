@@ -21,71 +21,26 @@ Modified by: Alehaaaa / alehaaaa.github.io
 from maya import cmds, mel, OpenMayaUI as mui
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin  # type: ignore
 
-from TheKeyMachine.Qt import QtCompat, QtCore, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCompat, QtCore, QtWidgets  # type: ignore
 
 
 from functools import partial
 
 from importlib import import_module, reload
 
-# -----------------------------------------------------------------------------------------------------------------------------
-#                                    We load the necessary modules for TheKeyMachine                                          #
-# -----------------------------------------------------------------------------------------------------------------------------
-
-
-import TheKeyMachine.mods.generalMod as general  # type: ignore
-import TheKeyMachine.mods.uiMod as ui  # type: ignore
-import TheKeyMachine.mods.reportMod as report  # type: ignore
-import TheKeyMachine.mods.keyToolsMod as keyTools  # type: ignore
-import TheKeyMachine.mods.helperMod as helper  # type: ignore
-import TheKeyMachine.mods.styleMod as style  # type: ignore
-import TheKeyMachine.mods.barMod as bar  # type: ignore
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
-import TheKeyMachine.core.customGraph as cg  # type: ignore
-import TheKeyMachine.mods.updater as updater  # type: ignore
-import TheKeyMachine.core.toolMenus as toolMenus  # type: ignore
-import TheKeyMachine.core.toolbox as toolbox  # type: ignore
+import TheKeyMachine.mods.reportMod as report  # type: ignore
 import TheKeyMachine.core.toolWidgets as toolWidgets  # type: ignore
 import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi  # type: ignore
-import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi  # type: ignore
-import TheKeyMachine.tools.isolate_bookmarks.api as isolateBookmarksApi  # type: ignore
+import TheKeyMachine.tools.isolate.api as isolateApi  # type: ignore
 
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi  # type: ignore
-from TheKeyMachine.data import colors as toolColors  # type: ignore
 
 from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
-from TheKeyMachine.widgets import customDialogs as customDialogs  # type: ignore
 from TheKeyMachine.widgets import util as wutil  # type: ignore
 
 QT_WIDGET_SIZE_MAX = 16777215
-
-
-mods = [
-    general,
-    ui,
-    report,
-    keyTools,
-    helper,
-    bar,
-    settings,
-    cg,
-    updater,
-    style,
-    cw,
-    customDialogs,
-    wutil,
-    toolMenus,
-    toolbox,
-    toolWidgets,
-    graphToolbarApi,
-    gimbalFixerApi,
-    isolateBookmarksApi,
-]
-
-for m in mods:
-    if m:
-        reload(m)
 
 # -----------------------------------------------------------------------------------------------------------------------------
 #    It attempts to load the user_preferences. If this is a new installation, it won't exist and the file must be created     #
@@ -98,18 +53,20 @@ WORKSPACE_NAME = "k"
 WORKSPACE_CONTROL_NAME = WORKSPACE_NAME + "WorkspaceControl"
 
 
-UI_COLORS = toolColors.UI_COLORS
-
-
 class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+
+        # Start the manager while this widget is still unmarked so its orphan
+        # sweep only removes leftovers from earlier sessions.
+        self._runtime_manager = runtime.get_runtime_manager()
+
         self.setWindowTitle("TheKeyMachine")
         self.setObjectName(WORKSPACE_NAME)
+        self.setProperty("tkm_floating_widget", True)
         self.setContextMenuPolicy(QtCore.Qt.PreventContextMenu)
         self.selection_sets_controller = selectionSetsApi.get_controller(owner=self)
 
-        self._runtime_manager = runtime.get_runtime_manager()
         report.install_bug_exception_handler()
         graphToolbarApi.sync_graph_toolbar_watch()
         self._runtime_manager.scene_opened.connect(self._on_scene_opened)
@@ -121,7 +78,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
 
         # Initial state variables from settingsMod
-        self.link_checkbox_state = settings.get_setting("link_checkbox_state", False)
         self.orbit_button_widget = None
 
         self.docking_position = settings.get_setting("docking_position", ["TimeSlider", "top"])
@@ -142,10 +98,6 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.setgroup_states = {}
         self.setgroup_buttons = {}
 
-        # Link object runtime states
-        self.link_obj_toggle_state = False
-        self.link_obj_pulse_thread = None
-
         self.buildUI()
 
         # Reconcile Graph Editor state at startup; ongoing tracking uses the event filter.
@@ -157,21 +109,17 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         Stops all background threads and performs necessary cleanup.
         """
         global _toolbar_instance
-        _toolbar_instance = None
-
-        try:
-            runtime.shutdown_runtime_manager()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-
-        # Stop link objects button pulse thread
-        if hasattr(self, "link_obj_pulse_thread") and self.link_obj_pulse_thread:
+        owns_runtime = _toolbar_instance is self
+        if owns_runtime:
+            _toolbar_instance = None
             try:
-                self.link_obj_pulse_thread.stop()
-                self.link_obj_pulse_thread.wait(500)
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                runtime.shutdown_runtime_manager(cleanup_widgets=False)
+            except TypeError:
+                # Supports the first hot reload from a runtimeManager module
+                # loaded before cleanup_widgets was introduced.
+                runtime.shutdown_runtime_manager()
+            except (RuntimeError, ValueError, AttributeError, KeyError, IndexError):
                 pass
-            self.link_obj_pulse_thread = None
 
         self._delete_tabbar_painter()
 
@@ -189,14 +137,14 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def _on_scene_opened(self, *_args):
         if not QtCompat.isValid(self):
             return
-        isolateBookmarksApi.update_isolate_popup_menu()
+        isolateApi.update_isolate_popup_menu()
 
     def _on_graph_editor_opened(self, *_args):
         if not QtCompat.isValid(self):
             return
         if not settings.get_setting("graph_toolbar_enabled", True):
             return
-        QtCore.QTimer.singleShot(0, cg.createCustomGraph)
+        QtCore.QTimer.singleShot(0, graphToolbarApi.create)
 
     def _sync_graph_editor_on_startup(self):
         if not QtCompat.isValid(self):
@@ -206,7 +154,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         graph_vis = cmds.getPanel(vis=True) or []
         if "graphEditor1" in graph_vis:
-            QtCore.QTimer.singleShot(0, cg.createCustomGraph)
+            QtCore.QTimer.singleShot(0, graphToolbarApi.create)
 
     def showWindow(self):
         # Build up kwargs for the visibleChangeCommand
@@ -476,53 +424,30 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.showWindow()
 
     def reload(self, *args):
+        global _toolbar_instance
         toolbar_module_name = "TheKeyMachine.core.toolbar"
-        customGraph_module_name = "TheKeyMachine.core.customGraph"
+        graph_toolbar_widgets_name = "TheKeyMachine.tools.graph_toolbar.widgets"
+
+        # A delayed closeEvent from this widget must not clear or shut down the
+        # replacement toolbar after the module dictionary has been reloaded.
+        if _toolbar_instance is self:
+            _toolbar_instance = None
 
         try:
-            report.uninstall_bug_exception_handler()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-
-        try:
-            runtime.shutdown_runtime_manager()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-
-        try:
-            for widget in QtWidgets.QApplication.topLevelWidgets():
-                if widget.property("tkm_floating_widget"):
-                    widget.close()
-                    try:
-                        widget.deleteLater()
-                    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                        pass
+            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
         # Importa el módulo y recarga
         toolbar_module = import_module(toolbar_module_name)
-        customGraph_module = import_module(customGraph_module_name)
-
-        # Close and delete the UI
-        try:
-            if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
-                cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-
-        if QtCompat.isValid(self):
-            try:
-                self.blockSignals(True)
-                self.close()
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
+        graph_toolbar_widgets = import_module(graph_toolbar_widgets_name)
 
         reload(toolbar_module)
-        reload(customGraph_module)
+        reload(graph_toolbar_widgets)
 
-        # Use the global show() instead of module-level 'tb'
-        toolbar_module.show()
+        # Cleanup was completed and flushed above. Running it again here can
+        # queue deletion of the newly hosted workspace-control child.
+        toolbar_module.show(cleanup_existing=False)
 
     def unload(self, *args):
         """
@@ -532,39 +457,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         _toolbar_instance = None
 
         try:
-            report.uninstall_bug_exception_handler()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-
-        graphToolbarApi.shutdown_graph_toolbar_runtime()
-
-        try:
-            runtime.shutdown_runtime_manager()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-
-        try:
-            for widget in QtWidgets.QApplication.topLevelWidgets():
-                if widget.property("tkm_floating_widget"):
-                    widget.close()
-                    try:
-                        widget.deleteLater()
-                    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                        pass
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-
-        try:
-            if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
-                cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-
-        try:
-            if QtCompat.isValid(self):
-                self.blockSignals(True)
-                self.close()
-                self.deleteLater()
+            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
@@ -607,6 +500,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             )
 
         self._populate_toolbar_from_layout("main", new_section)
+        toolWidgets.bind_toolbar_pinning_context(self.main_toolbar_widget)
 
 
 _toolbar_instance = None
@@ -614,39 +508,44 @@ _toolbar_instance = None
 
 def get_toolbar():
     global _toolbar_instance
+    if _toolbar_instance is not None:
+        try:
+            if not QtCompat.isValid(_toolbar_instance):
+                _toolbar_instance = None
+        except (RuntimeError, TypeError):
+            _toolbar_instance = None
     return _toolbar_instance
 
 
-def show():
+def show(cleanup_existing=True):
     global _toolbar_instance
 
-    try:
-        runtime.shutdown_runtime_manager()
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
-
-    # Close existing UI robustly
-    try:
-        if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
-            cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
-
-    if _toolbar_instance and QtCompat.isValid(_toolbar_instance):
+    if cleanup_existing:
         try:
-            _toolbar_instance.close()
-            _toolbar_instance.deleteLater()
+            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
-    _toolbar_instance = toolbar()
-    _toolbar_instance.showWindow()
+    instance = toolbar()
+    _toolbar_instance = instance
+    try:
+        instance.showWindow()
+    except Exception:
+        if _toolbar_instance is instance:
+            _toolbar_instance = None
+        try:
+            instance.close()
+            instance.deleteLater()
+            runtime.cleanup_workspace_controls(process_events=True)
+        except Exception:
+            pass
+        raise
 
 
 def toggle():
-    global _toolbar_instance
+    toolbar_instance = get_toolbar()
     try:
-        if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True):
+        if toolbar_instance is not None and cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True):
             vis_state = cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, visible=True)
 
             if vis_state:
@@ -656,8 +555,7 @@ def toggle():
             return
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
-    _toolbar_instance = toolbar()
-    _toolbar_instance.showWindow()
+    show()
 
 
 def welcome():

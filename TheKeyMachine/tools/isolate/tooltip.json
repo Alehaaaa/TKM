@@ -1,0 +1,14 @@
+{
+  "isolate": [
+    "Isolate the selected character or asset in the active viewport.",
+    {"movie": "isolate"}
+  ],
+  "isolate_bookmarks": [
+    "Save named object groups and recall them as viewport isolate selections.",
+    {"movie": "ibookmarks_window"},
+    {"separator": true},
+    "Bookmarks are stored with the Maya scene."
+  ],
+  "down_level": ["Keep one hierarchy level below the scene root when isolating."],
+  "help": ["Open the Isolate tool documentation."]
+}

@@ -5,7 +5,7 @@ import inspect
 import maya.cmds as cmds  # type: ignore
 import maya.mel as mel  # type: ignore
 
-from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtGui  # type: ignore
 
 from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import util as wutil
@@ -18,6 +18,25 @@ _ACTIVE_PROGRESS_STACK = []
 _TOOL_DURATION_ESTIMATES = {}
 _REFRESH_SUSPEND_DEPTH = 0
 _REFRESH_WAS_SUSPENDED = False
+
+
+def finish_active_progress():
+    """Stop every TKM-owned progress display and cancel its delayed timers."""
+    active = list(_ACTIVE_PROGRESS_STACK)
+    _ACTIVE_PROGRESS_STACK[:] = []
+    for progress in reversed(active):
+        try:
+            progress.exclude_from_estimates = True
+            progress.finish()
+        except Exception:
+            pass
+
+
+def mark_non_tool_action(callback):
+    """Mark a UI-only callback so dispatch skips progress and undo handling."""
+    if callable(callback):
+        callback._tkm_non_tool_action = True
+    return callback
 
 
 def _format_eta(seconds):
@@ -53,7 +72,9 @@ class AdaptiveProgress(object):
         self.value = 0
         self._bar = None
         self._active = False
+        self._finished = False
         self._cancelled = False
+        self.exclude_from_estimates = False
         self._last_status_update_ms = -1
         self._last_status_label = self.label
         self._timer = QtCore.QElapsedTimer()
@@ -121,7 +142,7 @@ class AdaptiveProgress(object):
         self._ensure_started(force=True)
 
     def _ensure_started(self, force=False):
-        if self._active:
+        if self._active or self._finished:
             return
         if not force and not self._should_show():
             return
@@ -234,6 +255,7 @@ class AdaptiveProgress(object):
         return self._cancelled
 
     def finish(self):
+        self._finished = True
         for timer in (self._show_timer, self._status_timer):
             if not timer:
                 continue
@@ -479,7 +501,13 @@ def tool_operation(
                 except Exception:
                     pass
     finally:
-        if operation_completed and owns_progress and progress_obj and not progress_obj.cancelled:
+        if (
+            operation_completed
+            and owns_progress
+            and progress_obj
+            and not progress_obj.cancelled
+            and not progress_obj.exclude_from_estimates
+        ):
             elapsed = progress_obj.elapsed_seconds
             if elapsed >= 0.2:
                 previous = _TOOL_DURATION_ESTIMATES.get(estimate_key)
@@ -564,7 +592,14 @@ def run_tool_callback(button, callback, *args, **kwargs):
         call_kwargs["_tkm_anchor_widget"] = button
         return callback(*args, **call_kwargs)
 
-    with tool_operation(tool_id=tool_id, label=label, anchor_widget=button, undo=True) as operation:
+    non_tool_action = bool(getattr(callback, "_tkm_non_tool_action", False))
+    with tool_operation(
+        tool_id=tool_id,
+        label=label,
+        anchor_widget=button,
+        progress=not non_tool_action,
+        undo=not non_tool_action,
+    ) as operation:
         call_kwargs = dict(kwargs)
         call_kwargs.setdefault("anchor_widget", button)
         call_kwargs.setdefault("tool_operation", operation)
@@ -1142,7 +1177,7 @@ def connect_control_from_data(control, data, callback=_USE_DESCRIPTOR_CALLBACK):
     except Exception:
         pass
     resolved_callback = data.get("callback") if callback is _USE_DESCRIPTOR_CALLBACK else callback
-    checkable = bool(data.get("checkable", data.get("type") == "check"))
+    checkable = bool(data.get("checkable", data.get("type") in {"check", "setting"}))
     getter = checked_state_getter(data)
     setter = checked_state_setter(data)
     changed_signal = data.get("changed_signal")
@@ -1560,6 +1595,7 @@ class FloatingToolWindowMixin:
     def _init_floating_window_behavior(self):
         self._hovered = False
         self._auto_transparency = self._auto_transparency_setting_enabled()
+        self.setProperty("tkm_floating_widget", True)
         self.setMouseTracking(True)
         self.setAttribute(QtCore.Qt.WA_Hover, True)
 

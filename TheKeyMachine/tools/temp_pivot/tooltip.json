@@ -1,0 +1,15 @@
+{
+  "temp_pivot": [
+    "Create a temporary pivot that drives the selected controls as one transform.",
+    {"movie": "temp_pivot"},
+    {"movie": "temp_pivot_chain"},
+    {"separator": true},
+    "Run the tool again to finish the active pivot session."
+  ],
+  "last_object": ["Create the temporary pivot at the last selected object's pivot."],
+  "centered": ["Create the temporary pivot at the center of the current selection."],
+  "worldspace": ["Create a temporary pivot aligned to world axes."],
+  "edit": ["Select and edit the active temporary pivot without ending the session."],
+  "reset": ["Reset the active pivot to its original placement and orientation."],
+  "help": ["Open the Temp Pivot documentation."]
+}

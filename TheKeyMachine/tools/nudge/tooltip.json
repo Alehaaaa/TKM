@@ -1,0 +1,13 @@
+{
+  "value": ["Set the frame count used by every Nudge and Inbetween command."],
+  "left": ["Move the targeted keys left by the Nudge Value.", {"movie": "nudge"}],
+  "left_all": ["Move every key on the targeted animation curves left."],
+  "left_scene": ["Move every animation key in the scene left."],
+  "right": ["Move the targeted keys right by the Nudge Value."],
+  "right_all": ["Move every key on the targeted animation curves right."],
+  "right_scene": ["Move every animation key in the scene right."],
+  "insert": ["Insert time after the current frame by the Nudge Value."],
+  "insert_scene": ["Insert time after the current frame on every animation curve in the scene."],
+  "remove": ["Remove time after the current frame by the Nudge Value."],
+  "remove_scene": ["Remove time after the current frame from every animation curve in the scene."]
+}

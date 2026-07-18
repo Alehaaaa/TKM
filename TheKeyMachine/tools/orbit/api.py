@@ -14,7 +14,7 @@ __all__ = [
 
 from maya import cmds
 
-from TheKeyMachine.Qt import QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtGui, QtWidgets  # type: ignore
 
 from TheKeyMachine.data import icons
 from TheKeyMachine.core import trigger
@@ -29,7 +29,7 @@ ORBIT_AUTO_TRANSPARENCY_KEY = "orbit_auto_transparency"
 ORBIT_BUTTON_CONFIGURATION_KEY = "button_configuration"
 
 def _window_class():
-    from TheKeyMachine.tools.orbit.custom_dialogs import OrbitWindow
+    from TheKeyMachine.tools.orbit.widgets import OrbitWindow
     return OrbitWindow
 
 # Default actions for the Orbit toolbar
@@ -161,17 +161,14 @@ def is_orbit_window_open():
 
 def close_orbit_window():
     win = get_orbit_window()
-    maya_window_closed = False
-    if cmds.window("orbit_window", exists=True):
-        cmds.deleteUI("orbit_window")
-        maya_window_closed = True
-
     if win and wutil.is_valid_widget(win):
         win.close()
-    elif maya_window_closed:
-        _emit_orbit_window_state(False)
+        return
+    if cmds.window("orbit_window", exists=True):
+        cmds.deleteUI("orbit_window")
+    _emit_orbit_window_state(False)
 
-def orbit_window(*args, offset_x=0, offset_y=0, rebuild=False, reuse_existing=False):
+def orbit_window(*args, offset_x=0, offset_y=0, rebuild=False, reuse_existing=True):
     existing_win = get_orbit_window()
     if reuse_existing and not rebuild and offset_x == 0 and offset_y == 0 and existing_win:
         if not existing_win.isVisible():
@@ -299,14 +296,10 @@ def build_orbit_context_menu(parent=None):
     return menu
 
 def bind_orbit_toolbar_button(button):
-    """Bind a toolbar button to the Orbit toggle using the shared helper."""
-    from TheKeyMachine.tools.common_toolbar_utils import bind_toolbar_button_common
-
-    bind_toolbar_button_common(
+    button.connect_window_toggle(
         orbit_toolbar_toggle,
-        button,
-        "_tkm_orbit_context_menu_slot",
-        lambda parent: build_orbit_context_menu(parent=parent),
+        context_attr="_tkm_orbit_context_menu_slot",
+        menu_factory=lambda parent: build_orbit_context_menu(parent=parent),
     )
     return True
 

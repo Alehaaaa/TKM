@@ -5,7 +5,7 @@ import os
 import importlib
 import traceback
 
-from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 Qt = QtCore.Qt
 QRect = QtCore.QRect
@@ -37,7 +37,8 @@ import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
-from TheKeyMachine.sliders import api as slider_api
+from TheKeyMachine.sliders import SliderMode
+from TheKeyMachine.sliders import utils as slider_utils
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.widgets.timeline as timelineWidgets
 from TheKeyMachine.data import colors as toolColors
@@ -49,49 +50,6 @@ importlib.reload(report)
 importlib.reload(wutil)
 importlib.reload(cw)
 importlib.reload(settings)
-
-
-class SliderMode:
-    """Professional object representation of a slider mode."""
-
-    def __init__(
-        self,
-        key,
-        label=None,
-        icon=None,
-        description="",
-        worldSpace=False,
-        frameButtons=False,
-        shortcut=None,
-        tooltip=None,
-    ):
-        self.key = key
-        self.label = label or key.replace("_", " ").title()
-        self.icon = icon  # Short text for the handle
-        self.description = description
-        self.worldSpace = worldSpace
-        self.frameButtons = frameButtons
-        self.shortcut = list(shortcut or [])
-        self.tooltip = tooltip
-
-    def __repr__(self):
-        return f"<SliderMode {self.key}>"
-
-
-class ResetWithoutEmit:
-    """Context manager to reset a slider without triggering signal emissions."""
-
-    def __init__(self, slider: QSlider):
-        self._slider = slider
-        self._blocker = None
-
-    def __enter__(self):
-        self._blocker = QSignalBlocker(self._slider)
-        self._slider.setValue(getattr(self._slider, "defaultValue", 0))
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._blocker = None
 
 
 """
@@ -320,6 +278,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
     WHEEL_DELTA_STEP: ClassVar[float] = 15.0
     WHEEL_ACCELERATION_STEP: ClassVar[float] = 0.2
     WHEEL_ACCELERATION_LIMIT: ClassVar[float] = 8.0
+    WHEEL_COMMIT_DELAY_MS: ClassVar[int] = 250
 
     started = Signal()
     moved = Signal(float)
@@ -339,6 +298,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         self._icon_color = icon_color or color
         self._text = text
         self._press_offset: Optional[int | bool] = None
+        self._has_dragged = False
         self._hover = False
         self._handle_hover = False
         self._tooltip_title = ""
@@ -350,6 +310,10 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
         self._wheel_count = 0
         self._prev_wheel_direction = 0
+        self._wheel_commit_timer = QTimer(self)
+        self._wheel_commit_timer.setSingleShot(True)
+        self._wheel_commit_timer.setInterval(self.WHEEL_COMMIT_DELAY_MS)
+        self._wheel_commit_timer.timeout.connect(self._finish_wheel_interaction)
 
         # fonts
         self._value_font = QFont()
@@ -441,28 +405,44 @@ class SliderHandle(cw.TooltipMixin, QSlider):
         if not inc:
             return
 
-        # enter "active" visuals
+        starting_interaction = not self._is_active()
+        self._press_offset = True
+        self._has_dragged = True
+
         self._apply_stylesheet(thick=True)
-        if not self._is_active():
+        if starting_interaction:
             self.started.emit()
 
         self.setValue(self.value() - inc)
-
-        self._press_offset = True
+        self._wheel_commit_timer.start()
 
     # --- internals --------------------------------------------------------------
     def _reset_visual_state(self):
-        with ResetWithoutEmit(self):
+        self._wheel_commit_timer.stop()
+        signal_blocker = QSignalBlocker(self)
+        try:
+            self.setValue(getattr(self, "defaultValue", 0))
             self._press_offset = None
+            self._has_dragged = False
             self._apply_stylesheet(thick=False)
+        finally:
+            del signal_blocker
 
         self._wheel_count = 0
         self._prev_wheel_direction = 0
         self.update()
 
     def _finish_interaction(self):
-        self.finished.emit()
-        self._reset_visual_state()
+        if not self._is_active():
+            return
+        try:
+            self.finished.emit()
+        finally:
+            self._reset_visual_state()
+
+    def _finish_wheel_interaction(self):
+        if self._is_wheel_session() and not self.isSliderDown():
+            self._finish_interaction()
 
     def _apply_stylesheet(self, *, thick: bool):
         h = self.handle_size()
@@ -573,9 +553,7 @@ QSlider::handle:horizontal {{
     def mouseReleaseEvent(self, e: QMouseEvent):
         if e.button() == Qt.LeftButton and self.isSliderDown():
             self.setSliderDown(False)
-            self._apply_stylesheet(thick=False)
             self._finish_interaction()
-            self._press_offset = None
             return e.accept()
         super().mouseReleaseEvent(e)
 
@@ -700,6 +678,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         icon_color: Optional[str] = None,
         text: str = "",
         dragCommand: Optional[callable] = None,
+        sessionFactory: Optional[callable] = None,
         tooltipTitle: str = "",
         tooltipDescription: str = "",
         tooltip=None,
@@ -718,7 +697,9 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._tooltipDescription = tooltipDescription
         self._tooltip = tooltip
         self._dragCommand = None
+        self._sessionFactory = sessionFactory
         self._sliderSession = None
+        self._drag_active = False
         self._framePicker = None
         self._pickedFrames = {}
 
@@ -731,6 +712,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._current_mode: Optional[SliderMode] = None
         self._temporary_mode: Optional[SliderMode] = None
         self._menu = None
+        self._mode_transition = None
+        self._mode_transition_overlay = None
 
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
@@ -962,7 +945,9 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         """
         self._modes = []
         for m in modes:
-            if isinstance(m, dict):
+            if isinstance(m, SliderMode):
+                self._modes.append(m)
+            elif isinstance(m, dict):
                 self._modes.append(SliderMode(**m))
             else:
                 self._modes.append(m)  # Likely a separator
@@ -985,10 +970,13 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                     self._setCurrentMode(found)
             else:
                 old_key = self._current_mode.key if self._current_mode else None
+                if old_key == found.key:
+                    return False
                 self._current_mode = found
                 self._temporary_mode = None
                 self._setCurrentMode(found)
                 self.currentModeChanged.emit(self, old_key, found.key)
+                return True
         else:
             # Fallback for initialization or unknown keys
             old_key = self._current_mode.key if self._current_mode else None
@@ -1078,7 +1066,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             command_label = "{} {}".format(mode.label, value_text)
         else:
             command_label = mode.label
-        command_icon = mode.icon if SliderHandle._looks_like_icon(mode.icon) else None
+        resolved_icon = mode.resolved_icon()
+        command_icon = resolved_icon if SliderHandle._looks_like_icon(resolved_icon) else None
         return command_id, command_label, command_icon
 
     ################################ GETTERS ################################
@@ -1122,8 +1111,9 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         QFlatTooltipManager.delayed_show(anchor_widget=self, **data)
 
     def _setCurrentMode(self, mode: SliderMode):
-        if mode.icon:
-            self.setText(mode.icon)
+        display_value = mode.display_value()
+        if display_value:
+            self.setText(display_value)
 
         self.setTooltipInfo(mode.label, mode.description, mode.tooltip)
         self.setWorldSpace(mode.worldSpace)
@@ -1158,12 +1148,21 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
     def _show_context_menu(self, pos: QPoint):
         if not self._modes:
             return
-        # Use the stable reference established during section registration
+        QFlatTooltipManager.hide()
         section = self._section_parent
+
+        if self._menu is not None:
+            try:
+                self._menu.close()
+                self._menu.deleteLater()
+            except RuntimeError:
+                pass
 
         menu = cw.MenuWidget(parent=self)
         menu.setTearOffEnabled(False)
+        menu.addSection("Slider Mode")
         group = QActionGroup(menu)
+        group.setExclusive(True)
         active = self.currentMode()
 
         for mode in self._modes:
@@ -1188,14 +1187,25 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             if section and hasattr(section, "_visible_slider_mode_keys"):
                 is_already_pinned = mode.key in section._visible_slider_mode_keys() and not is_current
 
-            if is_current or is_already_pinned:
+            if is_already_pinned:
                 act.setEnabled(False)
 
-            act.triggered.connect(lambda *args, m=mode: self.modeSelected.emit(m.key))
-            act.triggered.connect(lambda *args, m=mode: self.modeRequested.emit(m.key, False))
+            if not is_current and not is_already_pinned:
+                def _select_mode(_checked=False, mode_key=mode.key):
+                    self.modeSelected.emit(mode_key)
+                    self.modeRequested.emit(mode_key, False)
 
-        menu.exec_(self.mapToGlobal(pos))
-        menu.deleteLater()
+                act.triggered.connect(_select_mode)
+
+        self._menu = menu
+
+        def _release_menu(target=menu):
+            if self._menu is target:
+                self._menu = None
+            target.deleteLater()
+
+        menu.aboutToHide.connect(_release_menu)
+        menu.popup(self.mapToGlobal(pos))
 
     ############### GEOMETRY MANAGER METHODS ###############
     def resizeEvent(self, e):
@@ -1219,30 +1229,42 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._leftOverlay.raise_()
         self._rightOverlay.raise_()
 
-    def startFlash(self, flashes: int = 3, interval: int = 40):
-        """
-        Overlay the widget in white a given number of flashes, then remove it.
+    def startModeTransition(self):
+        """Briefly highlight the slider after a permanent mode change."""
+        if self._mode_transition is not None:
+            self._mode_transition.stop()
+            self._mode_transition.deleteLater()
+            self._mode_transition = None
+        if self._mode_transition_overlay is not None:
+            self._mode_transition_overlay.deleteLater()
 
-        flashes (int): Number of flashes.
-        interval (int): Duration in ms for each flash.
-        """
         overlay = QWidget(self)
-        overlay.setStyleSheet("background-color: white;")
+        overlay.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        overlay.setStyleSheet("background-color: rgba(255, 255, 255, 72); border-radius: 3px;")
         overlay.setGeometry(self.rect())
         overlay.raise_()
+        effect = QtWidgets.QGraphicsOpacityEffect(overlay)
+        overlay.setGraphicsEffect(effect)
+        effect.setOpacity(1.0)
 
-        count = 0
+        animation = QtCore.QPropertyAnimation(effect, b"opacity", self)
+        animation.setDuration(160)
+        animation.setStartValue(1.0)
+        animation.setEndValue(0.0)
+        animation.setEasingCurve(QtCore.QEasingCurve.OutCubic)
+        self._mode_transition = animation
+        self._mode_transition_overlay = overlay
 
-        def flash():
-            nonlocal count
-            if count >= flashes * 2:
-                overlay.deleteLater()
-                return
-            overlay.setVisible(count % 2 == 0)
-            count += 1
-            QTimer.singleShot(interval, flash)
+        def _finish(target_animation=animation, target_overlay=overlay):
+            if self._mode_transition is target_animation:
+                self._mode_transition = None
+            if self._mode_transition_overlay is target_overlay:
+                self._mode_transition_overlay = None
+            target_overlay.deleteLater()
+            target_animation.deleteLater()
 
-        flash()
+        animation.finished.connect(_finish)
+        animation.start()
 
     ############### SIGNAL PLUMBING METHODS ###############
 
@@ -1250,10 +1272,15 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         QFlatTooltipManager.hide()
         self._cancel_frame_picker()
         self._finish_active_session()
-        self._start_slider_interaction(preview=True)
+        try:
+            if self._start_slider_interaction(preview=True) is None:
+                return
+        except Exception as exc:
+            self._on_drag_error(exc)
+            return
 
+        self._drag_active = True
         self.dragStarted.emit()
-
         self._leftOverlay.hide()
         self._rightOverlay.hide()
 
@@ -1263,19 +1290,18 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def _on_drag_finished(self):
         if self._sliderSession is None:
-            self._leftOverlay.show()
-            self._rightOverlay.show()
+            self._restore_after_drag()
             return
 
-        value = 0.0 if not getattr(self._slider, "_has_dragged", True) else self.percent()
         try:
+            if not getattr(self._slider, "_has_dragged", False):
+                return
+            value = self.percent()
             self.valueSet.emit(float(value))
             self._commit_slider_value(value, require_existing_session=True)
         finally:
-            self.dragFinished.emit()
             self._finish_active_session()
-            self._leftOverlay.show()
-            self._rightOverlay.show()
+            self._restore_after_drag()
 
     def _on_button_clicked(self, btn: SliderButton):
         if btn in (self._leftFrameButton, self._rightFrameButton):
@@ -1343,9 +1369,18 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._rightFrameButton.setTooltipInfo(mode.label, right_description, mode.tooltip)
 
     def _finish_active_session(self):
-        if self._sliderSession is not None:
-            self._sliderSession.finish()
-            self._sliderSession = None
+        session = self._sliderSession
+        if session is None:
+            return
+        self._sliderSession = None
+        session.finish()
+
+    def _restore_after_drag(self):
+        if self._drag_active:
+            self._drag_active = False
+            self.dragFinished.emit()
+        self._leftOverlay.show()
+        self._rightOverlay.show()
 
     def _on_maya_undo_performed(self):
         self._finish_active_session()
@@ -1358,7 +1393,16 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             return None
 
         if self._sliderSession is None:
-            self._sliderSession = slider_api.create_session(mode.key)
+            if self._sessionFactory is None:
+                self._sliderSession = slider_utils.SliderSession(
+                    mode.key,
+                    title=mode.label,
+                    description=mode.description,
+                    tooltip=mode.tooltip,
+                    tint_color=self._color,
+                )
+            else:
+                self._sliderSession = self._sessionFactory(mode.key)
         elif self._sliderSession.mode != mode.key:
             self._sliderSession.switch_mode(
                 mode.key,
@@ -1423,6 +1467,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
                 self._slider._reset_visual_state()
             except Exception:
                 pass
+        self._restore_after_drag()
 
     def _on_modifiers_changed(self, *_args):
         if not self.idle():
@@ -1435,11 +1480,19 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     def leaveEvent(self, e):
         self._disconnect_modifier_watch()
-        self.resetDefaultMode()
-        # Finalize the interaction if we were wheeling when the mouse leaves the widget
         if self._slider and self._slider._is_active() and not self._slider.isSliderDown():
-            self._slider._reset_visual_state()
+            self._slider._finish_interaction()
+        self.resetDefaultMode()
         super().leaveEvent(e)
+
+    def closeEvent(self, e):
+        self._disconnect_modifier_watch()
+        self._cancel_frame_picker()
+        if self._slider:
+            self._slider._reset_visual_state()
+        self._finish_active_session()
+        self._restore_after_drag()
+        super().closeEvent(e)
 
     def enterEvent(self, e):
         self._connect_modifier_watch()

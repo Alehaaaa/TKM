@@ -1,0 +1,16 @@
+{
+  "create": [
+    "Create a viewport trail from the selected object's animated path.",
+    {"movie": "tracer"},
+    {"separator": true},
+    "Use Refresh after animation changes when Auto Update is disabled."
+  ],
+  "refresh": ["Rebuild the active trail from the object's current animation."],
+  "toggle": ["Show or hide the active trail without deleting it."],
+  "offset": ["Select the trail offset node so the displayed path can be repositioned."],
+  "grey": ["Use the neutral grey display style for the active trail."],
+  "red": ["Use the red display style for the active trail."],
+  "blue": ["Use the blue display style for the active trail."],
+  "remove": ["Delete the active tracer setup from the scene."],
+  "connected": ["Update the trail automatically while the source animation changes."]
+}

@@ -17,7 +17,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.28"
+__version__ = "0.1.29"
 __stage__ = "beta"
 __build__ = "333"
 __codename__ = "Flat White"
@@ -36,31 +36,13 @@ def reload():
     try:
         import TheKeyMachine.core.runtimeManager as runtime
 
-        runtime.shutdown_runtime_manager()
+        runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
     except Exception:
         pass
 
-    try:
-        import TheKeyMachine.mods.reportMod as report
-
-        report.uninstall_bug_exception_handler()
-    except Exception:
-        pass
-
-    try:
-        from TheKeyMachine.Qt import QtWidgets  # type: ignore
-
-        for widget in QtWidgets.QApplication.topLevelWidgets():
-            if widget.property("tkm_floating_widget"):
-                widget.close()
-                try:
-                    widget.deleteLater()
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-    modules_to_delete = [m for m in list(sys.modules.keys()) if m.startswith("TheKeyMachine")]
+    modules_to_delete = [
+        m for m in list(sys.modules.keys()) if m.startswith("TheKeyMachine")
+    ]
 
     for mod_name in modules_to_delete:
         del sys.modules[mod_name]

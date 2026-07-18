@@ -1,0 +1,6 @@
+{
+  "gimbal": [
+    "Analyze the selected control's animated rotation and rank all six rotation orders by gimbal risk.",
+    "Choose an order to convert the animation while preserving the visible motion."
+  ]
+}

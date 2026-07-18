@@ -1,0 +1,15 @@
+{
+  "align": [
+    "Match the selected source objects to the last selected target.",
+    {"movie": "align_objects"},
+    {"separator": true},
+    "Uses translation, rotation, and scale. A selected time range aligns every frame in that range."
+  ],
+  "translation": ["Match only world-space translation to the last selected target."],
+  "translation_all": ["Match translation on every keyed frame of the selected source objects."],
+  "rotation": ["Match only world-space rotation to the last selected target."],
+  "rotation_all": ["Match rotation on every keyed frame of the selected source objects."],
+  "scale": ["Match only world-space scale to the last selected target."],
+  "scale_all": ["Match scale on every keyed frame of the selected source objects."],
+  "help": ["Open the Align Objects documentation."]
+}

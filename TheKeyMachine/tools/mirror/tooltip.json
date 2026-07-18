@@ -1,0 +1,42 @@
+{
+  "select_opposite": [
+    "Select the opposite-side controls matching the current selection."
+  ],
+  "add_opposite": [
+    "Add the opposite-side controls to the current selection."
+  ],
+  "copy_opposite": [
+    "Copy the selected controls' current values to their opposite-side controls.",
+    "Saved mirror exceptions are applied per channel."
+  ],
+  "mirror": [
+    "Mirror the selected controls to their opposite-side equivalents.",
+    "Mirror exceptions can be configured per rig and are saved for reuse."
+  ],
+  "to_right": [
+    "Copy current mirrored values from selected left-side controls to their right-side opposites.",
+    "Invert exceptions multiply saved channels by -1 before writing them to the opposite control."
+  ],
+  "to_left": [
+    "Copy current mirrored values from selected right-side controls to their left-side opposites.",
+    "Invert exceptions multiply saved channels by -1 before writing them to the opposite control."
+  ],
+  "all_keys": [
+    "Copy all keyed animation from selected controls to their opposite-side controls.",
+    "Existing keys on the destination channels are replaced, and mirror exceptions are applied per channel."
+  ],
+  "add_invert": [
+    "Save an Invert exception for the selected controls and Channel Box attributes.",
+    "The saved channel value is multiplied by -1 during mirror operations."
+  ],
+  "add_keep": [
+    "Save a Keep exception for the selected controls and Channel Box attributes.",
+    "The saved channel value transfers unchanged during mirror operations."
+  ],
+  "remove_exception": [
+    "Remove saved mirror exceptions from the selected controls and Channel Box attributes."
+  ],
+  "help": [
+    "Open the Mirror tool documentation."
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "smart_rotation": ["Open Maya's rotate marking menu and cycle the rotate manipulator mode."],
+  "smart_rotation_release": ["Close Maya's rotate marking menu when the hotkey is released."],
+  "smart_translation": ["Open Maya's move marking menu and switch the translation manipulator mode."],
+  "smart_translation_release": ["Close Maya's move marking menu when the hotkey is released."]
+}

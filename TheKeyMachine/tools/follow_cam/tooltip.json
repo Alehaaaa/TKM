@@ -1,0 +1,11 @@
+{
+  "follow_cam": [
+    "Create a camera that follows the selected object in translation and rotation.",
+    {"movie": "follow_cam"},
+    {"separator": true},
+    "Useful for stabilizing a moving control in view while polishing its animation."
+  ],
+  "follow_cam_translation": ["Create a camera that follows only the selected object's translation."],
+  "follow_cam_rotation": ["Create a camera that follows only the selected object's rotation."],
+  "remove_follow_cam": ["Remove the active Follow Cam setup and restore the previous camera."]
+}

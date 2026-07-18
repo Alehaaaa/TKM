@@ -1,0 +1,15 @@
+{
+  "copy_pose": ["Copy the current pose from the selected controls.", "The pose remains available across Maya sessions."],
+  "paste_pose": ["Paste the saved pose onto the current selection."],
+  "paste_mirror_pose": ["Paste the saved pose onto matching opposite-side controls using mirror exceptions."],
+  "paste_pose_to": ["Choose a copied source control and paste its pose onto the selected targets."],
+  "export_pose": ["Export the copied pose data to a JSON file."],
+  "import_pose": ["Import copied pose data from a JSON file."],
+  "copy_animation": ["Copy animation from the selected objects or controls.", "The animation remains available across Maya sessions."],
+  "paste_animation": ["Replace animation on the current selection with the saved animation."],
+  "paste_insert_animation": ["Insert the saved animation while preserving surrounding timing."],
+  "paste_opposite_animation": ["Paste the saved animation onto matching opposite-side controls."],
+  "paste_animation_to": ["Choose a copied source control and paste its animation onto selected targets."],
+  "export_animation": ["Export the copied animation data to a JSON file."],
+  "import_animation": ["Import copied animation data from a JSON file."]
+}

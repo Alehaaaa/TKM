@@ -1,0 +1,11 @@
+{
+  "extras": ["Open the Graph Editor utility commands."],
+  "select_object": ["Select scene objects associated with the selected animation curves."],
+  "isolate": ["Show only selected curves in the Graph Editor.", {"movie": "isolate_curves"}],
+  "flip": ["Invert selected curve values vertically.", {"movie": "flip"}],
+  "overlap": ["Offset selected curves progressively to create overlapping motion."],
+  "mute": ["Toggle mute on selected curves.", {"movie": "mute_curves"}],
+  "lock": ["Toggle editing locks on selected curves.", {"movie": "lock_curves"}],
+  "match": ["Match selected curves to the final selected curve."],
+  "filter": ["Enable or clear Graph Editor filtering for the current selection."]
+}

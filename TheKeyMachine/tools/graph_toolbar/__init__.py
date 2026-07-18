@@ -1,11 +1,20 @@
-from TheKeyMachine.tools.graph_toolbar.api import (
-    bind_graph_toolbar_toggle,
-    custom_graph_bus,
-    emit_graph_toolbar_state,
-    get_graph_toolbar_checkbox_state,
-    is_graph_toolbar_visible,
-    set_graph_toolbar_enabled,
-    shutdown_graph_toolbar_runtime,
-    sync_graph_toolbar_watch,
-)
+from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.graph_toolbar import api
+
+
+TOOLTIPS = load_tooltips(__file__)
+
+
+class GraphToolbarToolObject(ToolObject):
+    ORDER = 950
+    TOOLS = {
+        "graph_settings_menu": {
+            "type": "menu", "label": "Graph Toolbar Settings", "icon": "settings",
+            "callback": api.show_settings_menu, "tooltip": TOOLTIPS["settings_menu"],
+        },
+        "graph_dock_menu": {
+            "type": "menu", "label": "Graph Toolbar Dock", "icon": "dock",
+            "callback": api.show_dock_menu, "tooltip": TOOLTIPS["dock_menu"],
+        },
+    }
 

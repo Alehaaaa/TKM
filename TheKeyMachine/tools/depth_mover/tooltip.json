@@ -1,0 +1,6 @@
+{
+  "depth_mover": [
+    "Drag selected transforms toward or away from the active camera while preserving their screen position.",
+    "Disable the tool to restore Maya's previous interaction context."
+  ]
+}

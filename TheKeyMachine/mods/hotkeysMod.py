@@ -9,7 +9,7 @@ import os
 
 from maya import cmds
 
-from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.core.toolbox as toolbox
@@ -807,7 +807,7 @@ def _command_row_from_data(command_name, primary_data, fallback_data=None, title
             or tooltip
         ),
         "shortcuts": primary_data.get("shortcuts", fallback_data.get("shortcuts", [])),
-        "checkable": bool(primary_data.get("checkable", primary_data.get("type") == "check")),
+        "checkable": bool(primary_data.get("checkable", primary_data.get("type") in {"check", "setting"})),
         "callback": primary_data.get("callback") or fallback_data.get("callback"),
         "get_checked": (
             primary_data.get("get_checked")
@@ -912,21 +912,17 @@ def _append_toolbox_item_rows(section, seen, title_lookup, icon_lookup, trigger_
 
     if item.get("type") == "widget":
         tool_key = item.get("key") or item.get("id")
-        if tool_key and tool_key in toolbox.TOOL_DEFINITIONS:
+        if tool_key and tool_key in toolbox.get_tool_definitions():
             _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_commands, tool_key)
         return
 
 
 def _slider_modes_from_section(section_data):
-    modes_attr = section_data.get("modes_attr")
-    if not modes_attr:
-        return []
-    sliders_module = __import__("TheKeyMachine.sliders", fromlist=[modes_attr])
-    return getattr(sliders_module, modes_attr, [])
+    return section_data.get("modes", [])
 
 
 def _slider_mode_icon(mode):
-    icon = mode.get("icon")
+    icon = mode.resolved_icon()
     if isinstance(icon, str) and os.path.splitext(icon)[1]:
         return icon
     return None
@@ -934,22 +930,22 @@ def _slider_mode_icon(mode):
 
 def _iter_slider_percentage_rows(slider_type, mode):
     mode_icon = _slider_mode_icon(mode)
-    mode_badge = str(mode.get("icon") or "")
+    mode_badge = str(mode.text or "")
 
     for value in trigger.SLIDER_BUTTON_VALUES:
-        value_title = "{}: {}".format(mode["label"], _slider_value_label(value))
+        value_title = "{}: {}".format(mode.label, _slider_value_label(value))
         yield {
-            "command": trigger.slider_command_name(slider_type, mode["key"], value),
+            "command": trigger.slider_command_name(slider_type, mode.key, value),
             "title": value_title,
             "icon": mode_icon,
             "badge_text": None if mode_icon else mode_badge,
-            "description": mode.get("description") or "Set {} to {} percent.".format(mode["label"], value),
-            "tooltip": mode.get("tooltip"),
+            "description": mode.description or "Set {} to {} percent.".format(mode.label, value),
+            "tooltip": mode.tooltip,
         }
 
 
 def _append_slider_mode_rows(section, slider_type, mode):
-    if not isinstance(mode, dict) or not mode.get("key"):
+    if not hasattr(mode, "key"):
         return
 
     mode_icon = _slider_mode_icon(mode)
@@ -1005,10 +1001,34 @@ def _append_background_runner_rows(section, seen, title_lookup, icon_lookup, tri
         )
 
 
+def _append_connect_entry_rows(section, seen, title_lookup, icon_lookup, trigger_commands, kind):
+    from TheKeyMachine.core import connectEntries
+
+    for entry in connectEntries.load_entries(kind):
+        if entry.get("type") != "entry" or not callable(entry.get("callback")):
+            continue
+        command_name = entry.get("id")
+        trigger.register_command(command_name, entry["callback"])
+        _append_section_row(
+            section,
+            seen,
+            title_lookup,
+            icon_lookup,
+            trigger_commands,
+            {
+                "command": command_name,
+                "title": entry.get("label") or _humanize(command_name),
+                "icon": entry.get("icon"),
+                "badge_text": entry.get("text"),
+                "description": entry.get("description") or "Run this custom tool.",
+            },
+        )
+
+
 def _iter_hotkey_tool_sections():
     seen = set()
 
-    for section_id, section_data in toolbox.TOOL_SECTION_DEFINITIONS.items():
+    for section_id, section_data in toolbox.get_section_definitions().items():
         if section_data.get("hotkey_only") and section_data.get("hotkeys") is not False:
             seen.add(section_id)
             yield section_id, section_data
@@ -1044,6 +1064,12 @@ def _build_command_catalog():
 
             for item in section_data.get("items", []):
                 _append_toolbox_item_rows(section, seen, title_lookup, icon_lookup, trigger_commands, item)
+
+            connect_kind = section_data.get("connect_kind")
+            if connect_kind:
+                _append_connect_entry_rows(
+                    section, seen, title_lookup, icon_lookup, trigger_commands, connect_kind
+                )
 
             if section_id == "background_runner_tools":
                 _append_background_runner_rows(section, seen, title_lookup, icon_lookup, trigger_commands)

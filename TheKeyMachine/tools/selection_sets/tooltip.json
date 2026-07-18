@@ -1,0 +1,8 @@
+{
+  "selection_sets": ["Create, organize, rename, and recall persistent selection sets stored with the Maya scene."],
+  "quick_export": ["Export all selection sets immediately to the configured quick-transfer file."],
+  "quick_import": ["Import selection sets immediately from the configured quick-transfer file."],
+  "export": ["Choose a file and export all TheKeyMachine selection sets."],
+  "import": ["Choose a file and import its selection sets into the current scene."],
+  "clear_all": ["Delete every TheKeyMachine selection set from the current scene.", "This action asks for confirmation before removing data."]
+}

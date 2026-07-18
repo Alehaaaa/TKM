@@ -1,0 +1,12 @@
+{
+  "blend_best_guess": ["Blend toward a smooth tangent inferred from neighboring keys."],
+  "blend_polished": ["Blend toward a polished spline tangent."],
+  "blend_flow": ["Blend toward a flowing plateau tangent."],
+  "blend_bounce": ["Blend toward a sharp bouncing tangent."],
+  "blend_auto": ["Blend toward Maya Auto tangents."],
+  "blend_spline": ["Blend toward Maya Spline tangents."],
+  "blend_clamped": ["Blend toward Maya Clamped tangents."],
+  "blend_linear": ["Blend toward Maya Linear tangents."],
+  "blend_flat": ["Blend toward Maya Flat tangents."],
+  "blend_plateau": ["Blend toward Maya Plateau tangents."]
+}

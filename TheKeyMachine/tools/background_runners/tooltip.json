@@ -1,0 +1,7 @@
+{
+  "background_runners": ["Toggle persistent automatic helpers and background tool runners."],
+  "channelbox_selection_highlight": ["Toggle timeline highlighting for selected Channel Box attributes."],
+  "channelbox_clear_on_selection_change": ["Toggle clearing Channel Box attributes when the object selection changes."],
+  "camera_orbit_selection": ["Toggle automatic camera orbit targeting from the current selection."],
+  "hide_static_animation_curves": ["Toggle automatic hiding of static curves in the Graph Editor."]
+}

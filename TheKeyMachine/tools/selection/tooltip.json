@@ -1,0 +1,6 @@
+{
+  "selector": ["Open the current selection as a compact list for quick re-selection."],
+  "hierarchy": ["Add descendant curve controls beneath the current selection.", {"movie": "select_hierarchy"}],
+  "rig_controls": ["Select all curve and joint controls in the selected rig hierarchy."],
+  "animated_controls": ["Select only animated curve and joint controls in the selected rig hierarchy."]
+}

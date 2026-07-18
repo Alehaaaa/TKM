@@ -6,13 +6,21 @@
 #
 # Supported kinds: new, changed, polish, bugfix.
 # Rule: keep each version to 6 changes at most.
-# Rule: sort entries by main group in this order: New, Changed, Polish, Bugfix.
+# Rule: sort entries by main group in this order: polish, bugfix, new, changed.
 # Rule: keep descriptions short and efficient.
 # Rule: mention each tool only once per version.
 # Rule: focus on animation tool changes, visible workflow changes, and bugfixes.
 # Rule: do not include repo housekeeping, docs, funding, metadata, or asset-only changes.
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
+
+0.1.29:
+  - polish: Reordered files to standarize all tools under tools/
+  - bugfix: Copy Relationship pastes selected or playback ranges only on existing relationship-object keys
+  - bugfix: Copy and Paste Pose and Animation handle remapped targets and single-object pastes reliably
+  - bugfix: Smart Key supports subframes
+  - bugfix: Snap Keys merges near-integer keys correctly
+  - bugfix: Each Animation Offset gesture undoes in one step
 
 0.1.28:
   - changed: Micro Move and Depth Mover now ship together across supported Maya versions and platforms with Shift/Control precision; Micro Move also keeps full-color cursors and reliable middle-button object drags

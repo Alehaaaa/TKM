@@ -1,0 +1,16 @@
+{
+  "connect_neighbors": ["Smoothly connect the selected curve segment to its surrounding keys."],
+  "ease_in_out": ["Reshape the selected keys between ease-in and ease-out timing."],
+  "gap_stitcher": ["Close value gaps between neighboring animation segments."],
+  "noise_wave": ["Drag left for procedural noise or right for an alternating wave."],
+  "pull_push": ["Pull keys toward the neighboring trend or push them away."],
+  "simplify_bake": ["Drag left to simplify keys or right to bake additional keys."],
+  "smooth_rough": ["Smooth the curve or exaggerate its local variation."],
+  "time_offsetter": ["Offset the animation shape in time while preserving key times."],
+  "time_offsetter_stagger": ["Stagger whole-object animation while keeping channels synchronized."],
+  "scale_average": ["Scale selected values around their average."],
+  "scale_default": ["Scale selected values around the channel default."],
+  "scale_frame": ["Scale values around picked reference frames or the current frame."],
+  "scale_neighbor_left": ["Scale values around the preceding key."],
+  "scale_neighbor_right": ["Scale values around the following key."]
+}

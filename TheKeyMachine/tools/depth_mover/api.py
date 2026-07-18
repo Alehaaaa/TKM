@@ -5,7 +5,7 @@ import os
 from maya.api import OpenMaya as om
 from maya import cmds, utils
 
-from TheKeyMachine.Qt import QtCompat, QtCore
+from TheKeyMachine.core.Qt import QtCompat, QtCore
 from TheKeyMachine.data import icons
 import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon

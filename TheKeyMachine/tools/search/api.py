@@ -1,17 +1,17 @@
 """Public API for the Search tool."""
 
-from TheKeyMachine.Qt import QtCore, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 
 import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.mods import settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
-from TheKeyMachine.tools.search.constants import (
+from TheKeyMachine.tools.search.controller import (
     SEARCH_SETTINGS_NAMESPACE,
     SEARCH_STAYS_ON_TOP_KEY,
     SEARCH_WINDOW_KEY,
 )
-from TheKeyMachine.tools.search import session_state
+from TheKeyMachine.tools.search import controller
 from TheKeyMachine.widgets import customWidgets as cw, util as wutil
 
 
@@ -39,7 +39,7 @@ def _emit_search_window_state(is_open):
 
 
 def _window_class():
-    from TheKeyMachine.tools.search.custom_dialogs import SearchDialog
+    from TheKeyMachine.tools.search.widgets import SearchDialog
 
     return SearchDialog
 
@@ -90,7 +90,7 @@ def set_search_stays_on_top(enabled):
 
 
 def restore_search_default_position():
-    session_state.clear_position()
+    controller.clear_position()
     window = get_search_window()
     if window:
         window.restore_default_position()
@@ -152,12 +152,9 @@ def toggle(checked=None, *_args):
 
 
 def bind_search_toolbar_button(button):
-    from TheKeyMachine.tools.common_toolbar_utils import bind_toolbar_button_common
-
-    bind_toolbar_button_common(
+    button.connect_window_toggle(
         search_toolbar_toggle,
-        button,
-        "_tkm_search_context_menu_slot",
-        lambda parent: build_search_context_menu(parent=parent),
+        context_attr="_tkm_search_context_menu_slot",
+        menu_factory=lambda parent: build_search_context_menu(parent=parent),
     )
     return True

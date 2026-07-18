@@ -31,7 +31,7 @@ import maya.cmds as cmds
 
 import TheKeyMachine.mods.generalMod as general
 
-from TheKeyMachine.Qt import QtCore, QtWidgets
+from TheKeyMachine.core.Qt import QtCore, QtWidgets
 
 from TheKeyMachine.widgets import customDialogs
 
@@ -70,19 +70,25 @@ def _clear_bug_report_dialog(*_):
     _BUG_REPORT_DIALOG = None
 
 
-def _get_open_bug_report_dialog():
+def _get_bug_report_dialog(include_hidden=False):
     global _BUG_REPORT_DIALOG
 
     if _is_valid_dialog(_BUG_REPORT_DIALOG):
         try:
-            if _BUG_REPORT_DIALOG.isVisible():
+            if include_hidden or _BUG_REPORT_DIALOG.isVisible():
                 return _BUG_REPORT_DIALOG
         except Exception:
             pass
+        if not include_hidden:
+            return None
         _clear_bug_report_dialog()
 
     for widget in QtWidgets.QApplication.topLevelWidgets():
-        if isinstance(widget, customDialogs.QFlatBugReportDialog) and _is_valid_dialog(widget) and widget.isVisible():
+        if (
+            isinstance(widget, customDialogs.QFlatBugReportDialog)
+            and _is_valid_dialog(widget)
+            and (include_hidden or widget.isVisible())
+        ):
             _set_bug_report_dialog(widget)
             return widget
     return None
@@ -313,7 +319,7 @@ def report_detected_exception(exc=None, context=None, source_file=None, tracebac
     if _is_exception_already_reported(exc):
         return
 
-    if _get_open_bug_report_dialog():
+    if _get_bug_report_dialog():
         _mark_exception_reported(exc)
         return
 
@@ -482,7 +488,7 @@ def install_bug_exception_handler():
 def bug_report_window(*args, dialog_title="Report a Bug", prefill_name="", prefill_explanation="", prefill_script_error=""):
     if not general.config.get("BUG_REPORT", True):
         return None
-    existing_dialog = _get_open_bug_report_dialog()
+    existing_dialog = _get_bug_report_dialog(include_hidden=True)
     if existing_dialog:
         if hasattr(existing_dialog, "apply_prefill"):
             existing_dialog.apply_prefill(
@@ -508,10 +514,8 @@ def bug_report_window(*args, dialog_title="Report a Bug", prefill_name="", prefi
         prefill_explanation=prefill_explanation,
         prefill_script_error=prefill_script_error,
     )
-    dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
+    dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
     _set_bug_report_dialog(dlg)
-    if hasattr(dlg, "finished"):
-        dlg.finished.connect(_clear_bug_report_dialog)
     dlg.destroyed.connect(_clear_bug_report_dialog)
     dlg.show_centered()
     return dlg

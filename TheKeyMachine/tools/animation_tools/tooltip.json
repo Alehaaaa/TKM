@@ -1,0 +1,23 @@
+{
+  "animation_tools": ["Open animation editing, cleanup, Smart Key, and snapping commands."],
+  "smart_key": ["Set a key at the current frame using the active Graph Editor, Channel Box, or object context."],
+  "smart_key_all": ["Set keys on every keyable scalar channel of the selected objects."],
+  "euler_filter": ["Apply the smart Euler filter to rotation curves in the active animation context."],
+  "snap": ["Move sub-frame keys onto whole frames. When the destination already has a key, keep it and merge the sub-frame key into it.", {"movie": "snap"}],
+  "clear_animation": ["Delete animation keys in the active key, channel, object, or time-range context.", {"movie": "delete_all_animation"}],
+  "crop": ["Keep keys inside the active range and remove keys outside it."],
+  "remove_redundant": ["Remove redundant keys using the mode selected from the right-click menu."],
+  "remove_redundant_flat": ["Remove only interior keys from flat-value runs. Non-flat motion keys are left untouched."],
+  "remove_redundant_all": ["Simplify all redundant keys on the active curves while preserving the current key selection."],
+  "remove_static": ["Remove animation curves whose values do not change in the active context.", {"movie": "delete_all_animation_static"}],
+  "reverse": ["Reverse the active animation range in time."],
+  "copy_keys": ["Copy keys from the active animation context."],
+  "cut_keys": ["Cut keys from the active animation context."],
+  "delete_keys": ["Delete keys at the active frame or selected key context."],
+  "paste_keys": ["Paste copied keys at the active context."],
+  "paste_keys_relative": ["Paste copied keys relative to the current frame."],
+  "clear_selected": ["Clear the current Graph Editor key selection."],
+  "select_scene": ["Select every animation curve in the scene."],
+  "delete_before": ["Delete selected objects' keys before the current frame."],
+  "delete_after": ["Delete selected objects' keys after the current frame."]
+}

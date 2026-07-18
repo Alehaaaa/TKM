@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from maya import cmds, OpenMayaUI as omui
 
-from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
@@ -13,8 +13,8 @@ from TheKeyMachine.widgets import util as wutil
 @dataclass(frozen=True)
 class TimeContext:
     mode: str
-    start_frame: int
-    end_frame: int
+    start_frame: float
+    end_frame: float
     frames: tuple = ()
 
     @property
@@ -30,7 +30,7 @@ def get_playback_range():
 
 
 def get_current_frame_range():
-    current = int(cmds.currentTime(query=True))
+    current = float(cmds.currentTime(query=True))
     return current, current
 
 

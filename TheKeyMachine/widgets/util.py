@@ -1,7 +1,7 @@
 import maya.cmds as cmds
 import maya.OpenMayaUI as omui
 
-from TheKeyMachine.Qt import QtCompat, QtGui, QtWidgets
+from TheKeyMachine.core.Qt import QtCompat, QtGui, QtWidgets
 
 QMainWindow = QtWidgets.QMainWindow
 

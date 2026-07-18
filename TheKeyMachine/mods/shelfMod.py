@@ -9,7 +9,7 @@ import weakref
 
 from maya import cmds
 
-from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtGui  # type: ignore
 from TheKeyMachine.data import icons
 
 
@@ -139,6 +139,20 @@ def _keep_menu_alive(menu):
         menu.destroyed.connect(lambda *_args: _release_closed_menu(menu_ref))
     except Exception:
         pass
+
+
+def cleanup_open_menus():
+    """Close temporary shelf menus that may otherwise keep stale callbacks alive."""
+    for menu in list(_OPEN_SHELF_MENUS):
+        try:
+            menu.close()
+        except Exception:
+            pass
+        try:
+            menu.deleteLater()
+        except Exception:
+            pass
+    _OPEN_SHELF_MENUS[:] = []
 
 
 def _exec_menu(menu):

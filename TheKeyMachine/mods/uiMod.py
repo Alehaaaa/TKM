@@ -20,7 +20,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 import maya.cmds as cmds
 import maya.mel as mel
 
-from TheKeyMachine.Qt import QtCore
+from TheKeyMachine.core.Qt import QtCore
 
 QTimer = QtCore.QTimer
 
@@ -37,7 +37,6 @@ import platform
 import shutil
 
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.keyToolsMod as keyTools
 import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.mods.updater as updater
@@ -49,7 +48,6 @@ from TheKeyMachine.mods import settingsMod as settings
 
 mods = [
     general,
-    keyTools,
     bar,
     customDialogs,
     cw,
@@ -76,53 +74,6 @@ class Color:
 
 
 # Se usa en customGraph para la funcion de filtro
-
-filterMode_sync_on_code = """
-
-global proc syncChannelBoxFcurveEd()
-{{
-    global string $gChannelBoxName;
-
-    string $selAttrs[] = `selectedChannelBoxPlugs`;
-    selectionConnection -e -clear {graph_editor_outliner};
-    if (size($selAttrs) > 0) {{
-        for ($attr in $selAttrs) {{
-            selectionConnection -e -select $attr {graph_editor_outliner};
-        }}
-        filterUIFilterSelection graphEditor1OutlineEd "";
-    }} else if (size($selAttrs) == 0) {{
-        string $objects[] = `channelBoxObjects`;
-        for ($obj in $objects) {{
-            selectionConnection -e -select $obj {graph_editor_outliner};
-
-        }}
-        filterUIClearFilter graphEditor1OutlineEd;
-
-    }}
-}}
-syncChannelBoxFcurveEd();
-""".format(graph_editor_outliner=selectionMod.GRAPH_EDITOR_OUTLINER)
-
-filterMode_sync_off_code = """
-
-global proc syncChannelBoxFcurveEd()
-{
-
-}
-syncChannelBoxFcurveEd();
-
-filterUIClearFilter graphEditor1OutlineEd;
-
-"""
-
-
-def filterMode_sync_on():
-    mel.eval(filterMode_sync_on_code)
-
-
-def filterMode_sync_off():
-    mel.eval(filterMode_sync_off_code)
-
 
 # ---------------------------------------------------- STARTUP SCRIPT ----------------------------------------------------------------------------
 
@@ -200,6 +151,9 @@ def install_userSetup(install=True):
 
 def uninstall():
     # Muestra un cuadro de diálogo para confirmar la desinstalación
+    from TheKeyMachine.tools import common as toolCommon
+
+    toolCommon.finish_active_progress()
     result = cmds.confirmDialog(
         title="Uninstall TheKeyMachine",
         message="Do you want to uninstall TheKeyMachine?",
@@ -264,36 +218,6 @@ def uninstall():
 
 
 # ________________________________________________ Donate window  ______________________________________________________ #
-
-
-def donate_window():
-    link = "https://github.com/Alehaaaa/TKM"
-    msg = (
-        "The development of TheKeyMachine is a big effort in terms of time and energy.",
-        "If you use this tool professionally or regularly, please try to make a donation.",
-        "This will greatly help the project grow and have continuity. Every small amount counts.",
-        "Thank you!",
-        "",
-        f"Support TheKeyMachine <a href='{link}' style='color:#86CDAD;'><br>{link}</a>",
-    )
-
-    dlg = customDialogs.QFlatConfirmDialog(
-        parent=None,
-        window="Donate",
-        title="Donate to TheKeyMachine",
-        message=msg,
-        closeButton=True,
-        icon="",
-    )
-    dlg.message_label.setTextFormat(QtCore.Qt.RichText)
-    dlg.message_label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
-    dlg.message_label.setOpenExternalLinks(True)
-    return dlg.exec_()
-
-
-def about_window():
-    dlg = customDialogs.TKMAboutDialog(parent=None)
-    dlg.exec_()
 
 
 send_bug_report = report.send_bug_report

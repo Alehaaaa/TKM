@@ -1,0 +1,20 @@
+{
+  "menu": ["Open TheKeyMachine preferences, docking, maintenance, updates, and help."],
+  "toggle": ["Show or hide the main TheKeyMachine toolbar."],
+  "shelf": ["Add a button to the current Maya shelf that toggles TheKeyMachine."],
+  "reload": ["Prompt to save the scene, then cleanly stop the current runtime, reload TheKeyMachine modules, and rebuild the toolbar."],
+  "unload": ["Close TheKeyMachine and remove its callbacks, script jobs, temporary UI, and runtime state."],
+  "uninstall": ["Remove TheKeyMachine's Maya startup integration and installed files.", "This action asks for confirmation."],
+  "updates": ["Check for a newer TheKeyMachine release and open the updater when one is available."],
+  "preferences": ["Open toolbar behavior, appearance, startup, and interaction preferences."],
+  "startup": ["Load TheKeyMachine automatically when Maya starts."],
+  "tooltips": ["Show rich tooltips, including interaction details and animated examples."],
+  "dock": ["Move the toolbar to a Maya dock area, the Time Slider, or the Range Slider."],
+  "system": ["Open reload, unload, and uninstall maintenance actions."],
+  "help": ["Open documentation, support, community, and project information."],
+  "hotkeys": ["Open the hotkey editor for assigning TheKeyMachine commands."],
+  "history": ["Review release notes and changes for installed TheKeyMachine versions."],
+  "about": ["Show the installed version, credits, license, and project information."],
+  "donate": ["Open the project support page in your browser."],
+  "bug_report": ["Create a bug report with environment details and optional diagnostic attachments."]
+}

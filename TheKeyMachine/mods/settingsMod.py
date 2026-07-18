@@ -56,11 +56,18 @@ def get_setting(key: str, default_value=None, namespace: Optional[str] = None):
 
 
 def set_setting(key: str, value, namespace: Optional[str] = None) -> None:
+    set_settings({key: value}, namespace=namespace)
+
+
+def set_settings(values: Dict[str, object], namespace: Optional[str] = None) -> None:
+    """Persist several settings with a single preferences file update."""
+    if not values:
+        return
     config_file = get_preferences_file(namespace=namespace)
     os.makedirs(os.path.dirname(config_file), exist_ok=True)
 
     config = _load_file(config_file) or {}
-    config[key] = value
+    config.update(values)
 
     with open(config_file, "w", encoding="utf-8") as handle:
         json.dump(config, handle, indent=4, sort_keys=True)

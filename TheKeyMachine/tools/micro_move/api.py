@@ -3,7 +3,7 @@ import os
 from maya.api import OpenMaya as om
 from maya import cmds, utils
 
-from TheKeyMachine.Qt import QtCompat, QtCore, QtGui, QtWidgets
+from TheKeyMachine.core.Qt import QtCompat, QtCore, QtGui, QtWidgets
 from TheKeyMachine.data import icons
 
 import TheKeyMachine.core.runtimeManager as runtime

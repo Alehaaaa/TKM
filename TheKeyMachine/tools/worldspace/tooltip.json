@@ -1,0 +1,7 @@
+{
+  "copy_frame": ["Copy the selected objects' world-space transforms at the current frame."],
+  "copy_range": ["Copy world-space animation from the selected time range, or from the full keyed range when no range is selected."],
+  "paste_frame": ["Paste the copied world-space transforms onto the selected objects at the current frame."],
+  "paste_animation": ["Paste copied world-space animation onto the selected objects while preserving the captured timing."],
+  "help": ["Open the World Space copy and paste documentation."]
+}

@@ -1,0 +1,14 @@
+{
+  "tweener": ["Blend values between the previous and next keys."],
+  "tweener_worldspace": ["Blend transforms between neighboring poses in world space."],
+  "blend_to_buffer": ["Blend the current pose toward the stored pose buffer."],
+  "blend_to_default": ["Blend channels toward their default values."],
+  "blend_to_ease": ["Blend the current values toward an eased interpolation."],
+  "blend_to_frame": ["Blend toward values sampled from picked reference frames."],
+  "blend_to_frame_ws": ["Blend toward picked reference frames in world space."],
+  "blend_to_neighbors": ["Blend toward the previous or next neighboring key."],
+  "blend_to_neighbors_ws": ["Blend toward neighboring poses in world space."],
+  "blend_to_infinity": ["Blend toward the curve's pre-infinity or post-infinity value."],
+  "blend_to_infinity_ws": ["Blend toward infinity values in world space."],
+  "blend_to_undo": ["Blend back toward the state captured before this interaction."]
+}

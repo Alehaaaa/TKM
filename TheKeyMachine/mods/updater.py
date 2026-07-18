@@ -26,11 +26,12 @@ except ImportError:
 except ImportError:
     pass
 
-from TheKeyMachine.Qt import QtCore, QtGui
+from TheKeyMachine.core.Qt import QtCore, QtGui
 
 QTimer = QtCore.QTimer
 QThread = QtCore.QThread
 Signal = QtCore.Signal
+QObject = QtCore.QObject
 
 from TheKeyMachine.mods.generalMod import get_thekeymachine_version
 
@@ -47,6 +48,8 @@ REPO = "https://raw.githubusercontent.com/Alehaaaa/TKM/main/"
 NO_DATA_ERROR = "<hl>No Data</hl>\nCould not sync with the server."
 NO_SERVER_ERROR = "<hl>%s %s</hl>\nCould not sync with the server."
 _REPO_ARCHIVE_REF = None
+DOWNLOAD_PROGRESS_UNITS = 1000
+DOWNLOAD_PROGRESS_UPDATE_MS = 80
 
 # SSL Context
 unverified_ssl_context = ssl.create_default_context()
@@ -94,35 +97,68 @@ def _repo_parts():
 
 
 def download(downloadUrl, saveFile):
-    response = urllib_request.urlopen(downloadUrl, context=unverified_ssl_context, timeout=60)
+    response = urllib_request.urlopen(
+        downloadUrl, context=unverified_ssl_context, timeout=60
+    )
 
     if response is None:
         cmds.warning("Error trying to install.")
         return
 
-    total_size = response.getheader("Content-Length")
-    total_size = int(total_size) if total_size else 0
-    block_size = 8192
+    try:
+        total_size = response.getheader("Content-Length")
+        total_size = int(total_size) if total_size else 0
+        block_size = 65536
 
-    downloaded = 0
-    progress_max = total_size if total_size > 0 else 0
-    with toolCommon.tool_operation(
-        tool_id="download_update",
-        label="Downloading Update",
-        progress_max=progress_max,
-        progress=True,
-        interruptable=False,
-        undo=False,
-        suspend_refresh=False,
-    ) as operation:
-        with open(saveFile, "wb") as output:
-            while True:
-                buffer = response.read(block_size)
-                if not buffer:
-                    break
-                downloaded += len(buffer)
-                output.write(buffer)
-                operation.step(len(buffer))
+        downloaded = 0
+        displayed_units = 0
+        last_update_ms = -DOWNLOAD_PROGRESS_UPDATE_MS
+        progress_timer = QtCore.QElapsedTimer()
+        progress_timer.start()
+        progress_max = DOWNLOAD_PROGRESS_UNITS if total_size > 0 else 0
+        with toolCommon.tool_operation(
+            tool_id="download_update",
+            label="Downloading Update",
+            progress_max=progress_max,
+            progress=True,
+            interruptable=False,
+            undo=False,
+            suspend_refresh=False,
+        ) as operation:
+            with open(saveFile, "wb") as output:
+                while True:
+                    buffer = response.read(block_size)
+                    if not buffer:
+                        break
+                    downloaded += len(buffer)
+                    output.write(buffer)
+
+                    now = progress_timer.elapsed()
+                    if total_size > 0:
+                        target_units = int(
+                            (downloaded / float(total_size)) * DOWNLOAD_PROGRESS_UNITS
+                        )
+                        target_units = min(
+                            DOWNLOAD_PROGRESS_UNITS, max(displayed_units, target_units)
+                        )
+                        if target_units > displayed_units and (
+                            now - last_update_ms >= DOWNLOAD_PROGRESS_UPDATE_MS
+                            or target_units >= DOWNLOAD_PROGRESS_UNITS
+                        ):
+                            operation.step(target_units - displayed_units)
+                            displayed_units = target_units
+                            last_update_ms = now
+                    elif now - last_update_ms >= DOWNLOAD_PROGRESS_UPDATE_MS:
+                        operation.step()
+                        last_update_ms = now
+
+            if total_size > 0 and displayed_units < DOWNLOAD_PROGRESS_UNITS:
+                operation.step(DOWNLOAD_PROGRESS_UNITS - displayed_units)
+    finally:
+        try:
+            response.close()
+        except Exception:
+            pass
     return True
 
 
@@ -141,7 +177,9 @@ def _repo_archive_ref():
     api_url = "https://api.github.com/repos/%s/%s/commits/%s" % (owner, repo, branch)
     try:
         req = urllib_request.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib_request.urlopen(req, context=unverified_ssl_context, timeout=10) as response:
+        with urllib_request.urlopen(
+            req, context=unverified_ssl_context, timeout=10
+        ) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode("utf-8"))
                 sha = data.get("sha", sha)
@@ -179,6 +217,13 @@ def install(command=None, file_path=None):
 
     if not os.path.isfile(tmpZipFile):
         return cmds.error("Error trying to install.")
+
+    try:
+        import TheKeyMachine.core.runtimeManager as runtime
+
+        runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
+    except Exception:
+        pass
 
     zfobj = zipfile.ZipFile(tmpZipFile)
     fileList = zfobj.namelist()
@@ -251,7 +296,9 @@ def _fetch_repo_file(filename):
 
 def _download_text(url):
     try:
-        with urllib_request.urlopen(url, context=unverified_ssl_context, timeout=30) as response:
+        with urllib_request.urlopen(
+            url, context=unverified_ssl_context, timeout=30
+        ) as response:
             if response.status == 200:
                 text = response.read().decode("utf-8")
                 if not text:
@@ -295,9 +342,13 @@ def _update_buttons(dialog_cls):
 
 def _update_template(latest_version, installed_version, changelog):
     return (
-        "<title>Update {} available\n(using {})</title>\n".format(latest_version, installed_version)
+        "<title>Update {} available\n(using {})</title>\n".format(
+            latest_version, installed_version
+        )
         + "<text>A new version of TheKeyMachine is ready to download and install.</text>\n"
-        + changelogMod.changelog_template(changelog, latest_version, installed_version=installed_version)
+        + changelogMod.changelog_template(
+            changelog, latest_version, installed_version=installed_version
+        )
         + "<separator/>"
         + '<spacing size="8"/>\n'
         + "<text>Install replaces tool files and keeps your user data.</text>\n"
@@ -340,10 +391,37 @@ class UpdateCheckWorker(QThread):
 
 
 updater_worker = None
+updater_result_dispatcher = None
+
+
+class UpdateResultDispatcher(QObject):
+    result_ready = Signal(bool, object)
+
+    def emit_result(self, success, result):
+        self.result_ready.emit(success, result)
+
+
+def shutdown_update_worker(wait_ms=1000):
+    global updater_worker, updater_result_dispatcher
+    worker = updater_worker
+    updater_worker = None
+    updater_result_dispatcher = None
+    if worker is None:
+        return
+    try:
+        if worker.isRunning():
+            worker.quit()
+            worker.wait(int(wait_ms))
+    except Exception:
+        pass
+    try:
+        worker.deleteLater()
+    except Exception:
+        pass
 
 
 def check_for_updates(anchor_widget=None, warning=True, force=False):
-    global updater_worker
+    global updater_worker, updater_result_dispatcher
     from TheKeyMachine.mods import generalMod as general
 
     if not general.config.get("INTERNET_CONNECTION", True):
@@ -364,81 +442,95 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                 pass
 
     def handle_result(success, latest_version):
+        global updater_result_dispatcher
         if not success:
             if warning:
-                wutil.make_inViewMessage(latest_version)  # latest_version contains error msg here
+                wutil.make_inViewMessage(
+                    latest_version
+                )  # latest_version contains error msg here
+            updater_result_dispatcher = None
             return
 
         if latest_version is None:
             if warning:
-                wutil.make_inViewMessage("<hl>" + installed_version + "</hl>\nYou are up-to-date.")
+                wutil.make_inViewMessage(
+                    "<hl>" + installed_version + "</hl>\nYou are up-to-date."
+                )
+            updater_result_dispatcher = None
             return
 
-        changelog = ""
-        if isinstance(latest_version, dict):
-            changelog = latest_version.get("changelog") or ""
-            latest_version = latest_version.get("version")
+        try:
+            changelog = ""
+            if isinstance(latest_version, dict):
+                changelog = latest_version.get("changelog") or ""
+                latest_version = latest_version.get("version")
 
-        # Update the icon
-        if anchor_widget and hasattr(anchor_widget, "setIcon"):
-            anchor_widget.setIcon(QtGui.QIcon(icons.tkm_main_update))
+            # Update the icon
+            if anchor_widget and hasattr(anchor_widget, "setIcon"):
+                anchor_widget.setIcon(QtGui.QIcon(icons.tkm_main_update))
 
-        # If we are skipping updates and this isn't a forced check, don't do anything else
-        if not force and settings.get_setting("skip_updates", False):
-            return
+            # If we are skipping updates and this isn't a forced check, don't do anything else
+            if not force and settings.get_setting("skip_updates", False):
+                return
 
-        latest_version = latest_version.strip()
-        template = _update_template(latest_version, installed_version, changelog)
-        if anchor_widget:
-            result = QFlatTooltipConfirm.question(
-                anchor_widget,
-                title="Update available",
-                tooltip=template,
-                icon=icons.tkm_main_update,
-                buttons=_update_buttons(QFlatTooltipConfirm),
-                highlight="Install",
-            )
-        else:
-            result = QFlatConfirmDialog.question(
-                None,
-                "Update available",
-                title="",
-                message="",
-                tooltip=template,
-                icon=icons.tkm_main_update,
-                buttons=_update_buttons(QFlatConfirmDialog),
-                highlight="Install",
-            )
+            latest_version = latest_version.strip()
+            template = _update_template(latest_version, installed_version, changelog)
+            if anchor_widget:
+                result = QFlatTooltipConfirm.question(
+                    anchor_widget,
+                    title="Update available",
+                    tooltip=template,
+                    icon=icons.tkm_main_update,
+                    buttons=_update_buttons(QFlatTooltipConfirm),
+                    highlight="Install",
+                )
+            else:
+                result = QFlatConfirmDialog.question(
+                    None,
+                    "Update available",
+                    title="",
+                    message="",
+                    tooltip=template,
+                    icon=icons.tkm_main_update,
+                    buttons=_update_buttons(QFlatConfirmDialog),
+                    highlight="Install",
+                )
 
-        if result and result.get("positive"):
-            if result.get("name") == "Install":
-                if not install():
-                    return
+            if result and result.get("positive"):
+                if result.get("name") == "Install":
+                    if not install():
+                        return
 
-                # Reset skip setting on successful manual install
-                settings.set_setting("skip_updates", False)
+                    # Reset skip setting on successful manual install
+                    settings.set_setting("skip_updates", False)
 
-                def _post_update():
-                    import TheKeyMachine.core.toolbar as ui
+                    def _post_update():
+                        import TheKeyMachine.core.toolbar as ui
 
-                    reload(ui)
+                        reload(ui)
 
-                    QFlatConfirmDialog.information(
-                        None,
-                        "Updated",
-                        title=f"Installed TheKeyMachine {latest_version}",
-                        message="You have successfully updated the tool!<br><br>\nPlease restart Maya if you experience any issues.",
-                        icon=icons.success,
-                        closeButton=True,
-                    )
+                        QFlatConfirmDialog.information(
+                            None,
+                            "Updated",
+                            title=f"Installed TheKeyMachine {latest_version}",
+                            message="You have successfully updated the tool!<br><br>\nPlease restart Maya if you experience any issues.",
+                            icon=icons.success,
+                            closeButton=True,
+                        )
 
-                QTimer.singleShot(100, _post_update)
+                    QTimer.singleShot(100, _post_update)
 
-            elif result.get("name") == "Skip":
-                settings.set_setting("skip_updates", True)
+                elif result.get("name") == "Skip":
+                    settings.set_setting("skip_updates", True)
+        finally:
+            updater_result_dispatcher = None
 
     delay = 0 if warning or force else 1000
     updater_worker = UpdateCheckWorker(installed_version, force=force, delay=delay)
-    updater_worker.result_ready.connect(handle_result)
+    updater_result_dispatcher = UpdateResultDispatcher()
+    updater_result_dispatcher.result_ready.connect(handle_result)
+    updater_worker.result_ready.connect(
+        updater_result_dispatcher.emit_result, QtCore.Qt.QueuedConnection
+    )
     updater_worker.finished.connect(cleanup_worker)
     updater_worker.start()

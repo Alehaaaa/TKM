@@ -1,4 +1,4 @@
-"""Declarative tooltip-media references and movie path lookup."""
+"""Tooltip-media compatibility lookup during package migration."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 
 
-MOVIE_ROOT = os.path.join(os.path.dirname(__file__), "movies")
+TOOLS_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "tools"))
 
 
 @dataclass(frozen=True)
@@ -20,13 +20,19 @@ class TooltipMedia:
 def path(filename: str | None, default=None):
     if not filename:
         return default
-    return os.path.join(MOVIE_ROOT, filename)
+    matches = []
+    for tool_name in os.listdir(TOOLS_ROOT):
+        candidate = os.path.join(TOOLS_ROOT, tool_name, "media", filename)
+        if os.path.isfile(candidate):
+            matches.append(candidate)
+    if len(matches) > 1:
+        raise RuntimeError("Tooltip movie {!r} has multiple tool owners".format(filename))
+    return matches[0] if matches else default
 
 
 def get_path(name: str, default=None):
     filename = name if os.path.splitext(name)[1] else "{}.gif".format(name)
-    resolved = path(filename)
-    return resolved if os.path.exists(resolved) else default
+    return path(filename, default=default)
 
 
 def get(name: str, default=None):

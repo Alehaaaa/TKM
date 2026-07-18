@@ -1,13 +1,14 @@
 """Manifest discovery and execution for user-defined tools."""
 
 from importlib import import_module, invalidate_caches, reload
+from html import escape
 import os
 import re
 import shutil
 
 from maya import cmds, mel
 
-from TheKeyMachine.Qt import QtCore
+from TheKeyMachine.core.Qt import QtCore
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.generalMod as general
 
@@ -46,7 +47,12 @@ def source_spec(kind):
 
 
 def entry_key(kind, source_id):
-    return "custom_{}_{}".format(kind, source_id)
+    safe_id = re.sub(r"\W+", "_", str(source_id), flags=re.UNICODE).strip("_")
+    if not safe_id:
+        raise ValueError("Custom entry ids must contain at least one letter or number")
+    if safe_id[0].isdigit():
+        safe_id = "tool_{}".format(safe_id)
+    return "custom_{}_{}".format(kind, safe_id)
 
 
 def _user_path(relative_path):
@@ -166,8 +172,28 @@ def _execute(kind, run_spec):
     raise ValueError("Custom entry 'run' dictionary requires 'call', 'python', or 'mel'")
 
 
-def _entry_callback(kind, run_spec):
-    return lambda: _execute(kind, run_spec)
+def is_entry_command(command_id):
+    return any(str(command_id).startswith("custom_{}_".format(kind)) for kind in SOURCES)
+
+
+def execute_entry_command(command_id, label=None):
+    """Resolve a custom entry at trigger time so stale Maya commands fail cleanly."""
+    for kind in SOURCES:
+        for entry in load_entries(kind, notify=True):
+            if entry.get("id") == command_id:
+                return _execute(kind, entry.get("run"))
+
+    from TheKeyMachine.widgets import util as wutil
+
+    display_name = label or str(command_id).replace("custom_tools_", "").replace("_", " ")
+    wutil.make_inViewMessage(
+        "Custom tool <b>{}</b> was not found. It may have been removed or renamed.".format(escape(display_name))
+    )
+    return None
+
+
+def _entry_callback(command_id, label):
+    return lambda: execute_entry_command(command_id, label=label)
 
 
 def _manifest_entries(kind):
@@ -178,6 +204,7 @@ def _manifest_entries(kind):
         raise TypeError("{}.{} must be a dictionary".format(spec["module"], spec["registry"]))
 
     entries = []
+    command_ids = set()
     for name, definition in registry.items():
         if not isinstance(definition, dict) or definition.get("enabled", True) is False:
             continue
@@ -188,19 +215,29 @@ def _manifest_entries(kind):
             continue
         label = str(name)
         source_id = str(definition.get("id", label))
+        command_id = entry_key(kind, source_id)
+        if command_id in command_ids:
+            raise ValueError("Custom entries resolve to the same id: {}".format(command_id))
+        command_ids.add(command_id)
         icon = _resolve_icon(kind, definition.get("icon"))
+        tooltip = definition.get("tooltip")
+        description = definition.get("description")
+        if description is None and isinstance(tooltip, str):
+            description = tooltip
         button_text = "".join(character for character in label if character.isalnum())[:3].upper()
         entries.append(
             {
                 "type": "entry",
                 "kind": kind,
                 "source_id": source_id,
-                "id": entry_key(kind, source_id),
+                "id": command_id,
                 "label": label,
                 "icon": icon,
                 "text": None if icon else button_text,
+                "description": description or "Run this custom tool.",
+                "tooltip": tooltip,
                 "run": run_spec,
-                "callback": _entry_callback(kind, run_spec),
+                "callback": _entry_callback(command_id, label),
             }
         )
 
@@ -224,6 +261,8 @@ def _signature(entries):
             entry.get("label"),
             entry.get("icon"),
             entry.get("text"),
+            entry.get("description"),
+            _signature_value(entry.get("tooltip")),
             _signature_value(entry.get("run")),
         )
         for entry in entries

@@ -1,16 +1,16 @@
-from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
-from TheKeyMachine.tools.attribute_switcher.common import (
+from TheKeyMachine.tools.attribute_switcher.controller import (
     ATTRIBUTE_SWITCHER_GEOMETRY_KEY,
     ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
     ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
 )
-from TheKeyMachine.tools.attribute_switcher.custom_dialogs import AttributeSwitcherWindow
+from TheKeyMachine.tools.attribute_switcher.widgets import AttributeSwitcherWindow
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
 from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
 
@@ -18,7 +18,6 @@ from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
 __all__ = [
     "attribute_switcher_window",
     "close_attribute_switcher_window",
-    "toggle",
     "toggle_window",
     "show",
     "popup",
@@ -102,12 +101,6 @@ def set_euler_filter_enabled(enabled):
     emit_attribute_switcher_euler_filter_state()
 
 
-def toggle(*_args, **_kwargs):
-    state = not is_euler_filter_enabled()
-    set_euler_filter_enabled(state)
-    return state
-
-
 def get_attribute_switcher_window():
     global _attribute_switcher_instance
     if (
@@ -125,11 +118,9 @@ def is_attribute_switcher_window_open():
 
 
 def close_attribute_switcher_window():
-    global _attribute_switcher_instance
     dlg = get_attribute_switcher_window()
     if dlg and wutil.is_valid_widget(dlg):
         dlg.close()
-    _attribute_switcher_instance = None
     _emit_attribute_switcher_window_state(False)
 
 
@@ -147,6 +138,9 @@ def attribute_switcher_window(reuse_existing=True, popup=True, anchor_button=Non
 
         dlg.destroyed.connect(_on_destroyed)
         _attribute_switcher_instance = dlg
+    else:
+        dlg._connect_runtime_manager()
+        dlg.refresh()
 
     dlg.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, is_stay_on_top())
     if anchor_button and wutil.is_valid_widget(anchor_button):
@@ -216,13 +210,10 @@ def build_attribute_switcher_context_menu(parent=None):
 
 
 def bind_attribute_switcher_toolbar_button(button):
-    """Bind a toolbar button to the Attribute Switcher toggle using the shared helper."""
-    from TheKeyMachine.tools.common_toolbar_utils import bind_toolbar_button_common
-    bind_toolbar_button_common(
+    button.connect_window_toggle(
         attribute_switcher_toolbar_toggle,
-        button,
-        "_tkm_attribute_switcher_context_menu_slot",
-        lambda parent: build_attribute_switcher_context_menu(parent=parent),
+        context_attr="_tkm_attribute_switcher_context_menu_slot",
+        menu_factory=lambda parent: build_attribute_switcher_context_menu(parent=parent),
     )
     return True
 
@@ -242,8 +233,8 @@ def toggle_window(checked=None, *_args):
 
 
 def show():
-    return attribute_switcher_window(reuse_existing=False, popup=False)
+    return attribute_switcher_window(reuse_existing=True, popup=False)
 
 
 def popup():
-    return attribute_switcher_window(reuse_existing=False, popup=True)
+    return attribute_switcher_window(reuse_existing=True, popup=True)

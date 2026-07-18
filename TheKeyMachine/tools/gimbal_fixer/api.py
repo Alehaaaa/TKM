@@ -1,6 +1,5 @@
-from TheKeyMachine.tools.gimbal_fixer.controller import convert_rotation_order
-from TheKeyMachine.tools.gimbal_fixer.analyzer import GimbalAnalyzer
-from TheKeyMachine.tools.gimbal_fixer.custom_dialogs import (
+from TheKeyMachine.tools.gimbal_fixer.controller import GimbalAnalyzer, convert_rotation_order
+from TheKeyMachine.tools.gimbal_fixer.widgets import (
     bind_gimbal_fixer_toolbar_button,
     close_gimbal_fixer_window,
     is_gimbal_fixer_window_open,

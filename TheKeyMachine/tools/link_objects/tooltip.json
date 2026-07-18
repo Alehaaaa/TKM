@@ -1,0 +1,18 @@
+{
+  "copy_relationship": [
+    "Copy the world-space relationship between selected objects.",
+    "Select followers first and the driver last."
+  ],
+  "paste_relationship": [
+    "Restore the copied relationship at the current frame, or at existing relationship-object keys when a timeline range is selected."
+  ],
+  "paste_range": [
+    "Restore the copied relationship at existing relationship-object keys in the selected timeline range, or the playback range when no range is selected."
+  ],
+  "auto_link": [
+    "Keep the copied followers attached to the driver while editing or changing frames."
+  ],
+  "help": [
+    "Open the Copy Relationship documentation."
+  ]
+}

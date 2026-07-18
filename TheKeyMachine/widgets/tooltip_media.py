@@ -1,6 +1,6 @@
 """Qt widgets used to render tooltip movie references."""
 
-from TheKeyMachine.Qt import QtCore, QtGui, QtWidgets
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 from TheKeyMachine.widgets import util as wutil
 
 

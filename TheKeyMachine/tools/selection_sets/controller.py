@@ -4,12 +4,11 @@ import re
 
 from maya import cmds
 
-from TheKeyMachine.Qt import QtCore, QtWidgets
+from TheKeyMachine.core.Qt import QtCore, QtWidgets
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools.selection_sets import api as selectionSetsApi
-from TheKeyMachine.tools.selection_sets import common as selectionSetCommon
 from TheKeyMachine.widgets import util as wutil
 
 
@@ -46,6 +45,14 @@ ANIMBOT_COLOR_INDEX_TO_TKM_INDEX = {
     28: 26,
     29: 27,
 }
+
+
+def normalize_scene_items(items):
+    """Return comparable long Maya paths for scene items."""
+    if not items:
+        return set()
+    normalized = cmds.ls(items, long=True) or []
+    return set(normalized or items)
 TKM_SELECTION_COLOR_BY_INDEX = {color.index: color for color in selectionSetsApi.SELECTION_SET_COLORS}
 
 
@@ -210,14 +217,14 @@ class SelectionSetsController:
         return selection_sets
 
     def _find_matching_selection_set(self, selection):
-        target_members = selectionSetCommon.normalize_scene_items(selection)
+        target_members = normalize_scene_items(selection)
         if not target_members:
             return None
 
         for subset in self.get_selection_sets():
             if not cmds.objExists(subset):
                 continue
-            subset_members = selectionSetCommon.normalize_scene_items(cmds.sets(subset, q=True) or [])
+            subset_members = normalize_scene_items(cmds.sets(subset, q=True) or [])
             if subset_members == target_members:
                 return subset
         return None

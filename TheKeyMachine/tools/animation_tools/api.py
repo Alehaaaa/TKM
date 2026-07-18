@@ -1,0 +1,87 @@
+"""Public entry point for animation tools."""
+
+from TheKeyMachine.tools.animation_tools import controller
+
+
+REMOVE_REDUNDANT_MODE_FLAT = controller.REMOVE_REDUNDANT_MODE_FLAT
+REMOVE_REDUNDANT_MODE_ALL = controller.REMOVE_REDUNDANT_MODE_ALL
+
+
+def apply_smart_euler_filter(*args):
+    return controller.apply_smart_euler_filter(*args)
+
+
+def clear_animation_keys(*args):
+    return controller.clear_animation_keys(*args)
+
+
+def copy_keys(*args):
+    return controller.copy_keys(*args)
+
+
+def crop_animation(*args):
+    return controller.crop_animation(*args)
+
+
+def cut_keys(*args):
+    return controller.cut_keys(*args)
+
+
+def delete_keys(*args):
+    return controller.delete_keys(*args)
+
+
+def paste_keys(*args):
+    return controller.paste_keys(*args)
+
+
+def paste_keys_relative(*args):
+    return controller.paste_keys_relative(*args)
+
+
+def remove_redundant_keys(*args):
+    return controller.remove_redundant_keys(*args)
+
+
+def get_remove_redundant_mode():
+    return controller.get_remove_redundant_mode()
+
+
+def set_remove_redundant_mode(mode):
+    return controller.set_remove_redundant_mode(mode)
+
+
+def remove_static_anim_curves(*args):
+    return controller.remove_static_anim_curves(*args)
+
+
+def reverse_animation(*args):
+    return controller.reverse_animation(*args)
+
+
+def set_smart_key(*args):
+    return controller.set_smart_key(*args)
+
+
+def set_smart_key_all_channels(*args):
+    return controller.set_smart_key_all_channels(*args)
+
+
+def snap_keyframes(*args):
+    return controller.snap_keyframes(*args)
+
+
+def clear_selected_keys(*args):
+    return controller.clear_selected_keys(*args)
+
+
+def select_all_animation_curves(*args):
+    return controller.select_all_animation_curves(*args)
+
+
+def delete_keyframes_before_current_time(*args):
+    return controller.delete_keyframes_before_current_time(*args)
+
+
+def delete_keyframes_after_current_time(*args):
+    return controller.delete_keyframes_after_current_time(*args)

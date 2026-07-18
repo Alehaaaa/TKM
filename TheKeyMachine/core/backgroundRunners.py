@@ -12,7 +12,7 @@ from typing import Dict, Optional
 
 from maya import cmds
 
-from TheKeyMachine.Qt import QtCore, QtGui  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtGui  # type: ignore
 
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.core.openMayaUtils as omutils

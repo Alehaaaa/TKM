@@ -1,0 +1,5 @@
+{
+  "euler_filter": ["Automatically apply an Euler filter after Attribute Switcher changes rotation order."],
+  "overshoot_sliders": ["Extend slider ranges and buttons beyond 100 percent to 150 percent."],
+  "custom_graph": ["Show or hide TheKeyMachine's toolbar inside every Maya Graph Editor.", "This preference persists between Maya sessions."]
+}

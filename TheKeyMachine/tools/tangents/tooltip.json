@@ -1,0 +1,19 @@
+{
+  "cycle": ["Match the first and last keys of selected Graph Editor curves to create a seamless cycle."],
+  "cycle_first": ["Copy each selected curve's last key value and tangent state onto its first key."],
+  "cycle_last": ["Copy each selected curve's first key value and tangent state onto its last key."],
+  "bouncy": ["Fit exaggerated tangent angles that add controlled overshoot around the targeted keys."],
+  "auto": ["Set automatic tangents on the targeted keys."],
+  "spline": ["Set smooth spline tangents on the targeted keys."],
+  "clamped": ["Set clamped tangents to smooth motion while limiting overshoot near equal values."],
+  "linear": ["Set straight linear interpolation through the targeted keys."],
+  "flat": ["Set horizontal flat tangents on the targeted keys."],
+  "step": ["Hold each key value until the following key."],
+  "plateau": ["Set plateau tangents to smooth extrema while reducing overshoot."],
+  "in": ["Apply {tangent} only to the incoming handle of the current key selection."],
+  "out": ["Apply {tangent} only to the outgoing handle of the current key selection."],
+  "first": ["Apply {tangent} only to the earliest targeted key."],
+  "last": ["Apply {tangent} only to the latest targeted key."],
+  "all": ["Apply {tangent} to every key on the targeted animation curves."],
+  "default": ["Use {tangent} for newly created Maya keys."]
+}

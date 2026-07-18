@@ -1,0 +1,12 @@
+{
+  "share": ["Add missing shared key times across the active animation channels.", {"movie": "share_keys"}],
+  "share_last": ["Use the last selected object as the source of key times for the other selected objects."],
+  "reblock": ["Re-space animation blocks while preserving their keyed poses.", {"movie": "reblock"}],
+  "reblock_insert": ["Insert reblocked timing without replacing the destination timing."],
+  "bake_1": ["Bake the active animation context on every frame."],
+  "bake_2": ["Bake the active animation context every two frames."],
+  "bake_3": ["Bake the active animation context every three frames."],
+  "bake_4": ["Bake the active animation context every four frames."],
+  "bake_custom": ["Bake using a custom positive frame interval."],
+  "bake_last": ["Bake selected targets at the key times of the last selected object."]
+}

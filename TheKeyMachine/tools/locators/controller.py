@@ -1,0 +1,1 @@
+"""Locator tool behavior boundary."""

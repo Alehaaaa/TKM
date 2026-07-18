@@ -1,104 +1,77 @@
-from TheKeyMachine.Qt import QtCore
+"""Public entry point for the Graph Editor toolbar."""
 
-import TheKeyMachine.mods.settingsMod as settings
-import TheKeyMachine.widgets.util as wutil
-import TheKeyMachine.core.runtimeManager as runtime
-from TheKeyMachine.tools import common as toolCommon
+from TheKeyMachine.tools.graph_toolbar import controller
 
 
-GRAPH_TOOLBAR_ENABLED_SETTING = "graph_toolbar_enabled"
+GRAPH_TOOLBAR_DOCK_SETTING = controller.GRAPH_TOOLBAR_DOCK_SETTING
+DOCK_BOTTOM_GRAPH = controller.DOCK_BOTTOM_GRAPH
+DOCK_TOP_GRAPH = controller.DOCK_TOP_GRAPH
+DOCK_BOTTOM_MENU = controller.DOCK_BOTTOM_MENU
+DOCK_OPTIONS = controller.DOCK_OPTIONS
+custom_graph_bus = controller.custom_graph_bus
 
 
-class CustomGraphBus(QtCore.QObject):
-    graph_toolbar_enabled_changed = QtCore.Signal(bool)
+def _show_menu(command_id):
+    from TheKeyMachine.mods import shelfMod
+
+    return shelfMod.show_tool_menu_at_cursor(command_id)
 
 
-custom_graph_bus = CustomGraphBus()
+def show_settings_menu(*_args):
+    return _show_menu("graph_settings_menu")
 
 
-def get_graph_toolbar_checkbox_state() -> bool:
-    return bool(settings.get_setting(GRAPH_TOOLBAR_ENABLED_SETTING, True))
+def show_dock_menu(*_args):
+    return _show_menu("graph_dock_menu")
 
 
-def is_graph_toolbar_visible() -> bool:
-    try:
-        from TheKeyMachine.core import customGraph
-
-        widget = customGraph.getCustomGraphWidget()
-        return bool(widget and wutil.is_valid_widget(widget) and widget.isVisible())
-    except (ImportError, RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return False
+def get_widget():
+    return controller.get_widget()
 
 
-def emit_graph_toolbar_state() -> None:
-    state = get_graph_toolbar_checkbox_state()
-    try:
-        custom_graph_bus.graph_toolbar_enabled_changed.emit(state)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
-    try:
-        runtime.get_runtime_manager().set_tool_state("custom_graph", state)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
+def create(*args, **kwargs):
+    return controller.create(*args, **kwargs)
 
 
-def sync_graph_toolbar_watch() -> None:
-    try:
-        runtime.get_runtime_manager().set_graph_editor_watch_enabled(get_graph_toolbar_checkbox_state())
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
+def remove():
+    return controller.remove()
 
 
-def bind_graph_toolbar_toggle(widget) -> None:
-    if widget is None:
-        return
-    toolCommon.bind_checked_signal(
-        widget,
-        custom_graph_bus.graph_toolbar_enabled_changed,
-        get_graph_toolbar_checkbox_state,
-        attr_name="_tkm_graph_toolbar_sync_relay",
-    )
-    toolCommon.sync_checked(widget, get_graph_toolbar_checkbox_state)
+def ensure():
+    return controller.ensure()
 
 
-def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
-    enabled = bool(enabled)
-    settings.set_setting(GRAPH_TOOLBAR_ENABLED_SETTING, enabled)
-    sync_graph_toolbar_watch()
-    emit_graph_toolbar_state()
-    if not apply:
-        return
-
-    from TheKeyMachine.core import customGraph
-
-    try:
-        if enabled:
-            QtCore.QTimer.singleShot(0, customGraph.createCustomGraph)
-        else:
-            QtCore.QTimer.singleShot(0, customGraph.removeCustomGraph)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        if enabled:
-            customGraph.createCustomGraph()
-        else:
-            customGraph.removeCustomGraph()
+def apply_alignment(alignment_label=None):
+    return controller.apply_alignment(alignment_label)
 
 
-def toggle(state=None, *args, **kwargs):
-    if state is None:
-        state = not get_graph_toolbar_checkbox_state()
-    return set_graph_toolbar_enabled(bool(state), apply=kwargs.get("apply", True))
+def move_dock(position=None):
+    return controller.move_dock(position)
 
 
-def shutdown_graph_toolbar_runtime() -> None:
-    """Remove the live Graph Editor toolbar without changing the saved preference."""
-    try:
-        runtime.get_runtime_manager().set_graph_editor_watch_enabled(False)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
+def get_graph_toolbar_checkbox_state():
+    return controller.get_graph_toolbar_checkbox_state()
 
-    try:
-        from TheKeyMachine.core import customGraph
 
-        customGraph.removeCustomGraph()
-    except (ImportError, RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
+def is_graph_toolbar_visible():
+    return controller.is_graph_toolbar_visible()
+
+
+def emit_graph_toolbar_state():
+    return controller.emit_graph_toolbar_state()
+
+
+def sync_graph_toolbar_watch():
+    return controller.sync_graph_toolbar_watch()
+
+
+def bind_graph_toolbar_toggle(widget):
+    return controller.bind_graph_toolbar_toggle(widget)
+
+
+def set_graph_toolbar_enabled(enabled, *, apply=True):
+    return controller.set_graph_toolbar_enabled(enabled, apply=apply)
+
+
+def shutdown_graph_toolbar_runtime():
+    return controller.shutdown_graph_toolbar_runtime()

@@ -4,7 +4,7 @@ import re
 import xml.etree.ElementTree as ET
 from functools import partial
 
-from TheKeyMachine.Qt import IsPyQt6, IsPySide6, QtCore, QtGui, QtSvg, QtWidgets
+from TheKeyMachine.core.Qt import IsPyQt6, IsPySide6, QtCore, QtGui, QtSvg, QtWidgets
 
 QRegularExpression = getattr(QtCore, "QRegularExpression", None) or getattr(QtCore, "QRegExp")
 QRegularExpressionValidator = getattr(QtGui, "QRegularExpressionValidator", None) or getattr(QtGui, "QRegExpValidator")
@@ -21,7 +21,14 @@ import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.widgets.customWidgets as cw
 
 
-_version_history_dialog = None
+def _prepare_modal_wait():
+    """Remove tool progress before waiting for user input."""
+    try:
+        from TheKeyMachine.tools import common as toolCommon
+
+        toolCommon.finish_active_progress()
+    except Exception:
+        pass
 
 
 def _parent_widget_for_layout(layout, fallback=None):
@@ -214,6 +221,10 @@ class QFlatDialog(QFlatWindowMixin, QtWidgets.QDialog):
         self._highlighted = highlight
         self._buttons_to_init = buttons
         self._default_button = None
+
+    def exec_(self):
+        _prepare_modal_wait()
+        return QtWidgets.QDialog.exec_(self)
 
     def _buttonConfigHook(self, index, config):
         return config
@@ -613,6 +624,7 @@ class QFlatConfirmDialog(QFlatDialog):
         if self._exclusive:
             return self.exec_() == QtWidgets.QDialog.Accepted
 
+        _prepare_modal_wait()
         self.show()
         self.raise_()
         self.activateWindow()
@@ -812,17 +824,16 @@ class QFlatTooltipConfirm(QFlatDialog):
         parent = kwargs.pop("parent", None) or anchor_widget.window()
         dlg = cls(parent=parent, **kwargs)
 
-        # Register with TooltipManager so it can be managed/cleared
-        QFlatTooltipManager._current_tooltip = dlg
-
-        dlg._show_around(anchor_widget, target_rect=kwargs.get("target_rect"))
-        dlg.exec_()
-
-        # Clean up registration
-        if QFlatTooltipManager._current_tooltip == dlg:
-            QFlatTooltipManager._current_tooltip = None
-
-        return dlg.clicked_button
+        try:
+            dlg._show_around(anchor_widget, target_rect=kwargs.get("target_rect"))
+            dlg.exec_()
+            return dlg.clicked_button
+        finally:
+            dlg.setParent(None)
+            dlg.deleteLater()
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                QtWidgets.QApplication.sendPostedEvents(dlg, QtCore.QEvent.DeferredDelete)
 
     show_around = _show_around
 
@@ -1135,111 +1146,6 @@ class QFlatToolBarPopupDialog(QFlatToolBarDialog):
         super().changeEvent(event)
 
 
-class QFlatSelectorDialog(QFlatToolBarPopupDialog):
-    """
-    A modern successor to the Maya textScrollList selector.
-    Displays a list of currently selected objects, allowing for quick
-    re-selection and focus.
-    """
-
-    def __init__(self, parent=None):
-        self.title = "Selector"
-        self.icon = icons.selector
-        super().__init__(parent=parent, native_popup=True)
-        self.title_label.setText("0")
-
-        self._refresh_timer = QtCore.QTimer(self)
-        self._refresh_timer.setSingleShot(True)
-        self._refresh_timer.timeout.connect(self.reload_objects)
-        self._suppress_next_refresh = False
-        self._pending_objects = []
-        self._refreshing = False
-
-        # List
-        self._list_model = QtCore.QStringListModel(self)
-        self.list_widget = QtWidgets.QListView()
-        self.list_widget.setModel(self._list_model)
-        self.list_widget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.list_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        self.list_widget.setUniformItemSizes(True)
-        self.list_widget.selectionModel().selectionChanged.connect(self._on_list_selection_changed)
-
-        self.mainLayout.addWidget(self.list_widget, 1)
-
-        # Auto-refresh with Maya selection changes (no manual reload button).
-        try:
-            import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
-
-            runtime.get_runtime_manager().selection_changed.connect(self._schedule_reload)
-        except Exception:
-            pass
-
-        self.reload_objects()
-
-    def _schedule_reload(self, *_args):
-        if self._suppress_next_refresh:
-            self._suppress_next_refresh = False
-            return
-        if not self._refresh_timer.isActive():
-            self._refresh_timer.start(0)
-
-    def _sort_selected_objects_for_display(self, objects):
-        return sorted(objects or [], key=lambda obj: (obj.rsplit("|", 1)[-1].lower(), obj.lower()))
-
-    def _select_all_rows(self):
-        selection_model = self.list_widget.selectionModel()
-        if not selection_model or not self._pending_objects:
-            return
-        top_left = self._list_model.index(0, 0)
-        bottom_right = self._list_model.index(len(self._pending_objects) - 1, 0)
-        selection_model.select(
-            QtCore.QItemSelection(top_left, bottom_right),
-            QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows,
-        )
-
-    def reload_objects(self):
-        """Fills the list with current selection names and preserves active selection in the UI."""
-        self._refreshing = True
-        self.list_widget.blockSignals(True)
-        
-        valid_selected = get_valid_selected_objects(long=True)
-            
-        selected = self._sort_selected_objects_for_display(valid_selected)
-        self._pending_objects = selected
-        item_labels = [obj.rsplit("|", 1)[-1] for obj in selected]
-        self.title_label.setText(str(len(selected)))
-        self._list_model.setStringList(item_labels)
-        self._select_all_rows()
-        self._refreshing = False
-        self.list_widget.blockSignals(False)
-
-    def _on_list_selection_changed(self):
-        """Syncs the dialog selection back to the Maya scene."""
-        import maya.cmds as cmds
-
-        if self._refreshing:
-            return
-
-        names = []
-        for index in self.list_widget.selectionModel().selectedIndexes():
-            row = index.row()
-            if 0 <= row < len(self._pending_objects):
-                names.append(self._pending_objects[row])
-
-        valid_names = [n for n in names if n and cmds.objExists(n)]
-
-        if names and not valid_names:
-            self.reload_objects()
-            return
-
-        if valid_names:
-            self._suppress_next_refresh = True
-            cmds.select(valid_names, replace=True)
-        else:
-            self._suppress_next_refresh = True
-            cmds.select(clear=True)
-
-
 class QFlatToolBarWindowDialog(QFlatDialog):
     """
     Full QFlat window shell with a unified top-left icon, title, and bottom bar.
@@ -1538,266 +1444,6 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
         self.activateWindow()
 
 
-class TKMAboutDialog(QFlatDialog):
-    def __init__(self, parent=None):
-        QFlatDialog.__init__(self, parent)
-        self.setWindowTitle("About TheKeyMachine")
-
-        content_widget = QtWidgets.QWidget()
-        content_layout = QtWidgets.QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(DPI(20), DPI(20), DPI(20), 0)
-        content_layout.setSpacing(DPI(12))
-
-        # Logo
-        logo_label = QtWidgets.QLabel()
-        logo_label.setAlignment(QtCore.Qt.AlignCenter)
-        logo_pixmap = QtGui.QPixmap(icons.TheKeyMachine_logo_250)
-        logo_label.setPixmap(logo_pixmap)
-        content_layout.addWidget(logo_label)
-
-        TheKeyMachine_stage_version = general.get_thekeymachine_stage_version()
-        TheKeyMachine_version = general.get_thekeymachine_version()
-        TheKeyMachine_build_version = general.get_thekeymachine_build_version()
-        TheKeyMachine_codename = general.get_thekeymachine_codename()
-
-        # Tool Name & Title
-        tool_name = QtWidgets.QLabel("Animation toolset for Maya Animators")
-        tool_name.setAlignment(QtCore.Qt.AlignCenter)
-        tool_name.setStyleSheet("font-size: %spx; font-weight: bold; color: #ececec;" % DPI(16))
-        content_layout.addWidget(tool_name)
-
-        # Version Badge
-        version_btn = QtWidgets.QPushButton(f"v{TheKeyMachine_version} {TheKeyMachine_stage_version}")
-        version_btn.setCursor(QtCore.Qt.PointingHandCursor)
-
-        clickable_style = """
-            QPushButton:hover {
-                background-color: #498042;
-                color: white;
-            }
-            QPushButton:pressed {
-                background-color: #3a5a3d;
-                color: #98ae97;
-            }
-            """
-        version_btn.clicked.connect(self._open_version_history)
-
-        version_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: rgba(76, 175, 80, 0.15);
-                border: 1px solid #4CAF50;
-                color: #81C784;
-                border-radius: %spx;
-                padding: %spx %spx;
-                font-size: %spx;
-                font-weight: bold;
-            }
-            %s
-            """
-            % (DPI(4), DPI(4), DPI(8), DPI(12), clickable_style)
-        )
-        content_layout.addWidget(version_btn, alignment=QtCore.Qt.AlignCenter)
-
-        build_label = QtWidgets.QLabel(f"Build: {TheKeyMachine_build_version} | {TheKeyMachine_codename}")
-        build_label.setAlignment(QtCore.Qt.AlignCenter)
-        build_label.setStyleSheet("font-size: %spx; color: #888888;" % DPI(11))
-        content_layout.addWidget(build_label)
-
-        info_text = """
-            <div style='text-align: center; color: #888888; font-size: %spx;'>
-                <p>This tool is licensed under the <a href='https://www.gnu.org/licenses/gpl-3.0.en.html' style='color: #67b9e0; text-decoration: none;'>GNU GPL 3.0</a>.</p>
-                <div style='margin-top: 10px;'>
-                    Developed by <a href='http://rodritorres.com' style='color: #67b9e0; text-decoration: none;'>Rodrigo Torres</a>
-                </div>
-                <div style='margin-top: 5px;'>
-                    Modified by <a href='http://alehaaaa.github.io' style='color: #67b9e0; text-decoration: none;'>Alehaaaa</a>
-                </div>
-            </div>
-        """ % (DPI(11))
-
-        info_label = QtWidgets.QLabel(info_text)
-        info_label.setAlignment(QtCore.Qt.AlignCenter)
-        info_label.setTextFormat(QtCore.Qt.RichText)
-        info_label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
-        info_label.setOpenExternalLinks(True)
-        info_label.setStyleSheet("background: transparent;")
-        content_layout.addWidget(info_label)
-
-        self.root_layout.addWidget(content_widget)
-        self.setBottomBar(closeButton=True)
-        self.adjustSize()
-
-    def _open_version_history(self):
-        self.accept()
-
-        def _show():
-            show_version_history_dialog(parent=None)
-
-        QtCore.QTimer.singleShot(0, _show)
-
-
-def show_version_history_dialog(parent=None):
-    global _version_history_dialog
-
-    if _version_history_dialog and is_valid_widget(_version_history_dialog):
-        _version_history_dialog.show()
-        _version_history_dialog.raise_()
-        _version_history_dialog.activateWindow()
-        return _version_history_dialog
-
-    dlg = TKMVersionHistoryDialog(parent=parent)
-    dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
-
-    def _clear_ref(*_args):
-        global _version_history_dialog
-        _version_history_dialog = None
-
-    dlg.destroyed.connect(_clear_ref)
-    _version_history_dialog = dlg
-    dlg.show()
-    dlg.raise_()
-    dlg.activateWindow()
-    return dlg
-
-
-class TKMVersionHistoryDialog(QFlatDialog):
-    def __init__(self, parent=None):
-        QFlatDialog.__init__(self, parent)
-        self.setWindowTitle("TheKeyMachine Version History")
-        self.setMinimumSize(DPI(620), DPI(520))
-
-        content_widget = QtWidgets.QWidget()
-        content_layout = QtWidgets.QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(DPI(12), DPI(12), DPI(12), 0)
-        content_layout.setSpacing(DPI(0))
-
-        logo_label = QtWidgets.QLabel()
-        logo_label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        logo_pixmap = QtGui.QPixmap(icons.TheKeyMachine_logo_250)
-        if not logo_pixmap.isNull():
-            logo_label.setPixmap(
-                logo_pixmap.scaledToWidth(DPI(170), QtCore.Qt.SmoothTransformation)
-            )
-        content_layout.addWidget(logo_label)
-        content_layout.addSpacing(DPI(18))
-
-        title_label = QtWidgets.QLabel("Version History")
-        title_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        title_label.setStyleSheet("font-size: %spx; font-weight: bold; color: #cfcfcf;" % DPI(15))
-        content_layout.addWidget(title_label)
-
-        sections = changelogMod.get_local_changelog_sections()
-        range_text = self._version_range_text(sections)
-        range_label = QtWidgets.QLabel(range_text)
-        range_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        range_label.setStyleSheet("font-size: %spx; font-weight: bold; color: #a8a8a8;" % DPI(10))
-        content_layout.addWidget(range_label)
-        content_layout.addSpacing(DPI(24))
-
-        scroll_area = QtWidgets.QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
-        scroll_area.setStyleSheet(
-            """
-            QScrollArea {
-                background-color: #242424;
-                border: none;
-            }
-            """
-        )
-
-        history_widget = QtWidgets.QWidget()
-        history_widget.setStyleSheet("background-color: #242424;")
-        history_layout = QtWidgets.QVBoxLayout(history_widget)
-        history_layout.setContentsMargins(0, 0, 0, 0)
-        history_layout.setSpacing(0)
-
-        if sections:
-            for index, section in enumerate(sections):
-                history_layout.addWidget(self._build_version_block(section, index))
-        else:
-            empty_label = QtWidgets.QLabel("No changelog available.")
-            empty_label.setAlignment(QtCore.Qt.AlignCenter)
-            empty_label.setStyleSheet("color: #bbbbbb; font-size: %spx; padding: %spx;" % (DPI(12), DPI(24)))
-            history_layout.addWidget(empty_label)
-
-        history_layout.addStretch(1)
-        scroll_area.setWidget(history_widget)
-        content_layout.addWidget(scroll_area, 1)
-
-        self.root_layout.addWidget(content_widget)
-        self.setBottomBar(closeButton=True)
-        self.resize(DPI(650), DPI(580))
-
-    def _version_range_text(self, sections):
-        if not sections:
-            return "(No changelog entries found)"
-        newest = sections[0].get("version", "")
-        oldest = sections[-1].get("version", "")
-        return "(From %s up to %s)" % (oldest, newest)
-
-    def _build_version_block(self, section, index):
-        frame = QtWidgets.QFrame()
-        frame.setStyleSheet(
-            """
-            QFrame {
-                background-color: %s;
-                border: none;
-            }
-            """
-            % ("#292929" if index % 2 == 0 else "#262626")
-        )
-
-        layout = QtWidgets.QVBoxLayout(frame)
-        layout.setContentsMargins(DPI(10), DPI(10), DPI(10), DPI(12))
-        layout.setSpacing(DPI(7))
-
-        version_label = QtWidgets.QLabel("Version %s" % section.get("version", ""))
-        version_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        version_label.setStyleSheet("font-size: %spx; font-weight: bold; color: #f0f0f0;" % DPI(15))
-        layout.addWidget(version_label)
-
-        for group in changelogMod.group_changelog_entries(section.get("entries", [])):
-            layout.addLayout(self._build_entry_group(group))
-
-        return frame
-
-    def _build_entry_group(self, group):
-        group_layout = QtWidgets.QVBoxLayout()
-        group_layout.setContentsMargins(DPI(2), 0, 0, 0)
-        group_layout.setSpacing(DPI(3))
-
-        header_layout = QtWidgets.QHBoxLayout()
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(DPI(8))
-
-        icon_label = QtWidgets.QLabel()
-        kind = group.get("kind", "")
-        pixmap = QtGui.QPixmap(changelogMod.change_kind_icon(kind))
-        icon_size = DPI(17)
-        if not pixmap.isNull():
-            icon_label.setPixmap(pixmap.scaled(icon_size, icon_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
-        icon_label.setFixedSize(icon_size, icon_size)
-        header_layout.addWidget(icon_label, 0, QtCore.Qt.AlignVCenter)
-
-        title = QtWidgets.QLabel("<b>%s</b>" % changelogMod.escape_text(changelogMod.change_kind_label(kind)))
-        title.setTextFormat(QtCore.Qt.RichText)
-        title.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        title.setStyleSheet("font-size: %spx; color: #d3d3d3;" % DPI(11))
-        header_layout.addWidget(title, 0, QtCore.Qt.AlignVCenter)
-        header_layout.addStretch(1)
-        group_layout.addLayout(header_layout)
-
-        for entry in group.get("entries", []):
-            label = QtWidgets.QLabel(changelogMod.escape_text(entry.get("description", "")))
-            label.setWordWrap(True)
-            label.setTextFormat(QtCore.Qt.RichText)
-            label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-            label.setStyleSheet("font-size: %spx; color: #d3d3d3;" % DPI(11))
-            group_layout.addWidget(label)
-
-        return group_layout
 
 
 class QFlatNumberInput(QFlatToolBarPopupDialog):

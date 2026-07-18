@@ -9,12 +9,13 @@ Centralized Maya runtime manager for TheKeyMachine.
 from __future__ import annotations
 
 import json
+import sys
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional
 
 from maya import cmds
 
-from TheKeyMachine.Qt import QtCompat, QtCore, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCompat, QtCore, QtWidgets  # type: ignore
 import TheKeyMachine.core.openMayaUtils as omutils
 
 try:
@@ -27,6 +28,8 @@ _OPTIONVAR_NAME = "TKM_RuntimeManager"
 _APP_RUNTIME_ATTRIBUTE = "_tkm_runtime_manager"
 _TRANSIENT_WIDGET_PROPERTY = "tkm_managed_transient"
 _MANAGER: Optional["RuntimeManager"] = None
+_TKM_FLOATING_WIDGET_PROPERTY = "tkm_floating_widget"
+_TKM_WORKSPACE_CONTROLS = ("kWorkspaceControl",)
 
 
 def _load_state() -> Dict[str, Any]:
@@ -97,19 +100,14 @@ def cleanup_orphaned_widgets() -> None:
     app = QtWidgets.QApplication.instance()
     if app is None:
         return
-    for widget in list(app.allWidgets()):
+    all_widgets = getattr(app, "allWidgets", None)
+    if not callable(all_widgets):
+        return
+    for widget in list(all_widgets()):
         try:
-            is_managed = bool(widget.property(_TRANSIENT_WIDGET_PROPERTY))
-            is_legacy_tint = widget.__class__.__name__ == "TimelineTint"
-            if not (is_managed or is_legacy_tint):
+            if not _is_tkm_cleanup_widget(widget):
                 continue
-            delete_tint = getattr(widget, "delete_tint", None)
-            if callable(delete_tint):
-                delete_tint()
-            else:
-                widget.hide()
-                widget.setParent(None)
-                widget.deleteLater()
+            _safe_delete_widget(widget)
         except Exception:
             pass
 
@@ -135,6 +133,170 @@ def cleanup_previous_runtime(current=None) -> None:
         delattr(app, _APP_RUNTIME_ATTRIBUTE)
     except Exception:
         pass
+
+
+def _safe_process_events() -> None:
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return
+    try:
+        app.processEvents()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        app.processEvents()
+    except Exception:
+        pass
+
+
+def _safe_delete_widget(widget) -> None:
+    if widget is None:
+        return
+    try:
+        if not QtCompat.isValid(widget):
+            return
+    except Exception:
+        pass
+    delete_tint = getattr(widget, "delete_tint", None)
+    if callable(delete_tint):
+        try:
+            delete_tint()
+            return
+        except Exception:
+            pass
+    try:
+        widget.blockSignals(True)
+    except Exception:
+        pass
+    try:
+        widget.hide()
+    except Exception:
+        pass
+    try:
+        parent = widget.parentWidget()
+        layout = parent.layout() if parent is not None and QtCompat.isValid(parent) else None
+        if layout is not None:
+            layout.removeWidget(widget)
+    except Exception:
+        pass
+    try:
+        widget.setParent(None)
+    except Exception:
+        pass
+    try:
+        widget.close()
+    except Exception:
+        pass
+    try:
+        widget.deleteLater()
+    except Exception:
+        pass
+
+
+def _is_tkm_cleanup_widget(widget) -> bool:
+    if widget is None:
+        return False
+    try:
+        if not QtCompat.isValid(widget):
+            return False
+    except Exception:
+        return False
+    try:
+        if bool(widget.property(_TRANSIENT_WIDGET_PROPERTY)) or bool(widget.property(_TKM_FLOATING_WIDGET_PROPERTY)):
+            return True
+    except Exception:
+        pass
+    try:
+        if widget.__class__.__name__ == "TimelineTint":
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def cleanup_tkm_widgets(process_events=True) -> None:
+    cleanup_orphaned_widgets()
+    if process_events:
+        _safe_process_events()
+
+
+def cleanup_workspace_controls(process_events=True) -> None:
+    for control_name in _TKM_WORKSPACE_CONTROLS:
+        try:
+            if cmds.workspaceControl(control_name, q=True, exists=True):
+                cmds.deleteUI(control_name, control=True)
+        except Exception:
+            try:
+                if cmds.control(control_name, exists=True):
+                    cmds.deleteUI(control_name)
+            except Exception:
+                pass
+    if process_events:
+        _safe_process_events()
+
+
+def shutdown_tool_modules() -> None:
+    """Stop module-level workers, dialogs, native contexts, and exception hooks."""
+    module_cleanups = (
+        ("TheKeyMachine.mods.updater", "shutdown_update_worker"),
+        ("TheKeyMachine.mods.reportMod", "uninstall_bug_exception_handler"),
+        ("TheKeyMachine.mods.shelfMod", "cleanup_open_menus"),
+        ("TheKeyMachine.tools.common", "finish_active_progress"),
+        ("TheKeyMachine.tools.graph_toolbar.api", "shutdown_graph_toolbar_runtime"),
+        ("TheKeyMachine.tools.plugins", "shutdown_all"),
+    )
+    for module_name, attr_name in module_cleanups:
+        try:
+            module = __import__(module_name, fromlist=[attr_name])
+            cleanup = getattr(module, attr_name, None)
+            if callable(cleanup):
+                cleanup()
+        except Exception:
+            pass
+
+    api_modules = [
+        module
+        for name, module in tuple(sys.modules.items())
+        if name.startswith("TheKeyMachine.tools.") and name.endswith(".api") and module is not None
+    ]
+    for module in api_modules:
+        for attr_name in ("cleanup", "shutdown"):
+            cleanup = getattr(module, attr_name, None)
+            if callable(cleanup):
+                try:
+                    cleanup()
+                except Exception:
+                    pass
+                break
+
+    graph_api = sys.modules.get("TheKeyMachine.tools.graph_toolbar.api")
+    graph_cleanup = getattr(graph_api, "shutdown_graph_toolbar_runtime", None)
+    if callable(graph_cleanup):
+        try:
+            graph_cleanup()
+        except Exception:
+            pass
+
+    toolbox_module = sys.modules.get("TheKeyMachine.core.toolbox")
+    reset_cache = getattr(toolbox_module, "reset_package_cache", None)
+    if callable(reset_cache):
+        reset_cache()
+
+    trigger_module = sys.modules.get("TheKeyMachine.core.trigger")
+    reset_registry = getattr(trigger_module, "reset_registry", None)
+    if callable(reset_registry):
+        reset_registry()
+
+
+def cleanup_for_reload(delete_workspace=True, process_events=True) -> None:
+    """Best-effort full cleanup before unloading, reloading, or replacing TKM files."""
+    shutdown_tool_modules()
+    shutdown_runtime_manager(cleanup_widgets=False)
+    cleanup_previous_runtime()
+    cleanup_orphaned_callbacks()
+    cleanup_tkm_widgets(process_events=False)
+    if delete_workspace:
+        cleanup_workspace_controls(process_events=False)
+    if process_events:
+        _safe_process_events()
 
 
 def _qt_modifiers_to_mask(modifiers) -> int:
@@ -267,12 +429,13 @@ class RuntimeManager(QtCore.QObject):
         self._started = True
         self._persist_state()
 
-    def shutdown(self) -> None:
+    def shutdown(self, cleanup_widgets: bool = True) -> None:
         self._shutdown_background_runners()
         self._remove_event_filter()
         self._shutdown_tool_controllers()
         self._clear_managed_widgets()
-        cleanup_orphaned_widgets()
+        if cleanup_widgets:
+            cleanup_orphaned_widgets()
         # Native tool contexts must be removed before their plug-ins unload.
         try:
             from TheKeyMachine.tools import plugins
@@ -387,8 +550,14 @@ class RuntimeManager(QtCore.QObject):
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return None
 
-        self._track_scriptjob(key, int(job_id))
-        return int(job_id)
+        if job_id is None:
+            return None
+        try:
+            job_id = int(job_id)
+        except (TypeError, ValueError):
+            return None
+        self._track_scriptjob(key, job_id)
+        return job_id
 
     def is_playing(self) -> bool:
         return bool(self._playback_active)
@@ -907,27 +1076,7 @@ class RuntimeManager(QtCore.QObject):
         self._persist_state()
 
     def _safe_delete_widget(self, widget) -> None:
-        if widget is None:
-            return
-        delete_tint = getattr(widget, "delete_tint", None)
-        if callable(delete_tint):
-            try:
-                delete_tint()
-                return
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
-        try:
-            widget.hide()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-        try:
-            widget.setParent(None)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-        try:
-            widget.deleteLater()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
+        _safe_delete_widget(widget)
 
     def _clear_managed_widgets(self) -> None:
         for key, widget in list(self._managed_widgets.items()):
@@ -946,12 +1095,12 @@ def get_runtime_manager(start: bool = True) -> RuntimeManager:
     return _MANAGER
 
 
-def shutdown_runtime_manager() -> None:
+def shutdown_runtime_manager(cleanup_widgets: bool = True) -> None:
     global _MANAGER
     if _MANAGER is not None:
         if QtCompat.isValid(_MANAGER):
             try:
-                _MANAGER.shutdown()
+                _MANAGER.shutdown(cleanup_widgets=cleanup_widgets)
             except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
             try:
@@ -961,4 +1110,5 @@ def shutdown_runtime_manager() -> None:
         _MANAGER = None
     cleanup_previous_runtime()
     cleanup_orphaned_callbacks()
-    cleanup_orphaned_widgets()
+    if cleanup_widgets:
+        cleanup_orphaned_widgets()

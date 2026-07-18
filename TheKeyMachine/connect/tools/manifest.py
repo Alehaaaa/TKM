@@ -3,7 +3,8 @@
 RULES
 1. Keep the ``TOOLS`` dictionary name unchanged.
 2. Each dictionary key is the visible tool name and its toolbar pin identity.
-   Names must be unique; renaming one creates a new pin identity.
+   Names must be unique; command ids are normalized for Maya hotkeys and shelves.
+   Renaming one creates a new pin identity unless an explicit ``id`` is provided.
 3. Dictionary order controls the menu and toolbar pin-menu order.
 4. Each entry needs either ``run`` for Python or ``mel`` for MEL.
 5. ``run`` may contain ``"module:function"`` or a short Python command.
@@ -14,6 +15,7 @@ RULES
    Without an icon, the toolbar button displays the first three letters of
    the name.
 7. Add ``"enabled": False`` to keep an entry without displaying it.
+8. Add ``"tooltip"`` with a string or list of paragraphs to document the tool.
 
 ADDING A MODULE TOOL
 1. Add a Python file anywhere inside this folder. Every module subfolder must
@@ -35,6 +37,7 @@ TOOLS = {
     # Run a function from any module/subfolder in this package.
     "Example: Create Locator": {
         "icon": icons.add,
+        "tooltip": "Create a locator at the current selection.",
         "run": "examples.locators:create_locator",
     },
     "Example: Show Selection Count": {
