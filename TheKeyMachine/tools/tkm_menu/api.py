@@ -96,10 +96,19 @@ def dock_toolbar(*_args, **target):
 
 
 def set_alignment(alignment_name, *_args):
+    from TheKeyMachine.mods import settingsMod as settings
+    settings.set_setting("toolbar_icon_alignment", alignment_name)
+
     from TheKeyMachine.core import toolWidgets, toolbar
     instance = toolbar.get_toolbar()
     if instance:
         return toolWidgets.set_main_toolbar_icon_alignment(instance, alignment_name)
+
+
+def get_alignment(*_args):
+    from TheKeyMachine.mods import settingsMod as settings
+    return settings.get_setting("toolbar_icon_alignment", "Center")
+
 
 
 def open_url(url, *_args):

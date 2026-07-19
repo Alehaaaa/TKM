@@ -1,5 +1,6 @@
 from functools import partial
 import inspect
+import warnings
 
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
@@ -284,6 +285,20 @@ class MenuWidget(QtWidgets.QMenu):
             parent = menu.parentWidget()
             menu.close()
             menu = parent
+
+    def mouseReleaseEvent(self, e):
+        action = self.actionAt(e.pos())
+        keep_open = False
+        if action and hasattr(action, "property"):
+            try:
+                keep_open = bool(action.property("tkm_keep_menu_open"))
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                keep_open = False
+        if action and action.isEnabled() and keep_open:
+            action.trigger()
+            e.accept()
+            return
+        QtWidgets.QMenu.mouseReleaseEvent(self, e)
 
     def _action_tooltip_key(self, action):
         if action is None or not QtCompat.isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
@@ -2492,10 +2507,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if cm is not None:
                 widget._tkm_default_mode_key = cm.key
             if hasattr(widget, "currentModeChanged"):
-                try:
-                    widget.currentModeChanged.disconnect(self._on_slider_current_mode_changed)
-                except (RuntimeError, TypeError):
-                    pass
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    try:
+                        widget.currentModeChanged.disconnect(self._on_slider_current_mode_changed)
+                    except (RuntimeError, TypeError):
+                        pass
                 widget.currentModeChanged.connect(self._on_slider_current_mode_changed)
 
             if cm:

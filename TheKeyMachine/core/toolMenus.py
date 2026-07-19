@@ -1,4 +1,5 @@
 from functools import partial
+import warnings
 
 from maya import cmds
 
@@ -251,6 +252,7 @@ def build_declared_menu(definition, parent_widget=None):
                     checked=value == current_value,
                     group=group,
                     description=choice.get("description", ""),
+                    open_menu=True,
                 )
             continue
         if item_type == "section":
@@ -443,6 +445,21 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
         menu.addMenu(section_menu, description="Pin tools in {}.".format(label))
 
     if sections:
+        from TheKeyMachine.core import toolWorkspaces
+        def on_pins_changed(*args, **kwargs):
+            is_deviating = toolWorkspaces.is_current_workspace_deviating(sections)
+            toolWorkspaces.mark_workspace_modified(is_deviating)
+
+        for section in sections:
+            if hasattr(section, "pinsChanged"):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    try:
+                        section.pinsChanged.disconnect(on_pins_changed)
+                    except Exception:
+                        pass
+                section.pinsChanged.connect(on_pins_changed)
+
         _add_toolbar_pinning_footer(menu, toolbar_widget, sections)
 
     return menu
@@ -478,27 +495,30 @@ def _toolbar_alignment_context(toolbar_widget):
             toolbar_widget.updateGeometry()
             toolbar_widget.update()
 
-        parent = toolbar_widget.parent() if wutil.is_valid_widget(toolbar_widget) else None
-        while parent:
-            if hasattr(parent, "update_height"):
-                QtCore.QTimer.singleShot(0, parent.update_height)
-                break
-            if hasattr(parent, "_update_height"):
-                QtCore.QTimer.singleShot(0, parent._update_height)
-                break
-            parent = parent.parent()
-
     return setting_key, _apply_alignment
 
 
 def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alignment_fn):
     from TheKeyMachine.widgets import customDialogs
+    from TheKeyMachine.core import toolWorkspaces
 
-    menu.close()
+    # Block pinsChanged on all sections while closing the menu so the
+    # deviation check is not triggered N times before the dialog opens.
+    for section in sections:
+        if hasattr(section, "blockSignals"):
+            section.blockSignals(True)
+    try:
+        menu.close()
+    finally:
+        for section in sections:
+            if hasattr(section, "blockSignals"):
+                section.blockSignals(False)
+
+    ws_name = toolWorkspaces.get_active_workspace_name()
     clicked = customDialogs.QFlatConfirmDialog.question(
         menu.parent(),
         "Restore Defaults",
-        "Restore the toolbar pins and alignment to their default values?",
+        "Restore the '{}' workspace defaults?".format(ws_name),
         buttons=[customDialogs.QFlatConfirmDialog.Yes, customDialogs.QFlatConfirmDialog.Cancel],
         highlight=customDialogs.QFlatConfirmDialog.Yes,
         title="Restore toolbar defaults?",
@@ -507,12 +527,7 @@ def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alig
     if clicked != customDialogs.QFlatConfirmDialog.Yes:
         return
 
-    for section in sections:
-        if not wutil.is_valid_widget(section):
-            continue
-        section.pin_widget_defaults()
-
-    apply_alignment_fn("Center")
+    toolWorkspaces.restore_workspace_defaults(sections, apply_alignment_fn)
 
     if wutil.is_valid_widget(toolbar_widget):
         layout = toolbar_widget.layout()
@@ -522,32 +537,73 @@ def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alig
         toolbar_widget.update()
 
 
-def _add_alignment_actions(menu, current_alignment, apply_alignment_fn, names=TOOLBAR_ALIGNMENT_NAMES):
+def _add_alignment_actions(menu, current_alignment, apply_alignment_fn, sections, names=TOOLBAR_ALIGNMENT_NAMES):
+    from TheKeyMachine.core import toolWorkspaces
     group = QActionGroup(menu)
     group.setExclusive(True)
     actions = {}
+    
+    def apply_align(checked, a):
+        if checked:
+            apply_alignment_fn(a)
+            is_deviating = toolWorkspaces.is_current_workspace_deviating(sections, get_alignment_fn=lambda: a)
+            toolWorkspaces.mark_workspace_modified(is_deviating)
+            
     for label in names:
         actions[label] = _add_checkable_action(
             menu,
             TOOLBAR_ALIGNMENT_LABEL % label,
-            partial(_apply_checked_value, apply_alignment_fn, label),
+            partial(apply_align, a=label),
             checked=label == current_alignment,
             group=group,
             description=TOOLBAR_ALIGNMENT_DESC % label.lower(),
+            open_menu=True,
         )
     return group, actions
 
 
+def _add_workspace_actions(menu, sections, apply_alignment_fn):
+    from TheKeyMachine.core import toolWorkspaces
+    
+    group = QActionGroup(menu)
+    group.setExclusive(True)
+    
+    active_ws = toolWorkspaces.get_active_workspace()
+    
+    for ws in toolWorkspaces.WORKSPACES:
+        is_current = ws["id"] == active_ws
+        label = toolWorkspaces.get_workspace_label(ws["id"]) if is_current else ws["name"]
+        
+        def apply_ws(checked, ws_id=ws["id"]):
+            if checked:
+                toolWorkspaces.apply_workspace(ws_id, sections, apply_alignment_fn)
+                
+        _add_checkable_action(
+            menu,
+            label,
+            apply_ws,
+            checked=is_current,
+            group=group,
+            description="Apply the {} workspace.".format(ws["name"]),
+            open_menu=True,
+        )
+    return group
+
 def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
     menu.addSeparator()
-
+    
     setting_key, apply_alignment_fn = _toolbar_alignment_context(toolbar_widget)
+    
+    menu._tkm_workspace_group = _add_workspace_actions(menu, sections, apply_alignment_fn)
+    
+    menu.addSeparator()
+
     current_align = settings.get_setting(setting_key, "Center")
     menu._tkm_alignment_group, menu._tkm_alignment_actions = _add_alignment_actions(
         menu,
         current_align,
         apply_alignment_fn,
-        names=("Left", "Right", "Center"),
+        sections,
     )
 
     menu.addSeparator()
@@ -700,16 +756,17 @@ def build_main_preferences_menu(
     )
 
     preferences_menu.addSection("Alignment")
-    align_group = QActionGroup(preferences_menu)
-    align_group.setExclusive(True)
-    for align_name, align_value in TOOLBAR_ALIGNMENTS.items():
-        _add_checkable_action(
-            preferences_menu,
-            TOOLBAR_ALIGNMENT_LABEL % align_name,
-            partial(_apply_checked_value, update_toolbar_icon_alignment, align_name),
-            checked=align_value == toolbar_alignment,
-            group=align_group,
-        )
+    current_align = "Center"
+    for k, v in TOOLBAR_ALIGNMENTS.items():
+        if v == toolbar_alignment:
+            current_align = k
+            break
+
+    preferences_menu._tkm_alignment_group, preferences_menu._tkm_alignment_actions = _add_alignment_actions(
+        preferences_menu,
+        current_align,
+        update_toolbar_icon_alignment,
+    )
 
     preferences_menu.addSection("Display")
     return preferences_menu

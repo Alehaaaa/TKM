@@ -98,36 +98,7 @@ _PACKAGE_TOOL_DEFINITIONS = None
 _PACKAGE_SECTION_DEFINITIONS = None
 
 
-TOOLBAR_PIN_DEFAULTS = {
-    "main": frozenset((
-        "TKM",
-        "nudge_left", "nudge_right", "nudge_value",
-        "default_object_values",
-        "tangent_bouncy", "tangent_auto", "tangent_spline", "tangent_linear", "tangent_step",
-        "blend_connect_neighbors", "tween_tweener",
-        "share_keys", "bake_animation_1", "bake_animation_2", "bake_animation_3",
-        "bake_animation_4", "bake_animation_custom", "animation_tools", "snap",
-        "mirror", "align_objects", "copy_pose", "copy_animation", "link_copy", "ws_copy_frame",
-        "animation_offset", "micro_move", "depth_mover",
-        "temp_pivot", "follow_cam", "create_tracer", "attribute_switcher", "gimbal",
-        "isolate_master", "selector", "select_rig_controls", "selection_sets", "orbit",
-        "attribute_switcher_euler_filter", "overshoot_sliders", "custom_graph", "graph_extra_tools",
-        "custom_tools", "background_runners", "search_window",
-    )),
-    "graph": frozenset((
-        "nudge_left", "nudge_right", "nudge_value",
-        "default_object_values",
-        "tangent_bouncy", "tangent_auto", "tangent_spline", "tangent_linear", "tangent_step",
-        "blend_connect_neighbors", "tween_tweener", "tangent_blend_best_guess",
-        "share_keys", "bake_animation_1", "bake_animation_2", "bake_animation_3",
-        "bake_animation_4", "bake_animation_custom", "animation_tools", "snap",
-        "mirror", "align_objects", "copy_pose", "copy_animation", "link_copy", "ws_copy_frame",
-        "animation_offset", "micro_move", "depth_mover",
-        "temp_pivot", "follow_cam", "create_tracer", "attribute_switcher", "gimbal",
-        "isolate_master", "selector", "select_rig_controls", "selection_sets", "orbit", "graph_extra_tools",
-        "custom_tools",
-    )),
-}
+
 
 TOOLBAR_SECTION_IDS = {
     # Preserve the original toolbox order. Split packages stay adjacent to the
@@ -160,7 +131,11 @@ TOOLBAR_SECTION_IDS = {
 
 
 def is_pinned_by_default(toolbar_id, tool_id):
-    return tool_id in TOOLBAR_PIN_DEFAULTS.get(toolbar_id, ())
+    from TheKeyMachine.core import toolWorkspaces
+    active_ws = toolWorkspaces.get_active_workspace()
+    ws = toolWorkspaces.WORKSPACE_DEFAULTS.get(active_ws, toolWorkspaces.WORKSPACE_DEFAULTS["standard"])
+    pins = ws["pins"].get(toolbar_id, frozenset())
+    return tool_id in pins
 
 
 def is_section_on_toolbar(toolbar_id, section_id):
@@ -242,10 +217,12 @@ def _validate_definition_graph(tools, sections):
         for section_id in section_ids:
             if section_id not in sections:
                 errors.append("toolbar {!r} references unknown section {!r}".format(toolbar_id, section_id))
-    for toolbar_id, tool_ids in TOOLBAR_PIN_DEFAULTS.items():
-        for tool_id in tool_ids:
-            if tool_id not in pinnable_ids:
-                errors.append("toolbar {!r} pins unknown tool {!r}".format(toolbar_id, tool_id))
+    from TheKeyMachine.core import toolWorkspaces
+    for workspace in toolWorkspaces.WORKSPACE_DEFAULTS.values():
+        for toolbar_id, tool_ids in workspace["pins"].items():
+            for tool_id in tool_ids:
+                if tool_id not in pinnable_ids:
+                    errors.append("workspace pins unknown tool {!r} in toolbar {!r}".format(tool_id, toolbar_id))
 
     for tool_id, tool in tools.items():
         menu = tool.get("menu")

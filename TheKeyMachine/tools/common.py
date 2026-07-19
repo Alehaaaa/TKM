@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from functools import lru_cache
 import inspect
+import warnings
 
 import maya.cmds as cmds  # type: ignore
 import maya.mel as mel  # type: ignore
@@ -1236,11 +1237,13 @@ def replace_tracked_connection(owner, attr_name, signal, callback, parent=None):
 
 
 def disconnect_signal(signal):
-    try:
-        signal.disconnect()
-        return True
-    except Exception:
-        return False
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        try:
+            signal.disconnect()
+            return True
+        except Exception:
+            return False
 
 
 def set_custom_context_menu_handler(widget, attr_name, callback):

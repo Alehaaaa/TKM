@@ -14,6 +14,9 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.30:
+  - new: Toolbar workspaces (Standard, Professional, Minimal) switch pinned tools from the right-click menu
+
 0.1.29:
   - polish: Reordered files to standarize all tools under tools/
   - bugfix: Copy Relationship pastes selected or playback ranges only on existing relationship-object keys

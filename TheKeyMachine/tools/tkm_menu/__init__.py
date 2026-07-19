@@ -20,9 +20,11 @@ class TkmMenuToolObject(ToolObject):
                         "toolbar_add_shelf_button", {"type": "check", "command": "start_with_maya"},
                         {"type": "check", "command": "show_tooltips"}, "separator",
                         {"type": "section", "label": "Alignment"},
-                        {"label": "Align Left", "icon": "settings", "callback": partial(api.set_alignment, "Left")},
-                        {"label": "Align Center", "icon": "settings", "callback": partial(api.set_alignment, "Center")},
-                        {"label": "Align Right", "icon": "settings", "callback": partial(api.set_alignment, "Right")},
+                        {"type": "choice", "get_value": api.get_alignment, "set_value": api.set_alignment, "items": [
+                            {"label": "Align Left", "value": "Left", "description": "Align toolbar icons to the left."},
+                            {"label": "Align Center", "value": "Center", "description": "Align toolbar icons to the center."},
+                            {"label": "Align Right", "value": "Right", "description": "Align toolbar icons to the right."},
+                        ]},
                     ]},
                     "hotkeys_window",
                     {"type": "menu", "label": "Dock", "icon": "dock", "items": [

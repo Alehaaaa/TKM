@@ -8,6 +8,7 @@ build the same controls from the same definitions.
 
 import importlib
 import random
+import warnings
 
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 import TheKeyMachine.mods.shelfMod as shelf  # type: ignore
@@ -124,10 +125,12 @@ def _is_valid_setting_toggle_target(widget):
 
 
 def _disconnect_setting_toggle_signal(signal, slot):
-    try:
-        signal.disconnect(slot)
-    except Exception:
-        pass
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        try:
+            signal.disconnect(slot)
+        except Exception:
+            pass
 
 
 def _retain_setting_toggle_slot(widget, slot):
@@ -262,10 +265,12 @@ def bind_background_runners_activity_button(btn):
         btn.setIcon(QtGui.QIcon(sequence[index]))
         state["index"] = index + 1
 
-    try:
-        timer.timeout.disconnect()
-    except Exception:
-        pass
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        try:
+            timer.timeout.disconnect()
+        except Exception:
+            pass
     timer.timeout.connect(_advance_icon)
 
     def _pulse(*_args):
@@ -723,8 +728,6 @@ def set_main_toolbar_icon_alignment(owner, alignment_name):
 
     toolbar_widget.updateGeometry()
     toolbar_widget.update()
-    if hasattr(owner, "update_height"):
-        owner.update_height()
 
 
 def add_graph_tool_item(section, item_data, graph_settings_menu_fn):
