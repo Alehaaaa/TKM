@@ -505,9 +505,8 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                     settings.set_setting("skip_updates", False)
 
                     def _post_update():
-                        import TheKeyMachine.core.toolbar as ui
-
-                        reload(ui)
+                        import TheKeyMachine
+                        TheKeyMachine.reload()
 
                         QFlatConfirmDialog.information(
                             None,

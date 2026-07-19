@@ -808,7 +808,47 @@ def populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn, t
         section.enable_entry_animations()
 
 
-def bind_toolbar_pinning_context(toolbar_widget):
+class _ToolbarPinningEventFilter(QtCore.QObject):
+    """Catches right-click mouse-press events on the parent toolbar widget
+    and opens the pinning context menu, forwarding the click position to the
+    toolbar_widget used to build the menu.
+
+    Installing this on the *parent* dock widget ensures that any blank area
+    (e.g. around the TKM button) also responds without hijacking child widgets'
+    own context menus.
+    """
+
+    def __init__(self, toolbar_widget, parent=None):
+        super().__init__(parent)
+        self._toolbar_widget = toolbar_widget
+
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.RightButton:
+            tw = self._toolbar_widget
+            if QtCompat.isValid(tw):
+                # Map the click position from the source object to toolbar_widget coords
+                try:
+                    local_pos = tw.mapFromGlobal(obj.mapToGlobal(event.pos()))
+                except RuntimeError:
+                    return False
+                if not toolMenus.should_show_toolbar_pinning_menu(tw, local_pos):
+                    return False
+                pinning_menu = toolMenus.build_toolbar_pinning_menu(tw, tw)
+                if pinning_menu.actions():
+                    pinning_menu.exec_(obj.mapToGlobal(event.pos()))
+                    return True
+        return False
+
+
+def bind_toolbar_pinning_context(toolbar_widget, parent_widget=None):
+    """Bind the right-click pinning context menu to *toolbar_widget*.
+
+    If *parent_widget* is supplied (typically the top-level dock container that
+    also hosts the TKM button), a QObject event-filter is installed on it so
+    that a right-click *anywhere* on the toolbar — including empty areas and
+    the TKM button column — opens the same pinning menu.
+    """
+    # ── Direct context-menu on the flow toolbar ──────────────────────────────
     def _on_toolbar_context_menu(pos):
         if not toolMenus.should_show_toolbar_pinning_menu(toolbar_widget, pos):
             return
@@ -817,10 +857,17 @@ def bind_toolbar_pinning_context(toolbar_widget):
             pinning_menu.exec_(toolbar_widget.mapToGlobal(pos))
 
     toolbar_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-    return toolCommon.replace_tracked_connection(
+    toolCommon.replace_tracked_connection(
         toolbar_widget,
         "_tkm_toolbar_pinning_context",
         toolbar_widget.customContextMenuRequested,
         _on_toolbar_context_menu,
         parent=toolbar_widget,
     )
+
+    # ── Event-filter on the parent dock so the whole toolbar responds ─────────
+    if parent_widget is not None and parent_widget is not toolbar_widget:
+        event_filter = _ToolbarPinningEventFilter(toolbar_widget, parent=parent_widget)
+        parent_widget.installEventFilter(event_filter)
+        # Store a reference so it isn't garbage-collected
+        parent_widget._tkm_pinning_event_filter = event_filter

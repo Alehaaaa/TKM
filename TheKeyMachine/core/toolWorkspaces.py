@@ -10,7 +10,6 @@ WORKSPACE_SETTING   = "toolbar_workspace"
 MODIFIED_SETTING    = "toolbar_workspace_modified"
 
 _STANDARD_MAIN = frozenset([
-    "TKM",
     "attribute_switcher_euler_filter", "align_objects", "animation_offset", "animation_tools",
     "attribute_switcher", "background_runners", "bake_animation_1", "blend_connect_neighbors",
     "copy_animation", "copy_pose", "create_tracer", "default_object_values",
@@ -30,10 +29,37 @@ _STANDARD_GRAPH = frozenset([
 ])
 
 _MINIMAL_MAIN = frozenset([
-    "TKM", "nudge_left", "nudge_right", "nudge_value",
-    "tangent_auto", "tangent_spline", "tangent_linear", "tangent_step",
-    "blend_connect_neighbors", "tween_tweener",
-    "bake_animation_1", "snap", "copy_pose", "selector"
+    "nudge_left", "nudge_right", "nudge_value",
+    "blend_connect_neighbors",
+    "tween_tweener",
+    "tangent_auto", "tangent_linear", "tangent_step",
+    "selector", "selection_sets",
+    "copy_animation", "copy_pose",
+    "mirror", "align_objects",
+    "link_copy", "ws_copy_frame",
+    "attribute_switcher",
+    "temp_pivot",
+    "micro_move",
+    "animation_offset",
+    "create_tracer",
+    "animation_tools",
+    "attribute_switcher_euler_filter",
+    "select_rig_controls",
+    "background_runners",
+    "search_window"
+])
+
+_PROFESSIONAL_MAIN = frozenset([
+    "nudge_value",
+    "blend_connect_neighbors",
+    "tween_tweener",
+    "selector",
+    "copy_pose", "copy_animation",
+    "link_copy", "ws_copy_frame",
+    "temp_pivot",
+    "animation_offset",
+    "create_tracer",
+    "animation_tools"
 ])
 
 WORKSPACE_DEFAULTS = {
@@ -45,14 +71,14 @@ WORKSPACE_DEFAULTS = {
         }
     },
     "professional": {
-        "alignment": "Center",
+        "alignment": "Right",
         "pins": {
-            "main": _STANDARD_MAIN - {"search_window", "background_runners", "custom_tools", "create_tracer", "orbit"},
+            "main": _PROFESSIONAL_MAIN,
             "graph": _STANDARD_GRAPH - {"search_window", "background_runners", "custom_tools", "create_tracer", "orbit"}
         }
     },
     "minimal": {
-        "alignment": "Left",
+        "alignment": "Right",
         "pins": {
             "main": _MINIMAL_MAIN,
             "graph": _MINIMAL_MAIN

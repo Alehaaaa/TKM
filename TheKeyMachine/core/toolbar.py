@@ -500,7 +500,20 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             )
 
         self._populate_toolbar_from_layout("main", new_section)
-        toolWidgets.bind_toolbar_pinning_context(self.main_toolbar_widget)
+        toolWidgets.bind_toolbar_pinning_context(self.main_toolbar_widget, parent_widget=self)
+
+        # Extract TKM button to a separate layout to the left
+        import TheKeyMachine.core.toolbox as toolbox
+        tkm_tool = toolbox.get_tool("TKM")
+        self.tkm_btn = cw.create_tool_button_from_data(tkm_tool)
+        self.tkm_btn.setObjectName("TKM_toolbar_button")
+        
+        self.tkm_layout = QtWidgets.QVBoxLayout()
+        self.tkm_layout.setContentsMargins(0, 6, 0, 0)
+        self.tkm_layout.addWidget(self.tkm_btn)
+        self.tkm_layout.addStretch()
+        self.main_layout.insertLayout(0, self.tkm_layout)
+
 
 
 _toolbar_instance = None

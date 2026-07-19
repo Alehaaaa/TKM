@@ -711,7 +711,7 @@ def _apply_pose_data(pose_data, selected_objects):
     return attrs_set, pasted_targets
 
 
-def copy_animation(*args):
+def copy_animation(*args, **kwargs):
     def get_animation_channels(control):
         channels = []
         for attr in cmds.listAttr(control, keyable=True) or []:
@@ -781,7 +781,7 @@ def copy_animation(*args):
 # PASTE ANIMATION ___________________________________________________________________________
 
 
-def paste_animation(*args, anchor_widget=None):
+def paste_animation(*args, anchor_widget=None, **kwargs):
     selected_objects = selectionMod.get_selected_objects()
 
     animation_data = clipboard.load("animation", "No animation file found. Please copy animation first")
@@ -809,7 +809,7 @@ def paste_animation(*args, anchor_widget=None):
 # PASTE INSERT _________________________________________________________________________
 
 
-def paste_insert_animation(*args, anchor_widget=None):
+def paste_insert_animation(*args, anchor_widget=None, **kwargs):
     selected_objects = selectionMod.get_selected_objects()
     current_time = cmds.currentTime(query=True)
 
@@ -840,7 +840,7 @@ def paste_insert_animation(*args, anchor_widget=None):
 # PASTE OPPOSITE ________________________________________________________________________
 
 
-def paste_opposite_animation(*args, anchor_widget=None):
+def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
     from TheKeyMachine.tools.mirror import controller as mirror_controller
 
     exceptions = mirror_controller.load_exceptions()
@@ -961,11 +961,11 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
     _paste_to_dialog.show()
 
 
-def export_animation_file(*args):
+def export_animation_file(*args, **kwargs):
     return clipboard.export_dialog("animation", "Export Animation")
 
 
-def import_animation_file(*args):
+def import_animation_file(*args, **kwargs):
     return clipboard.import_dialog("animation", "Import Animation")
 
 
@@ -1002,7 +1002,7 @@ def paste_pose_to(*args, anchor_widget=None, **kwargs):
 # COPY POSE ________________________________________________________________________
 
 
-def copy_pose(*args):
+def copy_pose(*args, **kwargs):
     selected_objects = selectionMod.get_selected_objects()
 
     if not selected_objects:
@@ -1032,18 +1032,18 @@ def copy_pose(*args):
         operation["success"] = True
 
 
-def export_pose_file(*args):
+def export_pose_file(*args, **kwargs):
     return clipboard.export_dialog("pose", "Export Pose")
 
 
-def import_pose_file(*args):
+def import_pose_file(*args, **kwargs):
     return clipboard.import_dialog("pose", "Import Pose")
 
 
 # PASTE POSE _____________________________________________________________
 
 
-def paste_pose(*args):
+def paste_pose(*args, **kwargs):
     selected_objects = selectionMod.get_selected_objects()
 
     pose_data = clipboard.load("pose", "No pose file found. Please copy pose first")
@@ -1059,7 +1059,7 @@ def paste_pose(*args):
             cmds.warning("No matching pose targets found")
 
 
-def paste_mirror_pose(*args):
+def paste_mirror_pose(*args, **kwargs):
     """Paste copied pose values onto opposite controls using mirror exceptions."""
     from TheKeyMachine.tools.mirror import controller as mirror_controller
 

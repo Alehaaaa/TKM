@@ -452,12 +452,10 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
 
         for section in sections:
             if hasattr(section, "pinsChanged"):
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", RuntimeWarning)
-                    try:
-                        section.pinsChanged.disconnect(on_pins_changed)
-                    except Exception:
-                        pass
+                try:
+                    section.pinsChanged.disconnect()
+                except Exception:
+                    pass
                 section.pinsChanged.connect(on_pins_changed)
 
         _add_toolbar_pinning_footer(menu, toolbar_widget, sections)

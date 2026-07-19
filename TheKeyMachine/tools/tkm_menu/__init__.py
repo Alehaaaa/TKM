@@ -70,7 +70,6 @@ class TkmMenuToolObject(ToolObject):
             "id": "system",
             "label": "TKM Menu", "hiddeable": False,
             "items": [
-                {"id": "TKM"},
                 *({"id": tool_id} for tool_id in (
                     "main_preferences_menu", "main_dock_menu", "main_system_menu", "help_menu",
                     "toolbar_toggle", "toolbar_add_shelf_button", "toolbar_reload", "toolbar_unload",

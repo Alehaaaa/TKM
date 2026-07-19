@@ -44,9 +44,9 @@ def _rig_controls(animated_only=False):
     return controls
 
 
-def open_selector(*args):
+def open_selector(*args, **kwargs):
     if not selectionMod.get_selected_objects():
-        return wutil.make_inViewMessage("Select at least one object")
+        return
 
     from TheKeyMachine.tools.selection.widgets import SelectorDialog
 
