@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 
-from TheKeyMachine.data import colors
+from TheKeyMachine.data.colors import COLORS
 
 
 IMAGE_ROOT = os.path.join(os.path.dirname(__file__), "icons")
@@ -66,7 +66,10 @@ def _selection_set_icon_filename(color):
     return "_{}{}_set.svg".format(color.family, shade)
 
 
-selection_set_color_icon_names = {color.suffix: _selection_set_icon_filename(color) for color in colors.SELECTION_SET_COLORS}
+selection_set_color_icon_names = {
+    color.suffix: _selection_set_icon_filename(color)
+    for color in COLORS.selection.all
+}
 selection_set_color_icons = {suffix: selection_set_path(filename) for suffix, filename in selection_set_color_icon_names.items()}
 selection_set_color_trash_icons = {
     suffix: selection_set_path(filename.replace(".svg", "_trash.svg")) for suffix, filename in selection_set_color_icon_names.items()

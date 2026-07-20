@@ -1,7 +1,7 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.locators import api
 
 
@@ -18,7 +18,7 @@ class LocatorsToolObject(ToolObject):
     SECTION = {
             "id": "locator_tools",
             "label": "Locators",
-            "color": toolColors.TOOLBAR_RED,
+            "color": COLORS.toolbar.red.hex,
             "items": [
                 {"id": "create_locator", "shortcuts": [
                     {"id": "locator_select_temp", "keys": [QtCore.Qt.Key_Control]},

@@ -6,7 +6,7 @@ from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 import TheKeyMachine.mods.settingsMod as settings  # type: ignore
 from TheKeyMachine.data import icons
 import TheKeyMachine.core.runtimeManager as runtime  # type: ignore
-from TheKeyMachine.data import colors as toolColors  # type: ignore
+from TheKeyMachine.data.colors import COLORS  # type: ignore
 from TheKeyMachine.tools import common as toolCommon  # type: ignore
 
 from .util import DPI
@@ -47,7 +47,10 @@ def _help_title(text="", status_title=None, tooltip=None):
 
 def _format_menu_status_tip(name, description="", tooltip=None):
     clean_name = toolCommon.clean_tool_text(name)
-    clean_description = toolCommon.clean_tool_text(description) or toolCommon.get_tooltip_summary(tooltip)
+    clean_description = (
+        toolCommon.get_tool_summary(description)
+        or toolCommon.get_tooltip_summary(tooltip)
+    )
     if clean_name and clean_description:
         return "{} - {}".format(clean_name, clean_description)
     return clean_name or clean_description
@@ -89,13 +92,13 @@ def get_widget_tint_color(widget, default=None):
 
 
 def _default_pressed_color_hex():
-    return toolColors.UI_COLORS.gray.hex
+    return COLORS.ui.gray.hex
 
 
 def _color_to_hex(color, default=None):
     if default is None:
         default = _default_pressed_color_hex()
-    resolved = toolColors.to_hex(color)
+    resolved = getattr(color, "hex", None)
     if resolved:
         return str(resolved)
     try:
@@ -347,16 +350,20 @@ class MenuWidget(QtWidgets.QMenu):
         if hasattr(action, "setProperty"):
             # Store the full Tooltip in a Python dict (not via Qt property)
             # so that body_lines / TooltipMedia objects survive the round-trip.
-            action_id = id(action)
-            self._action_help_store[action_id] = {
-                "tooltip": tooltip,
-                "shortcuts": list(shortcuts or ()),
-            }
-            action.setProperty("tkm_tooltip_source_key", "menu-action:{}".format(action_id))
+            source_key = self._action_tooltip_key(action)
+            if source_key:
+                self._action_help_store[source_key] = {
+                    "title": title,
+                    "description": description,
+                    "tooltip": tooltip,
+                    "shortcuts": list(shortcuts or ()),
+                    "command_id": command_id,
+                    "command_label": title,
+                    "command_icon": command_icon,
+                }
             action.setProperty("tkm_command_id", command_id)
             action.setProperty("tkm_command_label", title)
             action.setProperty("tkm_command_icon", command_icon)
-            self._action_tooltip_key(action)
         HelpSystem.push(action, title, description)
         self._set_native_action_tips(action, title, description, tooltip)
 
@@ -572,15 +579,33 @@ class MenuWidget(QtWidgets.QMenu):
             return
 
         try:
-            title = action.property("tkm_title") or action.text()
-            desc = action.property("tkm_description") or ""
             # Retrieve Python-side data to preserve Tooltip objects and shortcut descriptors.
-            action_help = self._action_help_store.get(id(action), {})
+            action_help = self._action_help_store.get(source_key, {})
+            title = (
+                action_help.get("title")
+                or action.property("tkm_title")
+                or action.text()
+            )
+            desc = action_help.get("description")
+            if desc is None:
+                desc = action.property("tkm_description") or ""
             tooltip = action_help.get("tooltip")
             shortcuts = action_help.get("shortcuts", ())
-            command_id = action.property("tkm_command_id") or None
-            command_label = action.property("tkm_command_label") or title
-            command_icon = action.property("tkm_command_icon") or None
+            command_id = (
+                action_help.get("command_id")
+                or action.property("tkm_command_id")
+                or None
+            )
+            command_label = (
+                action_help.get("command_label")
+                or action.property("tkm_command_label")
+                or title
+            )
+            command_icon = (
+                action_help.get("command_icon")
+                or action.property("tkm_command_icon")
+                or None
+            )
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return
 
@@ -3134,159 +3159,3 @@ class QFlatTabBarPainter(QtWidgets.QWidget):
             y = top + spacing * index
             painter.drawPoint(QtCore.QPointF(center - offset, y))
             painter.drawPoint(QtCore.QPointF(center + offset, y))
-
-
-class QFlatShelfPainter(QtWidgets.QWidget):
-    def __init__(self, parent=None):
-        QtWidgets.QWidget.__init__(self, parent)
-        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
-        self.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
-        self.setFocusPolicy(QtCore.Qt.NoFocus)
-        self.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
-        self.tabbar_width = DPI(16)
-        self.line_thickness = DPI(1)
-        self.line_color = QtGui.QColor(130, 130, 130)
-        self.margin = DPI(4)
-        self.center = DPI(5)
-        self.offset = DPI(1.5)
-        self._tab_handle = None
-        self._tab_bar = None
-        self._height_source = None
-        self._geometry_sync_pending = False
-        self._source_geometry = None
-        self._geometry_timer = QtCore.QTimer(self)
-        self._geometry_timer.setInterval(50)
-        self._geometry_timer.timeout.connect(self._syncToWorkspaceGeometry)
-
-    def attach(self, tab_handle, tab_bar, height_source):
-        """Track the workspace-control height and tab-handle position."""
-        self._tab_handle = tab_handle
-        self._tab_bar = tab_bar
-        self._height_source = height_source
-        for watched in (tab_handle, tab_bar, height_source):
-            if watched and QtCompat.isValid(watched):
-                watched.installEventFilter(self)
-        self.syncGeometry()
-        self._geometry_timer.start()
-
-    def _syncToWorkspaceGeometry(self):
-        """Follow native Maya geometry changes that do not emit Qt signals."""
-        if not all(
-            widget and QtCompat.isValid(widget)
-            for widget in (self._tab_handle, self._tab_bar, self._height_source)
-        ):
-            self._geometry_timer.stop()
-            return
-        geometry = self._height_source.geometry()
-        workspace_bottom = self._height_source.mapTo(
-            self._tab_handle,
-            QtCore.QPoint(0, self._height_source.height()),
-        ).y()
-        tab_position = self._tab_bar.mapTo(self._tab_handle, QtCore.QPoint(0, 0))
-        signature = (
-            geometry.x(), geometry.y(), geometry.width(), geometry.height(),
-            workspace_bottom, tab_position.x(), self._tab_bar.width(),
-        )
-        if signature != self._source_geometry:
-            self.syncGeometry()
-
-    def syncGeometry(self):
-        if not all(
-            widget and QtCompat.isValid(widget)
-            for widget in (self._tab_handle, self._tab_bar, self._height_source)
-        ):
-            return
-        # Anchor the top to the dock pane and the bottom directly to the mapped
-        # workspaceControl geometry. Only x/width come from Maya's tab bar.
-        tab_top_left = self._tab_bar.mapTo(self._tab_handle, QtCore.QPoint(0, 0))
-        workspace_bottom = self._height_source.mapTo(
-            self._tab_handle,
-            QtCore.QPoint(0, self._height_source.height()),
-        ).y()
-        source_geometry = self._height_source.geometry()
-        self._source_geometry = (
-            source_geometry.x(), source_geometry.y(),
-            source_geometry.width(), source_geometry.height(),
-            workspace_bottom, tab_top_left.x(), self._tab_bar.width(),
-        )
-        tab_width = max(1, self._tab_bar.width())
-        self.setGeometry(
-            tab_top_left.x(),
-            0,
-            tab_width,
-            max(1, workspace_bottom),
-        )
-        self.tabbar_width = tab_width
-        self.raise_()
-        self.update()
-
-    def eventFilter(self, watched, event):
-        if watched in (self._tab_handle, self._tab_bar, self._height_source) and event.type() in (
-            QtCore.QEvent.Resize,
-            QtCore.QEvent.Move,
-            QtCore.QEvent.LayoutRequest,
-            QtCore.QEvent.Show,
-        ):
-            self._queueGeometrySync()
-        return super().eventFilter(watched, event)
-
-    def _queueGeometrySync(self):
-        if self._geometry_sync_pending:
-            return
-        self._geometry_sync_pending = True
-
-        def apply_geometry():
-            self._geometry_sync_pending = False
-            if QtCompat.isValid(self):
-                self.syncGeometry()
-
-        QtCore.QTimer.singleShot(0, apply_geometry)
-
-    def paintEvent(self, event):
-        color = self.palette().color(self.backgroundRole())
-        painter = QtGui.QPainter(self)
-        painter.setPen(QtGui.QPen(color, self.tabbar_width))
-        painter.drawLine(self.tabbar_width // 2, 0, self.tabbar_width // 2, self.height())
-
-        pen = QtGui.QPen(self.line_color)
-        pen.setWidth(max(1, self.line_thickness))
-        pen.setCapStyle(QtCore.Qt.RoundCap)
-        painter.setPen(pen)
-
-        top = float(self.margin)
-        bottom = float(self.height() - self.margin)
-        available = max(0.0, bottom - top)
-        dot_count = max(2, int(available // max(1, DPI(3))) + 1)
-        spacing = available / float(dot_count - 1)
-        for index in range(dot_count):
-            y = top + spacing * index
-            painter.drawPoint(QtCore.QPointF(self.center - self.offset, y))
-            painter.drawPoint(QtCore.QPointF(self.center + self.offset, y))
-
-    def resizeEvent(self, event):
-        self.update()
-
-    def updateDrawingParameters(
-        self,
-        tabbar_width=None,
-        line_thickness=None,
-        line_color=None,
-        margin=None,
-        center=None,
-        offset=None,
-    ):
-        """Update drawing parameters and refresh the widget."""
-        if tabbar_width is not None:
-            self.tabbar_width = tabbar_width.width()
-        if line_thickness is not None:
-            self.line_thickness = line_thickness
-        if line_color is not None:
-            self.line_color = line_color
-        if margin is not None:
-            self.margin = margin
-        if center is not None:
-            self.center = center
-        if offset is not None:
-            self.offset = offset
-        self.update()

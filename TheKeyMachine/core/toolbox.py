@@ -92,7 +92,7 @@ from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
 import TheKeyMachine.core.trigger as trigger
 import TheKeyMachine.core.toolMenus as toolMenus
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 
 _PACKAGE_TOOL_DEFINITIONS = None
 _PACKAGE_SECTION_DEFINITIONS = None
@@ -109,7 +109,7 @@ TOOLBAR_SECTION_IDS = {
         "slider_blend", "slider_tween", "slider_tangent",
         "isolate_tools", "locator_tools", "selection_tools", "opposite_tools", "mirror_tools", "align_tools",
         "pose_animation_section", "tangents", "manipulator_tools",
-        "animation_offset_tools", "micro_move_tools", "depth_mover_tools",
+        "animation_offset_tools", "movers_tools",
         "temp_pivot_tools", "follow_cam_tools",
         "link_tools", "worldspace_tools",
         "attribute_tools", "selection_set_tools", "orbit_tools", "tracer_tools",
@@ -121,7 +121,7 @@ TOOLBAR_SECTION_IDS = {
         "slider_blend", "slider_tween", "slider_tangent",
         "isolate_tools", "locator_tools", "selection_tools", "opposite_tools", "mirror_tools", "align_tools",
         "pose_animation_section", "tangents", "manipulator_tools",
-        "animation_offset_tools", "micro_move_tools", "depth_mover_tools",
+        "animation_offset_tools", "movers_tools",
         "temp_pivot_tools", "follow_cam_tools",
         "link_tools", "worldspace_tools",
         "attribute_tools", "selection_set_tools", "orbit_tools", "tracer_tools",
@@ -399,7 +399,7 @@ def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
     section = dict(section_def)
     section["id"] = section_id
     section["_toolbar_id"] = toolbar_id
-    section.setdefault("color", toolColors.TOOLBAR_GRAY)
+    section.setdefault("color", COLORS.toolbar.gray.hex)
     if not resolve_items:
         section["items"] = list(section_def.get("items", []))
         return section
@@ -464,7 +464,7 @@ def get_tool_tint_color(tool_id, default=None):
             section = section_definitions.get(section_ref)
             if not section:
                 return None
-            section_color = section.get("color", toolColors.TOOLBAR_GRAY)
+            section_color = section.get("color", COLORS.toolbar.gray.hex)
             for child in section.get("items", []):
                 color = find_tint(child, inherited_color=section_color)
                 if color is not None:
@@ -481,7 +481,7 @@ def get_tool_tint_color(tool_id, default=None):
         return None
 
     for section in section_definitions.values():
-        section_color = section.get("color", toolColors.TOOLBAR_GRAY)
+        section_color = section.get("color", COLORS.toolbar.gray.hex)
         for item in section.get("items", []):
             color = find_tint(item, inherited_color=section_color)
             if color is not None:

@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.selection import api
 
 
@@ -31,7 +31,7 @@ class SelectionToolObject(ToolObject):
     }
 
     SECTION = {
-        "id": "selection_tools", "label": "Selection", "color": toolColors.TOOLBAR_GREEN,
+        "id": "selection_tools", "label": "Selection", "color": COLORS.toolbar.green.hex,
         "items": [
             {"id": "selector"},
             {"id": "select_hierarchy"},

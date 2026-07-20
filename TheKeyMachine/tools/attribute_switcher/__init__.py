@@ -1,5 +1,5 @@
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.attribute_switcher import api
 
 
@@ -25,6 +25,6 @@ class AttributeSwitcherToolObject(ToolObject):
     SECTION = {
         "id": "attribute_tools",
         "label": "Attribute Switcher",
-        "color": toolColors.TOOLBAR_GREEN,
+        "color": COLORS.toolbar.green.hex,
         "items": [{"id": "attribute_switcher"}, {"id": "gimbal"}],
     }

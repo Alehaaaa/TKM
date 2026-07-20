@@ -135,6 +135,58 @@ def time_unit():
         return om.MTime.kFilm
 
 
+def _matrix_values(matrix):
+    try:
+        return [
+            float(matrix[row][column])
+            for row in range(4)
+            for column in range(4)
+        ]
+    except Exception:
+        return None
+
+
+def _command_matrix_values(raw):
+    if not raw:
+        return None
+    values = raw[0] if len(raw) == 1 and isinstance(raw[0], (list, tuple)) else raw
+    try:
+        values = [float(value) for value in values]
+    except Exception:
+        return None
+    return values if len(values) == 16 else None
+
+
+def world_matrix_at_time(node, time=None):
+    """Evaluate a world matrix without changing Maya's current time."""
+    if om is not None:
+        try:
+            plug = find_plug(node, "worldMatrix")
+            if plug is not None:
+                plug = plug.elementByLogicalIndex(0)
+                context = (
+                    om.MDGContext.kNormal
+                    if time is None
+                    else om.MDGContext(mtime(time))
+                )
+                matrix_object = plug.asMObject(context)
+                values = _matrix_values(om.MFnMatrixData(matrix_object).matrix())
+                if values is not None:
+                    return values
+        except Exception:
+            pass
+
+    try:
+        from maya import cmds
+
+        kwargs = {"time": float(time)} if time is not None else {}
+        return _command_matrix_values(
+            cmds.getAttr("{}.worldMatrix[0]".format(node), **kwargs)
+        )
+    except Exception:
+        return None
+
+
 def mtime(time):
     if om is None:
         return None
@@ -161,6 +213,16 @@ def anim_curve_value_at_time(fn, time, fallback=None):
         if target is None:
             return fallback
         return fn.evaluate(target)
+    except Exception:
+        return fallback
+
+
+def evaluate_anim_curve(fn, time, fallback=None):
+    """Evaluate an animation curve directly without scanning its keys."""
+    if fn is None:
+        return fallback
+    try:
+        return fn.evaluate(mtime(time))
     except Exception:
         return fallback
 

@@ -127,18 +127,31 @@ def close_attribute_switcher_window():
 def attribute_switcher_window(reuse_existing=True, popup=True, anchor_button=None):
     global _attribute_switcher_instance
     dlg = get_attribute_switcher_window()
+    expected_revision = getattr(AttributeSwitcherWindow, "UI_REVISION", None)
+    if dlg and getattr(dlg, "UI_REVISION", None) != expected_revision:
+        dlg.close()
+        dlg.deleteLater()
+        _attribute_switcher_instance = None
+        dlg = None
     if not (reuse_existing and dlg and wutil.is_valid_widget(dlg)):
         close_attribute_switcher_window()
         dlg = AttributeSwitcherWindow(parent=wutil.get_maya_qt(qt=QtWidgets.QWidget), popup=popup)
 
+        created_dialog = dlg
+
         def _on_destroyed(*_):
             global _attribute_switcher_instance
+            if _attribute_switcher_instance is not created_dialog:
+                return
             _attribute_switcher_instance = None
             _emit_attribute_switcher_window_state(False)
 
         dlg.destroyed.connect(_on_destroyed)
         _attribute_switcher_instance = dlg
     else:
+        # closeEvent disables auto-close, but the widget is intentionally
+        # reusable. Restore its requested mode before refresh sizes the footer.
+        dlg.set_popup_mode(popup)
         dlg._connect_runtime_manager()
         dlg.refresh()
 
@@ -158,7 +171,7 @@ attribute_switcher_toolbar_toggle = ToolbarWindowToggle(
     is_attribute_switcher_window_open,
     lambda anchor_button=None: attribute_switcher_window(
         reuse_existing=True,
-        popup=anchor_button is None,
+        popup=True,
         anchor_button=anchor_button,
     ),
     close_attribute_switcher_window,
@@ -221,7 +234,7 @@ def bind_attribute_switcher_toolbar_button(button):
 def toggle_window(checked=None, *_args):
     if isinstance(checked, bool):
         return (
-            attribute_switcher_window(reuse_existing=True, popup=False)
+            attribute_switcher_window(reuse_existing=True, popup=True)
             if checked
             else close_attribute_switcher_window()
         )

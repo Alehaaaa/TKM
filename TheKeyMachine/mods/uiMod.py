@@ -41,7 +41,7 @@ import TheKeyMachine.mods.barMod as bar
 import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 from TheKeyMachine.mods import settingsMod as settings
@@ -55,7 +55,6 @@ mods = [
     updater,
     settings,
     report,
-    toolColors,
 ]
 
 for m in mods:
@@ -67,7 +66,7 @@ USER_FOLDER_PATH = general.config["USER_FOLDER_PATH"]
 
 class Color:
     def __init__(self, palette=None):
-        self.color = palette or toolColors.UI_COLORS
+        self.color = palette or COLORS.ui
 
 
 # ________________________________________________ Sync  ______________________________________________________ #

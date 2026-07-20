@@ -41,7 +41,7 @@ from TheKeyMachine.sliders import SliderMode
 from TheKeyMachine.sliders import utils as slider_utils
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.widgets.timeline as timelineWidgets
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager, format_tooltip_shortcut
 
@@ -61,7 +61,6 @@ No A/B picks. Context menu on right-click.
 """
 
 
-UI_COLORS = toolColors.UI_COLORS
 SLIDER_HANDLE_NEUTRAL_HEX = "#444444"
 SLIDER_VALUE_TEXT_HEX = "#747474"
 
@@ -219,7 +218,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
                 if not is_glow:
                     # Black linework on top
-                    pen = QPen(QColor(UI_COLORS.dark_gray.hex))
+                    pen = QPen(QColor(COLORS.ui.dark_gray.hex))
                     pen.setWidthF(0.85)
                     p.setPen(pen)
                     p.setBrush(Qt.NoBrush)
@@ -456,11 +455,11 @@ class SliderHandle(cw.TooltipMixin, QSlider):
             handle_border = "none"
         else:
             handle_bg = SLIDER_HANDLE_NEUTRAL_HEX
-            handle_border = f"{wutil.DPI(1)}px solid {UI_COLORS.darker_gray.hex}"
+            handle_border = f"{wutil.DPI(1)}px solid {COLORS.ui.darker_gray.hex}"
         self.setStyleSheet(
             f"""
 QSlider::groove:horizontal {{
-    background: {UI_COLORS.dark_gray.hex};
+    background: {COLORS.ui.dark_gray.hex};
     height: {gh}px;
     border-radius: {radius}px;
     margin: 0;
@@ -605,7 +604,7 @@ QSlider::handle:horizontal {{
             path = QPainterPath()
             path.addText(tx, ty, self._text_font, self._text)
 
-            p.setPen(QPen(QColor(UI_COLORS.dark_gray.hex), wutil.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            p.setPen(QPen(QColor(COLORS.ui.dark_gray.hex), wutil.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
             p.setBrush(Qt.NoBrush)
             p.drawPath(path)
 

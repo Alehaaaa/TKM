@@ -929,7 +929,7 @@ def apply_blend_to_undo(session, percentage, world_space=False):
             target = session.cache.auxiliary.get((attr_full, current_time, "undo_shape"))
             _apply_preserved_blended_tangents(cache.curve, current_time, target, t)
 
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.sliders import utils
 
 
@@ -962,7 +962,7 @@ def create_session(mode_key):
         mode_key, title=mode.label,
         description=mode.description,
         tooltip=mode.tooltip,
-        tint_color=toolColors.TOOLBAR_YELLOW,
+        tint_color=COLORS.toolbar.yellow.hex,
     )
 
 

@@ -1,6 +1,6 @@
 from maya import cmds
 
-from TheKeyMachine.core import animation_context
+from TheKeyMachine.core import openMayaUtils as open_maya
 import TheKeyMachine.core.toolbox as toolbox
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import clipboard
@@ -9,177 +9,82 @@ import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as wutil
 
 
-def _active_tint_color(tool_id):
-    return toolbox.get_tool_tint_color(tool_id)
+WORLDSPACE_CLIPBOARD = "worldspace"
+
+
+def _world_matrix(node, frame=None):
+    return open_maya.world_matrix_at_time(node, frame)
+
+
+def _apply_worldspace_values(node, values):
+    if not values:
+        return False
+    if len(values) == 16:
+        cmds.xform(node, matrix=values, worldSpace=True)
+    else:
+        # Backwards compatibility with six-value worldspace clipboards.
+        cmds.xform(node, translation=values[:3], worldSpace=True)
+        cmds.xform(node, rotation=values[3:6], worldSpace=True)
+    return True
+
+
+def _copy_worldspace_frames(selected_objects, frames, timerange, tool_id, label):
+    animation_data = {}
+    frames = tuple(dict.fromkeys(frames or ()))
+    if not frames:
+        return
+
+    with toolCommon.tool_operation(
+        tool_id=tool_id,
+        label=label,
+        progress=True,
+        progress_max=len(frames),
+        tint="range",
+        timerange=timerange,
+        tint_color=toolbox.get_tool_tint_color(tool_id),
+        undo=False,
+        suspend_refresh=True,
+    ) as operation:
+        for frame in frames:
+            if operation.cancelled:
+                break
+
+            for source_obj in selected_objects:
+                worldspace_values = _world_matrix(source_obj, frame)
+                if worldspace_values is None:
+                    continue
+                animation_data.setdefault(source_obj, {})[int(frame)] = worldspace_values
+            operation.step()
+
+        payload = {
+            "meta": {"ordered_objects": selected_objects},
+            "data": animation_data,
+        }
+        clipboard.save(WORLDSPACE_CLIPBOARD, payload)
+        operation.success = True
 
 
 def worldspace_copy_animation(*args):
-    target_info = animation_context.resolve_targets(default_mode="all_animation", ordered_selection=True, long_names=False)
-    selected_objects = target_info["target_objects"]
+    selected_objects = selectionMod.get_selected_objects(
+        orderedSelection=True,
+    )
     if not selected_objects:
         return
 
-    # Comprobar si los objetos seleccionados tienen claves de animación
-    if not cmds.keyframe(selected_objects, query=True):
-        return
-
-    animation_data = {}
-
-    # Guardar el tiempo actual antes de realizar cambios
-    original_time = cmds.currentTime(query=True)
-
-    time_context = target_info["time_context"]
-    keyframe_query = {"query": True}
-    if time_context.mode != "all_animation":
-        keyframe_query["time"] = time_context.timerange
-
+    selected_range = selectionMod.get_selected_time_slider_range()
+    timerange = selected_range or timelineWidgets.get_playback_range()
+    frames = range(int(timerange[0]), int(timerange[1]) + 1)
     try:
-        all_keyframes = sorted(list(set(cmds.keyframe(selected_objects, **keyframe_query) or [])))
-        if not all_keyframes:
-            return
-
-        with toolCommon.tool_operation(
-            tool_id="worldspace",
-            label="World Space animation copied",
-            progress=True,
-            progress_max=len(all_keyframes),
-            tint="range",
-            timerange=(int(all_keyframes[0]), int(all_keyframes[-1])),
-            undo=False,
-            suspend_refresh=True,
-        ) as operation:
-            for frame in all_keyframes:
-                if operation.cancelled:
-                    break
-
-                cmds.currentTime(frame)
-
-                for source_obj in selected_objects:
-                    # Asegurarse de que el objeto tiene claves en este frame
-                    if cmds.keyframe(source_obj, query=True, time=(frame, frame)):
-                        worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
-                            source_obj, query=True, rotation=True, worldSpace=True
-                        )
-                        if source_obj not in animation_data:
-                            animation_data[source_obj] = {}
-
-                        animation_data[source_obj][int(frame)] = worldspace_values
-
-                operation.step()
-
-            # Save to clipboard
-            payload = {
-                "meta": {"ordered_objects": selected_objects},
-                "data": animation_data,
-            }
-            clipboard.save("worldspace", payload)
-            operation.success = True
+        return _copy_worldspace_frames(
+            selected_objects,
+            frames,
+            timerange,
+            "ws_copy_range",
+            "World Space animation copied",
+        )
     finally:
-        # Restaurar el tiempo actual a su estado original
-        cmds.currentTime(original_time)
-
-
-# -------------------- Copy range World Space
-
-
-def copy_range_worldspace_animation(*args):
-    target_info = animation_context.resolve_targets(default_mode="current_frame", ordered_selection=True, long_names=False)
-    selected_objects = target_info["target_objects"]
-    if not selected_objects:
-        return
-
-    time_context = target_info["time_context"]
-    if time_context.mode != "time_slider_range":
-        return copy_worldspace_single_frame(*args)
-
-    animation_data = {}
-
-    # Guardar el tiempo actual antes de realizar cambios
-    original_time = cmds.currentTime(query=True)
-
-    frames_to_copy = list(time_context.frames or [])
-
-    try:
-        if not frames_to_copy:
-            return
-
-        with toolCommon.tool_operation(
-            tool_id="ws_copy_range",
-            label="World Space range copied",
-            progress=True,
-            progress_max=len(frames_to_copy),
-            tint="range",
-            timerange=(int(frames_to_copy[0]), int(frames_to_copy[-1])),
-            undo=False,
-            suspend_refresh=True,
-        ) as operation:
-            for frame in frames_to_copy:
-                if operation.cancelled:
-                    break
-
-                cmds.currentTime(frame)
-
-                for source_obj in selected_objects:
-                    worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
-                        source_obj, query=True, rotation=True, worldSpace=True
-                    )
-                    if source_obj not in animation_data:
-                        animation_data[source_obj] = {}
-
-                    animation_data[source_obj][int(frame)] = worldspace_values
-
-                operation.step()
-
-            # Save to clipboard
-            payload = {
-                "meta": {"ordered_objects": selected_objects},
-                "data": animation_data,
-            }
-            clipboard.save("worldspace", payload)
-            operation.success = True
-    finally:
-        timelineWidgets.clear_time_slider_selection()
-        cmds.currentTime(original_time)
-
-
-# ............. copy single frame World Space
-
-
-def copy_worldspace_single_frame(*args):
-    selected_objects = selectionMod.get_selected_objects(orderedSelection=True)
-    if not selected_objects:
-        return
-
-    animation_data = {}
-
-    # Obtener el tiempo actual
-    current_time = cmds.currentTime(query=True)
-
-    try:
-        with toolCommon.tool_operation(
-            tool_id="ws_copy_frame",
-            label="World Space current frame copied",
-            progress=False,
-            tint="current",
-            undo=False,
-            suspend_refresh=True,
-        ) as operation:
-            for source_obj in selected_objects:
-                worldspace_values = cmds.xform(source_obj, query=True, translation=True, worldSpace=True) + cmds.xform(
-                    source_obj, query=True, rotation=True, worldSpace=True
-                )
-                animation_data[source_obj] = {int(current_time): worldspace_values}
-
-            # Save to clipboard
-            payload = {
-                "meta": {"ordered_objects": selected_objects},
-                "data": animation_data,
-            }
-            clipboard.save("worldspace_frame", payload)
-            operation.success = True
-
-    finally:
-        pass
+        if selected_range:
+            timelineWidgets.clear_time_slider_selection()
 
 
 def paste_worldspace_single_frame(*args):
@@ -195,7 +100,10 @@ def paste_worldspace_single_frame(*args):
         operation_context.__enter__()
 
         # Load from clipboard
-        payload = clipboard.load("worldspace_frame", "No World Space data found. Please copy a frame first.")
+        payload = clipboard.load(
+            WORLDSPACE_CLIPBOARD,
+            "No World Space data found. Please copy first.",
+        )
         if payload is None:
             return
 
@@ -208,22 +116,38 @@ def paste_worldspace_single_frame(*args):
             animation_data = payload or {}
             ordered_sources = list(animation_data.keys())
 
-        ordered_sources = [obj for obj in ordered_sources if obj in animation_data]
+        ordered_sources = list(
+            dict.fromkeys(
+                obj for obj in ordered_sources if obj in animation_data
+            )
+        )
         if not ordered_sources:
             return wutil.make_inViewMessage("No World Space data found")
 
-        frame_range = timelineWidgets.get_animation_data_timerange(
-            {obj_name: {"frames": list((animation_data.get(obj_name) or {}).keys())} for obj_name in ordered_sources},
-            frame_key="frames",
+        copied_frames = [
+            frame
+            for obj_name in ordered_sources
+            for frame_key in (animation_data.get(obj_name) or {})
+            for frame in (_worldspace_frame_number(frame_key),)
+            if frame is not None
+        ]
+        frame_range = (
+            (min(copied_frames), max(copied_frames))
+            if copied_frames
+            else None
         )
         if frame_range:
             tint_session = timelineWidgets.begin_timeline_tint(
                 timerange=frame_range,
-                color=_active_tint_color("ws_paste_frame"),
+                color=toolbox.get_tool_tint_color("ws_paste_frame"),
                 key="ws_paste_frame",
             )
 
-        target_objects = selectionMod.get_selected_objects(orderedSelection=True)
+        target_objects = list(
+            dict.fromkeys(
+                selectionMod.get_selected_objects(orderedSelection=True)
+            )
+        )
 
         # No selection: paste back to the originally copied objects (if they still exist)
         if not target_objects:
@@ -253,8 +177,7 @@ def paste_worldspace_single_frame(*args):
                 return wutil.make_inViewMessage("No World Space data found")
             for obj in target_objects:
                 if cmds.objExists(obj):
-                    cmds.xform(obj, translation=values[:3], worldSpace=True)
-                    cmds.xform(obj, rotation=values[3:], worldSpace=True)
+                    _apply_worldspace_values(obj, values)
             return
 
         # Multi-source: paste in order (source[0]->target[0], ...)
@@ -264,8 +187,7 @@ def paste_worldspace_single_frame(*args):
             if not values:
                 return wutil.make_inViewMessage("No World Space data found")
             if cmds.objExists(target_obj):
-                cmds.xform(target_obj, translation=values[:3], worldSpace=True)
-                cmds.xform(target_obj, rotation=values[3:], worldSpace=True)
+                _apply_worldspace_values(target_obj, values)
 
         return
 
@@ -303,11 +225,15 @@ def worldspace_paste_animation(*args):
         with toolCommon.tool_operation(
             tool_id="ws_paste",
             label="Paste World Space Animation",
-            progress=False,
+            progress=True,
+            progress_max=1,
             undo=True,
             suspend_refresh=True,
         ) as operation:
-            payload = clipboard.load("worldspace", "No World Space animation data found. Please copy first.")
+            payload = clipboard.load(
+                WORLDSPACE_CLIPBOARD,
+                "No World Space animation data found. Please copy first.",
+            )
             if payload is None:
                 return
 
@@ -320,11 +246,19 @@ def worldspace_paste_animation(*args):
                 animation_data = payload or {}
                 ordered_sources = list(animation_data.keys())
 
-            ordered_sources = [obj for obj in ordered_sources if obj in animation_data]
+            ordered_sources = list(
+                dict.fromkeys(
+                    obj for obj in ordered_sources if obj in animation_data
+                )
+            )
             if not ordered_sources:
                 return wutil.make_inViewMessage("No World Space animation data found")
 
-            target_objects = selectionMod.get_selected_objects(orderedSelection=True)
+            target_objects = list(
+                dict.fromkeys(
+                    selectionMod.get_selected_objects(orderedSelection=True)
+                )
+            )
 
             # No selection: paste back to the originally copied objects (if they still exist)
             if not target_objects:
@@ -346,52 +280,66 @@ def worldspace_paste_animation(*args):
             else:
                 mapping = list(zip(ordered_sources, target_objects))
 
-            # Cut existing animation on targets
-            for _, target_obj in mapping:
-                if cmds.objExists(target_obj):
-                    cmds.cutKey(target_obj, attribute=["tx", "ty", "tz", "rx", "ry", "rz"])
+            valid_targets = list(
+                dict.fromkeys(
+                    target_obj
+                    for _, target_obj in mapping
+                    if cmds.objExists(target_obj)
+                )
+            )
 
             # Frames to paste (union of used sources)
-            mapped_animation_data = {}
             mapped_frame_values = {}
             frame_set = set()
             for source_obj, _ in mapping:
                 values_by_frame = _worldspace_frame_value_map(animation_data.get(source_obj) or {})
                 if values_by_frame:
                     mapped_frame_values[source_obj] = values_by_frame
-                    mapped_animation_data[source_obj] = {"frames": list(values_by_frame.keys())}
                     frame_set.update(values_by_frame.keys())
 
-            paste_range = timelineWidgets.get_animation_data_timerange(mapped_animation_data, frame_key="frames")
-            if not paste_range:
+            if not frame_set:
                 return wutil.make_inViewMessage("No World Space animation data found")
 
-            operation.timerange = paste_range
-            operation.tint = "range"
-
             all_frames = sorted(frame_set)
+            paste_range = (all_frames[0], all_frames[-1])
+            if valid_targets:
+                cmds.cutKey(
+                    valid_targets,
+                    attribute=["tx", "ty", "tz", "rx", "ry", "rz"],
+                    time=paste_range,
+                )
 
-            # Reconfigure progress now that we know max items
-            operation.progress_obj.max_items = len(all_frames)
-            operation.progress_obj._enabled = True
+            operation.timerange = paste_range
+            operation.tint_session = timelineWidgets.begin_timeline_tint(
+                timerange=paste_range,
+                color=toolbox.get_tool_tint_color("ws_paste"),
+                key="ws_paste",
+            )
+
+            operation.set_total(len(all_frames), reset=True)
 
             for frame in all_frames:
                 if operation.cancelled:
                     break
 
                 cmds.currentTime(frame)
+                keyed_targets = []
                 for source_obj, target_obj in mapping:
                     if not cmds.objExists(target_obj):
                         continue
                     values = (mapped_frame_values.get(source_obj) or {}).get(frame)
                     if values is None:
                         continue
-                    cmds.xform(target_obj, translation=values[:3], worldSpace=True)
-                    cmds.xform(target_obj, rotation=values[3:], worldSpace=True)
-                    cmds.setKeyframe(target_obj, time=(frame,), attribute=["tx", "ty", "tz", "rx", "ry", "rz"])
+                    if _apply_worldspace_values(target_obj, values):
+                        keyed_targets.append(target_obj)
+                if keyed_targets:
+                    cmds.setKeyframe(
+                        keyed_targets,
+                        time=(frame,),
+                        attribute=["tx", "ty", "tz", "rx", "ry", "rz"],
+                    )
                 operation.step()
 
-            valid_targets = [t for _, t in mapping if cmds.objExists(t)]
             if valid_targets:
                 cmds.filterCurve(valid_targets)
             

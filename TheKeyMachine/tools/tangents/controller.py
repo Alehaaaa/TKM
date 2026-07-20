@@ -1,20 +1,9 @@
 from maya import cmds
 
-from TheKeyMachine.core import animation_context, curveFitting
+from TheKeyMachine.core import animation_context, curveFitting, toolbox
 from TheKeyMachine.mods import selectionMod
 from TheKeyMachine.widgets import timeline
 from TheKeyMachine.widgets import util as wutil
-
-
-def _tint_color(tool_id, explicit=None):
-    if explicit:
-        return explicit
-    try:
-        from TheKeyMachine.core import toolbox
-
-        return toolbox.get_tool_tint_color(tool_id)
-    except Exception:
-        return None
 
 
 def _normalize_frames(frames):
@@ -94,7 +83,8 @@ def set_tangent(tangent_type, handle_mode="both", key_scope="selection", tint_co
     timerange = _target_range(targets) or (time_context.timerange if time_context else None)
     tint = timeline.begin_timeline_tint(
         timerange=timerange,
-        color=_tint_color("tangent_{}".format(tangent_type), tint_color),
+        color=tint_color
+        or toolbox.get_tool_tint_color("tangent_{}".format(tangent_type)),
         key="tangent_{}".format(tangent_type),
     ) if timerange else None
     try:
@@ -142,7 +132,7 @@ def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle
     timerange = (frames[0], frames[-1]) if frames else None
     tint = timeline.begin_timeline_tint(
         timerange=timerange,
-        color=_tint_color("tangent_bouncy", tint_color),
+        color=tint_color or toolbox.get_tool_tint_color("tangent_bouncy"),
         key="tangent_bouncy",
     ) if timerange else None
     try:

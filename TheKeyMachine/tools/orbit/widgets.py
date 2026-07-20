@@ -186,7 +186,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
             toolbox.get_tool("select_hierarchy"),
             toolbox.get_tool("link_copy"),
             toolbox.get_tool("temp_pivot"),
-            toolbox.get_tool("ws_copy_frame", label="Copy World Space Current Frame"),
+            toolbox.get_tool("ws_copy_frame", label="Copy World Space Animation"),
             toolbox.get_tool("ws_paste_frame", label="Paste World Space Current Frame"),
         ]
 

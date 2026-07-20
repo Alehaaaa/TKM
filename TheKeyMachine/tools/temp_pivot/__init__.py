@@ -1,7 +1,7 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.tools.temp_pivot import api
 
@@ -51,7 +51,7 @@ class TempPivotToolObject(ToolObject):
     }
     SECTION = {
         "id": "temp_pivot_tools", "label": "Temp Pivot",
-        "color": toolColors.TOOLBAR_PURPLE,
+        "color": COLORS.toolbar.purple.hex,
         "items": [
             {"id": "temp_pivot", "shortcuts": [
                 {"id": "temp_pivot_reset", "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Control]},

@@ -9,7 +9,7 @@
   "preferences": ["Open toolbar behavior, appearance, startup, and interaction preferences."],
   "startup": ["Load TheKeyMachine automatically when Maya starts."],
   "tooltips": ["Show rich tooltips, including interaction details and animated examples."],
-  "dock": ["Move the toolbar to a Maya dock area, the Time Slider, or the Range Slider."],
+  "dock": ["Move the toolbar between Maya dock areas and choose its top or bottom placement."],
   "system": ["Open reload, unload, and uninstall maintenance actions."],
   "help": ["Open documentation, support, community, and project information."],
   "hotkeys": ["Open the hotkey editor for assigning TheKeyMachine commands."],

@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.sliders import SliderMode
 
 
@@ -33,8 +33,8 @@ class TangentSliderToolObject(ToolObject):
         "id": "slider_tangent",
         "label": "Tangent Sliders",
         "icon": "tangent_auto",
-        "color": toolColors.TOOLBAR_ORANGE,
-        "icon_color": toolColors.SLIDER_ICON_ORANGE,
+        "color": COLORS.toolbar.orange.hex,
+        "icon_color": COLORS.ui.orange.hex,
         "type": "slider",
         "slider_type": "tangent",
         "modes": MODES,

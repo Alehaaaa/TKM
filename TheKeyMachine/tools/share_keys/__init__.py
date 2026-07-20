@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.share_keys import api
 
 
@@ -23,13 +23,13 @@ class ShareKeysToolObject(ToolObject):
         "bake_animation_from_last_selected": {"type": "tool", "label": "Bake From Last Selected", "icon": "bake_animation_1", "callback": api.bake_animation_from_last_selected, "tooltip": TOOLTIPS["bake_last"]},
     }
     SECTIONS = (
-        {"id": "key_sync_tools", "label": "Key Sync", "color": toolColors.TOOLBAR_GREEN, "items": [
+        {"id": "key_sync_tools", "label": "Key Sync", "color": COLORS.toolbar.green.hex, "items": [
             {"id": "share_keys", "shortcuts": [
                 {"id": "share_keys_from_last_selected", "keys": [QtCore.Qt.Key_Control]},
                 {"id": "reblock", "keys": [QtCore.Qt.Key_Shift]},
             ]}, {"id": "reblock"}, {"id": "share_keys_from_last_selected"},
         ]},
-        {"id": "bake_tools", "label": "Bake", "color": toolColors.TOOLBAR_GREEN, "items": [
+        {"id": "bake_tools", "label": "Bake", "color": COLORS.toolbar.green.hex, "items": [
             {"id": "bake_animation_1", "shortcuts": [
                 {"id": "bake_animation_2", "keys": [QtCore.Qt.Key_Control]},
                 {"id": "bake_animation_3", "keys": [QtCore.Qt.Key_Shift]},

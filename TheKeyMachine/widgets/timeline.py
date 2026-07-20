@@ -6,7 +6,7 @@ from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.widgets import util as wutil
 
 
@@ -516,7 +516,7 @@ def begin_timeline_context(
 
 
 def _default_tint_color():
-    return toolColors.TOOLBAR_GRAY
+    return COLORS.toolbar.gray.hex
 
 
 def _is_full_playback_timerange(timerange):
@@ -575,9 +575,17 @@ def _resolve_tint_variant_hex(color, preferred_shades=("base",)):
         return None
 
     family_name = getattr(color, "family", None)
-    family_colors = getattr(toolColors.color, family_name, None) if family_name else None
+    family_color = (
+        COLORS.selection.families.get(family_name)
+        if family_name
+        else None
+    )
     for shade in preferred_shades:
-        variant = getattr(family_colors, shade, None) if family_colors else None
+        variant = (
+            family_color
+            if shade == "base"
+            else getattr(family_color, shade, None)
+        )
         variant_hex = _color_hex(variant)
         if variant_hex is not None:
             return variant_hex
@@ -586,4 +594,4 @@ def _resolve_tint_variant_hex(color, preferred_shades=("base",)):
 
 
 def _color_hex(color):
-    return toolColors.to_hex(color)
+    return getattr(color, "hex", color)

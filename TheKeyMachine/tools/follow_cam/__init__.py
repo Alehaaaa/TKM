@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
 from TheKeyMachine.tools.follow_cam import api
 
@@ -44,7 +44,7 @@ class FollowCamToolObject(ToolObject):
     SECTION = {
             "id": "follow_cam_tools",
             "label": "Follow Cam",
-            "color": toolColors.TOOLBAR_PURPLE,
+            "color": COLORS.toolbar.purple.hex,
             "items": [
                 {
                     "id": "follow_cam",

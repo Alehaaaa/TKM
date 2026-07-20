@@ -4,6 +4,7 @@ from maya import cmds
 from maya.api import OpenMaya as om
 
 import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.core import toolbox
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.mods.settingsMod as settings
 from TheKeyMachine.tools import clipboard
@@ -116,19 +117,10 @@ def _apply_relationship(data, *, keyframe=False, frame=None, warn=True):
     return applied
 
 
-def _tool_tint_color(tool_id):
-    try:
-        from TheKeyMachine.core import toolbox
-
-        return toolbox.get_tool_tint_color(tool_id)
-    except Exception:
-        return None
-
-
 def _begin_paste_tint(timerange, tool_id, tool_operation=None, anchor_widget=None):
     tint_session = timelineWidgets.begin_timeline_tint(
         timerange=timerange,
-        color=_tool_tint_color(tool_id),
+        color=toolbox.get_tool_tint_color(tool_id),
         owner=anchor_widget,
         key=tool_id,
     )

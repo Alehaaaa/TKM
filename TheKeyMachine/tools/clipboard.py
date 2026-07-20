@@ -4,8 +4,8 @@ TheKeyMachine.tools.clipboard
 
 Centralized read/write layer for all tool clipboard data (copy-paste temp files).
 
-All tool clipboard operations — animation, pose, worldspace animation,
-worldspace frame, copy-link, temp-pivot — route through this module instead of
+All tool clipboard operations — animation, pose, worldspace, copy-link,
+temp-pivot — route through this module instead of
 scattering os.path / open / json.dump / json.load calls across every tool.
 
 Usage (write):
@@ -34,7 +34,6 @@ _SLOTS: dict = {
     "animation":        ("copy_animation",  "copy_animation_data.json"),
     "pose":             ("copy_pose",        "copy_pose_data.json"),
     "worldspace":       ("copy_worldspace", "copy_worldspace_data.json"),
-    "worldspace_frame": ("copy_worldspace", "copy_worldspace_single_frame_data.json"),
     "copy_link":        ("copy_link",        "copy_link_data.json"),
     "temp_pivot":       ("temp_pivot",       "temp_pivot_data.json"),
     "set_default":      ("default_default",  "default_default_data.json"),

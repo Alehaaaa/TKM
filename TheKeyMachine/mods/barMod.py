@@ -22,27 +22,6 @@ from maya import OpenMaya as om
 
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.widgets.util as wutil
-import TheKeyMachine.core.toolbox as toolbox
-
-
-# -------------------------------------------------------------------------
-
-
-def _active_tint_color(key=None, default=None):
-    if isinstance(key, str) and key.startswith("#"):
-        return key
-
-    if key:
-        try:
-            color = toolbox.get_tool_tint_color(key)
-            if color is not None:
-                return color
-        except Exception:
-            pass
-
-    if isinstance(default, str):
-        return default if default.startswith("#") else None
-    return default
 
 
 # ___________________________ iso Rig _____________________________________

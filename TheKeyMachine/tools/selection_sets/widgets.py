@@ -26,25 +26,30 @@ class SelectionSetButton(cw.InlineRenameButton):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        if self._renaming_active or self._match_state not in ("exact", "partial"):
+        if self._renaming_active or self._match_state not in ("active", "exact", "partial"):
             return
 
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
 
-        rect = self.rect().adjusted(1, 1, -1, -1)
         pen = QtGui.QPen(QtGui.QColor("#ffffff"))
-        pen.setWidth(wutil.DPI(2))
+        if self._match_state == "active":
+            pen.setWidthF(float(wutil.DPI(2)))
+        else:
+            pen.setWidthF(float(wutil.DPI(0.7)))
         if self._match_state == "partial":
-            color = pen.color()
-            color.setAlphaF(0.7)
-            pen.setColor(color)
-            pen.setWidth(wutil.DPI(0.5))
             pen.setStyle(QtCore.Qt.CustomDashLine)
             pen.setDashPattern([wutil.DPI(4), wutil.DPI(3)])
+
+        # QPainter centers a pen on its path. Inset by half its width and
+        # reduce the radius by the same amount so the stroke follows the
+        # button's stylesheet-rounded outer edge exactly.
+        inset = pen.widthF() * 0.5
+        rect = QtCore.QRectF(self.rect()).adjusted(inset, inset, -inset, -inset)
+        radius = max(0.0, float(self._match_radius) - inset)
         painter.setPen(pen)
         painter.setBrush(QtCore.Qt.NoBrush)
-        painter.drawRoundedRect(rect, self._match_radius, self._match_radius)
+        painter.drawRoundedRect(rect, radius, radius)
         painter.end()
 
 import re
@@ -53,7 +58,8 @@ import maya.cmds as cmds
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
-from TheKeyMachine.data import colors, icons
+from TheKeyMachine.data import icons
+from TheKeyMachine.data.colors import COLORS
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 from TheKeyMachine.tools.selection_sets import controller as selectionSetsController
 import TheKeyMachine.mods.selectionMod as selectionMod
@@ -70,7 +76,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.on_rejected = on_rejected
         self._opened = False
         self._completed = False
-        self._selected_color = selectionSetsApi.SELECTION_SET_DEFAULT_COLOR
+        self._selected_color = selectionSetsApi.SELECTION_COLORS.default
         self._color_buttons = {}
         self.setObjectName("selection_set_creation_dialog")
         self.setWindowTitle("Create Selection Set")
@@ -105,7 +111,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
                 border-radius: 7px;
             }
             """
-            % self._selected_color.base.hex
+            % self._selected_color.hex
         )
         entry_layout = QtWidgets.QHBoxLayout(self.entry_button)
         entry_layout.setContentsMargins(wutil.DPI(10), 0, wutil.DPI(10), 0)
@@ -168,7 +174,7 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.color_layout.setContentsMargins(0, 0, 0, 0)
         self.color_layout.setSpacing(wutil.DPI(1))
 
-        for color in selectionSetsApi.SELECTION_SET_COLORS:
+        for color in selectionSetsApi.SELECTION_COLORS.all:
             self.color_layout.addWidget(self._create_color_button(color))
 
         self.color_layout.addStretch(1)
@@ -356,6 +362,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         self.controller = controller or selectionSetsApi._resolve_toolbar_controller(controller)
         self._creation_dialog = None
         self._set_buttons = {}
+        self._primary_selected_set = None
         self._selection_match_timer = QtCore.QTimer(self)
         self._selection_match_timer.setSingleShot(True)
         self._selection_match_timer.timeout.connect(self._update_button_match_states)
@@ -598,7 +605,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         split_name = subset.split("_")
         color_suffix = split_name[-1] if len(split_name) >= 2 else ""
         set_name = "_".join(split_name[:-1]) if len(split_name) >= 2 else subset
-        color = colors.get_selection_set_color(f"_{color_suffix}", fallback=None)
+        color = COLORS.selection.get(f"_{color_suffix}", fallback=None)
         order = color.order if color else 999
         return order, set_name.lower(), subset.lower()
 
@@ -614,17 +621,24 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         button.setFixedHeight(wutil.DPI(38))
         button.set_rename_target(controller, subset, set_name)
-        button.clicked.connect(lambda *_, s=subset: controller.handle_set_selection(s, False, False))
+        button.clicked.connect(
+            lambda *_, s=subset: self._select_set(controller, s)
+        )
         button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         button.customContextMenuRequested.connect(lambda *_: self._show_set_menu(controller, subset))
 
-        color = colors.get_selection_set_color(f"_{color_suffix}")
-        button.setProperty("tkm_base_color", color.base.hex)
+        color = COLORS.selection.get(f"_{color_suffix}")
+        button.setProperty("tkm_base_color", color.hex)
         button.setProperty("tkm_hover_color", color.hover.hex)
         button.setProperty("tkm_text_color", color.text.hex)
         self._apply_set_button_style(button, match_state="none")
         self._set_buttons[subset] = button
         return button
+
+    def _select_set(self, controller, subset):
+        """Remember the explicitly clicked set before Maya changes selection."""
+        self._primary_selected_set = subset
+        controller.handle_set_selection(subset, False, False)
 
     def _apply_set_button_style(self, button, match_state="none"):
         color = button.property("tkm_base_color") or "#333333"
@@ -685,6 +699,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
 
     def _update_button_match_states(self):
         current_selection = selectionSetsController.normalize_scene_items(selectionMod.get_selected_objects(long=True))
+        primary_is_full = False
         for subset, button in list(self._set_buttons.items()):
             if not wutil.is_valid_widget(button):
                 self._set_buttons.pop(subset, None)
@@ -693,13 +708,19 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
                 self._apply_set_button_style(button, match_state="none")
                 continue
             set_members = selectionSetsController.normalize_scene_items(cmds.sets(subset, q=True) or [])
-            if current_selection == set_members:
-                match_state = "exact"
+            if set_members and set_members.issubset(current_selection):
+                if subset == self._primary_selected_set:
+                    match_state = "active"
+                    primary_is_full = True
+                else:
+                    match_state = "exact"
             elif current_selection and set_members and current_selection.intersection(set_members):
                 match_state = "partial"
             else:
                 match_state = "none"
             self._apply_set_button_style(button, match_state=match_state)
+        if self._primary_selected_set and not primary_is_full:
+            self._primary_selected_set = None
 
     def _show_set_menu(self, controller, subset):
         menu = QtWidgets.QMenu()

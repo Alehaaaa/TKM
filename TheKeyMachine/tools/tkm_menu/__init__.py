@@ -14,9 +14,9 @@ class TkmMenuToolObject(ToolObject):
             "type": "menu", "label": "TheKeyMachine", "icon": "tkm_main", "tooltip": TOOLTIPS["menu"],
             "callback": api.show_menu,
             "menu": {
-                "label": "TheKeyMachine", "items": [
+                "label": "TheKeyMachine", "description": TOOLTIPS["menu"][0], "items": [
                     {"type": "widget", "factory": api.create_logo_action},
-                    {"type": "menu", "label": "Preferences", "icon": "settings", "items": [
+                    {"type": "menu", "label": "Preferences", "icon": "settings", "description": TOOLTIPS["preferences"][0], "items": [
                         "toolbar_add_shelf_button", {"type": "check", "command": "start_with_maya"},
                         {"type": "check", "command": "show_tooltips"}, "separator",
                         {"type": "section", "label": "Alignment"},
@@ -27,22 +27,22 @@ class TkmMenuToolObject(ToolObject):
                         ]},
                     ]},
                     "hotkeys_window",
-                    {"type": "menu", "label": "Dock", "icon": "dock", "items": [
-                        {"label": "Top", "callback": partial(api.dock_toolbar, orient="top")},
-                        {"label": "Bottom", "callback": partial(api.dock_toolbar, orient="bottom")},
+                    {"type": "menu", "label": "Dock", "icon": "dock", "description": TOOLTIPS["dock"][0], "items": [
+                        {"type": "section", "label": "Position"},
+                        {"type": "choice", "get_value": api.get_dock_orientation, "set_value": api.set_dock_orientation, "items": api.dock_orientation_choices},
                         "separator",
-                        {"label": "Time Slider", "callback": partial(api.dock_toolbar, layout="TimeSlider")},
-                        {"label": "Range Slider", "callback": partial(api.dock_toolbar, layout="RangeSlider")},
+                        {"type": "section", "label": "Dock Area"},
+                        {"type": "choice", "get_value": api.get_dock_layout, "set_value": api.set_dock_layout, "items": api.dock_layout_choices},
                     ]},
-                    {"type": "menu", "label": "System", "icon": "system", "items": [
+                    {"type": "menu", "label": "System", "icon": "system", "description": TOOLTIPS["system"][0], "items": [
                         "toolbar_reload", "toolbar_unload", "toolbar_uninstall",
                     ]},
                     "separator",
-                    {"type": "menu", "label": "Help", "icon": "help", "items": [
+                    {"type": "menu", "label": "Help", "icon": "help", "description": TOOLTIPS["help"][0], "items": [
                         "bug_report_window", "separator",
-                        {"label": "Documentation", "icon": "help", "callback": partial(api.open_url, "https://thekeymachine.gitbook.io/base")},
-                        {"label": "Discord", "icon": "discord", "callback": partial(api.open_url, "https://discord.gg/G2J5yyjz")},
-                        {"label": "YouTube", "icon": "youtube", "callback": partial(api.open_url, "https://www.youtube.com/@TheKeyMachineAnimationTools")},
+                        {"label": "Documentation", "icon": "help", "description": "Open TheKeyMachine documentation.", "callback": partial(api.open_url, "https://thekeymachine.gitbook.io/base")},
+                        {"label": "Discord", "icon": "discord", "description": "Open the TheKeyMachine Discord community.", "callback": partial(api.open_url, "https://discord.gg/G2J5yyjz")},
+                        {"label": "YouTube", "icon": "youtube", "description": "Open TheKeyMachine tutorials on YouTube.", "callback": partial(api.open_url, "https://www.youtube.com/@TheKeyMachineAnimationTools")},
                     ]},
                     "donate_window", "check_for_updates", "about_window",
                 ]
@@ -78,4 +78,3 @@ class TkmMenuToolObject(ToolObject):
                 )),
             ],
         }
-

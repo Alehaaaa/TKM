@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.tools.default_values import api
 
@@ -23,7 +23,7 @@ class DefaultValuesToolObject(ToolObject):
         "default_help": {"type": "tool", "label": "Help", "icon": "help", "callback": lambda: general.open_url(DefaultValuesToolObject.DOC_URL), "tooltip": TOOLTIPS["help"], "pinnable": False},
     }
     SECTION = {
-        "id": "default_tools", "label": "Default", "color": toolColors.TOOLBAR_GREEN,
+        "id": "default_tools", "label": "Default", "color": COLORS.toolbar.green.hex,
         "items": [
             {"id": "default_object_values", "shortcuts": [
                 {"id": "default_translations", "keys": [QtCore.Qt.Key_Shift]},

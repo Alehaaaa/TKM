@@ -17,3 +17,11 @@ def toggle_camera_orbit_selection(*_args):
 
 def toggle_hide_static_animation_curves(*_args):
     return backgroundRunners.toggle_hide_static_animation_curves()
+
+
+def turn_all_off(*_args):
+    return backgroundRunners.turn_all_runners_off()
+
+
+def restore_defaults(*_args):
+    return backgroundRunners.restore_runner_defaults()

@@ -29,3 +29,11 @@ def toggle_camera_orbit_selection(*args):
 
 def toggle_hide_static_animation_curves(*args):
     return controller.toggle_hide_static_animation_curves(*args)
+
+
+def turn_all_off(*args):
+    return controller.turn_all_off(*args)
+
+
+def restore_defaults(*args):
+    return controller.restore_defaults(*args)

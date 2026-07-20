@@ -243,7 +243,15 @@ def build_declared_menu(definition, parent_widget=None):
             current_value = getter()
             group = QActionGroup(menu)
             group.setExclusive(True)
-            for choice in item.get("items", ()):
+            choice_groups = getattr(menu, "_tkm_choice_groups", None)
+            if choice_groups is None:
+                choice_groups = []
+                menu._tkm_choice_groups = choice_groups
+            choice_groups.append(group)
+            choices = item.get("items", ())
+            if callable(choices):
+                choices = choices()
+            for choice in choices:
                 value = choice.get("value")
                 _add_checkable_action(
                     menu,
@@ -375,12 +383,26 @@ def sync_main_dock_menu(toolbar):
         return
 
     for action in toolbar.dock_menu.actions():
+        orient = next(
+            (
+                key
+                for key, name in toolbar.docking_orients.items()
+                if name == action.text()
+            ),
+            None,
+        )
+        if orient:
+            is_current = orient == toolbar.docking_position[1]
+            action.setChecked(is_current)
+            action.setEnabled(not is_current)
+            continue
         layout = next((key for key, name in toolbar.docking_layouts.items() if name == action.text()), None)
         if layout:
-            if layout == toolbar.docking_position[0]:
-                action.setEnabled(False)
-                continue
-            action.setEnabled(wutil.check_visible_layout(layout))
+            is_current = layout == toolbar.docking_position[0]
+            action.setChecked(is_current)
+            action.setEnabled(
+                not is_current and wutil.check_visible_layout(layout)
+            )
 
 
 def _dock_toolbar(toolbar, checked, **target):
@@ -432,7 +454,7 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
     from TheKeyMachine.tools.tkm_menu import api as tkmMenuApi
 
     menu.addAction(tkmMenuApi.create_logo_action(menu, clickable=False))
-    
+
     sections = getattr(toolbar_widget, "_tkm_sections", []) or []
     for section in sections:
         if not wutil.is_valid_widget(section) or not getattr(section, "has_pinnable_items", lambda: False)():
@@ -452,15 +474,49 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
 
         for section in sections:
             if hasattr(section, "pinsChanged"):
-                try:
-                    section.pinsChanged.disconnect()
-                except Exception:
-                    pass
-                section.pinsChanged.connect(on_pins_changed)
+                toolCommon.replace_tracked_connection(
+                    section,
+                    "_tkm_toolbar_workspace_pin_connection",
+                    section.pinsChanged,
+                    on_pins_changed,
+                    parent=menu,
+                )
 
         _add_toolbar_pinning_footer(menu, toolbar_widget, sections)
 
     return menu
+
+
+def show_toolbar_pinning_menu(toolbar_widget, global_pos):
+    """Build and show one non-modal menu for this context request."""
+    if not wutil.is_valid_widget(toolbar_widget):
+        return False
+    closed_at = getattr(toolbar_widget, "_tkm_pinning_menu_closed_at", 0)
+    if QtCore.QDateTime.currentMSecsSinceEpoch() - closed_at < 150:
+        return True
+
+    active_menu = getattr(toolbar_widget, "_tkm_active_pinning_menu", None)
+    if active_menu and wutil.is_valid_widget(active_menu) and active_menu.isVisible():
+        return True
+
+    menu = build_toolbar_pinning_menu(toolbar_widget, toolbar_widget)
+    if not menu.actions():
+        menu.deleteLater()
+        return False
+    toolbar_widget._tkm_active_pinning_menu = menu
+
+    def _dispose_menu():
+        if wutil.is_valid_widget(toolbar_widget):
+            toolbar_widget._tkm_pinning_menu_closed_at = (
+                QtCore.QDateTime.currentMSecsSinceEpoch()
+            )
+            if getattr(toolbar_widget, "_tkm_active_pinning_menu", None) is menu:
+                toolbar_widget._tkm_active_pinning_menu = None
+        menu.deleteLater()
+
+    menu.aboutToHide.connect(_dispose_menu)
+    menu.popup(global_pos)
+    return True
 
 
 def _toolbar_alignment_context(toolbar_widget):

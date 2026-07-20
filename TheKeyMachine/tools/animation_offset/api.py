@@ -5,7 +5,7 @@ from TheKeyMachine.core.Qt import QtCompat, QtCore, QtWidgets
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.data import icons
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.animation_offset import widgets as offset_widgets
 import TheKeyMachine.widgets.timeline as timelineWidgets
@@ -520,7 +520,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._resnapshot(update_range=self._time_range is None)
         offset_widgets.show_animation_offset_tint(
             timerange=self._time_range,
-            color=toolColors.TOOLBAR_PURPLE,
+            color=COLORS.toolbar.purple.hex,
             owner=self._owner,
             key=self._tint_key,
             center_line=True,

@@ -3,7 +3,7 @@ from functools import partial
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.tools.align import api
 
@@ -110,7 +110,7 @@ class AlignToolObject(ToolObject):
     SECTION = {
         "id": "align_tools",
         "label": "Align Objects",
-        "color": toolColors.TOOLBAR_GREEN,
+        "color": COLORS.toolbar.green.hex,
         "items": [
             {
                 "id": "align_objects",

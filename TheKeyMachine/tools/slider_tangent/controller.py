@@ -204,7 +204,7 @@ def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1
                 )
             cmds.keyTangent(curve, edit=True, time=(time, time), lock=orig["locked"])
 
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.sliders import utils
 
 
@@ -235,7 +235,7 @@ def create_session(mode_key):
         mode_key, title=mode.label,
         description=mode.description,
         tooltip=mode.tooltip,
-        tint_color=toolColors.TOOLBAR_ORANGE,
+        tint_color=COLORS.toolbar.orange.hex,
     )
 
 

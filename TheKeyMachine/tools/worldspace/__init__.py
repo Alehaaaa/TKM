@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
 from TheKeyMachine.tools.worldspace import api
@@ -18,14 +18,14 @@ class WorldspaceToolObject(ToolObject):
             "type": "tool",
             "label": "Copy World Space",
             "icon": "worldspace_copy_frame",
-            "callback": api.copy_worldspace_single_frame,
+            "callback": api.worldspace_copy_animation,
             "tooltip": TOOLTIPS["copy_frame"],
         },
         "ws_copy_range": {
             "type": "tool",
             "label": "Copy World Space - Selected Range",
             "icon": "worldspace_copy_animation",
-            "callback": api.copy_range_worldspace_animation,
+            "callback": api.worldspace_copy_animation,
             "tooltip": TOOLTIPS["copy_range"],
         },
         "ws_paste_frame": {
@@ -55,7 +55,7 @@ class WorldspaceToolObject(ToolObject):
     SECTION = {
             "id": "worldspace_tools",
             "label": "Worldspace",
-            "color": toolColors.TOOLBAR_GREEN,
+            "color": COLORS.toolbar.green.hex,
             "items": [
                 {
                     "id": "ws_copy_frame",
@@ -72,4 +72,3 @@ class WorldspaceToolObject(ToolObject):
                 {"id": "ws_paste"},
             ],
         }
-

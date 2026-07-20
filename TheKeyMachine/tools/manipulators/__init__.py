@@ -1,5 +1,5 @@
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.manipulators import api
 
 
@@ -29,7 +29,7 @@ class ManipulatorsToolObject(ToolObject):
     SECTION = {
         "id": "manipulator_tools",
         "label": "Manipulators",
-        "color": toolColors.TOOLBAR_PURPLE,
+        "color": COLORS.toolbar.purple.hex,
         "items": [
             {"id": "smart_rotation"},
             {"id": "smart_rotation_release"},

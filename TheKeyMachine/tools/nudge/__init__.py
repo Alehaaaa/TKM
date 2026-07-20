@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.nudge import api, widgets
 
 
@@ -38,7 +38,7 @@ class NudgeToolObject(ToolObject):
         "nudge_remove_inbetween_scene": {"type": "tool", "label": "Remove Inbetween - Scene", "icon": "nudge_remove_inbetween_scene", "callback": api.nudge_remove_inbetween_scene, "tooltip": TOOLTIPS["remove_scene"]},
     }
     SECTION = {
-        "id": "nudge_tools", "label": "Nudge", "color": toolColors.TOOLBAR_GREEN,
+        "id": "nudge_tools", "label": "Nudge", "color": COLORS.toolbar.green.hex,
         "items": [
             {"id": "nudge_left", "shortcuts": [
                 {"id": "nudge_remove_inbetween", "keys": [QtCore.Qt.Key_Shift]},

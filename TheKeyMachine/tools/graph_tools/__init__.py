@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.graph_tools import api
 
 
@@ -63,7 +63,7 @@ class GraphToolsToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "graph_tools", "label": "Graph Tools", "color": toolColors.TOOLBAR_ORANGE,
+        "id": "graph_tools", "label": "Graph Tools", "color": COLORS.toolbar.orange.hex,
         "items": [
             {"id": "graph_extra_tools"},
             {"id": "graph_select_object_from_curve"},

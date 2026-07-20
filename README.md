@@ -4,7 +4,7 @@
 
 # TheKeyMachine, animation toolbar
 
-![Version](https://img.shields.io/badge/version-0.1.30-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.31-blue.svg)
 
 TheKeyMachine (TKM) is an open source Maya animation toolset built for faster key editing, cleaner selection workflows, smarter copy/paste utilities, floating tools, and timeline-aware operations.
 
@@ -35,9 +35,9 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 - `Clear Selection` to remove key selection quickly
 - `Select Scene Anim` to collect animation curves from the scene
 - `Anim Curve Tools` for selection-aware clear/copy/cut/paste/crop/reverse/filter workflows
-- `Set Smart Key` for animated curves, selected channels, Graph Editor keys, and highlighted time ranges
+- `Set Smart Key` for animated curves, selected channels, Graph Editor keys, highlighted ranges, exact subframes, and unanimated objects in mixed selections
 - `Smart Euler Filter`, redundant-key removal, and static-curve cleanup that respect the active selection context
-- `Snap Keys` grouped with the Anim Curve Tools
+- `Snap Keys` works from object or key/range selection and merges multiple subframe keys into the closest whole-frame key
 - nudge, inbetween, bake, tangent, and background-runner actions use clearer toolbar icons
 
 ### Tangents
@@ -51,7 +51,7 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 - `Select Rig Controls`, including animated-controls-only variants
 - `Isolate` with bookmark support and down-one-level options
 - `Create Locator` tools for quick temporary setup work
-- `Align` for translation, rotation, scale, full transform, and range matching
+- `Align` for translation, rotation, scale, full transform, and matching only the reference object's real keys across a selected range
 - `Tracer` for animation tracing, refresh, visibility, and style switching
 - `Default Values` on the current frame, selected keys, or ranges
 - `Clear Animation` in the active time context
@@ -77,8 +77,8 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 ### Linking And Space
 
 - `Link Objects` for relative links and optional auto-link behavior
-- `World Space` copy/paste for single-frame and range-based motion
-- `Attribute Switcher` for enum and attribute-driven switching workflows
+- `World Space` samples every frame in the selected or visible playback range, supports one-to-many pastes, and preserves animation outside the pasted range
+- `Attribute Switcher` for enum and attribute-driven switching, drag-release popup choices, and compact scrolling that expands only when the screen-limited content requires it
 
 ### Floating Windows
 
@@ -90,7 +90,7 @@ This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.
 
 ## Timeline Feedback
 
-Many tools tint the Maya time slider while they run. Full-range tools tint the full slider holder, while range-based tools tint only the working range, making it easier to see the current operation at a glance.
+Many tools tint the Maya time slider while they run. Full-range tools tint the full slider holder, while range-based tools tint only the working range. Tints inherit the owning toolbar section color, keeping related operations visually consistent.
 
 ## Tooltips And Menus
 

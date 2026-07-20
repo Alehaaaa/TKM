@@ -95,6 +95,70 @@ def dock_toolbar(*_args, **target):
         return instance.dock_to_ui(**target)
 
 
+def _docking_position():
+    from TheKeyMachine.core import toolbar
+    from TheKeyMachine.mods import settingsMod as settings
+
+    instance = toolbar.get_toolbar()
+    position = (
+        instance.docking_position
+        if instance
+        else settings.get_setting("docking_position", ["TimeSlider", "top"])
+    )
+    position = list(position or ["TimeSlider", "top"])
+    valid_areas = set(toolbar.DOCKING_AREAS)
+    valid_orientations = set(toolbar.DOCKING_ORIENTATIONS)
+    if len(position) != 2:
+        return ["TimeSlider", "top"]
+    if position[0] not in valid_areas:
+        position[0] = "TimeSlider"
+    if position[1] not in valid_orientations:
+        position[1] = "top"
+    return position
+
+
+def get_dock_orientation(*_args):
+    return _docking_position()[1]
+
+
+def set_dock_orientation(orientation, *_args):
+    return dock_toolbar(orient=orientation)
+
+
+def get_dock_layout(*_args):
+    return _docking_position()[0]
+
+
+def set_dock_layout(layout, *_args):
+    return dock_toolbar(layout=layout)
+
+
+def dock_orientation_choices():
+    from TheKeyMachine.core import toolbar
+
+    return [
+        {
+            "label": label,
+            "value": value,
+            "description": "Place the toolbar on the {} side.".format(value),
+        }
+        for value, label in toolbar.DOCKING_ORIENTATIONS.items()
+    ]
+
+
+def dock_layout_choices():
+    from TheKeyMachine.core import toolbar
+
+    return [
+        {
+            "label": label,
+            "value": value,
+            "description": "Dock the toolbar in {}.".format(label),
+        }
+        for value, label in toolbar.DOCKING_AREAS.items()
+    ]
+
+
 def set_alignment(alignment_name, *_args):
     from TheKeyMachine.mods import settingsMod as settings
     settings.set_setting("toolbar_icon_alignment", alignment_name)

@@ -423,6 +423,14 @@ def tool_operation(
     show_success_message=True,
     suspend_refresh=True,
 ):
+    if tint_color is None and tool_id:
+        try:
+            from TheKeyMachine.core import toolbox
+
+            tint_color = toolbox.get_tool_tint_color(tool_id)
+        except Exception:
+            tint_color = None
+
     parent_operation = current_tool_operation()
     progress_obj = None
     owns_progress = False

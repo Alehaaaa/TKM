@@ -25,11 +25,6 @@ import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as wutil
 
 
-def _timeline_tint_color(key):
-    import TheKeyMachine.mods.barMod as bar
-
-    return bar._active_tint_color(key)
-
 # _____________________________ Patrones Mirror ______________________________________
 
 
@@ -191,7 +186,6 @@ def mirror(*args):
             tint="context",
             default_mode="current_frame",
             tint_key="mirror",
-            tint_color=_timeline_tint_color("mirror"),
         )
         operation_context.__enter__()
         operation_context.start()
@@ -384,7 +378,6 @@ def mirror_to_right(*args):
         tint="context",
         default_mode="current_frame",
         tint_key="mirror_to_right",
-        tint_color=_timeline_tint_color("mirror_to_right"),
     ) as operation:
         operation.start()
         return _mirror_current_values(target_side="right", operation=operation)
@@ -401,7 +394,6 @@ def mirror_to_left(*args):
         tint="context",
         default_mode="current_frame",
         tint_key="mirror_to_left",
-        tint_color=_timeline_tint_color("mirror_to_left"),
     ) as operation:
         operation.start()
         return _mirror_current_values(target_side="left", operation=operation)

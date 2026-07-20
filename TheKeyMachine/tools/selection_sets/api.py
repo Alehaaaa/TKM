@@ -7,19 +7,18 @@ import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
 
 SELECTION_SETS_SETTINGS_NAMESPACE = "selection_sets_window"
 SELECTION_SETS_AUTO_TRANSPARENCY_KEY = "selection_sets_auto_transparency"
-ANIMBOT_CONVERSION_PROMPT_KEY = "animbot_conversion_prompt"
 
-SELECTION_SET_COLORS = toolColors.SELECTION_SET_COLORS
-SELECTION_SET_COLOR_BY_SUFFIX = toolColors.SELECTION_SET_COLOR_BY_SUFFIX
-SELECTION_SET_DEFAULT_COLOR = toolColors.SELECTION_SET_DEFAULT_COLOR
-selection_set_color_names = {color.suffix: color.label for color in SELECTION_SET_COLORS}
+SELECTION_COLORS = COLORS.selection
+selection_set_color_names = {
+    color.suffix: color.label for color in SELECTION_COLORS.all
+}
 
 
 _selection_set_creation_dialog = None
@@ -189,47 +188,26 @@ def _maybe_convert_animbot_selection_sets(controller=None):
     if not pending:
         return True
 
-    prompt_mode = settings.get_setting(
-        ANIMBOT_CONVERSION_PROMPT_KEY,
-        "ask",
-        namespace=SELECTION_SETS_SETTINGS_NAMESPACE,
-    )
-    if prompt_mode == "never":
-        return True
-    if prompt_mode == "always":
-        convert_fn(pending)
-        return True
-
     clicked = customDialogs.QFlatConfirmDialog.question(
         parent=wutil.get_maya_qt(qt=QtWidgets.QWidget),
         window="Selection Sets",
-        title="Convert animBot selection sets?",
+        title="Import animBot selection sets?",
         message=(
-            f"{len(pending)} animBot selection set"
-            f"{'' if len(pending) == 1 else 's'} can be copied into TKM Selection Sets."
+            f"Import {len(pending)} animBot selection set"
+            f"{'' if len(pending) == 1 else 's'} into TKM Selection Sets?"
         ),
         buttons=[
-            customDialogs.QFlatConfirmDialog.CustomButton("Yes", positive=True, icon=icons.apply),
-            customDialogs.QFlatConfirmDialog.CustomButton("Always", positive=True, icon=icons.apply),
-            customDialogs.QFlatConfirmDialog.CustomButton("Never", positive=False, icon=icons.cancel),
-            customDialogs.QFlatConfirmDialog.Cancel,
+            customDialogs.QFlatConfirmDialog.CustomButton("Import", positive=True, icon=icons.apply),
+            customDialogs.QFlatConfirmDialog.CustomButton("Not Now", positive=False, icon=icons.cancel),
         ],
-        highlight="Yes",
+        highlight="Import",
         closeButton=False,
         icon=icons.selection_sets,
     )
     choice = (clicked or {}).get("name")
-    if choice == "Yes":
+    if choice == "Import":
         convert_fn(pending)
-        return True
-    if choice == "Always":
-        settings.set_setting(ANIMBOT_CONVERSION_PROMPT_KEY, "always", namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
-        convert_fn(pending)
-        return True
-    if choice == "Never":
-        settings.set_setting(ANIMBOT_CONVERSION_PROMPT_KEY, "never", namespace=SELECTION_SETS_SETTINGS_NAMESPACE)
-        return True
-    return False
+    return True
 
 
 def open_selection_sets_toolbar_action(controller=None):

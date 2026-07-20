@@ -32,15 +32,6 @@ def _unique(items):
     return list(dict.fromkeys(items or []))
 
 
-def _timeline_tint_color(tool_id):
-    try:
-        from TheKeyMachine.core import toolbox
-
-        return toolbox.get_tool_tint_color(tool_id)
-    except Exception:
-        return None
-
-
 def _euler_full_turn():
     try:
         angular_unit = cmds.currentUnit(query=True, angle=True)
@@ -241,11 +232,6 @@ def _animation_command_context(
         timerange=timerange,
         default_mode=default_mode,
         tint_key=tint_key,
-        tint_color=(
-            _timeline_tint_color(tint_key)
-            if tint_key and operation_tint != "none"
-            else None
-        ),
     ):
         yield
 
@@ -676,6 +662,23 @@ def _frames_for_key_time_context(time_context):
     return (time_context.start_frame,)
 
 
+def _frames_for_smart_key(time_context):
+    """Keep a deliberately chosen sub-frame instead of expanding a UI range."""
+    current_time = float(cmds.currentTime(query=True))
+    if not math.isclose(
+        current_time, round(current_time), rel_tol=0.0, abs_tol=1e-8
+    ):
+        return (current_time,)
+    return _frames_for_key_time_context(time_context)
+
+
+def _nearest_whole_frame(key_time):
+    key_time = float(key_time)
+    if key_time >= 0.0:
+        return int(math.floor(key_time + 0.5))
+    return int(math.ceil(key_time - 0.5))
+
+
 def _curve_output_plug(curve):
     destinations = selectionMod.get_anim_curve_output_plugs([curve])
     return destinations[0] if destinations else None
@@ -785,14 +788,27 @@ def set_smart_key(*args):
     selected_objects = _unique(selected_objects)
     target_plugs = _unique(target_plugs)
 
-    frames = _frames_for_key_time_context(target_info["time_context"])
+    frames = _frames_for_smart_key(target_info["time_context"])
     source = target_info.get("source")
+    has_graph_keys = bool(target_info.get("has_graph_keys"))
+
+    # Passive Graph Editor/outliner contents must not replace the actual Maya
+    # object selection. Only explicitly selected keys or Channel Box channels
+    # take precedence over plain selected-object behavior.
+    scene_objects = _unique(selectionMod.get_valid_selected_objects(long=True))
+    if scene_objects and not has_graph_keys and source != "channel_box":
+        selected_objects = scene_objects
+        source = "objects"
 
     with _animation_command_context(
         "Set Smart Key",
         tint=False,
     ):
-        keyed = _set_selected_graph_editor_curves_current_time()
+        keyed = (
+            _set_selected_graph_editor_curves_current_time()
+            if has_graph_keys
+            else False
+        )
 
         if not keyed and _is_explicit_channel_source(source) and target_plugs:
             if source == "channel_box":
@@ -827,22 +843,31 @@ def set_smart_key(*args):
             if not selected_objects:
                 return wutil.make_inViewMessage("Select at least one object")
 
-            curves = animation_context.curves(target_info, include_shapes=False)
-            for curve in curves:
-                for frame in frames:
-                    keyed = _set_key_on_curve_preserving_tangent(curve, frame) or keyed
+            for obj in selected_objects:
+                animated_attrs = selectionMod.get_animated_channels_for_node(obj)
 
-            if not keyed and target_plugs:
-                for plug in target_plugs:
-                    if not plug or "." not in plug:
-                        continue
-                    node, attr = plug.rsplit(".", 1)
-                    try:
+                if animated_attrs:
+                    animated_plugs = [
+                        "{}.{}".format(obj, attr) for attr in animated_attrs
+                    ]
+                    curves = selectionMod.get_anim_curves_from_plugs(animated_plugs)
+                    for curve in curves:
                         for frame in frames:
-                            cmds.setKeyframe(node, attribute=attr, time=(frame,))
-                            keyed = True
-                    except (RuntimeError, ValueError, TypeError):
-                        pass
+                            keyed = (
+                                _set_key_on_curve_preserving_tangent(curve, frame)
+                                or keyed
+                            )
+                    continue
+
+                attrs = selectionMod.get_keyable_scalar_attributes(obj)
+                if not attrs:
+                    continue
+                try:
+                    for frame in frames:
+                        cmds.setKeyframe(obj, attribute=attrs, time=(frame,))
+                        keyed = True
+                except (RuntimeError, ValueError, TypeError):
+                    pass
 
         if not keyed:
             return wutil.make_inViewMessage("No keyable channels found")
@@ -858,7 +883,7 @@ def set_smart_key_all_channels(*args):
 
     selected_objects = _unique(selected_objects)
 
-    frames = _frames_for_key_time_context(target_info["time_context"])
+    frames = _frames_for_smart_key(target_info["time_context"])
 
     with _animation_command_context(
         "Set Smart Key All Channels",
@@ -884,13 +909,17 @@ def set_smart_key_all_channels(*args):
             return wutil.make_inViewMessage("No keyable channels found")
 
 
-def _snap_curve_key(curve, key_time, target_value):
-    rounded_time = round(key_time)
-    if float(rounded_time) == float(key_time):
+def _snap_curve_keys(
+    curve, rounded_time, key_times, target_value, curve_times
+):
+    """Merge one whole-frame bucket, keeping its nearest sub-frame key."""
+    if not key_times:
         return False
-
+    key_time = min(
+        key_times,
+        key=lambda value: (abs(float(value) - float(rounded_time)), float(value)),
+    )
     try:
-        key_times = cmds.keyframe(curve, query=True, timeChange=True) or []
         destination_exists = any(
             math.isclose(
                 float(existing_time), float(rounded_time), rel_tol=0.0, abs_tol=1e-8
@@ -898,16 +927,23 @@ def _snap_curve_key(curve, key_time, target_value):
             and not math.isclose(
                 float(existing_time), float(key_time), rel_tol=0.0, abs_tol=1e-8
             )
-            for existing_time in key_times
+            for existing_time in curve_times
         )
         if destination_exists:
-            # Maya's "over" move leaves a nearly coincident key when the
-            # destination is occupied. Merge by keeping the full-frame key.
-            cmds.cutKey(curve, time=(key_time, key_time), clear=True)
-            return True
+            # Maya's "over" move can leave two nearly coincident keys.
+            cmds.cutKey(curve, time=(rounded_time, rounded_time), clear=True)
 
-        # Move the existing key and set the value sampled at its destination in
-        # one edit. This keeps the full-frame animation intact while preserving
+        for redundant_time in key_times:
+            if math.isclose(
+                float(redundant_time), float(key_time), rel_tol=0.0, abs_tol=1e-8
+            ):
+                continue
+            cmds.cutKey(
+                curve, time=(redundant_time, redundant_time), clear=True
+            )
+
+        # Sampled before any deletion, target_value preserves the curve's value
+        # at the whole frame. Moving the closest key retains the most relevant
         # tangent weights, locks, and breakdown state.
         cmds.keyframe(
             curve,
@@ -923,45 +959,102 @@ def _snap_curve_key(curve, key_time, target_value):
     return True
 
 
-def snap_keyframes():
+def _curve_value_at_time(curve, curve_fn, time):
+    value = open_maya.evaluate_anim_curve(curve_fn, time)
+    if value is not None:
+        return open_maya.anim_curve_value_to_attr_value(curve, value)
+    try:
+        values = (
+            cmds.keyframe(
+                curve,
+                time=(time, time),
+                query=True,
+                eval=True,
+            )
+            or []
+        )
+    except _COMMAND_ERRORS:
+        values = []
+    return values[0] if values else None
+
+
+def _resolve_snap_targets():
+    """Resolve explicit keys first, then the selected scene objects.
+
+    A visible Graph Editor can retain passive curve/outliner state. That state
+    must not override an object-only selection for this command.
+    """
     target_info, _target_plugs, _selected_objects, _selected_channels = (
         animation_context.resolve_command_targets(
             default_mode="all_animation",
             include_shapes=True,
         )
     )
-    curves = animation_context.curves(target_info)
+    if target_info.get("has_graph_keys"):
+        return target_info, animation_context.curves(target_info)
+
+    selected_objects = _unique(selectionMod.get_selected_objects(long=True))
+    if not selected_objects:
+        return target_info, animation_context.curves(target_info)
+
+    target_plugs, source = selectionMod.get_attribute_plugs_from_nodes(
+        selected_objects
+    )
+    if source == "channel_box" and target_plugs:
+        curves = selectionMod.get_anim_curves_from_plugs(target_plugs)
+    else:
+        curves = selectionMod.get_anim_curves_for_nodes(
+            selected_objects, include_shapes=True
+        )
+
+    object_target_info = dict(target_info)
+    object_target_info.update(
+        target_plugs=target_plugs,
+        target_objects=selected_objects,
+        selected_channels=selectionMod.attribute_names_from_plugs(target_plugs),
+        selected_curves=curves,
+        selected_keyframes=[],
+        source=source,
+        has_graph_keys=False,
+    )
+    return object_target_info, curves
+
+
+def snap_keyframes():
+    target_info, curves = _resolve_snap_targets()
     if not curves:
         return wutil.make_inViewMessage("No animation curves found")
 
     curve_key_times = []
     for curve in curves:
-        snap_data = []
+        curve_times = cmds.keyframe(curve, query=True, timeChange=True) or []
+        curve_fn = open_maya.anim_curve_fn(curve)
+        buckets = {}
         for key_time in animation_context.key_times(curve, target_info):
-            rounded_time = round(key_time)
-            if float(rounded_time) == float(key_time):
-                continue
-            try:
-                values = (
-                    cmds.keyframe(
-                        curve, time=(rounded_time, rounded_time), query=True, eval=True
-                    )
-                    or []
-                )
-            except (
-                RuntimeError,
-                ValueError,
-                TypeError,
-                AttributeError,
-                KeyError,
-                IndexError,
+            rounded_time = _nearest_whole_frame(key_time)
+            if math.isclose(
+                float(rounded_time),
+                float(key_time),
+                rel_tol=0.0,
+                abs_tol=1e-8,
             ):
-                values = []
-            if values:
-                snap_data.append((key_time, values[0]))
+                continue
+            buckets.setdefault(rounded_time, []).append(key_time)
+
+        snap_data = []
+        for rounded_time, key_times in sorted(buckets.items()):
+            target_value = _curve_value_at_time(
+                curve,
+                curve_fn,
+                rounded_time,
+            )
+            if target_value is not None:
+                snap_data.append((rounded_time, key_times, target_value))
         if snap_data:
-            curve_key_times.append((curve, snap_data))
-    work_items = sum(len(snap_data) for _curve, snap_data in curve_key_times)
+            curve_key_times.append((curve, curve_times, snap_data))
+    work_items = sum(
+        len(snap_data) for _curve, _curve_times, snap_data in curve_key_times
+    )
 
     if not work_items:
         return wutil.make_inViewMessage("No sub-frame keys found")
@@ -973,17 +1066,22 @@ def snap_keyframes():
         progress=True,
         progress_max=work_items,
         undo=True,
-        tint="context",
-        default_mode="all_animation",
-        tint_key="snap",
-        tint_color=_timeline_tint_color("snap"),
     ) as operation:
         operation.start()
-        for curve, snap_data in curve_key_times:
-            for key_time, target_value in snap_data:
+        for curve, curve_times, snap_data in curve_key_times:
+            for rounded_time, key_times, target_value in snap_data:
                 if operation.cancelled:
                     return
-                snapped = _snap_curve_key(curve, key_time, target_value) or snapped
+                snapped = (
+                    _snap_curve_keys(
+                        curve,
+                        rounded_time,
+                        key_times,
+                        target_value,
+                        curve_times,
+                    )
+                    or snapped
+                )
                 operation.step()
 
     if not snapped:

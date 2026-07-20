@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.copy_paste import api
 
 
@@ -92,7 +92,7 @@ class CopyPasteToolObject(ToolObject):
     SECTION = {
         "id": "pose_animation_section",
         "label": "Pose & Animation",
-        "color": toolColors.TOOLBAR_GREEN,
+        "color": COLORS.toolbar.green.hex,
         "items": [
             {
                 "id": "copy_pose",

@@ -5,6 +5,7 @@ import re
 
 from maya import cmds
 
+from TheKeyMachine.core import toolbox
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import clipboard
@@ -16,20 +17,13 @@ import TheKeyMachine.widgets.util as wutil
 
 
 def _begin_timeline_tint(timerange, key, owner=None, color=None):
-    import TheKeyMachine.mods.barMod as bar
-
     return timelineWidgets.begin_timeline_tint(
         timerange=timerange,
-        color=color or bar._active_tint_color(key),
+        color=color or toolbox.get_tool_tint_color(key),
         owner=owner,
         key=key,
     )
 
-
-def _timeline_tint_color(key):
-    import TheKeyMachine.mods.barMod as bar
-
-    return bar._active_tint_color(key)
 
 # ______________________________________________________COPY PASTE ANIMATION ______________________________________________________________________________#
 
@@ -517,7 +511,6 @@ def _copy_paste_operation(
             timerange=operation_timerange,
             default_mode=default_mode,
             tint_key=tool_id,
-            tint_color=_timeline_tint_color(tool_id) if operation_tint != "none" else None,
         ) as operation:
             state["operation"] = operation
             yield state

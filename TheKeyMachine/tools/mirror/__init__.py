@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.mods import generalMod as general
 from TheKeyMachine.tools.mirror import api
 
@@ -82,7 +82,7 @@ class MirrorToolObject(ToolObject):
         {
             "id": "opposite_tools",
             "label": "Opposite",
-            "color": toolColors.TOOLBAR_GREEN,
+            "color": COLORS.toolbar.green.hex,
             "items": [
                 {"id": "select_opposite"},
                 {"id": "opposite_add"},
@@ -92,7 +92,7 @@ class MirrorToolObject(ToolObject):
         {
             "id": "mirror_tools",
             "label": "Mirror",
-            "color": toolColors.TOOLBAR_GREEN,
+            "color": COLORS.toolbar.green.hex,
             "items": [
                 {
                     "id": "mirror",

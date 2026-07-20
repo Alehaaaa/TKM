@@ -169,14 +169,6 @@ def get_copy_worldspace_data_folder():
     return _clipboard_path("worldspace", folder_only=True)
 
 
-def get_copy_worldspace_single_frame_data_file():
-    return _clipboard_path("worldspace_frame")
-
-
-def get_copy_worldspace_single_frame_data_folder():
-    return _clipboard_path("worldspace_frame", folder_only=True)
-
-
 # ------------------------------------------------------------------------
 
 

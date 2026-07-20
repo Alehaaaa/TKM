@@ -26,6 +26,7 @@ ANIMBOT_COLOR_INDEX_TO_TKM_INDEX = {
     7: 5,
     8: 6,
     9: 7,
+    10: 8,
     11: 9,
     12: 10,
     13: 11,
@@ -53,12 +54,14 @@ def normalize_scene_items(items):
         return set()
     normalized = cmds.ls(items, long=True) or []
     return set(normalized or items)
-TKM_SELECTION_COLOR_BY_INDEX = {color.index: color for color in selectionSetsApi.SELECTION_SET_COLORS}
+TKM_SELECTION_COLOR_BY_INDEX = {
+    color.index: color for color in selectionSetsApi.SELECTION_COLORS.all
+}
 
 
 def _selection_color_suffix_from_tkm_index(tkm_index):
     color = TKM_SELECTION_COLOR_BY_INDEX.get(tkm_index)
-    return color.suffix if color else selectionSetsApi.SELECTION_SET_DEFAULT_COLOR.suffix
+    return color.suffix if color else selectionSetsApi.SELECTION_COLORS.default.suffix
 
 
 class SelectionSetsController:

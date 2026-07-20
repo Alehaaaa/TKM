@@ -29,15 +29,6 @@ BAKE_UNDO_HELP = {
 }
 
 
-def _timeline_tint_color(tool_id):
-    try:
-        from TheKeyMachine.core import toolbox
-
-        return toolbox.get_tool_tint_color(tool_id)
-    except Exception:
-        return None
-
-
 def get_share_keys_mode():
     return settings.get_setting(SHARE_KEYS_MODE_SETTING, SHARE_KEYS_MODE_PRESERVE_TANGENT)
 
@@ -212,7 +203,6 @@ def share_keys(*args):
         undo=True,
         tint="range",
         timerange=(int(shared_frames[0]), int(shared_frames[-1])),
-        tint_color=_timeline_tint_color("share_keys"),
     ) as operation:
         operation.start()
         for objeto in objetos:
@@ -295,7 +285,6 @@ def share_keys_from_last_selected(*args):
         undo=True,
         tint="range",
         timerange=(int(frames[0]), int(frames[-1])),
-        tint_color=_timeline_tint_color("share_keys"),
     ) as operation:
         for target in targets:
             if operation.cancelled:
@@ -472,7 +461,6 @@ def bake_animation(bake_interval=1, window=None):
             undo=True,
             tint="range",
             timerange=time_context.timerange,
-            tint_color=_timeline_tint_color(tool_key),
             anchor_widget=window,
         ) as operation:
             operation.start()
@@ -534,7 +522,6 @@ def bake_animation_from_last_selected(*args):
             undo=True,
             tint="range",
             timerange=(int(frames[0]), int(frames[-1])),
-            tint_color=_timeline_tint_color("bake_animation_1"),
         ) as operation:
             for target in targets:
                 if operation.cancelled:

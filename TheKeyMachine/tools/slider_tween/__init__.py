@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.sliders import SliderMode
 
 
@@ -35,8 +35,8 @@ class TweenSliderToolObject(ToolObject):
     SECTION = {
         "id": "slider_tween",
         "label": "Tween Sliders",
-        "color": toolColors.TOOLBAR_YELLOW,
-        "icon_color": toolColors.SLIDER_ICON_YELLOW,
+        "color": COLORS.toolbar.yellow.hex,
+        "icon_color": COLORS.ui.yellow.hex,
         "type": "slider",
         "slider_type": "tween",
         "modes": MODES,

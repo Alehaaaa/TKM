@@ -1,5 +1,5 @@
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.animation_tools import api
 
 
@@ -67,7 +67,7 @@ class AnimationToolsToolObject(ToolObject):
     }
 
     SECTION = {
-        "id": "animation_tools", "label": "Anim Curve Tools", "color": toolColors.TOOLBAR_GREEN,
+        "id": "animation_tools", "label": "Anim Curve Tools", "color": COLORS.toolbar.green.hex,
         "items": [
             {"id": "animation_tools"}, "separator",
             {"id": "set_smart_key"}, {"id": "set_smart_key_all_channels"},

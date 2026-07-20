@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.sliders import SliderMode
 
 
@@ -37,8 +37,8 @@ class BlendSliderToolObject(ToolObject):
     SECTION = {
         "id": "slider_blend",
         "label": "Blend Sliders",
-        "color": toolColors.TOOLBAR_GREEN,
-        "icon_color": toolColors.SLIDER_ICON_GREEN,
+        "color": COLORS.toolbar.green.hex,
+        "icon_color": COLORS.ui.green.hex,
         "type": "slider",
         "slider_type": "blend",
         "modes": MODES,

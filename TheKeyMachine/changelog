@@ -14,6 +14,14 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.31:
+  - polish: Attribute Switcher scrolls attributes lists within to be able to see them all!
+  - bugfix: Smart Key handles exact subframes and mixed keyed or unkeyed selections
+  - bugfix: Snap Keys merges multiple subframes per frame from object or range selections
+  - bugfix: Fixed World Space toolbuttons, it bakes selected or visible ranges without removing outside keys
+  - bugfix: Auto Hide Static Curves refreshes already-open Graph Editors reliably
+  - changed: Align Objects uses the objecy keys and selects the target object at the end
+
 0.1.30:
   - new: Toolbar workspaces (Standard, Professional, Minimal) switch pinned tools from the right-click menu
 

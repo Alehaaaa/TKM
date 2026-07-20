@@ -1,5 +1,5 @@
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.micro_move import api
 
 
@@ -22,8 +22,8 @@ class MicroMoveToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "micro_move_tools",
-        "label": "Micro Move",
-        "color": toolColors.TOOLBAR_PURPLE,
-        "items": [{"id": "micro_move"}],
+        "id": "movers_tools",
+        "label": "Movers",
+        "color": COLORS.toolbar.purple.hex,
+        "items": [{"id": "micro_move"}, {"id": "depth_mover"}],
     }

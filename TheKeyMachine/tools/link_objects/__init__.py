@@ -1,7 +1,7 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.tools.link_objects import api
 
@@ -56,7 +56,7 @@ class LinkObjectsToolObject(ToolObject):
     SECTION = {
         "id": "link_tools",
         "label": "Copy Relationship",
-        "color": toolColors.TOOLBAR_GREEN,
+        "color": COLORS.toolbar.green.hex,
         "items": [
             {
                 "id": "link_copy",

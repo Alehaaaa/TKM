@@ -17,7 +17,7 @@ import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.widgets.timeline as timelineWidgets
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 
 
 @dataclass
@@ -198,7 +198,7 @@ class SliderSession:
         self.title = title or "Slider Operation"
         self.description = description
         self.tooltip = tooltip
-        self.tint_color = tint_color or toolColors.TOOLBAR_GREEN
+        self.tint_color = tint_color or COLORS.toolbar.green.hex
 
         self.targets = SliderTargetContext()
         self.cache = SliderCaches()
@@ -294,7 +294,7 @@ class SliderSession:
         self._tint_range = tint_range
         timelineWidgets.show_timeline_tint(
             timerange=tint_range,
-            color=color or toolColors.TOOLBAR_GREEN,
+            color=color or COLORS.toolbar.green.hex,
             duration_ms=None,
             key=self._tint_key,
             center_line=center_line,

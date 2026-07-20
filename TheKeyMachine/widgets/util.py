@@ -68,6 +68,18 @@ def is_valid_widget(widget, expected_type=None):
     return False
 
 
+def event_global_pos(event):
+    """Return a mouse event's global integer position across Qt 5 and Qt 6."""
+    for method_name in ("globalPosition", "globalPos", "screenPos"):
+        method = getattr(event, method_name, None)
+        if not callable(method):
+            continue
+        position = method()
+        to_point = getattr(position, "toPoint", None)
+        return to_point() if callable(to_point) else position
+    return QtGui.QCursor.pos()
+
+
 def check_visible_layout(layout):
     try:
         try:

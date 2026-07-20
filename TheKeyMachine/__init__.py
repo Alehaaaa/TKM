@@ -14,13 +14,12 @@ Developed by: Rodrigo Torres / rodritorres.com
 Modified by: Alehaaaa / alehaaaa.github.io
 
 
-
 """
 
-__version__ = "0.1.30"
+__version__ = "0.1.31"
 __stage__ = "beta"
-__build__ = "334"
-__codename__ = "Flat White"
+__build__ = "335"
+__codename__ = "Cortado"
 
 
 def reload():
@@ -59,8 +58,11 @@ def reload():
 
 def toggle():
     import TheKeyMachine.core.toolbar as t
+    from TheKeyMachine.tools.graph_toolbar import api as graph_toolbar
 
-    t.toggle()
+    visible = t.toggle()
+    graph_toolbar.set_graph_toolbar_enabled(visible, apply=True)
+    return visible
 
 
 def welcome():

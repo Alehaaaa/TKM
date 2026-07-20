@@ -52,6 +52,20 @@ QT_WIDGET_SIZE_MAX = 16777215
 WORKSPACE_NAME = "k"
 WORKSPACE_CONTROL_NAME = WORKSPACE_NAME + "WorkspaceControl"
 
+DOCKING_ORIENTATIONS = {
+    "top": "To Top",
+    "bottom": "To Bottom",
+}
+DOCKING_AREAS = {
+    "AttributeEditor": "Attribute Editor",
+    "ChannelBoxLayerEditor": "Channel Box",
+    "Outliner": "Outliner",
+    "MainPane": "Main Viewport",
+    "TimeSlider": "Time Slider",
+    "RangeSlider": "Range Slider",
+    "Shelf": "Shelf",
+}
+
 
 class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def __init__(self, parent=None):
@@ -81,19 +95,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.orbit_button_widget = None
 
         self.docking_position = settings.get_setting("docking_position", ["TimeSlider", "top"])
-        self.docking_orients = {
-            "top": "To Top",
-            "bottom": "To Bottom",
-        }
-        self.docking_layouts = {
-            "AttributeEditor": "Attribute Editor",
-            "ChannelBoxLayerEditor": "Channel Box",
-            "Outliner": "Outliner",
-            "MainPane": "Main Viewport",
-            "TimeSlider": "Time Slider",
-            "RangeSlider": "Range Slider",
-            "Shelf": "Shelf",
-        }
+        self.docking_orients = dict(DOCKING_ORIENTATIONS)
+        self.docking_layouts = dict(DOCKING_AREAS)
 
         self.setgroup_states = {}
         self.setgroup_buttons = {}
@@ -190,7 +193,8 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             cmds.workspaceControl(WORKSPACE_CONTROL_NAME, **kwargs)
 
         # Force initial resize
-        QtCore.QTimer.singleShot(200, self.shelf_tabbar)
+        if not self.ensure_shelf_painter():
+            cmds.evalDeferred(self.ensure_shelf_painter, lowestPriority=True)
         QtCore.QTimer.singleShot(500, self.update_height)
 
     def visible_change_command(self, *args):
@@ -198,6 +202,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             return
 
         if not self.isDockable():
+            return
+        if not cmds.workspaceControl(
+            WORKSPACE_CONTROL_NAME, query=True, visible=True
+        ):
+            self._delete_tabbar_painter()
             return
         if self.current_layout != cmds.workspaceLayoutManager(q=1, current=True):
             self.current_layout = cmds.workspaceLayoutManager(q=1, current=True)
@@ -208,7 +217,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
                     self.tabbar_painter.show()
                 else:
-                    cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
+                    cmds.evalDeferred(
+                        self.ensure_shelf_painter, lowestPriority=True
+                    )
                 return
 
         if not self.isFloating():
@@ -229,28 +240,41 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
                 self.tabbar_painter.show()
             else:
-                cmds.evalDeferred(self.shelf_tabbar, lowestPriority=True)
+                cmds.evalDeferred(
+                    self.ensure_shelf_painter, lowestPriority=True
+                )
         else:
             if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
                 self.tabbar_painter.hide()
 
         self.update_height()
 
-    def shelf_tabbar(self):
+    def ensure_shelf_painter(self):
         if not QtCompat.isValid(self):
-            return
+            return False
 
-        self._delete_tabbar_painter()
+        if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
+            self.tabbar_painter.show()
+            self.tabbar_painter.syncGeometry()
+            return True
 
         qctrl = mui.MQtUtil.findControl(WORKSPACE_CONTROL_NAME)
+        if not qctrl:
+            return False
         control = wutil.get_maya_qt(qctrl)
-        tab_handle = control.parent().parent()
+        if control is None or not QtCompat.isValid(control):
+            return False
+        control_parent = control.parent()
+        tab_handle = control_parent.parent() if control_parent else None
+        if tab_handle is None or not QtCompat.isValid(tab_handle):
+            return False
 
         control.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
 
         tab_bar = tab_handle.tabBar()
         if self.isFloating():
-            return tab_bar.setVisible(False)
+            tab_bar.setVisible(False)
+            return False
 
         # Temporary tab-bar experiment: paint the shelf treatment directly on
         # Maya's tab bar instead of creating the full-height shelf overlay.
@@ -258,6 +282,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         tab_bar.setFixedHeight(wutil.DPI(1000))
 
         self.tabbar_painter = cw.QFlatTabBarPainter(tab_bar, tab_handle)
+        return True
 
     def update_height(self):
         if not QtCompat.isValid(self):
@@ -383,23 +408,9 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         return layout
 
     def dock_to_ui(self, layout=None, orient=None):
-        if not layout:
-            layout_name = self.dock_ac_group.checkedAction().text()
-            index = list(self.docking_layouts.values()).index(layout_name)
-            layout = list(self.docking_layouts.keys())[index]
-        if not orient:
-            orient_name = self.pos_ac_group.checkedAction().text()
-            index = list(self.docking_orients.values()).index(orient_name)
-            orient = list(self.docking_orients.keys())[index]
-
-        # Enable / Disable actions
-        self.pos_ac_group.checkedAction().setEnabled(False)
-        self.dock_ac_group.checkedAction().setEnabled(False)
-
-        for group in [self.pos_ac_group, self.dock_ac_group]:
-            for action in group.actions():
-                if action and QtCompat.isValid(action):
-                    action.setEnabled(not action.isChecked())
+        current_layout, current_orient = self.docking_position
+        layout = layout or current_layout
+        orient = orient or current_orient
 
         # Build up kwargs for the workspaceControl command
         kwargs = {
@@ -415,9 +426,35 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             kwargs["dockToControl"] = [dock_to, orient]
             self.docking_position = [layout, orient]
             settings.set_setting("docking_position", self.docking_position)
+            self._sync_dock_action_groups()
 
         # Make the workspaceControl call just once
         cmds.workspaceControl(WORKSPACE_CONTROL_NAME, **kwargs)
+
+    def _sync_dock_action_groups(self):
+        """Keep toolbar-owned groups aligned with docking from any menu."""
+        current_layout, current_orient = self.docking_position
+        targets = (
+            (
+                getattr(self, "pos_ac_group", None),
+                self.docking_orients,
+                current_orient,
+            ),
+            (
+                getattr(self, "dock_ac_group", None),
+                self.docking_layouts,
+                current_layout,
+            ),
+        )
+        for group, labels, current_value in targets:
+            if group is None:
+                continue
+            current_label = labels[current_value]
+            for action in group.actions():
+                if action and QtCompat.isValid(action):
+                    is_current = action.text() == current_label
+                    action.setChecked(is_current)
+                    action.setEnabled(not is_current)
 
     # For use with toggle functionality on Shelf or Launcher
     def toggle(self, *args):
@@ -553,6 +590,7 @@ def show(cleanup_existing=True):
         except Exception:
             pass
         raise
+    return instance
 
 
 def toggle():
@@ -562,13 +600,21 @@ def toggle():
             vis_state = cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, visible=True)
 
             if vis_state:
+                toolbar_instance._delete_tabbar_painter()
                 cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, visible=False)
+                return False
             else:
                 cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
-            return
+                if not toolbar_instance.ensure_shelf_painter():
+                    cmds.evalDeferred(
+                        toolbar_instance.ensure_shelf_painter,
+                        lowestPriority=True,
+                    )
+                return True
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
     show()
+    return True
 
 
 def welcome():

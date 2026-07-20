@@ -2,7 +2,7 @@ from functools import partial
 
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.tangents import api
 
 
@@ -98,7 +98,7 @@ class TangentsToolObject(ToolObject):
     }
     SECTION = {
         "id": "tangents", "label": "Tangents", "icon": "tangent_auto",
-        "color": toolColors.TOOLBAR_ORANGE,
+        "color": COLORS.toolbar.orange.hex,
         "items": [
             {"id": "tangent_cycle_matcher"},
             {"id": "tangent_bouncy", "shortcuts": _shortcuts("bouncy", False)},

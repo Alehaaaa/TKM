@@ -1,5 +1,4 @@
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.data import colors as toolColors
 from TheKeyMachine.tools.depth_mover import api
 
 
@@ -20,9 +19,4 @@ class DepthMoverToolObject(ToolObject):
             "tooltip": TOOLTIPS["depth_mover"],
         },
     }
-    SECTION = {
-        "id": "depth_mover_tools",
-        "label": "Depth Mover",
-        "color": toolColors.TOOLBAR_PURPLE,
-        "items": [{"id": "depth_mover"}],
-    }
+    SECTION = None

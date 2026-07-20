@@ -18,6 +18,7 @@ import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.core.openMayaUtils as omutils
 from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import timeline as timelineWidgets
+from TheKeyMachine.widgets import util as wutil
 
 
 RUNNER_SETTINGS_NAMESPACE = "background_runners"
@@ -26,10 +27,6 @@ CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID = "channelbox_clear_on_selection_change"
 CAMERA_ORBIT_SELECTION_ID = "camera_orbit_selection"
 HIDE_STATIC_CURVES_ID = "hide_static_animation_curves"
 CHANNELBOX_TINT_KEY = "background_runner:channelbox_selection_highlight"
-
-GRAPH_EDITOR_PANEL = "graphEditor1"
-GRAPH_EDITOR = "graphEditor1GraphEd"
-GRAPH_EDITOR_CONNECTION = "graphEditor1FromOutliner"
 
 _CONTROLLER: Optional["BackgroundRunnerController"] = None
 
@@ -56,6 +53,20 @@ def toggle_runner_enabled(runner_id):
     enabled = not bool(getter()) if callable(getter) else True
     set_runner_enabled(runner_id, enabled)
     return enabled
+
+
+def turn_all_runners_off():
+    """Disable every registered runner and stop its live service."""
+    controller = get_controller()
+    for runner_id in controller.runner_ids():
+        controller.set_enabled(runner_id, False)
+
+
+def restore_runner_defaults():
+    """Restore every registered runner to its declared default state."""
+    controller = get_controller()
+    for runner_id, spec in get_runner_specs().items():
+        controller.set_enabled(runner_id, spec.get("default", False))
 
 
 def toggle_channelbox_selection_highlight():
@@ -475,16 +486,22 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
     """Select only non-flat channels in an open Graph Editor."""
 
     RUNTIME_KEY = "background_runner:hide_static_animation_curves"
+    EDITOR = "graphEditor1GraphEd"
+    OUTLINER_SELECTION = "graphEditor1FromOutliner"
+    SYNC_DELAY_MS = 100
 
     def __init__(self, manager, parent=None):
         super().__init__(parent or manager)
         self._manager = manager
         self._running = False
-        self._sync_pending = False
+        self._sync_timer = QtCore.QTimer(self)
+        self._sync_timer.setSingleShot(True)
+        self._sync_timer.setInterval(self.SYNC_DELAY_MS)
+        self._sync_timer.timeout.connect(self._run_scheduled_sync)
 
     def start(self):
         if self._running:
-            self._schedule_sync()
+            self.sync()
             return
         self._running = True
         for signal in (
@@ -492,36 +509,48 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
             self._manager.graph_editor_opened,
         ):
             self._manager.connect_signal(signal, self._schedule_sync, key=self.RUNTIME_KEY, unique=False)
-        self._schedule_sync()
+        # An already-open Graph Editor is ready to update immediately. Deferred
+        # syncing remains useful only for subsequent Maya UI/selection events.
+        self.sync()
 
     def stop(self):
         if not self._running:
             return
         self._running = False
         self._manager.disconnect_callbacks(self.RUNTIME_KEY)
-        self._sync_pending = False
+        self._sync_timer.stop()
         self.sync(include_flat=True)
 
     def _schedule_sync(self, *_args):
-        if not self._running or self._sync_pending:
+        if not self._running:
             return
-        self._sync_pending = True
-        try:
-            cmds.evalDeferred(self._run_deferred_sync, lowestPriority=True)
-        except Exception:
-            QtCore.QTimer.singleShot(0, self._run_deferred_sync)
+        self._sync_timer.start()
 
-    def _run_deferred_sync(self):
-        self._sync_pending = False
+    def _run_scheduled_sync(self):
         if self._running:
             self.sync()
 
     @staticmethod
-    def _graph_editor_visible():
+    def _visible_graph_editors():
+        """Resolve Maya's canonical Graph Editor like the graph toolbar does."""
         try:
-            return GRAPH_EDITOR_PANEL in (cmds.getPanel(visiblePanels=True) or [])
+            if "graphEditor1" not in (cmds.getPanel(vis=True) or []):
+                return []
         except Exception:
-            return False
+            return []
+        graph_widget = wutil.get_control_widget("graphEditor1")
+        if not graph_widget or not wutil.is_valid_widget(graph_widget):
+            return []
+        try:
+            return (
+                [HideStaticAnimationCurvesRunner.EDITOR]
+                if cmds.animCurveEditor(
+                    HideStaticAnimationCurvesRunner.EDITOR, exists=True
+                )
+                else []
+            )
+        except Exception:
+            return []
 
     @staticmethod
     def _is_flat_curve(curve):
@@ -570,7 +599,8 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
         return curve_attributes
 
     def sync(self, include_flat=False):
-        if not self._graph_editor_visible():
+        editors = self._visible_graph_editors()
+        if not editors:
             return
 
         attributes = []
@@ -583,13 +613,36 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
                 seen.add(attribute)
 
         try:
-            cmds.selectionConnection(GRAPH_EDITOR_CONNECTION, edit=True, clear=True)
+            if not cmds.selectionConnection(
+                self.OUTLINER_SELECTION, exists=True
+            ):
+                return
+            cmds.selectionConnection(
+                self.OUTLINER_SELECTION, edit=True, clear=True
+            )
             for attribute in attributes:
-                cmds.selectionConnection(GRAPH_EDITOR_CONNECTION, edit=True, select=attribute)
-            cmds.animCurveEditor(GRAPH_EDITOR, query=True, curvesShownForceUpdate=True)
+                cmds.selectionConnection(
+                    self.OUTLINER_SELECTION, edit=True, select=attribute
+                )
         except Exception:
             return
-        _emit_runner_triggered(self._manager, HIDE_STATIC_CURVES_ID)
+
+        updated = False
+        for editor in editors:
+            try:
+                cmds.animCurveEditor(
+                    editor,
+                    edit=True,
+                    forceMainConnection=self.OUTLINER_SELECTION,
+                )
+                cmds.animCurveEditor(
+                    editor, query=True, curvesShownForceUpdate=True
+                )
+                updated = True
+            except Exception:
+                continue
+        if updated:
+            _emit_runner_triggered(self._manager, HIDE_STATIC_CURVES_ID)
 
 
 class BackgroundRunnerController(QtCore.QObject):

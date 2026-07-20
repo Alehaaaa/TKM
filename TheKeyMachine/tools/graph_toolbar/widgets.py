@@ -18,7 +18,6 @@ Modified by: Alehaaaa / alehaaaa.github.io
 """
 
 import maya.cmds as cmds # type: ignore
-import maya.OpenMayaUI as mui # type: ignore
 
 from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 
@@ -53,8 +52,7 @@ def _graph_toolbar_alignment():
 
 
 def _graph_editor_control_widget():
-    graph_ptr = mui.MQtUtil.findControl("graphEditor1")
-    return wutil.get_maya_qt(graph_ptr, QtWidgets.QWidget) if graph_ptr else None
+    return wutil.get_control_widget("graphEditor1")
 
 
 def _layout_widgets(layout):

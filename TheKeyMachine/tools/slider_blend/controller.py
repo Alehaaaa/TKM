@@ -716,7 +716,7 @@ def apply_time_stagger(session, curves=None, amount=0.0):
         for j, new_t in updated.items():
             keys[j] = new_t
 
-from TheKeyMachine.data import colors as toolColors
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.sliders import utils
 
 
@@ -753,7 +753,7 @@ def create_session(mode_key):
         mode_key, title=mode.label,
         description=mode.description,
         tooltip=mode.tooltip,
-        tint_color=toolColors.TOOLBAR_GREEN,
+        tint_color=COLORS.toolbar.green.hex,
     )
 
 
