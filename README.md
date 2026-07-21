@@ -6,21 +6,16 @@
 
 ![Version](https://img.shields.io/badge/version-0.1.31-blue.svg)
 
-TheKeyMachine (TKM) is an open source Maya animation toolset built for faster key editing, cleaner selection workflows, smarter copy/paste utilities, floating tools, and timeline-aware operations.
+Maintained by <b>Alehaaaa</b> at <a href="https://alehaaaa.github.io">alehaaaa.github.io</a>. Originally developed by <b>Rodrigo Torres</b> at <a href="https://www.rodritorres.com">rodritorres.com</a>.
 
-It is designed for 3D animators working in Autodesk Maya and supports Maya 2022 and up on Windows, Linux, and macOS.
+This is an independent fork. Issues and support apply only to this version.
 
-The native Micro Move and Depth Mover viewport plug-ins are prebuilt for Maya
-2022–2027 on Windows, Linux, and macOS. One TKM release ZIP contains the full
-binary matrix plus the C++ sources; Maya automatically loads the matching
-version for the current platform and architecture. User machines never compile
-native code.
+TheKeyMachine (TKM) is an open-source animation toolset for Autodesk Maya, designed to speed up keyframe editing, improve selection workflows, simplify copy-and-paste operations, provide floating tools, and support timeline-aware animation tasks.
 
-TKM was developed by <b>Rodrigo Torres</b> (<a href="https://www.rodritorres.com">rodritorres.com</a>).
-
-This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.io">alehaaaa.github.io</a>), currently working at <b>Framestore</b>.
+Supports Maya 2022+ on Windows, Linux, and macOS.
 
 <a href="https://www.thekeymachine.xyz">thekeymachine.xyz</a>
+
 
 <img src="./TheKeyMachine/data/icons/toolbar_example.png" />
 
