@@ -31,6 +31,10 @@ def toggle_hide_static_animation_curves(*args):
     return controller.toggle_hide_static_animation_curves(*args)
 
 
+def toggle_animation_recovery(*args):
+    return controller.toggle_animation_recovery(*args)
+
+
 def turn_all_off(*args):
     return controller.turn_all_off(*args)
 

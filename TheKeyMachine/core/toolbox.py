@@ -2,6 +2,7 @@ import importlib
 import json
 import os
 import pkgutil
+import sys
 
 
 class ToolObject(object):
@@ -70,6 +71,12 @@ def load_tooltips(package_file):
         if isinstance(value, list):
             return [_resolve(item) for item in value]
         if isinstance(value, dict):
+            if set(value) == {"platform"}:
+                variants = value["platform"]
+                if not isinstance(variants, dict):
+                    raise TypeError("Tooltip platform variants must be a mapping")
+                selected = variants.get(sys.platform, variants.get("default"))
+                return _resolve(selected)
             if set(value) == {"movie"}:
                 filename = value["movie"]
                 if not os.path.splitext(filename)[1]:
@@ -111,10 +118,11 @@ TOOLBAR_SECTION_IDS = {
         "pose_animation_section", "tangents", "manipulator_tools",
         "animation_offset_tools", "movers_tools",
         "temp_pivot_tools", "follow_cam_tools",
-        "link_tools", "worldspace_tools",
+        "link_tools",
         "attribute_tools", "selection_set_tools", "orbit_tools", "tracer_tools",
         "global_tools",
-        "graph_tools", "animation_tools", "custom_tools_section", "background_runner_tools", "search_tools",
+        "graph_tools", "animation_tools", "custom_tools_section", "background_runner_tools",
+        "animation_recovery_tools", "search_tools",
     ),
     "graph": (
         "nudge_tools", "default_tools", "bake_tools", "key_sync_tools",
@@ -123,7 +131,7 @@ TOOLBAR_SECTION_IDS = {
         "pose_animation_section", "tangents", "manipulator_tools",
         "animation_offset_tools", "movers_tools",
         "temp_pivot_tools", "follow_cam_tools",
-        "link_tools", "worldspace_tools",
+        "link_tools",
         "attribute_tools", "selection_set_tools", "orbit_tools", "tracer_tools",
         "graph_tools", "animation_tools", "custom_tools_section",
     ),

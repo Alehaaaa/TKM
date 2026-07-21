@@ -4,8 +4,8 @@ TheKeyMachine.tools.clipboard
 
 Centralized read/write layer for all tool clipboard data (copy-paste temp files).
 
-All tool clipboard operations — animation, pose, worldspace, copy-link,
-temp-pivot — route through this module instead of
+All tool clipboard operations, including animation, pose, worldspace, copy-link,
+and temp-pivot, route through this module instead of
 scattering os.path / open / json.dump / json.load calls across every tool.
 
 Usage (write):

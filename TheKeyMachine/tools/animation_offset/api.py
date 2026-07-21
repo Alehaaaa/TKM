@@ -403,7 +403,7 @@ class AnimationOffsetController(QtCore.QObject):
         any_applied = False
 
         try:
-            with toolCommon.suppress_undo_notifications():
+            with runtime.suppress_undo_notifications():
                 for obj, attr in sorted(changed_plugs):
                     if not cmds.objExists(obj):
                         continue

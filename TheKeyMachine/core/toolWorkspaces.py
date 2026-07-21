@@ -11,6 +11,7 @@ MODIFIED_SETTING    = "toolbar_workspace_modified"
 
 _STANDARD_MAIN = frozenset([
     "attribute_switcher_euler_filter", "align_objects", "animation_offset", "animation_tools",
+    "animation_recovery",
     "attribute_switcher", "background_runners", "bake_animation_1", "blend_connect_neighbors",
     "copy_animation", "copy_pose", "create_tracer", "default_object_values",
     "delete_all_animation", "depth_mover", "follow_cam", "gimbal", "graph_extra_tools",
@@ -43,6 +44,7 @@ _MINIMAL_MAIN = frozenset([
     "animation_offset",
     "create_tracer",
     "animation_tools",
+    "animation_recovery",
     "attribute_switcher_euler_filter",
     "select_rig_controls",
     "background_runners",
@@ -59,7 +61,8 @@ _PROFESSIONAL_MAIN = frozenset([
     "temp_pivot",
     "animation_offset",
     "create_tracer",
-    "animation_tools"
+    "animation_tools",
+    "animation_recovery"
 ])
 
 WORKSPACE_DEFAULTS = {

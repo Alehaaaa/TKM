@@ -1,0 +1,6 @@
+{
+  "animation_recovery": [
+    "Browse automatic animation and channel snapshots, with alerts when an older scene file is opened.",
+    "Recover with nothing selected to restore everything, or select objects to restore only those objects."
+  ]
+}

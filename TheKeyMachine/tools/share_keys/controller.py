@@ -6,7 +6,6 @@ from collections import Counter
 from maya import cmds
 
 from TheKeyMachine.core import animation_context, curveFitting
-from TheKeyMachine.mods import helperMod as helper
 from TheKeyMachine.mods import selectionMod
 from TheKeyMachine.mods import settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
@@ -21,11 +20,11 @@ BAKE_TANGENT_MODE_STEP = "step_tangent"
 BAKE_TANGENT_MODE_KEEP_TYPE = "keep_tangent_type"
 BAKE_TANGENT_MODE_KEEP_SHAPE = "keep_animation_curve_shapes"
 BAKE_TANGENT_MODES = (BAKE_TANGENT_MODE_STEP, BAKE_TANGENT_MODE_KEEP_TYPE, BAKE_TANGENT_MODE_KEEP_SHAPE)
-BAKE_UNDO_HELP = {
-    1: ("Bake on Ones", helper.bake_animation_1_tooltip_text),
-    2: ("Bake on Twos", helper.bake_animation_2_tooltip_text),
-    3: ("Bake on Threes", helper.bake_animation_3_tooltip_text),
-    4: ("Bake on Fours", helper.bake_animation_4_tooltip_text),
+BAKE_TITLES = {
+    1: "Bake on Ones",
+    2: "Bake on Twos",
+    3: "Bake on Threes",
+    4: "Bake on Fours",
 }
 
 
@@ -454,8 +453,8 @@ def bake_animation(bake_interval=1, window=None):
     except ValueError as error:
         return wutil.make_inViewMessage(str(error))
 
-    bake_title, bake_tooltip = BAKE_UNDO_HELP.get(bake_interval, ("Bake Animation", helper.bake_animation_custom_tooltip_text))
-    tool_key = "bake_animation_{}".format(bake_interval) if bake_interval in BAKE_UNDO_HELP else "bake_animation_custom"
+    bake_title = BAKE_TITLES.get(bake_interval, "Bake Animation")
+    tool_key = "bake_animation_{}".format(bake_interval) if bake_interval in BAKE_TITLES else "bake_animation_custom"
 
     try:
         target_info = animation_context.resolve_targets(default_mode="all_animation", ordered_selection=True, long_names=True)

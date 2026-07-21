@@ -33,6 +33,11 @@ class BackgroundRunnersToolObject(ToolObject):
             "callback": api.toggle_hide_static_animation_curves,
             "tooltip": TOOLTIPS["hide_static_animation_curves"],
         },
+        "background_runner_animation_recovery": {
+            "type": "tool", "label": "Animation Recovery",
+            "callback": api.toggle_animation_recovery,
+            "tooltip": TOOLTIPS["animation_recovery"],
+        },
     }
     SECTION = {
         "id": "background_runner_tools",

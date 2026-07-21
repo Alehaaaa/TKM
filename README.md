@@ -4,7 +4,7 @@
 
 # TheKeyMachine, animation toolbar
 
-![Version](https://img.shields.io/badge/version-0.1.31-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.32-blue.svg)
 
 Maintained by <b>Alehaaaa</b> at <a href="https://alehaaaa.github.io">alehaaaa.github.io</a>. Originally developed by <b>Rodrigo Torres</b> at <a href="https://www.rodritorres.com">rodritorres.com</a>.
 
@@ -75,6 +75,16 @@ Supports Maya 2022+ on Windows, Linux, and macOS.
 - `World Space` samples every frame in the selected or visible playback range, supports one-to-many pastes, and preserves animation outside the pasted range
 - `Attribute Switcher` for enum and attribute-driven switching, drag-release popup choices, and compact scrolling that expands only when the screen-limited content requires it
 
+### Animation Recovery
+
+`Animation Recovery` is an optional background runner that keeps lightweight, scene-specific checkpoints when animation, transform channels, enum controls, or hierarchy changes are detected. It also creates a distinct checkpoint whenever the Maya scene is saved.
+
+The recovery window lists the newest changes first with their source scene, date, reason, current frame, playback and animation ranges, and selection count. Recover with nothing selected to restore all captured animation and channel values, or select controls first to restore only those controls and their animation. Recovery runs through the standard cancellable operation system with automatic ETA feedback and does not create another checkpoint when a saved point is applied.
+
+Most checkpoints store only their changed data. Periodic complete baselines bound replay time, while parent-linked checkpoints detect missing history instead of silently producing an incomplete result. The newest 20 complete baseline generations are retained per scene, keeping history bounded without orphaning deltas. When a point is recovered, the shortest complete chain is merged to rebuild the requested animation state. Each scene keeps a persistent recovery identity across Save, Save As, and incremental saves, with compact recovery files stored separately under `TheKeyMachine_user_data/animation_recovery/`.
+
+When a scene is opened with the same recovery identity but an older saved-file time than its newest checkpoint, the recovery window opens automatically so the newer animation can be reviewed or restored.
+
 ### Floating Windows
 
 - `Selection Sets`
@@ -108,6 +118,7 @@ Selection Sets support:
 
 Dedicated tools live under `TheKeyMachine/tools/` for:
 
+- `animation_recovery`
 - `animation_offset`
 - `attribute_switcher`
 - `depth_mover`

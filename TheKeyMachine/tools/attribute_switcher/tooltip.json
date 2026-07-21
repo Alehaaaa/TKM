@@ -1,6 +1,12 @@
 {
   "attribute_switcher": [
     "Switch configured attributes across selected controls from a compact floating window.",
+    {
+      "platform": {
+        "darwin": "Hold ⌘ and click attribute rows to select multiple channels and switch them together.",
+        "default": "Hold Ctrl and click attribute rows to select multiple channels and switch them together."
+      }
+    },
     "Rotation-order changes can be Euler-filtered automatically."
   ]
 }

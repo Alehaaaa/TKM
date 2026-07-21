@@ -8,7 +8,6 @@ from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 QActionGroup = QtGui.QActionGroup
 
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.helperMod as helper
 import TheKeyMachine.tools.share_keys.api as shareKeysApi
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings

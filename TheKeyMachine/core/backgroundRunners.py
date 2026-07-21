@@ -26,6 +26,7 @@ CHANNELBOX_HIGHLIGHT_ID = "channelbox_selection_highlight"
 CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID = "channelbox_clear_on_selection_change"
 CAMERA_ORBIT_SELECTION_ID = "camera_orbit_selection"
 HIDE_STATIC_CURVES_ID = "hide_static_animation_curves"
+ANIMATION_RECOVERY_ID = "animation_recovery"
 CHANNELBOX_TINT_KEY = "background_runner:channelbox_selection_highlight"
 
 _CONTROLLER: Optional["BackgroundRunnerController"] = None
@@ -83,6 +84,10 @@ def toggle_camera_orbit_selection():
 
 def toggle_hide_static_animation_curves():
     return toggle_runner_enabled(HIDE_STATIC_CURVES_ID)
+
+
+def toggle_animation_recovery():
+    return toggle_runner_enabled(ANIMATION_RECOVERY_ID)
 
 
 def _emit_runner_triggered(manager, runner_id):
@@ -692,11 +697,10 @@ class BackgroundRunnerController(QtCore.QObject):
         else:
             settings.set_setting(_runner_setting_key(runner_id), enabled, namespace=RUNNER_SETTINGS_NAMESPACE)
 
-        if runner_id in self._services:
-            if enabled:
-                self._start_service(runner_id)
-            else:
-                self._stop_service(runner_id)
+        if enabled:
+            self._start_service(runner_id)
+        else:
+            self._stop_service(runner_id)
 
         try:
             self._manager.backgroundRunnerChanged.emit(runner_id, enabled)
@@ -708,11 +712,19 @@ class BackgroundRunnerController(QtCore.QObject):
         service = self._services.get(runner_id)
         if service is not None:
             service.start()
+            return
+        starter = (get_runner_specs().get(runner_id) or {}).get("start")
+        if callable(starter):
+            starter()
 
     def _stop_service(self, runner_id):
         service = self._services.get(runner_id)
         if service is not None:
             service.stop()
+            return
+        stopper = (get_runner_specs().get(runner_id) or {}).get("stop")
+        if callable(stopper):
+            stopper()
 
 
 def get_controller(manager=None):
@@ -742,6 +754,7 @@ def shutdown_controller():
 
 def get_runner_specs() -> Dict[str, Dict[str, object]]:
     import TheKeyMachine.core.runtimeManager as runtime
+    from TheKeyMachine.tools.animation_recovery import controller as animationRecovery
 
     manager = runtime.get_runtime_manager(start=False)
 
@@ -770,6 +783,18 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
         return relay.changed
 
     return {
+        ANIMATION_RECOVERY_ID: {
+            "id": ANIMATION_RECOVERY_ID,
+            "label": "Animation Recovery",
+            "icon": icons.animation_recovery,
+            "description": "Save scene-scoped animation snapshots after animation and hierarchy changes.",
+            "default": False,
+            "get_enabled": animationRecovery.is_enabled,
+            "set_enabled": animationRecovery.set_persisted_enabled,
+            "start": lambda: animationRecovery.start(manager),
+            "stop": animationRecovery.shutdown,
+            "changed_signal": _background_runner_signal(ANIMATION_RECOVERY_ID),
+        },
         HIDE_STATIC_CURVES_ID: {
             "id": HIDE_STATIC_CURVES_ID,
             "label": "Auto Hide Static Animation Curves",

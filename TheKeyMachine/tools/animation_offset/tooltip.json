@@ -7,7 +7,6 @@
     {
       "separator": true
     },
-    "Select animated controls, enable the tool, then transform them with Maya's manipulators.",
-    "Each continuous manipulation is recorded as one Maya undo step."
+    "Select animated controls, enable the tool, then transform them with Maya's manipulators."
   ]
 }

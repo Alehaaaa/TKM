@@ -55,7 +55,16 @@ class LinkObjectsToolObject(ToolObject):
     }
     SECTION = {
         "id": "link_tools",
-        "label": "Copy Relationship",
+        "label": "Relationships & Worldspace",
+        "color": COLORS.toolbar.green.hex,
+        "items": [
+            {"section": "relationship_tools"},
+            {"section": "worldspace_tools"},
+        ],
+    }
+    SECTIONS = ({
+        "id": "relationship_tools",
+        "label": "Relationships",
         "color": COLORS.toolbar.green.hex,
         "items": [
             {
@@ -73,4 +82,4 @@ class LinkObjectsToolObject(ToolObject):
             "separator",
             {"id": "link_help"},
         ],
-    }
+    },)

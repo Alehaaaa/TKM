@@ -22,7 +22,17 @@ def create_nudge_value_widget(section, item_data, owner=None):
         widget.setValue(value)
         widget.blockSignals(blocked)
 
+    def commit_and_clear_focus():
+        widget.interpretText()
+        line_edit = widget.lineEdit()
+        if line_edit is not None:
+            line_edit.clearFocus()
+        widget.clearFocus()
+
     widget.valueChanged.connect(save_value)
+    line_edit = widget.lineEdit()
+    if line_edit is not None:
+        line_edit.returnPressed.connect(commit_and_clear_focus)
     toolCommon.replace_tracked_connection(
         widget, "_tkm_nudge_value_sync", manager.nudgeValueChanged, sync_value, parent=widget
     )

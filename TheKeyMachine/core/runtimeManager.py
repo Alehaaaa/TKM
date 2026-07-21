@@ -23,6 +23,11 @@ try:
 except ImportError:  # pragma: no cover
     om = None
 
+try:
+    from maya.api import OpenMayaAnim as oma  # type: ignore
+except ImportError:  # pragma: no cover
+    oma = None
+
 
 _OPTIONVAR_NAME = "TKM_RuntimeManager"
 _APP_RUNTIME_ATTRIBUTE = "_tkm_runtime_manager"
@@ -359,6 +364,7 @@ class RuntimeManager(QtCore.QObject):
     # Common / high-value signals
     scene_opened = QtCore.Signal()
     scene_new = QtCore.Signal()
+    scene_saved = QtCore.Signal()
 
     selection_changed = QtCore.Signal()
     time_changed = QtCore.Signal()
@@ -591,6 +597,80 @@ class RuntimeManager(QtCore.QObject):
         self._track_om(key, int(cb_id))
         return int(cb_id)
 
+    def add_node_attribute_changed_callbacks(
+        self,
+        nodes: Any,
+        handler: Callable[..., Any],
+        *,
+        key: str,
+    ) -> List[int]:
+        """Register the same attribute callback on many nodes with one state write."""
+        if not om:
+            return []
+        callback_ids = []
+        for node in nodes or []:
+            mobject = omutils.mobject_from_node(node)
+            if mobject is None:
+                continue
+
+            def _make_callback(node_name):
+                def _wrapped(*args):
+                    try:
+                        handler(*(args + (node_name,)))
+                    finally:
+                        self._emit(key)
+                return _wrapped
+
+            try:
+                callback_id = om.MNodeMessage.addAttributeChangedCallback(
+                    mobject,
+                    _make_callback(node),
+                )
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                continue
+            callback_ids.append(int(callback_id))
+
+        if callback_ids:
+            self._om_callbacks.setdefault(key, []).extend(callback_ids)
+            self._persist_state()
+        return callback_ids
+
+    def add_dag_change_callback(self, handler: Callable[..., Any], *, key: str) -> Optional[int]:
+        """Register one callback for DAG hierarchy changes and own its cleanup."""
+        if not om:
+            return None
+
+        def _wrapped(*args):
+            try:
+                handler(*args)
+            finally:
+                self._emit(key)
+
+        try:
+            cb_id = om.MDagMessage.addAllDagChangesCallback(_wrapped)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return None
+        self._track_om(key, int(cb_id))
+        return int(cb_id)
+
+    def add_anim_curve_edited_callback(self, handler: Callable[..., Any], *, key: str) -> Optional[int]:
+        """Register Maya's batched animation-curve edit callback."""
+        if not oma:
+            return None
+
+        def _wrapped(*args):
+            try:
+                handler(*args)
+            finally:
+                self._emit(key)
+
+        try:
+            cb_id = oma.MAnimMessage.addAnimCurveEditedCallback(_wrapped)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return None
+        self._track_om(key, int(cb_id))
+        return int(cb_id)
+
     def connect_signal(self, signal: Any, handler: Callable[..., Any], *, key: str, unique: bool = True) -> bool:
         if signal is None or handler is None:
             return False
@@ -604,8 +684,16 @@ class RuntimeManager(QtCore.QObject):
         return True
 
     def disconnect_callbacks(self, key: str) -> None:
-        for cb_id in list(self._om_callbacks.get(key, []) or []):
-            self._remove_om_callback_id(cb_id)
+        # Callback groups can contain thousands of scene-node watchers. Remove
+        # the group in one pass and persist once instead of rewriting the
+        # optionVar after every callback.
+        for cb_id in self._om_callbacks.pop(key, []) or []:
+            if not om:
+                break
+            try:
+                om.MMessage.removeCallback(int(cb_id))
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
 
         for job_id in list(self._scriptjobs.get(key, []) or []):
             _kill_scriptjob(int(job_id))
@@ -803,10 +891,19 @@ class RuntimeManager(QtCore.QObject):
             except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
+        def _after_save(*_args):
+            self._emit("scene_saved")
+            try:
+                self.scene_saved.emit()
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+
         cb_open = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterOpen, _after_open)
         cb_new = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterNew, _after_new)
+        cb_save = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterSave, _after_save)
         self._track_om("scene_opened", int(cb_open))
         self._track_om("scene_new", int(cb_new))
+        self._track_om("scene_saved", int(cb_save))
 
     def _start_background_runners(self) -> None:
         try:

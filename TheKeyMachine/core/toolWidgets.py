@@ -153,6 +153,10 @@ def add_tool_button(section, item_data, *, overrides=None):
     btn = cw.create_tool_button_from_data(data)
     if tool_id == "background_runners":
         bind_background_runners_activity_button(btn)
+    elif tool_id == "animation_recovery":
+        from TheKeyMachine.tools.animation_recovery import api as animationRecoveryApi
+
+        animationRecoveryApi.bind_toolbar_button(btn)
     section.addWidget(
         btn,
         data.get("label", ""),
@@ -844,8 +848,8 @@ def bind_toolbar_pinning_context(toolbar_widget, parent_widget=None):
 
     If *parent_widget* is supplied (typically the top-level dock container that
     also hosts the TKM button), a QObject event-filter is installed on it so
-    that a right-click *anywhere* on the toolbar — including empty areas and
-    the TKM button column — opens the same pinning menu.
+    that a right-click *anywhere* on the toolbar, including empty areas and
+    the TKM button column, opens the same pinning menu.
     """
     # ── Direct context-menu on the flow toolbar ──────────────────────────────
     def _on_toolbar_context_menu(pos):

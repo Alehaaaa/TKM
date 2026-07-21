@@ -19,6 +19,10 @@ def toggle_hide_static_animation_curves(*_args):
     return backgroundRunners.toggle_hide_static_animation_curves()
 
 
+def toggle_animation_recovery(*_args):
+    return backgroundRunners.toggle_animation_recovery()
+
+
 def turn_all_off(*_args):
     return backgroundRunners.turn_all_runners_off()
 
