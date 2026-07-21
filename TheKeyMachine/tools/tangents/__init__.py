@@ -16,35 +16,43 @@ def _tooltip(tooltip_key, tangent_label=None):
     return [value.replace("{tangent}", tangent_label) if isinstance(value, str) else value for value in values]
 
 
-def _scope_action(label, callback, tooltip_key, tangent_label=None):
-    return {"label": label, "callback": callback, "tooltip": _tooltip(tooltip_key, tangent_label)}
+def _scope_action(label, callback, tooltip_key, tangent_label=None, icon=None):
+    return {"label": label, "icon": icon, "callback": callback, "tooltip": _tooltip(tooltip_key, tangent_label)}
+
+
+def _tangent_icon(tangent_type, suffix=None):
+    return "tangent_{}{}".format(tangent_type, "_{}".format(suffix) if suffix else "")
 
 
 def _tangent_tool(tangent_type, label, text, maya_default=True):
     setter = api.set_bouncy if tangent_type == "bouncy" else partial(api.set_tangent, tangent_type)
+    tangent_icon = _tangent_icon(tangent_type)
+    menu_action = partial(_scope_action, tangent_label=label, icon=tangent_icon)
     menu_items = []
     if tangent_type != "step":
         menu_items.extend([
-            _scope_action("In Tangent", partial(setter, handle_mode="in"), "in", label),
-            _scope_action("Out Tangent", partial(setter, handle_mode="out"), "out", label),
+            menu_action("In Tangent", partial(setter, handle_mode="in"), "in"),
+            menu_action("Out Tangent", partial(setter, handle_mode="out"), "out"),
             "separator",
-            _scope_action("First Key", partial(setter, key_scope="first"), "first", label),
-            _scope_action("Last Key", partial(setter, key_scope="last"), "last", label),
+            menu_action("First Key", partial(setter, key_scope="first"), "first"),
+            menu_action("Last Key", partial(setter, key_scope="last"), "last"),
             "separator",
         ])
-    menu_items.append(_scope_action("All Keys", partial(setter, key_scope="all"), "all", label))
+    menu_items.append(menu_action(
+        "All Keys", partial(setter, key_scope="all"), "all", icon=_tangent_icon(tangent_type, "all_keys")
+    ))
     if maya_default:
-        menu_items.append(
-            _scope_action("Set Maya Default Tangent", partial(api.set_maya_default, tangent_type), "default", label)
-        )
+        menu_items.append(menu_action(
+            "Set Maya Default Tangent", partial(api.set_maya_default, tangent_type), "default"
+        ))
     return {
         "type": "tool",
         "label": label,
         "text": text,
-        "icon": "tangent_{}".format(tangent_type),
+        "icon": tangent_icon,
         "callback": setter,
         "tooltip": TOOLTIPS[tangent_type],
-        "menu": {"label": label, "icon": "tangent_{}".format(tangent_type), "items": menu_items},
+        "menu": {"label": label, "icon": tangent_icon, "items": menu_items},
     }
 
 
@@ -68,6 +76,7 @@ def _shortcuts(tangent_type, maya_default=True):
         ])
     variants.append({
         "id": "tangent_{}_all".format(tangent_type),
+        "icon": _tangent_icon(tangent_type, "all_keys"),
         "label": "{} All Keys".format(tangent_type.title()),
         "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift, QtCore.Qt.Key_Alt],
         "callback": partial(setter, key_scope="all"),
@@ -83,8 +92,8 @@ class TangentsToolObject(ToolObject):
             "icon": "match_curve_cycle", "callback": api.match_cycle,
             "tooltip": TOOLTIPS["cycle"],
             "menu": {"label": "Cycle Matcher", "icon": "match_curve_cycle", "items": [
-                _scope_action("Match First Key", partial(api.match_cycle, target_key="first"), "cycle_first"),
-                _scope_action("Match Last Key", partial(api.match_cycle, target_key="last"), "cycle_last"),
+                _scope_action("Match First Key", partial(api.match_cycle, target_key="first"), "cycle_first", icon="match_curve_cycle"),
+                _scope_action("Match Last Key", partial(api.match_cycle, target_key="last"), "cycle_last", icon="match_curve_cycle"),
             ]},
         },
         "tangent_bouncy": _tangent_tool("bouncy", "Bouncy Tangent", "BO", maya_default=False),
@@ -112,4 +121,3 @@ class TangentsToolObject(ToolObject):
             {"id": "tangent_plateau", "shortcuts": _shortcuts("plateau")},
         ],
     }
-
