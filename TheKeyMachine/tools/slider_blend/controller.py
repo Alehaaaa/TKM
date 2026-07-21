@@ -523,7 +523,7 @@ def apply_simplify(session, curves, amount):
 
 
 def apply_bake(session, curves, amount):
-    """Progressively insert uniform, shape-preserving keys up to every frame."""
+    """Progressively insert keys sampled from the untouched curve tendency."""
     resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
     amount = min(1.0, max(0.0, float(amount)))
     if amount <= 0.0:
@@ -532,9 +532,25 @@ def apply_bake(session, curves, amount):
         keys = sorted(set(float(time) for time in affected_map.get(curve, [])))
         if len(keys) < 2:
             continue
-        existing = set(cmds.keyframe(curve, query=True, time=(keys[0], keys[-1]), timeChange=True) or [])
         full_frame_targets = curveFitting.sample_times(keys[0], keys[-1], 1)
-        missing = [frame for frame in full_frame_targets if frame not in existing]
+        cache_key = (curve, "bake_tendency", tuple(full_frame_targets))
+        bake_data = session.cache.auxiliary.get(cache_key)
+        if bake_data is None:
+            existing = set(
+                float(frame) for frame in (
+                    cmds.keyframe(
+                        curve,
+                        query=True,
+                        time=(keys[0], keys[-1]),
+                        timeChange=True,
+                    ) or []
+                )
+            )
+            missing = [frame for frame in full_frame_targets if float(frame) not in existing]
+            captured = curveFitting.capture([curve], full_frame_targets).get(curve, {})
+            bake_data = (missing, captured)
+            session.cache.auxiliary[cache_key] = bake_data
+        missing, captured = bake_data
         add_count = min(len(missing), int(round(len(missing) * amount)))
         if add_count <= 0:
             continue
@@ -548,13 +564,13 @@ def apply_bake(session, curves, amount):
                 for index in range(add_count)
             }
             targets = [frame for index, frame in enumerate(missing) if index in target_indices]
-        if session.preview and session.anim_change is not None:
-            curve_fn = omutils.anim_curve_fn(curve)
-            for frame in targets:
-                omutils.add_anim_curve_key(curve_fn, frame, change=session.anim_change)
-        else:
-            for frame in targets:
-                cmds.setKeyframe(curve, time=(frame,), insert=True)
+        target_shape = {
+            curve: {frame: captured[frame] for frame in targets if frame in captured}
+        }
+        curveFitting.apply(
+            target_shape,
+            change=session.anim_change if session.preview else None,
+        )
 
     if session.targets.time_range:
         session.show_tint(session.targets.time_range)
@@ -794,4 +810,3 @@ def execute(mode, value, session=None):
     finally:
         if standalone:
             session.finish()
-

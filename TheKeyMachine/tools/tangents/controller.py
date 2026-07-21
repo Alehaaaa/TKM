@@ -2,6 +2,7 @@ from maya import cmds
 
 from TheKeyMachine.core import animation_context, curveFitting, toolbox
 from TheKeyMachine.mods import selectionMod
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import timeline
 from TheKeyMachine.widgets import util as wutil
 
@@ -58,8 +59,9 @@ def _target_range(targets):
     return (frames[0], frames[-1]) if frames else None
 
 
-def _set_tangent_on_target(target, tangent_type, frame, handle_mode="both"):
-    kwargs = {"time": (frame, frame)}
+def _set_tangent_on_target(target, tangent_type, frames, handle_mode="both"):
+    frames = list(frames) if isinstance(frames, (list, tuple, set)) else [frames]
+    kwargs = {"time": [(frame, frame) for frame in frames]}
     if handle_mode in ("both", "out"):
         kwargs["ott"] = tangent_type
     if handle_mode in ("both", "in"):
@@ -88,9 +90,15 @@ def set_tangent(tangent_type, handle_mode="both", key_scope="selection", tint_co
         key="tangent_{}".format(tangent_type),
     ) if timerange else None
     try:
+        operation = toolCommon.current_tool_operation()
+        if operation:
+            operation.set_total(len(targets))
         for curve, frames in targets.items():
-            for frame in frames:
-                _set_tangent_on_target(curve, tangent_type, frame, handle_mode)
+            if operation and operation.cancelled:
+                return
+            _set_tangent_on_target(curve, tangent_type, frames, handle_mode)
+            if operation:
+                operation.step()
     finally:
         if tint:
             tint.finish()
@@ -136,7 +144,12 @@ def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle
         key="tangent_bouncy",
     ) if timerange else None
     try:
+        operation = toolCommon.current_tool_operation()
+        if operation:
+            operation.set_total(len(targets))
         for curve, frame in targets:
+            if operation and operation.cancelled:
+                return
             in_angle, out_angle = curveFitting.bouncy_tangent_angles(
                 curve, frame, angle_adjustment_factor=angle_adjustment_factor
             )
@@ -146,6 +159,8 @@ def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle
             if handle_mode in ("both", "out"):
                 kwargs["outAngle"] = out_angle
             cmds.keyTangent(curve, **kwargs)
+            if operation:
+                operation.step()
     finally:
         if tint:
             tint.finish()
@@ -163,10 +178,18 @@ def _copy_key_state(curve, source_time, target_time):
 
 
 def match_cycle(target_key="last"):
-    for curve in selectionMod.get_graph_editor_selected_curves():
+    curves = selectionMod.get_graph_editor_selected_curves()
+    operation = toolCommon.current_tool_operation()
+    if operation:
+        operation.set_total(len(curves))
+    for curve in curves:
+        if operation and operation.cancelled:
+            return
         first = cmds.findKeyframe(curve, which="first")
         last = cmds.findKeyframe(curve, which="last")
         if target_key == "first":
             _copy_key_state(curve, last, first)
         else:
             _copy_key_state(curve, first, last)
+        if operation:
+            operation.step()

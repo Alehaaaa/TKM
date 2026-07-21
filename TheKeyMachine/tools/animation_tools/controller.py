@@ -5,7 +5,7 @@ import math
 
 from maya import cmds
 
-from TheKeyMachine.core import animation_context
+from TheKeyMachine.core import animation_context, curveFitting
 from TheKeyMachine.core import openMayaUtils as open_maya
 from TheKeyMachine.mods import selectionMod
 from TheKeyMachine.mods import settingsMod as settings
@@ -108,12 +108,15 @@ def _euler_turn_groups(curve, target_info, full_turn):
     return groups
 
 
-def _apply_euler_filter(curves, target_info):
+def _apply_euler_filter(curves, target_info, operation=None):
     changed_groups = 0
+    full_turn = _euler_full_turn()
     with animation_context.preserve_key_selection():
         for curve in curves or []:
+            if operation is not None and operation.cancelled:
+                break
             for start_time, end_time, offset in _euler_turn_groups(
-                curve, target_info, _euler_full_turn()
+                curve, target_info, full_turn
             ):
                 cmds.keyframe(
                     curve,
@@ -123,53 +126,47 @@ def _apply_euler_filter(curves, target_info):
                     valueChange=offset,
                 )
                 changed_groups += 1
+            if operation is not None:
+                operation.step()
     return changed_groups
 
 
 def delete_keyframes_before_current_time():
-    # Obtén los objetos seleccionados
     selected = selectionMod.get_selected_objects()
-
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
-
-    # Obtiene el tiempo actual
     current_time = cmds.currentTime(query=True)
-
+    operation = toolCommon.current_tool_operation()
+    if operation is not None:
+        operation.set_total(len(selected)).set_status("Deleting Keys Before Current")
     for obj in selected:
-        # Obtiene todos los keyframes del objeto
-        keyframes = cmds.keyframe(obj, query=True)
-
-        if not keyframes:
-            continue
-
-        # Elimina los keyframes que están antes de la currentTime
-        for keyframe in sorted(keyframes):
-            if keyframe < current_time:
-                cmds.cutKey(obj, time=(keyframe, keyframe))
+        if operation is not None and operation.cancelled:
+            break
+        keyframes = cmds.keyframe(obj, query=True, timeChange=True) or []
+        before = [frame for frame in keyframes if frame < current_time]
+        if before:
+            cmds.cutKey(obj, time=(min(before), max(before)), clear=True)
+        if operation is not None:
+            operation.step()
 
 
 def delete_keyframes_after_current_time():
-    # Obtén los objetos seleccionados
     selected = selectionMod.get_selected_objects()
-
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
-
-    # Obtiene el tiempo actual
     current_time = cmds.currentTime(query=True)
-
+    operation = toolCommon.current_tool_operation()
+    if operation is not None:
+        operation.set_total(len(selected)).set_status("Deleting Keys After Current")
     for obj in selected:
-        # Obtiene todos los keyframes del objeto
-        keyframes = cmds.keyframe(obj, query=True)
-
-        if not keyframes:
-            continue
-
-        # Elimina los keyframes que están después de la currentTime
-        for keyframe in sorted(keyframes):
-            if keyframe > current_time:
-                cmds.cutKey(obj, time=(keyframe, keyframe))
+        if operation is not None and operation.cancelled:
+            break
+        keyframes = cmds.keyframe(obj, query=True, timeChange=True) or []
+        after = [frame for frame in keyframes if frame > current_time]
+        if after:
+            cmds.cutKey(obj, time=(min(after), max(after)), clear=True)
+        if operation is not None:
+            operation.step()
 
 
 def select_all_animation_curves(*args):
@@ -211,7 +208,12 @@ def clear_selected_keys(*args):
 
 @contextmanager
 def _animation_command_context(
-    label, tint_key=None, default_mode="all_animation", timerange=None, tint=True
+    label,
+    tint_key=None,
+    default_mode="all_animation",
+    timerange=None,
+    tint=True,
+    progress_max=1,
 ):
     """Wrap animation hotkey commands with the shared tool operation.
 
@@ -225,41 +227,31 @@ def _animation_command_context(
         tool_id=tint_key,
         label=label,
         progress=True,
-        progress_max=1,
+        progress_max=progress_max,
         undo=True,
         undo_name=toolCommon.make_undo_chunk_name(title=label),
         tint=operation_tint,
         timerange=timerange,
         default_mode=default_mode,
         tint_key=tint_key,
-    ):
-        yield
+    ) as operation:
+        yield operation
 
 
-def _filter_curves_preserving_selection(
-    curves, filter_name, command_label, target_info
-):
-    time_context = target_info.get("time_context")
-    filter_kwargs = {}
-    if time_context and time_context.mode == "graph_editor_keys":
-        filter_kwargs["selectedKeys"] = True
-    elif time_context and time_context.mode == "time_slider_range":
-        filter_kwargs.update(
-            startTime=time_context.start_frame,
-            endTime=time_context.end_frame,
-        )
-    with animation_context.preserve_key_selection():
-        try:
-            return cmds.filterCurve(curves, filter=filter_name, **filter_kwargs)
-        except (RuntimeError, TypeError) as exc:
-            if filter_kwargs:
-                cmds.warning(
-                    "{} could not run on the selected time range: {}".format(
-                        command_label, exc
-                    )
-                )
-                return None
-            raise
+@contextmanager
+def _cleanup_command_context(tool_operation, label, tool_id):
+    """Use dispatch's standard operation, with a direct-call fallback."""
+    if tool_operation is not None:
+        tool_operation.set_status(label)
+        yield tool_operation
+        return
+    with _animation_command_context(
+        label,
+        tool_id,
+        tint=False,
+        progress_max=0,
+    ) as operation:
+        yield operation
 
 
 def _run_key_command(
@@ -356,9 +348,11 @@ def apply_smart_euler_filter(*args):
         return wutil.make_inViewMessage("No rotation animation curves found")
 
     with _animation_command_context(
-        "Apply Smart Euler Filter", "apply_smart_euler_filter"
-    ):
-        return _apply_euler_filter(curves, target_info)
+        "Apply Smart Euler Filter",
+        "apply_smart_euler_filter",
+        progress_max=len(curves),
+    ) as operation:
+        return _apply_euler_filter(curves, target_info, operation)
 
 
 def clear_animation_keys(*args):
@@ -502,15 +496,62 @@ def _flat_redundant_key_times(curve, target_info, tolerance=1e-8):
     return redundant
 
 
-def _remove_flat_redundant_keys(curves, target_info):
+def _remove_flat_redundant_keys(curves, target_info, operation=None):
     removed = 0
     with animation_context.preserve_key_selection():
         for curve in curves:
+            if operation is not None and operation.cancelled:
+                break
             redundant_times = _flat_redundant_key_times(curve, target_info)
             for key_time in reversed(redundant_times):
                 cmds.cutKey(curve, time=(key_time, key_time), clear=True)
                 removed += 1
+            if operation is not None:
+                operation.step()
     return removed
+
+
+def _remove_tendency_redundant_keys(
+    curves, target_info, operation=None, tolerance=0.01
+):
+    """Remove low-detail keys while retaining the fitted motion tendency."""
+    removed_count = 0
+    with animation_context.preserve_key_selection():
+        for curve in curves:
+            if operation is not None and operation.cancelled:
+                break
+            keys = sorted(
+                set(
+                    float(value)
+                    for value in animation_context.key_times(curve, target_info)
+                )
+            )
+            if len(keys) <= 2:
+                if operation is not None:
+                    operation.step()
+                continue
+
+            priority, scores = curveFitting.detail_priority_with_scores(curve, keys)
+            redundant = [
+                frame
+                for frame in reversed(priority)
+                if scores.get(frame, 0.0) <= tolerance
+            ]
+            if redundant:
+                redundant_set = set(redundant)
+                kept = [frame for frame in keys if frame not in redundant_set]
+                shape = curveFitting.capture([curve], kept)
+                for frame in sorted(redundant, reverse=True):
+                    cmds.cutKey(curve, time=(frame, frame), clear=True)
+                    removed_count += 1
+                curveFitting.apply(
+                    shape,
+                    set_values=False,
+                    preserve_tangent_types=True,
+                )
+            if operation is not None:
+                operation.step()
+    return removed_count
 
 
 def _redundant_key_targets():
@@ -542,61 +583,74 @@ def set_remove_redundant_mode(mode):
     return mode
 
 
-def remove_redundant_keys(*args):
-    target_info, curves, timerange = _redundant_key_targets()
-    if not curves:
-        return None
-
+def remove_redundant_keys(*args, **kwargs):
+    tool_operation = kwargs.pop("tool_operation", None)
     mode = get_remove_redundant_mode()
     remove_all = mode == REMOVE_REDUNDANT_MODE_ALL
-    with _animation_command_context(
-        "Remove All Redundant Keys" if remove_all else "Remove Flat Redundant Keys",
+    label = "Remove All Redundant Keys" if remove_all else "Remove Flat Redundant Keys"
+    with _cleanup_command_context(
+        tool_operation,
+        label,
         "remove_redundant_keys",
-        timerange=timerange,
-        tint=False,
-    ):
+    ) as operation:
+        operation.start()
+        target_info, curves, timerange = _redundant_key_targets()
+        if not curves:
+            return None
+        operation.timerange = timerange
         if remove_all:
-            return _filter_curves_preserving_selection(
-                curves, "simplify", "Remove Redundant Keys", target_info
+            operation.set_total(len(curves))
+            removed = _remove_tendency_redundant_keys(
+                curves, target_info, operation
             )
-        removed = _remove_flat_redundant_keys(curves, target_info)
+        else:
+            operation.set_total(len(curves))
+            removed = _remove_flat_redundant_keys(curves, target_info, operation)
     if removed == 0:
-        wutil.make_inViewMessage("No flat redundant keys found")
+        wutil.make_inViewMessage("No redundant keys found")
     return removed
 
 
-def remove_static_anim_curves(*args):
-    target_info, _target_plugs, _selected_objects, _selected_channels = (
-        animation_context.resolve_command_targets(default_mode="all_animation")
-    )
-    curves = animation_context.curves(target_info)
-    if not curves:
-        return wutil.make_inViewMessage("No animation curves found")
-
-    static_targets = {}
-    for curve in curves:
-        key_data = animation_context.key_data(curve, target_info)
-        if not key_data:
-            continue
-        values = [value for _time, value in key_data]
-        if max(values) - min(values) <= 1e-8:
-            key_times = tuple(time for time, _value in key_data)
-            static_targets.setdefault(key_times, []).append(curve)
-
-    if not static_targets:
-        return wutil.make_inViewMessage("No static animation curves found")
-
-    time_context = target_info["time_context"]
-    _range = (time_context.start_frame, time_context.end_frame)
-
-    with _animation_command_context(
+def remove_static_anim_curves(*args, **kwargs):
+    tool_operation = kwargs.pop("tool_operation", None)
+    with _cleanup_command_context(
+        tool_operation,
         "Remove Static Anim Curves",
         "remove_static_anim_curves",
-        timerange=_range,
-        tint=False,
-    ):
+    ) as operation:
+        operation.start()
+        target_info, _target_plugs, _selected_objects, _selected_channels = (
+            animation_context.resolve_command_targets(default_mode="all_animation")
+        )
+        curves = animation_context.curves(target_info)
+        if not curves:
+            return wutil.make_inViewMessage("No animation curves found")
+
+        static_targets = {}
+        operation.set_total(len(curves))
+        for curve in curves:
+            if operation.cancelled:
+                return None
+            key_data = animation_context.key_data(curve, target_info)
+            if not key_data:
+                operation.step()
+                continue
+            values = [value for _time, value in key_data]
+            if max(values) - min(values) <= 1e-8:
+                key_times = tuple(time for time, _value in key_data)
+                static_targets.setdefault(key_times, []).append(curve)
+            operation.step()
+
+        if not static_targets:
+            return wutil.make_inViewMessage("No static animation curves found")
+
+        time_context = target_info["time_context"]
+        operation.timerange = (time_context.start_frame, time_context.end_frame)
+        operation.set_total(len(curves) + len(static_targets))
         removed = False
         for key_times, grouped_curves in static_targets.items():
+            if operation.cancelled:
+                return None
             try:
                 cmds.cutKey(
                     grouped_curves,
@@ -630,6 +684,7 @@ def remove_static_anim_curves(*args):
                         IndexError,
                     ):
                         continue
+            operation.step()
         if not removed:
             return wutil.make_inViewMessage(
                 "Static animation curves could not be removed"
@@ -648,11 +703,17 @@ def reverse_animation(*args):
     time_context = target_info["time_context"]
     reverse_range = (time_context.start_frame, time_context.end_frame)
     with _animation_command_context(
-        "Reverse Animation", "reverse_animation", timerange=reverse_range
-    ):
+        "Reverse Animation",
+        "reverse_animation",
+        timerange=reverse_range,
+        progress_max=len(curves),
+    ) as operation:
         pivot = (reverse_range[0] + reverse_range[1]) * 0.5
         for curve in curves:
+            if operation.cancelled:
+                break
             cmds.scaleKey(curve, time=reverse_range, timeScale=-1, timePivot=pivot)
+            operation.step()
 
 
 def _frames_for_key_time_context(time_context):
@@ -766,14 +827,20 @@ def _set_key_on_curve_preserving_tangent(curve, frame):
     return True
 
 
-def _set_selected_graph_editor_curves_current_time():
+def _set_selected_graph_editor_curves_current_time(operation=None):
     curves = _unique(selectionMod.get_graph_editor_selected_curves())
     if not curves:
         return False
+    if operation is not None:
+        operation.set_total(len(curves)).set_status("Setting Smart Keys")
     frame = cmds.currentTime(query=True)
     keyed = False
     for curve in curves:
+        if operation is not None and operation.cancelled:
+            break
         keyed = _set_key_on_curve_preserving_tangent(curve, frame) or keyed
+        if operation is not None:
+            operation.step()
     return keyed
 
 
@@ -803,17 +870,26 @@ def set_smart_key(*args):
     with _animation_command_context(
         "Set Smart Key",
         tint=False,
-    ):
+        progress_max=0,
+    ) as operation:
         keyed = (
-            _set_selected_graph_editor_curves_current_time()
+            _set_selected_graph_editor_curves_current_time(operation)
             if has_graph_keys
             else False
         )
 
         if not keyed and _is_explicit_channel_source(source) and target_plugs:
             if source == "channel_box":
+                operation.set_total(
+                    len(target_plugs), reset=has_graph_keys
+                ).set_status(
+                    "Setting Smart Keys"
+                )
                 for plug in target_plugs:
+                    if operation.cancelled:
+                        break
                     if not plug or "." not in plug:
+                        operation.step()
                         continue
 
                     node, attr = plug.rsplit(".", 1)
@@ -824,8 +900,12 @@ def set_smart_key(*args):
                             keyed = True
                     except (RuntimeError, ValueError, TypeError):
                         pass
+                    operation.step()
             else:
                 curves = animation_context.curves(target_info, include_shapes=False)
+                operation.set_total(len(curves), reset=has_graph_keys).set_status(
+                    "Setting Smart Keys"
+                )
                 curve_frames = frames
                 if source in (
                     "graph_editor",
@@ -834,16 +914,26 @@ def set_smart_key(*args):
                     curve_frames = (cmds.currentTime(query=True),)
 
                 for curve in curves:
+                    if operation.cancelled:
+                        break
                     for frame in curve_frames:
                         keyed = (
                             _set_key_on_curve_preserving_tangent(curve, frame) or keyed
                         )
+                    operation.step()
 
         elif not keyed:
             if not selected_objects:
                 return wutil.make_inViewMessage("Select at least one object")
 
+            operation.set_total(
+                len(selected_objects), reset=has_graph_keys
+            ).set_status(
+                "Setting Smart Keys"
+            )
             for obj in selected_objects:
+                if operation.cancelled:
+                    break
                 animated_attrs = selectionMod.get_animated_channels_for_node(obj)
 
                 if animated_attrs:
@@ -857,10 +947,12 @@ def set_smart_key(*args):
                                 _set_key_on_curve_preserving_tangent(curve, frame)
                                 or keyed
                             )
+                    operation.step()
                     continue
 
                 attrs = selectionMod.get_keyable_scalar_attributes(obj)
                 if not attrs:
+                    operation.step()
                     continue
                 try:
                     for frame in frames:
@@ -868,6 +960,7 @@ def set_smart_key(*args):
                         keyed = True
                 except (RuntimeError, ValueError, TypeError):
                     pass
+                operation.step()
 
         if not keyed:
             return wutil.make_inViewMessage("No keyable channels found")
@@ -888,14 +981,21 @@ def set_smart_key_all_channels(*args):
     with _animation_command_context(
         "Set Smart Key All Channels",
         tint=False,
-    ):
+        progress_max=0,
+    ) as operation:
         if not selected_objects:
             return wutil.make_inViewMessage("Select at least one object")
 
         keyed = False
+        operation.set_total(len(selected_objects)).set_status(
+            "Setting All Smart Keys"
+        )
         for obj in selected_objects:
+            if operation.cancelled:
+                break
             attrs = selectionMod.get_keyable_scalar_attributes(obj)
             if not attrs:
+                operation.step()
                 continue
 
             try:
@@ -904,6 +1004,7 @@ def set_smart_key_all_channels(*args):
                     keyed = True
             except (RuntimeError, ValueError, TypeError):
                 pass
+            operation.step()
 
         if not keyed:
             return wutil.make_inViewMessage("No keyable channels found")

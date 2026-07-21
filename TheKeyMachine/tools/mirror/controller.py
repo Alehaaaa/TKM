@@ -85,7 +85,7 @@ def select_opposite(*args):
 
     for obj in selected_objects:
         opposite_obj = find_opposite_name(obj)
-        if opposite_obj and cmds.objExists(opposite_obj):
+        if opposite_obj:
             opposite_controls.append(opposite_obj)
 
     if opposite_controls:
@@ -100,7 +100,7 @@ def add_select_opposite(*args):
 
     for obj in selected_objects:
         opposite_obj = find_opposite_name(obj)
-        if opposite_obj and cmds.objExists(opposite_obj):
+        if opposite_obj:
             opposite_controls.append(opposite_obj)
 
     if opposite_controls:
@@ -111,17 +111,18 @@ def add_select_opposite(*args):
 
 
 def copy_opposite(*args):
+    operation_manager = None
     operation_context = None
     try:
         selected_objects = selectionMod.get_selected_objects()
-        operation_context = toolCommon.tool_operation(
+        operation_manager = toolCommon.tool_operation(
             tool_id="copy_opposite",
             label="Copy Opposite",
             progress=True,
             progress_max=len(selected_objects),
             undo=True
         )
-        operation_context.__enter__()
+        operation_context = operation_manager.__enter__()
         operation_context.start()
         ATTRIBUTES_TO_IGNORE = {"tag"}
         exceptions = load_exceptions()
@@ -138,8 +139,8 @@ def copy_opposite(*args):
             opposite_obj = find_opposite_name(obj)
 
             # Comprobamos si el objeto opuesto es válido y existe
-            if opposite_obj and cmds.objExists(opposite_obj):
-                keyable_attrs = cmds.listAttr(obj, keyable=True)
+            if opposite_obj:
+                keyable_attrs = cmds.listAttr(obj, keyable=True) or []
 
                 for attr in keyable_attrs:
                     if attr in ATTRIBUTES_TO_IGNORE:
@@ -160,9 +161,9 @@ def copy_opposite(*args):
     except Exception as e:
         cmds.warning("Error during copy: {}".format(str(e)))
     finally:
-        if operation_context:
+        if operation_manager and operation_context is not None:
             try:
-                operation_context.__exit__(None, None, None)
+                operation_manager.__exit__(None, None, None)
             except Exception:
                 pass
 
@@ -171,13 +172,14 @@ def copy_opposite(*args):
 
 
 def mirror(*args):
+    operation_manager = None
     operation_context = None
     try:
         selected_controls = selectionMod.get_selected_objects()
         if not selected_controls:
             return wutil.make_inViewMessage("Select at least one object")
 
-        operation_context = toolCommon.tool_operation(
+        operation_manager = toolCommon.tool_operation(
             tool_id="mirror",
             label="Mirror",
             progress=True,
@@ -187,7 +189,7 @@ def mirror(*args):
             default_mode="current_frame",
             tint_key="mirror",
         )
-        operation_context.__enter__()
+        operation_context = operation_manager.__enter__()
         operation_context.start()
         exceptions = load_exceptions()
 
@@ -245,7 +247,7 @@ def mirror(*args):
                 opposite_name = find_opposite_name(control)
                 if opposite_name:
                     # Si el control opuesto no está seleccionado, aún así procede con el espejado
-                    swap_control_values(control, opposite_name if cmds.objExists(opposite_name) else None)
+                    swap_control_values(control, opposite_name)
                     processed_controls.add(control)
                     if opposite_name:
                         processed_controls.add(opposite_name)
@@ -261,9 +263,9 @@ def mirror(*args):
     except Exception as e:
         cmds.warning("Error during mirroring: {}".format(str(e)))
     finally:
-        if operation_context:
+        if operation_manager and operation_context is not None:
             try:
-                operation_context.__exit__(None, None, None)
+                operation_manager.__exit__(None, None, None)
             except Exception:
                 pass
 
@@ -318,7 +320,7 @@ def _mirror_keyable_attrs(control):
 
 def _attr_settable(control, attr):
     try:
-        return cmds.objExists(f"{control}.{attr}") and cmds.getAttr(f"{control}.{attr}", settable=True)
+        return bool(cmds.getAttr(f"{control}.{attr}", settable=True))
     except Exception:
         return False
 

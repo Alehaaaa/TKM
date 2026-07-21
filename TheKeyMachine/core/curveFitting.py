@@ -106,22 +106,29 @@ def detail_priority_with_scores(curve, key_times):
     """Rank interior keys by their contribution to the sampled curve shape.
 
     This is a hierarchical Ramer-Douglas-Peucker-style ranking in graph space.
-    Keys furthest from the constant-slope chord across their current span rank
-    first. The chord may be flat, rising, or falling. Ties on steady runs
-    prefer the midpoint, producing clean, even reductions.
+    Each span is compared with its best-fit cubic Hermite tendency rather than
+    a straight endpoint chord. Keys with the smallest residual detail therefore
+    end up last and are the first ones removed by simplification. Ties on clean
+    spans retain the hierarchical midpoint order for even reductions.
     """
     frames = sorted(set(float(frame) for frame in key_times))
     if len(frames) <= 2:
         return [], {}
-    values = {frame: evaluate(curve, frame) for frame in frames}
+    values = {}
+
+    def _value(frame):
+        frame = float(frame)
+        if frame not in values:
+            values[frame] = evaluate(curve, frame)
+        return values[frame]
 
     def _span_candidate(first_index, last_index):
         if last_index - first_index <= 1:
             return None
         start = frames[first_index]
         end = frames[last_index]
-        start_value = values.get(start)
-        end_value = values.get(end)
+        start_value = _value(start)
+        end_value = _value(end)
         if start_value is None or end_value is None or end == start:
             return None
 
@@ -136,18 +143,53 @@ def detail_priority_with_scores(curve, key_times):
             for index in range(1, sample_count - 1)
         }
         probe_times.update(frames[index] for index in interior_indices)
-        deviations = []
-        sampled_values = []
-        for frame in probe_times:
-            value = values.get(frame) if frame in values else evaluate(curve, frame)
+        samples = []
+        for frame in sorted(probe_times):
+            value = _value(frame)
             if value is None:
                 continue
+            samples.append((frame, value))
+        if not samples:
+            return None
+
+        # Fit the smooth tendency once from the immutable sampled curve.
+        duration = end - start
+        aa = ab = bb = ar = br = 0.0
+        for frame, value in samples:
+            u = (frame - start) / duration
+            u2 = u * u
+            u3 = u2 * u
+            h00 = 2.0 * u3 - 3.0 * u2 + 1.0
+            h01 = -2.0 * u3 + 3.0 * u2
+            a = duration * (u3 - 2.0 * u2 + u)
+            b = duration * (u3 - u2)
+            residual = value - (h00 * start_value + h01 * end_value)
+            aa += a * a
+            ab += a * b
+            bb += b * b
+            ar += a * residual
+            br += b * residual
+        determinant = aa * bb - ab * ab
+        if abs(determinant) <= 1e-12:
+            start_slope = end_slope = (end_value - start_value) / duration
+        else:
+            start_slope = (ar * bb - br * ab) / determinant
+            end_slope = (br * aa - ar * ab) / determinant
+
+        deviations = []
+        sampled_values = []
+        for frame, value in samples:
             sampled_values.append(value)
             ratio = (frame - start) / (end - start)
-            chord_value = start_value + (end_value - start_value) * ratio
-            deviations.append((abs(value - chord_value), -abs(frame - midpoint), frame))
-        if not deviations:
-            return None
+            ratio2 = ratio * ratio
+            ratio3 = ratio2 * ratio
+            tendency_value = (
+                (2.0 * ratio3 - 3.0 * ratio2 + 1.0) * start_value
+                + (-2.0 * ratio3 + 3.0 * ratio2) * end_value
+                + duration * (ratio3 - 2.0 * ratio2 + ratio) * start_slope
+                + duration * (ratio3 - ratio2) * end_slope
+            )
+            deviations.append((abs(value - tendency_value), -abs(frame - midpoint), frame))
 
         deviation, center_bias, detail_time = max(deviations)
         value_scale = max(
@@ -195,14 +237,39 @@ def capture(curves, target_times):
     target_times = sorted(set(float(frame) for frame in target_times))
     for curve in dict.fromkeys(curves or []):
         samples = {}
+        existing_times = set(
+            float(frame)
+            for frame in (
+                cmds.keyframe(
+                    curve,
+                    query=True,
+                    time=(target_times[0], target_times[-1]),
+                    timeChange=True,
+                ) or []
+            )
+        ) if target_times else set()
         for frame in target_times:
             value = evaluate(curve, frame)
             if value is not None:
-                in_types = cmds.keyTangent(curve, query=True, time=(frame, frame), inTangentType=True) or []
-                out_types = cmds.keyTangent(curve, query=True, time=(frame, frame), outTangentType=True) or []
-                in_angles = cmds.keyTangent(curve, query=True, time=(frame, frame), inAngle=True) or []
-                out_angles = cmds.keyTangent(curve, query=True, time=(frame, frame), outAngle=True) or []
-                tangent_locks = cmds.keyTangent(curve, query=True, time=(frame, frame), lock=True) or []
+                if frame in existing_times:
+                    time_range = (frame, frame)
+                    in_types = cmds.keyTangent(
+                        curve, query=True, time=time_range, inTangentType=True
+                    ) or []
+                    out_types = cmds.keyTangent(
+                        curve, query=True, time=time_range, outTangentType=True
+                    ) or []
+                    in_angles = cmds.keyTangent(
+                        curve, query=True, time=time_range, inAngle=True
+                    ) or []
+                    out_angles = cmds.keyTangent(
+                        curve, query=True, time=time_range, outAngle=True
+                    ) or []
+                    tangent_locks = cmds.keyTangent(
+                        curve, query=True, time=time_range, lock=True
+                    ) or []
+                else:
+                    in_types = out_types = in_angles = out_angles = tangent_locks = []
                 samples[frame] = {
                     "value": value,
                     "in_angle": None,
@@ -243,7 +310,12 @@ def apply(shape_data, set_values=True, change=None, preserve_tangent_types=False
                 if index is None:
                     index = omutils.add_anim_curve_key(curve_fn, frame, change=change)
                 if set_values:
-                    omutils.set_anim_curve_value_by_index(curve_fn, index, sample["value"], change=change)
+                    curve_value = omutils.anim_curve_attr_value_to_curve_value(
+                        curve, sample["value"]
+                    )
+                    omutils.set_anim_curve_value_by_index(
+                        curve_fn, index, curve_value, change=change
+                    )
                 if not preserve_tangent_types:
                     omutils.set_anim_curve_tangents(
                         curve_fn,

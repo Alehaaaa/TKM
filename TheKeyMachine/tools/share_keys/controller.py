@@ -68,10 +68,21 @@ def _anim_curves_for_objects(objects):
 
 def _set_missing_keys(curves, frames, insert=False, operation=None):
     for curve in _unique(curves):
+        existing_frames = set(
+            _normalize_key_frames(
+                cmds.keyframe(
+                    curve,
+                    query=True,
+                    time=(frames[0], frames[-1]),
+                    timeChange=True,
+                )
+                or []
+            )
+        )
         for frame in frames:
             if operation and operation.cancelled:
                 return
-            if cmds.keyframe(curve, query=True, time=(frame, frame)):
+            if frame in existing_frames:
                 if operation:
                     operation.step()
                 continue
@@ -79,6 +90,7 @@ def _set_missing_keys(curves, frames, insert=False, operation=None):
                 cmds.setKeyframe(curve, time=(frame,), insert=True)
             else:
                 cmds.setKeyframe(curve, time=(frame,))
+            existing_frames.add(frame)
             if operation:
                 operation.step()
 
@@ -304,9 +316,13 @@ def reblock_move(*args):
         return
 
     curvas = selectionMod.get_anim_curves_for_nodes(objetos, include_shapes=True)
+    operation = toolCommon.current_tool_operation()
+    if operation:
+        operation.set_total(len(curvas))
 
     # Crear un diccionario para contar perfiles
     perfiles = Counter()
+    frames_by_curve = {}
 
     # Identificar perfil de cada curva y actualizar el contador
     for curva in curvas:
@@ -314,17 +330,24 @@ def reblock_move(*args):
         if keyframes is None:
             continue
         fotogramas = tuple(sorted(keyframes))
+        frames_by_curve[curva] = fotogramas
         perfiles[fotogramas] += 1
+
+    if not perfiles:
+        return wutil.make_inViewMessage("No animation curves found")
 
     # Identificar el perfil mayoritario
     perfil_mayoritario, _ = perfiles.most_common(1)[0]
 
     # Corregir curvas que no coinciden con el perfil mayoritario
     for curva in curvas:
-        keyframes = cmds.keyframe(curva, query=True, timeChange=True)
-        if keyframes is None:
+        if operation and operation.cancelled:
+            return
+        fotogramas = frames_by_curve.get(curva)
+        if fotogramas is None:
+            if operation:
+                operation.step()
             continue
-        fotogramas = tuple(sorted(keyframes))
 
         if fotogramas != perfil_mayoritario:
             # Ajustar el número de keyframes
@@ -361,6 +384,8 @@ def reblock_move(*args):
                     frame = fotogramas[i]
                     frame_objetivo = perfil_mayoritario[i]
                     cmds.keyframe(curva, edit=True, time=(frame,), timeChange=frame_objetivo)
+        if operation:
+            operation.step()
 
 
 def reblock_insert(*args):
@@ -381,8 +406,16 @@ def reblock_insert(*args):
     # Identificar los fotogramas clave "mayoritarios" como los más comunes
     contador_frames = Counter(frames_claves)
     frames_mayoritarios = {frame for frame, count in contador_frames.items() if count >= len(objetos) / 2}
+    if not frames_mayoritarios:
+        return wutil.make_inViewMessage("No shared key pattern found")
+
+    operation = toolCommon.current_tool_operation()
+    if operation:
+        operation.set_total(len(objetos))
 
     for objeto in objetos:
+        if operation and operation.cancelled:
+            return
         # Obtener los fotogramas clave específicos del objeto actual
         frames_objeto = set(cmds.keyframe(objeto, query=True, timeChange=True) or [])
 
@@ -394,6 +427,8 @@ def reblock_insert(*args):
                 if valor:
                     cmds.setKeyframe(objeto, time=frame_mayoritario_cercano, value=valor[0], insert=True)
                     cmds.cutKey(objeto, time=(frame, frame))
+        if operation:
+            operation.step()
 
 
 # ___________________________ BAKE ANIM  _____________________________________

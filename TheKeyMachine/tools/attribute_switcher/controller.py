@@ -256,12 +256,84 @@ class AttributeSwitcherController:
 
     # Scene edits ----------------------------------------------------------
 
+    @staticmethod
+    def _long_dag_path(target):
+        try:
+            matches = cmds.ls(target, long=True) or []
+        except Exception:
+            matches = []
+        return str(matches[0] if matches else target).rstrip("|")
+
+    @classmethod
+    def _sort_targets_by_influence(cls, targets):
+        """Order descendants before ancestors while preserving unrelated order."""
+        targets = list(targets or [])
+        paths = [cls._long_dag_path(target) for target in targets]
+
+        def influence(index):
+            parent_prefix = paths[index] + "|"
+            return sum(
+                1
+                for other_index, other_path in enumerate(paths)
+                if other_index != index and other_path.startswith(parent_prefix)
+            )
+
+        return [
+            target
+            for _score, _index, target in sorted(
+                (influence(index), index, target)
+                for index, target in enumerate(targets)
+            )
+        ]
+
+    @classmethod
+    def _sort_requests_by_influence(cls, requests):
+        """Order multi-switch requests from least to most DAG influence."""
+        requests = list(requests or [])
+        request_paths = []
+        for value, _attribute, options, _all_frames in requests:
+            try:
+                targets = options[value]["objects"]
+            except (KeyError, TypeError):
+                targets = []
+            request_paths.append(
+                {cls._long_dag_path(target) for target in targets}
+            )
+
+        all_paths = set().union(*request_paths) if request_paths else set()
+
+        def influence(index):
+            own_paths = request_paths[index]
+            return len(
+                {
+                    other_path
+                    for other_path in all_paths - own_paths
+                    if any(
+                        other_path.startswith(parent_path + "|")
+                        for parent_path in own_paths
+                    )
+                }
+            )
+
+        return [
+            request
+            for _score, _index, request in sorted(
+                (influence(index), index, request)
+                for index, request in enumerate(requests)
+            )
+        ]
+
     def apply_active_changes(self, active_widgets):
         for (attribute, _), (item, options) in active_widgets.items():
             self.apply_switch(item.currentText(), attribute, options)
 
     def apply_switch(
-        self, value, attribute, options, all_frames_override=None
+        self,
+        value,
+        attribute,
+        options,
+        all_frames_override=None,
+        _manage_session=True,
     ):
         all_frames = (
             all_frames_override
@@ -273,29 +345,31 @@ class AttributeSwitcherController:
                 value = value.split(" ")[0]
             all_frames = True
 
-        targets = options[value]["objects"]
+        targets = self._sort_targets_by_influence(
+            options[value]["objects"]
+        )
         target_attributes = options[value]["attrs"]
         enum_index = options[value].get("index", value)
+        operation_manager = None
         operation = None
         temporary_keys = {}
         try:
-            operation = toolCommon.tool_operation(
+            operation_manager = toolCommon.tool_operation(
                 tool_id="attribute_switcher",
                 label="Attribute Switcher",
                 progress=True,
                 undo=True,
             )
-            operation.__enter__()
-            self.disconnect_runtime()
+            operation = operation_manager.__enter__()
+            if _manage_session:
+                self.disconnect_runtime()
 
             timeline_selection = cmds.timeControl("timeControl1", q=True, rv=True)
             selected_range = cmds.timeControl("timeControl1", q=True, ra=True)
             keyframes = self._collect_keyframes(
                 targets, all_frames, timeline_selection, selected_range
             )
-            sorted_targets = sorted(
-                targets, key=lambda target: target.count("|"), reverse=True
-            )
+            sorted_targets = targets
             if isinstance(keyframes, dict) and keyframes:
                 self._apply_multiple_frames(
                     attribute, enum_index, keyframes, target_attributes
@@ -324,14 +398,45 @@ class AttributeSwitcherController:
                 self.apply_euler_filter(sorted_targets)
         finally:
             self._remove_temporary_keys(temporary_keys)
-            self.connect_runtime()
-            self.view.refresh(force=True)
-            if operation:
+            if _manage_session:
+                self.connect_runtime()
+                self.view.refresh(force=True)
+            if operation_manager and operation is not None:
                 try:
-                    operation.__exit__(None, None, None)
+                    operation_manager.__exit__(None, None, None)
                 except Exception:
                     pass
         cmds.showWindow("MayaWindow")
+
+    def apply_switches(self, requests):
+        """Apply a staged group of attribute switches as one operation."""
+        requests = list(requests or [])
+        if not requests:
+            return
+        requests = self._sort_requests_by_influence(requests)
+        with toolCommon.tool_operation(
+            tool_id="attribute_switcher_multi",
+            label="Switch Multiple Attributes",
+            progress=True,
+            progress_max=len(requests),
+            undo=True,
+        ) as operation:
+            self.disconnect_runtime()
+            try:
+                for value, attribute, options, all_frames in requests:
+                    if operation.cancelled:
+                        break
+                    self.apply_switch(
+                        value,
+                        attribute,
+                        options,
+                        all_frames_override=all_frames,
+                        _manage_session=False,
+                    )
+                    operation.step()
+            finally:
+                self.connect_runtime()
+                self.view.refresh(force=True)
 
     @staticmethod
     def _set_preserving_transform(target, attribute, value, transform=None):

@@ -33,6 +33,7 @@ from typing import Any, Optional
 _SLOTS: dict = {
     "animation":        ("copy_animation",  "copy_animation_data.json"),
     "pose":             ("copy_pose",        "copy_pose_data.json"),
+    "selection_sets":   ("selection_sets",   "selection_sets_data.json"),
     "worldspace":       ("copy_worldspace", "copy_worldspace_data.json"),
     "copy_link":        ("copy_link",        "copy_link_data.json"),
     "temp_pivot":       ("temp_pivot",       "temp_pivot_data.json"),
@@ -127,7 +128,42 @@ def load_raw(file_path: str, missing_warning: Optional[str] = None) -> Optional[
         return json.load(fh)
 
 
-def export_dialog(slot: str, caption: str) -> Optional[str]:
+def export_to(slot: str, target: str, operation=None) -> Optional[str]:
+    """Copy a clipboard slot to an explicit JSON path."""
+    source = _resolve(slot)
+    if not os.path.exists(source) or not target:
+        return None
+    if not target.lower().endswith(".json"):
+        target += ".json"
+    if operation is not None:
+        operation.set_total(1, reset=True)
+    target_dir = os.path.dirname(target)
+    if target_dir:
+        os.makedirs(target_dir, exist_ok=True)
+    shutil.copyfile(source, target)
+    if operation is not None:
+        operation.step()
+    return target
+
+
+def import_from(slot: str, source: str, operation=None) -> Optional[Any]:
+    """Load an explicit JSON file into a clipboard slot."""
+    if not source:
+        return None
+    if operation is not None:
+        operation.set_total(2, reset=True)
+    data = load_raw(source, "Could not import file")
+    if data is None:
+        return None
+    if operation is not None:
+        operation.step()
+    save(slot, data)
+    if operation is not None:
+        operation.step()
+    return data
+
+
+def export_dialog(slot: str, caption: str, operation=None) -> Optional[str]:
     """Open a Save dialog and copy the slot file to a user-chosen location.
 
     Returns the exported path, or None if the user cancelled / no data exists.
@@ -143,15 +179,16 @@ def export_dialog(slot: str, caption: str) -> Optional[str]:
     if not result:
         return None
     target = result[0]
-    if not target.lower().endswith(".json"):
-        target += ".json"
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    shutil.copyfile(file_path, target)
+    if operation is not None:
+        operation.set_status(caption)
+    target = export_to(slot, target, operation=operation)
+    if not target:
+        return None
     wutil.make_inViewMessage("File exported")
     return target
 
 
-def import_dialog(slot: str, caption: str) -> Optional[Any]:
+def import_dialog(slot: str, caption: str, operation=None) -> Optional[Any]:
     """Open an Open dialog, load JSON from the selected file, write it to *slot*.
 
     Returns the loaded data, or None if the user cancelled / the file was invalid.
@@ -163,9 +200,10 @@ def import_dialog(slot: str, caption: str) -> Optional[Any]:
     if not result:
         return None
     source = result[0]
-    data = load_raw(source, "Could not import file")
+    if operation is not None:
+        operation.set_status(caption)
+    data = import_from(slot, source, operation=operation)
     if data is None:
         return None
-    save(slot, data)
     wutil.make_inViewMessage("File imported")
     return data

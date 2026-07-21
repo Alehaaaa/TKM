@@ -36,6 +36,98 @@ COLOR_BLEND_MULTI = ACCENT_DARK_COLOR.hover.hex
 ATTRIBUTE_SWITCHER_GLOBE_IMAGE = icons.globe
 
 
+def _option_button_stylesheet(compact=False):
+    """Return the shared enum-option style used by both switch popups."""
+    if compact:
+        return (
+            "QPushButton { color: %s; background: %s; text-align: left; "
+            "padding: %spx; border-radius: %spx; border: none; }"
+            "QPushButton:hover { background: %s; }"
+            "QPushButton:checked { color: %s; background: %s; font-weight: bold; }"
+            % (
+                COLOR_ACCENT_HOVER,
+                COLOR_ACCENT_DARK,
+                wutil.DPI(7),
+                wutil.DPI(6),
+                COLOR_ACCENT_MAIN,
+                COLOR_BG_MAIN,
+                COLOR_ACCENT_LIGHT,
+            )
+        )
+    return (
+        "QPushButton { color: %s; background: %s; text-align: left; "
+        "padding: %spx %spx %spx %spx; border-radius: %spx; "
+        "font-size: %spx; font-weight: bold; border: none; }"
+        "QPushButton:hover, QPushButton:pressed { color: %s; background: %s; }"
+        "QPushButton:checked { color: %s; background: %s; }"
+        % (
+            COLOR_ACCENT_HOVER,
+            COLOR_ACCENT_DARK,
+            wutil.DPI(8),
+            wutil.DPI(18),
+            wutil.DPI(8),
+            wutil.DPI(8),
+            wutil.DPI(6),
+            wutil.DPI(11),
+            COLOR_ACCENT_DARK,
+            COLOR_ACCENT_MAIN,
+            COLOR_BG_MAIN,
+            COLOR_ACCENT_LIGHT,
+        )
+    )
+
+
+def _configure_option_button(button, compact=False):
+    """Apply the common interaction and appearance for enum options."""
+    button.setFlat(True)
+    button.setCursor(QtCore.Qt.PointingHandCursor)
+    button.setStyleSheet(_option_button_stylesheet(compact=compact))
+
+
+def _add_option_state_indicator(button, is_current=False, is_keyed=False):
+    """Add the standard current/keyed dot used by attribute options."""
+    dot_layout = QtWidgets.QHBoxLayout(button)
+    dot_layout.setContentsMargins(0, 0, wutil.DPI(6), 0)
+    dot_layout.addStretch(1)
+
+    dot = QtWidgets.QWidget(button)
+    dot.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+    dot_size = wutil.DPI(10)
+    dot.setFixedSize(dot_size, dot_size)
+    if is_current:
+        color = COLOR_BG_TRACK
+    elif is_keyed:
+        color = COLOR_BLEND_MULTI
+    else:
+        color = "transparent"
+    dot.setStyleSheet(
+        "background: {}; border-radius: {}px;".format(color, dot_size // 2)
+    )
+    dot_layout.addWidget(dot)
+
+
+def _connect_checkable_button(button, callback, *callback_args):
+    """Connect checked buttons across Qt bindings that omit clicked(bool)."""
+    def _dispatch(*_signal_args):
+        callback(button.isChecked(), *callback_args)
+
+    button.clicked.connect(_dispatch)
+
+
+def _multi_select_modifier_held():
+    """Query Ctrl/Cmd directly instead of relying on Maya key delivery."""
+    query_modifiers = getattr(
+        QtGui.QGuiApplication, "queryKeyboardModifiers", None
+    )
+    if callable(query_modifiers):
+        modifiers = query_modifiers()
+    else:
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+    return bool(
+        modifiers & (QtCore.Qt.ControlModifier | QtCore.Qt.MetaModifier)
+    )
+
+
 class Grip(QtWidgets.QSizeGrip):
     """
     A custom size grip that signals the parent to pause auto-closing on resizing.
@@ -162,6 +254,14 @@ class FloatingWidget(cd.QFlatDialog):
             and self._active_popup.isVisible()
         ):
             if self._active_popup.frameGeometry().contains(cursor_pos):
+                return True
+        if (
+            hasattr(self, "_multi_switch_dialog")
+            and self._multi_switch_dialog
+            and wutil.is_valid_widget(self._multi_switch_dialog)
+            and self._multi_switch_dialog.isVisible()
+        ):
+            if self._multi_switch_dialog.frameGeometry().contains(cursor_pos):
                 return True
         return False
 
@@ -533,56 +633,14 @@ class AttributePopup(QtWidgets.QWidget):
 
     def _create_option_button(self, text, index, is_all):
         btn = _PopupOptionButton(text, self, index, is_all)
-        btn.setFlat(True)
-        btn.setCursor(QtCore.Qt.PointingHandCursor)
+        _configure_option_button(btn)
         btn.setMinimumWidth(wutil.DPI(60))
         btn.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
-
-        # Style with design tokens
-        btn.setStyleSheet(
-            """
-            QPushButton {{
-                color: {0};
-                background-color: {1};
-                text-align: left;
-                padding: {2}px {3}px {2}px {2}px;
-                border-radius: {4}px;
-                font-size: {5}px;
-                font-weight: bold;
-                border: none;
-            }}
-            QPushButton:hover {{
-                background-color: {6};
-                color: {1};
-            }}
-            QPushButton:pressed {{
-                background-color: {6};
-                color: {1};
-            }}
-        """.format(COLOR_ACCENT_HOVER, COLOR_ACCENT_DARK, wutil.DPI(8), wutil.DPI(18), wutil.DPI(6), wutil.DPI(11), COLOR_ACCENT_MAIN)
+        _add_option_state_indicator(
+            btn,
+            is_current=index in self.current_indices,
+            is_keyed=index in self.marked_indices,
         )
-
-        # Sync indicator dot
-        dot_layout = QtWidgets.QHBoxLayout(btn)
-        dot_layout.setContentsMargins(0, 0, wutil.DPI(6), 0)
-        dot_layout.addStretch()
-
-        dot = QtWidgets.QWidget()
-        dot.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
-        dot_size = wutil.DPI(10)
-        dot.setFixedSize(dot_size, dot_size)
-
-        is_keyed = index in self.marked_indices
-        is_current = index in self.current_indices
-
-        if is_current:
-            dot.setStyleSheet("background: {}; border-radius: {}px;".format(COLOR_BG_TRACK, dot_size // 2))
-        elif is_keyed:
-            dot.setStyleSheet("background: {}; border-radius: {}px;".format(COLOR_BLEND_MULTI, dot_size // 2))
-        else:
-            dot.setStyleSheet("background: transparent;")
-
-        dot_layout.addWidget(dot)
         self._option_buttons.append(btn)
         return btn
 
@@ -732,14 +790,261 @@ class AttributePopup(QtWidgets.QWidget):
         self.show()
 
 
+class MultiAttributeSwitchDialog(FloatingWidget):
+    """Stage independent enum choices in a responsive column grid."""
+
+    def __init__(self, parent_dialog, entries):
+        FloatingWidget.__init__(self, popup=False, parent=parent_dialog)
+        self.parent_dialog = parent_dialog
+        self.entries = list(entries or [])
+        self._selected_options = {}
+        self._option_groups = []
+        self._column_widgets = []
+        self._all_frames = False
+        self.setWindowTitle("Switch Multiple Attributes")
+        self.setMinimumWidth(wutil.DPI(220))
+        self._build_ui()
+
+    def _build_ui(self):
+        title = QtWidgets.QLabel(
+            "Switch {} channels".format(len(self.entries)), self.mainContent
+        )
+        title.setStyleSheet(
+            "color: {}; font-size: {}px; font-weight: bold;".format(
+                COLOR_TEXT_SECONDARY, wutil.DPI(14)
+            )
+        )
+        self.mainLayout.addWidget(title)
+
+        self.mainLayout.addSpacing(wutil.DPI(10))
+        self._add_scope_controls()
+        self.mainLayout.addSpacing(wutil.DPI(10))
+        self._columns_grid = QtWidgets.QGridLayout()
+        self._columns_grid.setContentsMargins(0, 0, 0, 0)
+        self._columns_grid.setHorizontalSpacing(wutil.DPI(6))
+        self._columns_grid.setVerticalSpacing(wutil.DPI(6))
+        self.mainLayout.addLayout(self._columns_grid)
+        self._build_columns()
+        self._layout_columns(QtGui.QGuiApplication.primaryScreen())
+
+        self.setBottomBar(
+            buttons=[
+                cd.QFlatDialogButton(
+                    "Cancel", callback=self._cancel, icon=icons.cancel
+                ),
+                cd.QFlatDialogButton(
+                    "Apply",
+                    callback=self._apply,
+                    icon=icons.apply,
+                    highlight=True,
+                ),
+            ],
+            closeButton=False,
+            highlight="Apply",
+        )
+        self._apply_button = next(
+            (
+                button
+                for button in self.bottomBar.findChildren(QtWidgets.QPushButton)
+                if button.text() == "Apply"
+            ),
+            None,
+        )
+        if self._apply_button is not None:
+            self._apply_button.setEnabled(False)
+
+    def _add_scope_controls(self):
+        layout = QtWidgets.QHBoxLayout()
+        layout.setSpacing(wutil.DPI(4))
+        label = QtWidgets.QLabel("Keyframes", self.mainContent)
+        label.setStyleSheet(
+            "color: {}; font-size: {}px;".format(
+                COLOR_TEXT_SECONDARY, wutil.DPI(11)
+            )
+        )
+        layout.addWidget(label)
+        layout.addStretch(1)
+
+        group = QtWidgets.QButtonGroup(self)
+        group.setExclusive(True)
+        for text, all_frames in (
+            (AttributePopup.CURRENT_KEYFRAMES, False),
+            (AttributePopup.ALL_KEYFRAMES, True),
+        ):
+            button = QtWidgets.QPushButton(text, self.mainContent)
+            button.setCheckable(True)
+            _configure_option_button(button, compact=True)
+            _connect_checkable_button(
+                button, self._choose_scope, all_frames
+            )
+            group.addButton(button)
+            layout.addWidget(button)
+            if not all_frames:
+                button.setChecked(True)
+        self._scope_group = group
+        self.mainLayout.addLayout(layout)
+
+    def _build_columns(self):
+        for entry_index, (item, options_map) in enumerate(self.entries):
+            column = QtWidgets.QWidget(self.mainContent)
+            column.setFixedWidth(wutil.DPI(165))
+            column.setStyleSheet("background: transparent;")
+            layout = QtWidgets.QVBoxLayout(column)
+            layout.setContentsMargins(
+                wutil.DPI(5), wutil.DPI(5), wutil.DPI(5), wutil.DPI(5)
+            )
+            layout.setSpacing(wutil.DPI(3))
+
+            object_heading = QtWidgets.QLabel(item.object_label, column)
+            object_heading.setWordWrap(False)
+            object_heading.setStyleSheet(
+                "color: {}; font-size: {}px; background: transparent;".format(
+                    COLOR_TEXT_SECONDARY, wutil.DPI(11)
+                )
+            )
+            object_heading.setToolTip(item.object_label)
+            layout.addWidget(object_heading)
+
+            attribute_text = item.attribute_label
+            if item.has_mixed_key_values:
+                attribute_text += " *"
+            attribute_heading = QtWidgets.QLabel(attribute_text, column)
+            attribute_heading.setWordWrap(False)
+            attribute_heading.setStyleSheet(
+                "color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(
+                    COLOR_TEXT_SECONDARY, wutil.DPI(11)
+                )
+            )
+            attribute_heading.setToolTip(item.attribute_label)
+            layout.addWidget(attribute_heading)
+
+            group = QtWidgets.QButtonGroup(self)
+            group.setExclusive(True)
+            self._option_groups.append(group)
+            option_count = 0
+            for option_index, option in enumerate(item.options):
+                if option not in options_map:
+                    continue
+                option_count += 1
+                button = QtWidgets.QPushButton(option, column)
+                button.setCheckable(True)
+                _configure_option_button(button)
+                _connect_checkable_button(
+                    button, self._choose_option, entry_index, option
+                )
+                _add_option_state_indicator(
+                    button,
+                    is_current=option_index in item.current_indices,
+                    is_keyed=option_index in item.marked_indices,
+                )
+                group.addButton(button)
+                layout.addWidget(button)
+            if not option_count:
+                empty = QtWidgets.QLabel("No options", column)
+                empty.setStyleSheet(
+                    "color: {}; background: transparent;".format(
+                        COLOR_TEXT_SECONDARY
+                    )
+                )
+                layout.addWidget(empty)
+            layout.addStretch(1)
+            self._column_widgets.append(column)
+
+    def _layout_columns(self, screen):
+        while self._columns_grid.count():
+            self._columns_grid.takeAt(0)
+        available_width = wutil.DPI(700)
+        if screen is not None:
+            available_width = screen.availableGeometry().width() - wutil.DPI(80)
+        column_step = wutil.DPI(171)
+        columns_per_row = max(
+            1,
+            min(len(self._column_widgets), available_width // column_step),
+        )
+        for index, column in enumerate(self._column_widgets):
+            self._columns_grid.addWidget(
+                column,
+                index // columns_per_row,
+                index % columns_per_row,
+            )
+
+    def _choose_scope(self, checked, all_frames):
+        if checked:
+            self._all_frames = all_frames
+
+    def _choose_option(self, checked, entry_index, option):
+        if not checked:
+            return
+        self._selected_options[entry_index] = option
+        if self._apply_button is not None:
+            self._apply_button.setEnabled(True)
+
+    def _apply(self):
+        if not self._selected_options:
+            return
+        staged_entries = [
+            (self.entries[index][0], self.entries[index][1], option)
+            for index, option in sorted(self._selected_options.items())
+        ]
+        self.parent_dialog._apply_multi_switch(
+            staged_entries, self._all_frames
+        )
+
+    def _cancel(self):
+        self.parent_dialog._close_multi_switch_dialog(clear_selection=True)
+
+    def reject(self):
+        self._cancel()
+
+    def show_beside(self, widget):
+        position = widget.mapToGlobal(QtCore.QPoint(widget.width(), 0))
+        screen = (
+            QtGui.QGuiApplication.screenAt(position)
+            or QtGui.QGuiApplication.primaryScreen()
+        )
+        self._layout_columns(screen)
+        self.adjustSize()
+        if screen is not None:
+            available = screen.availableGeometry()
+            if position.x() + self.width() > available.right():
+                position.setX(
+                    widget.mapToGlobal(QtCore.QPoint(0, 0)).x() - self.width()
+                )
+            position.setX(
+                max(
+                    available.left(),
+                    min(position.x(), available.right() - self.width()),
+                )
+            )
+            position.setY(
+                max(
+                    available.top(),
+                    min(position.y(), available.bottom() - self.height()),
+                )
+            )
+        self.move(position)
+        self.show()
+        self.raise_()
+
+
 class AttributeItem(QtWidgets.QWidget):
     """
     A row item that shows an attribute name and a pill with the current value.
     """
 
-    def __init__(self, label_text, enum_attr, unique_controls, objects_map, parent_dialog):
+    def __init__(
+        self,
+        object_label,
+        attribute_label,
+        enum_attr,
+        unique_controls,
+        objects_map,
+        parent_dialog,
+    ):
         QtWidgets.QWidget.__init__(self, parent_dialog.mainContent)
-        self.label_text = label_text
+        self.object_label = object_label
+        self.attribute_label = attribute_label
+        self.label_text = "{} {}".format(object_label, attribute_label)
         self.enum_attr = enum_attr
         self.unique_controls = unique_controls
         self.objects_map = objects_map
@@ -776,11 +1081,34 @@ class AttributeItem(QtWidgets.QWidget):
         self.main_layout.setContentsMargins(wutil.DPI(6), wutil.DPI(6), wutil.DPI(6), wutil.DPI(6))
         self.main_layout.setSpacing(wutil.DPI(6))
 
-        self.name_label = QtWidgets.QLabel(self.label_text, self)
+        self.multi_checkbox = QtWidgets.QCheckBox(self)
+        self.multi_checkbox.setObjectName("HotkeyCommandCheckBox")
+        self.multi_checkbox.setVisible(False)
+        self.multi_checkbox.setToolTip("Select this channel for a staged multi-switch")
+        self.multi_checkbox.setCursor(QtCore.Qt.PointingHandCursor)
+        self.multi_checkbox.setSizePolicy(
+            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+        )
+        self.multi_checkbox.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.multi_checkbox.setStyleSheet(
+            "#HotkeyCommandCheckBox{background:transparent;spacing:0px;}"
+            "#HotkeyCommandCheckBox::indicator{width:%spx;height:%spx;border:1px solid #626262;border-radius:%spx;background:#262626;}"
+            "#HotkeyCommandCheckBox::indicator:hover{border-color:#7d7d7d;background:#303030;}"
+            "#HotkeyCommandCheckBox::indicator:checked{image:url(%s);border-color:#7d7d7d;background:#363636;}"
+            % (wutil.DPI(11), wutil.DPI(11), wutil.DPI(3), icons.apply)
+        )
+        self.multi_checkbox.toggled.connect(self._on_multi_checked)
+
+        display_label = self.label_text
+        if self.has_mixed_key_values:
+            display_label += " *"
+        self.name_label = QtWidgets.QLabel(display_label, self)
         self.name_label.setStyleSheet("color: {}; font-size: {}px;".format(COLOR_TEXT_MAIN, wutil.DPI(11)))
         self.name_label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.name_label.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
 
         self.pill_container = QtWidgets.QWidget(self)
+        self.pill_container.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
         self.pill_container.setFixedSize(wutil.DPI(60), wutil.DPI(16))
         self.pill_layout = QtWidgets.QHBoxLayout(self.pill_container)
         self.pill_layout.setContentsMargins(wutil.DPI(2), 0, wutil.DPI(2), 0)
@@ -819,39 +1147,44 @@ class AttributeItem(QtWidgets.QWidget):
 
         self._refresh_pill_style()
 
+        self.main_layout.addWidget(self.multi_checkbox, 0, QtCore.Qt.AlignVCenter)
         self.main_layout.addWidget(self.name_label, 1)
         self.main_layout.addWidget(self.pill_container)
-
-        self.mixed_keys_hint = QtWidgets.QLabel("*", self)
-        self.mixed_keys_hint.setAlignment(QtCore.Qt.AlignCenter)
-        self.mixed_keys_hint.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
-        self.mixed_keys_hint.setToolTip("This enum has keys on different values")
-        self.mixed_keys_hint.setStyleSheet(
-            "color: {}; font-size: {}px; font-weight: bold; background: transparent;".format(
-                COLOR_ACCENT_LIGHT, wutil.DPI(12)
-            )
-        )
-        self.mixed_keys_hint.setFixedSize(wutil.DPI(10), wutil.DPI(10))
-        self.mixed_keys_hint.setVisible(self.has_mixed_key_values)
 
         # Keep layout space but make transparent
         self.pill_opacity = QtWidgets.QGraphicsOpacityEffect(self.pill_container)
         self.pill_container.setGraphicsEffect(self.pill_opacity)
         self.pill_opacity.setOpacity(0.0)
 
-    def resizeEvent(self, event):
-        if hasattr(self, "mixed_keys_hint"):
-            self.mixed_keys_hint.move(
-                self.width() - self.mixed_keys_hint.width() - wutil.DPI(2),
-                wutil.DPI(1),
-            )
-            self.mixed_keys_hint.raise_()
-        QtWidgets.QWidget.resizeEvent(self, event)
-
     def _set_popup_active(self, active):
         self._popup_active = bool(active)
         self._hover_active = self._popup_active or self.underMouse()
         self.update()
+
+    def _on_multi_checked(self, checked):
+        self._update_multi_checkbox_visibility()
+        self.update()
+        handler = getattr(
+            self.parent_dialog, "_on_attribute_multi_checked", None
+        )
+        if callable(handler):
+            handler(self, checked)
+
+    @staticmethod
+    def _multi_select_modifier_held():
+        return _multi_select_modifier_held()
+
+    def _update_multi_checkbox_visibility(self):
+        if not self.is_enum:
+            self.multi_checkbox.hide()
+            return
+        cursor_inside = self.rect().contains(
+            self.mapFromGlobal(QtGui.QCursor.pos())
+        )
+        should_show = self.multi_checkbox.isChecked() or (
+            cursor_inside and self._multi_select_modifier_held()
+        )
+        self.multi_checkbox.setVisible(should_show)
 
     def _update_numeric_ball_pos(self):
         if self.is_enum:
@@ -919,7 +1252,9 @@ class AttributeItem(QtWidgets.QWidget):
         # Draw row background as seen in reference
         rect = self.rect().adjusted(1, 1, -1, -1)
         bg_color = QtGui.QColor(COLOR_ACCENT_MAIN)
-        if self._hover_active:
+        if self.is_enum and self.multi_checkbox.isChecked():
+            bg_color = QtGui.QColor(COLOR_BLEND_MULTI)
+        elif self._hover_active:
             bg_color = QtGui.QColor(COLOR_ACCENT_WHITE)
 
         painter.setBrush(QtGui.QBrush(bg_color))
@@ -928,6 +1263,7 @@ class AttributeItem(QtWidgets.QWidget):
 
     def enterEvent(self, event):
         self._hover_active = True
+        self._update_multi_checkbox_visibility()
         self.update()
         if self.parent_dialog:
             self.parent_dialog._handle_attr_hover(self)
@@ -936,8 +1272,25 @@ class AttributeItem(QtWidgets.QWidget):
                 self.parent_dialog._update_interaction_state(True)
         QtWidgets.QWidget.enterEvent(self, event)
 
+    def mouseMoveEvent(self, event):
+        self._update_multi_checkbox_visibility()
+        QtWidgets.QWidget.mouseMoveEvent(self, event)
+
+    def mousePressEvent(self, event):
+        if (
+            event.button() == QtCore.Qt.LeftButton
+            and self.is_enum
+            and self.multi_checkbox.isVisible()
+        ):
+            self.multi_checkbox.toggle()
+            event.accept()
+            return
+        QtWidgets.QWidget.mousePressEvent(self, event)
+
     def leaveEvent(self, event):
         self._hover_active = self._popup_active
+        if not self.multi_checkbox.isChecked():
+            self.multi_checkbox.hide()
         self.update()
         if self.parent_dialog:
             self.parent_dialog._handle_attr_leave(self)
@@ -1124,8 +1477,6 @@ class TargetsList(QtWidgets.QListWidget):
 
 
 class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
-    UI_REVISION = 6
-
     """
     The main widget for the Attribute Switcher tool.
     """
@@ -1136,6 +1487,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         self._init_floating_window_behavior()
 
         self._active_popup = None
+        self._multi_switch_dialog = None
         self._popup_pending_item = None
         self._is_ui_hovered = False
         self._popup_timer = QtCore.QTimer(self)
@@ -1153,6 +1505,12 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
         self._active_switch_widgets = {}
         self._previous_selection = []
+        self._last_multi_modifier_state = None
+        self._modifier_poll_timer = QtCore.QTimer(self)
+        self._modifier_poll_timer.setInterval(40)
+        self._modifier_poll_timer.timeout.connect(
+            self._poll_multi_select_modifier
+        )
 
         self.refresh()
         saved_geom = self.controller.saved_geometry()
@@ -1172,7 +1530,56 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
     def _geometry_settings_namespace(self):
         return ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE
 
+    def showBottomBar(self):
+        """Pin the popup while preserving the visible attribute area."""
+        geometry_before = QtCore.QRect(self.geometry())
+        had_bottom_bar = bool(
+            self.bottomBar and wutil.is_valid_widget(self.bottomBar)
+        )
+        FloatingWidget.showBottomBar(self)
+        has_bottom_bar = bool(
+            self.bottomBar and wutil.is_valid_widget(self.bottomBar)
+        )
+        if had_bottom_bar or not has_bottom_bar:
+            return
+
+        bottom_layout = self.bottomBar.layout()
+        if bottom_layout:
+            bottom_layout.activate()
+        self.bottomBar.ensurePolished()
+        footer_height = max(
+            self.bottomBar.sizeHint().height(),
+            self.bottomBar.minimumSizeHint().height(),
+        )
+        if footer_height <= 0:
+            return
+
+        screen = QtGui.QGuiApplication.screenAt(geometry_before.center())
+        screen = screen or QtGui.QGuiApplication.primaryScreen()
+        target_height = geometry_before.height() + footer_height
+        target_y = geometry_before.y()
+        if screen is not None:
+            available = screen.availableGeometry()
+            margin = wutil.DPI(10)
+            target_height = min(
+                target_height, available.height() - (margin * 2)
+            )
+            max_bottom = available.bottom() - margin
+            overflow = target_y + target_height - 1 - max_bottom
+            if overflow > 0:
+                target_y = max(available.top() + margin, target_y - overflow)
+
+        self.setGeometry(
+            geometry_before.x(),
+            target_y,
+            geometry_before.width(),
+            target_height,
+        )
+        self.root_layout.invalidate()
+        self.root_layout.activate()
+
     def closeEvent(self, e):
+        self._close_multi_switch_dialog(clear_selection=True)
         self._disconnect_runtime_manager()
         self.controller.save_geometry(
             [self.pos().x(), self.pos().y(), self.width(), self.height()],
@@ -1338,9 +1745,19 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
+        if hasattr(self, "_modifier_poll_timer"):
+            self._last_multi_modifier_state = None
+            self._modifier_poll_timer.start()
+            self._poll_multi_select_modifier()
         if self._geometry_fit_pending:
             self._fit_to_available_screen()
             self._geometry_fit_pending = False
+
+    def hideEvent(self, event):
+        if hasattr(self, "_modifier_poll_timer"):
+            self._modifier_poll_timer.stop()
+            self._last_multi_modifier_state = None
+        super().hideEvent(event)
 
     def _create_selection_layout(self):
         """Builds the header area showing tool title and current status."""
@@ -1416,6 +1833,15 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
             if not is_active and self._active_popup and wutil.is_valid_widget(self._active_popup) and self._active_popup.isVisible():
                 if self._active_popup.frameGeometry().contains(cursor_pos):
                     is_active = True
+            multi_dialog = getattr(self, "_multi_switch_dialog", None)
+            if (
+                not is_active
+                and multi_dialog
+                and wutil.is_valid_widget(multi_dialog)
+                and multi_dialog.isVisible()
+                and multi_dialog.frameGeometry().contains(cursor_pos)
+            ):
+                is_active = True
 
         if not force and self._is_ui_hovered == is_active:
             return
@@ -1443,6 +1869,24 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
                     attr_item.val_label.setVisible(True)
             attr_item.update()
 
+    def _poll_multi_select_modifier(self):
+        """Refresh once whenever the directly queried Ctrl/Cmd state changes."""
+        if not self.isVisible():
+            self._last_multi_modifier_state = None
+            return
+        modifier_held = _multi_select_modifier_held()
+        if modifier_held == self._last_multi_modifier_state:
+            return
+        self._last_multi_modifier_state = modifier_held
+        self._refresh_multi_checkbox_visibility()
+
+    def _refresh_multi_checkbox_visibility(self):
+        if not self.isVisible():
+            return
+        for item, _options_map in self._active_switch_widgets.values():
+            if wutil.is_valid_widget(item):
+                item._update_multi_checkbox_visibility()
+
     def enterEvent(self, event):
         self._update_interaction_state(True)
         FloatingWidget.enterEvent(self, event)
@@ -1453,6 +1897,11 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         FloatingWidget.leaveEvent(self, event)
 
     def _handle_attr_hover(self, item):
+        if item._multi_select_modifier_held() or self._selected_multi_entries():
+            self._popup_timer.stop()
+            self._popup_pending_item = None
+            self._close_active_popup()
+            return
         self._popup_pending_item = item
         self._popup_timer.start()
 
@@ -1464,6 +1913,11 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
     def _show_pending_popup(self):
         """Displays the attribute choice popup beside the hovered row."""
+        if self._selected_multi_entries():
+            self._popup_pending_item = None
+            self._close_active_popup()
+            return
+
         # Keep the popup while the cursor is over it or an option drag is active.
         if not self._popup_pending_item or not wutil.is_valid_widget(self._popup_pending_item):
             popup = self._active_popup
@@ -1504,6 +1958,62 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         popup.hide()
         popup.deleteLater()
         self._active_popup = None
+
+    def _selected_multi_entries(self):
+        """Return checked enum rows and their option maps in display order."""
+        entries = []
+        for _key, (item, options_map) in self._active_switch_widgets.items():
+            if (
+                wutil.is_valid_widget(item)
+                and item.is_enum
+                and item.multi_checkbox.isChecked()
+            ):
+                entries.append((item, options_map))
+        return entries
+
+    def _on_attribute_multi_checked(self, item, checked):
+        """Update the staged multi-switch UI without changing the scene."""
+        self._popup_timer.stop()
+        self._popup_pending_item = None
+        self._close_active_popup()
+
+        entries = self._selected_multi_entries()
+        self._close_multi_switch_dialog(clear_selection=False)
+        if len(entries) < 2:
+            return
+
+        self._multi_switch_dialog = MultiAttributeSwitchDialog(self, entries)
+        anchor = item if checked and wutil.is_valid_widget(item) else entries[-1][0]
+        self._multi_switch_dialog.show_beside(anchor)
+        self._update_interaction_state(True, force=True)
+
+    def _close_multi_switch_dialog(self, clear_selection=False):
+        """Close the staged dialog and optionally clear all checked rows."""
+        dialog = getattr(self, "_multi_switch_dialog", None)
+        self._multi_switch_dialog = None
+        if dialog and wutil.is_valid_widget(dialog):
+            dialog.hide()
+            dialog.deleteLater()
+
+        if clear_selection:
+            for item, _options_map in self._selected_multi_entries():
+                item.multi_checkbox.blockSignals(True)
+                item.multi_checkbox.setChecked(False)
+                item.multi_checkbox.blockSignals(False)
+                item._update_multi_checkbox_visibility()
+                item.update()
+        self._update_interaction_state(self._is_cursor_within_bounds(), force=True)
+
+    def _apply_multi_switch(self, staged_entries, all_frames):
+        """Commit each staged channel option as one operation."""
+        requests = [
+            (option, item.enum_attr, options_map, all_frames)
+            for item, options_map, option in staged_entries
+            if option in options_map
+        ]
+        self._close_multi_switch_dialog(clear_selection=True)
+        if requests:
+            self.controller.apply_switches(requests)
 
     # =================================================================================
     #  8. HELPERS
@@ -1551,6 +2061,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
             self._request_geometry_fit()
             return
 
+        self._close_multi_switch_dialog(clear_selection=True)
         self._previous_selection = current_sel
         self._rebuild_active_widgets()
 
@@ -1593,7 +2104,8 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         display_name = self._format_object_name(target_nodes)
 
         attr_item = AttributeItem(
-            "{} {}".format(display_name, data["long"].title()),
+            display_name,
+            data["long"].title(),
             enum_name,
             target_nodes,
             data["objects"],

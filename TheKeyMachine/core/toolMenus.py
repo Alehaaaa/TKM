@@ -256,7 +256,9 @@ def build_declared_menu(definition, parent_widget=None):
                 _add_checkable_action(
                     menu,
                     choice.get("label", str(value)),
-                    partial(_apply_checked_value, setter, value),
+                    toolCommon.mark_non_tool_action(
+                        partial(_apply_checked_value, setter, value)
+                    ),
                     checked=value == current_value,
                     group=group,
                     description=choice.get("description", ""),
@@ -307,7 +309,9 @@ def _add_exclusive_setting_actions(menu, specs, current_value, setter, group_att
         _add_checkable_action(
             menu,
             label,
-            partial(_apply_checked_value, setter, value),
+            toolCommon.mark_non_tool_action(
+                partial(_apply_checked_value, setter, value)
+            ),
             checked=value == current_value,
             group=group,
             description=description,
@@ -420,7 +424,9 @@ def build_main_dock_menu(toolbar):
         ori_btn = _add_checkable_action(
             toolbar.dock_menu,
             name,
-            partial(_dock_toolbar, toolbar, orient=orient),
+            toolCommon.mark_non_tool_action(
+                partial(_dock_toolbar, toolbar, orient=orient)
+            ),
             checked=is_current,
             group=toolbar.pos_ac_group,
             description="Place the toolbar on the {} side.".format(name.lower()),
@@ -437,7 +443,9 @@ def build_main_dock_menu(toolbar):
         dock_btn = _add_checkable_action(
             toolbar.dock_menu,
             name,
-            partial(_dock_toolbar, toolbar, layout=layout),
+            toolCommon.mark_non_tool_action(
+                partial(_dock_toolbar, toolbar, layout=layout)
+            ),
             checked=is_current,
             group=toolbar.dock_ac_group,
             description="Dock the toolbar in {}.".format(name),
@@ -607,7 +615,7 @@ def _add_alignment_actions(menu, current_alignment, apply_alignment_fn, sections
         actions[label] = _add_checkable_action(
             menu,
             TOOLBAR_ALIGNMENT_LABEL % label,
-            partial(apply_align, a=label),
+            toolCommon.mark_non_tool_action(partial(apply_align, a=label)),
             checked=label == current_alignment,
             group=group,
             description=TOOLBAR_ALIGNMENT_DESC % label.lower(),
@@ -635,7 +643,7 @@ def _add_workspace_actions(menu, sections, apply_alignment_fn):
         _add_checkable_action(
             menu,
             label,
-            apply_ws,
+            toolCommon.mark_non_tool_action(apply_ws),
             checked=is_current,
             group=group,
             description="Apply the {} workspace.".format(ws["name"]),
@@ -977,7 +985,11 @@ def build_graph_settings_submenu(apply_alignment_fn):
     settings_menu.addAction(
         QtGui.QIcon(icons.close),
         "Close",
-        lambda: QtCore.QTimer.singleShot(0, lambda: graphToolbarApi.set_graph_toolbar_enabled(False)),
+        toolCommon.mark_non_tool_action(
+            lambda: QtCore.QTimer.singleShot(
+                0, lambda: graphToolbarApi.set_graph_toolbar_enabled(False)
+            )
+        ),
         description="Hide the TKM Graph Editor toolbar and keep it disabled.",
     )
     return settings_menu
@@ -993,7 +1005,9 @@ def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, mov
         dock_actions[position] = _add_checkable_action(
             dock_menu,
             label,
-            partial(_apply_checked_value, move_dock_fn, position),
+            toolCommon.mark_non_tool_action(
+                partial(_apply_checked_value, move_dock_fn, position)
+            ),
             group=dock_group,
             description=description,
         )

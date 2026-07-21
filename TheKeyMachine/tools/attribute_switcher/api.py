@@ -127,12 +127,6 @@ def close_attribute_switcher_window():
 def attribute_switcher_window(reuse_existing=True, popup=True, anchor_button=None):
     global _attribute_switcher_instance
     dlg = get_attribute_switcher_window()
-    expected_revision = getattr(AttributeSwitcherWindow, "UI_REVISION", None)
-    if dlg and getattr(dlg, "UI_REVISION", None) != expected_revision:
-        dlg.close()
-        dlg.deleteLater()
-        _attribute_switcher_instance = None
-        dlg = None
     if not (reuse_existing and dlg and wutil.is_valid_widget(dlg)):
         close_attribute_switcher_window()
         dlg = AttributeSwitcherWindow(parent=wutil.get_maya_qt(qt=QtWidgets.QWidget), popup=popup)

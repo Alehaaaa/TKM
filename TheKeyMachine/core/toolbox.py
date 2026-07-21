@@ -376,11 +376,14 @@ def get_tool(tool_id, **overrides):
         )
 
     callback = tool.get("callback")
-    if callback:
-        if getattr(callback, "__name__", None) != tool_id:
-            tool["callback"] = trigger.make_command_callback(tool_id, callback)
-        elif not getattr(callback, "_tkm_trigger_proxy", False):
-            trigger.register_command(tool_id, callback)
+    if callback and not (
+        getattr(callback, "_tkm_trigger_proxy", False)
+        or getattr(callback, "_tkm_tool_dispatch", False)
+    ):
+        # Every surface executes the registered command. Keeping same-named API
+        # callbacks direct used to give toolbar/menu clicks a different
+        # progress, undo, and refresh path than hotkeys and shelf buttons.
+        tool["callback"] = trigger.make_command_callback(tool_id, callback)
     return tool
 
 

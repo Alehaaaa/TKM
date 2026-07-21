@@ -118,12 +118,16 @@ def _emit_gimbal_fixer_window_state(is_open):
         pass
 
 
-class GimbalFixerWindow(customDialogs.QFlatToolBarDialog):
-    def __init__(self, parent=None):
+class GimbalFixerWindow(
+    toolCommon.FloatingToolWindowMixin,
+    customDialogs.QFlatToolBarPopupDialog,
+):
+    def __init__(self, parent=None, popup=True):
         self.title = "Gimbal Fixer"
         self.icon = icons.reblock
         self.COLOR_BG_TRACK = self.DARK_BG_COLOR
-        super().__init__(parent=parent, popup=False, closeButton=True)
+        self._pinned = not popup
+        super().__init__(parent=parent, popup=popup, closeButton=False)
 
         self.setObjectName(WINDOW_NAME)
         self.setMinimumWidth(wutil.DPI(310))
@@ -148,17 +152,51 @@ class GimbalFixerWindow(customDialogs.QFlatToolBarDialog):
             self.order_buttons.append(button)
             self.mainLayout.addWidget(button)
 
+        self._set_action_bar(include_close=not popup)
+        self._connect_runtime_manager()
+        self.refresh()
+
+    def _set_action_bar(self, include_close):
         self.setBottomBar(
             buttons=[
                 customDialogs.QFlatDialogButton("Apply Best", callback=self.apply_best_order, icon=icons.apply, highlight=True),
             ],
-            closeButton=True,
+            closeButton=include_close,
             margins=0,
             spacing=2,
             highlight="Apply Best",
         )
-        self._connect_runtime_manager()
-        self.refresh()
+
+    def set_popup_mode(self, popup):
+        """Restore transient or pinned presentation when reusing the window."""
+        self._popup = bool(popup)
+        self._pinned = not popup
+        self._opened = False
+        self._set_action_bar(include_close=not popup)
+
+    def _pin_after_reposition(self):
+        if self._pinned:
+            return
+        self._pinned = True
+        self._popup = False
+        self._set_action_bar(include_close=True)
+
+    def mouseReleaseEvent(self, event):
+        was_dragging = self._is_dragging
+        drag_start = QtCore.QPoint(self._drag_start_pos)
+        global_position = wutil.event_global_pos(event)
+        super().mouseReleaseEvent(event)
+        if (
+            was_dragging
+            and (global_position - drag_start).manhattanLength() > wutil.DPI(10)
+        ):
+            self._pin_after_reposition()
+
+    def changeEvent(self, event):
+        if self._pinned:
+            customDialogs.QFlatToolBarDialog.changeEvent(self, event)
+            return
+        super().changeEvent(event)
 
     def _connect_runtime_manager(self):
         if self._callbacks_connected:
@@ -266,22 +304,29 @@ def close_gimbal_fixer_window():
         _emit_gimbal_fixer_window_state(False)
 
 
-def show_gimbal_fixer_window():
+def show_gimbal_fixer_window(anchor_button=None, popup=True):
     global _gimbal_fixer_window
     existing = existing_gimbal_fixer_window()
     if existing:
+        existing.set_popup_mode(popup)
         existing._connect_runtime_manager()
         existing.refresh()
-        existing.show()
-        existing.raise_()
-        existing.activateWindow()
+        if anchor_button and wutil.is_valid_widget(anchor_button):
+            existing.present_above_toolbar_button(anchor_button)
+        elif popup:
+            existing.present_beside_cursor()
+        else:
+            existing.present_floating_window()
         _emit_gimbal_fixer_window_state(True)
         return existing
 
     if cmds.window(WINDOW_NAME, exists=True):
         cmds.deleteUI(WINDOW_NAME)
 
-    window = GimbalFixerWindow(parent=wutil.get_maya_qt(qt=QtWidgets.QWidget))
+    window = GimbalFixerWindow(
+        parent=wutil.get_maya_qt(qt=QtWidgets.QWidget),
+        popup=popup,
+    )
     _gimbal_fixer_window = window
 
     def _on_destroyed(*_):
@@ -290,9 +335,12 @@ def show_gimbal_fixer_window():
         _emit_gimbal_fixer_window_state(False)
 
     window.destroyed.connect(_on_destroyed)
-    window.show()
-    window.raise_()
-    window.activateWindow()
+    if anchor_button and wutil.is_valid_widget(anchor_button):
+        window.present_above_toolbar_button(anchor_button)
+    elif popup:
+        window.present_beside_cursor()
+    else:
+        window.present_floating_window()
     _emit_gimbal_fixer_window_state(True)
 
     if not selectionMod.get_selected_objects():
@@ -303,7 +351,10 @@ def show_gimbal_fixer_window():
 
 gimbal_fixer_toolbar_toggle = toolCommon.ToolbarWindowToggle(
     is_gimbal_fixer_window_open,
-    show_gimbal_fixer_window,
+    lambda anchor_button=None: show_gimbal_fixer_window(
+        anchor_button=anchor_button,
+        popup=True,
+    ),
     close_gimbal_fixer_window,
     gimbal_fixer_window_bus.stateChanged,
 )

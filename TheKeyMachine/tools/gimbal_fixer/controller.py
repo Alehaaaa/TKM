@@ -60,45 +60,60 @@ def convert_rotation_order(rot_order="zxy"):
     for obj in selection:
         rotate_keys = cmds.keyframe(obj, attribute="rotate", query=True, timeChange=True)
         if rotate_keys:
-            key_times[obj] = list(set(rotate_keys))
+            key_times[obj] = set(rotate_keys)
             previous_orders[obj] = ROTATE_ORDERS[cmds.getAttr(obj + ".rotateOrder")]
-            all_key_times.extend(rotate_keys)
+            all_key_times.extend(key_times[obj])
             keyed_objects.append(obj)
         else:
             unkeyed_objects.append(obj)
 
+    keyed_work = sum(len(key_times[obj]) for obj in keyed_objects)
+    progress_total = keyed_work * 2 + len(keyed_objects) + len(unkeyed_objects)
     with toolCommon.tool_operation(
         tool_id="gimbal_fixer",
         label="Gimbal Fixer",
-        progress=False,
+        progress=True,
+        progress_max=max(1, progress_total),
         undo=True,
         suspend_refresh=False,
-    ):
+    ) as operation:
         if keyed_objects:
             all_key_times = sorted(set(all_key_times))
             with toolCommon.suspend_maya_refresh():
                 for frame in all_key_times:
+                    if operation.cancelled:
+                        break
                     cmds.currentTime(frame, edit=True)
                     for obj in keyed_objects:
                         if frame in key_times[obj]:
                             cmds.setKeyframe(obj, attribute="rotate")
+                            operation.step()
 
                 for frame in all_key_times:
+                    if operation.cancelled:
+                        break
                     cmds.currentTime(frame, edit=True)
                     for obj in keyed_objects:
                         if frame in key_times[obj]:
                             cmds.xform(obj, preserve=True, rotateOrder=rot_order)
                             cmds.setKeyframe(obj, attribute="rotate")
                             cmds.xform(obj, preserve=False, rotateOrder=previous_orders[obj])
+                            operation.step()
 
                 cmds.currentTime(current_time, edit=True)
 
                 for obj in keyed_objects:
+                    if operation.cancelled:
+                        break
                     cmds.xform(obj, preserve=False, rotateOrder=rot_order)
                     cmds.filterCurve(obj)
+                    operation.step()
 
         for obj in unkeyed_objects:
+            if operation.cancelled:
+                break
             cmds.xform(obj, preserve=True, rotateOrder=rot_order)
+            operation.step()
 
 import math
 

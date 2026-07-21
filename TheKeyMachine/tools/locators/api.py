@@ -2,6 +2,7 @@ from maya import cmds
 
 import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.tools import common as toolCommon
 
 
 def create_locator(*_args):
@@ -14,7 +15,12 @@ def create_locator(*_args):
         cmds.group(empty=True, name="temp_locators")
         cmds.parent("temp_locators", "TheKeyMachine")
 
+    operation = toolCommon.current_tool_operation()
+    if operation is not None:
+        operation.set_total(len(selection)).set_status("Creating Locators")
     for index, obj in enumerate(selection):
+        if operation is not None and operation.cancelled:
+            break
         locator = cmds.spaceLocator()[0]
         cmds.matchTransform(locator, obj)
         cmds.setAttr(locator + ".overrideEnabled", 1)
@@ -23,6 +29,8 @@ def create_locator(*_args):
             cmds.setAttr(locator + ".localScale" + axis, 5)
         locator = cmds.rename(locator, "tkm_temp_locator_{}".format(index))
         cmds.parent(locator, "temp_locators")
+        if operation is not None:
+            operation.step()
     cmds.select(selection)
 
 

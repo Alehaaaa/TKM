@@ -401,10 +401,20 @@ class MenuWidget(QtWidgets.QMenu):
 
     def _menu_at_global_pos(self, pos):
         widget = QtWidgets.QApplication.widgetAt(pos)
+        visited = set()
         while widget:
+            widget_id = id(widget)
+            if widget_id in visited:
+                break
+            visited.add(widget_id)
             if isinstance(widget, QtWidgets.QMenu):
                 return widget
-            widget = widget.parentWidget()
+            parent_widget = getattr(widget, "parentWidget", None)
+            if callable(parent_widget):
+                widget = parent_widget()
+                continue
+            parent = getattr(widget, "parent", None)
+            widget = parent() if callable(parent) else None
         for widget in QtWidgets.QApplication.topLevelWidgets():
             if isinstance(widget, QtWidgets.QMenu) and widget.isVisible() and widget.frameGeometry().contains(pos):
                 return widget
@@ -2508,6 +2518,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         tooltip=None,
         tooltip_enabled=True,
         pinnable=True,
+        icon=None,
+        command_icon=None,
     ):
         """Add a widget to the section with a toggle key."""
         widget_help = self._widget_help_data(widget)
@@ -2552,6 +2564,8 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     "label": label,
                     "description": description,
                     "tooltip": tooltip,
+                    "icon": icon,
+                    "command_icon": command_icon or icon,
                     "tooltip_enabled": tooltip_enabled,
                     "default": default,
                     "stable_help": hasattr(widget, "_tkm_default_mode_key"),

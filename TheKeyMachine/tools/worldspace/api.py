@@ -88,16 +88,17 @@ def worldspace_copy_animation(*args):
 
 
 def paste_worldspace_single_frame(*args):
+    operation_manager = None
     operation_context = None
     tint_session = None
     try:
-        operation_context = toolCommon.tool_operation(
+        operation_manager = toolCommon.tool_operation(
             tool_id="ws_paste_frame",
             label="Paste World Space Frame",
             progress=False,
             undo=True,
         )
-        operation_context.__enter__()
+        operation_context = operation_manager.__enter__()
 
         # Load from clipboard
         payload = clipboard.load(
@@ -163,6 +164,8 @@ def paste_worldspace_single_frame(*args):
         if source_count > 1 and target_count != source_count:
             return wutil.make_inViewMessage(selection_mismatch_message)
 
+        operation_context.set_total(len(target_objects))
+
         def _first_frame_values(obj_name):
             obj_data = animation_data.get(obj_name) or {}
             if not isinstance(obj_data, dict) or not obj_data:
@@ -176,27 +179,33 @@ def paste_worldspace_single_frame(*args):
             if not values:
                 return wutil.make_inViewMessage("No World Space data found")
             for obj in target_objects:
+                if operation_context.cancelled:
+                    return
                 if cmds.objExists(obj):
                     _apply_worldspace_values(obj, values)
+                operation_context.step()
             return
 
         # Multi-source: paste in order (source[0]->target[0], ...)
         for idx, target_obj in enumerate(target_objects):
+            if operation_context.cancelled:
+                return
             source_obj = ordered_sources[idx]
             values = _first_frame_values(source_obj)
             if not values:
                 return wutil.make_inViewMessage("No World Space data found")
             if cmds.objExists(target_obj):
                 _apply_worldspace_values(target_obj, values)
+            operation_context.step()
 
         return
 
     finally:
         if tint_session:
             tint_session.finish()
-        if operation_context:
+        if operation_manager and operation_context is not None:
             try:
-                operation_context.__exit__(None, None, None)
+                operation_manager.__exit__(None, None, None)
             except Exception:
                 pass
 

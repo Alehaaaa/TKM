@@ -18,12 +18,21 @@ def match_keys(*_args):
     if not source_values:
         return wutil.make_inViewMessage("No source keys found")
     source_times = {time for time, _value in source_values}
-    with _operation("graph_match_keys", "Match Curves"):
+    with _operation("graph_match_keys", "Match Curves") as operation:
+        operation.set_total(len(curves) - 1)
         for curve in curves[:-1]:
-            for frame in set(animation_context.key_times(curve, target_info)) - source_times:
-                cmds.cutKey(curve, time=(frame, frame), clear=True)
+            if operation.cancelled:
+                return
+            extra_frames = set(animation_context.key_times(curve, target_info)) - source_times
+            if extra_frames:
+                cmds.cutKey(
+                    curve,
+                    time=[(frame, frame) for frame in sorted(extra_frames)],
+                    clear=True,
+                )
             for time, value in source_values:
                 cmds.setKeyframe(curve, time=(time,), value=value)
+            operation.step()
 
 
 def flip_curves(*_args):

@@ -1,9 +1,5 @@
-import os
-
-
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
-import TheKeyMachine.mods.generalMod as general
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.selectionMod as selectionMod
@@ -275,22 +271,16 @@ def _place_selection_sets_window_default(win):
     )
 
 
-def _selection_sets_quick_file():
-    quick_dir = os.path.join(general.config["USER_FOLDER_PATH"], "TheKeyMachine_user_data", "selection_sets")
-    os.makedirs(quick_dir, exist_ok=True)
-    return os.path.join(quick_dir, "quick_selection_sets.json")
-
-
 def quick_import_selection_sets(controller=None):
     controller = _resolve_toolbar_controller(controller)
     if controller:
-        controller.import_sets(_selection_sets_quick_file())
+        controller.import_sets(quick=True)
 
 
 def quick_export_selection_sets(controller=None):
     controller = _resolve_toolbar_controller(controller)
     if controller:
-        controller.export_sets(_selection_sets_quick_file())
+        controller.export_sets(quick=True)
 
 
 def import_selection_sets(controller=None):
@@ -351,13 +341,13 @@ def build_selection_sets_context_menu(parent=None, controller=None):
         QtGui.QIcon(icons.selection_sets_import),
         "Quick Import",
         description="Import selection sets from the shared quick file.",
-    ).triggered.connect(lambda *_: controller and controller.import_sets(_selection_sets_quick_file()))
+    ).triggered.connect(lambda *_: controller and controller.import_sets(quick=True))
 
     menu.addAction(
         QtGui.QIcon(icons.selection_sets_export),
         "Quick Export",
         description="Export selection sets to the shared quick file, overwriting it.",
-    ).triggered.connect(lambda *_: controller and controller.export_sets(_selection_sets_quick_file()))
+    ).triggered.connect(lambda *_: controller and controller.export_sets(quick=True))
 
     menu.addAction(
         QtGui.QIcon(icons.selection_sets_import),

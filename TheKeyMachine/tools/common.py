@@ -77,6 +77,7 @@ class AdaptiveProgress(object):
         self._cancelled = False
         self.exclude_from_estimates = False
         self._last_status_update_ms = -1
+        self._last_progress_update_ms = -1
         self._last_status_label = self.label
         self._timer = QtCore.QElapsedTimer()
         self._timer.start()
@@ -159,12 +160,25 @@ class AdaptiveProgress(object):
             )
             self._active = True
             self._last_status_update_ms = self._timer.elapsed()
+            self._last_progress_update_ms = self._last_status_update_ms
             self._status_timer.start()
         except Exception:
             self._bar = None
 
     def start(self):
+        was_active = self._active
         self._ensure_started(force=True)
+        if was_active or not self._active:
+            return
+        # Synchronous Maya commands can block the event loop immediately after
+        # beginProgress. Flush one paint pass so an explicitly started standard
+        # tool operation is visible before its work begins.
+        try:
+            app = QtCore.QCoreApplication.instance()
+            if app is not None:
+                app.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+        except Exception:
+            pass
 
     def _status_text(self):
         title = format_tool_label(self.label)
@@ -176,8 +190,10 @@ class AdaptiveProgress(object):
                     return "{}... about {}".format(title, eta)
             elapsed = max(0, int(round(elapsed_seconds)))
             if elapsed:
-                return "{}... {} seconds elapsed".format(title, elapsed)
-            return "{}...".format(title)
+                return "{}... estimating time ({} seconds elapsed)".format(
+                    title, elapsed
+                )
+            return "{}... estimating time".format(title)
         eta = ""
         if self.value > 0:
             elapsed_seconds = max(0.001, self._timer.elapsed() / 1000.0)
@@ -206,6 +222,14 @@ class AdaptiveProgress(object):
             if status:
                 self.label = status
             now = self._timer.elapsed()
+            progress_due = (
+                status
+                or self._last_progress_update_ms < 0
+                or now - self._last_progress_update_ms >= 50
+                or (self.max_value and self.value >= self.max_value)
+            )
+            if not progress_due:
+                return self._cancelled
             status_due = (
                 status
                 or self._last_status_update_ms < 0
@@ -218,6 +242,7 @@ class AdaptiveProgress(object):
                 self._last_status_update_ms = now
                 self._last_status_label = self.label
             cmds.progressBar(self._bar, **kwargs)
+            self._last_progress_update_ms = now
             self._cancelled = bool(cmds.progressBar(self._bar, query=True, isCancelled=True))
         except Exception:
             self._cancelled = False
@@ -435,24 +460,25 @@ def tool_operation(
     progress_obj = None
     owns_progress = False
     estimate_key = str(tool_id or label or "Processing")
-    if progress:
-        if parent_operation and parent_operation.progress:
-            progress_obj = parent_operation.progress
-            if progress_max:
-                progress_obj.set_total(progress_max, reset=True)
-            if label:
-                progress_obj.set_status(label)
-        else:
-            progress_obj = AdaptiveProgress(
-                label or humanize_tool_name(tool_id) or "Processing",
-                progress_max,
-                interruptable=interruptable,
-                show_after_ms=200,
-                min_steps=10,
-                update_interval_ms=1000,
-                estimated_seconds=_TOOL_DURATION_ESTIMATES.get(estimate_key),
-            )
-            owns_progress = True
+    if parent_operation and parent_operation.progress:
+        # A nested helper must keep using the standard dispatched operation,
+        # even when it would not create a standalone progress display itself.
+        progress_obj = parent_operation.progress
+        if progress_max:
+            progress_obj.set_total(progress_max, reset=True)
+        if label:
+            progress_obj.set_status(label)
+    elif progress:
+        progress_obj = AdaptiveProgress(
+            label or humanize_tool_name(tool_id) or "Processing",
+            progress_max,
+            interruptable=interruptable,
+            show_after_ms=200,
+            min_steps=10,
+            update_interval_ms=1000,
+            estimated_seconds=_TOOL_DURATION_ESTIMATES.get(estimate_key),
+        )
+        owns_progress = True
     tint_session = _begin_operation_tint(
         tint=tint,
         timerange=timerange,
@@ -488,6 +514,8 @@ def tool_operation(
                 )
                 operation.undo_chunk_opened = bool(chunk_opened)
         with progress_obj if owns_progress else _null_context():
+            if progress_obj:
+                progress_obj.start()
             yield operation
         operation_completed = True
             
@@ -602,12 +630,21 @@ def run_tool_callback(button, callback, *args, **kwargs):
         return callback(*args, **call_kwargs)
 
     non_tool_action = bool(getattr(callback, "_tkm_non_tool_action", False))
+    policy = None
+    if tool_id and not non_tool_action:
+        try:
+            from TheKeyMachine.core import trigger
+
+            policy = trigger.operation_policy(tool_id)
+        except Exception:
+            policy = None
     with tool_operation(
         tool_id=tool_id,
         label=label,
         anchor_widget=button,
-        progress=not non_tool_action,
-        undo=not non_tool_action,
+        progress=(policy.progress if policy is not None else not non_tool_action),
+        undo=(policy.undo if policy is not None else not non_tool_action),
+        suspend_refresh=(policy.suspend_refresh if policy is not None else True),
     ) as operation:
         call_kwargs = dict(kwargs)
         call_kwargs.setdefault("anchor_widget", button)

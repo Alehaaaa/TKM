@@ -523,6 +523,8 @@ def build_slider_section(
             default=slot_key in default_keys,
             description=desc,
             tooltip=mode.tooltip,
+            icon=mode_data.get("icon"),
+            command_icon=mode_data.get("icon"),
         )
 
     section._default_keys = default_keys

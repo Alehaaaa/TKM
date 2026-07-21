@@ -4,7 +4,13 @@
   "smart_key_all": ["Set keys on every keyable scalar channel of the selected objects."],
   "euler_filter": ["Apply the smart Euler filter to rotation curves in the active animation context."],
   "snap": ["Move sub-frame keys onto whole frames. When the destination already has a key, keep it and merge the sub-frame key into it.", {"movie": "snap"}],
-  "clear_animation": ["Delete animation keys in the active key, channel, object, or time-range context.", {"movie": "delete_all_animation"}],
+  "clear_animation": [
+    "Delete all animation from the selected objects when no narrower animation selection is active.",
+    {"movie": "delete_all_animation"},
+    {"separator": true},
+    "Selection mode deletes only the active Graph Editor keys, Channel Box channels, or Time Slider range.",
+    {"movie": "delete_all_animation_selection"}
+  ],
   "crop": ["Keep keys inside the active range and remove keys outside it."],
   "remove_redundant": ["Remove redundant keys using the mode selected from the right-click menu."],
   "remove_redundant_flat": ["Remove only interior keys from flat-value runs. Non-flat motion keys are left untouched."],

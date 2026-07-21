@@ -358,14 +358,18 @@ def _driver_matrix(pivot):
     return _set_matrix_translation(matrix_value, _world_rotate_pivot(pivot))
 
 
-def _relative_matrices(pivot, selection):
+def _relative_matrices(pivot, selection, operation=None):
     pivot_matrix = _driver_matrix(pivot)
     pivot_inverse = pivot_matrix.inverse()
     result = {}
     for node in selection:
         if not cmds.objExists(node):
+            if operation is not None:
+                operation.step()
             continue
         result[node] = _matrix_list(_mmatrix(_matrix(node)) * pivot_inverse)
+        if operation is not None:
+            operation.step()
     return result
 
 
@@ -580,18 +584,24 @@ def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False
     if not selection:
         return wutil.make_inViewMessage("Select at least one object")
 
+    if worldspace:
+        placement_mode = PLACEMENT_WORLDSPACE
+    elif centered:
+        placement_mode = PLACEMENT_CENTERED
+    elif last_object:
+        placement_mode = PLACEMENT_LAST_OBJECT
+    else:
+        placement_mode = PLACEMENT_ORIGINAL
+
+    operation = toolCommon.current_tool_operation()
+    driven_selection = _driven_selection(selection, placement_mode)
+    if operation is not None:
+        operation.set_total(len(driven_selection) + 3).set_status(
+            "Setting Up Temp Pivot"
+        )
     open_chunk = False
     try:
         open_chunk = toolCommon.open_undo_chunk()
-
-        if worldspace:
-            placement_mode = PLACEMENT_WORLDSPACE
-        elif centered:
-            placement_mode = PLACEMENT_CENTERED
-        elif last_object:
-            placement_mode = PLACEMENT_LAST_OBJECT
-        else:
-            placement_mode = PLACEMENT_ORIGINAL
 
         pivot = _ensure_pivot_node()
         _session["suppress"] = True
@@ -604,8 +614,12 @@ def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False
                 selection,
                 placement_mode=placement_mode,
             )
+            if operation is not None:
+                operation.step()
             origin_matrix = _matrix(pivot)
             recovered_offset = _apply_session_offset(pivot, selection, placement_mode)
+            if operation is not None:
+                operation.step()
         finally:
             _session["suppress"] = False
 
@@ -613,7 +627,11 @@ def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False
             {
                 "active": True,
                 "selection": list(selection),
-                "relative_matrices": _relative_matrices(pivot, _driven_selection(selection, placement_mode)),
+                "relative_matrices": _relative_matrices(
+                    pivot,
+                    _driven_selection(selection, placement_mode),
+                    operation=operation,
+                ),
                 "placement_mode": placement_mode,
                 "worldspace_matrix": _matrix(pivot) if placement_mode == PLACEMENT_WORLDSPACE else None,
                 "worldspace_origin_matrix": origin_matrix if placement_mode == PLACEMENT_WORLDSPACE else None,
@@ -628,6 +646,8 @@ def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False
             _enter_pivot_edit_mode(pivot)
         _sync_time_slider_to_original_selection()
         _emit_temp_pivot_state_changed()
+        if operation is not None:
+            operation.step()
 
     except Exception as exc:
         try:

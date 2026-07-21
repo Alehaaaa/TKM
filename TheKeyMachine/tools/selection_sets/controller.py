@@ -1,13 +1,12 @@
-import json
-import os
 import re
 
 from maya import cmds
 
-from TheKeyMachine.core.Qt import QtCore, QtWidgets
+from TheKeyMachine.core.Qt import QtCore
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.tools import clipboard, common as toolCommon
 from TheKeyMachine.tools.selection_sets import api as selectionSetsApi
 from TheKeyMachine.widgets import util as wutil
 
@@ -70,54 +69,117 @@ class SelectionSetsController:
     def __init__(self, owner=None):
         self.owner = owner
 
-    def export_sets(self, file_path=None, *args):
-        if not file_path:
-            file_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Export Sets", "", "JSON Files (*.json);;All Files (*)")
+    def export_sets(self, file_path=None, *args, **kwargs):
+        operation = toolCommon.current_tool_operation()
+        if operation is not None:
+            return self._export_sets(operation, file_path, *args, **kwargs)
+        with toolCommon.tool_operation(
+            tool_id="selection_sets_export",
+            label="Export Selection Sets",
+            undo=False,
+        ) as operation:
+            return self._export_sets(operation, file_path, *args, **kwargs)
 
-        if not file_path:
-            return
+    def _export_sets(self, operation, file_path=None, *args, **kwargs):
+        quick = bool(kwargs.get("quick", False))
+        direct_sets = self._get_direct_selection_sets()
+        grouped_sets = []
+        for set_group in self.get_set_groups():
+            sub_sets = [
+                sub_set
+                for sub_set in (cmds.sets(set_group, q=True) or [])
+                if cmds.objExists(sub_set)
+            ]
+            grouped_sets.append((set_group, sub_sets))
+
+        item_total = len(direct_sets) + sum(
+            len(sub_sets) for _group, sub_sets in grouped_sets
+        )
+        if operation is not None:
+            operation.set_total(max(1, item_total + 1)).set_status(
+                "Exporting Selection Sets"
+            )
 
         set_data = {"sets": [], "set_groups": []}
-
-        for subset in self._get_direct_selection_sets():
+        for subset in direct_sets:
+            if operation is not None and operation.cancelled:
+                return
             set_data["sets"].append(self._serialize_selection_set(subset))
+            if operation is not None:
+                operation.step()
 
-        for set_group in self.get_set_groups():
+        for set_group, sub_sel_sets in grouped_sets:
             set_group_data = {"name": set_group.replace(SET_GROUP_SUFFIX, ""), "sets": []}
-            sub_sel_sets = cmds.sets(set_group, q=True) or []
             for sub_sel_set in sub_sel_sets:
-                if cmds.objExists(sub_sel_set):
-                    set_group_data["sets"].append(self._serialize_selection_set(sub_sel_set))
+                if operation is not None and operation.cancelled:
+                    return
+                set_group_data["sets"].append(self._serialize_selection_set(sub_sel_set))
+                if operation is not None:
+                    operation.step()
             if set_group_data["sets"]:
                 set_data["set_groups"].append(set_group_data)
 
-        export_dir = os.path.dirname(file_path)
-        if export_dir:
-            os.makedirs(export_dir, exist_ok=True)
+        clipboard.save("selection_sets", set_data)
+        if operation is not None:
+            operation.step()
+        if quick:
+            return clipboard.path("selection_sets")
+        if file_path:
+            return clipboard.export_to(
+                "selection_sets", file_path, operation=operation
+            )
+        return clipboard.export_dialog(
+            "selection_sets", "Export Selection Sets", operation=operation
+        )
 
-        with open(file_path, "w") as file:
-            json.dump(set_data, file, indent=4)
+    def import_sets(self, file_path=None, *args, **kwargs):
+        operation = toolCommon.current_tool_operation()
+        if operation is not None:
+            return self._import_sets(operation, file_path, *args, **kwargs)
+        with toolCommon.tool_operation(
+            tool_id="selection_sets_import",
+            label="Import Selection Sets",
+            undo=True,
+        ) as operation:
+            return self._import_sets(operation, file_path, *args, **kwargs)
 
-    def import_sets(self, file_path=None, *args):
-        if not file_path:
-            file_path, _ = QtWidgets.QFileDialog.getOpenFileName(None, "Import Sets", "", "JSON Files (*.json);;All Files (*)")
-
-        if not file_path:
+    def _import_sets(self, operation, file_path=None, *args, **kwargs):
+        quick = bool(kwargs.get("quick", False))
+        if quick:
+            set_data = clipboard.load(
+                "selection_sets", "Selection sets quick file not found"
+            )
+        elif file_path:
+            set_data = clipboard.import_from(
+                "selection_sets", file_path, operation=operation
+            )
+        else:
+            set_data = clipboard.import_dialog(
+                "selection_sets", "Import Selection Sets", operation=operation
+            )
+        if not set_data:
             return
 
-        if not os.path.isfile(file_path):
-            wutil.make_inViewMessage("Selection sets file not found")
-            return
-
-        with open(file_path, "r") as file:
-            set_data = json.load(file)
+        direct_sets = set_data.get("sets", [])
+        grouped_sets = set_data.get("set_groups", [])
+        item_total = len(direct_sets) + sum(
+            len(group.get("sets", [])) for group in grouped_sets
+        )
+        if operation is not None:
+            operation.set_total(max(1, item_total + 1), reset=True).set_status(
+                "Importing Selection Sets"
+            )
 
         sel_set_name = self._ensure_selection_sets_root()
 
-        for set_info in set_data.get("sets", []):
+        for set_info in direct_sets:
+            if operation is not None and operation.cancelled:
+                return
             self._import_selection_set(set_info, sel_set_name)
+            if operation is not None:
+                operation.step()
 
-        for set_group_data in set_data.get("set_groups", []):
+        for set_group_data in grouped_sets:
             set_group_name = set_group_data["name"]
             set_group_name_with_suffix = f"{set_group_name}{SET_GROUP_SUFFIX}"
 
@@ -126,8 +188,14 @@ class SelectionSetsController:
                 cmds.sets(set_group_name_with_suffix, add=sel_set_name)
 
             for set_info in set_group_data.get("sets", []):
+                if operation is not None and operation.cancelled:
+                    return
                 self._import_selection_set(set_info, set_group_name_with_suffix)
+                if operation is not None:
+                    operation.step()
 
+        if operation is not None:
+            operation.step()
         QtCore.QTimer.singleShot(500, selectionSetsApi.refresh_selection_sets_window)
 
     def rename_setgroup(self, old_setgroup_name, new_setgroup_name, *args):

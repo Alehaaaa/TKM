@@ -260,15 +260,19 @@ def set_orbit_stay_on_top(enabled: bool):
         win.apply_stay_on_top_setting()
 
 def restore_orbit_default_position():
-    """Reset the floating Orbit window to its default geometry."""
+    """Clear saved geometry without changing the Orbit window's open state."""
     settings.set_setting(
         "orbit_geometry",
         None,
         namespace=ORBIT_SETTINGS_NAMESPACE,
     )
     win = get_orbit_window()
-    if win and wutil.is_valid_widget(win):
-        win.present_above_toolbar_button(orbit_toolbar_toggle.anchor_button())
+    if win and wutil.is_valid_widget(win) and win.isVisible():
+        placed = win.move_above_toolbar_button(
+            orbit_toolbar_toggle.anchor_button()
+        )
+        if not placed:
+            win.move_beside_cursor()
 
 def build_orbit_context_menu(parent=None):
     menu = cw.OpenMenuWidget(parent)

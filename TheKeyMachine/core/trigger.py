@@ -36,8 +36,12 @@ def _policy_from_definition(command_name: str, definition, callback: Optional[Ca
         )
     if getattr(callback, "_tkm_non_tool_action", False):
         return OperationPolicy(progress=False, undo=False)
-    interactive = (definition or {}).get("type") == "menu" or command_name.endswith(("_menu", "_window"))
-    return OperationPolicy(progress=not interactive, undo=not interactive)
+    definition_type = (definition or {}).get("type")
+    is_tool_operation = (
+        definition_type in (None, "tool")
+        and not command_name.endswith(("_menu", "_window"))
+    )
+    return OperationPolicy(progress=is_tool_operation, undo=is_tool_operation)
 
 
 def register_command(name: str, callback: Callable, policy: Optional[OperationPolicy] = None) -> Callable:
@@ -143,7 +147,11 @@ def _register_slider_section(section_id: str, section) -> None:
             continue
         for value in SLIDER_BUTTON_VALUES:
             command_name = slider_command_name(prefix, mode_key, value)
-            register_command(command_name, _slider_callback(execute, mode_key, value))
+            register_command(
+                command_name,
+                _slider_callback(execute, mode_key, value),
+                policy=OperationPolicy(progress=False, undo=False),
+            )
 
 
 def _slider_callback(execute: Callable, mode: str, value: int) -> Callable:
@@ -178,6 +186,12 @@ def list_commands() -> list[str]:
 def has_command(name: str) -> bool:
     _discover_commands()
     return name in _COMMANDS
+
+
+def operation_policy(name: str) -> OperationPolicy:
+    """Return the standardized execution policy for a registered command."""
+    _discover_commands()
+    return _COMMAND_POLICIES.get(name) or OperationPolicy()
 
 
 def command_name_for_callback(callback: Callable) -> Optional[str]:

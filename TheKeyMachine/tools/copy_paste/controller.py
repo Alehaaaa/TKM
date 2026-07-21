@@ -135,9 +135,15 @@ def _animation_data_timerange(animation_data):
 def _query_anim_channel_data(source, time_context):
     if time_context.mode == "graph_editor_keys":
         selected_frames = set(time_context.frames)
-        keyframes = cmds.keyframe(source, query=True) or []
-        keyframes = [frame for frame in keyframes if int(frame) in selected_frames]
-        values = [cmds.keyframe(source, query=True, vc=True, time=(frame, frame))[0] for frame in keyframes]
+        all_keyframes = cmds.keyframe(source, query=True) or []
+        all_values = cmds.keyframe(source, query=True, vc=True) or []
+        selected_data = [
+            (frame, value)
+            for frame, value in zip(all_keyframes, all_values)
+            if int(frame) in selected_frames
+        ]
+        keyframes = [frame for frame, _value in selected_data]
+        values = [value for _frame, value in selected_data]
     elif time_context.mode == "time_slider_range":
         keyframes = cmds.keyframe(source, query=True, time=(time_context.start_frame, time_context.end_frame))
         values = cmds.keyframe(source, query=True, vc=True, time=(time_context.start_frame, time_context.end_frame))
@@ -461,8 +467,6 @@ def _apply_channel_weighted_tangents(target, channel, tangent_data, layer_name=N
 
 def _attr_exists_and_settable(node, attr):
     full_attr = f"{node}.{attr}"
-    if not cmds.objExists(full_attr):
-        return False
     try:
         return bool(cmds.getAttr(full_attr, settable=True))
     except Exception:
@@ -676,8 +680,12 @@ def _pose_target_mappings(pose_data, selected_objects):
     return [(target, target) for target in targets if target in pose_data]
 
 
-def _apply_pose_data(pose_data, selected_objects):
-    mappings = _pose_target_mappings(pose_data, selected_objects)
+def _apply_pose_data(pose_data, selected_objects, progress=None, mappings=None):
+    mappings = (
+        list(mappings)
+        if mappings is not None
+        else _pose_target_mappings(pose_data, selected_objects)
+    )
     if not mappings:
         return 0, []
 
@@ -686,9 +694,15 @@ def _apply_pose_data(pose_data, selected_objects):
     for source_control, target_control in mappings:
         control_attrs_set = 0
         for attr, value in pose_data[source_control].items():
+            if progress and progress.cancelled:
+                return attrs_set, pasted_targets
             if not _is_valid_pose_attribute_value(value):
+                if progress:
+                    progress.step()
                 continue
             if not _attr_exists_and_settable(target_control, attr):
+                if progress:
+                    progress.step()
                 continue
             try:
                 _set_attr_value(f"{target_control}.{attr}", value)
@@ -698,6 +712,8 @@ def _apply_pose_data(pose_data, selected_objects):
                 import TheKeyMachine.mods.reportMod as report
 
                 report.report_detected_exception(e, context="paste pose attribute set")
+            if progress:
+                progress.step()
         if control_attrs_set:
             pasted_targets.append(target_control)
 
@@ -730,7 +746,10 @@ def copy_animation(*args, **kwargs):
         ANIMATION_CONTROLS_KEY: {},
     }
     controls_data = animation_data[ANIMATION_CONTROLS_KEY]
-    channel_total = sum(len(get_animation_channels(control)) for control in selected_objects)
+    channels_by_control = {
+        control: get_animation_channels(control) for control in selected_objects
+    }
+    channel_total = sum(len(channels) for channels in channels_by_control.values())
 
     try:
         with _copy_paste_operation(
@@ -743,7 +762,7 @@ def copy_animation(*args, **kwargs):
                 if processor.cancelled:
                     return
                 control_name = control
-                animated_channels = get_animation_channels(control)
+                animated_channels = channels_by_control[control]
 
                 controls_data[control_name] = {}
                 for channel in animated_channels:
@@ -845,6 +864,10 @@ def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
     paste_range = _animation_data_timerange(animation_data)
     key_count = _animation_data_apply_count(animation_data)
     controls = _animation_controls(animation_data)
+    scene_nodes = cmds.ls() or []
+    scene_nodes_by_leaf = {
+        node.rsplit("|", 1)[-1]: node for node in scene_nodes
+    }
     prompt_range = None
     with _copy_paste_operation("paste_opposite_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
         keys_set = 0
@@ -856,7 +879,7 @@ def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
             mirror_control_name = mirror_controller.opposite_control_name(control_name)
 
             if mirror_control_name:
-                full_mirror_control_name = next((c for c in cmds.ls() if c.endswith(mirror_control_name)), None)
+                full_mirror_control_name = scene_nodes_by_leaf.get(mirror_control_name)
                 if not full_mirror_control_name:
                     continue
 
@@ -955,11 +978,19 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
 
 
 def export_animation_file(*args, **kwargs):
-    return clipboard.export_dialog("animation", "Export Animation")
+    return clipboard.export_dialog(
+        "animation",
+        "Export Animation",
+        operation=toolCommon.current_tool_operation(),
+    )
 
 
 def import_animation_file(*args, **kwargs):
-    return clipboard.import_dialog("animation", "Import Animation")
+    return clipboard.import_dialog(
+        "animation",
+        "Import Animation",
+        operation=toolCommon.current_tool_operation(),
+    )
 
 
 def paste_pose_to(*args, anchor_widget=None, **kwargs):
@@ -1002,17 +1033,28 @@ def copy_pose(*args, **kwargs):
         return
 
     pose_data = {}
+    attributes_by_control = {
+        control: cmds.listAttr(control, keyable=True, unlocked=True) or []
+        for control in selected_objects
+    }
+    attribute_total = sum(len(attrs) for attrs in attributes_by_control.values())
 
-    with _copy_paste_operation("copy_pose", "Pose Copied", tint="current") as operation:
+    with _copy_paste_operation(
+        "copy_pose",
+        "Pose Copied",
+        tint="current",
+        progress=True,
+        progress_max=attribute_total,
+    ) as operation:
+        processor = operation["operation"].set_status("Copying Pose")
         for control in selected_objects:
             control_name = control
-            attributes = cmds.listAttr(control, keyable=True, unlocked=True)
-
-            if attributes is None:
-                continue
+            attributes = attributes_by_control[control]
 
             pose_data[control_name] = {}
             for attr in attributes:
+                if processor.cancelled:
+                    return
                 try:
                     values = cmds.getAttr(f"{control}.{attr}")
                     pose_data[control_name][attr] = values
@@ -1020,17 +1062,26 @@ def copy_pose(*args, **kwargs):
                     import TheKeyMachine.mods.reportMod as report
 
                     report.report_detected_exception(e, context="copy pose attribute read")
+                processor.step()
 
         clipboard.save("pose", pose_data)
         operation["success"] = True
 
 
 def export_pose_file(*args, **kwargs):
-    return clipboard.export_dialog("pose", "Export Pose")
+    return clipboard.export_dialog(
+        "pose",
+        "Export Pose",
+        operation=toolCommon.current_tool_operation(),
+    )
 
 
 def import_pose_file(*args, **kwargs):
-    return clipboard.import_dialog("pose", "Import Pose")
+    return clipboard.import_dialog(
+        "pose",
+        "Import Pose",
+        operation=toolCommon.current_tool_operation(),
+    )
 
 
 # PASTE POSE _____________________________________________________________
@@ -1043,8 +1094,23 @@ def paste_pose(*args, **kwargs):
     if not pose_data:
         return
 
-    with _copy_paste_operation("paste_pose", "Pose Pasted", undo=True, tint="current") as operation:
-        attrs_set, pasted_targets = _apply_pose_data(pose_data, selected_objects)
+    mappings = _pose_target_mappings(pose_data, selected_objects)
+    attribute_total = sum(len(pose_data[source]) for source, _target in mappings)
+    with _copy_paste_operation(
+        "paste_pose",
+        "Pose Pasted",
+        undo=True,
+        tint="current",
+        progress=True,
+        progress_max=attribute_total,
+    ) as operation:
+        processor = operation["operation"].set_status("Pasting Pose")
+        attrs_set, pasted_targets = _apply_pose_data(
+            pose_data,
+            selected_objects,
+            progress=processor,
+            mappings=mappings,
+        )
         if attrs_set:
             operation["success"] = True
             _select_existing_targets(pasted_targets)
@@ -1064,19 +1130,37 @@ def paste_mirror_pose(*args, **kwargs):
 
     attrs_set = 0
     pasted_targets = []
-    with _copy_paste_operation("paste_mirror_pose", "Pose Pasted", undo=True, tint="current") as operation:
-        scene_nodes = cmds.ls() or []
+    attribute_total = sum(len(attributes) for attributes in pose_data.values())
+    with _copy_paste_operation(
+        "paste_mirror_pose",
+        "Pose Pasted",
+        undo=True,
+        tint="current",
+        progress=True,
+        progress_max=attribute_total,
+    ) as operation:
+        processor = operation["operation"].set_status("Pasting Mirror Pose")
+        scene_nodes = {
+            node.rsplit("|", 1)[-1]: node for node in (cmds.ls() or [])
+        }
         for control_name, attributes in pose_data.items():
             mirror_name = mirror_controller.opposite_control_name(control_name)
             if not mirror_name:
+                if attributes:
+                    processor.step(amount=len(attributes))
                 continue
-            mirror_control = next((node for node in scene_nodes if node.endswith(mirror_name)), None)
+            mirror_control = scene_nodes.get(mirror_name)
             if not mirror_control:
+                if attributes:
+                    processor.step(amount=len(attributes))
                 continue
 
             control_attrs_set = 0
             for attr, value in attributes.items():
+                if processor.cancelled:
+                    return
                 if not _is_valid_pose_attribute_value(value) or not _attr_exists_and_settable(mirror_control, attr):
+                    processor.step()
                     continue
                 mirrored_value = mirror_controller.apply_exception(exceptions, control_name, attr, value)
                 try:
@@ -1087,6 +1171,7 @@ def paste_mirror_pose(*args, **kwargs):
                     import TheKeyMachine.mods.reportMod as report
 
                     report.report_detected_exception(error, context="paste mirror pose attribute set")
+                processor.step()
             if control_attrs_set:
                 pasted_targets.append(mirror_control)
 

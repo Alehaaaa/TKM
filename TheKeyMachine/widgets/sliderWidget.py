@@ -1174,7 +1174,15 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             if shortcut_text:
                 label = "{}\t{}".format(mode.label, shortcut_text)
 
-            act = menu.addAction(label, description=mode.description, tooltip=getattr(mode, "tooltip", None), label=mode.label)
+            mode_icon = mode.resolved_icon()
+            action_args = (QtGui.QIcon(mode_icon), label) if mode_icon else (label,)
+            act = menu.addAction(
+                *action_args,
+                description=mode.description,
+                tooltip=getattr(mode, "tooltip", None),
+                label=mode.label,
+                command_icon=mode_icon,
+            )
             act.setCheckable(True)
             act.setActionGroup(group)
 

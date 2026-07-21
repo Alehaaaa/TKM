@@ -39,8 +39,8 @@ def paste_keys_relative(*args):
     return controller.paste_keys_relative(*args)
 
 
-def remove_redundant_keys(*args):
-    return controller.remove_redundant_keys(*args)
+def remove_redundant_keys(*args, **kwargs):
+    return controller.remove_redundant_keys(*args, **kwargs)
 
 
 def get_remove_redundant_mode():
@@ -51,8 +51,8 @@ def set_remove_redundant_mode(mode):
     return controller.set_remove_redundant_mode(mode)
 
 
-def remove_static_anim_curves(*args):
-    return controller.remove_static_anim_curves(*args)
+def remove_static_anim_curves(*args, **kwargs):
+    return controller.remove_static_anim_curves(*args, **kwargs)
 
 
 def reverse_animation(*args):
