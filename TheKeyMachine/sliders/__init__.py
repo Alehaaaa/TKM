@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+import glob
+import os
 from typing import Any, Optional, Tuple
 
 
@@ -38,7 +40,20 @@ class SliderMode:
 
     def resolved_icon(self):
         if not self.icon:
-            return None
+            if not self.text:
+                return None
+            from TheKeyMachine.data import icons
+
+            matches = glob.glob(
+                os.path.join(
+                    icons.IMAGE_ROOT,
+                    "slider_*",
+                    "{}.svg".format(self.key),
+                )
+            )
+            return sorted(matches)[0] if matches else None
+        if os.path.isabs(self.icon):
+            return self.icon if os.path.isfile(self.icon) else None
         from TheKeyMachine.data import icons
 
         return icons.get(self.icon) or self.icon

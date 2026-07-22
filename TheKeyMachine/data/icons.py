@@ -5,6 +5,8 @@ The attribute name is the asset name:
 
     icons.bug               -> data/icons/bug.svg
     icons.sliders_overshoot -> data/icons/sliders_overshoot.svg
+    icons.slider_blend.icons.connect_neighbors
+                            -> data/icons/slider_blend/connect_neighbors.svg
 
 Missing icons return ``None``.
 """
@@ -19,6 +21,24 @@ from TheKeyMachine.data.colors import COLORS
 IMAGE_ROOT = os.path.join(os.path.dirname(__file__), "icons")
 SELECTION_SETS_ROOT = os.path.join(IMAGE_ROOT, "selection_sets")
 ICON_EXTENSIONS = (".svg", ".png", ".jpg", ".jpeg")
+
+
+class _IconNamespace:
+    """Attribute-based access to one nested icon directory."""
+
+    def __init__(self, *parts):
+        self._parts = tuple(parts)
+
+    @property
+    def icons(self):
+        return self
+
+    def __getattr__(self, name):
+        parts = self._parts + (name,)
+        directory = os.path.join(IMAGE_ROOT, *parts)
+        if os.path.isdir(directory):
+            return _IconNamespace(*parts)
+        return get("/".join(parts))
 
 
 def path(filename: str | None, default=None):
@@ -59,7 +79,7 @@ def exists(name: str) -> bool:
     return get(name) is not None
 
 
-def _selection_set_icon_filename(color):
+def selection_set_icon_filename(color):
     if color.shade and color.shade != "base":
         shade = color.shade.capitalize()
     else: shade = ""
@@ -67,7 +87,7 @@ def _selection_set_icon_filename(color):
 
 
 selection_set_color_icon_names = {
-    color.suffix: _selection_set_icon_filename(color)
+    color.suffix: selection_set_icon_filename(color)
     for color in COLORS.selection.all
 }
 selection_set_color_icons = {suffix: selection_set_path(filename) for suffix, filename in selection_set_color_icon_names.items()}
@@ -77,4 +97,7 @@ selection_set_color_trash_icons = {
 
 
 def __getattr__(name):
+    directory = os.path.join(IMAGE_ROOT, name)
+    if os.path.isdir(directory):
+        return _IconNamespace(name)
     return get(name)

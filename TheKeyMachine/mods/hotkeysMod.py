@@ -928,17 +928,29 @@ def _slider_mode_icon(mode):
     return None
 
 
+def _slider_button_icon(slider_type, value):
+    value = int(value)
+    if value == 0:
+        return None
+    variant = "big" if abs(value) == 100 else "small"
+    return icons.get("slider_{}/square_{}".format(slider_type, variant))
+
+
 def _iter_slider_percentage_rows(slider_type, mode):
     mode_icon = _slider_mode_icon(mode)
     mode_badge = str(mode.text or "")
 
     for value in trigger.SLIDER_BUTTON_VALUES:
+        if value:
+            row_icon = _slider_button_icon(slider_type, value)
+        else:
+            row_icon = mode_icon
         value_title = "{}: {}".format(mode.label, _slider_value_label(value))
         yield {
             "command": trigger.slider_command_name(slider_type, mode.key, value),
             "title": value_title,
-            "icon": mode_icon,
-            "badge_text": None if mode_icon else mode_badge,
+            "icon": row_icon,
+            "badge_text": None if row_icon else mode_badge,
             "description": mode.description or "Set {} to {} percent.".format(mode.label, value),
             "tooltip": mode.tooltip,
         }

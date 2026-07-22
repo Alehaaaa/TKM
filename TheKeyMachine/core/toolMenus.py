@@ -225,6 +225,11 @@ def build_declared_menu(definition, parent_widget=None):
         if isinstance(item, str):
             _add_toolbox_action(menu, item)
             continue
+        available = item.get("available", True)
+        if not bool(available() if callable(available) else available):
+            continue
+        if item.get("separator_before"):
+            menu.addSeparator()
         item_type = item.get("type", "command")
         if item_type == "widget":
             factory = item.get("factory")
@@ -266,6 +271,21 @@ def build_declared_menu(definition, parent_widget=None):
             continue
         if item_type == "section":
             menu.addSection(item.get("label", ""))
+            continue
+        if item_type == "dynamic_menu":
+            builder = item.get("builder")
+            if not callable(builder):
+                raise TypeError("Declared dynamic menu requires a callable builder")
+            child = cw.MenuWidget(
+                _qicon(item.get("icon")),
+                item.get("label", ""),
+                parent=menu,
+                description=item.get("description", ""),
+            )
+            placeholder = child.addAction("Loading…")
+            placeholder.setEnabled(False)
+            child.aboutToShow.connect(partial(builder, child))
+            menu.addMenu(child, description=item.get("description", ""))
             continue
         if item_type == "menu":
             child = build_declared_menu(item, parent_widget=menu)

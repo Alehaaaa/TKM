@@ -63,18 +63,27 @@ FRAME_PICKER_COLOR = (235, 235, 235, 125)
 
 
 class TimelineFramePicker(QtCore.QObject):
-    """Interactive, single-frame timeline hover used by frame-aware sliders."""
+    """Preview timeline frames while scrubbing and commit one on release."""
 
     TINT_KEY = "slider_frame_picker"
 
-    def __init__(self, callback, owner=None, color=None, cancel_callback=None):
+    def __init__(
+        self,
+        callback,
+        owner=None,
+        color=None,
+        cancel_callback=None,
+        preview_callback=None,
+    ):
         super().__init__(owner or runtime.get_runtime_manager())
         self._callback = callback
         self._cancel_callback = cancel_callback
+        self._preview_callback = preview_callback
         self._color = color or FRAME_PICKER_COLOR
         self._timeline = TimelineTint.get_timeline_widget()
         self._frame = None
-        self._selection_made = False
+        self._previewed_frame = None
+        self._scrubbing = False
         if self._timeline:
             self._timeline.setMouseTracking(True)
             self._timeline.installEventFilter(self)
@@ -84,7 +93,8 @@ class TimelineFramePicker(QtCore.QObject):
 
     def cancel(self, notify=True):
         global _active_frame_picker
-        runtime.get_runtime_manager().clear_managed_widget(self.TINT_KEY)
+        self._scrubbing = False
+        self._clear_frame()
         app = QtWidgets.QApplication.instance()
         if app:
             try:
@@ -129,14 +139,34 @@ class TimelineFramePicker(QtCore.QObject):
         x = max(0.0, min(usable_width - 0.001, float(pos.x()) - float(self._timeline.width()) * 0.005))
         return max(start, min(end, int(start + (x / usable_width) * span)))
 
-    def _show_frame(self, frame):
-        if frame is None or frame == self._frame:
+    def _set_frame(self, frame, preview=False):
+        if frame is None:
             return
-        self._frame = frame
-        show_timeline_tint(
-            timerange=(frame, frame), color=self._color, duration_ms=None,
-            key=self.TINT_KEY, center_line=False, z_index=1,
-        )
+        if frame != self._frame:
+            self._frame = frame
+            show_timeline_tint(
+                timerange=(frame, frame), color=self._color, duration_ms=None,
+                key=self.TINT_KEY, center_line=False, z_index=1,
+            )
+        if preview and frame != self._previewed_frame:
+            self._previewed_frame = frame
+            if self._preview_callback:
+                self._preview_callback(frame)
+
+    def _clear_frame(self):
+        runtime.get_runtime_manager().clear_managed_widget(self.TINT_KEY)
+        self._frame = None
+
+    def _commit_frame(self, frame):
+        self._scrubbing = False
+        if frame is None:
+            self.cancel()
+            return
+        self._set_frame(frame, preview=True)
+        try:
+            self._callback(frame)
+        finally:
+            self.cancel(notify=False)
 
     def eventFilter(self, watched, event):
         event_type = event.type()
@@ -155,44 +185,61 @@ class TimelineFramePicker(QtCore.QObject):
             pos = self._timeline_pos(event)
             inside = pos is not None and self._timeline.rect().contains(pos)
             if event_type == QtCore.QEvent.MouseMove:
+                if self._scrubbing and pos is not None:
+                    self._set_frame(self._frame_at(pos), preview=True)
+                    event.accept()
+                    return True
                 if inside:
-                    self._show_frame(self._frame_at(pos))
+                    self._set_frame(self._frame_at(pos))
                 elif self._frame is not None:
-                    runtime.get_runtime_manager().clear_managed_widget(self.TINT_KEY)
-                    self._frame = None
+                    self._clear_frame()
                 return False
 
-            if inside:
-                selects_frame = (
-                    event.button() == QtCore.Qt.LeftButton
-                    and event_type in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonDblClick)
-                    and not self._selection_made
-                )
-                if selects_frame:
-                    frame = self._frame_at(pos)
-                    if frame is not None:
-                        self._selection_made = True
-                        self._callback(frame)
+            is_left_button = event.button() == QtCore.Qt.LeftButton
+            if inside and is_left_button and event_type == QtCore.QEvent.MouseButtonPress:
+                self._scrubbing = True
+                self._set_frame(self._frame_at(pos), preview=True)
                 event.accept()
-                if (
-                    event.button() == QtCore.Qt.LeftButton
-                    and event_type == QtCore.QEvent.MouseButtonRelease
-                ):
-                    self.cancel(notify=False)
                 return True
 
-        if watched is self._timeline and event_type == QtCore.QEvent.Leave and self._frame is not None:
-            runtime.get_runtime_manager().clear_managed_widget(self.TINT_KEY)
-            self._frame = None
+            if is_left_button and event_type == QtCore.QEvent.MouseButtonRelease and self._scrubbing:
+                frame = self._frame_at(pos) if pos is not None else self._frame
+                self._commit_frame(frame)
+                event.accept()
+                return True
+
+            if inside:
+                event.accept()
+                return True
+
+        if (
+            watched is self._timeline
+            and event_type == QtCore.QEvent.Leave
+            and self._frame is not None
+            and not self._scrubbing
+        ):
+            self._clear_frame()
         return False
 
 
-def begin_frame_picker(callback, owner=None, color=None, cancel_callback=None):
-    """Begin picking a snapped playback frame and return the picker controller."""
+def begin_frame_picker(
+    callback,
+    owner=None,
+    color=None,
+    cancel_callback=None,
+    preview_callback=None,
+):
+    """Begin previewing snapped playback frames, committing one on release."""
     global _active_frame_picker
     if _active_frame_picker is not None:
         _active_frame_picker.cancel()
-    _active_frame_picker = TimelineFramePicker(callback, owner=owner, color=color, cancel_callback=cancel_callback)
+    _active_frame_picker = TimelineFramePicker(
+        callback,
+        owner=owner,
+        color=color,
+        cancel_callback=cancel_callback,
+        preview_callback=preview_callback,
+    )
     if not _active_frame_picker.available:
         _active_frame_picker.cancel()
         return None
@@ -544,10 +591,23 @@ def _normalize_tint_color(color):
             hue = int(color) % 360
             qcolor = QtGui.QColor.fromHsv(hue, 75, 242, default_alpha)
         else:
-            rgb = list(color[:3])
-            alpha = int(color[3]) if len(color) > 3 else default_alpha
-            qcolor = QtGui.QColor(rgb[0], rgb[1], rgb[2], alpha)
+            try:
+                channels = list(color)
+            except TypeError:
+                channels = []
+            if len(channels) >= 3:
+                alpha = int(channels[3]) if len(channels) > 3 else default_alpha
+                qcolor = QtGui.QColor(
+                    int(channels[0]),
+                    int(channels[1]),
+                    int(channels[2]),
+                    alpha,
+                )
+            else:
+                qcolor = QtGui.QColor()
 
+    if not qcolor.isValid():
+        qcolor = QtGui.QColor(_default_tint_color())
     if qcolor.alpha() == 255:
         qcolor.setAlpha(default_alpha)
     qcolor.setAlpha(max(0, min(255, int(round(qcolor.alpha() * 0.8)))))
@@ -594,4 +654,7 @@ def _resolve_tint_variant_hex(color, preferred_shades=("base",)):
 
 
 def _color_hex(color):
-    return getattr(color, "hex", color)
+    if isinstance(color, str):
+        return color
+    value = getattr(color, "hex", None)
+    return value if isinstance(value, str) else None

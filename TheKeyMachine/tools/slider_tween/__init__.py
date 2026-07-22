@@ -35,6 +35,7 @@ class TweenSliderToolObject(ToolObject):
     SECTION = {
         "id": "slider_tween",
         "label": "Tween Sliders",
+        "icon": "slider_tween/tweener",
         "color": COLORS.toolbar.yellow.hex,
         "icon_color": COLORS.ui.yellow.hex,
         "type": "slider",

@@ -21,7 +21,7 @@ def _scope_action(label, callback, tooltip_key, tangent_label=None, icon=None):
 
 
 def _tangent_icon(tangent_type, suffix=None):
-    return "tangent_{}{}".format(tangent_type, "_{}".format(suffix) if suffix else "")
+    return "slider_tangent/tangent_{}{}".format(tangent_type, "_{}".format(suffix) if suffix else "")
 
 
 def _tangent_tool(tangent_type, label, text, maya_default=True):
@@ -106,7 +106,7 @@ class TangentsToolObject(ToolObject):
         "tangent_plateau": _tangent_tool("plateau", "Plateau Tangent", "PT"),
     }
     SECTION = {
-        "id": "tangents", "label": "Tangents", "icon": "tangent_auto",
+        "id": "tangents", "label": "Tangents", "icon": _tangent_icon("auto"),
         "color": COLORS.toolbar.orange.hex,
         "items": [
             {"id": "tangent_cycle_matcher"},

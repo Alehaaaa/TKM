@@ -10,11 +10,11 @@ class ManipulatorsToolObject(ToolObject):
     ORDER = 475
     TOOLS = {
         "smart_rotation": {
-            "type": "tool", "label": "Smart Rotation", "icon": "tangent_auto",
+            "type": "tool", "label": "Smart Rotation", "icon": "slider_tangent/tangent_auto",
             "callback": api.smart_rotation, "tooltip": TOOLTIPS["smart_rotation"],
         },
         "smart_rotation_release": {
-            "type": "tool", "label": "Smart Rotation Release", "icon": "tangent_auto",
+            "type": "tool", "label": "Smart Rotation Release", "icon": "slider_tangent/tangent_auto",
             "callback": api.smart_rotation_release, "tooltip": TOOLTIPS["smart_rotation_release"],
         },
         "smart_translation": {

@@ -41,6 +41,7 @@ from TheKeyMachine.sliders import SliderMode
 from TheKeyMachine.sliders import utils as slider_utils
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.widgets.timeline as timelineWidgets
+from TheKeyMachine.data import icons
 from TheKeyMachine.data.colors import COLORS
 
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager, format_tooltip_shortcut
@@ -63,6 +64,20 @@ No A/B picks. Context menu on right-click.
 
 SLIDER_HANDLE_NEUTRAL_HEX = "#444444"
 SLIDER_VALUE_TEXT_HEX = "#747474"
+SLIDER_FRAME_BUTTON_COLOR = "#d7d7d7"
+
+
+def _slider_button_variant(value):
+    value = int(value)
+    if value == 0:
+        return None
+    return "big" if abs(value) == 100 else "small"
+
+
+def _slider_button_icon(slider_type, variant):
+    if not slider_type or variant not in {"small", "big", "frame"}:
+        return None
+    return icons.get("slider_{}/square_{}".format(slider_type, variant))
 
 
 def _format_shortcut(shortcut) -> str:
@@ -104,6 +119,8 @@ class SliderButton(cw.TooltipMixin, QPushButton):
         self._color = color
         self._frameButton = bool(frameButton)
         self._frameValue = None
+        self._squareIconPath = None
+        self._squareIcon = QIcon()
         self.setCheckable(self._frameButton)
         self._box_sz = wutil.DPI(7) if (self._frameButton or abs(percent) == 100) else wutil.DPI(3)
         self.setFixedHeight(parent.height())
@@ -128,6 +145,15 @@ class SliderButton(cw.TooltipMixin, QPushButton):
     def setColor(self, color: str):
         self._color = color
         self.update()
+
+    def setSquareIcon(self, icon_path: Optional[str]):
+        self._squareIconPath = icon_path
+        self._squareIcon = QIcon(icon_path or "")
+        self.update()
+
+    @property
+    def squareIconPath(self) -> Optional[str]:
+        return self._squareIconPath
 
     def _update_tooltip(self):
         title = self._tooltip_title or "Value"
@@ -186,7 +212,6 @@ class SliderButton(cw.TooltipMixin, QPushButton):
         p.setRenderHint(QPainter.Antialiasing)
 
         w, h, s = self.width(), self.height(), self._box_sz
-        x = (w - s) // 2
         y = (h - s) // 2
 
         base_color = QColor(self._color)
@@ -202,13 +227,11 @@ class SliderButton(cw.TooltipMixin, QPushButton):
             glow_color = Qt.transparent
             offsets = [(0, 0)]
 
-        for dx, dy in offsets:
-            is_glow = dx != 0 or dy != 0
-
-            p.save()
-            p.translate(dx, dy)
-
-            if self._worldSpace:
+        if self._worldSpace:
+            for dx, dy in offsets:
+                is_glow = dx != 0 or dy != 0
+                p.save()
+                p.translate(dx, dy)
                 cx, cy = w // 2, h // 2
                 r = wutil.DPI(int(min(w, h) * 0.24))  # smaller globe
 
@@ -234,17 +257,19 @@ class SliderButton(cw.TooltipMixin, QPushButton):
                     mer_rect = QRect(cx - mer_w // 2, cy - r, mer_w, 2 * r)
                     p.drawArc(mer_rect, 90 * 14, 180 * 16)  # left arc
                     p.drawArc(mer_rect, 90 * 14, -180 * 16)  # right arc
-            else:
-                # Default: small filled square
-                if is_glow:
-                    p.setPen(Qt.NoPen)
-                else:
-                    p.setPen(QPen(Qt.black, 0.5))
-
-                p.setBrush(glow_color if is_glow else main_color)
-                p.drawRect(QRect(x, y, s, s))
-
-            p.restore()
+                p.restore()
+        elif not self._squareIcon.isNull():
+            icon_mode = QIcon.Active if self._hover else QIcon.Normal
+            icon_canvas_size = wutil.DPI(SliderHandle.HANDLE_SIZE)
+            icon_rect = QRect(0, 0, icon_canvas_size, icon_canvas_size)
+            icon_rect.moveCenter(QRect(0, 0, w, h).center())
+            self._squareIcon.paint(
+                p,
+                icon_rect,
+                Qt.AlignCenter,
+                icon_mode,
+                QIcon.Off,
+            )
 
         if self._frameButton and self._frameValue is not None:
             font = QFont(self.font())
@@ -588,7 +613,7 @@ QSlider::handle:horizontal {{
             main_color = base_color
 
         if self._icon:
-            icon_size = int(min(hrect.width(), hrect.height()) * 0.68)
+            icon_size = int(min(hrect.width(), hrect.height()) * 0.7038)
             qicon = QIcon(self._icon)
             if not qicon.isNull():
                 icon_rect = QRect(0, 0, icon_size, icon_size)
@@ -764,7 +789,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._leftLayout,
             self._leftOverlay,
             0,
-            "#d7d7d7",
+            SLIDER_FRAME_BUTTON_COLOR,
             False,
             self._leftButtons,
             frame_button=True,
@@ -792,7 +817,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._rightLayout,
             self._rightOverlay,
             0,
-            "#d7d7d7",
+            SLIDER_FRAME_BUTTON_COLOR,
             False,
             self._rightButtons,
             frame_button=True,
@@ -1034,7 +1059,12 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         )
         for b in self._leftButtons + self._rightButtons:
             if b in (self._leftFrameButton, self._rightFrameButton):
-                b.setTooltipInfo(title, description, tooltip)
+                b.setTooltipInfo(
+                    title,
+                    description,
+                    tooltip,
+                    command_icon=b.squareIconPath,
+                )
                 continue
             button_command = self._tooltip_command_metadata(b.percent)
             b.setTooltipInfo(
@@ -1065,8 +1095,15 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             command_label = "{} {}".format(mode.label, value_text)
         else:
             command_label = mode.label
-        resolved_icon = mode.resolved_icon()
-        command_icon = resolved_icon if SliderHandle._looks_like_icon(resolved_icon) else None
+        if value and self._section_prefix:
+            variant = _slider_button_variant(value)
+            command_icon = _slider_button_icon(
+                self._section_prefix,
+                variant,
+            )
+        else:
+            resolved_icon = mode.resolved_icon()
+            command_icon = resolved_icon if SliderHandle._looks_like_icon(resolved_icon) else None
         return command_id, command_label, command_icon
 
     ################################ GETTERS ################################
@@ -1114,11 +1151,38 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if display_value:
             self.setText(display_value)
 
+        self._refresh_button_icons()
         self.setTooltipInfo(mode.label, mode.description, mode.tooltip)
         self.setWorldSpace(mode.worldSpace)
         self.setFrameButtonsVisible(mode.frameButtons)
         self._update_frame_button_tooltips()
         self._refresh_toolTipData()
+
+    def _refresh_button_icons(self):
+        """Resolve the shared square variants for this slider type."""
+        has_mode = self.currentMode() is not None
+        for button in self._leftButtons + self._rightButtons:
+            if not has_mode or not self._section_prefix:
+                button.setSquareIcon(None)
+                continue
+            if button in (self._leftFrameButton, self._rightFrameButton):
+                variant = "frame"
+            else:
+                variant = _slider_button_variant(button.percent)
+            button.setSquareIcon(
+                _slider_button_icon(
+                    self._section_prefix,
+                    variant,
+                )
+            )
+
+    def refreshModePresentation(self):
+        """Reload the active mode icon, falling back to its text when missing."""
+        mode = self.currentMode()
+        if mode is not None:
+            self._setCurrentMode(mode)
+        self._slider.update()
+        self.update()
 
     def on_added_to_section(self, section, key: str):
         """Called automatically by QFlatSectionWidget to establish a stable reference."""
@@ -1132,7 +1196,9 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self._section_prefix = ""
         mode = self.currentMode()
         if mode is not None:
+            self._refresh_button_icons()
             self.setTooltipInfo(mode.label, mode.description, mode.tooltip)
+            self._update_frame_button_tooltips()
 
     def _is_pointer_over_widget(self) -> bool:
         try:
@@ -1330,22 +1396,28 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         active_button = self._leftFrameButton if side < 0 else self._rightFrameButton
         active_button.setChecked(True)
 
-        def _picked(frame):
-            frames = list(self._pickedFrames.get(mode.key, (None, None)))
-            frames[0 if side < 0 else 1] = int(frame)
-            self._pickedFrames[mode.key] = tuple(frames)
+        def _finish_pick():
             self._framePicker = None
             active_button.setChecked(False)
             self._update_frame_button_tooltips()
 
+        def _picked(frame):
+            frames = list(self._pickedFrames.get(mode.key, (None, None)))
+            frames[0 if side < 0 else 1] = int(frame)
+            self._pickedFrames[mode.key] = tuple(frames)
+            _finish_pick()
+
         def _cancelled():
-            self._framePicker = None
-            active_button.setChecked(False)
+            _finish_pick()
+
+        def _previewed(frame):
+            active_button.setFrameValue(int(frame))
 
         self._framePicker = timelineWidgets.begin_frame_picker(
             _picked,
             owner=self,
             cancel_callback=_cancelled,
+            preview_callback=_previewed,
         )
 
     def _cancel_frame_picker(self):
@@ -1367,13 +1439,23 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             left_description = "Pick left target frame"
             if left is not None:
                 left_description += ": {}".format(left)
-            self._leftFrameButton.setTooltipInfo(mode.label, left_description, mode.tooltip)
+            self._leftFrameButton.setTooltipInfo(
+                mode.label,
+                left_description,
+                mode.tooltip,
+                command_icon=self._leftFrameButton.squareIconPath,
+            )
         if self._rightFrameButton:
             self._rightFrameButton.setFrameValue(right)
             right_description = "Pick right target frame"
             if right is not None:
                 right_description += ": {}".format(right)
-            self._rightFrameButton.setTooltipInfo(mode.label, right_description, mode.tooltip)
+            self._rightFrameButton.setTooltipInfo(
+                mode.label,
+                right_description,
+                mode.tooltip,
+                command_icon=self._rightFrameButton.squareIconPath,
+            )
 
     def _finish_active_session(self):
         session = self._sliderSession

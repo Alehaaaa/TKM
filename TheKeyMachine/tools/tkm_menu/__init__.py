@@ -45,6 +45,13 @@ class TkmMenuToolObject(ToolObject):
                         {"label": "YouTube", "icon": "youtube", "description": "Open TheKeyMachine tutorials on YouTube.", "callback": partial(api.open_url, "https://www.youtube.com/@TheKeyMachineAnimationTools")},
                     ]},
                     "donate_window", "check_for_updates", "about_window",
+                    {
+                        "type": "dynamic_menu", "label": "Debug", "icon": "bug",
+                        "description": "Developer-only diagnostics and test actions.",
+                        "available": api.tool_debug_enabled,
+                        "separator_before": True,
+                        "builder": api.rebuild_debug_menu,
+                    },
                 ]
             },
         },

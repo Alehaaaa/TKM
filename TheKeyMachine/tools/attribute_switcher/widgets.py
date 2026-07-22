@@ -1632,10 +1632,31 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         self.enums_layout.activate()
         self.enums_container.adjustSize()
         self.enums_container.updateGeometry()
+        self._update_attribute_scroll_minimum_height()
         self.attributes_scroll.updateGeometry()
         self.mainLayout.invalidate()
         self.mainLayout.activate()
         self._refresh_attribute_scrollbar_margin()
+
+    def _update_attribute_scroll_minimum_height(self):
+        """Fit at least one complete enum row whenever rows are available."""
+        first_item = self.enums_layout.itemAt(0)
+        first_widget = first_item.widget() if first_item is not None else None
+        if first_widget is None:
+            self.attributes_scroll.setMinimumHeight(0)
+            return
+
+        first_widget.ensurePolished()
+        item_layout = first_widget.layout()
+        if item_layout is not None:
+            item_layout.activate()
+        row_height = max(
+            first_widget.sizeHint().height(),
+            first_widget.minimumSizeHint().height(),
+        )
+        self.attributes_scroll.setMinimumHeight(
+            row_height + (self.attributes_scroll.frameWidth() * 2)
+        )
 
     def _update_attribute_scrollbar_margin(self, minimum, maximum):
         """Keep enum rows clear of an overlay-style vertical scrollbar."""
@@ -1765,6 +1786,21 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         selection_layout.setSpacing(wutil.DPI(5))
         selection_layout.setContentsMargins(0, wutil.DPI(6), 0, wutil.DPI(8))
 
+        title_layout = QtWidgets.QHBoxLayout()
+        title_layout.setSpacing(wutil.DPI(6))
+        title_layout.setContentsMargins(0, 0, 0, 0)
+
+        title_icon_size = wutil.DPI(25)
+        title_icon = QtWidgets.QLabel()
+        title_icon.setFixedSize(title_icon_size, title_icon_size)
+        title_icon.setPixmap(
+            QtGui.QIcon(icons.attribute_switcher).pixmap(
+                title_icon_size,
+                title_icon_size,
+            )
+        )
+        title_icon.setAlignment(QtCore.Qt.AlignCenter)
+
         selection_title = QtWidgets.QLabel("Selection")
         selection_title.setStyleSheet(
             "font-size: %spx; color: %s; font-weight: bold; background: transparent;" % (wutil.DPI(18), self.TEXT_COLOR)
@@ -1773,10 +1809,13 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         selection_title.setWordWrap(False)
         selection_title.setFixedHeight(selection_title.fontMetrics().height() + 2)
 
+        title_layout.addWidget(title_icon)
+        title_layout.addWidget(selection_title, 1)
+
         self.selection_label = QtWidgets.QLabel("No switches for selection")
         self.selection_label.setStyleSheet("color: %s; background: transparent;" % self.TEXT_COLOR)
 
-        selection_layout.addWidget(selection_title)
+        selection_layout.addLayout(title_layout)
         selection_layout.addWidget(self.selection_label)
 
         self.mainLayout.insertLayout(0, selection_layout)

@@ -10,6 +10,53 @@ def bug_reports_available():
     return bool(generalMod.config.get("BUG_REPORT", True))
 
 
+_DEBUG_MODULE_NAME = "TheKeyMachine.core.debug"
+
+
+def _load_debug_module(reload_module=False):
+    """Load the canonical debug module, replacing stale pre-move aliases."""
+    import importlib
+    import sys
+
+    debug_module = sys.modules.get(_DEBUG_MODULE_NAME)
+    if debug_module is not None and (
+        getattr(debug_module, "__name__", None) != _DEBUG_MODULE_NAME
+        or getattr(debug_module, "__spec__", None) is None
+    ):
+        sys.modules.pop(_DEBUG_MODULE_NAME, None)
+        debug_module = None
+
+    if debug_module is None:
+        debug_module = importlib.import_module(_DEBUG_MODULE_NAME)
+    elif reload_module:
+        debug_module = importlib.reload(debug_module)
+    return debug_module
+
+
+def tool_debug_enabled():
+    try:
+        return _load_debug_module().is_enabled()
+    except Exception:
+        return False
+
+
+def rebuild_debug_menu(menu):
+    """Reload developer actions and repopulate the submenu before it opens."""
+    try:
+        return _load_debug_module(reload_module=True).populate_menu(menu)
+    except Exception as error:
+        menu.clear()
+        action = menu.addAction("Debug menu unavailable")
+        action.setEnabled(False)
+        try:
+            from maya import cmds
+
+            cmds.warning("TheKeyMachine debug menu could not reload: {}".format(error))
+        except Exception:
+            pass
+        return menu
+
+
 def show_menu(tool_id="TKM", *_args):
     from TheKeyMachine.mods import shelfMod
     return shelfMod.show_tool_menu_at_cursor(tool_id)

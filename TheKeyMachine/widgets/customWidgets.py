@@ -486,15 +486,21 @@ class MenuWidget(QtWidgets.QMenu):
                 cb=metadata_callback,
             ):
                 anchor = self._callback_anchor()
-
-                def _run(callback_anchor=anchor):
+                try:
                     pass_checked = (
                         action.isCheckable()
                         and self._callback_accepts_checked(cb)
                     )
-                    call_args = (checked,) if pass_checked else ()
+                except RuntimeError:
+                    return
+
+                def _run(
+                    callback_anchor=anchor,
+                    callback_accepts_checked=pass_checked,
+                ):
+                    call_args = (checked,) if callback_accepts_checked else ()
                     toolCommon.run_tool_callback(
-                        callback_anchor or action,
+                        callback_anchor,
                         cb,
                         *call_args,
                         _tkm_tool_id=command_id,

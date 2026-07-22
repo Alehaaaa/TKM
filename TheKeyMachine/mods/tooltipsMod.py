@@ -996,6 +996,8 @@ class QFlatTooltipManager(object):
 
         cls._ensure_mouse_filter()
 
+        if not icon and command_icon:
+            icon = command_icon
         if icon and not isinstance(icon, (str, bytes)):
             icon_obj = icon
             icon = None

@@ -5,3 +5,5 @@ tempCodeRunnerFile.python
 desktop.ini
 .vscode/
 .gitignore
+.env
+/TheKeyMachine/core/debug/
