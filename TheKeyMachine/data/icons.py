@@ -14,7 +14,6 @@ Missing icons return ``None``.
 from __future__ import annotations
 
 import os
-
 from TheKeyMachine.data.colors import COLORS
 
 
@@ -33,12 +32,60 @@ class _IconNamespace:
     def icons(self):
         return self
 
+    def get(self, name, default=None):
+        return get("/".join(self._parts + (name,)), default)
+
     def __getattr__(self, name):
         parts = self._parts + (name,)
+        icon_name = "/".join(parts)
+
+        result = get(icon_name)
+
+        if result is not None:
+            return result
+
         directory = os.path.join(IMAGE_ROOT, *parts)
+
         if os.path.isdir(directory):
             return _IconNamespace(*parts)
-        return get("/".join(parts))
+
+        raise AttributeError(name)
+
+
+def get(name: str | None, default=None):
+    if not name:
+        return default
+
+    name = str(name).replace("\\", "/").strip("/")
+
+    if os.path.splitext(name)[1]:
+        candidate = path(name)
+        return candidate if os.path.isfile(candidate) else default
+
+    for ext in ICON_EXTENSIONS:
+        candidate = path("{}{}".format(name, ext))
+
+        if os.path.isfile(candidate):
+            return candidate
+
+    return default
+
+
+def __getattr__(name):
+    if name.startswith("_"):
+        raise AttributeError(name)
+
+    result = get(name)
+
+    if result is not None:
+        return result
+
+    directory = os.path.join(IMAGE_ROOT, name)
+
+    if os.path.isdir(directory):
+        return _IconNamespace(name)
+
+    raise AttributeError(name)
 
 
 def path(filename: str | None, default=None):
@@ -51,21 +98,6 @@ def selection_set_path(filename: str | None, default=None):
     if not filename:
         return default
     return os.path.join(SELECTION_SETS_ROOT, filename)
-
-
-def get(name: str | None, default=None):
-    if not name:
-        return default
-
-    if os.path.splitext(name)[1]:
-        candidate = path(name)
-        return candidate if os.path.exists(candidate) else default
-
-    for ext in ICON_EXTENSIONS:
-        candidate = path("{}{}".format(name, ext))
-        if os.path.exists(candidate):
-            return candidate
-    return default
 
 
 def require(name: str) -> str:
@@ -94,10 +126,3 @@ selection_set_color_icons = {suffix: selection_set_path(filename) for suffix, fi
 selection_set_color_trash_icons = {
     suffix: selection_set_path(filename.replace(".svg", "_trash.svg")) for suffix, filename in selection_set_color_icon_names.items()
 }
-
-
-def __getattr__(name):
-    directory = os.path.join(IMAGE_ROOT, name)
-    if os.path.isdir(directory):
-        return _IconNamespace(name)
-    return get(name)

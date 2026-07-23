@@ -91,7 +91,7 @@ def apply_attr_curve_value(
         return
 
     try:
-        cmds.setKeyframe(attr_full, time=(current_time,), value=float(attr_value), absolute=True)
+        cmds.setKeyframe(attr_full, time=(current_time,), value=float(attr_value))
     except Exception:
         try:
             cmds.keyframe(attr_full, edit=True, time=(current_time, current_time), valueChange=float(attr_value), absolute=True)

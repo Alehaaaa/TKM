@@ -32,6 +32,16 @@ def _right_frame_from_time_range(time_range):
     return end - 1
 
 
+def _scalar_value(value):
+    """Unwrap Maya's occasional single-item result for scalar plugs."""
+    while isinstance(value, (list, tuple)) and len(value) == 1:
+        value = value[0]
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 # Removed local _resolve_contiguous_neighbors in favor of utils.get_block_neighbors
 
 
@@ -670,18 +680,42 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
 
             try:
                 curve, curve_fn = mode_values.curve_fn_for_attr(attr_full)
-                l_val = omutils.anim_curve_value_at_time(curve_fn, left_frame, cmds.getAttr(attr_full, time=left_frame))
-                r_val = omutils.anim_curve_value_at_time(curve_fn, right_frame, cmds.getAttr(attr_full, time=right_frame))
+                l_val = _scalar_value(
+                    omutils.anim_curve_value_at_time(
+                        curve_fn,
+                        left_frame,
+                        cmds.getAttr(attr_full, time=left_frame),
+                    )
+                )
+                r_val = _scalar_value(
+                    omutils.anim_curve_value_at_time(
+                        curve_fn,
+                        right_frame,
+                        cmds.getAttr(attr_full, time=right_frame),
+                    )
+                )
             except Exception:
+                continue
+            if l_val is None or r_val is None:
                 continue
 
             has_keys = _has_keyframes(attr_full)
             for t in times:
                 try:
-                    orig = omutils.anim_curve_value_at_time(curve_fn, t, cmds.getAttr(attr_full, time=t))
+                    orig = _scalar_value(
+                        omutils.anim_curve_value_at_time(
+                            curve_fn,
+                            t,
+                            cmds.getAttr(attr_full, time=t),
+                        )
+                    )
                     key_index = mode_values.find_or_add_key_index(session, curve_fn, t)
                     if key_index is not None:
-                        orig = omutils.anim_curve_value(curve_fn, key_index, orig)
+                        orig = _scalar_value(
+                            omutils.anim_curve_value(curve_fn, key_index, orig)
+                        )
+                    if orig is None:
+                        continue
                     session.cache.frame_data[(attr_full, t)] = BlendFrameData(
                         original_value=orig,
                         leftValue=l_val,
@@ -702,10 +736,12 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
 
     processed_world_targets = set()
     for (attr_full, time), cache in session.cache.frame_data.items():
-        orig = cache.original_value
-        target_v = cache.rightValue if percentage > 0 else cache.leftValue
+        orig = _scalar_value(cache.original_value)
+        left_value = _scalar_value(cache.leftValue)
+        right_value = _scalar_value(cache.rightValue)
+        target_v = right_value if percentage > 0 else left_value
 
-        if target_v is None or orig is None:
+        if target_v is None or orig is None or left_value is None or right_value is None:
             continue
 
         t = float(percentage) / 100.0
@@ -717,7 +753,7 @@ def apply_blend_to_frame(session, percentage, left_frame=None, right_frame=None,
             if _apply_world_space_blend(attr_full, time, target_f, t):
                 processed_world_targets.add(world_target)
                 continue
-        new_v = utils.lerp_towards(cache.leftValue, cache.rightValue, t, orig)
+        new_v = utils.lerp_towards(left_value, right_value, t, orig)
         mode_values.apply_attr_curve_value(
             session,
             attr_full,
@@ -989,4 +1025,3 @@ def execute(mode, value, session=None):
     finally:
         if standalone:
             session.finish()
-

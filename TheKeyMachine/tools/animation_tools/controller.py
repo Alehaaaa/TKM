@@ -915,6 +915,18 @@ def _frames_for_smart_key(time_context):
     return _frames_for_key_time_context(time_context)
 
 
+def _is_current_frame_only(frames):
+    frames = tuple(frames or ())
+    if len(frames) != 1:
+        return False
+    return math.isclose(
+        float(frames[0]),
+        float(cmds.currentTime(query=True)),
+        rel_tol=0.0,
+        abs_tol=1e-8,
+    )
+
+
 def _nearest_whole_frame(key_time):
     key_time = float(key_time)
     if key_time >= 0.0:
@@ -928,6 +940,21 @@ def _curve_output_plug(curve):
 
 
 def _curve_value_at_frame(curve, frame):
+    plug = _curve_output_plug(curve)
+    current_time = cmds.currentTime(query=True)
+    if plug and math.isclose(float(frame), float(current_time), rel_tol=0.0, abs_tol=1e-8):
+        try:
+            return cmds.getAttr(plug)
+        except (
+            RuntimeError,
+            ValueError,
+            TypeError,
+            AttributeError,
+            KeyError,
+            IndexError,
+        ):
+            pass
+
     try:
         values = cmds.keyframe(curve, query=True, eval=True, time=(frame, frame)) or []
         if values:
@@ -935,7 +962,6 @@ def _curve_value_at_frame(curve, frame):
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
 
-    plug = _curve_output_plug(curve)
     if plug:
         try:
             return cmds.getAttr(plug, time=frame)
@@ -1113,12 +1139,29 @@ def set_smart_key(*args):
             ).set_status(
                 "Setting Smart Keys"
             )
+            animated_channels_found = False
             for obj in selected_objects:
                 if operation.cancelled:
                     break
                 animated_attrs = selectionMod.get_animated_channels_for_node(obj)
 
                 if animated_attrs:
+                    animated_channels_found = True
+                    if _is_current_frame_only(frames):
+                        try:
+                            # Native attribute keying preserves the pose Maya
+                            # holds after a middle-button Time Slider drag.
+                            cmds.setKeyframe(
+                                obj,
+                                attribute=animated_attrs,
+                                time=(frames[0],),
+                            )
+                            keyed = True
+                        except (RuntimeError, ValueError, TypeError):
+                            pass
+                        operation.step()
+                        continue
+
                     animated_plugs = [
                         "{}.{}".format(obj, attr) for attr in animated_attrs
                     ]
@@ -1132,17 +1175,28 @@ def set_smart_key(*args):
                     operation.step()
                     continue
 
-                attrs = selectionMod.get_keyable_scalar_attributes(obj)
-                if not attrs:
-                    operation.step()
-                    continue
-                try:
-                    for frame in frames:
-                        cmds.setKeyframe(obj, attribute=attrs, time=(frame,))
-                        keyed = True
-                except (RuntimeError, ValueError, TypeError):
-                    pass
                 operation.step()
+
+            if not animated_channels_found and not operation.cancelled:
+                operation.set_total(
+                    len(selected_objects), reset=True
+                ).set_status(
+                    "Setting All Smart Keys"
+                )
+                for obj in selected_objects:
+                    if operation.cancelled:
+                        break
+                    attrs = selectionMod.get_keyable_scalar_attributes(obj)
+                    if not attrs:
+                        operation.step()
+                        continue
+                    try:
+                        for frame in frames:
+                            cmds.setKeyframe(obj, attribute=attrs, time=(frame,))
+                            keyed = True
+                    except (RuntimeError, ValueError, TypeError):
+                        pass
+                    operation.step()
 
         if not keyed:
             return wutil.make_inViewMessage("No keyable channels found")

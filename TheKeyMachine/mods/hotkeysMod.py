@@ -945,7 +945,7 @@ def _iter_slider_percentage_rows(slider_type, mode):
             row_icon = _slider_button_icon(slider_type, value)
         else:
             row_icon = mode_icon
-        value_title = "{}: {}".format(mode.label, _slider_value_label(value))
+        value_title = mode.label if value == 0 else "{}: {}".format(mode.label, _slider_value_label(value))
         yield {
             "command": trigger.slider_command_name(slider_type, mode.key, value),
             "title": value_title,
