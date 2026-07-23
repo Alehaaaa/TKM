@@ -10,10 +10,12 @@ from TheKeyMachine.core import openMayaUtils as open_maya
 from TheKeyMachine.mods import selectionMod
 from TheKeyMachine.mods import settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
+from TheKeyMachine.tools.animation_tools import time_navigation
 from TheKeyMachine.widgets import util as wutil
 
 
 _key_clipboard_start_frame = None
+_key_clipboard = None
 REMOVE_REDUNDANT_MODE_SETTING = "remove_redundant_keys_mode"
 REMOVE_REDUNDANT_MODE_FLAT = "flat_keys"
 REMOVE_REDUNDANT_MODE_ALL = "all_redundant"
@@ -335,6 +337,172 @@ def _paste_key_targets(target_plugs, selected_objects, selected_channels, **kwar
     return cmds.pasteKey(selected_objects, **kwargs)
 
 
+def _curve_key_snapshot(curve, target_info):
+    keys = animation_context.key_data(curve, target_info)
+    if not keys:
+        return []
+    snapshots = []
+    for time, value in keys:
+        tangent = {}
+        for flag in (
+            "inAngle", "outAngle", "inWeight", "outWeight",
+            "inTangentType", "outTangentType", "lock", "weightLock",
+        ):
+            try:
+                result = cmds.keyTangent(
+                    curve, query=True, time=(time, time), **{flag: True}
+                ) or []
+                if result:
+                    tangent[flag] = result[0]
+            except _COMMAND_ERRORS:
+                continue
+        snapshots.append({"time": float(time), "value": float(value), "tangent": tangent})
+    return snapshots
+
+
+def _capture_key_clipboard(target_info, target_plugs):
+    entries = []
+    plugs = _unique(target_plugs)
+    curves = animation_context.curves(target_info, include_shapes=False)
+    if not plugs:
+        plugs = selectionMod.get_anim_curve_output_plugs(curves)
+    for curve in curves:
+        curve_plugs = selectionMod.get_anim_curve_output_plugs([curve])
+        plug = curve_plugs[0] if curve_plugs else None
+        if plugs and plug not in plugs:
+            continue
+        keys = _curve_key_snapshot(curve, target_info)
+        if keys:
+            entries.append({"curve": curve, "plug": plug, "keys": keys})
+    return {"entries": entries}
+
+
+def _selected_destination_times():
+    result = {}
+    for curve in selectionMod.get_graph_editor_selected_curves():
+        try:
+            frames = cmds.keyframe(
+                curve, query=True, selected=True, timeChange=True
+            ) or []
+        except _COMMAND_ERRORS:
+            frames = []
+        if frames:
+            result[curve] = sorted(set(float(frame) for frame in frames))
+    return result
+
+
+def _map_clipboard_entries(target_curves):
+    entries = list((_key_clipboard or {}).get("entries") or [])
+    targets = _unique(target_curves)
+    if not entries or not targets:
+        return []
+    by_curve = {entry["curve"]: entry for entry in entries}
+    if set(targets) == set(by_curve):
+        return [(curve, by_curve[curve]) for curve in targets]
+    by_plug = {
+        entry["plug"]: entry for entry in entries if entry.get("plug")
+    }
+    target_plugs = {
+        curve: (selectionMod.get_anim_curve_output_plugs([curve]) or [None])[0]
+        for curve in targets
+    }
+    if all(target_plugs[curve] in by_plug for curve in targets):
+        return [(curve, by_plug[target_plugs[curve]]) for curve in targets]
+    return list(zip(targets, entries))
+
+
+def _apply_key_tangent_snapshot(curve, time, tangent):
+    for flag in (
+        "inTangentType", "outTangentType", "lock", "weightLock",
+        "inAngle", "outAngle", "inWeight", "outWeight",
+    ):
+        if flag not in tangent:
+            continue
+        try:
+            cmds.keyTangent(
+                curve,
+                edit=True,
+                time=(time, time),
+                **{flag: tangent[flag]}
+            )
+        except _COMMAND_ERRORS:
+            continue
+
+
+def _paste_snapshot_to_selected_times(destination_times):
+    mappings = _map_clipboard_entries(destination_times)
+    if not mappings:
+        return False
+    changed = False
+    for curve, entry in mappings:
+        times = destination_times.get(curve)
+        source_keys = entry.get("keys") or []
+        if not times or not source_keys:
+            continue
+        last_destination = len(times) - 1
+        last_source = len(source_keys) - 1
+        for index, destination_time in enumerate(times):
+            source_index = (
+                0 if not last_destination else round(index * last_source / last_destination)
+            )
+            source = source_keys[source_index]
+            cmds.setKeyframe(curve, time=destination_time, value=source["value"])
+            _apply_key_tangent_snapshot(
+                curve, destination_time, source.get("tangent") or {}
+            )
+            changed = True
+    return changed
+
+
+def _clipboard_ordered_targets(target_plugs):
+    targets = _unique(target_plugs)
+    source = [
+        entry.get("plug")
+        for entry in ((_key_clipboard or {}).get("entries") or [])
+        if entry.get("plug")
+    ]
+    if source and set(source) == set(targets):
+        return _unique(source)
+    return targets
+
+
+def _navigation_key_context():
+    curves = selectionMod.get_key_navigation_curves()
+    if not curves:
+        return [], None
+    selected_range = selectionMod.get_selected_time_slider_range()
+    return curves, selected_range
+
+
+def _go_to_key(amount):
+    if time_navigation.accumulate_pending_key_step(amount):
+        return True
+    curves, selected_range = _navigation_key_context()
+    if not curves:
+        return time_navigation.request_frame_step(amount)
+    return time_navigation.request_curve_key_step(
+        amount,
+        curves,
+        time_range=selected_range,
+    )
+
+
+def go_to_next_key(*args):
+    return _go_to_key(1)
+
+
+def go_to_previous_key(*args):
+    return _go_to_key(-1)
+
+
+def go_to_next_frame(*args):
+    return time_navigation.request_frame_step(1)
+
+
+def go_to_previous_frame(*args):
+    return time_navigation.request_frame_step(-1)
+
+
 def apply_smart_euler_filter(*args):
     target_info, _target_plugs, _selected_objects, _selected_channels = (
         animation_context.resolve_command_targets(default_mode="all_animation")
@@ -360,7 +528,7 @@ def clear_animation_keys(*args):
 
 
 def copy_keys(*args):
-    global _key_clipboard_start_frame
+    global _key_clipboard, _key_clipboard_start_frame
 
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(default_mode="all_animation")
@@ -369,11 +537,12 @@ def copy_keys(*args):
         target_info, target_plugs, selected_objects, selected_channels
     )
     _key_clipboard_start_frame = key_range[0] if key_range else None
+    _key_clipboard = _capture_key_clipboard(target_info, target_plugs)
     return _run_key_command(cmds.copyKey, "copy_keys", option="keys")
 
 
 def cut_keys(*args):
-    global _key_clipboard_start_frame
+    global _key_clipboard, _key_clipboard_start_frame
 
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(default_mode="all_animation")
@@ -382,6 +551,7 @@ def cut_keys(*args):
         target_info, target_plugs, selected_objects, selected_channels
     )
     _key_clipboard_start_frame = key_range[0] if key_range else None
+    _key_clipboard = _capture_key_clipboard(target_info, target_plugs)
     return _run_key_command(cmds.cutKey, "cut_keys", option="keys")
 
 
@@ -406,9 +576,15 @@ def paste_keys(*args):
     with _animation_command_context(
         "Paste Keys", "paste_keys", default_mode="current_frame"
     ):
+        destination_times = _selected_destination_times()
+        if destination_times and _paste_snapshot_to_selected_times(destination_times):
+            return True
         kwargs = {"option": "merge"}
         return _paste_key_targets(
-            target_plugs, selected_objects, selected_channels, **kwargs
+            _clipboard_ordered_targets(target_plugs),
+            selected_objects,
+            selected_channels,
+            **kwargs
         )
 
 
@@ -427,12 +603,18 @@ def paste_keys_relative(*args):
     with _animation_command_context(
         "Paste Keys Relative", "paste_keys_relative", default_mode="current_frame"
     ):
+        destination_times = _selected_destination_times()
+        if destination_times and _paste_snapshot_to_selected_times(destination_times):
+            return True
         time_offset = paste_time
         if _key_clipboard_start_frame is not None:
             time_offset = paste_time - _key_clipboard_start_frame
         kwargs = {"option": "merge", "timeOffset": time_offset}
         return _paste_key_targets(
-            target_plugs, selected_objects, selected_channels, **kwargs
+            _clipboard_ordered_targets(target_plugs),
+            selected_objects,
+            selected_channels,
+            **kwargs
         )
 
 

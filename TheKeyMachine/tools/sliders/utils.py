@@ -14,6 +14,7 @@ except ImportError:
     oma = None
 
 import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.tools.sliders import animlayers as slider_animlayers
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.widgets.timeline as timelineWidgets
@@ -156,7 +157,10 @@ def resolve_keyframe_targets(session=None):
 
 def resolve_curve_targets(session=None):
     """Unified entry for resolving whole curves and affected times."""
-    curves, src, time_range, has_graph_keys = selectionMod.resolve_target_curves()
+    plugs, src, time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
+    curves = slider_animlayers.get_slider_anim_curves_from_plugs(plugs)
+    if not curves:
+        curves, src, time_range, has_graph_keys = selectionMod.resolve_target_curves()
     if not curves:
         return [], {}, time_range, has_graph_keys
 

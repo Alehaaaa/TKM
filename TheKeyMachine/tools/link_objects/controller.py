@@ -4,6 +4,8 @@ from maya import cmds
 from maya.api import OpenMaya as om
 
 import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.core import animation_context
+from TheKeyMachine.core import animlayers
 from TheKeyMachine.core import toolbox
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.mods.settingsMod as settings
@@ -76,7 +78,11 @@ def copy_relationship(*_args, tool_operation=None, **_kwargs):
 
     clipboard.save(
         "copy_link",
-        {"main_obj": driver, "relative_matrices": offsets},
+        {
+            "main_obj": driver,
+            "relative_matrices": offsets,
+            "meta": {"layer_context": animlayers.capture_context()},
+        },
     )
     if is_auto_link_enabled():
         enable_auto_link()
@@ -88,15 +94,33 @@ def copy_relationship(*_args, tool_operation=None, **_kwargs):
     return True
 
 
-def _apply_relationship(data, *, keyframe=False, frame=None, warn=True):
+def _apply_relationship(
+    data,
+    *,
+    keyframe=False,
+    frame=None,
+    warn=True,
+    layer_context=None,
+):
     driver, followers = _existing_relationship(data, warn=warn)
     if not driver or not followers:
         return 0
 
     driver_matrix = _matrix(cmds.xform(driver, query=True, matrix=True, worldSpace=True))
     applied = 0
+    locked_destination = False
+    key_attributes = (
+        "tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"
+    )
     for follower in followers:
         try:
+            if keyframe:
+                groups, blocked = animlayers.group_attributes_by_destination(
+                    follower, key_attributes, context=layer_context
+                )
+                locked_destination = locked_destination or bool(blocked)
+                if not groups:
+                    continue
             offset_matrix = _matrix(data["relative_matrices"][follower])
             cmds.xform(
                 follower,
@@ -104,16 +128,20 @@ def _apply_relationship(data, *, keyframe=False, frame=None, warn=True):
                 worldSpace=True,
             )
             if keyframe:
-                cmds.setKeyframe(
+                blocked = animlayers.set_keyframe_in_destination(
                     follower,
-                    attribute=("translate", "rotate", "scale"),
-                    time=(frame if frame is not None else cmds.currentTime(query=True)),
+                    key_attributes,
+                    time=frame if frame is not None else cmds.currentTime(query=True),
+                    context=layer_context,
                 )
+                locked_destination = locked_destination or bool(blocked)
             applied += 1
         except (RuntimeError, TypeError, ValueError) as error:
             import TheKeyMachine.mods.reportMod as report
 
             report.report_detected_exception(error, context="apply relationship to {}".format(follower))
+    if locked_destination and warn:
+        wutil.make_inViewMessage("Current animation layer is locked")
     return applied
 
 
@@ -131,20 +159,73 @@ def _begin_paste_tint(timerange, tool_id, tool_operation=None, anchor_widget=Non
     return tint_session
 
 
-def _relationship_key_times(data, timerange):
+def _relationship_key_times(data, timerange, layer_context=None, selected_frames=None):
     driver, followers = _existing_relationship(data)
     if not driver or not followers:
         return []
-    try:
-        key_times = cmds.keyframe(
-            [driver] + followers,
-            query=True,
-            time=timerange,
-            timeChange=True,
-        ) or []
-    except (RuntimeError, TypeError, ValueError):
-        return []
+    key_times = []
+    attributes = ("tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz")
+    for node in [driver] + followers:
+        for attribute in attributes:
+            plug = "{}.{}".format(node, attribute)
+            destination = animlayers.selected_destination_for_plug(
+                plug, context=layer_context
+            )
+            if destination.get("blocked"):
+                continue
+            curve = animlayers.get_anim_curve_for_plug(
+                plug,
+                layer_name=destination.get("layer"),
+            )
+            try:
+                if curve:
+                    key_times.extend(
+                        cmds.keyframe(
+                            curve,
+                            query=True,
+                            time=timerange,
+                            timeChange=True,
+                        )
+                        or []
+                    )
+                elif not animlayers.has_anim_layers():
+                    key_times.extend(
+                        cmds.keyframe(
+                            plug,
+                            query=True,
+                            time=timerange,
+                            timeChange=True,
+                        )
+                        or []
+                    )
+            except (RuntimeError, TypeError, ValueError):
+                continue
+    if not key_times:
+        try:
+            key_times = cmds.keyframe(
+                [driver] + followers,
+                query=True,
+                time=timerange,
+                timeChange=True,
+            ) or []
+        except (RuntimeError, TypeError, ValueError):
+            key_times = []
+    if selected_frames is not None:
+        selected_frames = {float(frame) for frame in selected_frames}
+        key_times = [frame for frame in key_times if float(frame) in selected_frames]
     return sorted({float(frame) for frame in key_times})
+
+
+def _relationship_paste_context(data):
+    _driver, followers = _existing_relationship(data, warn=False)
+    attributes = ("tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz")
+    plugs = [
+        "{}.{}".format(follower, attribute)
+        for follower in followers
+        for attribute in attributes
+    ]
+    copied_context = ((data.get("meta") or {}).get("layer_context"))
+    return animlayers.prepare_paste_context(copied_context, plugs)
 
 
 def _paste_relationship_over_range(
@@ -154,6 +235,8 @@ def _paste_relationship_over_range(
     tool_operation=None,
     anchor_widget=None,
     tool_id="link_paste_range",
+    layer_context=None,
+    selected_frames=None,
 ):
     global _callback_suspended
 
@@ -164,8 +247,17 @@ def _paste_relationship_over_range(
         tool_operation=tool_operation,
         anchor_widget=anchor_widget,
     )
-    frames = _relationship_key_times(data, timerange)
+    created_layers = {}
+    if layer_context is None:
+        layer_context, created_layers = _relationship_paste_context(data)
+    frames = _relationship_key_times(
+        data,
+        timerange,
+        layer_context=layer_context,
+        selected_frames=selected_frames,
+    )
     if not frames:
+        animlayers.restore_created_layer_states(created_layers)
         if local_tint is not None:
             local_tint.finish()
         wutil.make_inViewMessage("No relationship object keys found in the animation range")
@@ -180,7 +272,7 @@ def _paste_relationship_over_range(
     _callback_suspended = True
     try:
         with toolCommon.suspend_maya_refresh():
-            for frame in frames:
+            for frame_index, frame in enumerate(frames):
                 if tool_operation is not None and tool_operation.cancelled:
                     break
                 cmds.currentTime(frame)
@@ -188,7 +280,8 @@ def _paste_relationship_over_range(
                     data,
                     keyframe=True,
                     frame=frame,
-                    warn=not applied_frames,
+                    warn=frame_index == 0,
+                    layer_context=layer_context,
                 ):
                     applied_frames += 1
                 if tool_operation is not None:
@@ -196,6 +289,7 @@ def _paste_relationship_over_range(
     finally:
         cmds.currentTime(original_time)
         _callback_suspended = False
+        animlayers.restore_created_layer_states(created_layers)
         if local_tint is not None:
             local_tint.finish()
 
@@ -210,15 +304,26 @@ def paste_relationship(*_args, tool_operation=None, anchor_widget=None, **_kwarg
     if not data:
         return False
 
-    selected_range = selectionMod.get_selected_time_slider_range()
-    if selected_range:
-        return _paste_relationship_over_range(
-            data,
-            selected_range,
-            tool_operation=tool_operation,
-            anchor_widget=anchor_widget,
-            tool_id="link_paste",
-        )
+    target_info = animation_context.resolve_targets(default_mode="current_frame")
+    time_context = target_info["time_context"]
+    layer_context, created_layers = _relationship_paste_context(data)
+    if time_context.mode in ("graph_editor_keys", "time_slider_range"):
+        try:
+            return _paste_relationship_over_range(
+                data,
+                time_context.timerange,
+                tool_operation=tool_operation,
+                anchor_widget=anchor_widget,
+                tool_id="link_paste",
+                layer_context=layer_context,
+                selected_frames=(
+                    time_context.frames
+                    if time_context.mode == "graph_editor_keys"
+                    else None
+                ),
+            )
+        finally:
+            animlayers.restore_created_layer_states(created_layers)
 
     frame = cmds.currentTime(query=True)
     local_tint = _begin_paste_tint(
@@ -228,8 +333,14 @@ def paste_relationship(*_args, tool_operation=None, anchor_widget=None, **_kwarg
         anchor_widget=anchor_widget,
     )
     try:
-        applied = _apply_relationship(data, keyframe=True, frame=frame)
+        applied = _apply_relationship(
+            data,
+            keyframe=True,
+            frame=frame,
+            layer_context=layer_context,
+        )
     finally:
+        animlayers.restore_created_layer_states(created_layers)
         if local_tint is not None:
             local_tint.finish()
     if not applied:

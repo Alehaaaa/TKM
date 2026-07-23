@@ -14,7 +14,7 @@ except ImportError:
 
 import TheKeyMachine.core.openMayaUtils as omutils
 from TheKeyMachine.core import curveFitting
-from TheKeyMachine.sliders import mode_values, utils
+from TheKeyMachine.tools.sliders import mode_values, utils
 
 
 def _ensure_curve_value_cache(session, curve, keys):
@@ -640,7 +640,7 @@ Slider modes that modify keyframe timing (offsetting and staggering).
 
 import maya.cmds as cmds
 from TheKeyMachine.core import curveFitting
-from TheKeyMachine.sliders import mode_values, utils
+from TheKeyMachine.tools.sliders import mode_values, utils
 
 
 def _curve_owner(curve):
@@ -733,7 +733,7 @@ def apply_time_stagger(session, curves=None, amount=0.0):
             keys[j] = new_t
 
 from TheKeyMachine.data.colors import COLORS
-from TheKeyMachine.sliders import utils
+from TheKeyMachine.tools.sliders import utils
 
 
 CURVE_OPERATIONS = {

@@ -61,16 +61,20 @@ def get_selected_object_count():
 
 def get_selected_time_range():
     try:
-        time_slider = get_playback_slider()
-        time_range = cmds.timeControl(time_slider, q=True, rangeArray=True)
-        current_time = cmds.currentTime(query=True)
+        time_range = _query_playback_slider(rangeArray=True)
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return None
 
     if not time_range or len(time_range) < 2:
         return None
 
-    if (time_range[1] - time_range[0]) > 1 or (time_range[0] != current_time and time_range[1] != current_time + 1):
+    if (time_range[1] - time_range[0]) > 1:
+        return time_range
+    try:
+        current_time = cmds.currentTime(query=True)
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return None
+    if time_range[0] != current_time and time_range[1] != current_time + 1:
         return time_range
     return None
 
@@ -135,43 +139,52 @@ def get_keyable_scalar_attributes(node):
 def get_anim_curve_output_plugs(curves):
     plugs = []
     for curve in curves or []:
-        try:
-            dest = cmds.listConnections("{}.output".format(curve), source=False, destination=True, plugs=True) or []
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            dest = []
-        plugs.extend(plug for plug in dest if plug and "." in plug)
+        pending = ["{}.output".format(curve)]
+        visited = set()
+        while pending:
+            source = pending.pop(0)
+            if source in visited:
+                continue
+            visited.add(source)
+            try:
+                destinations = cmds.listConnections(
+                    source,
+                    source=False,
+                    destination=True,
+                    plugs=True,
+                    skipConversionNodes=True,
+                ) or []
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                destinations = []
+            for destination in destinations:
+                if not destination or "." not in destination:
+                    continue
+                node = destination.split(".", 1)[0]
+                try:
+                    node_type = cmds.nodeType(node)
+                except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                    node_type = ""
+                if str(node_type).startswith("animBlendNode"):
+                    pending.append(node)
+                else:
+                    plugs.append(destination)
     return _unique(plugs)
 
 
 def get_anim_curves_from_plugs(plugs):
-    curves = []
     try:
         from TheKeyMachine.core import animlayers
     except Exception:
-        animlayers = None
-    use_layer_lookup = False
-    if animlayers is not None:
-        try:
-            use_layer_lookup = animlayers.has_anim_layers()
-        except Exception:
-            use_layer_lookup = False
-
-    for plug in plugs or []:
-        if not plug or not cmds.objExists(plug):
-            continue
-        if use_layer_lookup:
-            try:
-                layer_curve = animlayers.get_anim_curve_for_plug(plug)
-            except Exception:
-                layer_curve = None
-            if layer_curve:
-                curves.append(layer_curve)
-                continue
-        try:
-            curves.extend(cmds.listConnections(plug, source=True, destination=False, type="animCurve") or [])
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-    return _unique(curves)
+        return []
+    valid_plugs = [
+        plug
+        for plug in plugs or []
+        if plug and cmds.objExists(plug)
+    ]
+    return animlayers.get_anim_curves_from_plugs(
+        valid_plugs,
+        include_all_layers=True,
+    )
 
 
 def get_anim_curves_for_nodes(nodes, include_shapes=False):
@@ -464,8 +477,62 @@ def resolve_target_curves():
     return targets["curves"], targets["source"], targets["time_range"], targets["has_graph_keys"]
 
 
-def get_playback_slider():
-    return mel.eval("$tmpVar=$gPlayBackSlider")
+_PLAYBACK_SLIDER = None
+
+
+def get_playback_slider(refresh=False):
+    global _PLAYBACK_SLIDER
+    if refresh or _PLAYBACK_SLIDER is None:
+        _PLAYBACK_SLIDER = mel.eval("$tmpVar=$gPlayBackSlider")
+    return _PLAYBACK_SLIDER
+
+
+def _query_playback_slider(**kwargs):
+    global _PLAYBACK_SLIDER
+    for refresh in (False, True):
+        try:
+            return cmds.timeControl(
+                get_playback_slider(refresh=refresh),
+                query=True,
+                **kwargs
+            )
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            _PLAYBACK_SLIDER = None
+    return None
+
+
+def get_time_slider_anim_curves():
+    """Return the animation curves currently represented by the Time Slider."""
+    return _unique(_query_playback_slider(animCurveNames=True) or [])
+
+
+def get_key_navigation_curves():
+    """Resolve key-navigation curves with one UI-context lookup path."""
+    if is_graph_editor_visible():
+        try:
+            curves = cmds.keyframe(
+                query=True,
+                selected=True,
+                name=True,
+            ) or []
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            curves = []
+        if curves:
+            return _unique(curves)
+
+        try:
+            outliner_items = cmds.selectionConnection(
+                GRAPH_EDITOR_OUTLINER,
+                query=True,
+                object=True,
+            ) or []
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            outliner_items = []
+        _plugs, curves = _resolve_graph_outliner_items(outliner_items)
+        if curves:
+            return _unique(curves)
+
+    return get_time_slider_anim_curves()
 
 
 def _normalize_slider_range(range_array):
@@ -526,8 +593,15 @@ def get_graph_editor_selected_range(include_tangents=True):
 
 
 def get_selected_time_slider_range():
-    time_range = cmds.timeControl(get_playback_slider(), q=True, rangeArray=True)
-    current_time = int(cmds.currentTime(query=True))
-    if (time_range[1] - time_range[0]) > 1 or (time_range[0] != current_time and time_range[1] != current_time + 1):
+    time_range = _query_playback_slider(rangeArray=True)
+    if not time_range or len(time_range) < 2:
+        return None
+    if (time_range[1] - time_range[0]) > 1:
+        return _normalize_slider_range(time_range)
+    try:
+        current_time = int(cmds.currentTime(query=True))
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return None
+    if time_range[0] != current_time and time_range[1] != current_time + 1:
         return _normalize_slider_range(time_range)
     return None

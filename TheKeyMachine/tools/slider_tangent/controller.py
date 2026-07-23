@@ -6,7 +6,7 @@ Proper tangent blending and manipulation logic.
 
 import maya.cmds as cmds
 from TheKeyMachine.core import curveFitting
-from TheKeyMachine.sliders import utils
+from TheKeyMachine.tools.sliders import utils
 
 
 def _ensure_tangent_cache(session, curve, keys):
@@ -205,7 +205,7 @@ def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1
             cmds.keyTangent(curve, edit=True, time=(time, time), lock=orig["locked"])
 
 from TheKeyMachine.data.colors import COLORS
-from TheKeyMachine.sliders import utils
+from TheKeyMachine.tools.sliders import utils
 
 
 TANGENT_TYPES = {

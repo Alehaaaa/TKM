@@ -35,12 +35,40 @@ def mobject_from_node(node):
         return None
 
 
+def mobject_name(node, absolute=True):
+    """Return the dependency-node name for an MObject or Maya node name."""
+    fn = dependency_node_fn(node)
+    if fn is None:
+        return None
+    if absolute:
+        try:
+            return fn.absoluteName()
+        except Exception:
+            pass
+    try:
+        return fn.name()
+    except Exception:
+        return None
+
+
 def dependency_node_fn(node):
     mobject = mobject_from_node(node)
     if mobject is None:
         return None
     try:
         return om.MFnDependencyNode(mobject)
+    except Exception:
+        return None
+
+
+def mplug_from_name(plug_name):
+    """Resolve a complete Maya plug path, including arrays and compounds."""
+    if om is None or not plug_name:
+        return None
+    try:
+        selection = om.MSelectionList()
+        selection.add(str(plug_name))
+        return selection.getPlug(0)
     except Exception:
         return None
 
@@ -133,6 +161,194 @@ def time_unit():
         return om.MTime.uiUnit()
     except Exception:
         return om.MTime.kFilm
+
+
+def current_time():
+    """Return Maya's current time in the active UI time unit."""
+    if oma is None:
+        return None
+    try:
+        return float(oma.MAnimControl.currentTime().asUnits(time_unit()))
+    except Exception:
+        return None
+
+
+def set_current_time(time):
+    """Set Maya's current time through MAnimControl, outside command undo."""
+    if om is None or oma is None:
+        return False
+    try:
+        oma.MAnimControl.setCurrentTime(om.MTime(float(time), time_unit()))
+        return True
+    except Exception:
+        return False
+
+
+def add_event_callback(event_name, callback):
+    """Register a Maya event callback and return its numeric callback ID."""
+    if om is None or not event_name or not callable(callback):
+        return None
+    try:
+        return int(om.MEventMessage.addEventCallback(str(event_name), callback))
+    except Exception:
+        return None
+
+
+def remove_callback(callback_id):
+    """Remove a Maya API callback without raising for stale callback IDs."""
+    if om is None or callback_id is None:
+        return False
+    try:
+        om.MMessage.removeCallback(int(callback_id))
+        return True
+    except Exception:
+        return False
+
+
+def _anim_curve_fns(curves):
+    if om is None or oma is None:
+        return []
+    selection = om.MSelectionList()
+    count = 0
+    for curve in dict.fromkeys(curves or []):
+        if not curve:
+            continue
+        try:
+            selection.add(str(curve))
+            count += 1
+        except Exception:
+            continue
+
+    functions = []
+    for selection_index in range(count):
+        try:
+            node = selection.getDependNode(selection_index)
+            if not node.hasFn(om.MFn.kAnimCurve):
+                continue
+            functions.append(oma.MFnAnimCurve(node))
+        except Exception:
+            continue
+    return functions
+
+
+def _anim_curve_key_count(fn):
+    value = fn.numKeys
+    return int(value() if callable(value) else value)
+
+
+def _anim_curve_input(fn, index, unit):
+    return float(fn.input(index).asUnits(unit))
+
+
+def _first_key_after(fn, time, unit):
+    low = 0
+    high = _anim_curve_key_count(fn)
+    while low < high:
+        middle = (low + high) // 2
+        if _anim_curve_input(fn, middle, unit) <= time:
+            low = middle + 1
+        else:
+            high = middle
+    return low
+
+
+def _last_key_before(fn, time, unit):
+    return _first_key_after(fn, time - 0.0000000001, unit) - 1
+
+
+def step_anim_curve_key_time(
+    curves,
+    current,
+    amount,
+    time_range=None,
+    tolerance=0.000001,
+):
+    """Step through the union of curve keys without scanning every key."""
+    try:
+        current = float(current)
+        amount = int(amount)
+        tolerance = abs(float(tolerance))
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not amount:
+        return current
+
+    bounds = None
+    if time_range:
+        try:
+            bounds = tuple(sorted((
+                float(time_range[0]),
+                float(time_range[1]),
+            )))
+        except (IndexError, TypeError, ValueError):
+            bounds = None
+
+    functions = _anim_curve_fns(curves)
+    if not functions:
+        return None
+    unit = time_unit()
+    direction = 1 if amount > 0 else -1
+
+    def candidate(fn, position, wrap=False):
+        count = _anim_curve_key_count(fn)
+        if not count:
+            return None
+        lower = bounds[0] if bounds else None
+        upper = bounds[1] if bounds else None
+        if direction > 0:
+            threshold = position + tolerance
+            if lower is not None:
+                threshold = max(threshold, lower - tolerance)
+            if wrap:
+                index = 0 if lower is None else _first_key_after(
+                    fn, lower - tolerance, unit
+                )
+            else:
+                index = _first_key_after(fn, threshold, unit)
+            if index >= count:
+                return None
+        else:
+            threshold = position - tolerance
+            if upper is not None:
+                threshold = min(threshold, upper + tolerance)
+            if wrap:
+                index = count - 1 if upper is None else _last_key_before(
+                    fn, upper + tolerance, unit
+                )
+            else:
+                index = _last_key_before(fn, threshold, unit)
+            if index < 0:
+                return None
+        value = _anim_curve_input(fn, index, unit)
+        if lower is not None and value < lower - tolerance:
+            return None
+        if upper is not None and value > upper + tolerance:
+            return None
+        return value
+
+    position = current
+    for _step in range(abs(amount)):
+        candidates = [
+            value
+            for value in (
+                candidate(fn, position)
+                for fn in functions
+            )
+            if value is not None
+        ]
+        if not candidates:
+            candidates = [
+                value
+                for value in (
+                    candidate(fn, position, wrap=True)
+                    for fn in functions
+                )
+                if value is not None
+            ]
+        if not candidates:
+            return None
+        position = min(candidates) if direction > 0 else max(candidates)
+    return position
 
 
 def _matrix_values(matrix):

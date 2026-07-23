@@ -10,7 +10,7 @@ ordinary cleanup. Favor small migrations that leave the dependency graph better 
 
 Declarative values and asset lookup only. `data` is a leaf package: it may use the Python
 standard library and import another `data` module, but it must not import Maya, Qt, `core`,
-`widgets`, `tools`, `sliders`, or `mods`. Color definitions and lightweight media references
+`widgets`, `tools`, or `mods`. Color definitions and lightweight media references
 belong here; widgets that render them do not.
 
 ### `core`
@@ -32,7 +32,7 @@ Reusable Qt presentation and interaction components. Widgets may consume `data` 
 package. Widgets must not contain animation algorithms or import legacy command modules to
 execute feature behavior.
 
-### `tools/<feature>` and `sliders`
+### `tools/<feature>`
 
 Feature implementations. A feature keeps its `api.py`, controllers, dialogs, widgets,
 constants, and private helpers together. Its supported external command surface lives in
@@ -52,7 +52,7 @@ feature package, then update every internal caller directly. Stable command IDs 
 The intended dependency flow is:
 
 ```text
-data <- focused core services <- widgets / tools / sliders <- composition and legacy entry points
+data <- focused core services <- widgets / tools <- composition and legacy entry points
 ```
 
 The arrows mean “may be imported by.” Feature UI can depend on shared widgets, and composition
@@ -148,7 +148,7 @@ Before adding a function, choose its owner in this order:
 1. Pure declarative value or asset path: `data`.
 2. Reusable Qt presentation: `widgets`.
 3. Reusable Maya/domain behavior used by multiple features: focused `core` module.
-4. Behavior owned by one feature: `tools/<feature>` or `sliders`.
+4. Behavior owned by one feature: `tools/<feature>`.
 5. Toolbar, menu, hotkey, or feature assembly: composition module.
 6. Existing external Maya entry point only: `mods` or `core.trigger`.
 

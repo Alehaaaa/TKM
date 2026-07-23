@@ -31,6 +31,22 @@ def delete_keys(*args):
     return controller.delete_keys(*args)
 
 
+def go_to_next_key(*args):
+    return controller.go_to_next_key(*args)
+
+
+def go_to_previous_key(*args):
+    return controller.go_to_previous_key(*args)
+
+
+def go_to_next_frame(*args):
+    return controller.go_to_next_frame(*args)
+
+
+def go_to_previous_frame(*args):
+    return controller.go_to_previous_frame(*args)
+
+
 def paste_keys(*args):
     return controller.paste_keys(*args)
 

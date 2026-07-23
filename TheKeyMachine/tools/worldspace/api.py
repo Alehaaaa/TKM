@@ -1,5 +1,7 @@
 from maya import cmds
 
+from TheKeyMachine.core import animation_context
+from TheKeyMachine.core import animlayers
 from TheKeyMachine.core import openMayaUtils as open_maya
 import TheKeyMachine.core.toolbox as toolbox
 import TheKeyMachine.mods.selectionMod as selectionMod
@@ -57,7 +59,10 @@ def _copy_worldspace_frames(selected_objects, frames, timerange, tool_id, label)
             operation.step()
 
         payload = {
-            "meta": {"ordered_objects": selected_objects},
+            "meta": {
+                "ordered_objects": selected_objects,
+                "layer_context": animlayers.capture_context(),
+            },
             "data": animation_data,
         }
         clipboard.save(WORLDSPACE_CLIPBOARD, payload)
@@ -65,15 +70,29 @@ def _copy_worldspace_frames(selected_objects, frames, timerange, tool_id, label)
 
 
 def worldspace_copy_animation(*args):
-    selected_objects = selectionMod.get_selected_objects(
-        orderedSelection=True,
+    target_info = animation_context.resolve_targets(
+        default_mode="all_animation",
+        ordered_selection=True,
+        long_names=True,
     )
+    selected_objects = list(dict.fromkeys(target_info.get("target_objects") or []))
     if not selected_objects:
         return
 
-    selected_range = selectionMod.get_selected_time_slider_range()
-    timerange = selected_range or timelineWidgets.get_playback_range()
-    frames = range(int(timerange[0]), int(timerange[1]) + 1)
+    time_context = target_info["time_context"]
+    selected_range = (
+        time_context.timerange
+        if time_context.mode == "time_slider_range"
+        else None
+    )
+    if time_context.mode == "graph_editor_keys":
+        frames = list(dict.fromkeys(time_context.frames))
+        timerange = (
+            (min(frames), max(frames)) if frames else time_context.timerange
+        )
+    else:
+        timerange = selected_range or timelineWidgets.get_playback_range()
+        frames = range(int(timerange[0]), int(timerange[1]) + 1)
     try:
         return _copy_worldspace_frames(
             selected_objects,
@@ -230,6 +249,7 @@ def _worldspace_frame_value_map(obj_data):
 
 def worldspace_paste_animation(*args):
     original_time = cmds.currentTime(query=True)
+    created_layers = {}
     try:
         with toolCommon.tool_operation(
             tool_id="ws_paste",
@@ -311,12 +331,39 @@ def worldspace_paste_animation(*args):
 
             all_frames = sorted(frame_set)
             paste_range = (all_frames[0], all_frames[-1])
+            key_attributes = ["tx", "ty", "tz", "rx", "ry", "rz"]
+            copied_layer_context = (
+                (payload.get("meta") or {}).get("layer_context")
+                if isinstance(payload, dict)
+                else None
+            )
+            target_plugs = [
+                "{}.{}".format(target, attribute)
+                for target in valid_targets
+                for attribute in key_attributes
+            ]
+            layer_context, created_layers = animlayers.prepare_paste_context(
+                copied_layer_context,
+                target_plugs,
+            )
+            destination_groups = {}
+            locked_destination = False
             if valid_targets:
-                cmds.cutKey(
-                    valid_targets,
-                    attribute=["tx", "ty", "tz", "rx", "ry", "rz"],
-                    time=paste_range,
-                )
+                for target in valid_targets:
+                    groups, blocked = animlayers.group_attributes_by_destination(
+                        target, key_attributes, context=layer_context
+                    )
+                    destination_groups[target] = groups
+                    locked_destination = locked_destination or bool(blocked)
+                    blocked = animlayers.cut_keys_in_destination(
+                        target,
+                        key_attributes,
+                        paste_range,
+                        context=layer_context,
+                    )
+                    locked_destination = locked_destination or bool(blocked)
+            if locked_destination:
+                wutil.make_inViewMessage("Current animation layer is locked")
 
             operation.timerange = paste_range
             operation.tint_session = timelineWidgets.begin_timeline_tint(
@@ -332,27 +379,39 @@ def worldspace_paste_animation(*args):
                     break
 
                 cmds.currentTime(frame)
-                keyed_targets = []
                 for source_obj, target_obj in mapping:
                     if not cmds.objExists(target_obj):
+                        continue
+                    if not destination_groups.get(target_obj):
                         continue
                     values = (mapped_frame_values.get(source_obj) or {}).get(frame)
                     if values is None:
                         continue
                     if _apply_worldspace_values(target_obj, values):
-                        keyed_targets.append(target_obj)
-                if keyed_targets:
-                    cmds.setKeyframe(
-                        keyed_targets,
-                        time=(frame,),
-                        attribute=["tx", "ty", "tz", "rx", "ry", "rz"],
-                    )
+                        animlayers.set_keyframe_in_destination(
+                            target_obj,
+                            key_attributes,
+                            time=frame,
+                            context=layer_context,
+                        )
                 operation.step()
 
             if valid_targets:
-                cmds.filterCurve(valid_targets)
+                curves = []
+                for target, groups in destination_groups.items():
+                    for layer_name, attributes in groups.items():
+                        for attribute in attributes:
+                            curve = animlayers.get_anim_curve_for_plug(
+                                "{}.{}".format(target, attribute),
+                                layer_name=layer_name,
+                            )
+                            if curve:
+                                curves.append(curve)
+                if curves:
+                    cmds.filterCurve(*list(dict.fromkeys(curves)))
             
             operation.success = True
 
     finally:
+        animlayers.restore_created_layer_states(created_layers)
         cmds.currentTime(original_time)

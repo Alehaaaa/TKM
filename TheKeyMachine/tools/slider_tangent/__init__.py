@@ -1,7 +1,7 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
-from TheKeyMachine.sliders import SliderMode
+from TheKeyMachine.tools.sliders import SliderMode
 
 
 TOOLTIPS = load_tooltips(__file__)

@@ -12,8 +12,8 @@ except ImportError:
 
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.core.openMayaUtils as omutils
-from TheKeyMachine.sliders import mode_values, utils
-from TheKeyMachine.sliders.utils import TweenFrameData, BlendFrameData
+from TheKeyMachine.tools.sliders import mode_values, utils
+from TheKeyMachine.tools.sliders.utils import TweenFrameData, BlendFrameData
 
 # ---------------------------------------------------------------------------------------------------------------------
 #                                                Keyframe Target Resolution                                           #
@@ -930,7 +930,7 @@ def apply_blend_to_undo(session, percentage, world_space=False):
             _apply_preserved_blended_tangents(cache.curve, current_time, target, t)
 
 from TheKeyMachine.data.colors import COLORS
-from TheKeyMachine.sliders import utils
+from TheKeyMachine.tools.sliders import utils
 
 
 OPERATIONS = {

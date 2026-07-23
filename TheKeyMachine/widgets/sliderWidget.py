@@ -7,38 +7,13 @@ import traceback
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
-Qt = QtCore.Qt
-QRect = QtCore.QRect
-Signal = QtCore.Signal
-QTimer = QtCore.QTimer
-QPoint = QtCore.QPoint
-QEvent = QtCore.QEvent
-QSignalBlocker = QtCore.QSignalBlocker
-QColor = QtGui.QColor
-QFont = QtGui.QFont
-QMouseEvent = QtGui.QMouseEvent
-QPainter = QtGui.QPainter
-QWheelEvent = QtGui.QWheelEvent
-QPen = QtGui.QPen
-QPainterPath = QtGui.QPainterPath
-QActionGroup = QtGui.QActionGroup
-QIcon = QtGui.QIcon
-QWidget = QtWidgets.QWidget
-QHBoxLayout = QtWidgets.QHBoxLayout
-QSizePolicy = QtWidgets.QSizePolicy
-QSlider = QtWidgets.QSlider
-QPushButton = QtWidgets.QPushButton
-QStyle = QtWidgets.QStyle
-QStyleOptionSlider = QtWidgets.QStyleOptionSlider
-QLayout = QtWidgets.QLayout
-
 import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
-from TheKeyMachine.sliders import SliderMode
-from TheKeyMachine.sliders import utils as slider_utils
+from TheKeyMachine.tools.sliders import SliderMode
+from TheKeyMachine.tools.sliders import utils as slider_utils
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.widgets.timeline as timelineWidgets
 from TheKeyMachine.data import icons
@@ -87,17 +62,17 @@ def _format_shortcut(shortcut) -> str:
 def _shortcut_to_mask(shortcut) -> int:
     shortcut = shortcut or []
     mask = 0
-    if Qt.Key_Shift in shortcut:
+    if QtCore.Qt.Key_Shift in shortcut:
         mask |= 1
-    if Qt.Key_Control in shortcut:
+    if QtCore.Qt.Key_Control in shortcut:
         mask |= 4
-    if Qt.Key_Alt in shortcut:
+    if QtCore.Qt.Key_Alt in shortcut:
         mask |= 8
     return mask
 
 
 def _shortcut_requires_mid_click(shortcut) -> bool:
-    return Qt.MiddleButton in (shortcut or [])
+    return QtCore.Qt.MiddleButton in (shortcut or [])
 
 
 def _slider_command_name(prefix: str, mode: str, value: int) -> str:
@@ -110,21 +85,21 @@ def _slider_command_name(prefix: str, mode: str, value: int) -> str:
 
 
 # --- tiny button with centered square ------------------------------------------
-class SliderButton(cw.TooltipMixin, QPushButton):
+class SliderButton(cw.TooltipMixin, QtWidgets.QPushButton):
     """Flat square-indicator button that emits its signed percent on click."""
 
-    def __init__(self, parent: QWidget, *, percent: int, color: str, worldSpace: bool = False, frameButton: bool = False):
+    def __init__(self, parent: QtWidgets.QWidget, *, percent: int, color: str, worldSpace: bool = False, frameButton: bool = False):
         super().__init__(parent)
         self._percent = percent
         self._color = color
         self._frameButton = bool(frameButton)
         self._frameValue = None
         self._squareIconPath = None
-        self._squareIcon = QIcon()
+        self._squareIcon = QtGui.QIcon()
         self.setCheckable(self._frameButton)
         self._box_sz = wutil.DPI(7) if (self._frameButton or abs(percent) == 100) else wutil.DPI(3)
         self.setFixedHeight(parent.height())
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
         self.setStyleSheet(
             f"QPushButton {{ background: none; border-radius: 0; }}"
@@ -148,7 +123,7 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
     def setSquareIcon(self, icon_path: Optional[str]):
         self._squareIconPath = icon_path
-        self._squareIcon = QIcon(icon_path or "")
+        self._squareIcon = QtGui.QIcon(icon_path or "")
         self.update()
 
     @property
@@ -208,23 +183,23 @@ class SliderButton(cw.TooltipMixin, QPushButton):
 
     def paintEvent(self, e):
         super().paintEvent(e)
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
 
         w, h, s = self.width(), self.height(), self._box_sz
         y = (h - s) // 2
 
-        base_color = QColor(self._color)
+        base_color = QtGui.QColor(self._color)
         if getattr(self, "_hover", False):
-            main_color = QColor(
+            main_color = QtGui.QColor(
                 min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
             )
-            glow_color = QColor(255, 255, 255, 40)
+            glow_color = QtGui.QColor(255, 255, 255, 40)
             # Create a list of 8 offsets for silhouette glow + (0, 0) for main draw
             offsets = [(-1, -1), (1, 1), (-1, 1), (1, -1), (0, -1), (0, 1), (-1, 0), (1, 0), (0, 0)]
         else:
             main_color = base_color
-            glow_color = Qt.transparent
+            glow_color = QtCore.Qt.transparent
             offsets = [(0, 0)]
 
         if self._worldSpace:
@@ -235,55 +210,55 @@ class SliderButton(cw.TooltipMixin, QPushButton):
                 cx, cy = w // 2, h // 2
                 r = wutil.DPI(int(min(w, h) * 0.24))  # smaller globe
 
-                p.setPen(Qt.NoPen)
+                p.setPen(QtCore.Qt.NoPen)
                 p.setBrush(glow_color if is_glow else main_color)
-                p.drawEllipse(QRect(cx - r, cy - r, 2 * r, 2 * r))
+                p.drawEllipse(QtCore.QRect(cx - r, cy - r, 2 * r, 2 * r))
 
                 if not is_glow:
                     # Black linework on top
-                    pen = QPen(QColor(COLORS.ui.dark_gray.hex))
+                    pen = QtGui.QPen(QtGui.QColor(COLORS.ui.dark_gray.hex))
                     pen.setWidthF(0.85)
                     p.setPen(pen)
-                    p.setBrush(Qt.NoBrush)
+                    p.setBrush(QtCore.Qt.NoBrush)
 
                     # Outer circle outline
-                    p.drawEllipse(QRect(cx - r, cy - r, 2 * r, 2 * r))
+                    p.drawEllipse(QtCore.QRect(cx - r, cy - r, 2 * r, 2 * r))
 
                     # Equator
                     p.drawLine(cx - r + 1, cy, cx + r - 1, cy)
 
                     # Curved meridians (left/right)
                     mer_w = int(2 * r * 0.45)  # tweak curvature here (0.5–0.65 looks good)
-                    mer_rect = QRect(cx - mer_w // 2, cy - r, mer_w, 2 * r)
+                    mer_rect = QtCore.QRect(cx - mer_w // 2, cy - r, mer_w, 2 * r)
                     p.drawArc(mer_rect, 90 * 14, 180 * 16)  # left arc
                     p.drawArc(mer_rect, 90 * 14, -180 * 16)  # right arc
                 p.restore()
         elif not self._squareIcon.isNull():
-            icon_mode = QIcon.Active if self._hover else QIcon.Normal
+            icon_mode = QtGui.QIcon.Active if self._hover else QtGui.QIcon.Normal
             icon_canvas_size = wutil.DPI(SliderHandle.HANDLE_SIZE)
-            icon_rect = QRect(0, 0, icon_canvas_size, icon_canvas_size)
-            icon_rect.moveCenter(QRect(0, 0, w, h).center())
+            icon_rect = QtCore.QRect(0, 0, icon_canvas_size, icon_canvas_size)
+            icon_rect.moveCenter(QtCore.QRect(0, 0, w, h).center())
             self._squareIcon.paint(
                 p,
                 icon_rect,
-                Qt.AlignCenter,
+                QtCore.Qt.AlignCenter,
                 icon_mode,
-                QIcon.Off,
+                QtGui.QIcon.Off,
             )
 
         if self._frameButton and self._frameValue is not None:
-            font = QFont(self.font())
+            font = QtGui.QFont(self.font())
             font.setPixelSize(max(wutil.DPI(7), min(wutil.DPI(9), y)))
             font.setBold(False)
             p.setFont(font)
             p.setPen(main_color)
-            label_rect = QRect(0, -wutil.DPI(1), w, max(1, y + wutil.DPI(1)))
-            p.drawText(label_rect, Qt.AlignHCenter | Qt.AlignTop, str(int(self._frameValue)))
+            label_rect = QtCore.QRect(0, -wutil.DPI(1), w, max(1, y + wutil.DPI(1)))
+            p.drawText(label_rect, QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop, str(int(self._frameValue)))
         p.end()
 
 
 # --- core slider (custom painting & handle-only interaction) --------------------
-class SliderHandle(cw.TooltipMixin, QSlider):
+class SliderHandle(cw.TooltipMixin, QtWidgets.QSlider):
     """Horizontal slider that only drags when grabbing the handle."""
 
     PERCENT_SCALE: ClassVar[int] = 1000
@@ -304,16 +279,17 @@ class SliderHandle(cw.TooltipMixin, QSlider):
     WHEEL_ACCELERATION_LIMIT: ClassVar[float] = 8.0
     WHEEL_COMMIT_DELAY_MS: ClassVar[int] = 250
 
-    started = Signal()
-    moved = Signal(float)
-    finished = Signal()
+    started = QtCore.Signal()
+    moved = QtCore.Signal(float)
+    finished = QtCore.Signal()
 
-    def __init__(self, parent: QWidget, *, text: str, color: str, icon_color: Optional[str] = None):
-        super().__init__(Qt.Horizontal, parent)
+    def __init__(self, parent: QtWidgets.QWidget, *, text: str, color: str, icon_color: Optional[str] = None):
+        super().__init__(QtCore.Qt.Horizontal, parent)
+        self.setObjectName("TKMSliderHandle")
 
         # behavior
         self.setMouseTracking(True)
-        self.setFocusPolicy(Qt.ClickFocus)
+        self.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.setSingleStep(1)
         self.setPageStep(5)
 
@@ -334,15 +310,15 @@ class SliderHandle(cw.TooltipMixin, QSlider):
 
         self._wheel_count = 0
         self._prev_wheel_direction = 0
-        self._wheel_commit_timer = QTimer(self)
+        self._wheel_commit_timer = QtCore.QTimer(self)
         self._wheel_commit_timer.setSingleShot(True)
         self._wheel_commit_timer.setInterval(self.WHEEL_COMMIT_DELAY_MS)
         self._wheel_commit_timer.timeout.connect(self._finish_wheel_interaction)
 
         # fonts
-        self._value_font = QFont()
+        self._value_font = QtGui.QFont()
         self._value_font.setPointSize(wutil.DPI(self.VALUE_FONT_SIZE))
-        self._text_font = QFont()
+        self._text_font = QtGui.QFont()
         self._text_font.setPixelSize(int(wutil.DPI(self.TEXT_FONT_SIZE)))
 
         # size
@@ -443,7 +419,7 @@ class SliderHandle(cw.TooltipMixin, QSlider):
     # --- internals --------------------------------------------------------------
     def _reset_visual_state(self):
         self._wheel_commit_timer.stop()
-        signal_blocker = QSignalBlocker(self)
+        signal_blocker = QtCore.QSignalBlocker(self)
         try:
             self.setValue(getattr(self, "defaultValue", 0))
             self._press_offset = None
@@ -483,13 +459,13 @@ class SliderHandle(cw.TooltipMixin, QSlider):
             handle_border = f"{wutil.DPI(1)}px solid {COLORS.ui.darker_gray.hex}"
         self.setStyleSheet(
             f"""
-QSlider::groove:horizontal {{
+QSlider#TKMSliderHandle::groove:horizontal {{
     background: {COLORS.ui.dark_gray.hex};
     height: {gh}px;
     border-radius: {radius}px;
     margin: 0;
 }}
-QSlider::handle:horizontal {{
+QSlider#TKMSliderHandle::handle:horizontal {{
     width: {int(h * 1.05)}px;
     height: {h}px;
     margin-top: {mt}px;
@@ -507,22 +483,22 @@ QSlider::handle:horizontal {{
     def _is_wheel_session(self) -> bool:
         return self._press_offset is True
 
-    def _groove_rect(self) -> QRect:
-        opt = QStyleOptionSlider()
+    def _groove_rect(self) -> QtCore.QRect:
+        opt = QtWidgets.QStyleOptionSlider()
         self.initStyleOption(opt)
-        return self.style().subControlRect(QStyle.CC_Slider, opt, QStyle.SC_SliderGroove, self)
+        return self.style().subControlRect(QtWidgets.QStyle.CC_Slider, opt, QtWidgets.QStyle.SC_SliderGroove, self)
 
-    def _handle_rect(self) -> QRect:
-        opt = QStyleOptionSlider()
+    def _handle_rect(self) -> QtCore.QRect:
+        opt = QtWidgets.QStyleOptionSlider()
         self.initStyleOption(opt)
-        return self.style().subControlRect(QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self)
+        return self.style().subControlRect(QtWidgets.QStyle.CC_Slider, opt, QtWidgets.QStyle.SC_SliderHandle, self)
 
-    def _handle_hit_rect(self) -> QRect:
+    def _handle_hit_rect(self) -> QtCore.QRect:
         return self._handle_rect()
 
     # events (no groove click)
-    def mousePressEvent(self, e: QMouseEvent):
-        if e.button() == Qt.LeftButton:
+    def mousePressEvent(self, e: QtGui.QMouseEvent):
+        if e.button() == QtCore.Qt.LeftButton:
             hrect = self._handle_hit_rect()
             if hrect.contains(e.pos()):
                 self._apply_stylesheet(thick=True)
@@ -536,7 +512,7 @@ QSlider::handle:horizontal {{
             return
         super().mousePressEvent(e)
 
-    def mouseMoveEvent(self, e: QMouseEvent):
+    def mouseMoveEvent(self, e: QtGui.QMouseEvent):
         # Update handle hover state
         pos = e.pos()
         hrect = self._handle_hit_rect()
@@ -574,14 +550,14 @@ QSlider::handle:horizontal {{
             return
         super().mouseMoveEvent(e)
 
-    def mouseReleaseEvent(self, e: QMouseEvent):
-        if e.button() == Qt.LeftButton and self.isSliderDown():
+    def mouseReleaseEvent(self, e: QtGui.QMouseEvent):
+        if e.button() == QtCore.Qt.LeftButton and self.isSliderDown():
             self.setSliderDown(False)
             self._finish_interaction()
             return e.accept()
         super().mouseReleaseEvent(e)
 
-    def wheelEvent(self, e: QWheelEvent):
+    def wheelEvent(self, e: QtGui.QWheelEvent):
         delta = e.angleDelta().x() + e.angleDelta().y()
         self.apply_wheel_delta(delta)
         e.accept()
@@ -594,19 +570,19 @@ QSlider::handle:horizontal {{
 
     def sliderChange(self, change):
         super().sliderChange(change)
-        if change == QSlider.SliderValueChange:
+        if change == QtWidgets.QSlider.SliderValueChange:
             self.moved.emit(self.percent())
 
     def paintEvent(self, e):
         super().paintEvent(e)
-        p = QPainter(self)
+        p = QtGui.QPainter(self)
         hrect = self._handle_rect()
-        p.setRenderHint(QPainter.Antialiasing)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
 
-        base_color = QColor(self._icon_color)
+        base_color = QtGui.QColor(self._icon_color)
         handle_highlighted = getattr(self, "_handle_hover", False) or bool(self._press_offset)
         if handle_highlighted:
-            main_color = QColor(
+            main_color = QtGui.QColor(
                 min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
             )
         else:
@@ -614,11 +590,11 @@ QSlider::handle:horizontal {{
 
         if self._icon:
             icon_size = int(min(hrect.width(), hrect.height()) * 0.7038)
-            qicon = QIcon(self._icon)
+            qicon = QtGui.QIcon(self._icon)
             if not qicon.isNull():
-                icon_rect = QRect(0, 0, icon_size, icon_size)
+                icon_rect = QtCore.QRect(0, 0, icon_size, icon_size)
                 icon_rect.moveCenter(hrect.center())
-                qicon.paint(p, icon_rect, Qt.AlignCenter)
+                qicon.paint(p, icon_rect, QtCore.Qt.AlignCenter)
         else:
             p.setFont(self._text_font)
             fm = p.fontMetrics()
@@ -626,22 +602,22 @@ QSlider::handle:horizontal {{
             tx = hrect.x() + (hrect.width() - tw) / 2.0
             ty = hrect.y() + (hrect.height() + fm.capHeight()) / 2.0
 
-            path = QPainterPath()
+            path = QtGui.QPainterPath()
             path.addText(tx, ty, self._text_font, self._text)
 
-            p.setPen(QPen(QColor(COLORS.ui.dark_gray.hex), wutil.DPI(2.0), Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-            p.setBrush(Qt.NoBrush)
+            p.setPen(QtGui.QPen(QtGui.QColor(COLORS.ui.dark_gray.hex), wutil.DPI(2.0), QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+            p.setBrush(QtCore.Qt.NoBrush)
             p.drawPath(path)
 
             if handle_highlighted:
-                glow_color = QColor(255, 255, 255, 40)
+                glow_color = QtGui.QColor(255, 255, 255, 40)
                 p.setBrush(glow_color)
-                p.setPen(Qt.NoPen)
+                p.setPen(QtCore.Qt.NoPen)
                 for dx, dy in [(-1, -1), (1, 1), (-1, 1), (1, -1), (0, -1), (0, 1), (-1, 0), (1, 0)]:
                     glow_path = path.translated(dx, dy)
                     p.drawPath(glow_path)
 
-            p.setPen(Qt.NoPen)
+            p.setPen(QtCore.Qt.NoPen)
             p.setBrush(main_color)
             p.drawPath(path)
 
@@ -659,22 +635,22 @@ QSlider::handle:horizontal {{
             # Handle is on the left half, draw text in the right half space
             text_start = cx + hrect.width() // 2 + pad
             text_width = max(0, self.width() - text_start - edge_pad)
-            text_rect = QRect(text_start, 0, text_width, self.height())
-            align = Qt.AlignVCenter | Qt.AlignRight
+            text_rect = QtCore.QRect(text_start, 0, text_width, self.height())
+            align = QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight
         else:
             # Handle is on the right half, draw text in the left half space
             text_width = max(0, cx - hrect.width() // 2 - pad - edge_pad)
-            text_rect = QRect(edge_pad, 0, text_width, self.height())
-            align = Qt.AlignVCenter | Qt.AlignLeft
+            text_rect = QtCore.QRect(edge_pad, 0, text_width, self.height())
+            align = QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft
 
         p.setFont(self._value_font)
-        p.setPen(QColor(SLIDER_VALUE_TEXT_HEX))
+        p.setPen(QtGui.QColor(SLIDER_VALUE_TEXT_HEX))
         p.drawText(text_rect, align, f"{self.value() / float(self.PERCENT_SCALE):.2f}")
         p.end()
 
 
 # --- public composite widget ----------------------------------------------------
-class QFlatSliderWidget(cw.TooltipMixin, QWidget):
+class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
     """
     Public composite widget.
 
@@ -685,13 +661,13 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
       - dragFinished()
     """
 
-    valueChanged = Signal(float)
-    valueSet = Signal(float)
-    dragStarted = Signal()
-    dragFinished = Signal()
-    modeSelected = Signal(str)
-    modeRequested = Signal(str, bool)
-    currentModeChanged = Signal(object, object, object)
+    valueChanged = QtCore.Signal(float)
+    valueSet = QtCore.Signal(float)
+    dragStarted = QtCore.Signal()
+    dragFinished = QtCore.Signal()
+    modeSelected = QtCore.Signal(str)
+    modeRequested = QtCore.Signal(str, bool)
+    currentModeChanged = QtCore.Signal(object, object, object)
 
     def __init__(
         self,
@@ -706,7 +682,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         tooltipTitle: str = "",
         tooltipDescription: str = "",
         tooltip=None,
-        p: Optional[QLayout] = None,
+        p: Optional[QtWidgets.QLayout] = None,
     ):
         super().__init__(None)
         self.setObjectName(name)
@@ -739,33 +715,33 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._mode_transition = None
         self._mode_transition_overlay = None
 
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
         # base layout: only the slider; buttons live in overlay containers
-        base = QHBoxLayout(self)
+        base = QtWidgets.QHBoxLayout(self)
         base.setContentsMargins(1, 0, 1, 0)
         base.setSpacing(0)
 
         self._slider = SliderHandle(self, text=text, color=color, icon_color=self._icon_color)
         self._slider.setRange(int(min * self._scale), int(max * self._scale))
-        self._slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._slider.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         base.addWidget(self._slider)
         self._slider.installEventFilter(self)
 
         # overlay containers (left/right "stems"), on top of the slider
-        self._leftOverlay = QWidget(self)
-        self._rightOverlay = QWidget(self)
+        self._leftOverlay = QtWidgets.QWidget(self)
+        self._rightOverlay = QtWidgets.QWidget(self)
         for ov in (self._leftOverlay, self._rightOverlay):
-            ov.setAttribute(Qt.WA_StyledBackground, False)
+            ov.setAttribute(QtCore.Qt.WA_StyledBackground, False)
             ov.setMouseTracking(True)
             ov.setVisible(True)
             ov.setFixedHeight(self._slider.handle_size())
             ov.installEventFilter(self)
 
         # layouts inside overlays
-        self._leftLayout = QHBoxLayout(self._leftOverlay)
-        self._rightLayout = QHBoxLayout(self._rightOverlay)
+        self._leftLayout = QtWidgets.QHBoxLayout(self._leftOverlay)
+        self._rightLayout = QtWidgets.QHBoxLayout(self._rightOverlay)
         for lay in (self._leftLayout, self._rightLayout):
             lay.setContentsMargins(0, 0, 0, 0)
             lay.setSpacing(0)
@@ -859,7 +835,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         self._update_buttons()
 
         # Accept wheel focus from anywhere in the widget
-        self.setFocusPolicy(Qt.StrongFocus)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
     def _connect_modifier_watch(self):
         if self._modifier_watch_connected:
@@ -1210,7 +1186,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
 
     ############### CONTEXT MENU METHODS ###############
 
-    def _show_context_menu(self, pos: QPoint):
+    def _show_context_menu(self, pos: QtCore.QPoint):
         if not self._modes:
             return
         QFlatTooltipManager.hide()
@@ -1226,7 +1202,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         menu = cw.MenuWidget(parent=self)
         menu.setTearOffEnabled(False)
         menu.addSection("Slider Mode")
-        group = QActionGroup(menu)
+        group = QtGui.QActionGroup(menu)
         group.setExclusive(True)
         active = self.currentMode()
 
@@ -1311,8 +1287,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         if self._mode_transition_overlay is not None:
             self._mode_transition_overlay.deleteLater()
 
-        overlay = QWidget(self)
-        overlay.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        overlay = QtWidgets.QWidget(self)
+        overlay.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         overlay.setStyleSheet("background-color: rgba(255, 255, 255, 72); border-radius: 3px;")
         overlay.setGeometry(self.rect())
         overlay.raise_()
@@ -1589,7 +1565,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
             self.setTemporaryMode(runtime.get_modifier_mask(), requires_mid_click=False)
         super().enterEvent(e)
 
-    def wheelEvent(self, e: QWheelEvent):
+    def wheelEvent(self, e: QtGui.QWheelEvent):
         """Make the wheel change the slider"""
         delta = e.angleDelta().x() + e.angleDelta().y()
         self._slider.apply_wheel_delta(delta)
@@ -1599,11 +1575,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QWidget):
         try:
             event_type = event.type()
         except Exception:
-            return QWidget.eventFilter(self, obj, event)
+            return QtWidgets.QWidget.eventFilter(self, obj, event)
 
-        if event_type == QEvent.MouseButtonPress and getattr(event, "button", lambda: None)() == Qt.MiddleButton:
+        if event_type == QtCore.QEvent.MouseButtonPress and getattr(event, "button", lambda: None)() == QtCore.Qt.MiddleButton:
             if self.setTemporaryMode(runtime.get_modifier_mask(), requires_mid_click=True):
                 event.accept()
                 return True
 
-        return QWidget.eventFilter(self, obj, event)
+        return QtWidgets.QWidget.eventFilter(self, obj, event)

@@ -475,6 +475,11 @@ class RuntimeManager(QtCore.QObject):
             cleanups.append(depthMoverApi.cleanup)
         except Exception:
             pass
+        try:
+            from TheKeyMachine.tools.animation_tools import time_navigation
+            cleanups.append(time_navigation.cancel_pending_navigation)
+        except Exception:
+            pass
 
         for cleanup in cleanups:
             try:

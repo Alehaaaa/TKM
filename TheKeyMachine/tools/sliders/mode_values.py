@@ -9,14 +9,13 @@ curve units here; command-layer writes convert only at the last moment.
 import maya.cmds as cmds
 
 import TheKeyMachine.core.openMayaUtils as omutils
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.tools.sliders import animlayers as slider_animlayers
 
 
 def curve_fn_for_attr(attr_full):
-    curves = selectionMod.get_anim_curves_from_plugs([attr_full])
-    if not curves:
+    curve = slider_animlayers.get_slider_anim_curve_for_plug(attr_full)
+    if not curve:
         return None, None
-    curve = curves[0]
     return curve, omutils.anim_curve_fn(curve)
 
 

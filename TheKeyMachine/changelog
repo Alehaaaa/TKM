@@ -19,6 +19,8 @@
   - bugfix: Simplify and Bake sliders preserve the intended animation curve tendency
   - new: Animation Recovery keeps resilient incremental checkpoints and alerts when an older scene file is opened
   - new: Attribute Switcher can apply different options across multiple controls
+  - new: Anim Curve Tools adds refireable key and frame navigation with reliable channel-aware key pasting
+  - changed: Copy Animation, Align, World Space and Relationship tools preserve the active animation-layer context
 
 0.1.31:
   - polish: Attribute Switcher scrolls attributes lists within to be able to see them all!
