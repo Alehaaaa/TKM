@@ -52,8 +52,6 @@ def request_frame_step(amount):
 def request_curve_key_step(amount, curves, time_range=None):
     """Queue a native step through selected animation curves."""
     curves = tuple(dict.fromkeys(curves or []))
-    if not curves:
-        return False
     normalized_range = None
     if time_range:
         try:
@@ -63,6 +61,8 @@ def request_curve_key_step(amount, curves, time_range=None):
             )))
         except (IndexError, TypeError, ValueError):
             normalized_range = None
+    if not curves and not normalized_range:
+        return False
     return _queue("curve_key", amount, (curves, normalized_range))
 
 
@@ -123,14 +123,19 @@ def flush_pending_navigation(*_args):
             current += amount
         elif kind == "curve_key":
             curves, time_range = context
-            destination = omutils.step_anim_curve_key_time(
-                curves,
-                current,
-                amount,
-                time_range=time_range,
-                tolerance=_TIME_TOLERANCE,
-            )
+            if curves:
+                destination = omutils.step_anim_curve_key_time(
+                    curves,
+                    current,
+                    amount,
+                    time_range=time_range,
+                    tolerance=_TIME_TOLERANCE,
+                )
+            else:
+                destination = None
             current = destination if destination is not None else current + amount
+            if time_range:
+                current = max(time_range[0], min(time_range[1], current))
     return omutils.set_current_time(current)
 
 

@@ -1321,6 +1321,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
         QFlatTooltipManager.hide()
         self._cancel_frame_picker()
         self._finish_active_session()
+        self._suspend_auto_update = False
         try:
             if self._start_slider_interaction(preview=True) is None:
                 return
@@ -1335,6 +1336,8 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
 
     def _on_drag_moved(self, percent: float):
         self.valueChanged.emit(float(percent))
+        if getattr(self, "_suspend_auto_update", False):
+            return
         self._preview_slider_value(percent)
 
     def _on_drag_finished(self):
@@ -1492,10 +1495,16 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
         if session is None:
             return
 
+        timer = QtCore.QElapsedTimer()
+        timer.start()
+
         try:
             self._dragCommand(session.mode, value, session=session)
         except Exception as exc:
             self._on_drag_error(exc)
+
+        if timer.elapsed() >= 150:
+            self._suspend_auto_update = True
 
     def _commit_slider_value(self, value: float, require_existing_session: bool = False):
         if self._dragCommand is None:

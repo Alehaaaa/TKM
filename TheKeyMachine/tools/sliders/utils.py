@@ -24,6 +24,7 @@ from TheKeyMachine.data.colors import COLORS
 @dataclass
 class SliderTargetContext:
     """Holds targeting information resolved at the start of a slider interaction."""
+
     resolved: bool = False
     curves: List[str] = field(default_factory=list)
     # The map of attribute/curve to its affected keyframe times
@@ -42,6 +43,7 @@ class SliderTargetContext:
 @dataclass
 class SliderCaches:
     """Holds various caches used during a slider drag to ensure stability."""
+
     is_cached: bool = False
     original_keyframes: Dict[str, Dict[float, float]] = field(default_factory=dict)
     generated_positions: Dict[str, List[float]] = field(default_factory=dict)
@@ -105,9 +107,16 @@ def get_block_neighbors(time, target_times_set, all_keys):
             left_idx -= 1
         p_time = all_keys[left_idx - 1] if left_idx > 0 else all_keys[left_idx]
         right_idx = idx
-        while right_idx < len(all_keys) - 1 and all_keys[right_idx + 1] in target_times_set:
+        while (
+            right_idx < len(all_keys) - 1
+            and all_keys[right_idx + 1] in target_times_set
+        ):
             right_idx += 1
-        n_time = all_keys[right_idx + 1] if right_idx < len(all_keys) - 1 else all_keys[right_idx]
+        n_time = (
+            all_keys[right_idx + 1]
+            if right_idx < len(all_keys) - 1
+            else all_keys[right_idx]
+        )
     else:
         prev_ks = [f for f in all_keys if f < c_time]
         next_ks = [f for f in all_keys if f > c_time]
@@ -117,10 +126,22 @@ def get_block_neighbors(time, target_times_set, all_keys):
 
 
 def lerp(a, b, t):
+    while isinstance(a, (list, tuple)) and len(a) == 1:
+        a = a[0]
+    while isinstance(b, (list, tuple)) and len(b) == 1:
+        b = b[0]
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return [lerp(x, y, t) for x, y in zip(a, b)]
     return a + (b - a) * t
 
 
 def lerp_towards(left, right, t, current):
+    while isinstance(left, (list, tuple)) and len(left) == 1:
+        left = left[0]
+    while isinstance(right, (list, tuple)) and len(right) == 1:
+        right = right[0]
+    while isinstance(current, (list, tuple)) and len(current) == 1:
+        current = current[0]
     if t < 0.0:
         return lerp(left, current, t + 1.0)
     if t > 0.0:
@@ -130,7 +151,9 @@ def lerp_towards(left, right, t, current):
 
 def resolve_keyframe_targets(session=None):
     """Unified entry for resolving attribute plugs and affected times."""
-    plugs, src, time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
+    plugs, src, time_range, has_graph_keys = (
+        selectionMod.resolve_target_attribute_plugs()
+    )
     if not plugs:
         return {}, time_range
 
@@ -139,25 +162,39 @@ def resolve_keyframe_targets(session=None):
     affected = {}
     tangent_fs = set()
     if has_graph_keys:
-        tangent_fs = set(float(f) for f in selectionMod.get_graph_editor_selected_tangent_frames())
+        tangent_fs = {
+            float(f) for f in selectionMod.get_graph_editor_selected_tangent_frames()
+        }
 
     for plug in plugs:
         if has_graph_keys:
-            ks = set(float(t) for t in (cmds.keyframe(plug, q=True, selected=True, timeChange=True) or []))
+            ks = {
+                float(t)
+                for t in (
+                    cmds.keyframe(plug, q=True, selected=True, timeChange=True) or []
+                )
+            }
             if tangent_fs:
-                ks |= (tangent_fs & set(float(t) for t in (cmds.keyframe(plug, q=True, timeChange=True) or [])))
+                ks |= tangent_fs & {
+                    float(t)
+                    for t in (cmds.keyframe(plug, q=True, timeChange=True) or [])
+                }
             times = sorted(ks) if ks else [curr]
         elif time_range:
-            times = cmds.keyframe(plug, q=True, time=(time_range[0], time_range[1]), timeChange=True) or [curr]
+            times = cmds.keyframe(
+                plug, q=True, time=(time_range[0], time_range[1]), timeChange=True
+            ) or [curr]
         else:
             times = [curr]
-        affected[plug] = sorted(list(set(times)))
+        affected[plug] = sorted(set(times))
     return affected, time_range
 
 
 def resolve_curve_targets(session=None):
     """Unified entry for resolving whole curves and affected times."""
-    plugs, src, time_range, has_graph_keys = selectionMod.resolve_target_attribute_plugs()
+    plugs, src, time_range, has_graph_keys = (
+        selectionMod.resolve_target_attribute_plugs()
+    )
     curves = slider_animlayers.get_slider_anim_curves_from_plugs(plugs)
     if not curves:
         curves, src, time_range, has_graph_keys = selectionMod.resolve_target_curves()
@@ -171,10 +208,12 @@ def resolve_curve_targets(session=None):
         if has_graph_keys:
             ks = cmds.keyframe(c, q=True, selected=True, timeChange=True) or [curr]
         elif time_range:
-            ks = cmds.keyframe(c, q=True, time=(time_range[0], time_range[1]), timeChange=True) or [curr]
+            ks = cmds.keyframe(
+                c, q=True, time=(time_range[0], time_range[1]), timeChange=True
+            ) or [curr]
         else:
             ks = [curr]
-        times_map[c] = sorted(list(set(float(t) for t in ks)))
+        times_map[c] = sorted({float(t) for t in ks})
     return curves, times_map, time_range, has_graph_keys
 
 
@@ -241,7 +280,9 @@ class SliderSession:
         cmds.undoInfo(openChunk=True, chunkName=chunk_name)
         self._is_open = True
 
-    def switch_mode(self, mode, title=None, description="", tooltip=None, tint_color=None):
+    def switch_mode(
+        self, mode, title=None, description="", tooltip=None, tint_color=None
+    ):
         if mode == self.mode:
             return
         self.clear_tint()
@@ -252,7 +293,7 @@ class SliderSession:
         if tint_color is not None:
             self.tint_color = tint_color
         self._tint_key = "slider_{}_range".format(self.mode)
-        
+
         # If we switch modes mid-session, we keep the undo chunk open
         # but reset the resolved targets so they are re-calculated for the new mode.
         self.reset()
@@ -290,8 +331,15 @@ class SliderSession:
         if not timerange:
             return
         try:
-            tint_range = (int(round(timerange[0])), int(round(timerange[1])))
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            tint_range = (round(timerange[0]), round(timerange[1]))
+        except (
+            RuntimeError,
+            ValueError,
+            TypeError,
+            AttributeError,
+            KeyError,
+            IndexError,
+        ):
             return
         if self._tint_range == tint_range:
             return

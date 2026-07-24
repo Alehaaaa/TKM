@@ -57,7 +57,7 @@ class AdaptiveProgress(object):
         label,
         max_value=0,
         interruptable=True,
-        show_after_ms=350,
+        show_after_ms=500,
         min_steps=40,
         update_interval_ms=1000,
         estimated_seconds=None,
@@ -138,7 +138,7 @@ class AdaptiveProgress(object):
     def _should_show(self):
         if self._active:
             return False
-        return (self.max_value > 0 and self.max_value >= self.min_steps) or self._timer.elapsed() >= self.show_after_ms
+        return self._timer.elapsed() >= self.show_after_ms
 
     def _delayed_start(self):
         self._ensure_started(force=True)

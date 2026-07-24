@@ -468,9 +468,16 @@ def _clipboard_ordered_targets(target_plugs):
 
 def _navigation_key_context():
     curves = selectionMod.get_key_navigation_curves()
-    if not curves:
-        return [], None
-    selected_range = selectionMod.get_selected_time_slider_range()
+    selected_range = selectionMod.get_graph_editor_selected_range()
+    if selected_range is None:
+        selected_range = selectionMod.get_selected_time_slider_range()
+    if selected_range is None:
+        try:
+            min_time = cmds.playbackOptions(query=True, minTime=True)
+            max_time = cmds.playbackOptions(query=True, maxTime=True)
+            selected_range = (min_time, max_time)
+        except _COMMAND_ERRORS:
+            selected_range = None
     return curves, selected_range
 
 
@@ -478,8 +485,6 @@ def _go_to_key(amount):
     if time_navigation.accumulate_pending_key_step(amount):
         return True
     curves, selected_range = _navigation_key_context()
-    if not curves:
-        return time_navigation.request_frame_step(amount)
     return time_navigation.request_curve_key_step(
         amount,
         curves,
@@ -1136,9 +1141,27 @@ def set_smart_key(*args):
                 if not attrs:
                     operation.step()
                     continue
+                
+                valid_attrs = []
+                for attr in attrs:
+                    try:
+                        conns = cmds.listConnections(f"{obj}.{attr}", source=True, destination=False)
+                        if not conns:
+                            valid_attrs.append(attr)
+                            continue
+                        node_type = cmds.nodeType(conns[0])
+                        if "animCurve" in node_type or "animBlend" in node_type or "mute" in node_type:
+                            valid_attrs.append(attr)
+                    except Exception:
+                        pass
+                        
+                if not valid_attrs:
+                    operation.step()
+                    continue
+
                 try:
                     for frame in frames:
-                        cmds.setKeyframe(obj, attribute=attrs, time=(frame,))
+                        cmds.setKeyframe(obj, attribute=valid_attrs, time=(frame,))
                         keyed = True
                 except (RuntimeError, ValueError, TypeError):
                     pass
@@ -1179,10 +1202,27 @@ def set_smart_key_all_channels(*args):
             if not attrs:
                 operation.step()
                 continue
+                
+            valid_attrs = []
+            for attr in attrs:
+                try:
+                    conns = cmds.listConnections(f"{obj}.{attr}", source=True, destination=False)
+                    if not conns:
+                        valid_attrs.append(attr)
+                        continue
+                    node_type = cmds.nodeType(conns[0])
+                    if "animCurve" in node_type or "animBlend" in node_type or "mute" in node_type:
+                        valid_attrs.append(attr)
+                except Exception:
+                    pass
+                    
+            if not valid_attrs:
+                operation.step()
+                continue
 
             try:
                 for frame in frames:
-                    cmds.setKeyframe(obj, attribute=attrs, time=(frame,))
+                    cmds.setKeyframe(obj, attribute=valid_attrs, time=(frame,))
                     keyed = True
             except (RuntimeError, ValueError, TypeError):
                 pass
