@@ -143,8 +143,11 @@ class LayerCache(object):
         self.selected_unlocked_layers = []
         self.unlocked_layers = []
         self.preferred = None
-        self.root = AnimationLayer()
-        self.reset()
+        self.root = AnimationLayer(root=True)
+        # Do NOT call reset() here – module-level instantiation happens at
+        # import/reload time, when Maya may refuse cmds.animLayer queries with
+        # "Unable to parse the argument list". Data is populated lazily on the
+        # first real call to capture_context().
 
     def reset(self):
         root_name = root_layer_name()

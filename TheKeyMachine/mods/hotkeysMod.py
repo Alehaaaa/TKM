@@ -1535,7 +1535,7 @@ class HotkeyItemList(QtWidgets.QListWidget):
     pass
 
 
-class TriggerHotkeysDialog(cd.QFlatToolBarWindowDialog):
+class TriggerHotkeysDialog(cd.QFlatDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setWindowTitle("TheKeyMachine Hotkeys")

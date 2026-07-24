@@ -1092,7 +1092,7 @@ class QFlatToolBarDialog(QFlatFloatingWidget):
         self.setMinimumHeight(DPI(300))
 
         # Header. This popup toolbar header intentionally keeps its original
-        # title-first layout; full windows use QFlatToolBarWindowDialog instead.
+        # title-first layout; full windows use QFlatDialog instead.
         title_layout = QtWidgets.QHBoxLayout()
         title_layout.setContentsMargins(DPI(6), DPI(10), 0, DPI(4))
         title_layout.setSpacing(DPI(6))
@@ -1146,15 +1146,7 @@ class QFlatToolBarPopupDialog(QFlatToolBarDialog):
         super().changeEvent(event)
 
 
-class QFlatToolBarWindowDialog(QFlatDialog):
-    """
-    Full QFlat window shell with a unified top-left icon, title, and bottom bar.
-    """
-
-    pass
-
-
-class QFlatBugReportDialog(QFlatToolBarWindowDialog):
+class QFlatBugReportDialog(QFlatDialog):
     """
     Modern bug report dialog that reuses QFlatDialog styling.
     """
@@ -1423,7 +1415,7 @@ class QFlatBugReportDialog(QFlatToolBarWindowDialog):
             self._set_status("Sending bug report. Please wait...", error=False)
             event.ignore()
             return
-        QFlatToolBarWindowDialog.closeEvent(self, event)
+        QFlatDialog.closeEvent(self, event)
 
     def show_centered(self):
         # Avoid adjustSize() here: it tends to make this dialog overly tall based on content hints.
