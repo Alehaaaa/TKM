@@ -409,7 +409,7 @@ def get_selected_object_curves():
 
 
 def _resolve_slider_targets():
-    """Resolve explicit editor selections before the Time Slider's visible curves."""
+    """Resolve slider targets once, then expose plug/curve views for each slider family."""
     time_range = get_selected_time_range()
 
     try:
@@ -425,22 +425,37 @@ def _resolve_slider_targets():
             "has_graph_keys": True,
         }
 
+    graph_items = get_graph_editor_outliner_items()
+    if graph_items:
+        graph_plugs, graph_curves = _resolve_graph_outliner_items(graph_items)
+        if graph_plugs or graph_curves:
+            return {
+                "plugs": graph_plugs,
+                "curves": graph_curves,
+                "source": "graph_editor_outliner",
+                "time_range": time_range,
+                "has_graph_keys": False,
+            }
+
+    try:
+        selected_graph_curves = cmds.keyframe(query=True, name=True, sl=True) or []
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        selected_graph_curves = []
+    if selected_graph_curves:
+        return {
+            "plugs": get_anim_curve_output_plugs(selected_graph_curves),
+            "curves": _unique(selected_graph_curves),
+            "source": "graph_editor",
+            "time_range": time_range,
+            "has_graph_keys": True,
+        }
+
     plugs, source = _selected_object_attribute_plugs()
-    if source == "channel_box" and plugs:
+    if plugs:
         return {
             "plugs": plugs,
             "curves": get_anim_curves_from_plugs(plugs),
             "source": source,
-            "time_range": time_range,
-            "has_graph_keys": False,
-        }
-
-    timeline_curves = get_time_slider_anim_curves()
-    if timeline_curves:
-        return {
-            "plugs": get_anim_curve_output_plugs(timeline_curves),
-            "curves": timeline_curves,
-            "source": "time_slider",
             "time_range": time_range,
             "has_graph_keys": False,
         }
