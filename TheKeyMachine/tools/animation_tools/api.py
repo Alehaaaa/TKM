@@ -7,8 +7,8 @@ REMOVE_REDUNDANT_MODE_FLAT = controller.REMOVE_REDUNDANT_MODE_FLAT
 REMOVE_REDUNDANT_MODE_ALL = controller.REMOVE_REDUNDANT_MODE_ALL
 
 
-def apply_smart_euler_filter(*args):
-    return controller.apply_smart_euler_filter(*args)
+def apply_smart_euler_filter(*args, **kwargs):
+    return controller.apply_smart_euler_filter(*args, **kwargs)
 
 
 def clear_animation_keys(*args):
@@ -19,8 +19,8 @@ def copy_keys(*args):
     return controller.copy_keys(*args)
 
 
-def crop_animation(*args):
-    return controller.crop_animation(*args)
+def crop_animation(*args, **kwargs):
+    return controller.crop_animation(*args, **kwargs)
 
 
 def cut_keys(*args):
@@ -47,12 +47,12 @@ def go_to_previous_frame(*args):
     return controller.go_to_previous_frame(*args)
 
 
-def paste_keys(*args):
-    return controller.paste_keys(*args)
+def paste_keys(*args, **kwargs):
+    return controller.paste_keys(*args, **kwargs)
 
 
-def paste_keys_relative(*args):
-    return controller.paste_keys_relative(*args)
+def paste_keys_relative(*args, **kwargs):
+    return controller.paste_keys_relative(*args, **kwargs)
 
 
 def remove_redundant_keys(*args, **kwargs):
@@ -71,16 +71,16 @@ def remove_static_anim_curves(*args, **kwargs):
     return controller.remove_static_anim_curves(*args, **kwargs)
 
 
-def reverse_animation(*args):
-    return controller.reverse_animation(*args)
+def reverse_animation(*args, **kwargs):
+    return controller.reverse_animation(*args, **kwargs)
 
 
-def set_smart_key(*args):
-    return controller.set_smart_key(*args)
+def set_smart_key(*args, **kwargs):
+    return controller.set_smart_key(*args, **kwargs)
 
 
-def set_smart_key_all_channels(*args):
-    return controller.set_smart_key_all_channels(*args)
+def set_smart_key_all_channels(*args, **kwargs):
+    return controller.set_smart_key_all_channels(*args, **kwargs)
 
 
 def snap_keyframes(*args):

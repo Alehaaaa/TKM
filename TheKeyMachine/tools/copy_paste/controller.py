@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 import re
+import time
 
 from maya import cmds
 
@@ -156,15 +157,20 @@ def _animation_data_timerange(animation_data):
 
 
 def _query_anim_channel_data(source, time_context):
-    if time_context.mode == "graph_editor_keys":
-        keyframes = cmds.keyframe(source, query=True, selected=True, timeChange=True)
-        values = cmds.keyframe(source, query=True, selected=True, valueChange=True)
-    elif time_context.mode == "time_slider_range":
-        keyframes = cmds.keyframe(source, query=True, time=(time_context.start_frame, time_context.end_frame))
-        values = cmds.keyframe(source, query=True, vc=True, time=(time_context.start_frame, time_context.end_frame))
-    else:
-        keyframes = cmds.keyframe(source, query=True)
-        values = cmds.keyframe(source, query=True, vc=True)
+    if not source:
+        return {}
+    try:
+        if time_context.mode == "graph_editor_keys":
+            keyframes = cmds.keyframe(source, query=True, selected=True, timeChange=True)
+            values = cmds.keyframe(source, query=True, selected=True, valueChange=True)
+        elif time_context.mode == "time_slider_range":
+            keyframes = cmds.keyframe(source, query=True, time=(time_context.start_frame, time_context.end_frame))
+            values = cmds.keyframe(source, query=True, vc=True, time=(time_context.start_frame, time_context.end_frame))
+        else:
+            keyframes = cmds.keyframe(source, query=True)
+            values = cmds.keyframe(source, query=True, vc=True)
+    except Exception:
+        keyframes, values = [], []
 
     keyframes = keyframes or []
     values = values or []
@@ -177,6 +183,9 @@ def _query_anim_channel_data(source, time_context):
 
 def _query_static_channel_value(plug):
     try:
+        attr_type = cmds.getAttr(plug, type=True)
+        if attr_type in ("message", "matrix", "fltMatrix", "stringArray", "doubleArray", "Int32Array", "vectorArray", "pointArray"):
+            return {}
         value = cmds.getAttr(plug)
     except Exception:
         return {}
@@ -226,28 +235,41 @@ def _query_anim_layer_weight_data(layer_name, time_context):
     weight_plug = "{}.weight".format(layer_name)
     if not cmds.objExists(weight_plug):
         return {}
+    # Only query if the weight plug actually has an animCurve driving it.
+    # Unkeyed layers have a static weight (1.0) with no curve; querying them
+    # with cmds.keyframe can raise "Unable to parse the argument list".
+    try:
+        weight_curves = cmds.listConnections(
+            weight_plug, source=True, destination=False, type="animCurve"
+        ) or []
+    except Exception:
+        weight_curves = []
+    if not weight_curves:
+        return {}
     if time_context.mode == "graph_editor_keys":
-        keyframes = cmds.keyframe(
-            weight_plug,
-            query=True,
-            time=(time_context.start_frame, time_context.end_frame),
-            timeChange=True,
-        ) or []
-        values = cmds.keyframe(
-            weight_plug,
-            query=True,
-            time=(time_context.start_frame, time_context.end_frame),
-            valueChange=True,
-        ) or []
+        if time_context.start_frame is not None and time_context.end_frame is not None:
+            time_arg = (time_context.start_frame, time_context.end_frame)
+            try:
+                keyframes = cmds.keyframe(
+                    weight_plug, query=True, time=time_arg, timeChange=True
+                ) or []
+                values = cmds.keyframe(
+                    weight_plug, query=True, time=time_arg, valueChange=True
+                ) or []
+            except Exception:
+                keyframes, values = [], []
+        else:
+            keyframes, values = [], []
         data = {
             ANIMATION_FRAME_KEY: keyframes,
             ANIMATION_VALUE_KEY: values,
-            ANIMATION_TANGENT_KEY: _query_key_tangent_data(
-                weight_plug, keyframes
-            ),
+            ANIMATION_TANGENT_KEY: _query_key_tangent_data(weight_plug, keyframes),
         }
     else:
-        data = _query_anim_channel_data(weight_plug, time_context)
+        try:
+            data = _query_anim_channel_data(weight_plug, time_context)
+        except Exception:
+            data = {}
     return data if data else {}
 
 
@@ -279,13 +301,14 @@ def _apply_anim_layer_weight_data(
             layer_name, "weight", tangent_data
         )
         for key_index, (key_time, value) in enumerate(zip(keyframes, values)):
+            if value is None or key_time is None:
+                continue
             try:
-                pasted_time = key_time + weight_time_shift
+                pasted_time = float(key_time) + float(weight_time_shift)
                 cmds.setKeyframe(
-                    layer_name,
+                    f"{layer_name}.weight",
                     time=(pasted_time,),
-                    attribute="weight",
-                    value=value,
+                    value=float(value),
                 )
                 _apply_key_tangent_data(
                     layer_name,
@@ -430,8 +453,8 @@ def _apply_key_tangent_data(target, channel, key_time, tangent_data, index, laye
         if not kwargs:
             return
         try:
-            if layer_name:
-                kwargs["animLayer"] = layer_name
+            # keyTangent operates on the raw animCurve node; animLayer is not
+            # a valid flag and raises TypeError if passed.
             cmds.keyTangent(target, attribute=channel, time=(key_time,), edit=True, **kwargs)
         except Exception as e:
             import TheKeyMachine.mods.reportMod as report
@@ -474,10 +497,8 @@ def _apply_channel_weighted_tangents(target, channel, tangent_data, layer_name=N
     if weighted is None:
         return
     try:
-        kwargs = {"weightedTangents": bool(weighted)}
-        if layer_name:
-            kwargs["animLayer"] = layer_name
-        cmds.keyTangent(target, attribute=channel, edit=True, **kwargs)
+        # keyTangent operates on the raw animCurve; animLayer is not a valid flag.
+        cmds.keyTangent(target, attribute=channel, edit=True, weightedTangents=bool(weighted))
     except Exception:
         pass
 
@@ -485,9 +506,69 @@ def _apply_channel_weighted_tangents(target, channel, tangent_data, layer_name=N
 def _attr_exists_and_settable(node, attr):
     full_attr = f"{node}.{attr}"
     try:
-        return bool(cmds.getAttr(full_attr, settable=True))
+        if not cmds.getAttr(full_attr, settable=True):
+            return False
+        conns = cmds.listConnections(full_attr, source=True, destination=False, plugs=False)
+        if conns:
+            for conn in conns:
+                node_type = cmds.nodeType(conn)
+                if not ("animCurve" in node_type or "animBlend" in node_type or "mute" in node_type):
+                    return False
+        return True
     except Exception:
         return False
+
+
+_SETTABLE_SOURCE_TYPES = ("animCurve", "animBlendNodeBase", "mute")
+
+
+def _settable_keyable_channels(node):
+    """Return ``node``'s keyable, settable attribute names, excluding any
+    driven by something other than an anim curve/anim-layer blend/mute node.
+
+    Same rule as ``_attr_exists_and_settable``, but resolved with a handful
+    of batched queries for the whole node instead of 2-3 cmds calls per
+    attribute -- enumerating channels for many selected controls (e.g. Copy
+    Animation) was otherwise dominated by per-attribute round-trips.
+    """
+    try:
+        attrs = [a for a in (cmds.listAttr(node, keyable=True, settable=True) or []) if a != "tag"]
+    except Exception:
+        return []
+    if not attrs:
+        return []
+
+    try:
+        pairs = cmds.listConnections(
+            ["{}.{}".format(node, attr) for attr in attrs],
+            source=True,
+            destination=False,
+            plugs=True,
+            connections=True,
+        ) or []
+    except Exception:
+        pairs = []
+
+    sources_by_attr = {}
+    for index in range(0, len(pairs) - 1, 2):
+        dest_attr = pairs[index].rsplit(".", 1)[-1]
+        source_node = pairs[index + 1].split(".", 1)[0]
+        sources_by_attr.setdefault(dest_attr, []).append(source_node)
+
+    if not sources_by_attr:
+        return attrs
+
+    all_sources = sorted({source for sources in sources_by_attr.values() for source in sources})
+    try:
+        allowed_sources = set(cmds.ls(all_sources, type=_SETTABLE_SOURCE_TYPES) or [])
+    except Exception:
+        allowed_sources = set()
+
+    return [
+        attr
+        for attr in attrs
+        if all(source in allowed_sources for source in sources_by_attr.get(attr, ()))
+    ]
 
 
 def _set_attr_value(plug, value):
@@ -554,7 +635,6 @@ def _apply_animation_channels_to_targets(
     replace_range=(0, 10000),
     progress=None,
     layer_metadata=None,
-    layer_scope=None,
 ):
     keys_set = 0
     attr_settable_cache = {}
@@ -609,6 +689,23 @@ def _apply_animation_channels_to_targets(
         return layer_name
 
     def _destination_entries(target, channel, channel_data):
+        """Resolve where each copied layer's data goes on paste.
+
+        Two rules, matching the original spec exactly: a deliberately
+        selected NON-BASE destination layer in the Anim Layer Editor
+        overrides everything and takes the whole paste. Otherwise every
+        copied layer is restored by name -- matching an existing layer of
+        the same name or recreating it -- regardless of whether the copy
+        covered one layer or the whole stack.
+
+        The redirect only fires for a non-base selection on purpose:
+        BaseAnimation itself commonly shows as "selected" in Maya's Anim
+        Layer Editor whenever nothing else has been explicitly picked (a
+        fresh scene, or a layer that was since deleted), so treating any
+        selection -- including Base -- as a deliberate redirect silently
+        dumped a single named layer's keys into BaseAnimation instead of
+        restoring it by name.
+        """
         source_entries = _source_entries(channel_data)
         if not source_entries:
             return []
@@ -620,7 +717,14 @@ def _apply_animation_channels_to_targets(
         ]
         recreate_stack = bool(non_base and not destination_context.get("has_layers"))
         plug = "{}.{}".format(target, channel)
-        if destination_context.get("selection_explicit") and not recreate_stack:
+        active_layer_id = destination_context.get("active")
+        explicit_redirect = (
+            destination_context.get("selection_explicit")
+            and active_layer_id
+            and active_layer_id != animlayers.BASE_LAYER_ID
+            and not recreate_stack
+        )
+        if explicit_redirect:
             destination = animlayers.selected_destination_for_plug(
                 plug, context=destination_context
             )
@@ -631,46 +735,26 @@ def _apply_animation_channels_to_targets(
                 )
                 blocked_layers.add(blocked_name or "BaseAnimation")
                 return []
+            # explicit_redirect guarantees this is a non-base layer, so the
+            # only ambiguity left is which source entry to send there.
             destination_id = destination.get("layer_id")
             matching = [
                 entry for entry in source_entries if entry[0] == destination_id
             ]
             if not matching and len(source_entries) == 1:
                 matching = source_entries
-            if not matching and destination_id == animlayers.BASE_LAYER_ID:
-                matching = [
-                    entry
-                    for entry in source_entries
-                    if entry[0] == animlayers.BASE_LAYER_ID
-                ]
             if not matching:
                 return []
             _source_id, data, _weight_data = matching[0]
             return [(destination.get("layer"), data, {})]
 
-        preserve_stack = (
-            recreate_stack
-            or layer_scope in (None, "all")
-            or len(source_entries) > 1
-        )
-        if preserve_stack:
-            resolved = []
-            for layer_id, data, weight_data in source_entries:
-                layer_name = _ensure_source_layer(layer_id, target, channel)
-                if layer_name is False:
-                    continue
-                resolved.append((layer_name, data, weight_data))
-            return resolved
-
-        destination = animlayers.selected_destination_for_plug(
-            plug, context=destination_context
-        )
-        if destination.get("blocked"):
-            blocked_name = destination.get("layer") or destination_context.get("root_name")
-            blocked_layers.add(blocked_name or "BaseAnimation")
-            return []
-        _source_id, data, _weight_data = source_entries[0]
-        return [(destination.get("layer"), data, {})]
+        resolved = []
+        for layer_id, data, weight_data in source_entries:
+            layer_name = _ensure_source_layer(layer_id, target, channel)
+            if layer_name is False:
+                continue
+            resolved.append((layer_name, data, weight_data))
+        return resolved
 
     def _cut_destination_keys(target, channel, layer_name, timerange):
         try:
@@ -691,6 +775,18 @@ def _apply_animation_channels_to_targets(
         except Exception:
             pass
 
+    def _cut_layer_weight_keys(layer_name, timerange):
+        if not layer_name:
+            return
+        try:
+            cmds.cutKey(
+                "{}.weight".format(layer_name),
+                time=timerange,
+                option="keys",
+            )
+        except Exception:
+            pass
+
     def _apply_channel_data(target, channel, channel_data, layer_name=None):
         applied = 0
         pending_progress = 0
@@ -700,6 +796,12 @@ def _apply_animation_channels_to_targets(
             return applied
 
         paste_layer = layer_name
+        if paste_layer is None and animlayers.has_anim_layers():
+            # Once any anim layer exists, an implicit (no animLayer flag)
+            # setKeyframe can hit Maya's own ambiguous-layer resolution and
+            # silently key nothing. Target BaseAnimation by name instead of
+            # leaving it to Maya to guess.
+            paste_layer = animlayers.root_layer_name()
         channel_time_shift = time_shift
         if channel_time_shift is None:
             channel_time_shift = insert_time - keyframes[0] if insert_time is not None else 0
@@ -708,7 +810,12 @@ def _apply_animation_channels_to_targets(
         for key_index, (frame, value) in enumerate(zip(keyframes, values)):
             try:
                 key_time = frame + channel_time_shift
-                key_kwargs = {"time": (key_time,), "attribute": channel, "value": value}
+                key_kwargs = {
+                    "time": (key_time,),
+                    "attribute": channel,
+                    "value": value,
+                    "shape": False,
+                }
                 if paste_layer:
                     key_kwargs["animLayer"] = paste_layer
                 cmds.setKeyframe(target, **key_kwargs)
@@ -764,6 +871,7 @@ def _apply_animation_channels_to_targets(
                                 time=(static_time,),
                                 value=value,
                                 animLayer=destination["layer"],
+                                shape=False,
                             )
                         else:
                             _set_attr_value(f"{target}.{channel}", value)
@@ -788,6 +896,12 @@ def _apply_animation_channels_to_targets(
                     keys_set += _apply_channel_data(target, channel, layer_data, layer_name=layer_name)
                     weight_key = layer_name
                     if weight_data and weight_key not in applied_weights:
+                        if replace:
+                            # Weight belongs to the layer, not this channel,
+                            # so it isn't covered by the per-channel cut
+                            # above -- without this, old weight keys would
+                            # linger alongside newly pasted ones.
+                            _cut_layer_weight_keys(layer_name, replace_range)
                         keys_set += _apply_anim_layer_weight_data(
                             layer_name,
                             weight_data,
@@ -839,7 +953,6 @@ def _apply_animation_data(animation_data, selected_objects, replace=False, inser
                 ),
                 progress=progress,
                 layer_metadata=metadata.get(ANIMATION_LAYER_META_KEY) or {},
-                layer_scope=metadata.get("layer_scope"),
             )
             keys_set += applied
             if applied:
@@ -917,14 +1030,9 @@ def _apply_pose_data(pose_data, selected_objects, progress=None, mappings=None):
 
 
 def copy_animation(*args, **kwargs):
-    def get_animation_channels(control):
-        channels = []
-        for attr in cmds.listAttr(control, keyable=True) or []:
-            if attr == "tag":
-                continue
-            if _attr_exists_and_settable(control, attr):
-                channels.append(attr)
-        return channels
+    get_animation_channels = _settable_keyable_channels
+
+    _t0 = time.perf_counter() if toolCommon.debug_timing_enabled() else None
 
     target_info, target_plugs, selected_objects, _selected_channels = (
         animation_context.resolve_command_targets(
@@ -936,10 +1044,14 @@ def copy_animation(*args, **kwargs):
     if not selected_objects:
         return
 
+    _t_resolve = time.perf_counter() if toolCommon.debug_timing_enabled() else None
+
     time_context = target_info["time_context"]
     layer_context = animlayers.capture_context()
     if layer_context.get("selection_explicit") and not layer_context.get("copy_layer_ids"):
         return wutil.make_inViewMessage("Selected animation layer is locked")
+
+    _t_layer_context = time.perf_counter() if toolCommon.debug_timing_enabled() else None
 
     tint_range = _time_context_tint_range(time_context)
     copied_layer_ids = set(layer_context.get("copy_layer_ids") or [])
@@ -955,6 +1067,18 @@ def copy_animation(*args, **kwargs):
         metadata["weight"] = _query_anim_layer_weight_data(
             layer_name, time_context
         )
+
+    if toolCommon.debug_timing_enabled():
+        _t_weights = time.perf_counter()
+        toolCommon.debug_timing_log(
+            "copy_animation.setup ({} objects, {} layers)".format(
+                len(selected_objects), len(copied_layers)
+            ),
+            resolve_command_targets=(_t_resolve - _t0) * 1000,
+            capture_context=(_t_layer_context - _t_resolve) * 1000,
+            weight_queries=(_t_weights - _t_layer_context) * 1000,
+        )
+
     animation_data = {
         ANIMATION_META_KEY: {
             "type": "animation",
@@ -978,6 +1102,7 @@ def copy_animation(*args, **kwargs):
                 continue
             control, channel = plug.rsplit(".", 1)
             explicit_plugs.setdefault(control, []).append(channel)
+    _t_before_channels = time.perf_counter() if toolCommon.debug_timing_enabled() else None
     channels_by_control = {
         control: list(
             dict.fromkeys(explicit_plugs.get(control) or get_animation_channels(control))
@@ -985,6 +1110,11 @@ def copy_animation(*args, **kwargs):
         for control in selected_objects
     }
     channel_total = sum(len(channels) for channels in channels_by_control.values())
+    if toolCommon.debug_timing_enabled():
+        toolCommon.debug_timing_log(
+            "copy_animation.channel_enum ({} channels)".format(channel_total),
+            enumerate_channels=(time.perf_counter() - _t_before_channels) * 1000,
+        )
 
     try:
         with _copy_paste_operation(
@@ -1152,9 +1282,6 @@ def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
                         )
                         or {}
                     ),
-                    layer_scope=(animation_data.get(ANIMATION_META_KEY) or {}).get(
-                        "layer_scope"
-                    ),
                 )
                 keys_set += applied
                 if applied:
@@ -1172,8 +1299,6 @@ def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
 
 
 def paste_animation_to(source_control_name=None, replace=True, insert_at_current=False, *args, anchor_widget=None, **kwargs):
-    global _paste_to_dialog
-
     try:
         animation_data = clipboard.load("animation", "No animation file found. Please copy animation first")
     except Exception as e:
@@ -1219,9 +1344,6 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
                         )
                         or {}
                     ),
-                    layer_scope=(animation_data.get(ANIMATION_META_KEY) or {}).get(
-                        "layer_scope"
-                    ),
                 )
                 total_keys_set += applied
                 if applied:
@@ -1262,8 +1384,6 @@ def import_animation_file(*args, **kwargs):
 
 
 def paste_pose_to(*args, anchor_widget=None, **kwargs):
-    global _paste_to_dialog
-
     pose_data = clipboard.load("pose", "No pose file found. Please copy pose first")
     if not pose_data:
         return

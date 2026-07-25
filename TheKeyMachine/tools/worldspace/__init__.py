@@ -18,7 +18,7 @@ class WorldspaceToolObject(ToolObject):
             "type": "tool",
             "label": "Copy World Space",
             "icon": "worldspace_copy_frame",
-            "callback": api.worldspace_copy_animation,
+            "callback": api.worldspace_copy_frame,
             "tooltip": TOOLTIPS["copy_frame"],
         },
         "ws_copy_range": {

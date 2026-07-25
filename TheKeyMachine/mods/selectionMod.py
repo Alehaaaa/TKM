@@ -60,22 +60,21 @@ def get_selected_object_count():
 
 
 def get_selected_time_range():
-    try:
-        time_range = _query_playback_slider(rangeArray=True)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return None
-
+    """Base range-selection query. Maya's rangeArray end is exclusive (one frame
+    past the last actually-selected key); normalize it to an inclusive end here
+    so every caller sees the same, correct last frame."""
+    time_range = _query_playback_slider(rangeArray=True)
     if not time_range or len(time_range) < 2:
         return None
 
     if (time_range[1] - time_range[0]) > 1:
-        return time_range
+        return _normalize_slider_range(time_range)
     try:
-        current_time = cmds.currentTime(query=True)
+        current_time = int(cmds.currentTime(query=True))
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return None
     if time_range[0] != current_time and time_range[1] != current_time + 1:
-        return time_range
+        return _normalize_slider_range(time_range)
     return None
 
 
@@ -176,11 +175,10 @@ def get_anim_curves_from_plugs(plugs):
         from TheKeyMachine.core import animlayers
     except Exception:
         return []
-    valid_plugs = [
-        plug
-        for plug in plugs or []
-        if plug and cmds.objExists(plug)
-    ]
+    # animlayers' OpenMaya-based resolution already no-ops safely on an
+    # invalid plug name, so pre-checking each one with cmds.objExists here
+    # was a redundant Maya round trip per plug on top of that.
+    valid_plugs = [plug for plug in plugs or [] if plug]
     return animlayers.get_anim_curves_from_plugs(
         valid_plugs,
         include_all_layers=True,
@@ -208,6 +206,14 @@ def get_anim_curves_for_nodes(nodes, include_shapes=False):
 
 
 def get_attribute_plugs_from_nodes(nodes):
+    """Resolve ``obj.attr`` plugs for every node's channel-box selection (or
+    its keyable scalar attributes, if nothing is highlighted there).
+
+    Existence is checked with one ``listAttr`` per node instead of one
+    ``objExists`` per candidate plug -- for many selected controls with many
+    channels each, the per-plug round trips were the dominant cost of every
+    tool that resolves its targets through here (nearly all of them).
+    """
     nodes = _unique(nodes)
     if not nodes:
         return [], "none"
@@ -217,21 +223,25 @@ def get_attribute_plugs_from_nodes(nodes):
     if selected_channels:
         plugs = []
         for obj in nodes:
+            try:
+                node_attrs = set(cmds.listAttr(obj) or [])
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                node_attrs = set()
             for attr in selected_channels:
-                plug = "{}.{}".format(obj, attr)
-                if cmds.objExists(plug):
-                    plugs.append(plug)
+                if attr in node_attrs:
+                    plugs.append("{}.{}".format(obj, attr))
 
         if plugs:
             return _unique(plugs), "channel_box"
 
-    plugs = []
-    for obj in nodes:
-        attrs = get_keyable_scalar_attributes(obj)
-        for attr in attrs:
-            plug = "{}.{}".format(obj, attr)
-            if cmds.objExists(plug):
-                plugs.append(plug)
+    # get_keyable_scalar_attributes() already queries the live, visible,
+    # keyable, scalar attributes of each object -- every name it returns
+    # exists on that exact object, so there is nothing left to re-verify.
+    plugs = [
+        "{}.{}".format(obj, attr)
+        for obj in nodes
+        for attr in get_keyable_scalar_attributes(obj)
+    ]
 
     return _unique(plugs), "keyable_scalar"
 
@@ -593,15 +603,6 @@ def get_graph_editor_selected_range(include_tangents=True):
 
 
 def get_selected_time_slider_range():
-    time_range = _query_playback_slider(rangeArray=True)
-    if not time_range or len(time_range) < 2:
-        return None
-    if (time_range[1] - time_range[0]) > 1:
-        return _normalize_slider_range(time_range)
-    try:
-        current_time = int(cmds.currentTime(query=True))
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return None
-    if time_range[0] != current_time and time_range[1] != current_time + 1:
-        return _normalize_slider_range(time_range)
-    return None
+    """Same base range query as get_selected_time_range(); kept as a named
+    alias since callers elsewhere refer to it by this name."""
+    return get_selected_time_range()

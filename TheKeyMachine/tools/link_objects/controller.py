@@ -128,7 +128,7 @@ def _apply_relationship(
                 worldSpace=True,
             )
             if keyframe:
-                blocked = animlayers.set_keyframe_in_destination(
+                _keyed, blocked = animlayers.set_keyframe_in_destination(
                     follower,
                     key_attributes,
                     time=frame if frame is not None else cmds.currentTime(query=True),

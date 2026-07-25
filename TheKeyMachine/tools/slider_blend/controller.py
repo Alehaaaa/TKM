@@ -423,7 +423,7 @@ def apply_connect_neighbors(session, curves, amount):
             _apply_value(session, curve, time, value + offset)
 
     if affected_tint_times:
-        session.show_tint((min(affected_tint_times), max(affected_tint_times)))
+        session.show_target_tint((min(affected_tint_times), max(affected_tint_times)))
 
 
 def apply_gap_stitcher(session, curves, amount):
@@ -463,7 +463,7 @@ def apply_gap_stitcher(session, curves, amount):
             _apply_value(session, curve, time, value + full_offset * feather * blend)
             affected_times.append(time)
     if affected_times:
-        session.show_tint((min(affected_times), max(affected_times)))
+        session.show_target_tint((min(affected_times), max(affected_times)))
 
 
 def apply_simplify(session, curves, amount):
@@ -518,9 +518,6 @@ def apply_simplify(session, curves, amount):
                 cmds.cutKey(curve, time=(time, time), clear=True)
             curveFitting.apply(shape, set_values=False, preserve_tangent_types=True)
 
-    if session.targets.time_range:
-        session.show_tint(session.targets.time_range)
-
 
 def apply_bake(session, curves, amount):
     """Progressively insert keys sampled from the untouched curve tendency."""
@@ -571,9 +568,6 @@ def apply_bake(session, curves, amount):
             target_shape,
             change=session.anim_change if session.preview else None,
         )
-
-    if session.targets.time_range:
-        session.show_tint(session.targets.time_range)
 
 
 # ---------------------------------------------------------------------------------------------------------------------

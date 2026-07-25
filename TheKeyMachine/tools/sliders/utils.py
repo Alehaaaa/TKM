@@ -217,6 +217,17 @@ def resolve_curve_targets(session=None):
     return curves, times_map, time_range, has_graph_keys
 
 
+def _tint_resolved_range(session):
+    """Tint the timeline range driving this drag, in the slider's own color.
+
+    Called once per interaction, right after targets are resolved, so every
+    slider mode gets this for free instead of each apply_* function having
+    to remember to call it individually.
+    """
+    if session.targets.time_range:
+        session.show_target_tint(session.targets.time_range)
+
+
 def resolve_curve_targets_for_session(session):
     """Resolve curve targets once and cache them for an interaction."""
     if not session.targets.resolved:
@@ -226,7 +237,19 @@ def resolve_curve_targets_for_session(session):
         session.targets.time_range = time_range
         session.targets.has_graph_keys = has_graph_keys
         session.targets.resolved = True
+        _tint_resolved_range(session)
     return session.targets.curves, session.targets.affected_map
+
+
+def resolve_keyframe_targets_for_session(session):
+    """Resolve keyframe-plug targets once and cache them for an interaction."""
+    if not session.targets.resolved:
+        affected_map, time_range = resolve_keyframe_targets(session)
+        session.targets.affected_map = affected_map
+        session.targets.time_range = time_range
+        session.targets.resolved = True
+        _tint_resolved_range(session)
+    return session.targets.affected_map, session.targets.time_range
 
 
 class SliderSession:

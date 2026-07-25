@@ -173,7 +173,7 @@ def align_selected_objects(*_args, **kwargs):
                         cmds.matchTransform(
                             source_object, target_object, pos=pos, rot=rot, scl=scl
                         )
-                        blocked = animlayers.set_keyframe_in_destination(
+                        _keyed, blocked = animlayers.set_keyframe_in_destination(
                             source_object,
                             key_attributes,
                             time=frame,

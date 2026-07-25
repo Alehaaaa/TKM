@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from functools import lru_cache
 import inspect
+import time
 import warnings
 
 import maya.cmds as cmds  # type: ignore
@@ -11,6 +12,48 @@ from TheKeyMachine.core.Qt import QtCore, QtGui  # type: ignore
 from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import util as wutil
 from TheKeyMachine.mods import settingsMod as settings
+
+
+# Set TKM_DEBUG_TIMING=true in TheKeyMachine/.env (or the process
+# environment) to print a per-phase breakdown of every tool_operation() to
+# the Script Editor -- lets a reported "hang before the tool actually runs"
+# be pinned to an exact phase (progress/tint setup, undo chunk, refresh
+# suspension, or the callback itself) instead of guessed at. Uses the same
+# .env reader as TKM_TOOL_DEBUG (see core/debug.py) rather than a second,
+# duplicated parser. Read once at import -- tool_operation() runs on every
+# click, so this must not become another uncached per-click file read;
+# reload TheKeyMachine after changing the flag to pick up a new value.
+def _debug_timing_enabled():
+    try:
+        from TheKeyMachine.core import debug as _debug
+
+        return _debug.env_flag("TKM_DEBUG_TIMING")
+    except Exception:
+        return False
+
+
+_DEBUG_TIMING = _debug_timing_enabled()
+
+
+def debug_timing_enabled():
+    """Public accessor for _DEBUG_TIMING so other modules can add their own
+    fine-grained timing probes without reaching into a private module var."""
+    return _DEBUG_TIMING
+
+
+def debug_timing_log(label, **phases_ms):
+    """Print one [TKM timing] breakdown line if TKM_DEBUG_TIMING is on.
+
+    Shared by tool_operation()'s own phase breakdown and any controller that
+    wants to instrument further inside its callback (e.g. to split a slow
+    "callback" phase into its own sub-phases) -- one format, one place.
+    """
+    if not _DEBUG_TIMING:
+        return
+    parts = " ".join(
+        "{}={:.1f}ms".format(name, value) for name, value in phases_ms.items()
+    )
+    print("[TKM timing] {}: {}".format(label, parts))
 
 
 UNDO_PREFIX = "TKM"
@@ -59,7 +102,7 @@ class AdaptiveProgress(object):
         interruptable=True,
         show_after_ms=500,
         min_steps=40,
-        update_interval_ms=1000,
+        update_interval_ms=250,
         estimated_seconds=None,
     ):
         self.label = label or "Processing"
@@ -165,9 +208,9 @@ class AdaptiveProgress(object):
         except Exception:
             self._bar = None
 
-    def start(self):
+    def start(self, force=False):
         was_active = self._active
-        self._ensure_started(force=True)
+        self._ensure_started(force=force)
         if was_active or not self._active:
             return
         # Synchronous Maya commands can block the event loop immediately after
@@ -182,26 +225,34 @@ class AdaptiveProgress(object):
 
     def _status_text(self):
         title = format_tool_label(self.label)
-        if not self.max_value:
-            elapsed_seconds = max(0.0, self._timer.elapsed() / 1000.0)
-            if self.estimated_seconds and self.estimated_seconds > elapsed_seconds:
-                eta = _format_eta(self.estimated_seconds - elapsed_seconds)
+        if self.max_value:
+            # Total is already known (most TKM tools compute it upfront), so
+            # there's nothing to "estimate" -- show real N/Total progress
+            # from the first frame instead of a placeholder that implies an
+            # open-ended wait most operations never actually have.
+            if self.value > 0:
+                elapsed_seconds = max(0.001, self._timer.elapsed() / 1000.0)
+                remaining = (elapsed_seconds / float(self.value)) * max(0, self.max_value - self.value)
+                eta = _format_eta(remaining)
                 if eta:
                     return "{}... about {}".format(title, eta)
-            elapsed = max(0, int(round(elapsed_seconds)))
-            if elapsed:
-                return "{}... estimating time ({} seconds elapsed)".format(
-                    title, elapsed
-                )
-            return "{}... estimating time".format(title)
-        eta = ""
-        if self.value > 0:
-            elapsed_seconds = max(0.001, self._timer.elapsed() / 1000.0)
-            remaining = (elapsed_seconds / float(self.value)) * max(0, self.max_value - self.value)
-            eta = _format_eta(remaining)
-        if eta:
-            return "{}... about {}".format(title, eta)
-        return "{}... estimating time".format(title)
+            return "{}... {}/{}".format(title, self.value, self.max_value)
+
+        # Total is genuinely unknown here. Most operations still finish in
+        # well under a second, so lead with the plain label instead of
+        # "estimating time" -- only start saying that once enough time has
+        # actually passed that a bare label would look stuck.
+        elapsed_seconds = max(0.0, self._timer.elapsed() / 1000.0)
+        if self.estimated_seconds and self.estimated_seconds > elapsed_seconds:
+            eta = _format_eta(self.estimated_seconds - elapsed_seconds)
+            if eta:
+                return "{}... about {}".format(title, eta)
+        if elapsed_seconds >= 1.0:
+            elapsed = int(round(elapsed_seconds))
+            return "{}... estimating time ({} seconds elapsed)".format(
+                title, elapsed
+            )
+        return title
 
     @property
     def elapsed_seconds(self):
@@ -430,6 +481,28 @@ def _begin_operation_tint(tint=None, timerange=None, default_mode="current_frame
     return None
 
 
+def ensure_operation_tint(operation, tint=None, timerange=None, default_mode="current_frame", tint_key=None, tint_color=None):
+    """Give an already-open ``ToolOperation`` a timeline tint if it doesn't have one yet.
+
+    Lets a command that reused the dispatcher's operation (instead of opening
+    its own via ``tool_operation()``) still ask for tint/timerange context,
+    without duplicating ``tool_operation()``'s own tint-begin logic -- both
+    paths route through the same ``_begin_operation_tint()``.
+    """
+    if operation is None or operation.tint_session:
+        return
+    if timerange:
+        operation.timerange = timerange
+    operation.tint_session = _begin_operation_tint(
+        tint=tint,
+        timerange=timerange,
+        default_mode=default_mode,
+        tint_key=tint_key or operation.tool_id,
+        tint_color=tint_color,
+        owner=operation.anchor_widget,
+    )
+
+
 @contextmanager
 def tool_operation(
     tool_id=None,
@@ -448,6 +521,8 @@ def tool_operation(
     show_success_message=True,
     suspend_refresh=True,
 ):
+    _t_start = time.perf_counter() if _DEBUG_TIMING else None
+
     if tint_color is None and tool_id:
         try:
             from TheKeyMachine.core import toolbox
@@ -455,6 +530,8 @@ def tool_operation(
             tint_color = toolbox.get_tool_tint_color(tool_id)
         except Exception:
             tint_color = None
+
+    _t_tint_color = time.perf_counter() if _DEBUG_TIMING else None
 
     parent_operation = current_tool_operation()
     progress_obj = None
@@ -475,10 +552,11 @@ def tool_operation(
             interruptable=interruptable,
             show_after_ms=200,
             min_steps=10,
-            update_interval_ms=1000,
+            update_interval_ms=250,
             estimated_seconds=_TOOL_DURATION_ESTIMATES.get(estimate_key),
         )
         owns_progress = True
+    _t_progress = time.perf_counter() if _DEBUG_TIMING else None
     tint_session = _begin_operation_tint(
         tint=tint,
         timerange=timerange,
@@ -487,6 +565,7 @@ def tool_operation(
         tint_color=tint_color,
         owner=anchor_widget,
     )
+    _t_tint_session = time.perf_counter() if _DEBUG_TIMING else None
     operation = ToolOperation(
         tool_id=tool_id,
         label=label,
@@ -498,12 +577,13 @@ def tool_operation(
         operation.timerange = timerange
     chunk_opened = False
     _TOOL_OPERATION_STACK.append(operation)
-    
+
     refresh_suspended = False
     operation_completed = False
     if suspend_refresh:
         refresh_suspended = _acquire_refresh_suspension()
         operation.refresh_suspended = refresh_suspended
+    _t_refresh = time.perf_counter() if _DEBUG_TIMING else None
 
     try:
         if undo:
@@ -513,10 +593,24 @@ def tool_operation(
                     undo_name or make_undo_chunk_name(tool_id=tool_id, title=label)
                 )
                 operation.undo_chunk_opened = bool(chunk_opened)
+        _t_undo = time.perf_counter() if _DEBUG_TIMING else None
         with progress_obj if owns_progress else _null_context():
             if progress_obj:
-                progress_obj.start()
+                progress_obj.start(force=False)
+            _t_before_callback = time.perf_counter() if _DEBUG_TIMING else None
             yield operation
+            if _DEBUG_TIMING:
+                _t_after_callback = time.perf_counter()
+                debug_timing_log(
+                    tool_id or label or "?",
+                    tint_color=(_t_tint_color - _t_start) * 1000,
+                    progress_setup=(_t_progress - _t_tint_color) * 1000,
+                    tint_session=(_t_tint_session - _t_progress) * 1000,
+                    refresh_suspend=(_t_refresh - _t_tint_session) * 1000,
+                    undo_chunk=(_t_undo - _t_refresh) * 1000,
+                    callback=(_t_after_callback - _t_before_callback) * 1000,
+                    total_before_callback=(_t_before_callback - _t_start) * 1000,
+                )
         operation_completed = True
             
         if operation.success:
@@ -533,7 +627,6 @@ def tool_operation(
                     pass
             if show_success_message:
                 try:
-                    from TheKeyMachine.widgets import util as wutil
                     wutil.make_inViewMessage(operation.success_message or label or "Operation Successful")
                 except Exception:
                     pass

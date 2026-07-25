@@ -34,15 +34,10 @@ def _right_frame_from_time_range(time_range):
 
 # Removed local _resolve_contiguous_neighbors in favor of utils.get_block_neighbors
 
-
-def _resolve_keyframe_targets_for_session(session):
-    """Cache the resolved keyframe target map on the session."""
-    if not session.targets.resolved:
-        affected_map, time_range = utils.resolve_keyframe_targets(session)
-        session.targets.affected_map = affected_map
-        session.targets.time_range = time_range
-        session.targets.resolved = True
-    return session.targets.affected_map, session.targets.time_range
+# Target resolution/caching (and the range-selection timeline tint that comes
+# with it) now lives in utils.resolve_keyframe_targets_for_session, shared
+# with every other slider tool instead of duplicated here.
+_resolve_keyframe_targets_for_session = utils.resolve_keyframe_targets_for_session
 
 
 # ---------------------------------------------------------------------------------------------------------------------

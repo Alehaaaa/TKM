@@ -69,9 +69,9 @@ def _copy_worldspace_frames(selected_objects, frames, timerange, tool_id, label)
         operation.success = True
 
 
-def worldspace_copy_animation(*args):
+def _worldspace_copy(default_mode, tool_id, label):
     target_info = animation_context.resolve_targets(
-        default_mode="all_animation",
+        default_mode=default_mode,
         ordered_selection=True,
         long_names=True,
     )
@@ -90,6 +90,9 @@ def worldspace_copy_animation(*args):
         timerange = (
             (min(frames), max(frames)) if frames else time_context.timerange
         )
+    elif time_context.mode == "current_frame":
+        frames = list(time_context.frames)
+        timerange = time_context.timerange
     else:
         timerange = selected_range or timelineWidgets.get_playback_range()
         frames = range(int(timerange[0]), int(timerange[1]) + 1)
@@ -98,12 +101,24 @@ def worldspace_copy_animation(*args):
             selected_objects,
             frames,
             timerange,
-            "ws_copy_range",
-            "World Space animation copied",
+            tool_id,
+            label,
         )
     finally:
         if selected_range:
             timelineWidgets.clear_time_slider_selection()
+
+
+def worldspace_copy_frame(*args):
+    """Copy world-space transforms. Copies the current frame when nothing
+    is selected, or the selected time-slider range / graph editor keys."""
+    return _worldspace_copy("current_frame", "ws_copy_frame", "World Space copied")
+
+
+def worldspace_copy_animation(*args):
+    """Copy world-space animation. Copies the visible playback range when
+    nothing is selected, or the selected time-slider range / graph editor keys."""
+    return _worldspace_copy("all_animation", "ws_copy_range", "World Space animation copied")
 
 
 def paste_worldspace_single_frame(*args):

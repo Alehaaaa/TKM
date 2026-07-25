@@ -365,6 +365,7 @@ class RuntimeManager(QtCore.QObject):
     scene_opened = QtCore.Signal()
     scene_new = QtCore.Signal()
     scene_saved = QtCore.Signal()
+    scene_before_saved = QtCore.Signal()
 
     selection_changed = QtCore.Signal()
     time_changed = QtCore.Signal()
@@ -903,12 +904,21 @@ class RuntimeManager(QtCore.QObject):
             except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
+        def _before_save(*_args):
+            self._emit("scene_before_saved")
+            try:
+                self.scene_before_saved.emit()
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+
         cb_open = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterOpen, _after_open)
         cb_new = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterNew, _after_new)
         cb_save = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterSave, _after_save)
+        cb_before_save = om.MSceneMessage.addCallback(om.MSceneMessage.kBeforeSave, _before_save)
         self._track_om("scene_opened", int(cb_open))
         self._track_om("scene_new", int(cb_new))
         self._track_om("scene_saved", int(cb_save))
+        self._track_om("scene_before_saved", int(cb_before_save))
 
     def _start_background_runners(self) -> None:
         try:

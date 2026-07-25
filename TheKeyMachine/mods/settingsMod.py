@@ -7,6 +7,15 @@ from TheKeyMachine.mods.generalMod import USER_FOLDER_PATH
 _PREFERENCES_ROOT = os.path.join(USER_FOLDER_PATH, "TheKeyMachine_user_data", "preferences")
 _DEFAULT_FILENAME = "user_preferences.json"
 
+# get_setting() is called from nearly every tool controller, often more than
+# once per invocation (e.g. checking several preference keys), and every
+# TKM toolbar click routes through tool_operation()/settings lookups. Without
+# caching, every one of those calls re-reads and re-parses the whole
+# preferences file from disk -- the "small lag on every click" users notice.
+# Cache by mtime (a cheap stat) so repeated reads skip the file entirely
+# until something on disk actually changes.
+_FILE_CACHE: Dict[str, "tuple[Optional[float], Optional[Dict]]"] = {}
+
 
 def _preferences_dir() -> str:
     """Return (and lazily create) the folder that stores preference json files."""
@@ -36,13 +45,31 @@ def _candidate_files(namespace: Optional[str]) -> Iterable[str]:
 
 
 def _load_file(config_file: str) -> Optional[Dict]:
-    if not os.path.isfile(config_file):
+    try:
+        mtime = os.path.getmtime(config_file)
+    except OSError:
+        _FILE_CACHE.pop(config_file, None)
         return None
+
+    cached_mtime, cached_config = _FILE_CACHE.get(config_file, (None, None))
+    if cached_config is not None and cached_mtime == mtime:
+        return cached_config
+
     try:
         with open(config_file, "r", encoding="utf-8") as handle:
-            return json.load(handle)
+            config = json.load(handle)
     except Exception:
         return None
+    _FILE_CACHE[config_file] = (mtime, config)
+    return config
+
+
+def _store_cache(config_file: str, config: Dict) -> None:
+    try:
+        mtime = os.path.getmtime(config_file)
+    except OSError:
+        mtime = None
+    _FILE_CACHE[config_file] = (mtime, config)
 
 
 def get_setting(key: str, default_value=None, namespace: Optional[str] = None):
@@ -71,3 +98,4 @@ def set_settings(values: Dict[str, object], namespace: Optional[str] = None) -> 
 
     with open(config_file, "w", encoding="utf-8") as handle:
         json.dump(config, handle, indent=4, sort_keys=True)
+    _store_cache(config_file, config)

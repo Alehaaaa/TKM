@@ -1,5 +1,7 @@
 """Prebuilt native Maya plug-in selection, loading, validation, and cleanup."""
 
+import contextlib
+import logging
 import os
 import platform
 import re
@@ -171,6 +173,32 @@ def _restore_context(spec):
             pass
 
 
+@contextlib.contextmanager
+def _suppress_pymel_node_cleanup_warnings():
+    """Silence PyMEL's benign node-cleanup warning during plug-in unload.
+
+    When a plug-in that registers custom node types (e.g. manipulator
+    containers) is unloaded, PyMEL's own bookkeeping in
+    ``pymel.internal.factories`` tries to remove a matching PyNode class for
+    each type. Node types that were never wrapped with ``pm.PyNode(...)``
+    (true here, since TKM uses ``maya.api.OpenMaya`` / ``cmds`` and PyMEL is
+    only ever an incidental, third-party import in the session) have no such
+    class to remove, so PyMEL logs a warning even though nothing is wrong.
+    Only touch the logger if PyMEL is actually loaded, and restore its
+    level afterward so we never suppress genuine PyMEL warnings elsewhere.
+    """
+    if "pymel.internal.factories" not in sys.modules:
+        yield
+        return
+    pymel_logger = logging.getLogger("pymel.internal.factories")
+    previous_level = pymel_logger.level
+    pymel_logger.setLevel(logging.ERROR)
+    try:
+        yield
+    finally:
+        pymel_logger.setLevel(previous_level)
+
+
 def unload(spec, restore_context=True):
     if restore_context:
         _restore_context(spec)
@@ -180,7 +208,8 @@ def unload(spec, restore_context=True):
     plugin_name = loaded_plugin(spec)
     if not plugin_name:
         return False
-    cmds.unloadPlugin(plugin_name)
+    with _suppress_pymel_node_cleanup_warnings():
+        cmds.unloadPlugin(plugin_name)
     try:
         cmds.pluginInfo(plugin_name, edit=True, remove=True)
     except RuntimeError:

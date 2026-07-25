@@ -6,6 +6,7 @@ import math
 from maya import cmds
 
 from TheKeyMachine.core import animation_context, curveFitting
+from TheKeyMachine.core import animlayers
 from TheKeyMachine.core import openMayaUtils as open_maya
 from TheKeyMachine.mods import selectionMod
 from TheKeyMachine.mods import settingsMod as settings
@@ -216,11 +217,35 @@ def _animation_command_context(
     timerange=None,
     tint=True,
     progress_max=1,
+    tool_operation=None,
 ):
     """Wrap animation hotkey commands with the shared tool operation.
 
     tint=False disables the timeline/context tint for commands that should feel silent.
+
+    ``tool_operation`` is the operation core/trigger.py's dispatcher already
+    opened for this command (forwarded through the callback's ``**kwargs`` --
+    see ``_make_dispatched_command``). When present, reuse it instead of
+    nesting a second ``tool_operation()``: exactly one operation, one undo
+    chunk, one TKM_DEBUG_TIMING line per command, regardless of entry point.
+    Only a direct/standalone call that bypasses dispatch falls through to
+    opening its own operation below.
     """
+    if tool_operation is not None:
+        tool_operation.set_status(label)
+        if progress_max:
+            tool_operation.set_total(progress_max, reset=True)
+        operation_tint = ("range" if timerange is not None else "context") if tint else "none"
+        toolCommon.ensure_operation_tint(
+            tool_operation,
+            tint=operation_tint,
+            timerange=timerange,
+            default_mode=default_mode,
+            tint_key=tint_key,
+        )
+        yield tool_operation
+        return
+
     operation_tint = "none"
     if tint:
         operation_tint = "range" if timerange is not None else "context"
@@ -242,16 +267,13 @@ def _animation_command_context(
 
 @contextmanager
 def _cleanup_command_context(tool_operation, label, tool_id):
-    """Use dispatch's standard operation, with a direct-call fallback."""
-    if tool_operation is not None:
-        tool_operation.set_status(label)
-        yield tool_operation
-        return
+    """Cleanup-command alias: tint-less, caller-managed progress, dispatch-reused."""
     with _animation_command_context(
         label,
         tool_id,
         tint=False,
         progress_max=0,
+        tool_operation=tool_operation,
     ) as operation:
         yield operation
 
@@ -508,7 +530,8 @@ def go_to_previous_frame(*args):
     return time_navigation.request_frame_step(-1)
 
 
-def apply_smart_euler_filter(*args):
+def apply_smart_euler_filter(*args, **kwargs):
+    tool_operation = kwargs.pop("tool_operation", None)
     target_info, _target_plugs, _selected_objects, _selected_channels = (
         animation_context.resolve_command_targets(default_mode="all_animation")
     )
@@ -524,6 +547,7 @@ def apply_smart_euler_filter(*args):
         "Apply Smart Euler Filter",
         "apply_smart_euler_filter",
         progress_max=len(curves),
+        tool_operation=tool_operation,
     ) as operation:
         return _apply_euler_filter(curves, target_info, operation)
 
@@ -569,7 +593,8 @@ def delete_keys(*args):
     )
 
 
-def paste_keys(*args):
+def paste_keys(*args, **kwargs):
+    tool_operation = kwargs.pop("tool_operation", None)
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(
             default_mode="current_frame", include_shapes=False
@@ -579,7 +604,7 @@ def paste_keys(*args):
         return wutil.make_inViewMessage("Select at least one object or channel")
 
     with _animation_command_context(
-        "Paste Keys", "paste_keys", default_mode="current_frame"
+        "Paste Keys", "paste_keys", default_mode="current_frame", tool_operation=tool_operation
     ):
         destination_times = _selected_destination_times()
         if destination_times and _paste_snapshot_to_selected_times(destination_times):
@@ -593,9 +618,10 @@ def paste_keys(*args):
         )
 
 
-def paste_keys_relative(*args):
+def paste_keys_relative(*args, **kwargs):
     global _key_clipboard_start_frame
 
+    tool_operation = kwargs.pop("tool_operation", None)
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(
             default_mode="current_frame", include_shapes=False
@@ -606,7 +632,10 @@ def paste_keys_relative(*args):
 
     paste_time = target_info["time_context"].start_frame
     with _animation_command_context(
-        "Paste Keys Relative", "paste_keys_relative", default_mode="current_frame"
+        "Paste Keys Relative",
+        "paste_keys_relative",
+        default_mode="current_frame",
+        tool_operation=tool_operation,
     ):
         destination_times = _selected_destination_times()
         if destination_times and _paste_snapshot_to_selected_times(destination_times):
@@ -623,7 +652,8 @@ def paste_keys_relative(*args):
         )
 
 
-def crop_animation(*args):
+def crop_animation(*args, **kwargs):
+    tool_operation = kwargs.pop("tool_operation", None)
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(default_mode="all_animation")
     )
@@ -637,7 +667,7 @@ def crop_animation(*args):
         return wutil.make_inViewMessage("No animation curves found")
 
     with _animation_command_context(
-        "Crop Animation", "crop_animation", timerange=crop_range
+        "Crop Animation", "crop_animation", timerange=crop_range, tool_operation=tool_operation
     ):
         for curve in curves:
             frames = cmds.keyframe(curve, query=True, timeChange=True) or []
@@ -879,7 +909,8 @@ def remove_static_anim_curves(*args, **kwargs):
         return True
 
 
-def reverse_animation(*args):
+def reverse_animation(*args, **kwargs):
+    tool_operation = kwargs.pop("tool_operation", None)
     target_info, _target_plugs, _selected_objects, _selected_channels = (
         animation_context.resolve_command_targets(default_mode="all_animation")
     )
@@ -894,6 +925,7 @@ def reverse_animation(*args):
         "reverse_animation",
         timerange=reverse_range,
         progress_max=len(curves),
+        tool_operation=tool_operation,
     ) as operation:
         pivot = (reverse_range[0] + reverse_range[1]) * 0.5
         for curve in curves:
@@ -1031,7 +1063,64 @@ def _set_selected_graph_editor_curves_current_time(operation=None):
     return keyed
 
 
-def set_smart_key(*args):
+def _filter_settable_keyable_attrs(obj, attrs):
+    """Keep attrs that are free or driven only by a curve/blend/mute node --
+    i.e. safe for Smart Key to key directly. Shared by both Smart Key
+    entry points so they treat "keyable" the same way.
+    """
+    valid = []
+    for attr in attrs:
+        try:
+            conns = cmds.listConnections(f"{obj}.{attr}", source=True, destination=False)
+            if not conns:
+                valid.append(attr)
+                continue
+            node_type = cmds.nodeType(conns[0])
+            if "animCurve" in node_type or "animBlend" in node_type or "mute" in node_type:
+                valid.append(attr)
+        except Exception:
+            pass
+    return valid
+
+
+def _key_attributes_layer_aware(obj, attributes, frame, layer_context=None):
+    """Key ``attributes`` on ``obj`` at ``frame`` through the one shared
+    animation-layer destination route (see ``core.animlayers``).
+
+    An attribute that already has a curve on the resolved destination layer
+    keeps its existing tangent shape; one that doesn't gets a fresh key,
+    added to that layer the same way every other layer-aware tool in TKM
+    does it. This is the single path both Smart Key and Smart Key All
+    Channels use to actually set a key, so they behave identically.
+
+    Returns ``(keyed_attrs, blocked_attrs)``.
+    """
+    if not attributes:
+        return [], []
+    groups, blocked = animlayers.group_attributes_by_destination(
+        obj, attributes, context=layer_context
+    )
+    keyed_attrs = []
+    for layer_name, grouped_attributes in groups.items():
+        for attr in grouped_attributes:
+            plug = "{}.{}".format(obj, attr)
+            curve = animlayers.get_anim_curve_for_plug(plug, layer_name=layer_name)
+            if curve and _set_key_on_curve_preserving_tangent(curve, frame):
+                keyed_attrs.append(attr)
+                continue
+            key_kwargs = {"attribute": attr, "time": (frame,), "shape": False}
+            if layer_name:
+                key_kwargs["animLayer"] = layer_name
+            try:
+                if cmds.setKeyframe(obj, **key_kwargs):
+                    keyed_attrs.append(attr)
+            except (RuntimeError, ValueError, TypeError):
+                pass
+    return keyed_attrs, blocked
+
+
+def set_smart_key(*args, **kwargs):
+    tool_operation = kwargs.pop("tool_operation", None)
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(
             default_mode="current_frame",
@@ -1054,10 +1143,13 @@ def set_smart_key(*args):
         selected_objects = scene_objects
         source = "objects"
 
+    layer_context = animlayers.capture_context()
+
     with _animation_command_context(
         "Set Smart Key",
         tint=False,
         progress_max=0,
+        tool_operation=tool_operation,
     ) as operation:
         keyed = (
             _set_selected_graph_editor_curves_current_time(operation)
@@ -1081,12 +1173,11 @@ def set_smart_key(*args):
 
                     node, attr = plug.rsplit(".", 1)
 
-                    try:
-                        for frame in frames:
-                            cmds.setKeyframe(node, attribute=attr, time=(frame,))
-                            keyed = True
-                    except (RuntimeError, ValueError, TypeError):
-                        pass
+                    for frame in frames:
+                        keyed_attrs, _blocked = _key_attributes_layer_aware(
+                            node, [attr], frame, layer_context
+                        )
+                        keyed = keyed or bool(keyed_attrs)
                     operation.step()
             else:
                 curves = animation_context.curves(target_info, include_shapes=False)
@@ -1121,57 +1212,42 @@ def set_smart_key(*args):
             for obj in selected_objects:
                 if operation.cancelled:
                     break
-                animated_attrs = selectionMod.get_animated_channels_for_node(obj)
-
-                if animated_attrs:
-                    animated_plugs = [
-                        "{}.{}".format(obj, attr) for attr in animated_attrs
-                    ]
-                    curves = selectionMod.get_anim_curves_from_plugs(animated_plugs)
-                    for curve in curves:
-                        for frame in frames:
-                            keyed = (
-                                _set_key_on_curve_preserving_tangent(curve, frame)
-                                or keyed
-                            )
-                    operation.step()
-                    continue
 
                 attrs = selectionMod.get_keyable_scalar_attributes(obj)
                 if not attrs:
                     operation.step()
                     continue
-                
-                valid_attrs = []
-                for attr in attrs:
-                    try:
-                        conns = cmds.listConnections(f"{obj}.{attr}", source=True, destination=False)
-                        if not conns:
-                            valid_attrs.append(attr)
-                            continue
-                        node_type = cmds.nodeType(conns[0])
-                        if "animCurve" in node_type or "animBlend" in node_type or "mute" in node_type:
-                            valid_attrs.append(attr)
-                    except Exception:
-                        pass
-                        
+
+                valid_attrs = _filter_settable_keyable_attrs(obj, attrs)
                 if not valid_attrs:
                     operation.step()
                     continue
 
-                try:
-                    for frame in frames:
-                        cmds.setKeyframe(obj, attribute=valid_attrs, time=(frame,))
-                        keyed = True
-                except (RuntimeError, ValueError, TypeError):
-                    pass
+                # "Smart" means: touch only channels already animated
+                # somewhere (any layer, not just BaseAnimation) if the
+                # object has any; otherwise key everything so the object
+                # can start being animated.
+                animated_attrs = [
+                    attr for attr in valid_attrs
+                    if animlayers.get_anim_curves_by_layer_for_plug(
+                        "{}.{}".format(obj, attr)
+                    )
+                ]
+                target_attrs = animated_attrs or valid_attrs
+
+                for frame in frames:
+                    keyed_attrs, _blocked = _key_attributes_layer_aware(
+                        obj, target_attrs, frame, layer_context
+                    )
+                    keyed = keyed or bool(keyed_attrs)
                 operation.step()
 
         if not keyed:
             return wutil.make_inViewMessage("No keyable channels found")
 
 
-def set_smart_key_all_channels(*args):
+def set_smart_key_all_channels(*args, **kwargs):
+    tool_operation = kwargs.pop("tool_operation", None)
     target_info, _target_plugs, selected_objects, _selected_channels = (
         animation_context.resolve_command_targets(
             default_mode="current_frame",
@@ -1182,11 +1258,13 @@ def set_smart_key_all_channels(*args):
     selected_objects = _unique(selected_objects)
 
     frames = _frames_for_smart_key(target_info["time_context"])
+    layer_context = animlayers.capture_context()
 
     with _animation_command_context(
         "Set Smart Key All Channels",
         tint=False,
         progress_max=0,
+        tool_operation=tool_operation,
     ) as operation:
         if not selected_objects:
             return wutil.make_inViewMessage("Select at least one object")
@@ -1202,30 +1280,17 @@ def set_smart_key_all_channels(*args):
             if not attrs:
                 operation.step()
                 continue
-                
-            valid_attrs = []
-            for attr in attrs:
-                try:
-                    conns = cmds.listConnections(f"{obj}.{attr}", source=True, destination=False)
-                    if not conns:
-                        valid_attrs.append(attr)
-                        continue
-                    node_type = cmds.nodeType(conns[0])
-                    if "animCurve" in node_type or "animBlend" in node_type or "mute" in node_type:
-                        valid_attrs.append(attr)
-                except Exception:
-                    pass
-                    
+
+            valid_attrs = _filter_settable_keyable_attrs(obj, attrs)
             if not valid_attrs:
                 operation.step()
                 continue
 
-            try:
-                for frame in frames:
-                    cmds.setKeyframe(obj, attribute=valid_attrs, time=(frame,))
-                    keyed = True
-            except (RuntimeError, ValueError, TypeError):
-                pass
+            for frame in frames:
+                keyed_attrs, _blocked = _key_attributes_layer_aware(
+                    obj, valid_attrs, frame, layer_context
+                )
+                keyed = keyed or bool(keyed_attrs)
             operation.step()
 
         if not keyed:

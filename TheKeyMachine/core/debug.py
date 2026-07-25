@@ -30,7 +30,7 @@ _TRASH_ICON_PATH = os.path.abspath(
 )
 
 
-def _dotenv_value():
+def _dotenv_value(name):
     dotenv_path = os.path.abspath(
         os.path.join(os.path.dirname(__file__), os.pardir, ".env")
     )
@@ -41,21 +41,30 @@ def _dotenv_value():
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 key, value = line.split("=", 1)
-                if key.strip() == _ENV_NAME:
+                if key.strip() == name:
                     return value.strip().strip('"\'')
     except OSError:
         pass
     return None
 
 
+def env_flag(name, default=False):
+    """Read a boolean dev flag from the process environment, then .env.
+
+    Shared by any TKM_* on/off switch so there is exactly one place that
+    understands the ``TheKeyMachine/.env`` file format.
+    """
+    value = os.environ.get(name)
+    if value is None:
+        value = _dotenv_value(name)
+    if value is None:
+        return bool(default)
+    return str(value).strip().lower() in _TRUE_VALUES
+
+
 def is_enabled():
     """Read the process environment, then .env, then the off fallback."""
-    value = os.environ.get(_ENV_NAME)
-    if value is None:
-        value = _dotenv_value()
-    if value is None:
-        return TOOL_DEBUG
-    return str(value).strip().lower() in _TRUE_VALUES
+    return env_flag(_ENV_NAME, default=TOOL_DEBUG)
 
 
 def print_debug_summary(*_args):

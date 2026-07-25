@@ -82,11 +82,11 @@ class AnimationLayer(object):
                 self.passthrough = _query_layer_flag(
                     self.name, "passthrough", default=True
                 )
-                self.parent = _query_layer_value(self.name, "parent")
-                self.rotation_accumulation_mode = _query_layer_value(
+                self.parent = _layer_parent(self.name)
+                self.rotation_accumulation_mode = _accumulation_mode(
                     self.name, "rotationAccumulationMode"
                 )
-                self.scale_accumulation_mode = _query_layer_value(
+                self.scale_accumulation_mode = _accumulation_mode(
                     self.name, "scaleAccumulationMode"
                 )
             return
@@ -108,15 +108,14 @@ class AnimationLayer(object):
                 value = default
             setattr(self, field, bool(value))
 
-        # These settings are most stable through cmds across Maya versions.
+        self.rotation_accumulation_mode = _accumulation_mode(
+            self.name, "rotationAccumulationMode", node=node
+        )
+        self.scale_accumulation_mode = _accumulation_mode(
+            self.name, "scaleAccumulationMode", node=node
+        )
         if self.name:
-            self.parent = _query_layer_value(self.name, "parent")
-            self.rotation_accumulation_mode = _query_layer_value(
-                self.name, "rotationAccumulationMode"
-            )
-            self.scale_accumulation_mode = _query_layer_value(
-                self.name, "scaleAccumulationMode"
-            )
+            self.parent = _layer_parent(self.name)
 
     def as_dict(self):
         return {
@@ -354,16 +353,27 @@ def _layer_name(layer):
         return omutils.mobject_name(layer)
 
 
-def _layer_graph_for_plug(plug_name):
+def _layer_graph_for_plug(plug_name, scene_layers=None):
+    """Resolve one plug plus the scene's layer graph and its root.
+
+    ``scene_layers`` lets a caller that already walked the graph (e.g.
+    ``get_anim_curves_from_plugs`` resolving many plugs at once) pass it
+    straight through instead of re-walking it -- ``_scene_layers()`` was
+    otherwise re-querying the whole animLayer graph from Maya once per plug,
+    which dominated resolution time for any sizeable selection.
+    """
     if om is None:
         return None, None, []
     plug = omutils.mplug_from_name(plug_name)
     if plug is None:
         return None, None, []
-    if not has_anim_layers():
+    if scene_layers is None:
+        scene_layers = _scene_layers()
+    if not scene_layers:
         return plug, None, []
-    root_layer = _root_layer()
-    return plug, root_layer, _scene_layers()
+    # _scene_layers() always appends the root before any children, so the
+    # first entry is the root layer -- no separate _root_layer() call needed.
+    return plug, scene_layers[0], scene_layers
 
 
 def _direct_anim_curve_for_plug(plug_name):
@@ -381,13 +391,15 @@ def _direct_anim_curve_for_plug(plug_name):
     return curves[0] if curves else None
 
 
-def get_anim_curves_by_layer_for_plug(plug_name):
+def get_anim_curves_by_layer_for_plug(plug_name, scene_layers=None):
     """Return every available animation-layer curve for a plug.
 
     Entries use ``layer=None`` for the root/base layer so callers can keep
-    layered data distinct without depending on OpenMaya objects.
+    layered data distinct without depending on OpenMaya objects. Pass an
+    already-resolved ``scene_layers`` (see ``_layer_graph_for_plug``) when
+    resolving many plugs in a row.
     """
-    plug, root_layer, scene_layers = _layer_graph_for_plug(plug_name)
+    plug, root_layer, scene_layers = _layer_graph_for_plug(plug_name, scene_layers=scene_layers)
     if plug is None:
         return []
 
@@ -453,14 +465,64 @@ def _query_layer_flag(layer_name, flag, default=False):
         return default
 
 
-def _query_layer_value(layer_name, flag, default=None):
+def _accumulation_mode(layer_name, attribute, node=None, default=None):
+    """Read an animLayer accumulation-mode value directly from the node
+    instead of ``cmds.animLayer(query=True, <flag>=True)``.
+
+    That query flag reliably prints "Unable to parse the argument list" to
+    the Script Editor for rotationAccumulationMode/scaleAccumulationMode on
+    some layers (BaseAnimation, freshly created layers), even though the
+    underlying attribute reads back fine. Wrapping the call in try/except
+    only stops the Python exception -- Maya still prints its own error
+    banner underneath, which is the noise users see. Reading the attribute
+    directly (OpenMaya when we already have the node, cmds.getAttr
+    otherwise) never touches that broken flag, so nothing gets printed.
+    """
+    if node is not None:
+        try:
+            return node.findPlug(attribute, True).asInt()
+        except Exception:
+            pass
     if not layer_name or cmds is None:
         return default
     try:
-        value = cmds.animLayer(layer_name, query=True, **{flag: True})
-    except _COMMAND_ERRORS:
+        value = cmds.getAttr("{}.{}".format(layer_name, attribute))
+    except Exception:
         return default
     return default if value is None else value
+
+
+def _layer_parent(layer_name):
+    """Resolve an animLayer's parent without ``cmds.animLayer(query=True,
+    parent=True)``.
+
+    That flag turned out to have the same "Unable to parse the argument
+    list" issue as the accumulation-mode ones -- it's the last remaining
+    cmds.animLayer query flag in the normal refresh path. A parent layer
+    connects to a child through the child's ``message`` plug into the
+    parent's ``childrenLayers`` array (the same link ``_scene_layers()``
+    already walks via OpenMaya), so ``listConnections`` -- a different,
+    unaffected command -- can read it back directly.
+    """
+    if not layer_name or cmds is None:
+        return None
+    try:
+        destinations = cmds.listConnections(
+            "{}.message".format(layer_name),
+            source=False,
+            destination=True,
+            type="animLayer",
+            plugs=True,
+        ) or []
+    except Exception:
+        destinations = []
+    for destination in destinations:
+        if ".childrenLayers" not in destination:
+            continue
+        node_name = destination.split(".", 1)[0]
+        if node_name != layer_name:
+            return node_name
+    return None
 
 
 cache = LayerCache()
@@ -471,28 +533,15 @@ def layer_metadata(layer_name):
     cached = cache.by_id(layer_id_for_name(layer_name))
     if cached is not None:
         return cached.as_dict()
+    # Uncached (e.g. a layer just created this operation, before the next
+    # cache.reset()): build through the same AnimationLayer.refresh() path
+    # the cache itself uses, instead of a second, cmds-heavy implementation.
+    # That path already prefers OpenMaya over cmds.animLayer(query=True,
+    # ...) wherever possible, which is what keeps this from re-triggering
+    # "Unable to parse the argument list" on a freshly created layer.
     root_name = root_layer_name()
     is_root = bool(layer_name and layer_name == root_name)
-    parent = _query_layer_value(layer_name, "parent")
-    if isinstance(parent, (list, tuple)):
-        parent = parent[0] if parent else None
-    return {
-        "name": layer_name,
-        "root": is_root,
-        "selected": _query_layer_flag(layer_name, "selected"),
-        "preferred": _query_layer_flag(layer_name, "preferred"),
-        "locked": _query_layer_flag(layer_name, "lock"),
-        "muted": _query_layer_flag(layer_name, "mute"),
-        "override": _query_layer_flag(layer_name, "override"),
-        "passthrough": _query_layer_flag(layer_name, "passthrough", default=True),
-        "parent": parent or None,
-        "rotation_accumulation_mode": _query_layer_value(
-            layer_name, "rotationAccumulationMode"
-        ),
-        "scale_accumulation_mode": _query_layer_value(
-            layer_name, "scaleAccumulationMode"
-        ),
-    }
+    return AnimationLayer(layer_name, root=is_root).as_dict()
 
 
 def capture_context():
@@ -529,12 +578,19 @@ def layer_contains_plug(layer_name, plug_name):
         attributes = []
     if plug_name in attributes:
         return True
-    node_name = str(plug_name).split(".", 1)[0]
+    node_name, _, attr_name = str(plug_name).partition(".")
+    short_node = node_name.rsplit("|", 1)[-1]
     for attribute in attributes:
-        attribute_node = str(attribute).split(".", 1)[0]
+        attribute_node, _, attribute_attr = str(attribute).partition(".")
+        # Comparing node names alone matches any attribute on the same node,
+        # not the one being checked (e.g. pTorus1.visibility being a member
+        # would falsely mark pTorus1.scaleX as one too). Require the same
+        # attribute name as well.
+        if attribute_attr != attr_name:
+            continue
         if attribute_node == node_name:
             return True
-        if attribute_node.rsplit("|", 1)[-1] == node_name.rsplit("|", 1)[-1]:
+        if attribute_node.rsplit("|", 1)[-1] == short_node:
             return True
     try:
         affected = cmds.animLayer(plug_name, query=True, affectedLayers=True) or []
@@ -546,9 +602,12 @@ def layer_contains_plug(layer_name, plug_name):
 def selected_destination_for_plug(plug_name, context=None):
     """Resolve the current paste/key destination for one plug.
 
-    A selected non-root layer is used only when the target is already a member.
-    A locked member is reported as blocked. Non-members safely fall back to
-    BaseAnimation, matching Maya's normal keying behavior.
+    A selected, unlocked non-root layer is the destination for as long as
+    it's active -- the same way keying with a layer highlighted in Maya's
+    Anim Layer Editor adds new attributes to that layer instead of quietly
+    keying BaseAnimation. A locked selected layer blocks the attribute
+    instead. ``member`` reports prior membership for callers that care, but
+    no longer changes which layer is targeted.
     """
     context = context or capture_context()
     selected = list(context.get("selected") or [])
@@ -568,13 +627,11 @@ def selected_destination_for_plug(plug_name, context=None):
     layer_name = layer_name_for_id(layer_id, context)
     member = layer_contains_plug(layer_name, plug_name)
     metadata = (context.get("layers") or {}).get(layer_id) or layer_metadata(layer_name)
-    if not member:
-        return {"layer": None, "layer_id": BASE_LAYER_ID, "blocked": False, "member": False}
     return {
         "layer": layer_name,
         "layer_id": layer_id,
         "blocked": bool(metadata.get("locked")),
-        "member": True,
+        "member": member,
     }
 
 
@@ -625,10 +682,18 @@ def cut_keys_in_destination(node, attributes, timerange, context=None):
 
 
 def set_keyframe_in_destination(node, attributes, time=None, context=None):
-    """Set keys on the current editable layer and return blocked attributes."""
+    """Set keys on the current editable layer.
+
+    Returns ``(keyed_attrs, blocked_attrs)``. A layer group that raises is
+    skipped as before, but a group that runs without error and still keys
+    nothing (Maya can silently no-op ``setKeyframe`` for some attribute/layer
+    combinations) is no longer reported as a false success -- callers used to
+    have no way to tell the two apart.
+    """
     groups, blocked = group_attributes_by_destination(
         node, attributes, context=context
     )
+    keyed = []
     for layer_name, grouped_attributes in groups.items():
         kwargs = {"attribute": grouped_attributes}
         if time is not None:
@@ -636,24 +701,28 @@ def set_keyframe_in_destination(node, attributes, time=None, context=None):
         if layer_name:
             kwargs["animLayer"] = layer_name
         try:
-            cmds.setKeyframe(node, **kwargs)
+            result = cmds.setKeyframe(node, **kwargs)
         except _COMMAND_ERRORS:
             continue
-    return blocked
+        if result:
+            keyed.extend(grouped_attributes)
+    return keyed, blocked
 
 
 def get_anim_curve_for_plug(
     plug_name,
     layer_name=None,
     layer_selector=None,
+    scene_layers=None,
 ):
     """Return one layer curve for a plug.
 
     ``layer_name=None`` addresses BaseAnimation. A feature-specific
     ``layer_selector`` may instead choose an animation-layer object from the
-    refreshed shared cache.
+    refreshed shared cache. Pass an already-resolved ``scene_layers`` (see
+    ``_layer_graph_for_plug``) when resolving many plugs in a row.
     """
-    plug, root_layer, scene_layers = _layer_graph_for_plug(plug_name)
+    plug, root_layer, scene_layers = _layer_graph_for_plug(plug_name, scene_layers=scene_layers)
     if plug is None:
         return None
     if not scene_layers:
@@ -688,25 +757,32 @@ def get_anim_curves_from_plugs(
     layer_selector=None,
     include_all_layers=False,
 ):
-    """Resolve unique curves for plugs through one shared lookup path."""
+    """Resolve unique curves for plugs through one shared lookup path.
+
+    Walks the scene's animLayer graph once for the whole batch instead of
+    once per plug -- resolving hundreds of plugs one at a time previously
+    meant hundreds of redundant re-walks of the same, unchanged graph.
+    """
     curves = []
+    scene_layers = _scene_layers()
     for plug_name in dict.fromkeys(plugs or []):
         if not plug_name:
             continue
         if include_all_layers:
             resolved = [
                 entry["curve"]
-                for entry in get_anim_curves_by_layer_for_plug(plug_name)
+                for entry in get_anim_curves_by_layer_for_plug(plug_name, scene_layers=scene_layers)
                 if entry.get("curve")
             ]
         else:
             curve = get_anim_curve_for_plug(
                 plug_name,
                 layer_selector=layer_selector,
+                scene_layers=scene_layers,
             )
             resolved = [curve] if curve else []
         if include_all_layers and not resolved:
-            curve = get_anim_curve_for_plug(plug_name)
+            curve = get_anim_curve_for_plug(plug_name, scene_layers=scene_layers)
             resolved = [curve] if curve else []
         for curve in resolved:
             if curve and curve not in curves:
@@ -752,8 +828,19 @@ def create_layer(metadata):
         )
     except _COMMAND_ERRORS:
         pass
-    for flag, key in (
-        ("passthrough", "passthrough"),
+    passthrough = metadata.get("passthrough")
+    if passthrough is not None:
+        try:
+            cmds.animLayer(layer_name, edit=True, passthrough=passthrough)
+        except _COMMAND_ERRORS:
+            pass
+
+    # rotationAccumulationMode/scaleAccumulationMode: cmds.animLayer(edit=True,
+    # <flag>=value) is the same flag pair that prints "Unable to parse the
+    # argument list" on query for a layer just created in this evaluation
+    # (see _accumulation_mode). Setting the underlying attribute directly
+    # with setAttr has the same effect without going through that flag.
+    for attribute, key in (
         ("rotationAccumulationMode", "rotation_accumulation_mode"),
         ("scaleAccumulationMode", "scale_accumulation_mode"),
     ):
@@ -761,7 +848,7 @@ def create_layer(metadata):
         if value is None:
             continue
         try:
-            cmds.animLayer(layer_name, edit=True, **{flag: value})
+            cmds.setAttr("{}.{}".format(layer_name, attribute), value)
         except _COMMAND_ERRORS:
             pass
     return layer_name
