@@ -2928,13 +2928,34 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         still open. A plain update()/repaint() is sometimes a no-op because
         Qt doesn't consider anything dirty; toggling updatesEnabled forces a
         real invalidate first.
+
+        "Pin All"/"Pin Defaults" flip many actions at once from *inside* the
+        menu's own mouseReleaseEvent, so Qt is still mid-way through its own
+        click bookkeeping when this runs. An immediate repaint can therefore
+        still get swallowed. Schedule a second, deferred pass that runs after
+        the current event has fully finished, once Qt's internal state has
+        settled -- that pass is what reliably makes every changed action's
+        checkmark actually show up, not just the ones a plain synchronous
+        repaint happens to catch.
         """
         if menu is None or not QtCompat.isValid(menu):
             return
-        menu.setUpdatesEnabled(False)
-        menu.setUpdatesEnabled(True)
-        menu.update()
-        menu.repaint()
+
+        def _repaint(menu=menu):
+            if not QtCompat.isValid(menu):
+                return
+            menu.setUpdatesEnabled(False)
+            menu.setUpdatesEnabled(True)
+            menu.update()
+            menu.repaint()
+            for action in menu.actions():
+                if QtCompat.isValid(action):
+                    rect = menu.actionGeometry(action)
+                    if rect.isValid():
+                        menu.update(rect)
+
+        _repaint()
+        QtCore.QTimer.singleShot(0, _repaint)
 
     def _bind_pin_menu_action(self, menu, action, key, checked):
         def sync_action(action=action, menu=menu, section=self, widget_key=key):

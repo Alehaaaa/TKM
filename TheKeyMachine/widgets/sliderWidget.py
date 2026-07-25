@@ -50,7 +50,7 @@ def _slider_button_variant(value):
 
 
 def _slider_button_icon(slider_type, variant):
-    if not slider_type or variant not in {"small", "big", "frame"}:
+    if not slider_type or variant not in {"small", "big", "frame", "world"}:
         return None
     return icons.get("slider_{}/square_{}".format(slider_type, variant))
 
@@ -85,7 +85,7 @@ def _slider_command_name(prefix: str, mode: str, value: int) -> str:
 
 
 # --- tiny button with centered square ------------------------------------------
-class SliderButton(cw.TooltipMixin, QtWidgets.QPushButton):
+class SliderButton(cw.TooltipMixin, QtWidgets.QToolButton):
     """Flat square-indicator button that emits its signed percent on click."""
 
     def __init__(self, parent: QtWidgets.QWidget, *, percent: int, color: str, worldSpace: bool = False, frameButton: bool = False):
@@ -96,14 +96,19 @@ class SliderButton(cw.TooltipMixin, QtWidgets.QPushButton):
         self._frameValue = None
         self._squareIconPath = None
         self._squareIcon = QtGui.QIcon()
+        self._worldSpaceIconPath = None
+        self._worldSpaceIcon = QtGui.QIcon()
         self.setCheckable(self._frameButton)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.setAutoRaise(True)
+        self.setMouseTracking(True)
         self._box_sz = wutil.DPI(7) if (self._frameButton or abs(percent) == 100) else wutil.DPI(3)
         self.setFixedHeight(parent.height())
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
         self.setStyleSheet(
-            f"QPushButton {{ background: none; border-radius: 0; }}"
-            f"QPushButton:pressed, QPushButton:checked {{ background-color: {self._color}; border-radius: 0; }}"
+            f"QToolButton {{ background: none; border-radius: 0; }}"
+            f"QToolButton:pressed, QToolButton:checked {{ background-color: {self._color}; border-radius: 0; }}"
         )
 
         self._worldSpace = worldSpace
@@ -116,6 +121,7 @@ class SliderButton(cw.TooltipMixin, QtWidgets.QPushButton):
         self._tooltip_command_icon = None
         # Initial tooltip
         self._update_tooltip()
+        self._refresh_icon()
 
     def setColor(self, color: str):
         self._color = color
@@ -124,11 +130,33 @@ class SliderButton(cw.TooltipMixin, QtWidgets.QPushButton):
     def setSquareIcon(self, icon_path: Optional[str]):
         self._squareIconPath = icon_path
         self._squareIcon = QtGui.QIcon(icon_path or "")
-        self.update()
+        self._refresh_icon()
 
     @property
     def squareIconPath(self) -> Optional[str]:
         return self._squareIconPath
+
+    def setWorldSpaceIcon(self, icon_path: Optional[str]):
+        self._worldSpaceIconPath = icon_path
+        self._worldSpaceIcon = QtGui.QIcon(icon_path or "")
+        self._refresh_icon()
+
+    @property
+    def worldSpaceIconPath(self) -> Optional[str]:
+        return self._worldSpaceIconPath
+
+    @property
+    def worldSpace(self) -> bool:
+        return self._worldSpace
+
+    def _refresh_icon(self):
+        """setIcon()-based glyph: world-space uses the exported, per-slider-type
+        globe icon (same asset pipeline as the big/small squares), otherwise the
+        mode-specific square icon file. No manual painting."""
+        icon = self._worldSpaceIcon if self._worldSpace else self._squareIcon
+        self.setIcon(icon)
+        icon_canvas_size = wutil.DPI(SliderHandle.HANDLE_SIZE)
+        self.setIconSize(QtCore.QSize(icon_canvas_size, icon_canvas_size))
 
     def _update_tooltip(self):
         title = self._tooltip_title or "Value"
@@ -164,8 +192,8 @@ class SliderButton(cw.TooltipMixin, QtWidgets.QPushButton):
         return self._percent
 
     def setWorldSpace(self, enabled: int):
-        self._worldSpace = enabled
-        self.update()
+        self._worldSpace = bool(enabled)
+        self._refresh_icon()
 
     def setFrameValue(self, frame):
         self._frameValue = frame
@@ -183,9 +211,12 @@ class SliderButton(cw.TooltipMixin, QtWidgets.QPushButton):
 
     def paintEvent(self, e):
         super().paintEvent(e)
-        p = QtGui.QPainter(self)
-        p.setRenderHint(QtGui.QPainter.Antialiasing)
 
+        if not (self._frameButton and self._frameValue is not None):
+            return
+
+        # Frame-picker number readout only; the icon/globe glyph is now real
+        # QIcon content (see _refresh_icon) drawn natively by super().paintEvent().
         w, h, s = self.width(), self.height(), self._box_sz
         y = (h - s) // 2
 
@@ -194,67 +225,77 @@ class SliderButton(cw.TooltipMixin, QtWidgets.QPushButton):
             main_color = QtGui.QColor(
                 min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
             )
-            glow_color = QtGui.QColor(255, 255, 255, 40)
-            # Create a list of 8 offsets for silhouette glow + (0, 0) for main draw
-            offsets = [(-1, -1), (1, 1), (-1, 1), (1, -1), (0, -1), (0, 1), (-1, 0), (1, 0), (0, 0)]
         else:
             main_color = base_color
-            glow_color = QtCore.Qt.transparent
-            offsets = [(0, 0)]
 
-        if self._worldSpace:
-            for dx, dy in offsets:
-                is_glow = dx != 0 or dy != 0
-                p.save()
-                p.translate(dx, dy)
-                cx, cy = w // 2, h // 2
-                r = wutil.DPI(int(min(w, h) * 0.24))  # smaller globe
-
-                p.setPen(QtCore.Qt.NoPen)
-                p.setBrush(glow_color if is_glow else main_color)
-                p.drawEllipse(QtCore.QRect(cx - r, cy - r, 2 * r, 2 * r))
-
-                if not is_glow:
-                    # Black linework on top
-                    pen = QtGui.QPen(QtGui.QColor(COLORS.ui.dark_gray.hex))
-                    pen.setWidthF(0.85)
-                    p.setPen(pen)
-                    p.setBrush(QtCore.Qt.NoBrush)
-
-                    # Outer circle outline
-                    p.drawEllipse(QtCore.QRect(cx - r, cy - r, 2 * r, 2 * r))
-
-                    # Equator
-                    p.drawLine(cx - r + 1, cy, cx + r - 1, cy)
-
-                    # Curved meridians (left/right)
-                    mer_w = int(2 * r * 0.45)  # tweak curvature here (0.5–0.65 looks good)
-                    mer_rect = QtCore.QRect(cx - mer_w // 2, cy - r, mer_w, 2 * r)
-                    p.drawArc(mer_rect, 90 * 14, 180 * 16)  # left arc
-                    p.drawArc(mer_rect, 90 * 14, -180 * 16)  # right arc
-                p.restore()
-        elif not self._squareIcon.isNull():
-            icon_mode = QtGui.QIcon.Active if self._hover else QtGui.QIcon.Normal
-            icon_canvas_size = wutil.DPI(SliderHandle.HANDLE_SIZE)
-            icon_rect = QtCore.QRect(0, 0, icon_canvas_size, icon_canvas_size)
-            icon_rect.moveCenter(QtCore.QRect(0, 0, w, h).center())
-            self._squareIcon.paint(
-                p,
-                icon_rect,
-                QtCore.Qt.AlignCenter,
-                icon_mode,
-                QtGui.QIcon.Off,
-            )
-
-        if self._frameButton and self._frameValue is not None:
-            font = QtGui.QFont(self.font())
-            font.setPixelSize(max(wutil.DPI(7), min(wutil.DPI(9), y)))
-            font.setBold(False)
-            p.setFont(font)
-            p.setPen(main_color)
-            label_rect = QtCore.QRect(0, -wutil.DPI(1), w, max(1, y + wutil.DPI(1)))
-            p.drawText(label_rect, QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop, str(int(self._frameValue)))
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        font = QtGui.QFont(self.font())
+        font.setPixelSize(max(wutil.DPI(7), min(wutil.DPI(9), y)))
+        font.setBold(False)
+        p.setFont(font)
+        p.setPen(main_color)
+        label_rect = QtCore.QRect(0, -wutil.DPI(1), w, max(1, y + wutil.DPI(1)))
+        p.drawText(label_rect, QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop, str(int(self._frameValue)))
         p.end()
+
+
+# --- handle grip (real QToolButton: setIcon()/QSS instead of hand-painting) -----
+class _SliderHandleGrip(QtWidgets.QToolButton):
+    """
+    The draggable glyph on top of the slider handle.
+
+    Purely visual state (icon + hover/pressed highlight) is done via setIcon()
+    and QSS, not a custom paintEvent. Drag math still lives on the owning
+    SliderHandle; this widget only forwards raw mouse positions to it and
+    triggers the started/finished emits from its native pressed()/released().
+    """
+
+    def __init__(self, slider: "SliderHandle", *, radius_px: int):
+        super().__init__(slider)
+        self._slider = slider
+        self.setObjectName("TKMSliderHandleGrip")
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.setAutoRaise(True)
+        self.setMouseTracking(True)
+        self.setStyleSheet(
+            f"QToolButton#TKMSliderHandleGrip {{"
+            f" background: transparent; border: none; padding: 0; border-radius: {radius_px}px; }}"
+            f"QToolButton#TKMSliderHandleGrip:pressed {{"
+            f" background-color: rgba(255, 255, 255, 55); }}"
+        )
+
+        self.pressed.connect(self._slider._on_handle_grip_pressed)
+        self.released.connect(self._slider._on_handle_grip_released)
+
+    def enterEvent(self, e):
+        self._slider._set_handle_hover(True)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._slider._set_handle_hover(False)
+        super().leaveEvent(e)
+
+    def mousePressEvent(self, e):
+        if e.button() == QtCore.Qt.LeftButton:
+            self._slider._begin_handle_drag(self.mapToParent(e.pos()))
+        super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        # Deliberately skip QAbstractButton's own move handling: it cancels
+        # the pressed/down state (and emits released()) once the cursor
+        # strays outside the button's rect, which happens constantly while
+        # dragging since the grip trails the slider value, not the cursor.
+        if e.buttons() & QtCore.Qt.LeftButton:
+            self._slider._update_handle_drag(self.mapToParent(e.pos()))
+            e.accept()
+            return
+        super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        super().mouseReleaseEvent(e)
+        if e.button() == QtCore.Qt.LeftButton:
+            self._slider._end_handle_drag()
 
 
 # --- core slider (custom painting & handle-only interaction) --------------------
@@ -326,6 +367,11 @@ class SliderHandle(cw.TooltipMixin, QtWidgets.QSlider):
         self.setFixedHeight(wutil.DPI(self.DEFAULT_HEIGHT))
 
         self._apply_stylesheet(thick=False)
+
+        # handle grip (QToolButton) sitting on top of the QSlider's own handle
+        self._handleGrip = _SliderHandleGrip(self, radius_px=wutil.DPI(self.HANDLE_RADIUS))
+        self._refresh_handle_icon()
+        self._update_handle_button_geometry()
 
     def setTooltipInfo(
         self,
@@ -476,6 +522,7 @@ QSlider#TKMSliderHandle::handle:horizontal {{
 }}
 """
         )
+        self._update_handle_button_geometry()
 
     def _is_active(self) -> bool:
         return self.isSliderDown() or (self._press_offset is not None)
@@ -496,15 +543,115 @@ QSlider#TKMSliderHandle::handle:horizontal {{
     def _handle_hit_rect(self) -> QtCore.QRect:
         return self._handle_rect()
 
+    # --- handle-grip plumbing (drag math shared by the grip button and, as a
+    # fallback, this widget's own mouse events) ---------------------------------
+    def _update_handle_button_geometry(self):
+        grip = getattr(self, "_handleGrip", None)
+        if grip is None:
+            return
+        grip.setGeometry(self._handle_rect())
+
+    def _set_handle_hover(self, hovered: bool):
+        hovered = bool(hovered)
+        if self._handle_hover == hovered:
+            return
+        self._handle_hover = hovered
+        if self._is_active():
+            return
+        if hovered:
+            if hasattr(self, "_toolTipData") and (self._toolTipData.get("text") or self._toolTipData.get("description")):
+                QFlatTooltipManager.delayed_show(anchor_widget=self, **self._toolTipData)
+        else:
+            QFlatTooltipManager.cancel_timer()
+
+    def _on_handle_grip_pressed(self):
+        self.started.emit()
+
+    def _on_handle_grip_released(self):
+        self._finish_interaction()
+
+    def _begin_handle_drag(self, pos: QtCore.QPoint):
+        hrect = self._handle_rect()
+        self._apply_stylesheet(thick=True)
+        self._press_offset = pos.x() - hrect.x()
+        self._has_dragged = False
+        self.setSliderDown(True)
+
+    def _update_handle_drag(self, pos: QtCore.QPoint):
+        if not (self.isSliderDown() and self._press_offset is not None and not self._is_wheel_session()):
+            return
+        # Re-calculate track width based on style geometry
+        groove_rect = self._groove_rect()
+        handle_rect = self._handle_rect()
+        track_left = groove_rect.left()
+        track_w = groove_rect.width() - handle_rect.width()
+
+        desired_left = pos.x() - int(self._press_offset)
+        if track_w > 0:
+            desired_left = max(track_left, min(track_left + track_w, desired_left))
+            ratio = (desired_left - track_left) / track_w
+        else:
+            ratio = 0.0
+        rng = float(self.maximum() - self.minimum())
+        self.setSliderPosition(int(round(self.minimum() + ratio * rng)))
+        self._has_dragged = True
+
+    def _end_handle_drag(self):
+        if self.isSliderDown():
+            self.setSliderDown(False)
+
+    def _refresh_handle_icon(self):
+        grip = getattr(self, "_handleGrip", None)
+        if grip is None:
+            return
+
+        icon_edge = int(self.handle_size() * 0.7038)
+        grip.setIconSize(QtCore.QSize(icon_edge, icon_edge))
+
+        if self._icon:
+            grip.setIcon(QtGui.QIcon(self._icon))
+        else:
+            grip.setIcon(QtGui.QIcon(self._build_glyph_pixmap(icon_edge)))
+
+    def _build_glyph_pixmap(self, size: int) -> QtGui.QPixmap:
+        """Rasterizes the handle's short text label into a colored glyph icon.
+
+        Built once (on text/color change), not per paintEvent: the resulting
+        pixmap is handed to the grip via setIcon().
+        """
+        ratio = self.devicePixelRatioF()
+        pixmap = QtGui.QPixmap(max(1, int(size * ratio)), max(1, int(size * ratio)))
+        pixmap.setDevicePixelRatio(ratio)
+        pixmap.fill(QtCore.Qt.transparent)
+
+        p = QtGui.QPainter(pixmap)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+
+        fm = QtGui.QFontMetrics(self._text_font)
+        tw = fm.horizontalAdvance(self._text)
+        tx = (size - tw) / 2.0
+        ty = (size + fm.capHeight()) / 2.0
+
+        path = QtGui.QPainterPath()
+        path.addText(tx, ty, self._text_font, self._text)
+
+        p.setPen(QtGui.QPen(QtGui.QColor(COLORS.ui.dark_gray.hex), wutil.DPI(2.0), QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        p.setBrush(QtCore.Qt.NoBrush)
+        p.drawPath(path)
+
+        p.setPen(QtCore.Qt.NoPen)
+        p.setBrush(QtGui.QColor(self._icon_color))
+        p.drawPath(path)
+        p.end()
+
+        return pixmap
+
     # events (no groove click)
     def mousePressEvent(self, e: QtGui.QMouseEvent):
         if e.button() == QtCore.Qt.LeftButton:
             hrect = self._handle_hit_rect()
             if hrect.contains(e.pos()):
-                self._apply_stylesheet(thick=True)
-                self._press_offset = e.pos().x() - hrect.x()
-                self._has_dragged = False
-                self.setSliderDown(True)
+                self._begin_handle_drag(e.pos())
                 self.started.emit()
                 e.accept()
                 return
@@ -513,49 +660,22 @@ QSlider#TKMSliderHandle::handle:horizontal {{
         super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e: QtGui.QMouseEvent):
-        # Update handle hover state
-        pos = e.pos()
-        hrect = self._handle_hit_rect()
-        is_handle_hover = hrect.contains(pos)
-
-        was_handle_hover = getattr(self, "_handle_hover", False)
-        self._handle_hover = is_handle_hover
-
-        if is_handle_hover != was_handle_hover and not self._is_active():
-            self.update()
-
-            if is_handle_hover:
-                if hasattr(self, "_toolTipData") and (self._toolTipData.get("text") or self._toolTipData.get("description")):
-                    QFlatTooltipManager.delayed_show(anchor_widget=self, **self._toolTipData)
-            else:
-                QFlatTooltipManager.cancel_timer()
-
         if self.isSliderDown() and self._press_offset is not None and not self._is_wheel_session():
-            # Re-calculate track width based on style geometry
-            groove_rect = self._groove_rect()
-            handle_rect = self._handle_rect()
-            track_left = groove_rect.left()
-            track_w = groove_rect.width() - handle_rect.width()
-
-            desired_left = e.pos().x() - int(self._press_offset)
-            if track_w > 0:
-                desired_left = max(track_left, min(track_left + track_w, desired_left))
-                ratio = (desired_left - track_left) / track_w
-            else:
-                ratio = 0.0
-            rng = float(self.maximum() - self.minimum())
-            self.setSliderPosition(int(round(self.minimum() + ratio * rng)))
-            self._has_dragged = True
+            self._update_handle_drag(e.pos())
             e.accept()
             return
         super().mouseMoveEvent(e)
 
     def mouseReleaseEvent(self, e: QtGui.QMouseEvent):
         if e.button() == QtCore.Qt.LeftButton and self.isSliderDown():
-            self.setSliderDown(False)
+            self._end_handle_drag()
             self._finish_interaction()
             return e.accept()
         super().mouseReleaseEvent(e)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._update_handle_button_geometry()
 
     def wheelEvent(self, e: QtGui.QWheelEvent):
         delta = e.angleDelta().x() + e.angleDelta().y()
@@ -572,60 +692,18 @@ QSlider#TKMSliderHandle::handle:horizontal {{
         super().sliderChange(change)
         if change == QtWidgets.QSlider.SliderValueChange:
             self.moved.emit(self.percent())
+        self._update_handle_button_geometry()
 
     def paintEvent(self, e):
         super().paintEvent(e)
-        p = QtGui.QPainter(self)
-        hrect = self._handle_rect()
-        p.setRenderHint(QtGui.QPainter.Antialiasing)
-
-        base_color = QtGui.QColor(self._icon_color)
-        handle_highlighted = getattr(self, "_handle_hover", False) or bool(self._press_offset)
-        if handle_highlighted:
-            main_color = QtGui.QColor(
-                min(base_color.red() + 60, 255), min(base_color.green() + 60, 255), min(base_color.blue() + 60, 255), base_color.alpha()
-            )
-        else:
-            main_color = base_color
-
-        if self._icon:
-            icon_size = int(min(hrect.width(), hrect.height()) * 0.7038)
-            qicon = QtGui.QIcon(self._icon)
-            if not qicon.isNull():
-                icon_rect = QtCore.QRect(0, 0, icon_size, icon_size)
-                icon_rect.moveCenter(hrect.center())
-                qicon.paint(p, icon_rect, QtCore.Qt.AlignCenter)
-        else:
-            p.setFont(self._text_font)
-            fm = p.fontMetrics()
-            tw = fm.horizontalAdvance(self._text)
-            tx = hrect.x() + (hrect.width() - tw) / 2.0
-            ty = hrect.y() + (hrect.height() + fm.capHeight()) / 2.0
-
-            path = QtGui.QPainterPath()
-            path.addText(tx, ty, self._text_font, self._text)
-
-            p.setPen(QtGui.QPen(QtGui.QColor(COLORS.ui.dark_gray.hex), wutil.DPI(2.0), QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
-            p.setBrush(QtCore.Qt.NoBrush)
-            p.drawPath(path)
-
-            if handle_highlighted:
-                glow_color = QtGui.QColor(255, 255, 255, 40)
-                p.setBrush(glow_color)
-                p.setPen(QtCore.Qt.NoPen)
-                for dx, dy in [(-1, -1), (1, 1), (-1, 1), (1, -1), (0, -1), (0, 1), (-1, 0), (1, 0)]:
-                    glow_path = path.translated(dx, dy)
-                    p.drawPath(glow_path)
-
-            p.setPen(QtCore.Qt.NoPen)
-            p.setBrush(main_color)
-            p.drawPath(path)
 
         if not self._press_offset:
-            p.end()
             return
 
         # live % display while dragging/wheeling
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        hrect = self._handle_rect()
         cx = hrect.center().x()
         mid = self.width() // 2
         pad = wutil.DPI(self.VALUE_HANDLE_PADDING)
@@ -871,6 +949,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
     def setText(self, text: str):
         self._slider._text = text
         self._slider._icon = text if self._slider._looks_like_icon(text) else None
+        self._slider._refresh_handle_icon()
         self._slider.update()
 
     def setColor(self, color: str):
@@ -886,6 +965,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
     def setIconColor(self, color: str):
         self._icon_color = color
         self._slider._icon_color = color
+        self._slider._refresh_handle_icon()
         self._slider.update()
 
     def setWorldSpace(self, enabled: bool):
@@ -1043,13 +1123,16 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
                 )
                 continue
             button_command = self._tooltip_command_metadata(b.percent)
+            command_icon = button_command[2]
+            if b.worldSpace and b.worldSpaceIconPath:
+                command_icon = b.worldSpaceIconPath
             b.setTooltipInfo(
                 title,
                 description,
                 tooltip,
                 command_id=button_command[0],
                 command_label=button_command[1],
-                command_icon=button_command[2],
+                command_icon=command_icon,
             )
 
     def _tooltip_command_metadata(self, value):
@@ -1128,18 +1211,19 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
             self.setText(display_value)
 
         self._refresh_button_icons()
-        self.setTooltipInfo(mode.label, mode.description, mode.tooltip)
         self.setWorldSpace(mode.worldSpace)
+        self.setTooltipInfo(mode.label, mode.description, mode.tooltip)
         self.setFrameButtonsVisible(mode.frameButtons)
         self._update_frame_button_tooltips()
         self._refresh_toolTipData()
 
     def _refresh_button_icons(self):
-        """Resolve the shared square variants for this slider type."""
+        """Resolve the shared square (and, for the ±100 buttons, world-space) variants for this slider type."""
         has_mode = self.currentMode() is not None
         for button in self._leftButtons + self._rightButtons:
             if not has_mode or not self._section_prefix:
                 button.setSquareIcon(None)
+                button.setWorldSpaceIcon(None)
                 continue
             if button in (self._leftFrameButton, self._rightFrameButton):
                 variant = "frame"
@@ -1151,6 +1235,13 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
                     variant,
                 )
             )
+            if abs(int(button.percent)) == 100:
+                button.setWorldSpaceIcon(
+                    _slider_button_icon(
+                        self._section_prefix,
+                        "world",
+                    )
+                )
 
     def refreshModePresentation(self):
         """Reload the active mode icon, falling back to its text when missing."""

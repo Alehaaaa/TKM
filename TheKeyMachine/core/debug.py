@@ -25,6 +25,7 @@ _SLIDER_BUTTON_SIZES = {
     "big": _SLIDER_BUTTON_STANDARD_SIZE,
     "frame": _SLIDER_BUTTON_STANDARD_SIZE,
 }
+_SLIDER_WORLDSPACE_BORDER_WIDTH = 1.5
 _TRASH_ICON_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), os.pardir, "data", "icons", "trash.svg")
 )
@@ -84,8 +85,18 @@ def print_debug_summary(*_args):
     return summary
 
 
+_FLATTENABLE_SVG_TAGS = {"path", "rect", "circle", "ellipse", "line", "polygon", "polyline"}
+
+
 def _flatten_svg_paths(output_path):
-    """Move Qt's grouped outline/fill paths directly under the SVG root."""
+    """Move Qt's grouped shapes directly under the SVG root.
+
+    Qt's SVG generator doesn't just emit ``<path>``: drawEllipse()/drawLine()
+    come out as native ``<ellipse>``/``<line>`` elements, only drawArc() (and
+    drawPath()) become ``<path>``. Any tag not in _FLATTENABLE_SVG_TAGS was
+    previously dropped on the floor here, which silently deleted primitives
+    (e.g. the filled globe circle and equator line of the world-space icon).
+    """
     ElementTree.register_namespace("", _SVG_NAMESPACE)
     tree = ElementTree.parse(output_path)
     root = tree.getroot()
@@ -96,10 +107,10 @@ def _flatten_svg_paths(output_path):
         attributes.update(element.attrib)
         for child in element:
             tag = child.tag.rsplit("}", 1)[-1]
-            if tag == "path":
-                path_attributes = dict(attributes)
-                path_attributes.update(child.attrib)
-                flattened.append(ElementTree.Element(child.tag, path_attributes))
+            if tag in _FLATTENABLE_SVG_TAGS:
+                shape_attributes = dict(attributes)
+                shape_attributes.update(child.attrib)
+                flattened.append(ElementTree.Element(child.tag, shape_attributes))
             elif tag == "g":
                 collect(child, attributes)
 
@@ -245,9 +256,73 @@ def _write_slider_button_icon(color, output_path, variant):
     return os.path.isfile(output_path) and os.path.getsize(output_path) > 0
 
 
+def _write_slider_worldspace_icon(color, output_path, size=int(_SLIDER_BUTTON_CANVAS_SIZE), hover=False):
+    """Render the world-space globe glyph as a flattened SVG.
+
+    This is the exact QPainter drawing that used to run live in
+    ``SliderButton.paintEvent`` (circle + equator + meridian arcs, plus its
+    silhouette-glow offsets), baked once into a file via the same
+    QSvgGenerator pipeline used for the slider text icons.
+    """
+    from TheKeyMachine.core.Qt import QtCore, QtGui, QtSvg
+    from TheKeyMachine.widgets import util as wutil
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    generator = QtSvg.QSvgGenerator()
+    generator.setFileName(output_path)
+    generator.setSize(QtCore.QSize(size, size))
+    generator.setViewBox(QtCore.QRect(0, 0, size, size))
+    generator.setTitle("TheKeyMachine slider icon")
+    generator.setDescription("World-space slider button icon")
+
+    p = QtGui.QPainter(generator)
+    p.setRenderHint(QtGui.QPainter.Antialiasing)
+
+    w, h = size, size
+    base_color = QtGui.QColor(color)
+    main_color = base_color
+    glow_color = QtCore.Qt.transparent
+    offsets = [(0, 0)]
+
+    for dx, dy in offsets:
+        is_glow = dx != 0 or dy != 0
+        p.save()
+        p.translate(dx, dy)
+        cx, cy = w // 2, h // 2
+        r = wutil.DPI(int(min(w, h) * 0.24))  # smaller globe
+
+        p.setPen(QtCore.Qt.NoPen)
+        p.setBrush(glow_color if is_glow else main_color)
+        p.drawEllipse(QtCore.QRect(cx - r, cy - r, 2 * r, 2 * r))
+
+        if not is_glow:
+            # Black linework on top
+            pen = QtGui.QPen(QtGui.QColor(COLORS.ui.dark_gray.hex))
+            pen.setWidthF(_SLIDER_WORLDSPACE_BORDER_WIDTH)
+            p.setPen(pen)
+            p.setBrush(QtCore.Qt.NoBrush)
+
+            # Outer circle outline
+            p.drawEllipse(QtCore.QRect(cx - r, cy - r, 2 * r, 2 * r))
+
+            # Equator
+            p.drawLine(cx - r + 1, cy, cx + r - 1, cy)
+
+            # Curved meridians (left/right)
+            mer_w = int(2 * r * 0.45)  # tweak curvature here (0.5–0.65 looks good)
+            mer_rect = QtCore.QRect(cx - mer_w // 2, cy - r, mer_w, 2 * r)
+            p.drawArc(mer_rect, 90 * 14, 180 * 16)  # left arc
+            p.drawArc(mer_rect, 90 * 14, -180 * 16)  # right arc
+        p.restore()
+
+    p.end()
+    _flatten_svg_paths(output_path)
+    return os.path.isfile(output_path) and os.path.getsize(output_path) > 0
+
+
 def _slider_button_icon_name(slider_type, variant):
     """Return the extensionless shared asset name for one slider type."""
-    if not slider_type or variant not in _SLIDER_BUTTON_SIZES:
+    if not slider_type or (variant not in _SLIDER_BUTTON_SIZES and variant != "world"):
         return None
     return "slider_{}/square_{}".format(slider_type, variant)
 
@@ -461,7 +536,7 @@ def export_slider_button_icons(*_args):
             os.makedirs(icons_dir, exist_ok=True)
             _clear_slider_button_icons(
                 icons_dir,
-                tuple(_SLIDER_BUTTON_SIZES),
+                tuple(_SLIDER_BUTTON_SIZES) + ("world",),
             )
         except OSError:
             failed.append(icons_dir)
@@ -471,6 +546,8 @@ def export_slider_button_icons(*_args):
         variants = ["small", "big"]
         if any(getattr(mode, "frame_buttons", False) for mode in modes):
             variants.append("frame")
+        if any(getattr(mode, "world_space", False) for mode in modes):
+            variants.append("world")
 
         for variant in variants:
             asset_name = _slider_button_icon_name(slider_type, variant)
@@ -480,11 +557,14 @@ def export_slider_button_icons(*_args):
             )
             color = SLIDER_FRAME_BUTTON_COLOR if variant == "frame" else colored
             try:
-                success = _write_slider_button_icon(
-                    color,
-                    output_path,
-                    variant,
-                )
+                if variant == "world":
+                    success = _write_slider_worldspace_icon(color, output_path)
+                else:
+                    success = _write_slider_button_icon(
+                        color,
+                        output_path,
+                        variant,
+                    )
             except OSError:
                 success = False
             (exported if success else failed).append(output_path)
