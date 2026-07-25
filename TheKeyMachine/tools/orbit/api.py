@@ -218,6 +218,7 @@ orbit_toolbar_toggle = ToolbarWindowToggle(
     lambda: orbit_window(reuse_existing=True),
     close_orbit_window,
     orbit_window_bus.stateChanged,
+    tool_id="orbit",
 )
 
 def _orbit_auto_transparency_enabled():

@@ -150,10 +150,13 @@ class SearchResultItemWidget(QtWidgets.QWidget):
                 "#SearchResultCheckBox::indicator:checked{image:url(%s);border-color:#7d7d7d;background:#363636;}"
                 % (wutil.DPI(11), wutil.DPI(11), wutil.DPI(3), icons.apply)
             )
-            callback = row.get("callback") or trigger.get_command(row.get("command"))
+            # Dispatch by name instead of caching a direct callable -- see the
+            # same fix in mods/hotkeysMod.py's HotkeyCommandItemWidget for why.
+            command_name = row.get("command")
+            can_run = bool(command_name) and trigger.has_command(command_name)
             toolCommon.connect_tool_control(
                 self.check_box,
-                (lambda *_args, cb=callback: cb()) if callable(callback) else None,
+                (lambda *_args, name=command_name: trigger.execute_command(name)) if can_run else None,
                 checkable=True,
                 getter=row.get("get_checked"),
                 setter=row.get("set_checked"),

@@ -177,13 +177,6 @@ def _iter_assign_command_entries():
             yield str(name), _shortcut_from_combo(combo)
 
 
-def _assign_command_owners():
-    owners = {}
-    for name, combo in _iter_assign_command_entries():
-        owners.setdefault(_combo_key(combo), []).append(name)
-    return owners
-
-
 def _load_hotkeys_from_maya():
     mapping = {}
     stale_assignments = []
@@ -520,14 +513,27 @@ def _first_assignment_result(result):
 
 
 def _query_hotkey_assignment(combo):
+    """Find the Maya command bound to ``combo``, preferring a press binding.
+
+    Checks ``name`` (press) across every key candidate -- the literal key,
+    then its legacy shifted form -- before ever looking at ``releaseName``.
+    A release-only binding only fires at key-up, in whatever tool/drag
+    context happened to trigger it; it isn't what actually conflicts with a
+    user pressing this key, so it shouldn't preempt a real press binding
+    just because it happens to sit on the more literal of the two
+    candidates. TKM's own hotkeys are always press-only (see _assign_hotkey),
+    so releaseName here can only ever be a third-party/Maya-default match --
+    kept as a last-resort signal, not a first one.
+    """
     combo = _normalize_combo(combo)
     if not combo:
         return None
-    for key_shortcut, shift_required in _maya_hotkey_candidates(combo):
-        flags = _hotkey_flag_kwargs(combo)
-        flags["keyShortcut"] = key_shortcut
-        flags["sht"] = shift_required
-        for query_flag in ("name", "releaseName"):
+    candidates = _maya_hotkey_candidates(combo)
+    for query_flag in ("name", "releaseName"):
+        for key_shortcut, shift_required in candidates:
+            flags = _hotkey_flag_kwargs(combo)
+            flags["keyShortcut"] = key_shortcut
+            flags["sht"] = shift_required
             try:
                 kwargs = dict(flags)
                 kwargs.update({"query": True, query_flag: True})
@@ -986,13 +992,11 @@ def _append_background_runner_rows(section, seen, title_lookup, icon_lookup, tri
     """Add the individual entries exposed by the Background Runners menu."""
     from TheKeyMachine.core import backgroundRunners
 
-    command_overrides = {
-        backgroundRunners.CHANNELBOX_HIGHLIGHT_ID: "background_runner_channelbox_selection_highlight",
-        backgroundRunners.CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID: "background_runner_channelbox_clear_on_selection_change",
-        backgroundRunners.CAMERA_ORBIT_SELECTION_ID: "background_runner_camera_orbit_selection",
-    }
     for runner_id, spec in backgroundRunners.get_runner_specs().items():
-        command_name = command_overrides.get(runner_id, runner_id)
+        # Same runner_id -> registered command mapping the dropdown menu uses
+        # (backgroundRunners.RUNNER_COMMAND_IDS) -- one table, not a second
+        # hardcoded copy that can drift out of sync with it.
+        command_name = spec.get("command_id", runner_id)
         _append_section_row(
             section,
             seen,
@@ -1107,7 +1111,6 @@ class HotkeyStatusResolver(object):
         self.icon_lookup = icon_lookup
         self.maya_hotkeys = _load_hotkeys_from_maya()
         self.draft_combo_owners = _combo_owners(self.draft_mapping)
-        self.assign_command_owners = _assign_command_owners()
         self.external_cache = {}
 
     def status_for(self, command_name, combo):
@@ -1145,20 +1148,24 @@ class HotkeyStatusResolver(object):
         return None, "", None
 
     def _external_assignment(self, combo, ckey):
-        assignment = self._assign_command_assignment(ckey)
-        if assignment:
-            return assignment
+        # cmds.hotkey()/cmds.hotkeyCheck() are the only queries here scoped
+        # to the CURRENTLY ACTIVE hotkey set -- deliberately the sole source
+        # of truth for "what's really bound to this combo right now."
+        #
+        # An earlier version of this also consulted cmds.assignCommand's
+        # table (via a now-removed _assign_command_assignment/
+        # assign_command_owners) and checked it *first*. That table is a
+        # flat, legacy registry with no hotkey-set partitioning at all, so
+        # it can still list a name-command left over from a *different*,
+        # inactive set (e.g. from before TKM switched to its own writable
+        # set, or from another custom set the user isn't using right now).
+        # Giving that stale data priority over the live, correctly-scoped
+        # query was exactly how a conflict got pinned on a tool that "only
+        # works" in that other, not-currently-active context instead of on
+        # whatever is actually bound to the key today.
         if ckey not in self.external_cache:
             self.external_cache[ckey] = _query_current_name_command(combo)
         return self.external_cache[ckey]
-
-    def _assign_command_assignment(self, ckey):
-        for assignment in self.assign_command_owners.get(ckey, []):
-            command_name = _command_from_name_command(assignment)
-            if command_name in self.draft_mapping:
-                continue
-            return assignment
-        return None
 
 
 class HotkeyCaptureEdit(QtWidgets.QLineEdit):
@@ -1237,6 +1244,20 @@ class HotkeyCaptureEdit(QtWidgets.QLineEdit):
             self.setCursorPosition(len(self.text()))
         finally:
             self._updating = False
+
+    def event(self, evt):
+        # Qt sends every focused widget a ShortcutOverride pass before the
+        # real key press -- if we don't claim it here, any ancestor
+        # QShortcut/QAction (a dialog's default button firing on Enter, a
+        # QDialog's built-in Escape-to-reject, Tab moving focus to the next
+        # widget) can steal the key first and keyPressEvent below never sees
+        # it at all. Enter/Escape/Tab/Delete are all explicitly supported,
+        # bindable keys here (see KEY_TEXT_ALIASES/_qt_key_to_combo), so this
+        # field must capture literally every key while it has focus.
+        if evt.type() == QtCore.QEvent.ShortcutOverride:
+            evt.accept()
+            return True
+        return super().event(evt)
 
     def keyPressEvent(self, event):
         combo = _qt_key_to_combo(event)
@@ -1379,10 +1400,18 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
                 "#HotkeyCommandCheckBox::indicator:checked{image:url(%s);border-color:#7d7d7d;background:#363636;}"
                 % (wutil.DPI(11), wutil.DPI(11), wutil.DPI(3), icons.apply)
             )
-            callback = self.command_data.get("callback") or trigger.get_command(self.command_name())
+            # Dispatch by name (like every other trigger entry point) instead
+            # of caching a direct callable here: every row reaching this
+            # widget is already guaranteed a registered command (see
+            # _append_section_row's trigger.has_command() gate), and
+            # execute_command() always resolves the *current* dispatched
+            # command instead of a reference that can go stale across a
+            # registry rebuild/reload.
+            command_name = self.command_name()
+            can_run = trigger.has_command(command_name)
             toolCommon.connect_tool_control(
                 self.check_box,
-                (lambda *_args, cb=callback: cb()) if callable(callback) else None,
+                (lambda *_args, name=command_name: trigger.execute_command(name)) if can_run else None,
                 checkable=True,
                 getter=self._check_state_getter(),
                 setter=self.command_data.get("set_checked"),

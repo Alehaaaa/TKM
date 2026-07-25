@@ -534,18 +534,40 @@ def tool_operation(
     _t_tint_color = time.perf_counter() if _DEBUG_TIMING else None
 
     parent_operation = current_tool_operation()
+    if parent_operation is not None:
+        # core/trigger.py's dispatcher already opened the one real operation
+        # for this user action (tool_id = the registered command name)
+        # before calling the callback. Every command implementation that
+        # opens tool_operation() again while that's live -- directly, or via
+        # a per-module helper like _run_key_command / _copy_paste_operation /
+        # tangents/api.py's _run() -- is re-wrapping itself, not composing a
+        # genuinely separate tool (audited: no dispatched command invokes a
+        # *different* registered command synchronously as a sub-step). Merge
+        # into the live operation instead of nesting a second one, so every
+        # command gets exactly one ToolOperation, one undo chunk, one tint
+        # session, and one TKM_DEBUG_TIMING line per click -- regardless of
+        # how many internal helpers it routes through.
+        if label:
+            parent_operation.set_status(label)
+        if progress_max and parent_operation.progress:
+            parent_operation.progress.set_total(progress_max, reset=True)
+        if timerange:
+            parent_operation.timerange = timerange
+        ensure_operation_tint(
+            parent_operation,
+            tint=tint,
+            timerange=timerange,
+            default_mode=default_mode,
+            tint_key=tint_key or tool_id,
+            tint_color=tint_color,
+        )
+        yield parent_operation
+        return
+
     progress_obj = None
     owns_progress = False
     estimate_key = str(tool_id or label or "Processing")
-    if parent_operation and parent_operation.progress:
-        # A nested helper must keep using the standard dispatched operation,
-        # even when it would not create a standalone progress display itself.
-        progress_obj = parent_operation.progress
-        if progress_max:
-            progress_obj.set_total(progress_max, reset=True)
-        if label:
-            progress_obj.set_status(label)
-    elif progress:
+    if progress:
         progress_obj = AdaptiveProgress(
             label or humanize_tool_name(tool_id) or "Processing",
             progress_max,
@@ -1465,15 +1487,26 @@ def replace_tracked_connections(owner, attr_name, pairs, parent=None):
 
 
 class ToolbarWindowToggle(QtCore.QObject):
-    """Keeps any number of controls in sync with one floating window."""
+    """Keeps any number of controls in sync with one floating window.
 
-    def __init__(self, is_open_fn, open_fn, close_fn, state_signal=None, parent=None):
+    ``tool_id`` should be the same registered trigger command this toggle's
+    tool also exposes to hotkeys/shelf/search (e.g. ``"attribute_switcher"``)
+    -- passing it routes every open/close through the same ``tool_operation()``
+    dispatch primitive every other command uses (matching that command's own
+    progress/undo policy, usually none for a window toggle) instead of a
+    wholly separate wrapping mechanism, while still calling this toggle's own
+    anchor-button-aware open/close functions rather than re-invoking the
+    command by name (which would lose the button-anchored popup position).
+    """
+
+    def __init__(self, is_open_fn, open_fn, close_fn, state_signal=None, tool_id=None, parent=None):
         super().__init__(parent)
         self._buttons = {}
         self._syncing = False
         self._is_open_fn = is_open_fn
         self._open_fn = open_fn
         self._close_fn = close_fn
+        self._tool_id = tool_id
         if state_signal is not None:
             state_signal.connect(self._on_window_state_changed)
 
@@ -1549,52 +1582,59 @@ class ToolbarWindowToggle(QtCore.QObject):
                 continue
             self._set_button_checked(button, is_open)
 
+    def _run(self, fn, *, context):
+        """Run one open/close action through the shared dispatch primitive.
+
+        Every registered trigger command's body runs inside a
+        ``tool_operation()``; this is the same call, using this toggle's own
+        ``tool_id`` so TKM_DEBUG_TIMING and any future per-tool policy line
+        up with the identical command reachable via hotkey/shelf/search.
+        Window toggles need neither progress nor an undo chunk, matching the
+        ``"check"``-type policy those commands already declare in trigger.py.
+        ``report.safe_execute`` still does the actual error containment --
+        centralizing here just means it (and the dispatch wrap) happens once
+        instead of being copy-pasted at every call site below.
+        """
+        import TheKeyMachine.mods.reportMod as report
+
+        with tool_operation(
+            tool_id=self._tool_id,
+            progress=False,
+            undo=False,
+            suspend_refresh=False,
+            show_success_message=False,
+        ):
+            return report.safe_execute(fn, context=context)
+
     def _on_button_toggled(self, _button, checked):
         if self._syncing:
             return
-        import TheKeyMachine.mods.reportMod as report
-
         if checked:
-            report.safe_execute(
-                lambda: self._open_from_source(_button),
-                context="toolbar window toggle open",
-            )
+            self._run(lambda: self._open_from_source(_button), context="toolbar window toggle open")
         else:
-            report.safe_execute(self._close_fn, context="toolbar window toggle close")
+            self._run(self._close_fn, context="toolbar window toggle close")
         self._reconcile_button_state()
 
     def _on_button_destroyed(self, button_id):
         self._buttons.pop(button_id, None)
 
     def open(self, source_button=None):
-        import TheKeyMachine.mods.reportMod as report
-
         if not self._is_open_fn():
-            result = report.safe_execute(
-                lambda: self._open_from_source(source_button),
-                context="toolbar window toggle open",
-            )
+            result = self._run(lambda: self._open_from_source(source_button), context="toolbar window toggle open")
             self._reconcile_button_state()
             return result
 
     def close(self):
-        import TheKeyMachine.mods.reportMod as report
-
         if self._is_open_fn():
-            result = report.safe_execute(self._close_fn, context="toolbar window toggle close")
+            result = self._run(self._close_fn, context="toolbar window toggle close")
             self._reconcile_button_state()
             return result
 
     def toggle(self, source_button=None):
-        import TheKeyMachine.mods.reportMod as report
-
         if self._is_open_fn():
-            result = report.safe_execute(self._close_fn, context="toolbar window toggle close")
+            result = self._run(self._close_fn, context="toolbar window toggle close")
         else:
-            result = report.safe_execute(
-                lambda: self._open_from_source(source_button),
-                context="toolbar window toggle open",
-            )
+            result = self._run(lambda: self._open_from_source(source_button), context="toolbar window toggle open")
         self._reconcile_button_state()
         return result
 

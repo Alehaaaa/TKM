@@ -357,6 +357,7 @@ gimbal_fixer_toolbar_toggle = toolCommon.ToolbarWindowToggle(
     ),
     close_gimbal_fixer_window,
     gimbal_fixer_window_bus.stateChanged,
+    tool_id="gimbal",
 )
 
 

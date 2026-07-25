@@ -142,6 +142,7 @@ search_toolbar_toggle = ToolbarWindowToggle(
     show_search_window,
     close_search_window,
     search_window_bus.stateChanged,
+    tool_id="search_window",
 )
 
 

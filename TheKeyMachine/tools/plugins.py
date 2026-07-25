@@ -173,6 +173,15 @@ def _restore_context(spec):
             pass
 
 
+class _IgnorePyNodeCleanupWarning(logging.Filter):
+    """Match only PyMEL's benign 'no PyNode registered' cleanup warning."""
+
+    _NEEDLE = "could not find an associated PyNode registered"
+
+    def filter(self, record):
+        return self._NEEDLE not in record.getMessage()
+
+
 @contextlib.contextmanager
 def _suppress_pymel_node_cleanup_warnings():
     """Silence PyMEL's benign node-cleanup warning during plug-in unload.
@@ -184,19 +193,23 @@ def _suppress_pymel_node_cleanup_warnings():
     (true here, since TKM uses ``maya.api.OpenMaya`` / ``cmds`` and PyMEL is
     only ever an incidental, third-party import in the session) have no such
     class to remove, so PyMEL logs a warning even though nothing is wrong.
-    Only touch the logger if PyMEL is actually loaded, and restore its
-    level afterward so we never suppress genuine PyMEL warnings elsewhere.
+
+    Only touch the logger if PyMEL is actually loaded, and use a message
+    filter rather than raising the log level so any other, genuinely useful
+    warning that ``pymel.internal.factories`` might log during the same
+    call still comes through untouched.
     """
     if "pymel.internal.factories" not in sys.modules:
         yield
         return
     pymel_logger = logging.getLogger("pymel.internal.factories")
-    previous_level = pymel_logger.level
-    pymel_logger.setLevel(logging.ERROR)
+    node_cleanup_filter = _IgnorePyNodeCleanupWarning()
+    pymel_logger.addFilter(node_cleanup_filter)
     try:
         yield
     finally:
-        pymel_logger.setLevel(previous_level)
+        if node_cleanup_filter in pymel_logger.filters:
+            pymel_logger.removeFilter(node_cleanup_filter)
 
 
 def unload(spec, restore_context=True):
@@ -210,10 +223,11 @@ def unload(spec, restore_context=True):
         return False
     with _suppress_pymel_node_cleanup_warnings():
         cmds.unloadPlugin(plugin_name)
-    try:
-        cmds.pluginInfo(plugin_name, edit=True, remove=True)
-    except RuntimeError:
-        pass
+    if plugin_name in (cmds.pluginInfo(query=True, listPlugins=True) or []):
+        try:
+            cmds.pluginInfo(plugin_name, edit=True, remove=True)
+        except RuntimeError:
+            pass
     return True
 
 

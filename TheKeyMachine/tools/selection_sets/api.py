@@ -230,6 +230,7 @@ _selection_sets_toolbar_toggle = ToolbarWindowToggle(
     lambda: _selection_sets_open_fn(),
     close_selection_sets_window,
     selection_sets_window_bus.stateChanged,
+    tool_id="selection_sets",
 )
 
 

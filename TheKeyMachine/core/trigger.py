@@ -121,9 +121,33 @@ def _discover_commands() -> None:
         for section_id, section in toolbox.get_section_definitions().items():
             if section.get("type") == "slider":
                 _register_slider_section(section_id, section)
+
+        _register_connect_entries()
         _DISCOVERY_COMPLETE = True
     finally:
         _DISCOVERY_IN_PROGRESS = False
+
+
+def _register_connect_entries() -> None:
+    """Eagerly register every custom-tools manifest entry as a real command.
+
+    Without this, a custom tool only entered _COMMANDS -- and therefore only
+    ran inside tool_operation() -- once the Hotkeys editor had been opened at
+    least once in the session (mods/hotkeysMod.py's
+    _append_connect_entry_rows registers them too, so it still picks up
+    manifest edits made while Maya is running). Before that first open, a
+    hotkey or shelf button for a custom tool fell through execute_command()'s
+    fallback straight to connectEntries.execute_entry_command(), which has no
+    progress/undo/tint wrapping at all -- a different (and lesser) execution
+    path than every other command gets.
+    """
+    from TheKeyMachine.core import connectEntries
+
+    for kind in connectEntries.SOURCES:
+        for entry in connectEntries.load_entries(kind):
+            if entry.get("type") != "entry" or not callable(entry.get("callback")):
+                continue
+            register_command(entry["id"], entry["callback"])
 
 
 def _register_slider_section(section_id: str, section) -> None:

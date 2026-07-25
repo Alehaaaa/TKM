@@ -2766,34 +2766,28 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         menu=None,
         additional_settings=None,
     ):
-        """Apply a set of pin states as one visibility and layout transaction."""
+        """Apply a set of pin states as one visibility and layout transaction.
+
+        Every pin key -- slider or toolbutton -- maps to exactly one widget
+        slot and only ever touches that slot's visibility. A slider's mode
+        (what it currently displays) is a separate concern handled via
+        right-click / _on_slider_current_mode_changed, not here.
+        """
         start_width = self.width() if self.isVisible() else 0
         self._cancel_entry_animation()
         reveal_widget = None
         applied_states = {}
-        mode_settings = {}
 
         for key, visible in states.items():
-            widget, mode_key = self._widget_for_pin_key(key)
+            widget = self._widgets.get(key)
             if widget is None or not QtCompat.isValid(widget):
                 continue
             visible = bool(visible)
-            current_mode = getattr(widget, "_current_mode", None)
-            if visible and mode_key and (current_mode is None or current_mode.key != mode_key):
-                blocked = widget.blockSignals(True)
-                try:
-                    widget.setCurrentMode(mode_key)
-                finally:
-                    widget.blockSignals(blocked)
-                slot_key = next((slot for slot, candidate in self._widgets.items() if candidate is widget), None)
-                if slot_key:
-                    mode_settings[f"slider_mode_{slot_key}"] = mode_key
             if visible and widget.isHidden() and reveal_widget is None:
                 reveal_widget = widget
             widget.setVisible(visible)
             applied_states[key] = visible
         setting_values = dict(additional_settings or {})
-        setting_values.update(mode_settings)
         if save_setting:
             setting_values.update({f"pin_{key}": visible for key, visible in applied_states.items()})
         if setting_values:
@@ -2834,23 +2828,18 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._menu_metadata.append({"type": "separator"})
 
     def _on_slider_current_mode_changed(self, widget, old_key, new_key):
-        """Persist a slider slot and refresh its section like a normal toolbutton."""
+        """Persist which mode a slot displays. Does not touch any pin/visibility state.
+
+        A slot's pin key always means "is this slot's widget visible" -- the
+        same as a toolbutton. Switching what content a visible slot shows
+        (via right-click) is an orthogonal, per-slot preference, so it must
+        never flip another slot's pin setting.
+        """
         slot_key = next((k for k, v in self._widgets.items() if v is widget), None)
         if not slot_key:
             return
         if new_key:
-            setting_values = {f"slider_mode_{slot_key}": new_key}
-            old_pin_key = self._pin_key_for_mode(old_key)
-            new_pin_key = self._pin_key_for_mode(new_key)
-            if old_pin_key:
-                setting_values[f"pin_{old_pin_key}"] = False
-            if new_pin_key:
-                setting_values[f"pin_{new_pin_key}"] = True
-            settings.set_settings(setting_values, namespace=self._settings_namespace)
-            if old_pin_key:
-                toolCommon.publish_control_state(self._pin_state_key(old_pin_key), False)
-            if new_pin_key:
-                toolCommon.publish_control_state(self._pin_state_key(new_pin_key), True)
+            self._set_setting(f"slider_mode_{slot_key}", new_key)
 
         if QtCompat.isValid(widget):
             widget.updateGeometry()
@@ -2901,6 +2890,13 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         return handler
 
     def _visible_slider_mode_keys(self):
+        """Modes currently shown by some *visible* slot in this section.
+
+        Used only to warn a slot's own mode-select menu (sliderWidget.py)
+        that a candidate mode is already being displayed elsewhere, so a
+        user doesn't end up with two visible slots showing the same content.
+        Not used for pin-menu checked state -- see _is_pin_key_checked.
+        """
         modes = set()
         for widget in self._widgets.values():
             if not QtCompat.isValid(widget) or widget.isHidden() or not hasattr(widget, "_current_mode"):
@@ -2910,33 +2906,35 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 modes.add(current_mode.key)
         return modes
 
-    def _pin_key_for_mode(self, mode_key):
-        item = next((item for item in self._menu_metadata if item.get("mode_key") == mode_key), None)
-        return item.get("id") if item else None
-
-    def _widget_for_pin_key(self, key):
-        item = next((item for item in self._menu_metadata if item.get("id") == key), None)
-        mode_key = item.get("mode_key") if item else None
-        if mode_key:
-            matching = []
-            for widget in self._widgets.values():
-                if widget is None or not QtCompat.isValid(widget):
-                    continue
-                current_mode = getattr(widget, "_current_mode", None)
-                if current_mode is not None and current_mode.key == mode_key:
-                    matching.append(widget)
-            if matching:
-                visible = next((widget for widget in matching if not widget.isHidden()), None)
-                return visible or matching[0], mode_key
-        return self._widgets.get(key), mode_key
-
     def _is_pin_key_checked(self, key):
-        item = next((item for item in self._menu_metadata if item.get("id") == key), None)
-        mode_key = item.get("mode_key") if item else None
-        if mode_key:
-            return mode_key in self._visible_slider_mode_keys()
+        """A pin key is checked iff its own widget slot is visible.
+
+        Sliders are pinned exactly like toolbuttons: one key, one widget,
+        one visibility flag. Which mode a visible slider slot is currently
+        displaying (changeable via right-click) never factors in here.
+        """
         widget = self._widgets.get(key)
         return bool(widget and QtCompat.isValid(widget) and not widget.isHidden())
+
+    @staticmethod
+    def _force_menu_repaint(menu):
+        """Force a QMenu to redraw its actions' current checked state.
+
+        QMenu does not reliably repaint a checkable action's indicator when
+        the action is checked/unchecked programmatically (as opposed to by a
+        direct user click) while the menu stays open. This is most visible
+        for a cascaded submenu the user is actively looking at -- e.g. right
+        after "Pin All"/"Pin Defaults" is clicked with the section flyout
+        still open. A plain update()/repaint() is sometimes a no-op because
+        Qt doesn't consider anything dirty; toggling updatesEnabled forces a
+        real invalidate first.
+        """
+        if menu is None or not QtCompat.isValid(menu):
+            return
+        menu.setUpdatesEnabled(False)
+        menu.setUpdatesEnabled(True)
+        menu.update()
+        menu.repaint()
 
     def _bind_pin_menu_action(self, menu, action, key, checked):
         def sync_action(action=action, menu=menu, section=self, widget_key=key):
@@ -2948,9 +2946,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 action.setChecked(checked_now)
             finally:
                 action.blockSignals(blocked)
-            if QtCompat.isValid(menu):
-                menu.update()
-                menu.repaint()
+            section._force_menu_repaint(menu)
 
         try:
             toolCommon.replace_tracked_connection(
@@ -2978,8 +2974,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 action.setChecked(checked)
             finally:
                 action.blockSignals(blocked)
-        menu.update()
-        menu.repaint()
+        self._force_menu_repaint(menu)
 
     def _refresh_layout(self):
         """Trigger a height recalculation."""

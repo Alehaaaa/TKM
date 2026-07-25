@@ -217,35 +217,17 @@ def _animation_command_context(
     timerange=None,
     tint=True,
     progress_max=1,
-    tool_operation=None,
 ):
     """Wrap animation hotkey commands with the shared tool operation.
 
     tint=False disables the timeline/context tint for commands that should feel silent.
 
-    ``tool_operation`` is the operation core/trigger.py's dispatcher already
-    opened for this command (forwarded through the callback's ``**kwargs`` --
-    see ``_make_dispatched_command``). When present, reuse it instead of
-    nesting a second ``tool_operation()``: exactly one operation, one undo
-    chunk, one TKM_DEBUG_TIMING line per command, regardless of entry point.
-    Only a direct/standalone call that bypasses dispatch falls through to
-    opening its own operation below.
+    ``toolCommon.tool_operation()`` itself detects when core/trigger.py's
+    dispatcher already has an operation open for this command and merges
+    into it -- so calling it here, even from a command that dispatch already
+    wrapped, still yields exactly one operation, one undo chunk, and one
+    TKM_DEBUG_TIMING line per click. No reuse plumbing needed at this layer.
     """
-    if tool_operation is not None:
-        tool_operation.set_status(label)
-        if progress_max:
-            tool_operation.set_total(progress_max, reset=True)
-        operation_tint = ("range" if timerange is not None else "context") if tint else "none"
-        toolCommon.ensure_operation_tint(
-            tool_operation,
-            tint=operation_tint,
-            timerange=timerange,
-            default_mode=default_mode,
-            tint_key=tint_key,
-        )
-        yield tool_operation
-        return
-
     operation_tint = "none"
     if tint:
         operation_tint = "range" if timerange is not None else "context"
@@ -266,14 +248,13 @@ def _animation_command_context(
 
 
 @contextmanager
-def _cleanup_command_context(tool_operation, label, tool_id):
-    """Cleanup-command alias: tint-less, caller-managed progress, dispatch-reused."""
+def _cleanup_command_context(label, tool_id):
+    """Cleanup-command alias: tint-less, caller-managed progress."""
     with _animation_command_context(
         label,
         tool_id,
         tint=False,
         progress_max=0,
-        tool_operation=tool_operation,
     ) as operation:
         yield operation
 
@@ -530,8 +511,7 @@ def go_to_previous_frame(*args):
     return time_navigation.request_frame_step(-1)
 
 
-def apply_smart_euler_filter(*args, **kwargs):
-    tool_operation = kwargs.pop("tool_operation", None)
+def apply_smart_euler_filter(*args):
     target_info, _target_plugs, _selected_objects, _selected_channels = (
         animation_context.resolve_command_targets(default_mode="all_animation")
     )
@@ -547,7 +527,6 @@ def apply_smart_euler_filter(*args, **kwargs):
         "Apply Smart Euler Filter",
         "apply_smart_euler_filter",
         progress_max=len(curves),
-        tool_operation=tool_operation,
     ) as operation:
         return _apply_euler_filter(curves, target_info, operation)
 
@@ -593,8 +572,7 @@ def delete_keys(*args):
     )
 
 
-def paste_keys(*args, **kwargs):
-    tool_operation = kwargs.pop("tool_operation", None)
+def paste_keys(*args):
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(
             default_mode="current_frame", include_shapes=False
@@ -604,7 +582,7 @@ def paste_keys(*args, **kwargs):
         return wutil.make_inViewMessage("Select at least one object or channel")
 
     with _animation_command_context(
-        "Paste Keys", "paste_keys", default_mode="current_frame", tool_operation=tool_operation
+        "Paste Keys", "paste_keys", default_mode="current_frame"
     ):
         destination_times = _selected_destination_times()
         if destination_times and _paste_snapshot_to_selected_times(destination_times):
@@ -618,10 +596,9 @@ def paste_keys(*args, **kwargs):
         )
 
 
-def paste_keys_relative(*args, **kwargs):
+def paste_keys_relative(*args):
     global _key_clipboard_start_frame
 
-    tool_operation = kwargs.pop("tool_operation", None)
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(
             default_mode="current_frame", include_shapes=False
@@ -632,10 +609,7 @@ def paste_keys_relative(*args, **kwargs):
 
     paste_time = target_info["time_context"].start_frame
     with _animation_command_context(
-        "Paste Keys Relative",
-        "paste_keys_relative",
-        default_mode="current_frame",
-        tool_operation=tool_operation,
+        "Paste Keys Relative", "paste_keys_relative", default_mode="current_frame"
     ):
         destination_times = _selected_destination_times()
         if destination_times and _paste_snapshot_to_selected_times(destination_times):
@@ -652,8 +626,7 @@ def paste_keys_relative(*args, **kwargs):
         )
 
 
-def crop_animation(*args, **kwargs):
-    tool_operation = kwargs.pop("tool_operation", None)
+def crop_animation(*args):
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(default_mode="all_animation")
     )
@@ -667,7 +640,7 @@ def crop_animation(*args, **kwargs):
         return wutil.make_inViewMessage("No animation curves found")
 
     with _animation_command_context(
-        "Crop Animation", "crop_animation", timerange=crop_range, tool_operation=tool_operation
+        "Crop Animation", "crop_animation", timerange=crop_range
     ):
         for curve in curves:
             frames = cmds.keyframe(curve, query=True, timeChange=True) or []
@@ -800,13 +773,11 @@ def set_remove_redundant_mode(mode):
     return mode
 
 
-def remove_redundant_keys(*args, **kwargs):
-    tool_operation = kwargs.pop("tool_operation", None)
+def remove_redundant_keys(*args):
     mode = get_remove_redundant_mode()
     remove_all = mode == REMOVE_REDUNDANT_MODE_ALL
     label = "Remove All Redundant Keys" if remove_all else "Remove Flat Redundant Keys"
     with _cleanup_command_context(
-        tool_operation,
         label,
         "remove_redundant_keys",
     ) as operation:
@@ -828,10 +799,8 @@ def remove_redundant_keys(*args, **kwargs):
     return removed
 
 
-def remove_static_anim_curves(*args, **kwargs):
-    tool_operation = kwargs.pop("tool_operation", None)
+def remove_static_anim_curves(*args):
     with _cleanup_command_context(
-        tool_operation,
         "Remove Static Anim Curves",
         "remove_static_anim_curves",
     ) as operation:
@@ -909,8 +878,7 @@ def remove_static_anim_curves(*args, **kwargs):
         return True
 
 
-def reverse_animation(*args, **kwargs):
-    tool_operation = kwargs.pop("tool_operation", None)
+def reverse_animation(*args):
     target_info, _target_plugs, _selected_objects, _selected_channels = (
         animation_context.resolve_command_targets(default_mode="all_animation")
     )
@@ -925,7 +893,6 @@ def reverse_animation(*args, **kwargs):
         "reverse_animation",
         timerange=reverse_range,
         progress_max=len(curves),
-        tool_operation=tool_operation,
     ) as operation:
         pivot = (reverse_range[0] + reverse_range[1]) * 0.5
         for curve in curves:
@@ -1119,8 +1086,7 @@ def _key_attributes_layer_aware(obj, attributes, frame, layer_context=None):
     return keyed_attrs, blocked
 
 
-def set_smart_key(*args, **kwargs):
-    tool_operation = kwargs.pop("tool_operation", None)
+def set_smart_key(*args):
     target_info, target_plugs, selected_objects, selected_channels = (
         animation_context.resolve_command_targets(
             default_mode="current_frame",
@@ -1149,7 +1115,6 @@ def set_smart_key(*args, **kwargs):
         "Set Smart Key",
         tint=False,
         progress_max=0,
-        tool_operation=tool_operation,
     ) as operation:
         keyed = (
             _set_selected_graph_editor_curves_current_time(operation)
@@ -1246,8 +1211,7 @@ def set_smart_key(*args, **kwargs):
             return wutil.make_inViewMessage("No keyable channels found")
 
 
-def set_smart_key_all_channels(*args, **kwargs):
-    tool_operation = kwargs.pop("tool_operation", None)
+def set_smart_key_all_channels(*args):
     target_info, _target_plugs, selected_objects, _selected_channels = (
         animation_context.resolve_command_targets(
             default_mode="current_frame",
@@ -1264,7 +1228,6 @@ def set_smart_key_all_channels(*args, **kwargs):
         "Set Smart Key All Channels",
         tint=False,
         progress_max=0,
-        tool_operation=tool_operation,
     ) as operation:
         if not selected_objects:
             return wutil.make_inViewMessage("Select at least one object")

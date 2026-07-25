@@ -29,6 +29,19 @@ HIDE_STATIC_CURVES_ID = "hide_static_animation_curves"
 ANIMATION_RECOVERY_ID = "animation_recovery"
 CHANNELBOX_TINT_KEY = "background_runner:channelbox_selection_highlight"
 
+# The registered trigger command id for each runner -- see
+# tools/background_runners/__init__.py's TOOLS dict, which is the actual
+# source of truth for these names. Kept here, next to the runner ids
+# themselves, so every consumer (the dropdown menu, the Hotkeys editor) reads
+# the same mapping instead of each hardcoding its own copy.
+RUNNER_COMMAND_IDS = {
+    CHANNELBOX_HIGHLIGHT_ID: "background_runner_channelbox_selection_highlight",
+    CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID: "background_runner_channelbox_clear_on_selection_change",
+    CAMERA_ORBIT_SELECTION_ID: "background_runner_camera_orbit_selection",
+    HIDE_STATIC_CURVES_ID: "hide_static_animation_curves",
+    ANIMATION_RECOVERY_ID: "background_runner_animation_recovery",
+}
+
 _CONTROLLER: Optional["BackgroundRunnerController"] = None
 
 
@@ -782,7 +795,7 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
             setattr(manager, relay_attr, relay)
         return relay.changed
 
-    return {
+    specs = {
         ANIMATION_RECOVERY_ID: {
             "id": ANIMATION_RECOVERY_ID,
             "label": "Animation Recovery",
@@ -852,3 +865,6 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
             "changed_signal": _background_runner_signal(CAMERA_ORBIT_SELECTION_ID),
         },
     }
+    for runner_id, spec in specs.items():
+        spec["command_id"] = RUNNER_COMMAND_IDS.get(runner_id, runner_id)
+    return specs

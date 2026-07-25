@@ -641,6 +641,11 @@ def _apply_animation_channels_to_targets(
     progress_batch_size = 25
     destination_context = animlayers.capture_context()
     copied_layers = layer_metadata or {}
+    # Diagnostic only (TKM_DEBUG_TIMING): count how many keys actually land
+    # on each resolved layer name, so a "keys ended up on the wrong layer"
+    # report can be confirmed or ruled out from real setKeyframe results
+    # instead of re-reading the destination-resolution logic again.
+    _debug_layer_counts = {} if toolCommon.debug_timing_enabled() else None
     created_layers = {}
     applied_weights = set()
     blocked_layers = set()
@@ -752,6 +757,9 @@ def _apply_animation_channels_to_targets(
         for layer_id, data, weight_data in source_entries:
             layer_name = _ensure_source_layer(layer_id, target, channel)
             if layer_name is False:
+                if _debug_layer_counts is not None:
+                    bucket = "{} [layer create/membership failed, skipped]".format(layer_id)
+                    _debug_layer_counts[bucket] = _debug_layer_counts.get(bucket, 0) + 1
                 continue
             resolved.append((layer_name, data, weight_data))
         return resolved
@@ -818,9 +826,14 @@ def _apply_animation_channels_to_targets(
                 }
                 if paste_layer:
                     key_kwargs["animLayer"] = paste_layer
-                cmds.setKeyframe(target, **key_kwargs)
+                result = cmds.setKeyframe(target, **key_kwargs)
                 _apply_key_tangent_data(target, channel, key_time, tangent_data, key_index, layer_name=paste_layer)
                 applied += 1
+                if _debug_layer_counts is not None:
+                    bucket = paste_layer or "BaseAnimation(no layer flag)"
+                    if not result:
+                        bucket += " [setKeyframe returned falsy]"
+                    _debug_layer_counts[bucket] = _debug_layer_counts.get(bucket, 0) + 1
             except Exception as e:
                 import TheKeyMachine.mods.reportMod as report
 
@@ -918,6 +931,11 @@ def _apply_animation_channels_to_targets(
     if blocked_layers:
         locked_name = sorted(blocked_layers)[0]
         wutil.make_inViewMessage("Current animation layer '{}' is locked".format(locked_name))
+
+    if _debug_layer_counts is not None:
+        print("[TKM timing] paste keys actually written, by resolved layer: {}".format(
+            dict(_debug_layer_counts)
+        ))
 
     return keys_set
 

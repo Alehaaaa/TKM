@@ -37,7 +37,11 @@ RUNTIME_TRANSFORM_KEY = "animation_recovery:transforms"
 RUNTIME_LAYER_KEY = "animation_recovery:layers"
 SCENE_NODE = "TheKeyMachine"
 SCENE_ID_ATTRIBUTE = "tkmAnimationRecoverySceneId"
-SCENE_LAST_CHECKPOINT_ATTRIBUTE = "tkmAnimationRecoveryLastCheckpoint"
+# fileInfo, not a node attribute: it is scene-global (survives even if the
+# TheKeyMachine node were ever removed), is documented as NOT undoable, and
+# needs no create/lock/unlock dance -- unlike a node attribute, it is exactly
+# the right weight for a value stamped on every single snapshot.
+CHECKPOINT_FILEINFO_KEY = "tkm_animationRecoveryLastCheckpoint"
 SCHEMA_VERSION = 6
 BASELINE_INTERVAL = 50
 MAX_BASELINE_GENERATIONS = 20
@@ -605,21 +609,41 @@ def _capture_layer(layer, member_plugs=None):
 
 
 def _animation_layers_snapshot():
-    """Capture every animation layer plus a curve-name -> layer-context map."""
+    """Capture every animation layer plus a curve-name -> layer-context map.
+
+    This runs on every debounced capture, so the expensive part --
+    findCurveForPlug, called per member attribute -- is only paid for layers
+    that actually have keyed curves, and skipped entirely (one cheap
+    animCurves query instead) for layers that are just empty membership
+    scaffolding. The common case of one animated attribute per layer is
+    resolved without findCurveForPlug at all, since there is nothing to
+    disambiguate.
+    """
     layers = cmds.ls(type="animLayer") or []
     layers_data = []
     curve_layer_map = {}
     for layer in layers:
         member_plugs = _layer_query(layer, "attribute", default=[]) or []
-        layer_uuid = _node_uuid(layer)
-        for plug in member_plugs:
-            for curve_name in _layer_curves_for_plug(layer, plug):
-                if curve_name and curve_name not in curve_layer_map:
+        layer_curves = _layer_query(layer, "animCurves", default=[]) or []
+        if layer_curves:
+            layer_uuid = _node_uuid(layer)
+            if len(member_plugs) == 1 and len(layer_curves) == 1:
+                curve_name = layer_curves[0]
+                if curve_name not in curve_layer_map:
                     curve_layer_map[curve_name] = {
                         "name": layer,
                         "uuid": layer_uuid,
-                        "plug": plug,
+                        "plug": member_plugs[0],
                     }
+            else:
+                for plug in member_plugs:
+                    for curve_name in _layer_curves_for_plug(layer, plug):
+                        if curve_name and curve_name not in curve_layer_map:
+                            curve_layer_map[curve_name] = {
+                                "name": layer,
+                                "uuid": layer_uuid,
+                                "plug": plug,
+                            }
         layers_data.append(_capture_layer(layer, member_plugs=member_plugs))
     return layers_data, curve_layer_map
 
@@ -763,18 +787,6 @@ def ensure_scene_id():
             cmds.setAttr(plug, lock=True, keyable=False, channelBox=False)
         except Exception:
             pass
-        checkpoint_plug = "{}.{}".format(node, SCENE_LAST_CHECKPOINT_ATTRIBUTE)
-        if not cmds.objExists(checkpoint_plug):
-            try:
-                cmds.addAttr(
-                    node,
-                    longName=SCENE_LAST_CHECKPOINT_ATTRIBUTE,
-                    niceName="Animation Recovery Last Checkpoint",
-                    dataType="string",
-                )
-                cmds.setAttr(checkpoint_plug, "", type="string")
-            except Exception:
-                pass
         return scene_id
     finally:
         try:
@@ -799,55 +811,49 @@ def current_scene_id(create=False):
     return ensure_scene_id() if create else None
 
 
-def set_last_saved_checkpoint(checkpoint_name):
-    """Stamp the checkpoint current at save time onto the scene node.
+def set_last_saved_checkpoint(timestamp):
+    """Stamp the checkpoint timestamp current right now onto the scene.
 
-    Because this attribute lives on a node in the scene, its value is written
-    into the file itself the next time the scene is saved. Reopening the
-    scene can then compare it against the recovery folder's newest checkpoint
-    to know whether the saved scene already reflects everything Animation
-    Recovery knows about, independent of filesystem timestamps.
+    Stored via fileInfo rather than a node attribute: fileInfo is scene-global
+    (no node/lock bookkeeping needed) and, per Maya's own documentation, is
+    explicitly NOT undoable -- unlike a plain setAttr, writing it on every
+    single snapshot (which happens constantly while animating) never pushes
+    an entry onto the user's undo queue. Its value is preserved when the
+    scene is saved exactly like a node attribute's would be, which is all
+    this needs: reopening the scene can compare it against the recovery
+    folder's newest checkpoint timestamp to know whether the saved scene
+    already reflects everything Animation Recovery knows about, independent
+    of filesystem timestamps.
     """
-    node = _scene_node()
-    if not node:
+    try:
+        timestamp = float(timestamp or 0.0)
+    except (TypeError, ValueError):
         return False
-    plug = "{}.{}".format(node, SCENE_LAST_CHECKPOINT_ATTRIBUTE)
-    if not cmds.objExists(plug):
-        try:
-            cmds.addAttr(
-                node,
-                longName=SCENE_LAST_CHECKPOINT_ATTRIBUTE,
-                niceName="Animation Recovery Last Checkpoint",
-                dataType="string",
-            )
-        except Exception:
-            return False
+    if timestamp <= 0.0:
+        return False
     try:
-        was_locked = bool(cmds.getAttr(plug, lock=True))
-    except Exception:
-        was_locked = False
-    try:
-        if was_locked:
-            cmds.setAttr(plug, lock=False)
-        cmds.setAttr(plug, checkpoint_name or "", type="string")
+        cmds.fileInfo(CHECKPOINT_FILEINFO_KEY, repr(timestamp))
+        return True
     except Exception:
         return False
-    finally:
-        try:
-            cmds.setAttr(plug, lock=True, keyable=False, channelBox=False)
-        except Exception:
-            pass
-    return True
 
 
-def last_saved_checkpoint(scene_id=None):
-    node = _scene_node()
-    plug = "{}.{}".format(node, SCENE_LAST_CHECKPOINT_ATTRIBUTE) if node else None
-    if not plug or not cmds.objExists(plug):
+def last_saved_checkpoint():
+    """Read the timestamp stamped by set_last_saved_checkpoint, if any.
+
+    fileInfo is scene-global by nature (there is exactly one open scene at a
+    time), so this takes no scene_id -- unlike the recovery-file lookups
+    below, which are keyed by folder and do need one.
+    """
+    try:
+        values = cmds.fileInfo(CHECKPOINT_FILEINFO_KEY, query=True) or []
+    except Exception:
+        return None
+    if not values:
         return None
     try:
-        return cmds.getAttr(plug) or None
-    except Exception:
+        return float(values[0])
+    except (TypeError, ValueError):
         return None
 
 
@@ -910,14 +916,14 @@ def newer_recovery_for_current_scene(scene_id=None):
         return None
     newest_path = paths[-1]
 
-    stamped_checkpoint = last_saved_checkpoint(scene_id=scene_id)
-    if stamped_checkpoint:
-        # The scene node records the checkpoint that was current the last time
-        # this scene was actually saved. When that still matches the newest
-        # checkpoint on disk, the opened scene already reflects everything
-        # Animation Recovery knows about -- no need to fall back to fragile
-        # filesystem timestamps.
-        if stamped_checkpoint == os.path.basename(newest_path):
+    stamped_timestamp = last_saved_checkpoint()
+    if stamped_timestamp is not None:
+        # The scene node records the checkpoint timestamp that was current the
+        # last time this scene was actually saved (or, at minimum, live in
+        # memory). When no checkpoint on disk is newer than that, the opened
+        # scene already reflects everything Animation Recovery knows about --
+        # no need to fall back to fragile filesystem timestamps.
+        if _filename_timestamp_value(newest_path) <= stamped_timestamp:
             return None
         return newest_path
 
@@ -1996,12 +2002,12 @@ class AnimationRecoveryService(QtCore.QObject):
             if self._timer.isActive():
                 self.capture_now()
             path = self.capture_now(reason="scene_save")
-            checkpoint_name = os.path.basename(path) if path else self._last_checkpoint_name
-            if not checkpoint_name:
+            timestamp = _filename_timestamp_value(path) if path else self._last_snapshot_timestamp
+            if not timestamp:
                 return
             # Stamped before Maya writes the file so the value is embedded in
             # the scene being saved, not the one that follows it.
-            if not set_last_saved_checkpoint(checkpoint_name):
+            if not set_last_saved_checkpoint(timestamp):
                 cmds.warning(
                     "Animation Recovery could not stamp the last checkpoint "
                     "onto the scene node."
@@ -2299,7 +2305,7 @@ class AnimationRecoveryService(QtCore.QObject):
         # (caught by our kBeforeSave hook or not), whatever is already on the
         # node at that moment is the true latest checkpoint, not a stale one.
         try:
-            set_last_saved_checkpoint(os.path.basename(path))
+            set_last_saved_checkpoint(_filename_timestamp_value(path))
         except Exception:
             pass
         self.snapshotSaved.emit(path)

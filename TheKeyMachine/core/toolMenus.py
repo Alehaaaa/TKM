@@ -477,12 +477,21 @@ def build_main_dock_menu(toolbar):
 
 
 def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
+    """Build the pinning menu's structure: submenus, actions, icons, connections.
+
+    The available tools are fixed once the toolbar is populated, so this is
+    meant to run once per toolbar instance. Per-open state (pin checkmarks,
+    active workspace, current alignment) is not baked in here; it is applied
+    by ``refresh_toolbar_pinning_menu`` right before the (cached) menu pops
+    back up.
+    """
     menu = cw.MenuWidget(parent_widget, tearoff=False)
     from TheKeyMachine.tools.tkm_menu import api as tkmMenuApi
 
     menu.addAction(tkmMenuApi.create_logo_action(menu, clickable=False))
 
     sections = getattr(toolbar_widget, "_tkm_sections", []) or []
+    menu._tkm_section_menus = []
     for section in sections:
         if not wutil.is_valid_widget(section) or not getattr(section, "has_pinnable_items", lambda: False)():
             continue
@@ -492,6 +501,7 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
         section_menu = cw.OpenMenuWidget(QtGui.QIcon(icon_path or ""), label)
         section.populate_pinning_menu(section_menu)
         menu.addMenu(section_menu, description="Pin tools in {}.".format(label))
+        menu._tkm_section_menus.append((section, section_menu))
 
     if sections:
         from TheKeyMachine.core import toolWorkspaces
@@ -514,34 +524,95 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
     return menu
 
 
+def refresh_toolbar_pinning_menu(menu, toolbar_widget):
+    """Resync a cached pinning menu's per-open state without rebuilding it.
+
+    Only checkmarks/labels that can drift between two openings of the same
+    menu are touched here: pin state per tool, the active workspace, and the
+    current icon alignment. No actions, icons, or connections are recreated.
+    """
+    if not wutil.is_valid_widget(menu):
+        return
+
+    for section, section_menu in getattr(menu, "_tkm_section_menus", ()):
+        if wutil.is_valid_widget(section) and wutil.is_valid_widget(section_menu):
+            section._sync_pin_menu_actions(section_menu)
+
+    _refresh_toolbar_pinning_footer(menu, toolbar_widget)
+
+
+def _refresh_toolbar_pinning_footer(menu, toolbar_widget):
+    from TheKeyMachine.core import toolWorkspaces
+
+    workspace_actions = getattr(menu, "_tkm_workspace_actions", None) or {}
+    if workspace_actions:
+        active_ws = toolWorkspaces.get_active_workspace()
+        for ws in toolWorkspaces.WORKSPACES:
+            action = workspace_actions.get(ws["id"])
+            if not wutil.is_valid_widget(action):
+                continue
+            label, is_current = _workspace_action_state(ws, active_ws)
+            blocked = action.blockSignals(True)
+            try:
+                action.setText(label)
+                action.setChecked(is_current)
+            finally:
+                action.blockSignals(blocked)
+
+    alignment_actions = getattr(menu, "_tkm_alignment_actions", None) or {}
+    setting_key = getattr(menu, "_tkm_alignment_setting_key", None)
+    if alignment_actions and setting_key and wutil.is_valid_widget(toolbar_widget):
+        current_align = settings.get_setting(setting_key, "Center")
+        for label, action in alignment_actions.items():
+            if not wutil.is_valid_widget(action):
+                continue
+            blocked = action.blockSignals(True)
+            try:
+                action.setChecked(label == current_align)
+            finally:
+                action.blockSignals(blocked)
+
+
 def show_toolbar_pinning_menu(toolbar_widget, global_pos):
-    """Build and show one non-modal menu for this context request."""
+    """Show the toolbar's pinning menu for this context request.
+
+    The menu is built once per toolbar instance and cached on the widget,
+    since the toolbox's tool set never changes while the toolbar is alive.
+    Later right-clicks just refresh the state that *can* change between
+    openings (pins, active workspace, alignment) instead of tearing down
+    and rebuilding every submenu/action/icon from scratch.
+    """
     if not wutil.is_valid_widget(toolbar_widget):
         return False
     closed_at = getattr(toolbar_widget, "_tkm_pinning_menu_closed_at", 0)
     if QtCore.QDateTime.currentMSecsSinceEpoch() - closed_at < 150:
         return True
 
-    active_menu = getattr(toolbar_widget, "_tkm_active_pinning_menu", None)
-    if active_menu and wutil.is_valid_widget(active_menu) and active_menu.isVisible():
+    menu = getattr(toolbar_widget, "_tkm_pinning_menu", None)
+    if menu is not None and not wutil.is_valid_widget(menu):
+        menu = None
+        toolbar_widget._tkm_pinning_menu = None
+
+    if menu is not None and menu.isVisible():
         return True
 
-    menu = build_toolbar_pinning_menu(toolbar_widget, toolbar_widget)
-    if not menu.actions():
-        menu.deleteLater()
-        return False
-    toolbar_widget._tkm_active_pinning_menu = menu
+    if menu is None:
+        menu = build_toolbar_pinning_menu(toolbar_widget, toolbar_widget)
+        if not menu.actions():
+            menu.deleteLater()
+            return False
 
-    def _dispose_menu():
-        if wutil.is_valid_widget(toolbar_widget):
-            toolbar_widget._tkm_pinning_menu_closed_at = (
-                QtCore.QDateTime.currentMSecsSinceEpoch()
-            )
-            if getattr(toolbar_widget, "_tkm_active_pinning_menu", None) is menu:
-                toolbar_widget._tkm_active_pinning_menu = None
-        menu.deleteLater()
+        def _on_menu_closed():
+            if wutil.is_valid_widget(toolbar_widget):
+                toolbar_widget._tkm_pinning_menu_closed_at = (
+                    QtCore.QDateTime.currentMSecsSinceEpoch()
+                )
 
-    menu.aboutToHide.connect(_dispose_menu)
+        menu.aboutToHide.connect(_on_menu_closed)
+        toolbar_widget._tkm_pinning_menu = menu
+    else:
+        refresh_toolbar_pinning_menu(menu, toolbar_widget)
+
     menu.popup(global_pos)
     return True
 
@@ -643,23 +714,36 @@ def _add_alignment_actions(menu, current_alignment, apply_alignment_fn, sections
     return group, actions
 
 
+def _workspace_action_state(ws, active_ws):
+    """Single source of truth for a workspace action's label/checked state.
+
+    Shared by the initial build and by the cached-menu refresh pass so the
+    two can never compute this differently.
+    """
+    from TheKeyMachine.core import toolWorkspaces
+
+    is_current = ws["id"] == active_ws
+    label = toolWorkspaces.get_workspace_label(ws["id"]) if is_current else ws["name"]
+    return label, is_current
+
+
 def _add_workspace_actions(menu, sections, apply_alignment_fn):
     from TheKeyMachine.core import toolWorkspaces
-    
+
     group = QActionGroup(menu)
     group.setExclusive(True)
-    
+    actions = {}
+
     active_ws = toolWorkspaces.get_active_workspace()
-    
+
     for ws in toolWorkspaces.WORKSPACES:
-        is_current = ws["id"] == active_ws
-        label = toolWorkspaces.get_workspace_label(ws["id"]) if is_current else ws["name"]
-        
+        label, is_current = _workspace_action_state(ws, active_ws)
+
         def apply_ws(checked, ws_id=ws["id"]):
             if checked:
                 toolWorkspaces.apply_workspace(ws_id, sections, apply_alignment_fn)
-                
-        _add_checkable_action(
+
+        actions[ws["id"]] = _add_checkable_action(
             menu,
             label,
             toolCommon.mark_non_tool_action(apply_ws),
@@ -668,15 +752,16 @@ def _add_workspace_actions(menu, sections, apply_alignment_fn):
             description="Apply the {} workspace.".format(ws["name"]),
             open_menu=True,
         )
-    return group
+    return group, actions
 
 def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
     menu.addSeparator()
-    
+
     setting_key, apply_alignment_fn = _toolbar_alignment_context(toolbar_widget)
-    
-    menu._tkm_workspace_group = _add_workspace_actions(menu, sections, apply_alignment_fn)
-    
+    menu._tkm_alignment_setting_key = setting_key
+
+    menu._tkm_workspace_group, menu._tkm_workspace_actions = _add_workspace_actions(menu, sections, apply_alignment_fn)
+
     menu.addSeparator()
 
     current_align = settings.get_setting(setting_key, "Center")

@@ -738,16 +738,25 @@ def get_anim_curve_for_plug(
             or _direct_anim_curve_for_plug(plug_name)
         )
 
-    target_layer = root_layer
     if layer_name:
         for layer in scene_layers:
             if _layer_name(layer) == layer_name:
-                target_layer = layer
-                break
-        else:
-            return None
+                # A specific, named non-root layer was requested. If it has
+                # no curve yet for this plug, that's a real answer -- a
+                # freshly created layer legitimately has none yet -- not an
+                # invitation to substitute _direct_anim_curve_for_plug's
+                # unlayered lookup, which finds the first animCurve directly
+                # connected to the plug with no regard for which layer it
+                # actually belongs to. On a plug already animated on
+                # BaseAnimation, that fallback silently returned Base's
+                # curve for an AnimLayer1 request, so callers like
+                # _cut_destination_keys ended up cutting Base's keys while
+                # believing they were touching the new layer.
+                return anim_curve_for_layer(plug, layer)
+        return None
+
     return (
-        anim_curve_for_layer(plug, target_layer)
+        anim_curve_for_layer(plug, root_layer)
         or _direct_anim_curve_for_plug(plug_name)
     )
 

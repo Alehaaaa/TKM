@@ -170,6 +170,7 @@ attribute_switcher_toolbar_toggle = ToolbarWindowToggle(
     ),
     close_attribute_switcher_window,
     attribute_switcher_window_bus.stateChanged,
+    tool_id="attribute_switcher",
 )
 
 
