@@ -155,7 +155,10 @@ def apply_defaults(translations=False, rotations=False, scales=False):
                     continue
                 value = _stored_default(node, attr, data)
                 if value is not None:
-                    cmds.keyframe(curve, edit=True, valueChange=value, time=(frame, frame))
+                    try:
+                        cmds.keyframe(curve, edit=True, valueChange=value, time=(frame, frame))
+                    except RuntimeError:
+                        pass
                 operation.step()
             return
 
@@ -167,7 +170,7 @@ def apply_defaults(translations=False, rotations=False, scales=False):
                 operation.step()
                 continue
             node, attr = plug.split(".", 1)
-            if not _matches(attr, translations, rotations, scales) or cmds.getAttr(plug, lock=True):
+            if not _matches(attr, translations, rotations, scales) or not cmds.getAttr(plug, settable=True):
                 operation.step()
                 continue
             value = _stored_default(node, attr, data)
@@ -175,11 +178,14 @@ def apply_defaults(translations=False, rotations=False, scales=False):
                 operation.step()
                 continue
             time_context = target_info["time_context"]
-            if time_context.mode == "current_frame":
-                cmds.setAttr(plug, value)
-                operation.step()
-                continue
-            frames = cmds.keyframe(plug, query=True, time=time_context.timerange) or []
-            if frames:
-                cmds.setKeyframe(node, attribute=attr, time=frames, value=value)
+            try:
+                if time_context.mode == "current_frame":
+                    cmds.setAttr(plug, value)
+                    operation.step()
+                    continue
+                frames = cmds.keyframe(plug, query=True, time=time_context.timerange) or []
+                if frames:
+                    cmds.setKeyframe(node, attribute=attr, time=frames, value=value)
+            except RuntimeError:
+                pass
             operation.step()

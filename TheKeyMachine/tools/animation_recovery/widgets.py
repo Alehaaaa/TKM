@@ -14,6 +14,23 @@ from TheKeyMachine.widgets import util as wutil
 
 _dialog = None
 
+# Each recovery entry gets a status dot in column 0: a plain (white) change,
+# a file save still recoverable from disk (green), or a save superseded by a
+# later save to the same filename (muted green, irrecuperable). Every dot but
+# the newest (topmost) row also carries a full through-line so the column
+# reads as one continuous vertical timeline; the first row only connects
+# downward, since nothing newer sits above it.
+_STATUS_ICONS = {
+    "white": (icons.recovery_dot_white, icons.recovery_dot_white_first),
+    "green": (icons.recovery_dot_green, icons.recovery_dot_green_first),
+    "muted_green": (icons.recovery_dot_green_muted, icons.recovery_dot_green_muted_first),
+}
+
+
+def _status_icon(status, is_first):
+    through_icon, first_icon = _STATUS_ICONS.get(status, _STATUS_ICONS["white"])
+    return first_icon if is_first else through_icon
+
 
 def _display_date(value):
     today = datetime.now().date()
@@ -106,7 +123,8 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         self.tree.setUniformRowHeights(True)
         self.tree.header().setStretchLastSection(True)
         self.tree.header().setSectionResizeMode(0, QtWidgets.QHeaderView.Fixed)
-        self.tree.setColumnWidth(0, wutil.DPI(34))
+        self.tree.setColumnWidth(0, wutil.DPI(28))
+        self.tree.setIconSize(QtCore.QSize(wutil.DPI(22), wutil.DPI(22)))
         tree_palette = self.tree.palette()
         tree_palette.setColor(QtGui.QPalette.Base, QtGui.QColor("#333333"))
         tree_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor("#383838"))
@@ -281,13 +299,15 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         self.tree.clear()
         entries = controller.list_recoveries()
         selected_item = None
-        for entry in entries:
+        for row_index, entry in enumerate(entries):
             item = QtWidgets.QTreeWidgetItem([
-                str(entry["change"]),
+                "",
                 _display_date(entry["created"]),
             ])
             item.setData(0, QtCore.Qt.UserRole, entry["path"])
             item.setTextAlignment(0, QtCore.Qt.AlignCenter)
+            item.setIcon(0, QtGui.QIcon(_status_icon(entry.get("status"), row_index == 0)))
+            item.setToolTip(0, "Change {}".format(entry["change"]))
             if entry.get("reason") == "scene_save":
                 scene_save_brush = QtGui.QBrush(QtGui.QColor("#3f4a42"))
                 item.setBackground(0, scene_save_brush)

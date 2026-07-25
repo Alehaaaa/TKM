@@ -20,6 +20,7 @@ except ImportError:
     om = None
 
 from TheKeyMachine.core import six
+from TheKeyMachine.core import toolbox
 from TheKeyMachine.core.Qt import QtCore
 from TheKeyMachine.mods import generalMod as general
 from TheKeyMachine.mods import settingsMod as settings
@@ -369,6 +370,32 @@ def _recovery_reason(path):
         return REASONS_BY_CODE.get(reason_code & ~FULL_SNAPSHOT_FLAG, "animation")
     except Exception:
         return "animation"
+
+
+def _recovery_source_file(path):
+    """Cheap peek at the filename a checkpoint recorded at capture time.
+
+    Every checkpoint -- not just full snapshots -- carries its own meta
+    block, so this only needs to decompress and read the leading "details"
+    entry of the packed payload. It skips ``_unpack_payload``'s curve/object/
+    layer reconstruction entirely, which is what actually makes a full
+    ``_load_recovery()`` call expensive on an animation-heavy scene, so
+    list_recoveries() can afford to call this once per row.
+    """
+    try:
+        if path.lower().endswith(".json"):
+            details = (_load_recovery(path).get("meta") or {})
+            return details.get("source_file")
+        with io.open(path, "rb") as stream:
+            compiled = stream.read()
+        if compiled[:1] == b"x" or len(compiled) < 3:
+            return None
+        serialized = zlib.decompress(compiled[2:]).decode("utf-8")
+        packed = json.loads(serialized)
+        details = packed[0] if packed else []
+        return details[0] if len(details) > 0 else None
+    except Exception:
+        return None
 
 
 def _recovery_header(path):
@@ -900,6 +927,22 @@ def list_recoveries(scene_id=None):
             "reason": _recovery_reason(path),
         })
     entries.reverse()
+
+    # Status dot for the recovery list: "white" for a plain change, "green"
+    # for the newest save to a given filename (still recoverable from disk),
+    # "muted_green" for an earlier save to that same filename a later save has
+    # since overwritten (the checkpoint survives, the file it describes
+    # doesn't). Entries are newest-first, so the first save seen per filename
+    # while walking them is the current one; any later (older) match lost.
+    seen_filenames = set()
+    for entry in entries:
+        if entry["reason"] != "scene_save":
+            entry["status"] = "white"
+            continue
+        key = _recovery_source_file(entry["path"]) or entry["path"]
+        entry["status"] = "muted_green" if key in seen_filenames else "green"
+        seen_filenames.add(key)
+
     return entries
 
 
@@ -1616,6 +1659,23 @@ def _restore_object_states(objects_data, uuid_lookup, operation=None):
     return True
 
 
+def _curves_timerange(curves_data):
+    """Min/max keyframe time spanned by the curves a recovery restores.
+
+    Mirrors copy_paste's ``_animation_data_timerange`` so the recovered range
+    can drive the same timeline-tint mechanism ``tool_operation`` gives every
+    other range-scoped edit.
+    """
+    frames = [
+        position
+        for curve_data in curves_data or []
+        for position in (curve_data.get("positions") or [])
+    ]
+    if not frames:
+        return None
+    return (min(frames), max(frames))
+
+
 def restore_recovery(path):
     checkpoint_scene_id = _recovery_scene_id(path)
     scene_id = current_scene_id(create=False)
@@ -1634,6 +1694,9 @@ def restore_recovery(path):
             undo=True,
             undo_name=toolCommon.make_undo_chunk_name(tool_id="animation_recovery_restore"),
             suspend_refresh=True,
+            tint="range",
+            tint_color=toolbox.get_tool_tint_color("animation_recovery"),
+            show_success_message=False,
         ) as operation:
             payload = _load_merged_recovery(path, operation=operation, chain_paths=chain_paths)
             if payload is None:
@@ -1738,6 +1801,13 @@ def restore_recovery(path):
             # Lock state is applied last so it never blocks membership/curve
             # reconnection above -- a locked layer cannot receive new members.
             _lock_restored_layers(layers_data, layer_name_map)
+
+            # tool_operation() paints the timeline tint itself once it sees
+            # operation.success + operation.timerange -- same handoff paste
+            # animation uses, just resolved after restore instead of before it,
+            # since the recovered range isn't known until curves_data loads.
+            operation.timerange = _curves_timerange(curves_data)
+            operation.success = True
 
     wutil.make_inViewMessage("Animation recovered")
     return True

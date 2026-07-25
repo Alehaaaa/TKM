@@ -40,7 +40,6 @@ def _control_nodes(nodes):
     nodes = list(dict.fromkeys(nodes or ()))
     if not nodes:
         return []
-    joints = set(cmds.ls(nodes, type="joint", long=True) or [])
     shapes = cmds.listRelatives(
         nodes,
         shapes=True,
@@ -51,7 +50,7 @@ def _control_nodes(nodes):
     curve_parents = set(
         cmds.listRelatives(curve_shapes, parent=True, fullPath=True) or []
     )
-    return [node for node in nodes if node in joints or node in curve_parents]
+    return [node for node in nodes if node in curve_parents]
 
 
 def _rig_controls(animated_only=False):
