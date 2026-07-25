@@ -130,6 +130,19 @@ Commands that rebuild curves or disturb active keys must use
 plugs, not every attribute on the selected object. Batch Maya calls where their semantics are
 identical, and isolate failures per curve only as a fallback.
 
+## Scene nodes
+
+Any tool that needs a persistent node in the scene creates and looks it up through
+`core.scene_nodes.TkmSceneNode` instead of hand-rolling its own `objExists` / `createNode` /
+`parent` / attribute-locking calls.
+
+`TkmSceneNode.root()` returns TheKeyMachine's single root node, creating it if missing.
+The root **only ever parents other tools' nodes** and must never carry tool-owned data or be
+deleted by a tool: `set_attr` and `delete` on the root both raise. A tool that needs its own
+persistent node or a scene-scoped attribute creates a child with `root().child(name, ...)` and
+reads/writes that child instead — see `tools.animation_recovery.controller` for the pattern
+(its scene-ID attribute lives on its own `tkm_animation_recovery` child node, not on the root).
+
 ## Command lifecycle
 
 - User-facing mutations run inside `tools.common.tool_operation` or the trigger dispatcher so

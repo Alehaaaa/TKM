@@ -100,8 +100,8 @@ def unload_toolbar(*_args):
 
 
 def uninstall(*_args):
-    from TheKeyMachine.mods import uiMod
-    return uiMod.uninstall()
+    from TheKeyMachine.mods import generalMod as general
+    return general.uninstall()
 
 
 def check_for_updates(*_args):
@@ -110,13 +110,13 @@ def check_for_updates(*_args):
 
 
 def set_start_with_maya(enabled, *_args):
-    from TheKeyMachine.mods import uiMod
-    return uiMod.install_userSetup(enabled)
+    from TheKeyMachine.mods import generalMod as general
+    return general.install_userSetup(enabled)
 
 
 def starts_with_maya():
-    from TheKeyMachine.mods import uiMod
-    return bool(uiMod.check_userSetup())
+    from TheKeyMachine.mods import generalMod as general
+    return bool(general.check_userSetup())
 
 
 def set_tooltips_enabled(enabled, *_args):

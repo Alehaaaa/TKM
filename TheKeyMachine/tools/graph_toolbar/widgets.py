@@ -36,12 +36,7 @@ import TheKeyMachine.tools.graph_toolbar.controller as graphToolbarController  #
 
 
 _GRAPH_TOOLBAR_OBJECT = "tkm_customGraph_flowToolbar"
-_GRAPH_TOOLBAR_DOCK_SETTING = graphToolbarController.GRAPH_TOOLBAR_DOCK_SETTING
-_DOCK_BOTTOM_GRAPH = graphToolbarController.DOCK_BOTTOM_GRAPH
-_DOCK_TOP_GRAPH = graphToolbarController.DOCK_TOP_GRAPH
-_DOCK_BOTTOM_MENU = graphToolbarController.DOCK_BOTTOM_MENU
-_DOCK_OPTIONS = graphToolbarController.DOCK_OPTIONS
-_DOCK_POSITION_IDS = {position for position, _label, _description in _DOCK_OPTIONS}
+_DOCK_POSITION_IDS = {position for position, _label, _description in graphToolbarController.DOCK_OPTIONS}
 
 _GRAPH_TOOLBAR_WIDGET = None
 
@@ -148,9 +143,9 @@ def removeCustomGraph() -> None:
 
 def _place_graph_toolbar_widget(toolbar_widget, dock_position=None):
     if dock_position is None:
-        dock_position = settings.get_setting(_GRAPH_TOOLBAR_DOCK_SETTING, _DOCK_BOTTOM_GRAPH)
+        dock_position = settings.get_setting(graphToolbarController.GRAPH_TOOLBAR_DOCK_SETTING, graphToolbarController.DOCK_BOTTOM_GRAPH)
     if dock_position not in _DOCK_POSITION_IDS:
-        dock_position = _DOCK_BOTTOM_GRAPH
+        dock_position = graphToolbarController.DOCK_BOTTOM_GRAPH
 
     host, graph_layout, graph_content = _graph_editor_layout_host()
     if not host or not graph_layout or not graph_content:
@@ -163,16 +158,16 @@ def _place_graph_toolbar_widget(toolbar_widget, dock_position=None):
     toolbar_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
     graph_index = graph_layout.indexOf(graph_content)
-    if dock_position == _DOCK_BOTTOM_MENU:
+    if dock_position == graphToolbarController.DOCK_BOTTOM_MENU:
         menu_indices = [
             graph_layout.indexOf(widget)
             for widget in _layout_widgets(graph_layout)
             if isinstance(widget, QtWidgets.QMenuBar)
         ]
         insert_index = max(menu_indices) + 1 if menu_indices else max(0, graph_index)
-    elif dock_position == _DOCK_TOP_GRAPH:
+    elif dock_position == graphToolbarController.DOCK_TOP_GRAPH:
         insert_index = max(0, graph_index)
-    else:  # _DOCK_BOTTOM_GRAPH
+    else:  # graphToolbarController.DOCK_BOTTOM_GRAPH
         insert_index = graph_index + 1
 
     graph_layout.insertWidget(insert_index, toolbar_widget)
@@ -207,7 +202,7 @@ def applyCustomGraphAlignment(alignment_label=None):
 
 
 def moveCustomGraphDock(position=None):
-    settings.set_setting(_GRAPH_TOOLBAR_DOCK_SETTING, position)
+    settings.set_setting(graphToolbarController.GRAPH_TOOLBAR_DOCK_SETTING, position)
     toolbar_widget = getCustomGraphWidget()
     if toolbar_widget and wutil.is_valid_widget(toolbar_widget):
         if _place_graph_toolbar_widget(toolbar_widget, position):
@@ -283,9 +278,9 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     def _build_graph_settings_menu(_menu, source_widget=None):
         return toolMenus.build_graph_settings_menu(
             source_widget or flow_qw,
-            dock_options=_DOCK_OPTIONS,
-            dock_setting=_GRAPH_TOOLBAR_DOCK_SETTING,
-            default_dock_position=_DOCK_BOTTOM_GRAPH,
+            dock_options=graphToolbarController.DOCK_OPTIONS,
+            dock_setting=graphToolbarController.GRAPH_TOOLBAR_DOCK_SETTING,
+            default_dock_position=graphToolbarController.DOCK_BOTTOM_GRAPH,
             move_dock_fn=moveCustomGraphDock,
             apply_alignment_fn=applyCustomGraphAlignment,
         )

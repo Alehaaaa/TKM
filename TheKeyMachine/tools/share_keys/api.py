@@ -28,6 +28,6 @@ def bake_animation_4(*args): return controller.bake_animation_4(*args)
 def bake_animation_from_last_selected(*args): return controller.bake_animation_from_last_selected(*args)
 
 
-def bake_animation_custom(*args):
+def bake_animation_custom(*args, anchor_widget=None):
     from TheKeyMachine.tools.share_keys.widgets import open_custom_bake
-    return open_custom_bake()
+    return open_custom_bake(anchor_button=anchor_widget)

@@ -1,23 +1,19 @@
 from maya import cmds
 
-import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.widgets.util as wutil
+from TheKeyMachine.core.scene_nodes import TkmSceneNode
 
 
 def create_tracer(*_args):
     selected_objects = selectionMod.get_selected_objects()
     if len(selected_objects) != 1:
         return wutil.make_inViewMessage("Select only one object")
-    if not cmds.objExists("TheKeyMachine"):
-        general.create_TheKeyMachine_node()
     if cmds.objExists("TKM_Tracer"):
         cmds.delete("TKM_Tracer")
 
-    cmds.createNode("transform", name="TKM_Tracer")
-    cmds.parent("TKM_Tracer", "TheKeyMachine")
-    cmds.createNode("transform", name="tracer_offset")
-    cmds.parent("tracer_offset", "TKM_Tracer")
+    tracer_node = TkmSceneNode.root().child("TKM_Tracer")
+    tracer_node.child("tracer_offset")
     cmds.select(selected_objects)
     if cmds.objExists("tracerHandle"):
         cmds.delete("tracerHandle")

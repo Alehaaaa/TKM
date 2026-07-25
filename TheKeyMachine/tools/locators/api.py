@@ -1,7 +1,7 @@
 from maya import cmds
 
-import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.core.scene_nodes import TkmSceneNode
 from TheKeyMachine.tools import common as toolCommon
 
 
@@ -9,11 +9,7 @@ def create_locator(*_args):
     selection = selectionMod.get_selected_objects()
     if not selection:
         return
-    if not cmds.objExists("TheKeyMachine"):
-        general.create_TheKeyMachine_node()
-    if not cmds.objExists("temp_locators"):
-        cmds.group(empty=True, name="temp_locators")
-        cmds.parent("temp_locators", "TheKeyMachine")
+    TkmSceneNode.root().child("temp_locators")
 
     operation = toolCommon.current_tool_operation()
     if operation is not None:

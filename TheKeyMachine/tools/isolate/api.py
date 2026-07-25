@@ -3,16 +3,30 @@ import re
 from maya import cmds
 
 import TheKeyMachine.mods.selectionMod as selectionMod
-import TheKeyMachine.mods.generalMod as general
+from TheKeyMachine.core.scene_nodes import TkmSceneNode
 from TheKeyMachine.tools.isolate import controller
-from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
 from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import util as wutil
 
 
 WINDOW_NAME = "isolate_bookmarksWindow"
-ROOT_NODE = "isolate_bookmarks"
 POPUP_MENU = "isolate_button_popupMenu"
+# Stamped on each bookmark item node so the original selected object can be
+# read back directly instead of reverse-parsed out of the node's name.
+ITEM_OBJECT_ATTR = "tkmIsolateBookmarkObject"
+_BOOKMARK_NODE_SUFFIX = "_isolate_bookmark"
+_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+
+def _bookmark_node_name(bookmark_name):
+    return "{}{}".format(bookmark_name, _BOOKMARK_NODE_SUFFIX)
+
+
+def _bookmark_label(bookmark_node_name):
+    if bookmark_node_name.endswith(_BOOKMARK_NODE_SUFFIX):
+        return bookmark_node_name[: -len(_BOOKMARK_NODE_SUFFIX)]
+    return bookmark_node_name
 
 
 def isolate_master(*args):
@@ -34,137 +48,143 @@ def toggle_down_one_level(checked=None, *_args):
 
 
 def create_isolate_bookmark_node():
-    if not cmds.objExists("TheKeyMachine"):
-        general.create_TheKeyMachine_node()
-    if not cmds.objExists(ROOT_NODE):
-        general.create_isolate_bookmarks_node()
+    """Return the TkmSceneNode that parents all isolate bookmarks, creating it if missing."""
+    return controller.create_isolate_bookmarks_node()
 
 
 def list_bookmarks():
-    return cmds.listRelatives(ROOT_NODE, children=True) or []
+    """Return the bare bookmark names (display labels), in scene order."""
+    nodes = cmds.listRelatives(controller.ROOT_NODE, children=True) or []
+    return [_bookmark_label(node) for node in nodes]
 
 
-def _bookmark_label(bookmark):
-    return bookmark.replace("_isolate_bookmark", "")
-
-
-def _selected_bookmark(list_widget):
-    if isinstance(list_widget, QtWidgets.QListWidget):
-        item = list_widget.currentItem()
-        return item.text() if item else None
-
-    item = cmds.textScrollList(list_widget, query=True, selectItem=True)
-    return item[0] if item else None
-
-
-def update_bookmark_list(list_widget, *_args):
-    bookmarks = list_bookmarks()
-    if isinstance(list_widget, QtWidgets.QListWidget):
-        current_name = _selected_bookmark(list_widget)
-        list_widget.clear()
-        for bookmark in bookmarks:
-            list_widget.addItem(_bookmark_label(bookmark))
-
-        if current_name:
-            matches = list_widget.findItems(current_name, QtCore.Qt.MatchExactly)
-            if matches:
-                list_widget.setCurrentItem(matches[0])
-        elif list_widget.count():
-            list_widget.setCurrentRow(0)
-        return
-
-    cmds.textScrollList(list_widget, edit=True, removeAll=True)
-    for bookmark in bookmarks:
-        cmds.textScrollList(list_widget, edit=True, append=_bookmark_label(bookmark))
-
-
-def create_bookmark(list_widget, *_args):
-    current_selection = selectionMod.get_selected_objects()
-    if not current_selection:
-        return
-
-    from TheKeyMachine.tools import common as toolCommon
-
-    toolCommon.finish_active_progress()
-    text = cmds.promptDialog(
-        title="Create Bookmark",
-        message="Enter bookmark name:",
-        button=["Create", "Cancel"],
-        defaultButton="Create",
-        cancelButton="Cancel",
-        dismissString="Cancel",
-    )
-
-    if text != "Create":
-        return
-
-    bookmark_name = cmds.promptDialog(query=True, text=True)
+def _validate_new_bookmark_name(bookmark_name):
     if not bookmark_name:
         cmds.warning("Bookmark name cannot be empty")
-        return
+        return False
+    if not _NAME_PATTERN.match(bookmark_name):
+        cmds.warning(
+            "Invalid bookmark name. It should start with a letter or underscore "
+            "and contain only letters, numbers, and underscores"
+        )
+        return False
+    if cmds.objExists(_bookmark_node_name(bookmark_name)):
+        # TkmSceneNode.child() adopts an existing node by name rather than
+        # uniquifying it, so a repeat name must be rejected here -- otherwise
+        # the new selection would silently merge into the old bookmark.
+        cmds.warning("A bookmark named '{}' already exists".format(bookmark_name))
+        return False
+    return True
 
-    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", bookmark_name):
-        cmds.warning("Invalid bookmark name. It should start with a letter or underscore and contain only letters, numbers, and underscores")
-        return
 
-    create_isolate_bookmark_node()
-    bookmark_node = cmds.group(em=True, name="{}_isolate_bookmark".format(bookmark_name))
-    cmds.parent(bookmark_node, ROOT_NODE)
+def create_bookmark(bookmark_name=None):
+    """Create a bookmark from the current selection.
+
+    Prompts for a name when ``bookmark_name`` isn't supplied. Returns the new
+    bookmark's name, or None if the selection was empty, the prompt was
+    cancelled, or the name was invalid.
+    """
+    current_selection = selectionMod.get_selected_objects()
+    if not current_selection:
+        wutil.make_inViewMessage("Select something to bookmark")
+        return None
+
+    if bookmark_name is None:
+        from TheKeyMachine.tools import common as toolCommon
+
+        toolCommon.finish_active_progress()
+        text = cmds.promptDialog(
+            title="Create Bookmark",
+            message="Enter bookmark name:",
+            button=["Create", "Cancel"],
+            defaultButton="Create",
+            cancelButton="Cancel",
+            dismissString="Cancel",
+        )
+        if text != "Create":
+            return None
+        bookmark_name = cmds.promptDialog(query=True, text=True)
+
+    if not _validate_new_bookmark_name(bookmark_name):
+        return None
+
+    bookmarks_root = create_isolate_bookmark_node()
+    bookmark_node = bookmarks_root.child(_bookmark_node_name(bookmark_name))
 
     new_groups = []
-    for obj in current_selection:
+    for index, obj in enumerate(current_selection):
         obj_name = obj.split("|")[-1]
         if "->" in obj_name:
             obj_name = obj_name.split("->")[-1]
-        obj_name = obj_name.replace(".", "_")
-        new_group = cmds.group(em=True, name="{}_{}_isolate_bookmark_item".format(obj_name, bookmark_name))
-        cmds.parent(new_group, bookmark_node)
-        new_groups.append(new_group)
+        obj_name = obj_name.replace(".", "_").replace(":", "_")
+        item_node = bookmark_node.child("{}_{}_isolate_bookmark_item_{}".format(obj_name, bookmark_name, index))
+        # Store the actual selected object so it can be restored directly by
+        # isolate_bookmark() instead of reverse-parsed out of the node name.
+        item_node.set_attr(ITEM_OBJECT_ATTR, obj)
+        new_groups.append(item_node.name)
 
     for new_group in new_groups:
         cmds.select(new_group, add=True)
-
     cmds.select(clear=True)
-    update_bookmark_list(list_widget)
+
+    update_isolate_popup_menu()
+    return bookmark_name
+
+
+def rename_bookmark(old_name, new_name):
+    """Rename an existing bookmark in place. Returns the new name, or None on failure."""
+    if not new_name or old_name == new_name:
+        return None
+    if not _NAME_PATTERN.match(new_name):
+        cmds.warning(
+            "Invalid bookmark name. It should start with a letter or underscore "
+            "and contain only letters, numbers, and underscores"
+        )
+        return None
+
+    old_node = _bookmark_node_name(old_name)
+    if not cmds.objExists(old_node):
+        cmds.warning("Bookmark '{}' not found".format(old_name))
+        return None
+
+    new_node = _bookmark_node_name(new_name)
+    if cmds.objExists(new_node):
+        cmds.warning("A bookmark named '{}' already exists".format(new_name))
+        return None
+
+    cmds.rename(old_node, new_node)
+    update_isolate_popup_menu()
+    return new_name
+
+
+def remove_bookmark(bookmark_name):
+    bookmark_node_name = _bookmark_node_name(bookmark_name)
+    if cmds.objExists(bookmark_node_name):
+        cmds.delete(bookmark_node_name)
     update_isolate_popup_menu()
 
 
-def remove_bookmark(list_widget, *_args):
-    bookmark_name = _selected_bookmark(list_widget)
-    if not bookmark_name:
-        return
-
-    cmds.delete("{}_isolate_bookmark".format(bookmark_name))
-    update_bookmark_list(list_widget)
-    update_isolate_popup_menu()
-
-
-def isolate_bookmark(list_widget=None, bookmark_name=None, *_args):
+def isolate_bookmark(bookmark_name=None, *_args):
     current_selection = selectionMod.get_selected_objects(long=True)
-
-    if not bookmark_name and list_widget:
-        bookmark_name = _selected_bookmark(list_widget)
 
     if not bookmark_name:
         cmds.warning("No bookmark selected")
         return
 
-    bookmark_name = bookmark_name.replace("_isolate_bookmark", "")
-    bookmark_node = "{}_isolate_bookmark".format(bookmark_name)
+    bookmark_node = _bookmark_node_name(bookmark_name)
     if not cmds.objExists(bookmark_node):
         cmds.warning("Bookmark '{}' not found".format(bookmark_name))
         return
 
-    objects = cmds.listRelatives(bookmark_node, allDescendents=True, fullPath=True) or []
-    if not objects:
+    item_nodes = cmds.listRelatives(bookmark_node, allDescendents=True, fullPath=True) or []
+    if not item_nodes:
         cmds.warning("No objects in bookmark '{}'".format(bookmark_name))
         return
 
     selected_objects = []
-    for obj in objects:
-        obj_name = obj.rsplit("|", 1)[-1].replace("_isolate_bookmark_item", "")
-        obj_name = obj_name.replace("_{}".format(bookmark_name), "")
-        if cmds.objExists(obj_name):
+    for item_node in item_nodes:
+        obj_name = TkmSceneNode(item_node).get_attr(ITEM_OBJECT_ATTR)
+        if obj_name and cmds.objExists(obj_name):
             selected_objects.append(obj_name)
 
     current_panel = cmds.getPanel(wf=True)
@@ -194,9 +214,8 @@ def update_isolate_popup_menu(popup_menu=POPUP_MENU, *_args):
 
     cmds.popupMenu(popup_menu, e=True, deleteAllItems=True)
 
-    if cmds.objExists(ROOT_NODE):
-        for bookmark in list_bookmarks():
-            text = bookmark.replace("_isolate_bookmark", "")
+    if cmds.objExists(controller.ROOT_NODE):
+        for text in list_bookmarks():
             cmds.menuItem(
                 l=text,
                 parent=popup_menu,
@@ -232,26 +251,29 @@ def _existing_isolate_bookmarks_window():
     return None
 
 
-def create_isolate_bookmarks_window(*_args):
+def create_isolate_bookmarks_window(*_args, anchor_widget=None):
     from TheKeyMachine.tools.isolate.widgets import IsolateBookmarksWindow
 
     original_selection = selectionMod.get_selected_objects()
 
+    def _present(win):
+        if anchor_widget is not None:
+            win.present_above_toolbar_button(anchor_widget)
+        else:
+            win.present_beside_cursor()
+
     existing = _existing_isolate_bookmarks_window()
     if existing:
+        existing.set_popup_mode(True)
         existing.refresh()
-        existing.show()
-        existing.raise_()
-        existing.activateWindow()
+        _present(existing)
         return existing
 
     if cmds.window(WINDOW_NAME, exists=True):
         cmds.deleteUI(WINDOW_NAME)
 
     window = IsolateBookmarksWindow(parent=wutil.get_maya_qt(qt=QtWidgets.QWidget))
-    window.show()
-    window.raise_()
-    window.activateWindow()
+    _present(window)
 
     if original_selection:
         cmds.select(original_selection, replace=True)

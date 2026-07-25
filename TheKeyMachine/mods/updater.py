@@ -28,11 +28,6 @@ except ImportError:
 
 from TheKeyMachine.core.Qt import QtCore, QtGui
 
-QTimer = QtCore.QTimer
-QThread = QtCore.QThread
-Signal = QtCore.Signal
-QObject = QtCore.QObject
-
 from TheKeyMachine.mods.generalMod import get_thekeymachine_version
 
 from TheKeyMachine.widgets.customDialogs import QFlatConfirmDialog, QFlatTooltipConfirm
@@ -356,11 +351,11 @@ def _update_template(latest_version, installed_version, changelog):
     )
 
 
-class UpdateCheckWorker(QThread):
-    result_ready = Signal(bool, object)
+class UpdateCheckWorker(QtCore.QThread):
+    result_ready = QtCore.Signal(bool, object)
 
     def __init__(self, installed_version, force=False, delay=0, parent=None):
-        QThread.__init__(self, parent)
+        QtCore.QThread.__init__(self, parent)
         self.installed_version = installed_version
         self.force = force
         self.delay = delay
@@ -394,8 +389,8 @@ updater_worker = None
 updater_result_dispatcher = None
 
 
-class UpdateResultDispatcher(QObject):
-    result_ready = Signal(bool, object)
+class UpdateResultDispatcher(QtCore.QObject):
+    result_ready = QtCore.Signal(bool, object)
 
     def emit_result(self, success, result):
         self.result_ready.emit(success, result)
@@ -517,7 +512,7 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                             closeButton=True,
                         )
 
-                    QTimer.singleShot(100, _post_update)
+                    QtCore.QTimer.singleShot(100, _post_update)
 
                 elif result.get("name") == "Skip":
                     settings.set_setting("skip_updates", True)

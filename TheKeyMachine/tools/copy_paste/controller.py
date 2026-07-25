@@ -14,9 +14,9 @@ import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import clipboard
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.customDialogs as customDialogs
-import TheKeyMachine.widgets.customWidgets as customWidgets
 import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as wutil
+from TheKeyMachine.tools.copy_paste import widgets as copy_paste_widgets
 
 
 def _begin_timeline_tint(timerange, key, owner=None, color=None):
@@ -1381,7 +1381,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
         _maybe_apply_paste_range(prompt_range, anchor_widget=anchor_widget)
         return True
 
-    _paste_to_dialog = customWidgets.PasteToDialog(_animation_controls(animation_data), _apply_mappings, data_label="animation")
+    _paste_to_dialog = copy_paste_widgets.PasteToDialog(_animation_controls(animation_data), _apply_mappings, data_label="animation")
     _paste_to_dialog.show()
 
 
@@ -1425,7 +1425,7 @@ def paste_pose_to(*args, anchor_widget=None, **kwargs):
             _select_existing_targets(pasted_targets)
             return True
 
-    _paste_to_dialog = customWidgets.PasteToDialog(pose_data, _apply_mappings, data_label="pose")
+    _paste_to_dialog = copy_paste_widgets.PasteToDialog(pose_data, _apply_mappings, data_label="pose")
     _paste_to_dialog.show()
 
 

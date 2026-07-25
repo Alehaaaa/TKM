@@ -5,14 +5,10 @@ from maya import cmds
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
-QActionGroup = QtGui.QActionGroup
-
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.tools.share_keys.api as shareKeysApi
 from TheKeyMachine.data import icons
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.mods.shelfMod as shelf
-import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.updater as updater
 import TheKeyMachine.core.toolWidgets as toolWidgets
 import TheKeyMachine.tools.graph_toolbar.api as graphToolbarApi
@@ -245,7 +241,7 @@ def build_declared_menu(definition, parent_widget=None):
             if not callable(getter) or not callable(setter):
                 raise TypeError("Declared menu choice requires get_value and set_value")
             current_value = getter()
-            group = QActionGroup(menu)
+            group = QtGui.QActionGroup(menu)
             group.setExclusive(True)
             choice_groups = getattr(menu, "_tkm_choice_groups", None)
             if choice_groups is None:
@@ -318,89 +314,6 @@ def build_declared_menu(definition, parent_widget=None):
     return menu
 
 
-def _add_exclusive_setting_actions(menu, specs, current_value, setter, group_attr=None):
-    group = QActionGroup(menu)
-    group.setExclusive(True)
-    if group_attr:
-        setattr(menu, group_attr, group)
-
-    for label, value, description in specs:
-        _add_checkable_action(
-            menu,
-            label,
-            toolCommon.mark_non_tool_action(
-                partial(_apply_checked_value, setter, value)
-            ),
-            checked=value == current_value,
-            group=group,
-            description=description,
-        )
-    return group
-
-def build_share_keys_menu(menu, source_widget=None):
-    _add_exclusive_setting_actions(
-        menu,
-        (
-            (
-                "Keep Tangent Type",
-                shareKeysApi.SHARE_KEYS_MODE_PRESERVE_TANGENT,
-                "Add missing keys without changing tangent type.",
-            ),
-            (
-                "Keep Anim Curve Shape",
-                shareKeysApi.SHARE_KEYS_MODE_PRESERVE_SHAPE,
-                "Insert missing keys while preserving animation curve shape.",
-            ),
-        ),
-        shareKeysApi.get_share_keys_mode(),
-        shareKeysApi.set_share_keys_mode,
-    )
-    menu.addSeparator()
-    _add_toolbox_actions(menu, ("share_keys", "reblock", "separator", "share_keys_from_last_selected"), source_widget)
-    return False
-
-
-def build_bake_menu(menu, source_widget=None):
-    _add_exclusive_setting_actions(
-        menu,
-        (
-            (
-                "Bake To Step Tangent",
-                shareKeysApi.BAKE_TANGENT_MODE_STEP,
-                "Bake keys, then turn baked tangents to stepped.",
-            ),
-            (
-                "Keep Tangent Type",
-                shareKeysApi.BAKE_TANGENT_MODE_KEEP_TYPE,
-                "Bake keys without forcing the baked keys to stepped tangents.",
-            ),
-            (
-                "Keep Animation Curve Shapes",
-                shareKeysApi.BAKE_TANGENT_MODE_KEEP_SHAPE,
-                "Bake while preserving animation curve shapes where Maya can do so.",
-            ),
-        ),
-        shareKeysApi.get_bake_tangent_mode(),
-        shareKeysApi.set_bake_tangent_mode,
-        group_attr="_tkm_bake_tangent_group",
-    )
-    menu.addSeparator()
-    _add_toolbox_actions(
-        menu,
-        (
-            "bake_animation_1",
-            "bake_animation_2",
-            "bake_animation_3",
-            "bake_animation_4",
-            "bake_animation_custom",
-            "separator",
-            "bake_animation_from_last_selected",
-        ),
-        source_widget,
-    )
-    return False
-
-
 def sync_main_dock_menu(toolbar):
     if not wutil.is_valid_widget(getattr(toolbar, "dock_menu", None)):
         return
@@ -436,7 +349,7 @@ def _dock_toolbar(toolbar, checked, **target):
 def build_main_dock_menu(toolbar):
     toolbar.dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the toolbar to a different Maya area.")
 
-    toolbar.pos_ac_group = QActionGroup(toolbar)
+    toolbar.pos_ac_group = QtGui.QActionGroup(toolbar)
     toolbar.pos_ac_group.setExclusive(True)
     for orient, name in toolbar.docking_orients.items():
         is_current = orient == toolbar.docking_position[1]
@@ -455,7 +368,7 @@ def build_main_dock_menu(toolbar):
 
     toolbar.dock_menu.addSeparator()
 
-    toolbar.dock_ac_group = QActionGroup(toolbar)
+    toolbar.dock_ac_group = QtGui.QActionGroup(toolbar)
     toolbar.dock_ac_group.setExclusive(True)
     for layout, name in toolbar.docking_layouts.items():
         is_current = layout == toolbar.docking_position[0]
@@ -691,7 +604,7 @@ def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alig
 
 def _add_alignment_actions(menu, current_alignment, apply_alignment_fn, sections, names=TOOLBAR_ALIGNMENT_NAMES):
     from TheKeyMachine.core import toolWorkspaces
-    group = QActionGroup(menu)
+    group = QtGui.QActionGroup(menu)
     group.setExclusive(True)
     actions = {}
     
@@ -730,7 +643,7 @@ def _workspace_action_state(ws, active_ws):
 def _add_workspace_actions(menu, sections, apply_alignment_fn):
     from TheKeyMachine.core import toolWorkspaces
 
-    group = QActionGroup(menu)
+    group = QtGui.QActionGroup(menu)
     group.setExclusive(True)
     actions = {}
 
@@ -912,7 +825,7 @@ def build_main_preferences_menu(
     _add_checkable_action(
         preferences_menu,
         command_id="start_with_maya",
-        checked=ui.check_userSetup(),
+        checked=general.check_userSetup(),
     )
 
     _add_checkable_action(
@@ -1101,7 +1014,7 @@ def build_graph_settings_submenu(apply_alignment_fn):
 
 def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, move_dock_fn):
     dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the Graph Editor toolbar.")
-    dock_group = QActionGroup(dock_menu)
+    dock_group = QtGui.QActionGroup(dock_menu)
     dock_group.setExclusive(True)
 
     dock_actions = {}

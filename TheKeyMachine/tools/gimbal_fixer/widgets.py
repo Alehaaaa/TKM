@@ -120,14 +120,20 @@ def _emit_gimbal_fixer_window_state(is_open):
 
 class GimbalFixerWindow(
     toolCommon.FloatingToolWindowMixin,
-    customDialogs.QFlatToolBarPopupDialog,
+    customDialogs.QFlatPinnableToolBarPopupDialog,
 ):
     def __init__(self, parent=None, popup=True):
         self.title = "Gimbal Fixer"
         self.icon = icons.reblock
         self.COLOR_BG_TRACK = self.DARK_BG_COLOR
-        self._pinned = not popup
-        super().__init__(parent=parent, popup=popup, closeButton=False)
+        super().__init__(
+            parent=parent,
+            popup=popup,
+            persistent_buttons=[
+                customDialogs.QFlatDialogButton("Apply Best", callback=self.apply_best_order, icon=icons.apply, highlight=True),
+            ],
+            bottom_bar_kwargs={"margins": 0, "spacing": 2, "highlight": "Apply Best"},
+        )
 
         self.setObjectName(WINDOW_NAME)
         self.setMinimumWidth(wutil.DPI(310))
@@ -152,51 +158,8 @@ class GimbalFixerWindow(
             self.order_buttons.append(button)
             self.mainLayout.addWidget(button)
 
-        self._set_action_bar(include_close=not popup)
         self._connect_runtime_manager()
         self.refresh()
-
-    def _set_action_bar(self, include_close):
-        self.setBottomBar(
-            buttons=[
-                customDialogs.QFlatDialogButton("Apply Best", callback=self.apply_best_order, icon=icons.apply, highlight=True),
-            ],
-            closeButton=include_close,
-            margins=0,
-            spacing=2,
-            highlight="Apply Best",
-        )
-
-    def set_popup_mode(self, popup):
-        """Restore transient or pinned presentation when reusing the window."""
-        self._popup = bool(popup)
-        self._pinned = not popup
-        self._opened = False
-        self._set_action_bar(include_close=not popup)
-
-    def _pin_after_reposition(self):
-        if self._pinned:
-            return
-        self._pinned = True
-        self._popup = False
-        self._set_action_bar(include_close=True)
-
-    def mouseReleaseEvent(self, event):
-        was_dragging = self._is_dragging
-        drag_start = QtCore.QPoint(self._drag_start_pos)
-        global_position = wutil.event_global_pos(event)
-        super().mouseReleaseEvent(event)
-        if (
-            was_dragging
-            and (global_position - drag_start).manhattanLength() > wutil.DPI(10)
-        ):
-            self._pin_after_reposition()
-
-    def changeEvent(self, event):
-        if self._pinned:
-            customDialogs.QFlatToolBarDialog.changeEvent(self, event)
-            return
-        super().changeEvent(event)
 
     def _connect_runtime_manager(self):
         if self._callbacks_connected:

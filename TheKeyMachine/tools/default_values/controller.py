@@ -4,8 +4,8 @@ import os
 from maya import cmds
 
 from TheKeyMachine.core import animation_context
-from TheKeyMachine.mods import generalMod as general
 from TheKeyMachine.mods import selectionMod
+from TheKeyMachine.tools import clipboard
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import util as wutil
 
@@ -16,7 +16,7 @@ SCALE_ATTRS = {"scale", "scaleX", "scaleY", "scaleZ"}
 
 
 def _data_path():
-    return general.get_set_default_data_file()
+    return clipboard.path("set_default")
 
 
 def _load_data():

@@ -9,8 +9,9 @@ except ImportError:
     om = None
 
 import TheKeyMachine.core.runtimeManager as runtime
-import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.tools import clipboard
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.util as wutil
 
@@ -64,7 +65,7 @@ _session_offsets = {}
 
 
 def _data_file():
-    return general.get_temp_pivot_data_file()
+    return clipboard.path("temp_pivot")
 
 
 def _load_data():
@@ -83,7 +84,7 @@ def _load_data():
 
 
 def _save_data(data):
-    folder = general.get_temp_pivot_data_folder()
+    folder = os.path.dirname(_data_file())
     os.makedirs(folder, exist_ok=True)
     with open(_data_file(), "w", encoding="utf-8") as stream:
         json.dump(data, stream, indent=2)
@@ -147,24 +148,8 @@ def _object_pivot_space_matrix(node):
     return _set_matrix_translation(_mmatrix(_matrix(node)), _world_rotate_pivot(node))
 
 
-def _ensure_root():
-    if not cmds.objExists("TheKeyMachine"):
-        general.create_TheKeyMachine_node()
-    return "TheKeyMachine"
-
-
 def _ensure_pivot_node():
-    if cmds.objExists(TEMP_PIVOT_NODE):
-        pivot = TEMP_PIVOT_NODE
-    else:
-        pivot = cmds.createNode("transform", name=TEMP_PIVOT_NODE)
-
-    try:
-        parent = cmds.listRelatives(pivot, parent=True, fullPath=False) or []
-        if not parent or parent[0] != "TheKeyMachine":
-            cmds.parent(pivot, _ensure_root())
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
+    return TkmSceneNode.root().child(TEMP_PIVOT_NODE).name
 
     return pivot
 

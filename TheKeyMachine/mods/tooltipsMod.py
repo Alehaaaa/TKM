@@ -3,30 +3,6 @@ from TheKeyMachine.tools import common as toolCommon
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtSvg, QtWidgets  # type: ignore
 
-QWidget = QtWidgets.QWidget
-QHBoxLayout = QtWidgets.QHBoxLayout
-QVBoxLayout = QtWidgets.QVBoxLayout
-QLabel = QtWidgets.QLabel
-QToolButton = QtWidgets.QToolButton
-QFrame = QtWidgets.QFrame
-QMenu = QtWidgets.QMenu
-QApplication = QtWidgets.QApplication
-QSizePolicy = QtWidgets.QSizePolicy
-QColor = QtGui.QColor
-QPixmap = QtGui.QPixmap
-QPainter = QtGui.QPainter
-QPolygonF = QtGui.QPolygonF
-QCursor = QtGui.QCursor
-QGuiApplication = QtGui.QGuiApplication
-QMovie = QtGui.QMovie
-QFontMetrics = QtGui.QFontMetrics
-QIcon = QtGui.QIcon
-Qt = QtCore.Qt
-QSize = QtCore.QSize
-QPoint = QtCore.QPoint
-QPointF = QtCore.QPointF
-QTimer = QtCore.QTimer
-QRect = QtCore.QRect
 QSvgRenderer = getattr(QtSvg, "QSvgRenderer", None)
 
 from TheKeyMachine.widgets import util as wutil
@@ -38,12 +14,12 @@ import TheKeyMachine.mods.settingsMod as settings
 
 IS_MAC = sys.platform == "darwin"
 SHORTCUT_KEY_MAP = {
-    Qt.Key_Alt: "⌥" if IS_MAC else "Alt",
-    Qt.Key_Shift: "⇧" if IS_MAC else "Shift",
-    Qt.Key_Control: "⌘" if IS_MAC else "Ctrl",
-    Qt.MiddleButton: "Click" if IS_MAC else "MidClick",
+    QtCore.Qt.Key_Alt: "⌥" if IS_MAC else "Alt",
+    QtCore.Qt.Key_Shift: "⇧" if IS_MAC else "Shift",
+    QtCore.Qt.Key_Control: "⌘" if IS_MAC else "Ctrl",
+    QtCore.Qt.MiddleButton: "Click" if IS_MAC else "MidClick",
 }
-SHORTCUT_KEY_ORDER = [Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift, Qt.MiddleButton]
+SHORTCUT_KEY_ORDER = [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift, QtCore.Qt.MiddleButton]
 
 
 class Tooltip(str):
@@ -162,7 +138,7 @@ def format_tooltip_shortcut(keys_list, include_click_suffix=False):
     return result
 
 
-class QFlatTooltip(QWidget):
+class QFlatTooltip(QtWidgets.QWidget):
     """A floating tooltip with an arrow pointing to its source."""
 
     BG_COLOR = "#333333"
@@ -189,12 +165,12 @@ class QFlatTooltip(QWidget):
         command_icon=None,
         from_menu=False,
     ):
-        QWidget.__init__(self, wutil.get_maya_qt())
-        window_type = Qt.ToolTip if from_menu else Qt.Tool
-        self.setWindowFlags(window_type | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setAttribute(Qt.WA_ShowWithoutActivating)
-        self.setAttribute(Qt.WA_NoMouseReplay)
+        QtWidgets.QWidget.__init__(self, wutil.get_maya_qt())
+        window_type = QtCore.Qt.ToolTip if from_menu else QtCore.Qt.Tool
+        self.setWindowFlags(window_type | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating)
+        self.setAttribute(QtCore.Qt.WA_NoMouseReplay)
 
         self.anchor_widget = anchor_widget
         self.shortcuts = shortcuts or []
@@ -214,7 +190,7 @@ class QFlatTooltip(QWidget):
             fallback_icon=icon,
         )
 
-        self._auto_close_timer = QTimer(self)
+        self._auto_close_timer = QtCore.QTimer(self)
         self._auto_close_timer.setInterval(200)
         self._auto_close_timer.timeout.connect(self._check_auto_close)
 
@@ -226,7 +202,7 @@ class QFlatTooltip(QWidget):
             self._auto_close_timer.stop()
             return
 
-        cursor_pos = QCursor.pos()
+        cursor_pos = QtGui.QCursor.pos()
         tt_geo = self.frameGeometry()
         side = getattr(self, "side", "bottom")
 
@@ -243,7 +219,7 @@ class QFlatTooltip(QWidget):
             anc_geo = self.target_rect
         elif self.anchor_widget and wutil.is_valid_widget(self.anchor_widget) and self.anchor_widget.isVisible():
             anc_geo = self.anchor_widget.rect()
-            anc_geo.moveTo(self.anchor_widget.mapToGlobal(QPoint(0, 0)))
+            anc_geo.moveTo(self.anchor_widget.mapToGlobal(QtCore.QPoint(0, 0)))
         else:
             self.close()
             return
@@ -251,8 +227,8 @@ class QFlatTooltip(QWidget):
         if anc_geo.contains(cursor_pos):
             return
 
-        if isinstance(self.anchor_widget, QMenu):
-            active_popup = QApplication.activePopupWidget()
+        if isinstance(self.anchor_widget, QtWidgets.QMenu):
+            active_popup = QtWidgets.QApplication.activePopupWidget()
             if active_popup and active_popup.geometry().contains(cursor_pos):
                 return
 
@@ -264,29 +240,29 @@ class QFlatTooltip(QWidget):
         else:
             bridge_top, bridge_bot = tt_geo.bottom() - 1, anc_geo.top() + 1
 
-        bridge = QRect(bridge_l, bridge_top, bridge_r - bridge_l, bridge_bot - bridge_top)
+        bridge = QtCore.QRect(bridge_l, bridge_top, bridge_r - bridge_l, bridge_bot - bridge_top)
         if bridge.contains(cursor_pos):
             return
 
         self.close()
 
     def _setup_ui(self):
-        self.main_layout = QVBoxLayout(self)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
-        self.main_layout.setSizeConstraint(QVBoxLayout.SetMinAndMaxSize)
+        self.main_layout.setSizeConstraint(QtWidgets.QVBoxLayout.SetMinAndMaxSize)
         self.setStyleSheet(
             "QFlatTooltip > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(
                 self.BG_COLOR, wutil.DPI(self.BORDER_RADIUS)
             )
         )
 
-        self.bg_frame = QFrame()
+        self.bg_frame = QtWidgets.QFrame()
         self.bg_frame.setObjectName("BgFrame")
         self.bg_frame.setMinimumWidth(wutil.DPI(self.MIN_WIDTH))
         self.bg_frame.setMaximumWidth(wutil.DPI(self.MAX_WIDTH))
-        self.bg_layout = QVBoxLayout(self.bg_frame)
+        self.bg_layout = QtWidgets.QVBoxLayout(self.bg_frame)
         self.bg_layout.setContentsMargins(0, 0, 0, 0)
         self.bg_layout.setSpacing(0)
         self.main_layout.addWidget(self.bg_frame)
@@ -305,7 +281,7 @@ class QFlatTooltip(QWidget):
 
         if not header_pixmap:
             if self.icon and isinstance(self.icon, (str, bytes)):
-                header_pixmap = QIcon(self.icon)
+                header_pixmap = QtGui.QIcon(self.icon)
 
         if header_title or header_pixmap:
             header_frame, header_layout = self._create_section_frame(
@@ -325,7 +301,7 @@ class QFlatTooltip(QWidget):
             self.bg_layout.addWidget(header_frame)
             self.has_header = True
 
-        content_layout = QVBoxLayout()
+        content_layout = QtWidgets.QVBoxLayout()
         content_layout.setSpacing(wutil.DPI(6))
         top_margin = wutil.DPI(12)
         content_layout.setContentsMargins(wutil.DPI(12), top_margin, wutil.DPI(12), wutil.DPI(8))
@@ -343,7 +319,7 @@ class QFlatTooltip(QWidget):
             self._build_shortcuts_section()
 
     def _create_section_frame(self, color, rounded_top=False, rounded_bottom=False):
-        frame = QFrame()
+        frame = QtWidgets.QFrame()
         if rounded_top or rounded_bottom:
             frame.setObjectName("TooltipHeaderFrame")
             frame.setStyleSheet(
@@ -362,7 +338,7 @@ class QFlatTooltip(QWidget):
         else:
             frame.setObjectName("TooltipSectionFrame")
             frame.setStyleSheet("QFrame#TooltipSectionFrame {{ background-color: {}; }}".format(color))
-        layout = QHBoxLayout(frame)
+        layout = QtWidgets.QHBoxLayout(frame)
         if rounded_top:
             layout.setContentsMargins(wutil.DPI(10), wutil.DPI(8), wutil.DPI(8), wutil.DPI(8))
             layout.setSpacing(wutil.DPI(6))
@@ -374,13 +350,13 @@ class QFlatTooltip(QWidget):
     def _add_header_action_buttons(self, layout, header_title):
         if not self.command_id:
             return
-        actions = QWidget(self)
-        actions.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Minimum)
-        actions_layout = QVBoxLayout(actions)
+        actions = QtWidgets.QWidget(self)
+        actions.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Minimum)
+        actions_layout = QtWidgets.QVBoxLayout(actions)
         actions_layout.setContentsMargins(0, 0, 0, 0)
         actions_layout.setSpacing(wutil.DPI(1))
 
-        buttons_layout = QHBoxLayout()
+        buttons_layout = QtWidgets.QHBoxLayout()
         buttons_layout.setContentsMargins(0, 0, 0, 0)
         buttons_layout.setSpacing(wutil.DPI(2))
         if self.command_id:
@@ -393,7 +369,7 @@ class QFlatTooltip(QWidget):
             command_lbl = self._create_command_shortcut_label(shortcut_text, buttons_layout.sizeHint().width())
             actions_layout.addWidget(command_lbl)
 
-        layout.addWidget(actions, 0, Qt.AlignVCenter)
+        layout.addWidget(actions, 0, QtCore.Qt.AlignVCenter)
 
     def _command_shortcut_text(self):
         if not self.command_id:
@@ -406,12 +382,12 @@ class QFlatTooltip(QWidget):
             return ""
 
     def _create_command_shortcut_label(self, shortcut_text, width):
-        label = QLabel(shortcut_text)
+        label = QtWidgets.QLabel(shortcut_text)
         label.setObjectName("TooltipCommandShortcutLabel")
-        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         label.setContentsMargins(0, 0, wutil.DPI(3), 0)
         label.setWordWrap(False)
-        label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        label.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
         label.setToolTip(self.command_id or "")
         font = label.font()
         font.setPixelSize(wutil.DPI(9.5))
@@ -419,20 +395,20 @@ class QFlatTooltip(QWidget):
         label.setStyleSheet(
             "#TooltipCommandShortcutLabel { color: #8c8c8c; background: transparent; padding: 0px; margin: 0px; }"
         )
-        metrics = QFontMetrics(label.font())
+        metrics = QtGui.QFontMetrics(label.font())
         available_width = max(1, int(width or label.sizeHint().width()))
         label.setFixedWidth(available_width)
-        label.setText(metrics.elidedText(shortcut_text, Qt.ElideMiddle, available_width))
+        label.setText(metrics.elidedText(shortcut_text, QtCore.Qt.ElideMiddle, available_width))
         return label
 
     def _create_header_button(self, icon_path, tooltip, callback):
-        btn = QToolButton(self)
+        btn = QtWidgets.QToolButton(self)
         btn.setObjectName("TooltipHeaderButton")
         btn.setAutoRaise(True)
-        btn.setCursor(Qt.PointingHandCursor)
+        btn.setCursor(QtCore.Qt.PointingHandCursor)
         btn.setToolTip(tooltip)
-        btn.setIcon(QIcon(icon_path))
-        btn.setIconSize(QSize(wutil.DPI(22), wutil.DPI(22)))
+        btn.setIcon(QtGui.QIcon(icon_path))
+        btn.setIconSize(QtCore.QSize(wutil.DPI(22), wutil.DPI(22)))
         btn.setFixedSize(wutil.DPI(24), wutil.DPI(24))
         btn.setStyleSheet(
             "QToolButton#TooltipHeaderButton { background-color: transparent; border: none; border-radius: 0px; padding: 0px; }"
@@ -471,7 +447,7 @@ class QFlatTooltip(QWidget):
         frame, layout = self._create_section_frame(self.HEADER_COLOR)
         layout.setContentsMargins(0, wutil.DPI(4), 0, wutil.DPI(4))
 
-        title_lbl = self._create_text_label("Shortcuts", size=16, bold=True, elide=True, align=Qt.AlignCenter)
+        title_lbl = self._create_text_label("Shortcuts", size=16, bold=True, elide=True, align=QtCore.Qt.AlignCenter)
         title_lbl.setMinimumHeight(wutil.DPI(20))
         layout.addWidget(title_lbl)
 
@@ -482,11 +458,11 @@ class QFlatTooltip(QWidget):
         max_row_width = 0
         shortcut_font = self.font()
         shortcut_font.setPixelSize(wutil.DPI(10.5))
-        shortcut_metrics = QFontMetrics(shortcut_font)
+        shortcut_metrics = QtGui.QFontMetrics(shortcut_font)
         shortcut_icon_dim = 11.25
 
         for sh in self.shortcuts:
-            row = QHBoxLayout()
+            row = QtWidgets.QHBoxLayout()
             row.setContentsMargins(wutil.DPI(12), 0, wutil.DPI(12), 0)
             row.setSpacing(wutil.DPI(20))
 
@@ -494,9 +470,9 @@ class QFlatTooltip(QWidget):
             row.addWidget(self._create_icon_label(icon, dim=shortcut_icon_dim))
 
             label_text = sh.get("label", "")
-            name = QLabel(label_text)
+            name = QtWidgets.QLabel(label_text)
             name.setWordWrap(False)
-            name.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+            name.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
             name.setMinimumWidth(shortcut_metrics.horizontalAdvance(label_text))
             name.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5)))
             row.addWidget(name)
@@ -505,9 +481,9 @@ class QFlatTooltip(QWidget):
             command = sh.get("keys", "")
             if isinstance(command, list):
                 command = format_tooltip_shortcut(command, include_click_suffix=True)
-            keys = QLabel(command)
+            keys = QtWidgets.QLabel(command)
             keys.setWordWrap(False)
-            keys.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+            keys.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
             keys.setMinimumWidth(shortcut_metrics.horizontalAdvance(command))
             keys.setStyleSheet("color: {}; font-size: {}px;".format(self.TEXT_COLOR, wutil.DPI(10.5)))
             row.addWidget(keys)
@@ -531,17 +507,17 @@ class QFlatTooltip(QWidget):
             self.bg_frame.setMaximumWidth(max(wutil.DPI(self.MAX_WIDTH), self._shortcut_min_width))
 
     def _create_icon_label(self, source, dim=32):
-        lbl = QLabel()
+        lbl = QtWidgets.QLabel()
         target_size = self._icon_target_size(dim)
         if hasattr(source, "pixmap"):
             pix = source.pixmap(target_size)
         elif isinstance(source, (str, bytes)):
             icon = source.decode() if isinstance(source, bytes) else source
             pix = self._load_icon_pixmap(icon, target_size)
-        elif isinstance(source, QPixmap):
-            pix = source.scaled(target_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        elif isinstance(source, QtGui.QPixmap):
+            pix = source.scaled(target_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
         else:
-            pix = QPixmap()
+            pix = QtGui.QPixmap()
 
         if not pix.isNull():
             lbl.setPixmap(pix)
@@ -549,29 +525,29 @@ class QFlatTooltip(QWidget):
 
     def _icon_target_size(self, dim):
         px_dim = max(1, int(wutil.DPI(dim * 2)))
-        return QSize(px_dim, px_dim)
+        return QtCore.QSize(px_dim, px_dim)
 
     def _load_icon_pixmap(self, path, target_size):
         if not path:
-            return QPixmap()
+            return QtGui.QPixmap()
 
         if path.lower().endswith(".svg") and QSvgRenderer:
             renderer = QSvgRenderer(path)
             if renderer.isValid():
-                pixmap = QPixmap(target_size)
-                pixmap.fill(Qt.transparent)
-                painter = QPainter(pixmap)
+                pixmap = QtGui.QPixmap(target_size)
+                pixmap.fill(QtCore.Qt.transparent)
+                painter = QtGui.QPainter(pixmap)
                 renderer.render(painter)
                 painter.end()
                 return pixmap
 
-        pixmap = QPixmap(path)
+        pixmap = QtGui.QPixmap(path)
         if pixmap.isNull():
             return pixmap
-        return pixmap.scaled(target_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        return pixmap.scaled(target_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
 
     def _create_text_label(self, text, size=11, bold=False, elide=False, align=None):
-        lbl = QLabel(text)
+        lbl = QtWidgets.QLabel(text)
         lbl.setObjectName("text_label")
         lbl.setToolTip(text)
         lbl.setWordWrap(True)
@@ -587,10 +563,10 @@ class QFlatTooltip(QWidget):
             f = lbl.font()
             f.setPixelSize(wutil.DPI(size))
             f.setBold(bold)
-            fm = QFontMetrics(f)
+            fm = QtGui.QFontMetrics(f)
             limit = wutil.DPI(self.MAX_WIDTH - 80)
             if fm.horizontalAdvance(text) > limit:
-                lbl.setText(fm.elidedText(text, Qt.ElideLeft, limit))
+                lbl.setText(fm.elidedText(text, QtCore.Qt.ElideLeft, limit))
                 lbl.setWordWrap(False)
         return lbl
 
@@ -606,7 +582,7 @@ class QFlatTooltip(QWidget):
             return size
 
         scale = float(max_width) / float(size.width())
-        return QSize(max_width, max(1, int(size.height() * scale)))
+        return QtCore.QSize(max_width, max(1, int(size.height() * scale)))
 
     def _create_media_label(self, path):
         max_media_width = self._body_max_width()
@@ -614,8 +590,8 @@ class QFlatTooltip(QWidget):
         if path.lower().endswith(".gif"):
             lbl = TooltipMovieWidget()
             lbl.setMaximumWidth(max_media_width)
-            movie = QMovie(path)
-            movie.setCacheMode(QMovie.CacheAll)
+            movie = QtGui.QMovie(path)
+            movie.setCacheMode(QtGui.QMovie.CacheAll)
             movie.jumpToFrame(0)
             frame_size = movie.currentImage().size()
             if not frame_size.isValid():
@@ -626,22 +602,22 @@ class QFlatTooltip(QWidget):
             movie.start()
             lbl._movie = movie
         else:
-            lbl = QLabel()
-            lbl.setAlignment(Qt.AlignCenter)
+            lbl = QtWidgets.QLabel()
+            lbl.setAlignment(QtCore.Qt.AlignCenter)
             lbl.setMaximumWidth(max_media_width)
-            pix = QPixmap(path)
+            pix = QtGui.QPixmap(path)
             if not pix.isNull():
                 contained_size = self._contain_size(max_media_width, pix.size())
                 if contained_size is not None and pix.size() != contained_size:
-                    pix = pix.scaled(contained_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    pix = pix.scaled(contained_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
                 lbl.setPixmap(pix)
         return lbl
 
     def _create_body_text_label(self, text):
-        raw_lbl = QLabel(text)
+        raw_lbl = QtWidgets.QLabel(text)
         raw_lbl.setWordWrap(True)
         raw_lbl.setOpenExternalLinks(False)
-        raw_lbl.setTextFormat(Qt.PlainText)
+        raw_lbl.setTextFormat(QtCore.Qt.PlainText)
         raw_lbl.setMaximumWidth(self._body_max_width())
         raw_lbl.setStyleSheet(
             "color: {}; background: transparent; font-size: {}px; margin: 0; padding: 0;".format(self.TEXT_COLOR, wutil.DPI(10.5))
@@ -649,9 +625,9 @@ class QFlatTooltip(QWidget):
         return raw_lbl
 
     def _create_separator(self):
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Plain)
+        line = QtWidgets.QFrame()
+        line.setFrameShape(QtWidgets.QFrame.HLine)
+        line.setFrameShadow(QtWidgets.QFrame.Plain)
         line.setStyleSheet("background-color: #4a4a4a; color: #4a4a4a; border: none; min-height: 1px; max-height: 1px; margin: 0; padding: 0;")
         return line
 
@@ -669,23 +645,23 @@ class QFlatTooltip(QWidget):
             layout.addWidget(self._create_body_text_label(str(item)))
 
     def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setPen(Qt.NoPen)
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
 
         side = getattr(self, "side", "bottom")
-        painter.setBrush(QColor(self.BG_COLOR))
+        painter.setBrush(QtGui.QColor(self.BG_COLOR))
 
         aw = wutil.DPI(self.ARROW_W)
         ah = wutil.DPI(self.ARROW_H)
         ax = getattr(self, "arrow_x", self.width() / 2)
 
         if side == "top":
-            poly = QPolygonF([QPointF(ax, 0), QPointF(ax - aw / 2, ah + 1), QPointF(ax + aw / 2, ah + 1)])
+            poly = QtGui.QPolygonF([QtCore.QPointF(ax, 0), QtCore.QPointF(ax - aw / 2, ah + 1), QtCore.QPointF(ax + aw / 2, ah + 1)])
             painter.drawPolygon(poly)
         else:
-            poly = QPolygonF(
-                [QPointF(ax, self.height()), QPointF(ax - aw / 2, self.height() - ah - 1), QPointF(ax + aw / 2, self.height() - ah - 1)]
+            poly = QtGui.QPolygonF(
+                [QtCore.QPointF(ax, self.height()), QtCore.QPointF(ax - aw / 2, self.height() - ah - 1), QtCore.QPointF(ax + aw / 2, self.height() - ah - 1)]
             )
             painter.drawPolygon(poly)
 
@@ -698,22 +674,22 @@ class QFlatTooltip(QWidget):
 
         if target_rect:
             self._global_anc = target_rect
-            cursor_pos = target_pos or QCursor.pos()
+            cursor_pos = target_pos or QtGui.QCursor.pos()
         elif action_rect:
             try:
-                self._global_anc = QRect(widget.mapToGlobal(action_rect.topLeft()), action_rect.size())
+                self._global_anc = QtCore.QRect(widget.mapToGlobal(action_rect.topLeft()), action_rect.size())
             except RuntimeError:
                 return
             self.target_rect = self._global_anc
-            cursor_pos = target_pos or QCursor.pos()
+            cursor_pos = target_pos or QtGui.QCursor.pos()
         else:
             try:
-                target_global = widget.mapToGlobal(QPoint(0, 0))
+                target_global = widget.mapToGlobal(QtCore.QPoint(0, 0))
             except RuntimeError:
                 return
-            self._global_anc = QRect(target_global, widget.size())
+            self._global_anc = QtCore.QRect(target_global, widget.size())
             self.target_rect = self._global_anc
-            cursor_pos = target_pos or QCursor.pos()
+            cursor_pos = target_pos or QtGui.QCursor.pos()
 
         # Calculate target_x based on cursor position, clamped to the anchor's horizontal bounds.
         # This makes the tooltip (and arrow) "grow" from exactly where the user is hovering.
@@ -733,9 +709,9 @@ class QFlatTooltip(QWidget):
 
         gap = wutil.DPI(2)
         edge_padding = wutil.DPI(5)
-        pos = QPoint(target_x - w // 2, self._global_anc.top() - h - gap)
+        pos = QtCore.QPoint(target_x - w // 2, self._global_anc.top() - h - gap)
 
-        screen = QGuiApplication.screenAt(cursor_pos) or QGuiApplication.primaryScreen()
+        screen = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
         geo = screen.availableGeometry()
         available_top = self._global_anc.top() - geo.top() - gap
         available_bottom = geo.bottom() - self._global_anc.bottom() - gap
@@ -818,14 +794,14 @@ class _TooltipMouseFilter(QtCore.QObject):
             return event.globalPos()
         if hasattr(event, "globalPosition"):
             pos = event.globalPosition()
-            return QPoint(int(pos.x()), int(pos.y()))
+            return QtCore.QPoint(int(pos.x()), int(pos.y()))
         return None
 
     @staticmethod
     def _tooltip_button_at(tooltip, global_pos):
         widget = tooltip.childAt(tooltip.mapFromGlobal(global_pos))
         while widget and widget is not tooltip:
-            if isinstance(widget, QToolButton):
+            if isinstance(widget, QtWidgets.QToolButton):
                 return widget
             widget = widget.parentWidget()
         return None
@@ -866,7 +842,7 @@ class QFlatTooltipManager(object):
 
     @classmethod
     def _ensure_mouse_filter(cls):
-        app = QApplication.instance()
+        app = QtWidgets.QApplication.instance()
         if not app:
             return
         if cls._mouse_filter is None:
@@ -886,7 +862,7 @@ class QFlatTooltipManager(object):
             return None
         try:
             rect = widget.rect()
-            rect.moveTo(widget.mapToGlobal(QPoint(0, 0)))
+            rect.moveTo(widget.mapToGlobal(QtCore.QPoint(0, 0)))
             return rect
         except (RuntimeError, ValueError, TypeError, AttributeError):
             return None
@@ -895,7 +871,7 @@ class QFlatTooltipManager(object):
     def _request_contains_cursor(cls, request):
         if not request:
             return False
-        cursor_pos = QCursor.pos()
+        cursor_pos = QtGui.QCursor.pos()
         target_rect = request.get("target_rect")
         if callable(target_rect):
             try:
@@ -918,7 +894,7 @@ class QFlatTooltipManager(object):
         if tooltip and tooltip.isVisible():
             check_auto_close = getattr(tooltip, "_check_auto_close", None)
             if callable(check_auto_close):
-                QTimer.singleShot(0, check_auto_close)
+                QtCore.QTimer.singleShot(0, check_auto_close)
             else:
                 cls._current_tooltip = None
                 cls._current_source_key = None
@@ -951,7 +927,7 @@ class QFlatTooltipManager(object):
             return
         check_auto_close = getattr(tooltip, "_check_auto_close", None)
         if callable(check_auto_close):
-            QTimer.singleShot(0, check_auto_close)
+            QtCore.QTimer.singleShot(0, check_auto_close)
         else:
             cls._current_tooltip = None
             cls._current_source_key = None
@@ -1018,7 +994,7 @@ class QFlatTooltipManager(object):
             command_id=command_id,
             command_label=command_label,
             command_icon=command_icon,
-            from_menu=isinstance(anchor_widget, QMenu),
+            from_menu=isinstance(anchor_widget, QtWidgets.QMenu),
         )
         cls._current_tooltip.show_around(anchor_widget, action_rect, target_rect=target_rect, target_pos=target_pos)
 
@@ -1033,7 +1009,7 @@ class QFlatTooltipManager(object):
         cls.cancel_timer()
 
         if not cls._timer:
-            cls._timer = QTimer()
+            cls._timer = QtCore.QTimer()
             cls._timer.setSingleShot(True)
 
         anchor = kwargs.get("anchor_widget")

@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from typing import ClassVar, Optional
 import os
-import importlib
 import traceback
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
-import TheKeyMachine.mods.uiMod as ui
 import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.customWidgets as cw
@@ -20,12 +18,6 @@ from TheKeyMachine.data import icons
 from TheKeyMachine.data.colors import COLORS
 
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager, format_tooltip_shortcut
-
-importlib.reload(ui)
-importlib.reload(report)
-importlib.reload(wutil)
-importlib.reload(cw)
-importlib.reload(settings)
 
 
 """

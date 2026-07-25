@@ -19,10 +19,10 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 import maya.cmds as cmds
 import json
+import shutil
 import subprocess
 import os
 import sys
-import TheKeyMachine.mods.selectionMod as selectionMod
 
 
 def load_config():
@@ -109,119 +109,7 @@ def get_tool_data_path(tool_name, filename=None):
     return folder
 
 
-# ---------------------------------------------------------------------------
-# Clipboard path helpers
-# These thin wrappers delegate to tools.clipboard so every tool can still call
-# general.get_copy_animation_file() etc. without breaking, while the new
-# clipboard module is the single source of truth for all temp-file paths.
-# ---------------------------------------------------------------------------
-
-def _clipboard_path(slot, folder_only=False):
-    from TheKeyMachine.tools import clipboard
-    p = clipboard.path(slot)
-    return os.path.dirname(p) if folder_only else p
-
-
-# MIRROR EXCEPTIONS ___________________
-def get_mirror_exceptions_file():
-    return _clipboard_path("mirror")
-
-
-# SET DEFAULT VALUES ___________________
-def get_set_default_data_file():
-    return _clipboard_path("set_default")
-
-
-# COPY PASTE ANIMATION ___________________
-def get_copy_animation_file():
-    return _clipboard_path("animation")
-
-
-# COPY PASTE POSE ___________________
-def get_copy_paste_pose_file():
-    return _clipboard_path("pose")
-
-
-# TEMP PIVOT _____________________________
-def get_temp_pivot_data_file():
-    return _clipboard_path("temp_pivot")
-
-
-def get_temp_pivot_data_folder():
-    return _clipboard_path("temp_pivot", folder_only=True)
-
-
-# COPY LINK ______________________________
-def get_copy_link_data_file():
-    return _clipboard_path("copy_link")
-
-
-def get_copy_link_data_folder():
-    return _clipboard_path("copy_link", folder_only=True)
-
-
-# COPY WORLDSPACE ________________________
-def get_copy_worldspace_data_file():
-    return _clipboard_path("worldspace")
-
-
-def get_copy_worldspace_data_folder():
-    return _clipboard_path("worldspace", folder_only=True)
-
-
 # ------------------------------------------------------------------------
-
-
-def create_TheKeyMachine_node():
-    # Guardar la selección inicial
-    initial_selection = selectionMod.get_selected_objects()
-
-    tkm_version = get_thekeymachine_version()
-    tkm_stage = get_thekeymachine_stage_version()
-    tkm_full_version = "v{} {}".format(tkm_version, tkm_stage)
-
-    tkm_codename = get_thekeymachine_codename()
-
-    if not cmds.objExists("TheKeyMachine"):
-        # Crear el assetNode en lugar de un nodo de transformación
-        node = cmds.container(type="dagContainer", name="TheKeyMachine")
-
-        # Establecer el icono del assetNode
-        icon = get_tkm_node_image()
-        cmds.setAttr(node + ".iconName", icon, type="string")
-
-        # Bloquear y ocultar todos los atributos de transformación
-        attributes = ["translateX", "translateY", "translateZ", "rotateX", "rotateY", "rotateZ", "scaleX", "scaleY", "scaleZ", "visibility"]
-
-        for attr in attributes:
-            cmds.setAttr(node + "." + attr, lock=True, keyable=False, channelBox=False)
-
-        # Añadir los atributos "codeEnum" y "version"
-        cmds.addAttr(node, longName="version", niceName="version", attributeType="enum", enumName=tkm_full_version, keyable=True)
-        cmds.addAttr(node, longName="series", niceName="series", attributeType="enum", enumName=tkm_codename, keyable=True)
-
-        # Restaurar la selección inicial
-        if initial_selection:
-            cmds.select(initial_selection, replace=True)
-
-
-def create_isolate_bookmarks_node():
-    # Guardar la selección inicial
-    initial_selection = selectionMod.get_selected_objects()
-
-    if not cmds.objExists("isolate_bookmarks"):
-        node = cmds.createNode("transform", name="isolate_bookmarks")
-
-        # Bloquear y ocultar todos los atributos de transformación
-        attributes = ["translateX", "translateY", "translateZ", "rotateX", "rotateY", "rotateZ", "scaleX", "scaleY", "scaleZ", "visibility"]
-
-        for attr in attributes:
-            cmds.setAttr(node + "." + attr, lock=True, keyable=False, channelBox=False)
-        cmds.parent("isolate_bookmarks", "TheKeyMachine")
-
-    # Restaurar la selección inicial
-    if initial_selection:
-        cmds.select(initial_selection, replace=True)
 
 
 def get_local_config_file():
@@ -289,3 +177,145 @@ def open_file(sub_directory, file_name):
             finally:
                 # Restaurar el valor original de LD_LIBRARY_PATH
                 os.environ["LD_LIBRARY_PATH"] = original_ld_path
+
+
+# ---------------------------------------------------- STARTUP SCRIPT ----------------------------------------------------------------------------
+
+
+def _user_setup_path():
+    maya_app_dir = os.getenv("MAYA_APP_DIR") or cmds.internalVar(userAppDir=True)
+    return os.path.realpath(os.path.join(maya_app_dir, "scripts", "userSetup.py"))
+
+
+def check_userSetup():
+    user_setup_file = _user_setup_path()
+
+    startCode = "# start TheKeyMachine"
+
+    try:
+        with open(user_setup_file, "r") as input_file:
+            lines = input_file.readlines()
+            for line in lines:
+                if line.strip() == startCode:
+                    return True
+    except IOError:
+        pass
+
+    return False
+
+
+def install_userSetup(install=True):
+    user_setup_file = _user_setup_path()
+
+    cmds_import = "from maya import cmds\n"
+    newUserSetup = ""
+    startCode, endCode = "# start TheKeyMachine", "# end TheKeyMachine"
+
+    try:
+        with open(user_setup_file, "r") as input_file:
+            lines = input_file.readlines()
+
+            # Remove existing block between startCode and endCode
+            inside_block = False
+            for line in lines:
+                if line == cmds_import:
+                    cmds_import = ""
+                if line.strip() == startCode:
+                    inside_block = True
+                if not inside_block:
+                    newUserSetup += line
+                if line.strip() == endCode:
+                    inside_block = False
+
+            # Ensure there's always a two-line gap at the end
+            newUserSetup = newUserSetup.rstrip() + "\n\n"
+
+    except IOError:
+        newUserSetup = ""
+
+    run_script = "import TheKeyMachine; TheKeyMachine.toggle()"
+    tkm_run_code = (
+        "{}\n\n".format(startCode)
+        + "{0}".format(cmds_import)
+        + "if not cmds.about(batch=True):\n"
+        + '    cmds.evalDeferred(lambda: cmds.evalDeferred("{}", lowestPriority=True))\n\n'.format(run_script)
+        + "{}".format(endCode)
+    )
+
+    if install:
+        newUserSetup += tkm_run_code
+
+    # Write the updated userSetup file
+    with open(user_setup_file, "w") as output_file:
+        output_file.write(newUserSetup)
+
+
+# ---------------------------------------------------- UNINSTALL ---------------------------------------------------------------------------------
+
+
+def _tkm_folder_path():
+    if INSTALL_PATH:
+        return os.path.join(INSTALL_PATH, "TheKeyMachine")
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _backup_uninstalled_marker(tkm_folder_path):
+    """Create the "uninstalled" marker folder inside TheKeyMachine, if missing."""
+    uninstalled_folder_path = os.path.join(tkm_folder_path, "uninstalled")
+    if os.path.exists(uninstalled_folder_path):
+        cmds.warning('"uninstalled" folder already exists inside "TheKeyMachine".')
+        return
+    os.makedirs(uninstalled_folder_path)
+
+
+def _remove_tkm_install(tkm_folder_path):
+    if not os.path.exists(tkm_folder_path):
+        cmds.warning("TheKeyMachine folder not found")
+        return
+    shutil.rmtree(tkm_folder_path)
+
+
+def _remove_tkm_workspace_controls():
+    """Close and delete TheKeyMachine's workspace controls ("k" the toolbar, "s" the search panel)."""
+    for control_name in ("k", "s"):
+        if not cmds.workspaceControl(control_name, exists=True):
+            cmds.warning('The workspaceControl "{}" does not exist.'.format(control_name))
+            continue
+        if control_name == "k":
+            cmds.workspaceControl(control_name, edit=True, floating=True)
+            cmds.workspaceLayoutManager(save=True)
+            cmds.workspaceControl(control_name, edit=True, close=True)
+        cmds.deleteUI(control_name, control=True)
+
+    cmds.warning("TheKeyMachine has been uninstalled")
+
+
+def uninstall():
+    from TheKeyMachine.core.Qt import QtCore
+    from TheKeyMachine.tools import common as toolCommon
+
+    toolCommon.finish_active_progress()
+    result = cmds.confirmDialog(
+        title="Uninstall TheKeyMachine",
+        message="Do you want to uninstall TheKeyMachine?",
+        button=["Uninstall", "Cancel"],
+        defaultButton="Uninstall",
+        cancelButton="Cancel",
+        dismissString="Cancel",
+    )
+
+    if result != "Uninstall":
+        print("Uninstallation cancelled by user")
+        return
+
+    try:
+        tkm_folder_path = _tkm_folder_path()
+        _backup_uninstalled_marker(tkm_folder_path)
+        _remove_tkm_install(tkm_folder_path)
+        # Remove the auto-launch block from userSetup.py so Maya doesn't try to
+        # import TheKeyMachine on next startup against a folder that no longer exists.
+        install_userSetup(install=False)
+        # Delay the workspace teardown to give the "recenter toolbar" callback time to stop.
+        QtCore.QTimer.singleShot(700, _remove_tkm_workspace_controls)
+    except Exception as e:
+        cmds.error(f"An error occurred during uninstallation: {e}")

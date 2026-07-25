@@ -3,8 +3,6 @@ import maya.OpenMayaUI as omui
 
 from TheKeyMachine.core.Qt import QtCompat, QtGui, QtWidgets
 
-QMainWindow = QtWidgets.QMainWindow
-
 from TheKeyMachine.data import icons
 
 def DPI(val):
@@ -32,7 +30,7 @@ def get_screen_resolution():
     return screen_rect.width(), screen_rect.height()
 
 
-def get_maya_qt(ptr=None, qt=QMainWindow):
+def get_maya_qt(ptr=None, qt=QtWidgets.QMainWindow):
     if ptr is None:
         ptr = omui.MQtUtil.mainWindow()
     return QtCompat.wrapInstance(int(ptr), qt)

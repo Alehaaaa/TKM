@@ -246,7 +246,7 @@ def shutdown_tool_modules() -> None:
         ("TheKeyMachine.mods.shelfMod", "cleanup_open_menus"),
         ("TheKeyMachine.tools.common", "finish_active_progress"),
         ("TheKeyMachine.tools.graph_toolbar.api", "shutdown_graph_toolbar_runtime"),
-        ("TheKeyMachine.tools.plugins", "shutdown_all"),
+        ("TheKeyMachine.core.native_plugins", "shutdown_all"),
     )
     for module_name, attr_name in module_cleanups:
         try:
@@ -445,8 +445,8 @@ class RuntimeManager(QtCore.QObject):
             cleanup_orphaned_widgets()
         # Native tool contexts must be removed before their plug-ins unload.
         try:
-            from TheKeyMachine.tools import plugins
-            plugins.shutdown_all()
+            from TheKeyMachine.core import native_plugins
+            native_plugins.shutdown_all()
         except Exception:
             pass
         self._remove_all()

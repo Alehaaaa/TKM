@@ -9,7 +9,7 @@ from TheKeyMachine.core.Qt import QtCompat, QtCore
 from TheKeyMachine.data import icons
 import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.tools import plugins
+from TheKeyMachine.core import native_plugins as plugins
 
 
 DEPTH_CONTEXT = "tkmDepthMoverCtx"

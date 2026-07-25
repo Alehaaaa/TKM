@@ -188,6 +188,12 @@ class FloatingWidget(cd.QFlatDialog):
     BORDER_RADIUS = wutil.DPI(5)
     AUTO_CLOSE_DIST = wutil.DPI(10)
     AUTO_CLOSE_PERIOD_MS = 300
+    # Newly shown/positioned popups can report stale geometry for a moment
+    # (present_beside_cursor() moves+shows before the window manager has
+    # finished applying it), which made _is_cursor_within_bounds() see the
+    # cursor as "outside" the window on the very first open and close it
+    # within ~200ms. Ignore auto-close requests until geometry has settled.
+    AUTO_CLOSE_GRACE_MS = 400
     TEXT_COLOR = COLOR_TEXT_SECONDARY
 
     def __init__(self, popup=False, parent=None):
@@ -201,6 +207,7 @@ class FloatingWidget(cd.QFlatDialog):
         self._drag_start_pos = QtCore.QPoint()
 
         self._auto_close_active = True if popup else None
+        self._shown_elapsed = QtCore.QElapsedTimer()
 
         # Event-driven auto-close mechanism
         self._auto_close_timer = QtCore.QTimer(self)
@@ -210,6 +217,13 @@ class FloatingWidget(cd.QFlatDialog):
 
         self._setup_ui()
         self.setMouseTracking(True)
+
+    def showEvent(self, event):
+        # Restart the grace window every time the popup (re)appears, not just
+        # on first construction -- a reused/hidden-then-reshown widget can hit
+        # the same stale-geometry window.
+        self._shown_elapsed.start()
+        cd.QFlatDialog.showEvent(self, event)
 
     def enterEvent(self, event):
         self._auto_close_timer.stop()
@@ -223,6 +237,9 @@ class FloatingWidget(cd.QFlatDialog):
     def _process_auto_close_request(self):
         """Evaluates whether the window should close based on current cursor position."""
         if not self._auto_close_active or not self.isVisible():
+            return
+
+        if not self._shown_elapsed.isValid() or not self._shown_elapsed.hasExpired(self.AUTO_CLOSE_GRACE_MS):
             return
 
         if self._is_cursor_within_bounds():

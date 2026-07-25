@@ -12,7 +12,7 @@ QSvgRenderer = getattr(QtSvg, "QSvgRenderer", None)
 PYSIDE_VERSION = 6 if (IsPySide6 or IsPyQt6) else 2
 
 from TheKeyMachine.mods.selectionMod import get_valid_selected_objects
-from TheKeyMachine.widgets.util import DPI, get_maya_qt, is_valid_widget
+from TheKeyMachine.widgets.util import DPI, event_global_pos, get_maya_qt, is_valid_widget
 from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
 
 from TheKeyMachine.data import icons
@@ -1091,33 +1091,32 @@ class QFlatToolBarDialog(QFlatFloatingWidget):
         self.setMinimumWidth(DPI(230))
         self.setMinimumHeight(DPI(300))
 
-        # Header. This popup toolbar header intentionally keeps its original
-        # title-first layout; full windows use QFlatDialog instead.
+        # Header. Matches AttributeSwitcherWindow's selection header exactly:
+        # icon first (fixed size, centered), then an expanding bold title
+        # label -- the one icon/title system every toolbar popup shares.
         title_layout = QtWidgets.QHBoxLayout()
-        title_layout.setContentsMargins(DPI(6), DPI(10), 0, DPI(4))
+        title_layout.setContentsMargins(DPI(6), DPI(10), DPI(6), DPI(4))
         title_layout.setSpacing(DPI(6))
+
+        if self.icon:
+            icon_size = DPI(25)
+            icon_label = QtWidgets.QLabel()
+            icon_label.setFixedSize(icon_size, icon_size)
+            icon_label.setPixmap(QtGui.QIcon(self.icon).pixmap(icon_size, icon_size))
+            icon_label.setAlignment(QtCore.Qt.AlignCenter)
+            title_layout.addWidget(icon_label, alignment=QtCore.Qt.AlignVCenter)
 
         self.title_label = QtWidgets.QLabel()
         self.title_label.setObjectName("title_label")
         self.title_label.setStyleSheet(
-            "#title_label{font-size: %spx; color: %s; font-weight: bold; background: transparent;}" % (DPI(24), self.TEXT_COLOR)
+            "#title_label{font-size: %spx; color: %s; font-weight: bold; background: transparent;}" % (DPI(18), self.TEXT_COLOR)
         )
         self.title_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.title_label.setWordWrap(False)
-        title_layout.addWidget(self.title_label)
-
-        if self.icon:
-            icon_label = QtWidgets.QLabel()
-            icon_size = DPI(30)
-
-            icon = QtGui.QIcon(self.icon)
-            pixmap = icon.pixmap(icon_size, icon_size)
-
-            icon_label.setPixmap(pixmap)
-            icon_label.setFixedSize(icon_size, icon_size)
-            icon_label.setAlignment(QtCore.Qt.AlignCenter)
-
-            title_layout.addWidget(icon_label, alignment=QtCore.Qt.AlignVCenter)
+        title_layout.addWidget(self.title_label, 1)
+        # Kept as an attribute so subclasses can append persistent header
+        # affordances (e.g. a "+" create button) without re-building the header.
+        self.title_layout = title_layout
 
         self.mainLayout.addLayout(title_layout)
 
@@ -1142,6 +1141,70 @@ class QFlatToolBarPopupDialog(QFlatToolBarDialog):
             if self._opened:
                 self.close()
             self._opened = True
+            return
+        super().changeEvent(event)
+
+
+class QFlatPinnableToolBarPopupDialog(QFlatToolBarPopupDialog):
+    """A toolbar popup that turns into a normal pinned window once dragged.
+
+    Opens as a transient popup with no bottom bar (unless ``persistent_buttons``
+    are supplied), closing itself the moment Maya's UI steals window activation
+    -- the same behavior ``QFlatToolBarPopupDialog`` gives every other transient
+    popup. Dragging it promotes the window to "pinned": activation changes stop
+    closing it, and a Close button appears in the bottom bar alongside any
+    persistent buttons. This is the one place that owns that pin/unpin quirk;
+    subclasses only describe their own persistent buttons and reuse it instead
+    of re-implementing drag detection and activation-change handling.
+    """
+
+    DRAG_PIN_DISTANCE = None  # falls back to DPI(10) if left unset
+
+    def __init__(self, parent=None, popup=True, persistent_buttons=None, bottom_bar_kwargs=None, **kwargs):
+        self._pinned = not popup
+        self._persistent_buttons = list(persistent_buttons or [])
+        self._bottom_bar_kwargs = dict(bottom_bar_kwargs or {})
+        super().__init__(parent=parent, popup=popup, closeButton=False, **kwargs)
+        self._refresh_action_bar()
+
+    def _refresh_action_bar(self):
+        self.setBottomBar(
+            buttons=list(self._persistent_buttons),
+            closeButton=self._pinned,
+            **self._bottom_bar_kwargs,
+        )
+
+    def set_persistent_buttons(self, buttons):
+        """Replace the always-visible bottom-bar buttons (Close is managed separately)."""
+        self._persistent_buttons = list(buttons or [])
+        self._refresh_action_bar()
+
+    def set_popup_mode(self, popup):
+        """Restore transient or pinned presentation when reusing the window."""
+        self._popup = bool(popup)
+        self._pinned = not popup
+        self._opened = False
+        self._refresh_action_bar()
+
+    def _pin_after_reposition(self):
+        if self._pinned:
+            return
+        self._pinned = True
+        self._popup = False
+        self._refresh_action_bar()
+
+    def mouseReleaseEvent(self, event):
+        was_dragging = self._is_dragging
+        drag_start = QtCore.QPoint(self._drag_start_pos)
+        global_position = event_global_pos(event)
+        super().mouseReleaseEvent(event)
+        threshold = self.DRAG_PIN_DISTANCE if self.DRAG_PIN_DISTANCE is not None else DPI(10)
+        if was_dragging and (global_position - drag_start).manhattanLength() > threshold:
+            self._pin_after_reposition()
+
+    def changeEvent(self, event):
+        if self._pinned:
+            QFlatToolBarDialog.changeEvent(self, event)
             return
         super().changeEvent(event)
 
@@ -1434,81 +1497,3 @@ class QFlatBugReportDialog(QFlatDialog):
         self.show()
         self.raise_()
         self.activateWindow()
-
-
-
-
-class QFlatNumberInput(QFlatToolBarPopupDialog):
-    """
-    Flat floating dialog with:
-        - title
-        - optional icon
-        - numeric input (spinbox)
-        - action button
-    """
-
-    def __init__(
-        self,
-        callback=None,
-        width=DPI(230),
-        popup=True,
-        closeButton=True,
-        parent=None,
-    ):
-        self.title = "Bake Custom Interval"
-        self.icon = icons.bake_animation_custom
-        self.start_value = 1.0
-
-        self.COLOR_BG_TRACK = self.DARK_BG_COLOR
-
-        super().__init__(
-            parent=parent,
-            popup=popup,
-            closeButton=closeButton,
-            native_popup=True,
-        )
-
-        self.setMinimumWidth(width)
-        self.title_label.setText(self.title)
-
-        self._callback = callback
-
-        # Spinbox (replaces line edit)
-        self.spinbox = cw.QFlatSpinBox()
-        self.spinbox.setFixedHeight(DPI(30))
-
-        # Configure behavior
-        self.spinbox.setValue(self.start_value)
-        self.spinbox.setSingleStep(1.0)  # step size
-
-        # Enter key support (depends on your widget internals)
-        if hasattr(self.spinbox, "lineEdit"):
-            self.spinbox.lineEdit().returnPressed.connect(self._on_accept)
-
-        self.mainLayout.addWidget(self.spinbox)
-
-        bake_button = QFlatDialogButton(
-            "Bake",
-            icon=icons.apply,
-            callback=self._on_accept,
-            highlight=True,
-        )
-
-        self.setBottomBar([bake_button], margins=0, spacing=2)
-
-        self.spinbox.setFocus()
-
-    # --- Value helpers ---
-    def value(self):
-        return self.spinbox.value()
-
-    def int_value(self):
-        return int(self.spinbox.value())
-
-    def float_value(self):
-        return float(self.spinbox.value())
-
-    # --- Action ---
-    def _on_accept(self, *args):
-        if self._callback:
-            self._callback(self.value(), self)

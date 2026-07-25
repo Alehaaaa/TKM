@@ -5,9 +5,9 @@ import os
 
 from maya import cmds
 
-import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.tools import clipboard
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.copy_paste.controller import (
     ANIMATION_CONTROLS_KEY,
@@ -291,7 +291,7 @@ def _mirror_control_side(control):
 
 
 def load_exceptions():
-    mirror_exceptions_file_path = general.get_mirror_exceptions_file()
+    mirror_exceptions_file_path = clipboard.path("mirror")
     if os.path.exists(mirror_exceptions_file_path):
         try:
             with open(mirror_exceptions_file_path, "r") as file:
@@ -488,7 +488,7 @@ def _update_mirror_exceptions(exception_type):
         if not control_exceptions:
             exceptions.pop(control_name, None)
 
-    json_path = general.get_mirror_exceptions_file()
+    json_path = clipboard.path("mirror")
     os.makedirs(os.path.dirname(json_path), exist_ok=True)
     with open(json_path, "w") as file:
         json.dump(exceptions, file, indent=4)

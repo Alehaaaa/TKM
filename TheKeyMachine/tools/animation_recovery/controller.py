@@ -22,6 +22,7 @@ except ImportError:
 from TheKeyMachine.core import six
 from TheKeyMachine.core import toolbox
 from TheKeyMachine.core.Qt import QtCore
+from TheKeyMachine.core.scene_nodes import TkmSceneNode
 from TheKeyMachine.mods import generalMod as general
 from TheKeyMachine.mods import settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
@@ -36,7 +37,10 @@ RUNTIME_ANIMATION_KEY = "animation_recovery:animation"
 RUNTIME_SCENE_KEY = "animation_recovery:scene"
 RUNTIME_TRANSFORM_KEY = "animation_recovery:transforms"
 RUNTIME_LAYER_KEY = "animation_recovery:layers"
-SCENE_NODE = "TheKeyMachine"
+SCENE_NODE = "tkm_animation_recovery"
+# Animation recovery owns this child node under the TKM root; tools must never
+# stamp their own attributes onto the root itself (TheKeyMachine only ever
+# parents other tools' nodes -- see TheKeyMachine.core.scene_nodes).
 SCENE_ID_ATTRIBUTE = "tkmAnimationRecoverySceneId"
 # fileInfo, not a node attribute: it is scene-global (survives even if the
 # TheKeyMachine node were ever removed), is documented as NOT undoable, and
@@ -773,14 +777,10 @@ def _scene_node():
 
 
 def ensure_scene_id():
-    """Create the TKM parent only while recovery is active and persist its ID."""
+    """Create animation recovery's own TKM child node and persist its scene ID."""
     previous_selection = cmds.ls(selection=True, long=True) or []
     try:
-        if not _scene_node():
-            general.create_TheKeyMachine_node()
-        node = _scene_node()
-        if not node:
-            return None
+        node = TkmSceneNode.root().child(SCENE_NODE, lock_transform=True).name
         plug = "{}.{}".format(node, SCENE_ID_ATTRIBUTE)
         if not cmds.objExists(plug):
             cmds.addAttr(

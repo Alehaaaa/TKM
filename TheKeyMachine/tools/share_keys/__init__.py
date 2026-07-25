@@ -11,11 +11,76 @@ class ShareKeysToolObject(ToolObject):
     ORDER = 310
     DOC_URL = "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/share-keys"
     TOOLS = {
-        "share_keys": {"type": "tool", "label": "Share Keys", "text": "sK", "icon": "share_keys", "callback": api.share_keys, "tooltip": TOOLTIPS["share"], "menu": {"label": "Share Keys", "items": ["share_keys_from_last_selected", "reblock"]}},
+        "share_keys": {
+            "type": "tool", "label": "Share Keys", "text": "sK", "icon": "share_keys",
+            "callback": api.share_keys, "tooltip": TOOLTIPS["share"],
+            "menu": {
+                "label": "Share Keys",
+                "items": [
+                    {
+                        "type": "choice",
+                        "get_value": api.get_share_keys_mode,
+                        "set_value": api.set_share_keys_mode,
+                        "items": [
+                            {
+                                "value": api.SHARE_KEYS_MODE_PRESERVE_TANGENT,
+                                "label": "Keep Tangent Type",
+                                "description": "Add missing keys without changing tangent type.",
+                            },
+                            {
+                                "value": api.SHARE_KEYS_MODE_PRESERVE_SHAPE,
+                                "label": "Keep Anim Curve Shape",
+                                "description": "Insert missing keys while preserving animation curve shape.",
+                            },
+                        ],
+                    },
+                    "separator",
+                    "share_keys_from_last_selected",
+                    "reblock",
+                ],
+            },
+        },
         "share_keys_from_last_selected": {"type": "tool", "label": "Share Keys From Last Selected", "icon": "share_keys", "callback": api.share_keys_from_last_selected, "tooltip": TOOLTIPS["share_last"]},
         "reblock": {"type": "tool", "label": "Reblock", "text": "rB", "icon": "reblock", "callback": api.reblock_move, "tooltip": TOOLTIPS["reblock"]},
         "reblock_insert": {"type": "tool", "label": "Reblock Insert", "text": "rB+", "icon": "reblock", "callback": api.reblock_insert, "tooltip": TOOLTIPS["reblock_insert"]},
-        "bake_animation_1": {"type": "tool", "label": "Bake on Ones", "icon": "bake_animation_1", "callback": api.bake_animation_1, "tooltip": TOOLTIPS["bake_1"]},
+        "bake_animation_1": {
+            "type": "tool", "label": "Bake on Ones", "icon": "bake_animation_1",
+            "callback": api.bake_animation_1, "tooltip": TOOLTIPS["bake_1"],
+            "menu": {
+                "label": "Bake",
+                "items": [
+                    {
+                        "type": "choice",
+                        "get_value": api.get_bake_tangent_mode,
+                        "set_value": api.set_bake_tangent_mode,
+                        "items": [
+                            {
+                                "value": api.BAKE_TANGENT_MODE_STEP,
+                                "label": "Bake To Step Tangent",
+                                "description": "Bake keys, then turn baked tangents to stepped.",
+                            },
+                            {
+                                "value": api.BAKE_TANGENT_MODE_KEEP_TYPE,
+                                "label": "Keep Tangent Type",
+                                "description": "Bake keys without forcing the baked keys to stepped tangents.",
+                            },
+                            {
+                                "value": api.BAKE_TANGENT_MODE_KEEP_SHAPE,
+                                "label": "Keep Animation Curve Shapes",
+                                "description": "Bake while preserving animation curve shapes where Maya can do so.",
+                            },
+                        ],
+                    },
+                    "separator",
+                    "bake_animation_2",
+                    "bake_animation_3",
+                    "bake_animation_4",
+                    "bake_animation_custom",
+                    "separator",
+                    "bake_animation_from_last_selected",
+                ],
+            },
+        },
         "bake_animation_2": {"type": "tool", "label": "Bake on Twos", "icon": "bake_animation_2", "callback": api.bake_animation_2, "tooltip": TOOLTIPS["bake_2"]},
         "bake_animation_3": {"type": "tool", "label": "Bake on Threes", "icon": "bake_animation_3", "callback": api.bake_animation_3, "tooltip": TOOLTIPS["bake_3"]},
         "bake_animation_4": {"type": "tool", "label": "Bake on Fours", "icon": "bake_animation_3", "callback": api.bake_animation_4, "tooltip": TOOLTIPS["bake_4"]},

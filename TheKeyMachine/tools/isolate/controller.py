@@ -1,9 +1,18 @@
 from maya import cmds
 
 import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.core.scene_nodes import TkmSceneNode
+
+
+ROOT_NODE = "isolate_bookmarks"
 
 
 _down_one_level = False
+
+
+def create_isolate_bookmarks_node():
+    """Return the TkmSceneNode that parents all isolate bookmark nodes, creating it if missing."""
+    return TkmSceneNode.root().child(ROOT_NODE, lock_transform=True)
 
 
 def is_down_one_level():

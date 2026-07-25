@@ -1,8 +1,8 @@
 from maya import cmds
 
-import TheKeyMachine.mods.generalMod as general
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.widgets.util as wutil
+from TheKeyMachine.core.scene_nodes import TkmSceneNode
 
 
 followCam_original_camera = None
@@ -81,8 +81,7 @@ def create_follow_cam(translation=True, rotation=True, *args):
 
     selected_objects = selectionMod.get_selected_objects()
 
-    if not cmds.objExists("TheKeyMachine"):
-        general.create_TheKeyMachine_node()
+    TkmSceneNode.root()
 
     if not selected_objects:
         return wutil.make_inViewMessage("Select at least one object")
