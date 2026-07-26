@@ -141,7 +141,7 @@ The root **only ever parents other tools' nodes** and must never carry tool-owne
 deleted by a tool: `set_attr` and `delete` on the root both raise. A tool that needs its own
 persistent node or a scene-scoped attribute creates a child with `root().child(name, ...)` and
 reads/writes that child instead — see `tools.animation_recovery.controller` for the pattern
-(its scene-ID attribute lives on its own `tkm_animation_recovery` child node, not on the root).
+(its scene-ID attribute lives on its own `Animation_Recovery` child node, not on the root).
 
 ## Command lifecycle
 

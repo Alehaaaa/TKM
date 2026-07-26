@@ -460,7 +460,7 @@ def _refresh_toolbar_pinning_footer(menu, toolbar_widget):
     workspace_actions = getattr(menu, "_tkm_workspace_actions", None) or {}
     if workspace_actions:
         active_ws = toolWorkspaces.get_active_workspace()
-        for ws in toolWorkspaces.WORKSPACES:
+        for ws in toolWorkspaces.list_workspaces():
             action = workspace_actions.get(ws["id"])
             if not wutil.is_valid_widget(action):
                 continue
@@ -484,6 +484,26 @@ def _refresh_toolbar_pinning_footer(menu, toolbar_widget):
                 action.setChecked(label == current_align)
             finally:
                 action.blockSignals(blocked)
+
+
+def invalidate_toolbar_pinning_menu(toolbar_widget):
+    """Drop a toolbar's cached right-click pinning menu so it rebuilds fresh
+    next time it's opened, instead of reusing a stale action set.
+
+    The menu is normally cached because its tool/section actions never
+    change while a toolbar is alive (see ``show_toolbar_pinning_menu``) --
+    but its footer also lists every workspace, and unlike the rest of the
+    menu, that list can change at any time (creating/renaming/deleting a
+    custom workspace via the Workspaces editor), so it isn't safe to assume
+    that part stays fixed for the toolbar's lifetime.
+    """
+    if not wutil.is_valid_widget(toolbar_widget):
+        return
+    menu = getattr(toolbar_widget, "_tkm_pinning_menu", None)
+    if menu is not None:
+        if wutil.is_valid_widget(menu):
+            menu.deleteLater()
+        toolbar_widget._tkm_pinning_menu = None
 
 
 def show_toolbar_pinning_menu(toolbar_widget, global_pos):
@@ -642,6 +662,7 @@ def _workspace_action_state(ws, active_ws):
 
 def _add_workspace_actions(menu, sections, apply_alignment_fn):
     from TheKeyMachine.core import toolWorkspaces
+    from TheKeyMachine.tools.workspaces import controller as workspacesController
 
     group = QtGui.QActionGroup(menu)
     group.setExclusive(True)
@@ -649,12 +670,18 @@ def _add_workspace_actions(menu, sections, apply_alignment_fn):
 
     active_ws = toolWorkspaces.get_active_workspace()
 
-    for ws in toolWorkspaces.WORKSPACES:
+    for ws in toolWorkspaces.list_workspaces():
         label, is_current = _workspace_action_state(ws, active_ws)
 
+        # Built-in and custom workspaces apply through the same one call:
+        # the Workspaces editor's controller already knows how to tell them
+        # apart (a custom one replays its saved snapshot; a built-in one
+        # uses the fixed defaults these very ``sections``/``apply_alignment_fn``
+        # would otherwise be needed for), so this menu doesn't need its own
+        # copy of that branch.
         def apply_ws(checked, ws_id=ws["id"]):
             if checked:
-                toolWorkspaces.apply_workspace(ws_id, sections, apply_alignment_fn)
+                workspacesController.apply_workspace(ws_id)
 
         actions[ws["id"]] = _add_checkable_action(
             menu,
@@ -954,6 +981,7 @@ def build_main_settings_menu(
         update_toolbar_icon_alignment=update_toolbar_icon_alignment,
     )
     _add_action(toolbar_menu, command_id="hotkeys_window")
+    _add_action(toolbar_menu, command_id="workspaces_window")
     _add_registered_menu(
         toolbar_menu,
         partial(build_main_dock_menu, toolbar),

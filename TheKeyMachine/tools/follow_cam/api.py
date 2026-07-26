@@ -3,10 +3,11 @@ from maya import cmds
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.widgets.util as wutil
 from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.data import icons
 
 
 followCam_original_camera = None
-FOLLOW_CAM_GROUP = "tkm_followCam"
+FOLLOW_CAM_GROUP = "Follow_Cam"
 FOLLOW_CAM_ORIGINAL_CAMERA_ATTR = "tkmOriginalCamera"
 
 
@@ -101,14 +102,14 @@ def create_follow_cam(translation=True, rotation=True, *args):
     elif stored_camera:
         followCam_original_camera = stored_camera
 
-    if cmds.objExists("tkm_followCam"):
+    if cmds.objExists(FOLLOW_CAM_GROUP):
         follow_cam = cmds.duplicate(camera, name="followCam_tmp")[0]
-        follow_cam_group = cmds.group(follow_cam, name="tkm_followCam_tmp")
+        follow_cam_group = TkmSceneNode.root().child("Follow_Cam_tmp", icon=icons.follow_cam).name
     else:
         follow_cam = cmds.duplicate(camera, name="followCam")[0]
-        follow_cam_group = cmds.group(follow_cam, name="tkm_followCam")
+        follow_cam_group = TkmSceneNode.root().child(FOLLOW_CAM_GROUP, icon=icons.follow_cam).name
+    cmds.parent(follow_cam, follow_cam_group)
 
-    cmds.parent(follow_cam_group, "TheKeyMachine")
     cmds.parent(follow_cam_group, world=True)
 
     if translation and not rotation:
@@ -126,9 +127,9 @@ def create_follow_cam(translation=True, rotation=True, *args):
 
     cmds.parent(follow_cam_group, "TheKeyMachine")
 
-    if cmds.objExists("tkm_followCam_tmp"):
-        cmds.delete("tkm_followCam")
-        cmds.rename("tkm_followCam_tmp", "tkm_followCam")
+    if cmds.objExists("Follow_Cam_tmp"):
+        cmds.delete(FOLLOW_CAM_GROUP)
+        cmds.rename("Follow_Cam_tmp", FOLLOW_CAM_GROUP)
         cmds.rename("followCam_tmp", "followCam")
         follow_cam = "followCam"
 

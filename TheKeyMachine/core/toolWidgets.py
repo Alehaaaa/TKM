@@ -663,6 +663,7 @@ def populate_main_toolbar_from_layout(layout_id, new_section_fn, owner):
                 new_section_fn,
                 namespace="main_toolbar_sliders",
                 object_prefix="bar",
+                color=section_def.get("color"),
             )
             if section:
                 section.set_menu_identity(
@@ -729,6 +730,11 @@ def set_main_toolbar_icon_alignment(owner, alignment_name):
 
     layout = toolbar_widget.layout()
     if layout:
+        # "Single Line" is an extra mode offered by the Workspaces editor: it
+        # is not one of the Qt.Alignment flags, it just stops sections from
+        # wrapping onto a new row.
+        if hasattr(layout, "setSingleLine"):
+            layout.setSingleLine(alignment_name == "Single Line")
         layout.setAlignment(toolMenus.toolbar_alignment_value(alignment_name))
         layout.invalidate()
 

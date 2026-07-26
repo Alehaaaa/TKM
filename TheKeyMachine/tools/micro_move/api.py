@@ -21,7 +21,6 @@ ROTATE_CONTEXT_COMMAND = "tkmMicroRotateContextCmd"
 BUILD_COMMAND = "tkmMicroMoveBuild"
 CONFIGURE_COMMAND = "tkmMicroMoveConfigure"
 REFRESH_COMMAND = "tkmMicroMoveRefresh"
-LEGACY_HELPERS_GROUP = "tkm_microMove_helpers"
 
 PLUGIN_SPEC = plugins.NativePluginSpec(
     label="Micro Move",
@@ -43,24 +42,6 @@ PLUGIN_SPEC = plugins.NativePluginSpec(
 )
 RUNTIME_CALLBACK_KEY = "micro_move:tool_changed"
 _CONTROLLER = None
-
-
-def _remove_legacy_helpers():
-    if not cmds.objExists(LEGACY_HELPERS_GROUP):
-        return
-
-    original_selection = cmds.ls(selection=True, long=True) or []
-    try:
-        cmds.lockNode(LEGACY_HELPERS_GROUP, lock=False)
-    except Exception:
-        pass
-    cmds.delete(LEGACY_HELPERS_GROUP)
-
-    valid_selection = [node for node in original_selection if cmds.objExists(node)]
-    if valid_selection:
-        cmds.select(valid_selection, replace=True)
-    else:
-        cmds.select(clear=True)
 
 
 def _plugin_cursor_paths():
@@ -165,7 +146,6 @@ class _ColorCursorFilter(QtCore.QObject):
 
 def _ensure_micro_contexts():
     """Load the native plug-in and recreate its MPx contexts."""
-    _remove_legacy_helpers()
     plugins.ensure_contexts(
         PLUGIN_SPEC,
         (

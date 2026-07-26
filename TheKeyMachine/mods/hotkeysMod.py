@@ -195,69 +195,7 @@ def _load_hotkeys_from_maya():
     if stale_assignments:
         _clear_stale_hotkey_assignments(stale_assignments)
 
-    _migrate_literal_symbol_assignments(mapping)
     return _copy_hotkey_mapping(mapping)
-
-
-def _migrate_literal_symbol_assignments(mapping):
-    """Move TKM's old Shift+number bindings to Maya's literal ASCII keys."""
-    migrated = False
-    for command_name, shortcut in _iter_mapping_combos(mapping):
-        combo = _normalize_combo(shortcut)
-        symbol = str(combo.get("key") or "")
-        base_key = SHIFTED_SYMBOL_BASE_KEYS.get(symbol)
-        if not base_key:
-            continue
-
-        expected_name = _name_command_name(command_name)
-        common = {
-            "alt": bool(combo.get("alt")),
-            "ctl": bool(combo.get("ctrl")),
-        }
-        try:
-            legacy_name = _first_assignment_result(
-                cmds.hotkey(
-                    keyShortcut=base_key,
-                    sht=True,
-                    query=True,
-                    name=True,
-                    **common
-                )
-            )
-            literal_name = _first_assignment_result(
-                cmds.hotkey(
-                    keyShortcut=symbol,
-                    sht=False,
-                    query=True,
-                    name=True,
-                    **common
-                )
-            )
-        except Exception:
-            continue
-        if legacy_name != expected_name or literal_name not in (None, expected_name):
-            continue
-
-        try:
-            cmds.hotkey(
-                keyShortcut=base_key,
-                sht=True,
-                name="",
-                releaseName="",
-                **common
-            )
-            cmds.hotkey(
-                keyShortcut=symbol,
-                sht=False,
-                name=expected_name,
-                **common
-            )
-            migrated = True
-        except Exception:
-            continue
-
-    if migrated:
-        _save_hotkeys_to_maya()
 
 
 def shortcut_for_command(command_name):
@@ -455,7 +393,7 @@ def _maya_shift_required(combo):
 
 
 def _maya_hotkey_candidates(combo):
-    """Return Maya's literal ASCII binding and its legacy physical form."""
+    """Return Maya's literal ASCII binding and its shift-invariant physical form."""
     combo = _normalize_combo(combo)
     if not combo:
         return []
@@ -516,7 +454,7 @@ def _query_hotkey_assignment(combo):
     """Find the Maya command bound to ``combo``, preferring a press binding.
 
     Checks ``name`` (press) across every key candidate -- the literal key,
-    then its legacy shifted form -- before ever looking at ``releaseName``.
+    then its shift-invariant physical form -- before ever looking at ``releaseName``.
     A release-only binding only fires at key-up, in whatever tool/drag
     context happened to trigger it; it isn't what actually conflicts with a
     user pressing this key, so it shouldn't preempt a real press binding

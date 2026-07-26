@@ -13,11 +13,11 @@ Usage::
     from TheKeyMachine.core.scene_nodes import TkmSceneNode
 
     root = TkmSceneNode.root()                       # ensures "TheKeyMachine" exists
-    bookmarks = root.child("isolate_bookmarks", lock_transform=True)
+    bookmarks = root.child("Isolate_Bookmarks", lock_transform=True, icon=icons.isolate_bookmarks)
     bookmark = bookmarks.child("run_isolate_bookmark")
 
-    tracer = root.child("TKM_Tracer")
-    offset = tracer.child("tracer_offset")
+    tracer = root.child("Tracer", icon=icons.tracer)
+    offset = tracer.child("Tracer_Offset")
 
     scene_id = root.get_attr("tkmAnimationRecoverySceneId")
     if scene_id is None:
@@ -112,15 +112,25 @@ class TkmSceneNode:
         """Return True without creating the root node (use before optional cleanup)."""
         return cmds.objExists(ROOT_NAME)
 
-    def child(self, name, *, node_type="transform", lock_transform=False):
+    def child(self, name, *, node_type="transform", lock_transform=False, icon=None):
         """Return the child node *name* under this node, creating/re-homing it as needed.
 
         Safe to call repeatedly: an existing node is reused, and if it was ever
         moved elsewhere in the scene it is re-parented back under this node.
+
+        Pass *icon* (a path from ``TheKeyMachine.data.icons``) to give the node
+        its owning tool's icon in the outliner, the same way ``root()`` stamps
+        the TKM icon on the root node. Only ``dagContainer`` nodes support a
+        custom outliner icon, so supplying *icon* creates the node as one
+        regardless of *node_type*.
         """
         if not cmds.objExists(name):
             with _preserve_selection():
-                node = cmds.createNode(node_type, name=name)
+                if icon:
+                    node = cmds.container(type="dagContainer", name=name)
+                    cmds.setAttr(node + ".iconName", icon, type="string")
+                else:
+                    node = cmds.createNode(node_type, name=name)
                 if lock_transform:
                     TkmSceneNode(node).lock_transform()
         else:

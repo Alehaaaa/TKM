@@ -232,6 +232,11 @@ def show_hotkeys(*_args):
     return hotkeysMod.show_hotkeys_window()
 
 
+def show_workspaces(*_args):
+    from TheKeyMachine.tools.workspaces import api as workspacesApi
+    return workspacesApi.show_workspaces_window()
+
+
 def show_version_history(*_args):
     from TheKeyMachine.tools.tkm_menu import widgets
     return widgets.show_version_history_dialog()

@@ -138,6 +138,52 @@ TOOLBAR_SECTION_IDS = {
 }
 
 
+def get_ordered_section_ids(toolbar_id):
+    """Return *toolbar_id*'s section ids, honoring a user-saved drag-and-drop reorder.
+
+    The Workspaces editor lets users drag sections into a new order and persists
+    that order under the "workspaces" settings namespace. Everything that used
+    to read ``TOOLBAR_SECTION_IDS`` directly should go through this instead so a
+    saved reorder survives a toolbar reload / Maya restart.
+
+    Sections built with ``"hiddeable": False`` (the fixed "TKM Menu" section)
+    are never offered up for reordering and always keep their original index;
+    only the remaining, editable sections are permuted among each other.
+    """
+    base = TOOLBAR_SECTION_IDS.get(toolbar_id, ())
+    try:
+        from TheKeyMachine.mods import settingsMod as settings
+
+        custom_order = settings.get_setting(
+            "section_order_{}".format(toolbar_id), None, namespace="workspaces"
+        )
+    except Exception:
+        custom_order = None
+
+    if not custom_order:
+        return base
+
+    definitions = _section_definitions()
+    fixed_by_index = {}
+    movable = []
+    for index, section_id in enumerate(base):
+        section_def = definitions.get(section_id) or {}
+        if section_def.get("hiddeable", True) is False:
+            fixed_by_index[index] = section_id
+        else:
+            movable.append(section_id)
+
+    movable_set = set(movable)
+    ordered_movable = [section_id for section_id in custom_order if section_id in movable_set]
+    ordered_movable.extend(section_id for section_id in movable if section_id not in ordered_movable)
+
+    result = []
+    movable_iter = iter(ordered_movable)
+    for index in range(len(base)):
+        result.append(fixed_by_index[index] if index in fixed_by_index else next(movable_iter))
+    return tuple(result)
+
+
 def is_pinned_by_default(toolbar_id, tool_id):
     from TheKeyMachine.core import toolWorkspaces
     active_ws = toolWorkspaces.get_active_workspace()
@@ -500,13 +546,38 @@ def get_tool_tint_color(tool_id, default=None):
     return default
 
 
+def group_sections_by_color(sections):
+    """Group *sections* (dicts with a ``"color"`` key) into runs of consecutive matching colors.
+
+    Returns a list of lists, each holding the original section dicts for one
+    contiguous same-color run, in their original order. Two sections of the
+    same color that are not adjacent produce two separate runs.
+
+    Used by the Workspaces editor to present -- and reorder -- whole color
+    runs as one unit instead of individual sections. The toolbar's own
+    inter-section spacing does *not* use this: it compares each *visible*
+    section's live color directly at layout time (see
+    ``customWidgets.QFlowLayout``), since a hidden (unpinned) section can drop
+    out of a run and change which sections actually end up adjacent.
+    """
+    groups = []
+    previous_color = object()
+    for section in sections:
+        color = section.get("color")
+        if not groups or color != previous_color:
+            groups.append([])
+        groups[-1].append(section)
+        previous_color = color
+    return groups
+
+
 def get_toolbar_sections(layout_id, resolve_items=True):
     if not layout_id:
         return []
     definitions = _section_definitions()
     section_ids = [
         section_id
-        for section_id in TOOLBAR_SECTION_IDS.get(layout_id, ())
+        for section_id in get_ordered_section_ids(layout_id)
         for definition in (definitions.get(section_id),)
         if definition is not None
         if not definition.get("hotkeys")

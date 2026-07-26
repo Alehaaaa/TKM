@@ -1,4 +1,13 @@
+import re
+
 from TheKeyMachine.mods import settingsMod
+
+# Namespace + keys used by the Workspaces editor (tools/workspaces) for data
+# that does not belong in the default preferences file: user-created
+# workspaces and display-name overrides for any workspace (built-in or not).
+WORKSPACES_NAMESPACE = "workspaces"
+CUSTOM_WORKSPACES_SETTING = "custom_workspaces"
+NAME_OVERRIDES_SETTING = "workspace_name_overrides"
 
 WORKSPACES = [
     {"id": "standard",     "name": "Standard"},
@@ -109,21 +118,145 @@ def mark_workspace_modified(modified: bool = True):
     settingsMod.set_setting(MODIFIED_SETTING, modified)
 
 
+def get_custom_workspaces() -> list:
+    return settingsMod.get_setting(CUSTOM_WORKSPACES_SETTING, [], namespace=WORKSPACES_NAMESPACE) or []
+
+
+def _set_custom_workspaces(entries) -> None:
+    settingsMod.set_setting(CUSTOM_WORKSPACES_SETTING, entries, namespace=WORKSPACES_NAMESPACE)
+
+
+def set_custom_workspaces(entries) -> None:
+    """Replace the full list of custom workspaces (used by import/export)."""
+    _set_custom_workspaces(list(entries or []))
+
+
+def set_name_overrides(overrides: dict) -> None:
+    """Replace the full set of workspace display-name overrides (import/export)."""
+    settingsMod.set_setting(NAME_OVERRIDES_SETTING, dict(overrides or {}), namespace=WORKSPACES_NAMESPACE)
+
+
+def get_name_overrides() -> dict:
+    return settingsMod.get_setting(NAME_OVERRIDES_SETTING, {}, namespace=WORKSPACES_NAMESPACE) or {}
+
+
+def is_custom_workspace(ws_id: str) -> bool:
+    return any(entry.get("id") == ws_id for entry in get_custom_workspaces())
+
+
+def list_workspaces() -> list:
+    """Every workspace selectable in the Workspaces editor: built-ins, then user-created ones."""
+    overrides = get_name_overrides()
+    entries = [
+        {"id": ws["id"], "name": overrides.get(ws["id"], ws["name"]), "builtin": True}
+        for ws in WORKSPACES
+    ]
+    for custom in get_custom_workspaces():
+        entries.append({
+            "id": custom["id"],
+            "name": overrides.get(custom["id"], custom.get("name", "Workspace")),
+            "builtin": False,
+        })
+    return entries
+
+
+def _all_workspace_ids() -> set:
+    return {ws["id"] for ws in WORKSPACES} | {entry.get("id") for entry in get_custom_workspaces()}
+
+
+def _slugify_workspace_name(name: str) -> str:
+    existing_ids = _all_workspace_ids()
+    base = re.sub(r"[^a-z0-9]+", "_", (name or "workspace").strip().lower()).strip("_") or "workspace"
+    candidate = base
+    counter = 2
+    while candidate in existing_ids:
+        candidate = "{}_{}".format(base, counter)
+        counter += 1
+    return candidate
+
+
+def create_workspace(name: str, snapshot: dict) -> str:
+    """Create a new custom workspace from a per-toolbar snapshot.
+
+    ``snapshot`` looks like::
+
+        {"main":  {"alignment": "Center", "pins": [...tool ids...],
+                   "docking": ["TimeSlider", "top"], "section_order": [...ids...]},
+         "graph": {"alignment": "Center", "pins": [...tool ids...],
+                   "docking": "bottom_graph_editor", "section_order": [...ids...]}}
+    """
+    entries = get_custom_workspaces()
+    ws_id = _slugify_workspace_name(name)
+    entries.append({"id": ws_id, "name": (name or "Workspace").strip() or "Workspace", "snapshot": snapshot or {}})
+    _set_custom_workspaces(entries)
+    return ws_id
+
+
+def get_custom_workspace_snapshot(ws_id: str):
+    for entry in get_custom_workspaces():
+        if entry.get("id") == ws_id:
+            return entry.get("snapshot") or {}
+    return None
+
+
+def rename_workspace(ws_id: str, new_name: str) -> bool:
+    new_name = (new_name or "").strip()
+    if not new_name or not ws_id:
+        return False
+
+    if any(ws["id"] == ws_id for ws in WORKSPACES):
+        overrides = get_name_overrides()
+        overrides[ws_id] = new_name
+        settingsMod.set_setting(NAME_OVERRIDES_SETTING, overrides, namespace=WORKSPACES_NAMESPACE)
+        return True
+
+    entries = get_custom_workspaces()
+    for entry in entries:
+        if entry.get("id") == ws_id:
+            entry["name"] = new_name
+            _set_custom_workspaces(entries)
+            return True
+    return False
+
+
+def delete_workspace(ws_id: str) -> bool:
+    """Remove a custom workspace. Built-in workspaces can't be deleted."""
+    if not ws_id or not is_custom_workspace(ws_id):
+        return False
+
+    entries = [entry for entry in get_custom_workspaces() if entry.get("id") != ws_id]
+    _set_custom_workspaces(entries)
+
+    overrides = get_name_overrides()
+    if ws_id in overrides:
+        overrides.pop(ws_id, None)
+        settingsMod.set_setting(NAME_OVERRIDES_SETTING, overrides, namespace=WORKSPACES_NAMESPACE)
+
+    if get_active_workspace() == ws_id:
+        set_active_workspace("standard")
+    return True
+
+
+def get_workspace_defaults(ws_id: str):
+    """Built-in pin/alignment defaults for *ws_id*, or ``None`` if unknown."""
+    return WORKSPACE_DEFAULTS.get(ws_id)
+
+
 def get_active_workspace_name() -> str:
     ws_id = get_active_workspace()
-    for ws in WORKSPACES:
-        if ws["id"] == ws_id:
-            return ws["name"]
+    for entry in list_workspaces():
+        if entry["id"] == ws_id:
+            return entry["name"]
     return "Standard"
 
 
 def get_workspace_label(ws_id: str) -> str:
     name = "Standard"
-    for ws in WORKSPACES:
-        if ws["id"] == ws_id:
-            name = ws["name"]
+    for entry in list_workspaces():
+        if entry["id"] == ws_id:
+            name = entry["name"]
             break
-    
+
     if ws_id == get_active_workspace() and is_workspace_modified():
         return f"{name} *"
     return name

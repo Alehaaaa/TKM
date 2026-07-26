@@ -1475,6 +1475,7 @@ class QFlowLayout(QtWidgets.QLayout):
     def __init__(self, parent=None, margin=0, Hspacing=-1, Vspacing=-1, alignment=None, **kwargs):
         super().__init__(parent)
         self._item_list = []
+        self._single_line = False
 
         # Handle 'Wspacing'
         self._Hspacing = kwargs.get("Wspacing", Hspacing)
@@ -1487,6 +1488,16 @@ class QFlowLayout(QtWidgets.QLayout):
 
         if alignment is not None:
             self.setAlignment(alignment)
+
+    def setSingleLine(self, enabled):
+        """When enabled, sections are never wrapped onto a new row."""
+        enabled = bool(enabled)
+        if self._single_line != enabled:
+            self._single_line = enabled
+            self.invalidate()
+
+    def singleLine(self):
+        return self._single_line
 
     def __del__(self):
         item = self.takeAt(0)
@@ -1540,6 +1551,31 @@ class QFlowLayout(QtWidgets.QLayout):
     def _vertical_spacing(self):
         return self._Vspacing if self._Vspacing != -1 else self.DEFAULT_SPACING
 
+    # Toolbar sections are visually clustered by color: two consecutive
+    # *visible* sections sharing a color sit close together (a third of the
+    # normal gap), while a color change gets the full gap. This is decided
+    # live, straight off each section's own ``get_tint_color()``, rather than
+    # a flag computed once from the static section order -- a run's members
+    # can be hidden/shown independently (pinning), so which sections actually
+    # end up adjacent on screen can only be known at layout time.
+    COLOR_GROUP_SPACING_FACTOR = 1.0 / 3.0
+
+    def _item_color(self, item):
+        widget = item.widget() if item is not None else None
+        get_color = getattr(widget, "get_tint_color", None)
+        color = get_color() if callable(get_color) else None
+        if color:
+            return color
+        from TheKeyMachine.data.colors import COLORS
+
+        return COLORS.toolbar.gray.hex
+
+    def _gap_between(self, previous_color, item):
+        spacing = self._horizontal_spacing()
+        if previous_color is not None and self._item_color(item) == previous_color:
+            return spacing * self.COLOR_GROUP_SPACING_FACTOR
+        return spacing
+
     def expandingDirections(self):
         return QtCore.Qt.Orientations(0)
 
@@ -1569,18 +1605,17 @@ class QFlowLayout(QtWidgets.QLayout):
         margins = self.contentsMargins()
         width = margins.left() + margins.right()
         height = margins.top() + margins.bottom()
-        visible_count = 0
-        spacing_x = self._horizontal_spacing()
+        previous_color = None
 
         for item in self._visible_items():
             item_size = item.sizeHint()
-            if visible_count:
-                width += spacing_x
+            if previous_color is not None:
+                width += self._gap_between(previous_color, item)
             width += item_size.width()
             height = max(height, item_size.height() + margins.top() + margins.bottom())
-            visible_count += 1
+            previous_color = self._item_color(item)
 
-        return QtCore.QSize(width, height)
+        return QtCore.QSize(int(round(width)), int(round(height)))
 
     def doLayout(self, rect, test_only):
         margins = self.contentsMargins()
@@ -1592,8 +1627,8 @@ class QFlowLayout(QtWidgets.QLayout):
         lines = []
         current_line = []
         current_line_width = 0
+        previous_color = None
 
-        space_x = self._horizontal_spacing()
         space_y = self._vertical_spacing()
 
         for item in self._item_list:
@@ -1603,22 +1638,30 @@ class QFlowLayout(QtWidgets.QLayout):
                 continue
 
             item_size = item.sizeHint()
-            next_x = x + item_size.width() + space_x
+            # The gap leads the item (rather than trailing the previous one)
+            # so it can vary per item: a color change from the previous
+            # *visible* item gets the full gap, a same-color continuation
+            # gets the tight one. The first item of any line never gets a
+            # leading gap.
+            leading_gap = self._gap_between(previous_color, item) if current_line else 0
+            next_x = x + leading_gap + item_size.width()
 
             # Check for wrap
-            if next_x - space_x > effective_rect.right() and line_height > 0:
+            if not self._single_line and current_line and next_x > effective_rect.right() and line_height > 0:
                 lines.append((current_line, current_line_width, line_height))
                 x = effective_rect.x()
                 y = y + line_height + space_y
-                next_x = x + item_size.width() + space_x
+                leading_gap = 0
+                next_x = x + leading_gap + item_size.width()
                 line_height = 0
                 current_line = []
                 current_line_width = 0
 
             current_line.append(item)
             x = next_x
-            current_line_width = x - effective_rect.x() - space_x
+            current_line_width = x - effective_rect.x()
             line_height = max(line_height, item_size.height())
+            previous_color = self._item_color(item)
 
         if current_line:
             lines.append((current_line, current_line_width, line_height))
@@ -1639,11 +1682,15 @@ class QFlowLayout(QtWidgets.QLayout):
                 else:  # Default is AlignLeft
                     current_x = effective_rect.x()
 
-                for item in line_items:
+                line_previous_color = None
+                for index, item in enumerate(line_items):
                     item_size = item.sizeHint()
+                    if index:
+                        current_x += self._gap_between(line_previous_color, item)
                     dy = (lh - item_size.height()) / 2
                     item.setGeometry(QtCore.QRect(QtCore.QPoint(int(current_x), int(current_y + dy)), item_size))
-                    current_x += item_size.width() + space_x
+                    current_x += item_size.width()
+                    line_previous_color = self._item_color(item)
 
                 current_y += lh + space_y
 
@@ -1878,6 +1925,53 @@ class QFlatToolbar(QFlowContainer):
         self.layout().addWidget(sec)
         return sec
 
+    def set_single_line(self, enabled):
+        """Force every section onto one row instead of wrapping (see the Workspaces editor)."""
+        layout = self.layout()
+        if isinstance(layout, QFlowLayout):
+            layout.setSingleLine(enabled)
+            layout.invalidate()
+            self.updateGeometry()
+            self.update()
+
+    def is_single_line(self):
+        layout = self.layout()
+        return bool(isinstance(layout, QFlowLayout) and layout.singleLine())
+
+    def reorder_sections(self, old_section_ids, new_section_ids):
+        """Re-insert already-built sections to match a new id order.
+
+        ``old_section_ids`` must list the currently tracked sections' ids in
+        their current (built) order, matched positionally against
+        ``self._tkm_sections``. ``new_section_ids`` is the same set of ids in
+        the desired order. Used by the Workspaces editor so a drag-and-drop
+        reorder is reflected immediately in an already-open toolbar, without
+        needing a full reload.
+        """
+        current = list(self._tkm_sections)
+        if len(old_section_ids) != len(current) or len(new_section_ids) != len(current):
+            return False
+
+        id_to_widget = dict(zip(old_section_ids, current))
+        reordered = []
+        for section_id in new_section_ids:
+            widget = id_to_widget.get(section_id)
+            if widget is None or not QtCompat.isValid(widget):
+                return False
+            reordered.append(widget)
+
+        layout = self.layout()
+        for widget in reordered:
+            layout.removeWidget(widget)
+        for widget in reordered:
+            layout.addWidget(widget)
+
+        self._tkm_sections = reordered
+        layout.invalidate()
+        self.updateGeometry()
+        self.update()
+        return True
+
     def set_alignment(self, alignment):
         layout = self.layout()
         if layout:
@@ -1923,17 +2017,23 @@ class InlineRenameLineEdit(QtWidgets.QLineEdit):
 
 
 class InlineRenameButton(QtWidgets.QPushButton):
-    def __init__(self, text="", parent=None, line_edit_class=None):
+    def __init__(self, text="", parent=None, line_edit_class=None, rename_alignment=None, rename_margins=None):
         super().__init__(text, parent)
         self._renaming_active = False
         self._original_text = text
         self._rename_hidden_text_stylesheet = None
         self._rename_payload = None
         self._rename_commit_callback = None
+        # Inset (left, top, right, bottom) the editor gets positioned within,
+        # relative to the button's own rect. Callers whose button text isn't
+        # centered (e.g. a left-aligned row label) can pass a matching
+        # alignment/margins pair so the editor lands exactly where the text
+        # it's replacing sits, instead of the centered default.
+        self._rename_margins = rename_margins or (DPI(6), DPI(5), DPI(6), DPI(5))
         editor_class = line_edit_class or InlineRenameLineEdit
         self.inline_rename_field = editor_class(self)
         self.inline_rename_field.setFrame(False)
-        self.inline_rename_field.setAlignment(QtCore.Qt.AlignCenter)
+        self.inline_rename_field.setAlignment(rename_alignment or QtCore.Qt.AlignCenter)
         self.inline_rename_field.hide()
         self.inline_rename_field.returnPressed.connect(self._finish_inline_rename)
         self.inline_rename_field.editingFinished.connect(self._finish_inline_rename)
@@ -1951,6 +2051,17 @@ class InlineRenameButton(QtWidgets.QPushButton):
             return
         super().mouseDoubleClickEvent(event)
 
+    def is_renaming(self):
+        return self._renaming_active
+
+    def commit_inline_rename(self):
+        """Finish an active rename, applying whatever text is currently in
+        the editor. A no-op if no rename is in progress -- safe to call
+        unconditionally whenever focus/selection is about to move elsewhere
+        for a reason that won't otherwise trigger the editor's own
+        focus-out (e.g. clicking a non-focusable row in another column)."""
+        self._finish_inline_rename()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._renaming_active:
@@ -1960,10 +2071,23 @@ class InlineRenameButton(QtWidgets.QPushButton):
         if not self._rename_commit_callback or self._rename_payload is None:
             return
         self._renaming_active = True
-        self._position_inline_rename()
         self._sync_inline_rename_style()
         self.inline_rename_field.setText(self._original_text)
         self._apply_hidden_text_style(True)
+        # Deferred by one tick: a button that was just inserted into a view
+        # (e.g. a brand-new row added via setItemWidget, immediately renamed)
+        # is not necessarily resized to its final, stretched width yet --
+        # that happens on the view's own next layout pass, not synchronously
+        # on insertion. Positioning off self.rect() before that pass leaves
+        # the editor sized to a transient, too-small geometry, cutting off
+        # the very text it's meant to replace. Waiting one tick guarantees
+        # the real, final size is what gets used.
+        QtCore.QTimer.singleShot(0, self._show_inline_rename)
+
+    def _show_inline_rename(self):
+        if not self._renaming_active:
+            return
+        self._position_inline_rename()
         self.inline_rename_field.show()
         self.inline_rename_field.raise_()
         self.inline_rename_field.setFocus(QtCore.Qt.ActiveWindowFocusReason)
@@ -1971,7 +2095,8 @@ class InlineRenameButton(QtWidgets.QPushButton):
         self.update()
 
     def _position_inline_rename(self):
-        rect = self.rect().adjusted(DPI(6), DPI(5), -DPI(6), -DPI(5))
+        left, top, right, bottom = self._rename_margins
+        rect = self.rect().adjusted(left, top, -right, -bottom)
         self.inline_rename_field.setGeometry(rect)
 
     def _finish_inline_rename(self):
@@ -1981,7 +2106,12 @@ class InlineRenameButton(QtWidgets.QPushButton):
         new_name = self.inline_rename_field.text().strip()
         self.inline_rename_field.hide()
         self._apply_hidden_text_style(False)
-        self.update()
+        # Force an immediate, synchronous redraw rather than scheduling one:
+        # hiding the editor and restoring the button's own text happen back
+        # to back here, and letting Qt coalesce them into a deferred repaint
+        # (the default for update()) can leave the editor's last frame
+        # visible for a beat alongside the button's real text underneath it.
+        self.repaint()
         if new_name and new_name != self._original_text and self._rename_commit_callback and self._rename_payload is not None:
             self._rename_commit_callback(self._rename_payload, new_name)
 
@@ -2040,6 +2170,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self.layout().setSpacing(spacing)
         self._hiddeable = hiddeable
         self._settings_namespace = settings_namespace
+        # Read live by QFlatToolbar's QFlowLayout (see get_tint_color) to
+        # decide the gap that precedes this section: sections whose color
+        # matches the previously *visible* section get a tight, same-run
+        # gap; a color change gets the full inter-group gap.
         self._tint_color = color
 
         self._widgets = {}  # slot_key -> widget mapping

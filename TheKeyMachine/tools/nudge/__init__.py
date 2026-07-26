@@ -11,7 +11,7 @@ class NudgeToolObject(ToolObject):
     ORDER = 100
     TOOLS = {
         "nudge_value": {
-            "type": "widget", "label": "Nudge Value", "tooltip": TOOLTIPS["value"],
+            "type": "widget", "label": "Nudge Value", "text": "NV", "tooltip": TOOLTIPS["value"],
             "widget_factory": widgets.create_nudge_value_widget,
         },
         "nudge_left": {

@@ -3,17 +3,18 @@ from maya import cmds
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.widgets.util as wutil
 from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.data import icons
 
 
 def create_tracer(*_args):
     selected_objects = selectionMod.get_selected_objects()
     if len(selected_objects) != 1:
         return wutil.make_inViewMessage("Select only one object")
-    if cmds.objExists("TKM_Tracer"):
-        cmds.delete("TKM_Tracer")
+    if cmds.objExists("Tracer"):
+        cmds.delete("Tracer")
 
-    tracer_node = TkmSceneNode.root().child("TKM_Tracer")
-    tracer_node.child("tracer_offset")
+    tracer_node = TkmSceneNode.root().child("Tracer", icon=icons.tracer)
+    tracer_node.child("Tracer_Offset")
     cmds.select(selected_objects)
     if cmds.objExists("tracerHandle"):
         cmds.delete("tracerHandle")
@@ -24,18 +25,18 @@ def create_tracer(*_args):
     cmds.setAttr("tracerHandleShape.trailDrawMode", 1)
     set_tracer_red_color()
     cmds.disconnectAttr("tracer.points", "tracerHandleShape.points")
-    cmds.parent("tracerHandle", "tracer_offset")
+    cmds.parent("tracerHandle", "Tracer_Offset")
     cmds.select(selected_objects)
 
 
 def select_tracer_offset_node(*_args):
-    if cmds.objExists("tracer_offset"):
-        cmds.select("tracer_offset", replace=True)
+    if cmds.objExists("Tracer_Offset"):
+        cmds.select("Tracer_Offset", replace=True)
 
 
 def remove_tracer(*_args):
-    if cmds.objExists("TKM_Tracer"):
-        cmds.delete("TKM_Tracer")
+    if cmds.objExists("Tracer"):
+        cmds.delete("Tracer")
 
 
 def is_connected():

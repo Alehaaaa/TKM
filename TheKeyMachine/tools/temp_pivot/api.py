@@ -11,12 +11,13 @@ except ImportError:
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.data import icons
 from TheKeyMachine.tools import clipboard
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.util as wutil
 
 
-TEMP_PIVOT_NODE = "tkm_temp_pivot"
+TEMP_PIVOT_NODE = "Temp_Pivot"
 RUNTIME_KEY = "temp_pivot"
 TIME_SLIDER_CONNECTION = "tkm_temp_pivot_time_slider_connection"
 DATA_OFFSETS_KEY = "offsets"
@@ -149,7 +150,7 @@ def _object_pivot_space_matrix(node):
 
 
 def _ensure_pivot_node():
-    return TkmSceneNode.root().child(TEMP_PIVOT_NODE).name
+    return TkmSceneNode.root().child(TEMP_PIVOT_NODE, icon=icons.temp_pivot).name
 
     return pivot
 

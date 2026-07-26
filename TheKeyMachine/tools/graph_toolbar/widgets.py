@@ -191,6 +191,9 @@ def applyCustomGraphAlignment(alignment_label=None):
         return False
 
     try:
+        if hasattr(layout, "setSingleLine"):
+            current_alignment = settings.get_setting("graph_toolbar_alignment", "Center")
+            layout.setSingleLine(current_alignment == "Single Line")
         layout.setAlignment(_graph_toolbar_alignment())
         layout.invalidate()
         toolbar_widget.updateGeometry()

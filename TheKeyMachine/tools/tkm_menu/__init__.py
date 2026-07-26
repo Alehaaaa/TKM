@@ -27,6 +27,7 @@ class TkmMenuToolObject(ToolObject):
                         ]},
                     ]},
                     "hotkeys_window",
+                    "workspaces_window",
                     {"type": "menu", "label": "Dock", "icon": "dock", "description": TOOLTIPS["dock"][0], "items": [
                         {"type": "section", "label": "Position"},
                         {"type": "choice", "get_value": api.get_dock_orientation, "set_value": api.set_dock_orientation, "items": api.dock_orientation_choices},
@@ -68,6 +69,7 @@ class TkmMenuToolObject(ToolObject):
         "main_system_menu": {"type": "menu", "label": "System", "icon": "system", "callback": partial(api.show_menu, "main_system_menu"), "tooltip": TOOLTIPS["system"]},
         "help_menu": {"type": "menu", "label": "Help", "icon": "help", "callback": partial(api.show_menu, "help_menu"), "tooltip": TOOLTIPS["help"]},
         "hotkeys_window": {"type": "tool", "label": "Hotkeys", "icon": "hotkeys", "callback": api.show_hotkeys, "tooltip": TOOLTIPS["hotkeys"]},
+        "workspaces_window": {"type": "tool", "label": "Workspaces", "icon": "align", "callback": api.show_workspaces, "tooltip": TOOLTIPS["workspaces"]},
         "version_history_window": {"type": "tool", "label": "Version History", "icon": "about", "callback": api.show_version_history, "tooltip": TOOLTIPS["history"]},
         "about_window": {"type": "tool", "label": "About", "icon": "about", "callback": api.show_about, "tooltip": TOOLTIPS["about"]},
         "donate_window": {"type": "tool", "label": "Donate", "icon": "donate", "callback": api.show_donate, "tooltip": TOOLTIPS["donate"]},

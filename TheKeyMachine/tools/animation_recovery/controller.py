@@ -23,6 +23,7 @@ from TheKeyMachine.core import six
 from TheKeyMachine.core import toolbox
 from TheKeyMachine.core.Qt import QtCore
 from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.data import icons
 from TheKeyMachine.mods import generalMod as general
 from TheKeyMachine.mods import settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
@@ -37,7 +38,7 @@ RUNTIME_ANIMATION_KEY = "animation_recovery:animation"
 RUNTIME_SCENE_KEY = "animation_recovery:scene"
 RUNTIME_TRANSFORM_KEY = "animation_recovery:transforms"
 RUNTIME_LAYER_KEY = "animation_recovery:layers"
-SCENE_NODE = "tkm_animation_recovery"
+SCENE_NODE = "Animation_Recovery"
 # Animation recovery owns this child node under the TKM root; tools must never
 # stamp their own attributes onto the root itself (TheKeyMachine only ever
 # parents other tools' nodes -- see TheKeyMachine.core.scene_nodes).
@@ -339,12 +340,6 @@ def _load_recovery(path):
             return json.load(stream)
     with io.open(path, "rb") as stream:
         compiled = stream.read()
-    if compiled[:1] == b"x":
-        # Compatibility with the short-lived initial compact format.
-        legacy = json.loads(zlib.decompress(compiled).decode("utf-8"))
-        if legacy and isinstance(legacy[0], int):
-            return _unpack_payload(legacy[1:], version=legacy[0], full_snapshot=True)
-        return _unpack_payload(legacy, full_snapshot=True)
     if len(compiled) < 3:
         raise ValueError("Invalid Animation Recovery file")
     version, reason_code = struct.unpack("BB", compiled[:2])
@@ -368,7 +363,7 @@ def _recovery_reason(path):
     try:
         with io.open(path, "rb") as stream:
             header = stream.read(2)
-        if header[:1] == b"x" or len(header) < 2:
+        if len(header) < 2:
             return "animation"
         _version, reason_code = struct.unpack("BB", header)
         return REASONS_BY_CODE.get(reason_code & ~FULL_SNAPSHOT_FLAG, "animation")
@@ -392,7 +387,7 @@ def _recovery_source_file(path):
             return details.get("source_file")
         with io.open(path, "rb") as stream:
             compiled = stream.read()
-        if compiled[:1] == b"x" or len(compiled) < 3:
+        if len(compiled) < 3:
             return None
         serialized = zlib.decompress(compiled[2:]).decode("utf-8")
         packed = json.loads(serialized)
@@ -780,7 +775,7 @@ def ensure_scene_id():
     """Create animation recovery's own TKM child node and persist its scene ID."""
     previous_selection = cmds.ls(selection=True, long=True) or []
     try:
-        node = TkmSceneNode.root().child(SCENE_NODE, lock_transform=True).name
+        node = TkmSceneNode.root().child(SCENE_NODE, lock_transform=True, icon=icons.animation_recovery).name
         plug = "{}.{}".format(node, SCENE_ID_ATTRIBUTE)
         if not cmds.objExists(plug):
             cmds.addAttr(
@@ -997,10 +992,6 @@ def newer_recovery_for_current_scene(scene_id=None):
         )
         saved_mtime = details.get("source_mtime")
         if same_path and saved_mtime is not None and scene_mtime >= float(saved_mtime):
-            return None
-        # Legacy scene-save points predate exact mtime storage. Their timestamp
-        # is naturally a fraction later than the file they describe.
-        if same_path and saved_mtime is None and checkpoint_time - scene_mtime < 2.0:
             return None
     return latest["path"]
 
@@ -1734,13 +1725,9 @@ def restore_recovery(path):
             current_curves = _curve_maps(scoped_curves)[0]
             _all_curves, by_name, by_uuid = _curve_maps()
             saved_uuids = set(item.get("uuid") for item in curves_data if item.get("uuid"))
-            saved_legacy_names = set(
-                item.get("name") for item in curves_data
-                if item.get("name") and not item.get("uuid")
-            )
             extra_curves = [
                 curve for curve in current_curves
-                if _node_uuid(curve) not in saved_uuids and curve not in saved_legacy_names
+                if _node_uuid(curve) not in saved_uuids
             ]
             key_total = sum(len(item.get("positions") or []) for item in curves_data)
             attribute_total = sum(len(item.get("attributes") or {}) for item in objects_data)

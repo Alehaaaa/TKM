@@ -13,6 +13,7 @@
   "system": ["Open reload, unload, and uninstall maintenance actions."],
   "help": ["Open documentation, support, community, and project information."],
   "hotkeys": ["Open the hotkey editor for assigning TheKeyMachine commands."],
+  "workspaces": ["Open the Workspaces editor to customize toolbar docking, alignment, section order, and pinned tools."],
   "history": ["Review release notes and changes for installed TheKeyMachine versions."],
   "about": ["Show the installed version, credits, license, and project information."],
   "donate": ["Open the project support page in your browser."],
