@@ -4,7 +4,7 @@
 
 # TheKeyMachine, animation toolbar
 
-![Version](https://img.shields.io/badge/version-0.1.32-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.33-blue.svg)
 
 Maintained by <b>Alehaaaa</b> at <a href="https://alehaaaa.github.io">alehaaaa.github.io</a>. Originally developed by <b>Rodrigo Torres</b> at <a href="https://www.rodritorres.com">rodritorres.com</a>.
 
