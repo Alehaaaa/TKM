@@ -9,7 +9,7 @@ curve units here; command-layer writes convert only at the last moment.
 import maya.cmds as cmds
 
 import TheKeyMachine.core.openMayaUtils as omutils
-from TheKeyMachine.tools.sliders import animlayers as slider_animlayers
+from TheKeyMachine.mods.sliders import animlayers as slider_animlayers
 
 
 def curve_fn_for_attr(attr_full):

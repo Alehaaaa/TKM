@@ -26,7 +26,6 @@ own right-click pinning menu can never drift apart.
 
 from TheKeyMachine.data.colors import COLORS
 import TheKeyMachine.core.toolbox as toolbox
-import TheKeyMachine.core.toolMenus as toolMenus
 import TheKeyMachine.core.toolWidgets as toolWidgets
 import TheKeyMachine.core.toolWorkspaces as toolWorkspaces
 import TheKeyMachine.mods.settingsMod as settings
@@ -225,6 +224,10 @@ def get_color_groups(toolbar_id):
     return groups
 
 
+def _color_groups_by_id(toolbar_id):
+    return {group["id"]: group for group in get_color_groups(toolbar_id)}
+
+
 def reorder_color_groups(toolbar_id, new_group_id_order):
     """Persist a drag-and-drop reorder of whole color groups.
 
@@ -233,7 +236,7 @@ def reorder_color_groups(toolbar_id, new_group_id_order):
     the persisted order is still a plain section-id sequence -- groups are
     purely a presentation concept, not a stored one.
     """
-    groups_by_id = {group["id"]: group for group in get_color_groups(toolbar_id)}
+    groups_by_id = _color_groups_by_id(toolbar_id)
     new_section_order = []
     for group_id in new_group_id_order:
         group = groups_by_id.get(group_id)
@@ -249,8 +252,7 @@ def watch_group_pins(toolbar_id, group_id, callback):
     the list of connected live section widgets (empty if the toolbar isn't
     open), to be passed to ``unwatch_group_pins`` later.
     """
-    groups_by_id = {group["id"]: group for group in get_color_groups(toolbar_id)}
-    group = groups_by_id.get(group_id)
+    group = _color_groups_by_id(toolbar_id).get(group_id)
     if not group:
         return []
     watched = []
@@ -339,7 +341,12 @@ def get_section_tools(toolbar_id, section_id):
     registered there regardless of whether it also has pin *menu* metadata),
     or from the active workspace's defaults when it isn't.
     """
-    section_def = toolbox.get_tool_section(section_id, resolve_items=False, toolbar_id=toolbar_id)
+    # One resolve, not two: ``resolve_items=True`` only ever touches the
+    # "items" key (empty for slider sections, since those declare "modes"
+    # instead) -- "type"/"slider_type"/"modes" pass through untouched either
+    # way, so there's no need for a separate resolve_items=False call just to
+    # branch on section type first.
+    section_def = toolbox.get_tool_section(section_id, resolve_items=True, toolbar_id=toolbar_id)
     if not section_def:
         return []
 
@@ -360,7 +367,6 @@ def get_section_tools(toolbar_id, section_id):
                 )
             )
     else:
-        resolved = toolbox.get_tool_section(section_id, resolve_items=True, toolbar_id=toolbar_id) or {}
         entries = [
             _tool_row(
                 item["id"],
@@ -369,7 +375,7 @@ def get_section_tools(toolbar_id, section_id):
                 item.get("text"),
                 item.get("description"),
             )
-            for item in _iter_leaf_tools(resolved.get("items", []))
+            for item in _iter_leaf_tools(section_def.get("items", []))
             if item.get("pinnable", True) is not False
         ]
 
@@ -422,27 +428,8 @@ def get_active_workspace():
     return toolWorkspaces.get_active_workspace()
 
 
-def _invalidate_toolbar_pinning_menus():
-    """Drop any cached toolbar right-click pinning menus.
-
-    That menu's footer lists every workspace (see
-    ``core.toolMenus._add_workspace_actions``); unlike the rest of the menu,
-    which is cached for a toolbar's whole lifetime because the tool/section
-    set never changes, the workspace list can change at any time from here.
-    Without this, a workspace created/renamed/deleted in this window
-    wouldn't show up correctly on an already-open toolbar's context menu
-    until the toolbar itself was rebuilt.
-    """
-    for toolbar_id in ("main", "graph"):
-        widget = get_toolbar_widget(toolbar_id)
-        if widget is not None:
-            toolMenus.invalidate_toolbar_pinning_menu(widget)
-
-
 def rename_workspace(ws_id, new_name):
-    result = toolWorkspaces.rename_workspace(ws_id, new_name)
-    _invalidate_toolbar_pinning_menus()
-    return result
+    return toolWorkspaces.rename_workspace(ws_id, new_name)
 
 
 def is_custom_workspace(ws_id):
@@ -450,9 +437,7 @@ def is_custom_workspace(ws_id):
 
 
 def delete_workspace(ws_id):
-    result = toolWorkspaces.delete_workspace(ws_id)
-    _invalidate_toolbar_pinning_menus()
-    return result
+    return toolWorkspaces.delete_workspace(ws_id)
 
 
 def export_workspaces_data():
@@ -482,7 +467,6 @@ def import_workspaces_data(data):
         merged_overrides.update(incoming_overrides)
         toolWorkspaces.set_name_overrides(merged_overrides)
 
-    _invalidate_toolbar_pinning_menus()
     return True
 
 
@@ -510,7 +494,6 @@ def create_workspace_from_current(name):
     snapshot = snapshot_current_configuration()
     ws_id = toolWorkspaces.create_workspace(name, snapshot)
     toolWorkspaces.set_active_workspace(ws_id)
-    _invalidate_toolbar_pinning_menus()
     return ws_id
 
 

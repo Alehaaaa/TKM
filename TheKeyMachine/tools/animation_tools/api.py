@@ -101,3 +101,7 @@ def delete_keyframes_before_current_time(*args):
 
 def delete_keyframes_after_current_time(*args):
     return controller.delete_keyframes_after_current_time(*args)
+
+
+def cleanup():
+    return controller.cleanup()

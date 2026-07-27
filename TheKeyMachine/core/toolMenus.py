@@ -486,24 +486,18 @@ def _refresh_toolbar_pinning_footer(menu, toolbar_widget):
                 action.blockSignals(blocked)
 
 
-def invalidate_toolbar_pinning_menu(toolbar_widget):
-    """Drop a toolbar's cached right-click pinning menu so it rebuilds fresh
-    next time it's opened, instead of reusing a stale action set.
+def _workspace_menu_fingerprint():
+    """A snapshot of "what the workspace footer should currently show".
 
-    The menu is normally cached because its tool/section actions never
-    change while a toolbar is alive (see ``show_toolbar_pinning_menu``) --
-    but its footer also lists every workspace, and unlike the rest of the
-    menu, that list can change at any time (creating/renaming/deleting a
-    custom workspace via the Workspaces editor), so it isn't safe to assume
-    that part stays fixed for the toolbar's lifetime.
+    Compared against what a cached pinning menu was built with, so
+    ``show_toolbar_pinning_menu`` can tell -- without any cooperation from
+    whatever created/renamed/deleted a workspace -- whether that footer is
+    now stale. Includes names (not just ids) so a rename invalidates it too,
+    not only an add/remove.
     """
-    if not wutil.is_valid_widget(toolbar_widget):
-        return
-    menu = getattr(toolbar_widget, "_tkm_pinning_menu", None)
-    if menu is not None:
-        if wutil.is_valid_widget(menu):
-            menu.deleteLater()
-        toolbar_widget._tkm_pinning_menu = None
+    from TheKeyMachine.core import toolWorkspaces
+
+    return tuple((ws["id"], ws["name"]) for ws in toolWorkspaces.list_workspaces())
 
 
 def show_toolbar_pinning_menu(toolbar_widget, global_pos):
@@ -514,6 +508,15 @@ def show_toolbar_pinning_menu(toolbar_widget, global_pos):
     Later right-clicks just refresh the state that *can* change between
     openings (pins, active workspace, alignment) instead of tearing down
     and rebuilding every submenu/action/icon from scratch.
+
+    The one part of it that isn't fixed for the toolbar's lifetime is its
+    workspace footer: workspaces can be created, renamed, or deleted at any
+    time from the Workspaces editor, and a plain label refresh can't add or
+    remove an action. Rather than relying on every place that mutates the
+    workspace list to remember to invalidate this cache, the cached menu is
+    fingerprinted at build time and compared against the live workspace list
+    on every open -- any difference (add, remove, or rename) drops the whole
+    cached menu and forces the fresh rebuild below.
     """
     if not wutil.is_valid_widget(toolbar_widget):
         return False
@@ -523,6 +526,14 @@ def show_toolbar_pinning_menu(toolbar_widget, global_pos):
 
     menu = getattr(toolbar_widget, "_tkm_pinning_menu", None)
     if menu is not None and not wutil.is_valid_widget(menu):
+        menu = None
+        toolbar_widget._tkm_pinning_menu = None
+
+    if (
+        menu is not None
+        and getattr(menu, "_tkm_workspace_fingerprint", None) != _workspace_menu_fingerprint()
+    ):
+        menu.deleteLater()
         menu = None
         toolbar_widget._tkm_pinning_menu = None
 
@@ -701,6 +712,7 @@ def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
     menu._tkm_alignment_setting_key = setting_key
 
     menu._tkm_workspace_group, menu._tkm_workspace_actions = _add_workspace_actions(menu, sections, apply_alignment_fn)
+    menu._tkm_workspace_fingerprint = _workspace_menu_fingerprint()
 
     menu.addSeparator()
 

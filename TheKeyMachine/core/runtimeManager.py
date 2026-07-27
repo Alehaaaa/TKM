@@ -477,8 +477,8 @@ class RuntimeManager(QtCore.QObject):
         except Exception:
             pass
         try:
-            from TheKeyMachine.tools.animation_tools import time_navigation
-            cleanups.append(time_navigation.cancel_pending_navigation)
+            from TheKeyMachine.tools.animation_tools import api as animationToolsApi
+            cleanups.append(animationToolsApi.cleanup)
         except Exception:
             pass
 

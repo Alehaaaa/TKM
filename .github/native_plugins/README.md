@@ -13,7 +13,7 @@ The C++ sources remain next to their Python APIs under `TheKeyMachine/tools/`.
 To make an explicit development build, configure this directory with CMake:
 
 ```shell
-cmake -S native_plugins -B build/native_plugins \
+cmake -S .github/native_plugins -B build/native_plugins \
   -DMAYA_VERSION=2025 \
   -DMAYA_DEVKIT_ROOT=/path/to/devkit \
   -DTKM_PLATFORM=linux \

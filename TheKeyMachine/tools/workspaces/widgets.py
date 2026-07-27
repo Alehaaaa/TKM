@@ -468,6 +468,7 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         self._current_workspace_id = None
         self._current_group_id = None
         self._current_group_key = None
+        self._current_groups_by_id = {}
         self._watched_group_sections = []
         self._workspace_rows = {}
         self._toolbar_rows = {}
@@ -786,6 +787,12 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         list_widget.clear()
         self._group_rows = {}
         groups = controller.get_color_groups(self._current_toolbar_id)
+        # Cached for the rest of this window's lifetime until the next
+        # refresh: _select_group/_refresh_tools_list/_on_groups_reordered all
+        # need to look a group up by id right after this same list was just
+        # computed, and re-querying the controller (which rescans every
+        # toolbar section) each time would just repeat this exact work.
+        self._current_groups_by_id = {group["id"]: group for group in groups}
         select_id = None
         for row_index, group in enumerate(groups):
             item = QtWidgets.QListWidgetItem(list_widget)
@@ -824,8 +831,7 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         # identity survives that even when the group id doesn't.
         dragged_item = list_widget.currentItem()
         dragged_group_id = dragged_item.data(QtCore.Qt.UserRole) if dragged_item is not None else None
-        groups_by_id = {group["id"]: group for group in controller.get_color_groups(self._current_toolbar_id)}
-        dragged_group = groups_by_id.get(dragged_group_id) or {}
+        dragged_group = self._current_groups_by_id.get(dragged_group_id) or {}
         dragged_section_ids = dragged_group.get("section_ids") or ()
         dragged_section_id = dragged_section_ids[0] if dragged_section_ids else None
 
@@ -877,8 +883,7 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         list_widget.clear()
 
         if self._current_group_id:
-            groups_by_id = {group["id"]: group for group in controller.get_color_groups(self._current_toolbar_id)}
-            group = groups_by_id.get(self._current_group_id) or {}
+            group = self._current_groups_by_id.get(self._current_group_id) or {}
             color = group.get("color") or "#5D5D5D"
             member_sections = group.get("sections") or []
             show_headers = len(member_sections) > 1

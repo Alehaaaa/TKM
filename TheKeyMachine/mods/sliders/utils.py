@@ -14,7 +14,7 @@ except ImportError:
     oma = None
 
 import TheKeyMachine.core.runtimeManager as runtime
-from TheKeyMachine.tools.sliders import animlayers as slider_animlayers
+from TheKeyMachine.mods.sliders import animlayers as slider_animlayers
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.widgets.timeline as timelineWidgets

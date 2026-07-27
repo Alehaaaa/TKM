@@ -11,7 +11,6 @@ from TheKeyMachine.core import openMayaUtils as open_maya
 from TheKeyMachine.mods import selectionMod
 from TheKeyMachine.mods import settingsMod as settings
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.tools.animation_tools import time_navigation
 from TheKeyMachine.widgets import util as wutil
 
 
@@ -29,6 +28,149 @@ _COMMAND_ERRORS = (
     KeyError,
     IndexError,
 )
+
+# ----------------------------
+# Undo-free, refireable time navigation batching
+# ----------------------------
+_nav_pending_actions = []
+_nav_flush_scheduled = False
+_nav_idle_callback_id = None
+_NAV_TIME_TOLERANCE = 0.000001
+
+
+def _nav_queue(kind, amount, context=()):
+    global _nav_flush_scheduled
+
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if not amount:
+        return False
+    context = context if kind == "curve_key" else ()
+    if kind == "curve_key" and not context:
+        return False
+
+    signature = (kind, context)
+    if _nav_pending_actions and _nav_pending_actions[-1][:2] == signature:
+        combined = _nav_pending_actions[-1][2] + amount
+        if combined:
+            _nav_pending_actions[-1] = (kind, context, combined)
+        else:
+            _nav_pending_actions.pop()
+    else:
+        _nav_pending_actions.append((kind, context, amount))
+
+    if not _nav_pending_actions or _nav_flush_scheduled:
+        return True
+    _nav_flush_scheduled = True
+    _nav_schedule_flush()
+    return True
+
+
+def _nav_request_frame_step(amount):
+    """Queue an unclamped frame step and combine rapid repeated requests."""
+    return _nav_queue("frame", amount)
+
+
+def _nav_request_curve_key_step(amount, curves, time_range=None):
+    """Queue a native step through selected animation curves."""
+    curves = tuple(dict.fromkeys(curves or []))
+    normalized_range = None
+    if time_range:
+        try:
+            normalized_range = tuple(sorted((
+                float(time_range[0]),
+                float(time_range[1]),
+            )))
+        except (IndexError, TypeError, ValueError):
+            normalized_range = None
+    if not curves and not normalized_range:
+        return False
+    return _nav_queue("curve_key", amount, (curves, normalized_range))
+
+
+def _nav_accumulate_pending_key_step(amount):
+    """Add to an already queued key step without querying curve data again."""
+    if not _nav_pending_actions or _nav_pending_actions[-1][0] != "curve_key":
+        return False
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if not amount:
+        return True
+
+    kind, times, pending_amount = _nav_pending_actions[-1]
+    combined = pending_amount + amount
+    if combined:
+        _nav_pending_actions[-1] = (kind, times, combined)
+    else:
+        _nav_pending_actions.pop()
+    return True
+
+
+def _nav_schedule_flush():
+    global _nav_idle_callback_id
+    _nav_idle_callback_id = open_maya.add_event_callback("idle", _nav_flush_from_idle)
+    if _nav_idle_callback_id is None:
+        _nav_flush_pending()
+
+
+def _nav_flush_from_idle(*_args):
+    global _nav_idle_callback_id
+    callback_id = _nav_idle_callback_id
+    _nav_idle_callback_id = None
+    open_maya.remove_callback(callback_id)
+    return _nav_flush_pending()
+
+
+def _nav_flush_pending(*_args):
+    """Apply the accumulated navigation batch with one Maya API time change."""
+    global _nav_flush_scheduled
+
+    actions = list(_nav_pending_actions)
+    _nav_pending_actions[:] = []
+    _nav_flush_scheduled = False
+    if not actions:
+        return False
+
+    current = open_maya.current_time()
+    if current is None:
+        return False
+    for kind, context, amount in actions:
+        if kind == "frame":
+            current += amount
+        elif kind == "curve_key":
+            curves, time_range = context
+            if curves:
+                destination = open_maya.step_anim_curve_key_time(
+                    curves,
+                    current,
+                    amount,
+                    time_range=time_range,
+                    tolerance=_NAV_TIME_TOLERANCE,
+                )
+            else:
+                destination = None
+            current = destination if destination is not None else current + amount
+            if time_range:
+                current = max(time_range[0], min(time_range[1], current))
+    return open_maya.set_current_time(current)
+
+
+def cancel_pending_navigation():
+    """Discard queued work when the TKM runtime is shutting down."""
+    global _nav_flush_scheduled, _nav_idle_callback_id
+    open_maya.remove_callback(_nav_idle_callback_id)
+    _nav_idle_callback_id = None
+    _nav_pending_actions[:] = []
+    _nav_flush_scheduled = False
+
+
+def cleanup():
+    """Release runtime resources held by this tool. Called on TKM shutdown."""
+    cancel_pending_navigation()
 
 
 def _unique(items):
@@ -485,10 +627,10 @@ def _navigation_key_context():
 
 
 def _go_to_key(amount):
-    if time_navigation.accumulate_pending_key_step(amount):
+    if _nav_accumulate_pending_key_step(amount):
         return True
     curves, selected_range = _navigation_key_context()
-    return time_navigation.request_curve_key_step(
+    return _nav_request_curve_key_step(
         amount,
         curves,
         time_range=selected_range,
@@ -504,11 +646,11 @@ def go_to_previous_key(*args):
 
 
 def go_to_next_frame(*args):
-    return time_navigation.request_frame_step(1)
+    return _nav_request_frame_step(1)
 
 
 def go_to_previous_frame(*args):
-    return time_navigation.request_frame_step(-1)
+    return _nav_request_frame_step(-1)
 
 
 def apply_smart_euler_filter(*args):

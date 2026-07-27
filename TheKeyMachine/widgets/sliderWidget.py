@@ -10,8 +10,8 @@ import TheKeyMachine.mods.reportMod as report
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
-from TheKeyMachine.tools.sliders import SliderMode
-from TheKeyMachine.tools.sliders import utils as slider_utils
+from TheKeyMachine.mods.sliders import SliderMode
+from TheKeyMachine.mods.sliders import utils as slider_utils
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.widgets.timeline as timelineWidgets
 from TheKeyMachine.data import icons

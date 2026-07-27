@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/build-plugins.yml"
-      - "native_plugins/**"
+      - ".github/native_plugins/**"
       - "TheKeyMachine/tools/depth_mover/**"
       - "TheKeyMachine/tools/micro_move/**"
       - "!TheKeyMachine/tools/depth_mover/__builds__/**"
@@ -15,7 +15,7 @@ on:
     tags: ["v*"]
     paths:
       - ".github/workflows/build-plugins.yml"
-      - "native_plugins/**"
+      - ".github/native_plugins/**"
       - "TheKeyMachine/tools/depth_mover/**"
       - "TheKeyMachine/tools/micro_move/**"
       - "!TheKeyMachine/tools/depth_mover/__builds__/**"
@@ -106,7 +106,7 @@ jobs:
           cache: true
       - name: Configure
         run: >-
-          cmake -S native_plugins -B build/native_plugins
+          cmake -S .github/native_plugins -B build/native_plugins
           ${{ matrix.cmake_arch }}
           -DMAYA_VERSION=${{ matrix.maya }}
           -DMAYA_DEVKIT_ROOT="${{ steps.devkit.outputs.devkit-path }}"
@@ -159,7 +159,7 @@ jobs:
             bash -lc '
               yum install -y mesa-libGLU-devel &&
               /opt/python/cp39-cp39/bin/python -m pip install --disable-pip-version-check cmake==3.27.9 &&
-              /opt/python/cp39-cp39/bin/cmake -S native_plugins -B build/native_plugins \
+              /opt/python/cp39-cp39/bin/cmake -S .github/native_plugins -B build/native_plugins \
                 -DMAYA_VERSION=${{ matrix.maya }} \
                 -DMAYA_DEVKIT_ROOT=/maya-devkit \
                 -DTKM_PLATFORM=linux \
@@ -190,7 +190,7 @@ jobs:
           path: builds-package
           merge-multiple: true
       - name: Validate complete binary matrix
-        run: python3 native_plugins/validate_matrix.py builds-package
+        run: python3 .github/native_plugins/validate_matrix.py builds-package
       - name: Replace release builds with generated matrix
         run: |
           rm -rf \
@@ -216,7 +216,7 @@ jobs:
           if errors:
               raise SystemExit("Invalid assembled release:\n- " + "\n- ".join(errors))
           PY
-          python3 native_plugins/validate_matrix.py .
+          python3 .github/native_plugins/validate_matrix.py .
       - name: Commit generated builds to main
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/plugin_build')
         run: |
