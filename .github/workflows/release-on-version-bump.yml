@@ -1,0 +1,67 @@
+name: Release on version bump
+
+# Deliberately lightweight: single ubuntu-latest job (cheapest runner, 1x minute
+# multiplier), no matrix, no setup-python/upload-artifact steps, and a tag prefix
+# ("TKM-") that never overlaps with the "v*" tags that trigger the heavier
+# build-plugins.yml native-plugin matrix.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "TheKeyMachine/version"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-on-version-bump-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Normalize version, stage, build, codename and README badge
+        id: sync
+        run: python3 scripts/release/sync_version_metadata.py >> "$GITHUB_OUTPUT"
+
+      - name: Commit normalized metadata
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore: sync version metadata to ${{ steps.sync.outputs.version }}"
+            git push
+          fi
+
+      - name: Render changelog entry as release notes
+        run: python3 scripts/release/render_release_notes.py "${{ steps.sync.outputs.version }}" > release_notes.md
+
+      - name: Build release zip
+        run: |
+          mkdir -p dist
+          zip -rq "dist/TKM-${{ steps.sync.outputs.version }}.zip" \
+            TheKeyMachine \
+            "TheKeyMachine_Drag&Drop_installer.py" \
+            README.md \
+            how_to_install.txt \
+            license_gpl-3.0.txt \
+            -x '*/__pycache__/*' '*.pyc' '*.pyo' \
+               'TheKeyMachine/tools/micro_move/_native/*'
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.sync.outputs.version }}
+        run: |
+          tag="TKM-${VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --title "TheKeyMachine ${VERSION}" --notes-file release_notes.md
+          else
+            gh release create "$tag" --title "TheKeyMachine ${VERSION}" --notes-file release_notes.md
+          fi
+          gh release upload "$tag" "dist/TKM-${VERSION}.zip" --clobber
