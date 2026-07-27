@@ -1024,6 +1024,34 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
             else:
                 self._modes.append(m)  # Likely a separator
 
+    def refreshModes(self, modes: list[dict | str]):
+        """Re-apply a (re-translated) mode list without disturbing which mode is active.
+
+        ``setCurrentMode()`` no-ops when the requested key already matches
+        the active mode, which is exactly the case on a language switch --
+        the *key* never changes, only its label/tooltip text. This replaces
+        ``self._modes`` (so the mode-switch menu picks up the new text too)
+        and then re-pushes the current/temporary mode's text directly,
+        bypassing that same-key guard.
+        """
+        current_key = self._current_mode.key if self._current_mode else None
+        temporary_key = self._temporary_mode.key if self._temporary_mode else None
+
+        self.setModes(modes)
+        self._current_mode = None
+        self._temporary_mode = None
+        for m in self._modes:
+            if not isinstance(m, SliderMode):
+                continue
+            if m.key == current_key:
+                self._current_mode = m
+            if m.key == temporary_key:
+                self._temporary_mode = m
+
+        active_mode = self.currentMode()
+        if active_mode is not None:
+            self._setCurrentMode(active_mode)
+
     def setCurrentMode(self, identifier: str, temporary: bool = False):
         """Updates the current mode and adjusts UI accordingly."""
         found = None
@@ -1282,9 +1310,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
             except RuntimeError:
                 pass
 
+        from TheKeyMachine.core import i18n
+
         menu = cw.MenuWidget(parent=self)
         menu.setTearOffEnabled(False)
-        menu.addSection("Slider Mode")
+        menu.addSection(i18n.tr("slider_mode_section", "Slider Mode"))
         group = QtGui.QActionGroup(menu)
         group.setExclusive(True)
         active = self.currentMode()

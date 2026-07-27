@@ -238,6 +238,18 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     if not force and not settings.get_setting("graph_toolbar_enabled", True):
         return removeCustomGraph()
 
+    # Idempotency guard: more than one startup/panel-open trigger can land
+    # here for the same already-open Graph Editor (the watch timer and the
+    # toolbar's own startup sync both race to call this). Reuse an existing,
+    # still-valid toolbar instead of tearing it down and rebuilding every
+    # section from scratch -- the same outcome ensureCustomGraph() already
+    # gets by checking first.
+    existing = getCustomGraphWidget()
+    if existing and wutil.is_valid_widget(existing):
+        _place_graph_toolbar_widget(existing)
+        applyCustomGraphAlignment()
+        return existing
+
     graph_vis = cmds.getPanel(vis=True)
     if "graphEditor1" not in graph_vis:
         if not force:

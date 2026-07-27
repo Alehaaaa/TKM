@@ -1,0 +1,405 @@
+{
+    "TKM": {
+        "en": {
+            "label": "TheKeyMachine",
+            "tooltip": [
+                "Open TheKeyMachine preferences, docking, maintenance, updates, and help."
+            ]
+        },
+        "es": {
+            "label": "TheKeyMachine",
+            "tooltip": [
+                "Abre las preferencias, el acoplamiento, el mantenimiento, las actualizaciones y la ayuda de TheKeyMachine."
+            ]
+        },
+        "fr": {
+            "label": "TheKeyMachine",
+            "tooltip": [
+                "Ouvre les préférences, l'ancrage, la maintenance, les mises à jour et l'aide de TheKeyMachine."
+            ]
+        }
+    },
+    "toolbar_toggle": {
+        "en": {
+            "label": "Toggle Toolbar",
+            "tooltip": [
+                "Show or hide the main TheKeyMachine toolbar."
+            ]
+        },
+        "es": {
+            "label": "Alternar Barra de Herramientas",
+            "tooltip": [
+                "Muestra u oculta la barra de herramientas principal de TheKeyMachine."
+            ]
+        },
+        "fr": {
+            "label": "Basculer la Barre d'Outils",
+            "tooltip": [
+                "Affiche ou masque la barre d'outils principale de TheKeyMachine."
+            ]
+        }
+    },
+    "toolbar_add_shelf_button": {
+        "en": {
+            "label": "Add Toggle Button To Shelf",
+            "tooltip": [
+                "Add a button to the current Maya shelf that toggles TheKeyMachine."
+            ]
+        },
+        "es": {
+            "label": "Añadir Botón al Shelf",
+            "tooltip": [
+                "Añade un botón al shelf actual de Maya que activa o desactiva TheKeyMachine."
+            ]
+        },
+        "fr": {
+            "label": "Ajouter un Bouton à l'Étagère",
+            "tooltip": [
+                "Ajoute un bouton à l'étagère Maya actuelle qui active ou désactive TheKeyMachine."
+            ]
+        }
+    },
+    "toolbar_reload": {
+        "en": {
+            "label": "Reload",
+            "tooltip": [
+                "Prompt to save the scene, then cleanly stop the current runtime, reload TheKeyMachine modules, and rebuild the toolbar."
+            ]
+        },
+        "es": {
+            "label": "Recargar",
+            "tooltip": [
+                "Pide guardar la escena, detiene la ejecución actual, recarga los módulos de TheKeyMachine y reconstruye la barra de herramientas."
+            ]
+        },
+        "fr": {
+            "label": "Recharger",
+            "tooltip": [
+                "Propose d'enregistrer la scène, arrête proprement l'exécution en cours, recharge les modules de TheKeyMachine et reconstruit la barre d'outils."
+            ]
+        }
+    },
+    "toolbar_unload": {
+        "en": {
+            "label": "Unload",
+            "tooltip": [
+                "Close TheKeyMachine and remove its callbacks, script jobs, temporary UI, and runtime state."
+            ]
+        },
+        "es": {
+            "label": "Descargar",
+            "tooltip": [
+                "Cierra TheKeyMachine y elimina sus callbacks, script jobs, interfaz temporal y estado de ejecución."
+            ]
+        },
+        "fr": {
+            "label": "Décharger",
+            "tooltip": [
+                "Ferme TheKeyMachine et supprime ses callbacks, script jobs, interface temporaire et état d'exécution."
+            ]
+        }
+    },
+    "toolbar_uninstall": {
+        "en": {
+            "label": "Uninstall",
+            "tooltip": [
+                "Remove TheKeyMachine's Maya startup integration and installed files.",
+                "This action asks for confirmation."
+            ]
+        },
+        "es": {
+            "label": "Desinstalar",
+            "tooltip": [
+                "Elimina la integración de TheKeyMachine con el inicio de Maya y sus archivos instalados.",
+                "Esta acción pedirá confirmación."
+            ]
+        },
+        "fr": {
+            "label": "Désinstaller",
+            "tooltip": [
+                "Supprime l'intégration de TheKeyMachine au démarrage de Maya et ses fichiers installés.",
+                "Cette action demande une confirmation."
+            ]
+        }
+    },
+    "check_for_updates": {
+        "en": {
+            "label": "Check for Updates",
+            "tooltip": [
+                "Check for a newer TheKeyMachine release and open the updater when one is available."
+            ]
+        },
+        "es": {
+            "label": "Buscar Actualizaciones",
+            "tooltip": [
+                "Comprueba si hay una nueva versión de TheKeyMachine y abre el actualizador si está disponible."
+            ]
+        },
+        "fr": {
+            "label": "Vérifier les Mises à Jour",
+            "tooltip": [
+                "Vérifie s'il existe une nouvelle version de TheKeyMachine et ouvre le programme de mise à jour si disponible."
+            ]
+        }
+    },
+    "main_preferences_menu": {
+        "en": {
+            "label": "Preferences",
+            "tooltip": [
+                "Open toolbar behavior, appearance, startup, and interaction preferences."
+            ]
+        },
+        "es": {
+            "label": "Preferencias",
+            "tooltip": [
+                "Abre las preferencias de comportamiento, apariencia, inicio e interacción de la barra de herramientas."
+            ]
+        },
+        "fr": {
+            "label": "Préférences",
+            "tooltip": [
+                "Ouvre les préférences de comportement, d'apparence, de démarrage et d'interaction de la barre d'outils."
+            ]
+        }
+    },
+    "start_with_maya": {
+        "en": {
+            "label": "Start with Maya",
+            "tooltip": [
+                "Load TheKeyMachine automatically when Maya starts."
+            ]
+        },
+        "es": {
+            "label": "Iniciar con Maya",
+            "tooltip": [
+                "Carga TheKeyMachine automáticamente al iniciar Maya."
+            ]
+        },
+        "fr": {
+            "label": "Démarrer avec Maya",
+            "tooltip": [
+                "Charge TheKeyMachine automatiquement au démarrage de Maya."
+            ]
+        }
+    },
+    "show_tooltips": {
+        "en": {
+            "label": "Show Tooltips",
+            "tooltip": [
+                "Show rich tooltips, including interaction details and animated examples."
+            ]
+        },
+        "es": {
+            "label": "Mostrar Tooltips",
+            "tooltip": [
+                "Muestra tooltips enriquecidos, con detalles de interacción y ejemplos animados."
+            ]
+        },
+        "fr": {
+            "label": "Afficher les Infobulles",
+            "tooltip": [
+                "Affiche des infobulles enrichies, avec des détails d'interaction et des exemples animés."
+            ]
+        }
+    },
+    "main_dock_menu": {
+        "en": {
+            "label": "Dock",
+            "tooltip": [
+                "Move the toolbar between Maya dock areas and choose its top or bottom placement."
+            ]
+        },
+        "es": {
+            "label": "Acoplar",
+            "tooltip": [
+                "Mueve la barra de herramientas entre las áreas de acoplamiento de Maya y elige su posición superior o inferior."
+            ]
+        },
+        "fr": {
+            "label": "Ancrage",
+            "tooltip": [
+                "Déplace la barre d'outils entre les zones d'ancrage de Maya et choisit son emplacement en haut ou en bas."
+            ]
+        }
+    },
+    "main_system_menu": {
+        "en": {
+            "label": "System",
+            "tooltip": [
+                "Open reload, unload, and uninstall maintenance actions."
+            ]
+        },
+        "es": {
+            "label": "Sistema",
+            "tooltip": [
+                "Abre las acciones de mantenimiento de recarga, descarga y desinstalación."
+            ]
+        },
+        "fr": {
+            "label": "Système",
+            "tooltip": [
+                "Ouvre les actions de maintenance de rechargement, déchargement et désinstallation."
+            ]
+        }
+    },
+    "languages_menu": {
+        "en": {
+            "label": "Languages",
+            "tooltip": [
+                "Choose the toolbar's language and whether tool names are translated too."
+            ]
+        },
+        "es": {
+            "label": "Idiomas",
+            "tooltip": [
+                "Elige el idioma de la barra de herramientas y si los nombres de las herramientas también se traducen."
+            ]
+        },
+        "fr": {
+            "label": "Langues",
+            "tooltip": [
+                "Choisit la langue de la barre d'outils et si les noms des outils sont également traduits."
+            ]
+        }
+    },
+    "help_menu": {
+        "en": {
+            "label": "Help",
+            "tooltip": [
+                "Open documentation, support, community, and project information."
+            ]
+        },
+        "es": {
+            "label": "Ayuda",
+            "tooltip": [
+                "Abre la documentación, soporte, comunidad e información del proyecto."
+            ]
+        },
+        "fr": {
+            "label": "Aide",
+            "tooltip": [
+                "Ouvre la documentation, l'assistance, la communauté et les informations du projet."
+            ]
+        }
+    },
+    "hotkeys_window": {
+        "en": {
+            "label": "Hotkeys",
+            "tooltip": [
+                "Open the hotkey editor for assigning TheKeyMachine commands."
+            ]
+        },
+        "es": {
+            "label": "Atajos de Teclado",
+            "tooltip": [
+                "Abre el editor de atajos de teclado para asignar comandos de TheKeyMachine."
+            ]
+        },
+        "fr": {
+            "label": "Raccourcis Clavier",
+            "tooltip": [
+                "Ouvre l'éditeur de raccourcis clavier pour assigner des commandes de TheKeyMachine."
+            ]
+        }
+    },
+    "workspaces_window": {
+        "en": {
+            "label": "Workspaces",
+            "tooltip": [
+                "Open the Workspaces editor to customize toolbar docking, alignment, section order, and pinned tools."
+            ]
+        },
+        "es": {
+            "label": "Espacios de Trabajo",
+            "tooltip": [
+                "Abre el editor de Espacios de Trabajo para personalizar el acoplamiento, la alineación, el orden de secciones y las herramientas ancladas."
+            ]
+        },
+        "fr": {
+            "label": "Espaces de Travail",
+            "tooltip": [
+                "Ouvre l'éditeur d'Espaces de Travail pour personnaliser l'ancrage, l'alignement, l'ordre des sections et les outils épinglés."
+            ]
+        }
+    },
+    "version_history_window": {
+        "en": {
+            "label": "Version History",
+            "tooltip": [
+                "Review release notes and changes for installed TheKeyMachine versions."
+            ]
+        },
+        "es": {
+            "label": "Historial de Versiones",
+            "tooltip": [
+                "Revisa las notas de la versión y los cambios de las versiones instaladas de TheKeyMachine."
+            ]
+        },
+        "fr": {
+            "label": "Historique des Versions",
+            "tooltip": [
+                "Consulte les notes de version et les changements des versions installées de TheKeyMachine."
+            ]
+        }
+    },
+    "about_window": {
+        "en": {
+            "label": "About",
+            "tooltip": [
+                "Show the installed version, credits, license, and project information."
+            ]
+        },
+        "es": {
+            "label": "Acerca de",
+            "tooltip": [
+                "Muestra la versión instalada, créditos, licencia e información del proyecto."
+            ]
+        },
+        "fr": {
+            "label": "À Propos",
+            "tooltip": [
+                "Affiche la version installée, les crédits, la licence et les informations du projet."
+            ]
+        }
+    },
+    "donate_window": {
+        "en": {
+            "label": "Donate",
+            "tooltip": [
+                "Open the project support page in your browser."
+            ]
+        },
+        "es": {
+            "label": "Donar",
+            "tooltip": [
+                "Abre la página de apoyo al proyecto en tu navegador."
+            ]
+        },
+        "fr": {
+            "label": "Faire un Don",
+            "tooltip": [
+                "Ouvre la page de soutien au projet dans votre navigateur."
+            ]
+        }
+    },
+    "bug_report_window": {
+        "en": {
+            "label": "Bug Report",
+            "tooltip": [
+                "Create a bug report with environment details and optional diagnostic attachments."
+            ]
+        },
+        "es": {
+            "label": "Reportar un Error",
+            "tooltip": [
+                "Crea un reporte de error con detalles del entorno y archivos de diagnóstico opcionales."
+            ]
+        },
+        "fr": {
+            "label": "Signaler un Bug",
+            "tooltip": [
+                "Crée un rapport de bug avec les détails de l'environnement et des fichiers de diagnostic optionnels."
+            ]
+        }
+    }
+}

@@ -1,0 +1,182 @@
+{
+    "tangent_cycle_matcher": {
+        "en": {
+            "label": "Cycle Matcher",
+            "tooltip": [
+                "Match the first and last keys of selected Graph Editor curves to create a seamless cycle."
+            ]
+        },
+        "es": {
+            "label": "Igualador de Ciclos",
+            "tooltip": [
+                "Iguala la primera y la última clave de las curvas seleccionadas del Graph Editor para crear un ciclo sin cortes."
+            ]
+        },
+        "fr": {
+            "label": "Correspondance de Cycle",
+            "tooltip": [
+                "Fait correspondre la première et la dernière clé des courbes sélectionnées du Graph Editor pour créer un cycle sans coupure."
+            ]
+        }
+    },
+    "tangent_bouncy": {
+        "en": {
+            "label": "Bouncy Tangent",
+            "tooltip": [
+                "Fit exaggerated tangent angles that add controlled overshoot around the targeted keys."
+            ]
+        },
+        "es": {
+            "label": "Tangente Bouncy",
+            "tooltip": [
+                "Ajusta ángulos de tangente exagerados que añaden un rebote controlado alrededor de las claves objetivo."
+            ]
+        },
+        "fr": {
+            "label": "Tangente Bouncy",
+            "tooltip": [
+                "Ajuste des angles de tangente exagérés qui ajoutent un rebond contrôlé autour des clés ciblées."
+            ]
+        }
+    },
+    "tangent_auto": {
+        "en": {
+            "label": "Auto Tangent",
+            "tooltip": [
+                "Set automatic tangents on the targeted keys."
+            ]
+        },
+        "es": {
+            "label": "Tangente Auto",
+            "tooltip": [
+                "Pone tangentes Auto en las claves objetivo."
+            ]
+        },
+        "fr": {
+            "label": "Tangente Auto",
+            "tooltip": [
+                "Définit des tangentes Auto sur les clés ciblées."
+            ]
+        }
+    },
+    "tangent_spline": {
+        "en": {
+            "label": "Spline Tangent",
+            "tooltip": [
+                "Set smooth spline tangents on the targeted keys."
+            ]
+        },
+        "es": {
+            "label": "Tangente Spline",
+            "tooltip": [
+                "Pone tangentes Spline suaves en las claves objetivo."
+            ]
+        },
+        "fr": {
+            "label": "Tangente Spline",
+            "tooltip": [
+                "Définit des tangentes Spline lisses sur les clés ciblées."
+            ]
+        }
+    },
+    "tangent_clamped": {
+        "en": {
+            "label": "Clamped Tangent",
+            "tooltip": [
+                "Set clamped tangents to smooth motion while limiting overshoot near equal values."
+            ]
+        },
+        "es": {
+            "label": "Tangente Clamped",
+            "tooltip": [
+                "Pone tangentes Clamped para suavizar el movimiento limitando el rebote cerca de valores iguales."
+            ]
+        },
+        "fr": {
+            "label": "Tangente Clamped",
+            "tooltip": [
+                "Définit des tangentes Clamped pour lisser le mouvement en limitant le dépassement près de valeurs égales."
+            ]
+        }
+    },
+    "tangent_linear": {
+        "en": {
+            "label": "Linear Tangent",
+            "tooltip": [
+                "Set straight linear interpolation through the targeted keys."
+            ]
+        },
+        "es": {
+            "label": "Tangente Linear",
+            "tooltip": [
+                "Pone interpolación Linear recta a través de las claves objetivo."
+            ]
+        },
+        "fr": {
+            "label": "Tangente Linear",
+            "tooltip": [
+                "Définit une interpolation Linear droite à travers les clés ciblées."
+            ]
+        }
+    },
+    "tangent_flat": {
+        "en": {
+            "label": "Flat Tangent",
+            "tooltip": [
+                "Set horizontal flat tangents on the targeted keys."
+            ]
+        },
+        "es": {
+            "label": "Tangente Flat",
+            "tooltip": [
+                "Pone tangentes Flat horizontales en las claves objetivo."
+            ]
+        },
+        "fr": {
+            "label": "Tangente Flat",
+            "tooltip": [
+                "Définit des tangentes Flat horizontales sur les clés ciblées."
+            ]
+        }
+    },
+    "tangent_step": {
+        "en": {
+            "label": "Step Tangent",
+            "tooltip": [
+                "Hold each key value until the following key."
+            ]
+        },
+        "es": {
+            "label": "Tangente Step",
+            "tooltip": [
+                "Mantiene cada valor de clave hasta la siguiente clave."
+            ]
+        },
+        "fr": {
+            "label": "Tangente Step",
+            "tooltip": [
+                "Maintient chaque valeur de clé jusqu'à la clé suivante."
+            ]
+        }
+    },
+    "tangent_plateau": {
+        "en": {
+            "label": "Plateau Tangent",
+            "tooltip": [
+                "Set plateau tangents to smooth extrema while reducing overshoot."
+            ]
+        },
+        "es": {
+            "label": "Tangente Plateau",
+            "tooltip": [
+                "Pone tangentes Plateau para suavizar los extremos reduciendo el rebote."
+            ]
+        },
+        "fr": {
+            "label": "Tangente Plateau",
+            "tooltip": [
+                "Définit des tangentes Plateau pour lisser les extrema en réduisant le dépassement."
+            ]
+        }
+    }
+}

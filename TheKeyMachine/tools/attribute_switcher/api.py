@@ -1,3 +1,5 @@
+from functools import partial
+
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.data import icons
@@ -6,11 +8,10 @@ import TheKeyMachine.core.runtimeManager as runtime
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools.attribute_switcher.controller import (
-    ATTRIBUTE_SWITCHER_GEOMETRY_KEY,
     ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
     ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
+    ROTATE_ORDER_LIGHTNING_MODE_KEY,
 )
-from TheKeyMachine.tools.attribute_switcher.widgets import AttributeSwitcherWindow
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
 from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
 
@@ -25,11 +26,19 @@ __all__ = [
     "set_euler_filter_enabled",
     "is_stay_on_top",
     "set_stay_on_top",
+    "is_rotate_order_lightning_enabled",
+    "set_rotate_order_lightning_enabled",
     "bind_attribute_switcher_toolbar_button",
 ]
 
 _attribute_switcher_instance = None
 attribute_switcher_window_bus = toolCommon.WindowStateBus()
+
+
+def _window_class():
+    from TheKeyMachine.tools.attribute_switcher.widgets import AttributeSwitcherWindow
+
+    return AttributeSwitcherWindow
 
 
 def _emit_attribute_switcher_window_state(is_open):
@@ -46,6 +55,34 @@ def is_stay_on_top():
     return settings.get_setting(
         ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
         False,
+        namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
+    )
+
+
+def is_rotate_order_lightning_enabled():
+    """Return whether rotate order conversion uses the fast, math-only path.
+
+    Off by default (Normal mode): the frame-by-frame, world-matrix-
+    preserving conversion that works with every rig. Lightning mode skips
+    that for eligible controls and converts keyed rotations with pure
+    Euler math instead, at the cost of automatically falling back to
+    Normal for rigs it can't safely fast-path (animation layers, driven
+    keys, expressions).
+    """
+    return bool(
+        settings.get_setting(
+            ROTATE_ORDER_LIGHTNING_MODE_KEY,
+            False,
+            namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
+        )
+    )
+
+
+def set_rotate_order_lightning_enabled(enabled):
+    """Switch the Attribute Switcher between Normal and Lightning rotate-order modes."""
+    settings.set_setting(
+        ROTATE_ORDER_LIGHTNING_MODE_KEY,
+        bool(enabled),
         namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
     )
 
@@ -129,7 +166,7 @@ def attribute_switcher_window(reuse_existing=True, popup=True, anchor_button=Non
     dlg = get_attribute_switcher_window()
     if not (reuse_existing and dlg and wutil.is_valid_widget(dlg)):
         close_attribute_switcher_window()
-        dlg = AttributeSwitcherWindow(parent=wutil.get_maya_qt(qt=QtWidgets.QWidget), popup=popup)
+        dlg = _window_class()(parent=wutil.get_maya_qt(qt=QtWidgets.QWidget), popup=popup)
 
         created_dialog = dlg
 
@@ -174,15 +211,6 @@ attribute_switcher_toolbar_toggle = ToolbarWindowToggle(
 )
 
 
-def restore_attribute_switcher_default_position():
-    settings.set_setting(
-        ATTRIBUTE_SWITCHER_GEOMETRY_KEY, None, namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE
-    )
-    dlg = get_attribute_switcher_window()
-    if dlg and wutil.is_valid_widget(dlg):
-        dlg.present_above_toolbar_button(attribute_switcher_toolbar_toggle.anchor_button())
-
-
 def set_stay_on_top(enabled):
     settings.set_setting(
         ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
@@ -197,6 +225,51 @@ def set_stay_on_top(enabled):
         dlg.activateWindow()
 
 
+def _set_rotate_order_mode(checked, lightning):
+    # Checkable actions in an exclusive QActionGroup both re-emit their
+    # toggle when the selection changes -- the one being unchecked as well
+    # as the one being checked -- so only act on the action actually being
+    # turned on.
+    if checked:
+        set_rotate_order_lightning_enabled(lightning)
+
+
+def _add_rotate_order_mode_actions(menu):
+    """Normal vs Lightning rotate-order conversion, as an exclusive choice."""
+    lightning_enabled = is_rotate_order_lightning_enabled()
+
+    menu.addSection("Rotate Order Conversion")
+
+    group = QtGui.QActionGroup(menu)
+    group.setExclusive(True)
+
+    normal_action = menu.addAction(
+        "Normal Mode",
+        description="Convert rotate order by preserving world orientation at every keyframe.",
+        tooltip="Slower, but safe for every rig -- including animation layers, driven keys, and expressions.",
+        callback=toolCommon.mark_non_tool_action(
+            partial(_set_rotate_order_mode, lightning=False)
+        ),
+    )
+    normal_action.setCheckable(True)
+    normal_action.setChecked(not lightning_enabled)
+    group.addAction(normal_action)
+
+    lightning_action = menu.addAction(
+        "Super Mode",
+        description="Convert rotate order with pure math on the keyed rotation values, skipping per-frame evaluation.",
+        tooltip="Much faster. Automatically falls back to Normal Mode for rigs it can't safely fast-path (animation layers, driven keys, expressions).",
+        callback=toolCommon.mark_non_tool_action(
+            partial(_set_rotate_order_mode, lightning=True)
+        ),
+    )
+    lightning_action.setCheckable(True)
+    lightning_action.setChecked(lightning_enabled)
+    group.addAction(lightning_action)
+
+    return group
+
+
 def build_attribute_switcher_context_menu(parent=None):
     menu = widgets.OpenMenuWidget(parent)
     menu.addAction(
@@ -208,11 +281,14 @@ def build_attribute_switcher_context_menu(parent=None):
 
     menu.addSeparator()
 
+    _add_rotate_order_mode_actions(menu)
+
+    menu.addSeparator()
+
     toolCommon.add_floating_window_actions(
         menu,
         is_stay_on_top,
         set_stay_on_top,
-        restore_attribute_switcher_default_position,
     )
     return menu
 

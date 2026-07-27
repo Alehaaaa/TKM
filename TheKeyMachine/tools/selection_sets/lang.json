@@ -1,0 +1,125 @@
+{
+    "selection_sets": {
+        "en": {
+            "label": "Selection Sets",
+            "tooltip": [
+                "Create, organize, rename, and recall persistent selection sets stored with the Maya scene."
+            ]
+        },
+        "es": {
+            "label": "Sets de Selección",
+            "tooltip": [
+                "Crea, organiza, renombra y recupera sets de selección persistentes guardados con la escena de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Ensembles de Sélection",
+            "tooltip": [
+                "Crée, organise, renomme et rappelle des ensembles de sélection persistants enregistrés avec la scène Maya."
+            ]
+        }
+    },
+    "selection_sets_quick_export": {
+        "en": {
+            "label": "Quick Export",
+            "tooltip": [
+                "Export all selection sets immediately to the configured quick-transfer file."
+            ]
+        },
+        "es": {
+            "label": "Exportación Rápida",
+            "tooltip": [
+                "Exporta todos los sets de selección inmediatamente al archivo de transferencia rápida configurado."
+            ]
+        },
+        "fr": {
+            "label": "Export Rapide",
+            "tooltip": [
+                "Exporte immédiatement tous les ensembles de sélection vers le fichier de transfert rapide configuré."
+            ]
+        }
+    },
+    "selection_sets_quick_import": {
+        "en": {
+            "label": "Quick Import",
+            "tooltip": [
+                "Import selection sets immediately from the configured quick-transfer file."
+            ]
+        },
+        "es": {
+            "label": "Importación Rápida",
+            "tooltip": [
+                "Importa sets de selección inmediatamente desde el archivo de transferencia rápida configurado."
+            ]
+        },
+        "fr": {
+            "label": "Import Rapide",
+            "tooltip": [
+                "Importe immédiatement des ensembles de sélection depuis le fichier de transfert rapide configuré."
+            ]
+        }
+    },
+    "selection_sets_export": {
+        "en": {
+            "label": "Export",
+            "tooltip": [
+                "Choose a file and export all TheKeyMachine selection sets."
+            ]
+        },
+        "es": {
+            "label": "Exportar",
+            "tooltip": [
+                "Elige un archivo y exporta todos los sets de selección de TheKeyMachine."
+            ]
+        },
+        "fr": {
+            "label": "Exporter",
+            "tooltip": [
+                "Choisissez un fichier et exportez tous les ensembles de sélection de TheKeyMachine."
+            ]
+        }
+    },
+    "selection_sets_import": {
+        "en": {
+            "label": "Import",
+            "tooltip": [
+                "Choose a file and import its selection sets into the current scene."
+            ]
+        },
+        "es": {
+            "label": "Importar",
+            "tooltip": [
+                "Elige un archivo e importa sus sets de selección en la escena actual."
+            ]
+        },
+        "fr": {
+            "label": "Importer",
+            "tooltip": [
+                "Choisissez un fichier et importez ses ensembles de sélection dans la scène actuelle."
+            ]
+        }
+    },
+    "selection_sets_clear_all": {
+        "en": {
+            "label": "Clear All Selection Sets",
+            "tooltip": [
+                "Delete every TheKeyMachine selection set from the current scene.",
+                "This action asks for confirmation before removing data."
+            ]
+        },
+        "es": {
+            "label": "Borrar Todos los Sets de Selección",
+            "tooltip": [
+                "Elimina todos los sets de selección de TheKeyMachine de la escena actual.",
+                "Esta acción pedirá confirmación."
+            ]
+        },
+        "fr": {
+            "label": "Effacer Tous les Ensembles de Sélection",
+            "tooltip": [
+                "Supprime tous les ensembles de sélection de TheKeyMachine de la scène actuelle.",
+                "Cette action demande une confirmation."
+            ]
+        }
+    }
+}

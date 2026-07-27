@@ -2701,6 +2701,77 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if self._hiddeable:
             self._menu_metadata.append({"type": "separator"})
 
+    def refresh_translations(self):
+        """Re-apply the active language to this section's already-built widgets.
+
+        Widgets are constructed once when the toolbar is populated -- unlike
+        the menus in toolMenus.py, which rebuild fresh on every open and
+        already pick up a language switch on their own. A widget's tooltip
+        text is set once by ``addWidget()`` and needs to be explicitly
+        refreshed here.
+
+        Slider sections store the same per-package ``lang.json`` lookup
+        inputs (source modes + package file) that built them in the first
+        place -- see ``toolWidgets.build_slider_section`` -- so refreshing
+        them is just re-running that lookup and pushing the result into each
+        slider via ``refreshModes()``. Every other section's widgets are
+        keyed by registered tool ids, refreshed via ``toolbox.get_tool()``,
+        which applies the identical ``lang.json`` lookup. Both paths read
+        the same JSON schema (now including the "en" source entry); only the
+        widget-update call differs, because sliders and buttons expose
+        different APIs for pushing new text.
+        """
+        if not self._widgets:
+            return
+
+        source_modes = getattr(self, "_tkm_slider_source_modes", None)
+        if source_modes is not None:
+            from TheKeyMachine.core import i18n
+
+            prefix = getattr(self, "_tkm_slider_prefix", "")
+            package_file = getattr(self, "_tkm_slider_package_file", None)
+            localized_modes = i18n.localize_slider_modes(source_modes, package_file)
+            for mode in localized_modes:
+                if not hasattr(mode, "key"):
+                    continue
+                slot_key = f"{prefix}_{mode.key}"
+                widget = self._widgets.get(slot_key)
+                if not QtCompat.isValid(widget) or not hasattr(widget, "refreshModes"):
+                    continue
+                widget.refreshModes(localized_modes)
+                entry = next((item for item in self._menu_metadata if item.get("id") == slot_key), None)
+                if entry is not None:
+                    entry["label"] = mode.label
+                    entry["description"] = mode.description
+                    entry["tooltip"] = mode.tooltip
+            return
+
+        import TheKeyMachine.core.toolbox as toolbox
+
+        for key, widget in self._widgets.items():
+            if not QtCompat.isValid(widget) or not hasattr(widget, "setToolTipData"):
+                continue
+            try:
+                tool = toolbox.get_tool(key)
+            except KeyError:
+                continue
+            label = tool.get("menu_label") or tool.get("label") or ""
+            tooltip = tool.get("tooltip")
+            description = tool.get("description") or (tooltip if isinstance(tooltip, str) else "")
+            status_description = _status_description(description=description, tooltip=tooltip)
+            widget.setToolTipData(
+                text=label,
+                description=description,
+                tooltip=tooltip,
+                status_title=label,
+                status_description=status_description,
+            )
+            entry = next((item for item in self._menu_metadata if item.get("id") == key), None)
+            if entry is not None:
+                entry["label"] = label
+                entry["description"] = description
+                entry["tooltip"] = tooltip
+
     def _on_slider_current_mode_changed(self, widget, old_key, new_key):
         """Persist which mode a slot displays. Does not touch any pin/visibility state.
 

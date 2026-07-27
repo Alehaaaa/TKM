@@ -20,11 +20,7 @@ class TkmMenuToolObject(ToolObject):
                         "toolbar_add_shelf_button", {"type": "check", "command": "start_with_maya"},
                         {"type": "check", "command": "show_tooltips"}, "separator",
                         {"type": "section", "label": "Alignment"},
-                        {"type": "choice", "get_value": api.get_alignment, "set_value": api.set_alignment, "items": [
-                            {"label": "Align Left", "value": "Left", "description": "Align toolbar icons to the left."},
-                            {"label": "Align Center", "value": "Center", "description": "Align toolbar icons to the center."},
-                            {"label": "Align Right", "value": "Right", "description": "Align toolbar icons to the right."},
-                        ]},
+                        {"type": "choice", "get_value": api.get_alignment, "set_value": api.set_alignment, "items": api.alignment_choices},
                     ]},
                     "hotkeys_window",
                     "workspaces_window",
@@ -37,6 +33,12 @@ class TkmMenuToolObject(ToolObject):
                     ]},
                     {"type": "menu", "label": "System", "icon": "system", "description": TOOLTIPS["system"][0], "items": [
                         "toolbar_reload", "toolbar_unload", "toolbar_uninstall",
+                        {
+                            "type": "dynamic_menu", "label": "Languages", "icon": "globe",
+                            "description": TOOLTIPS["languages"][0],
+                            "separator_before": True,
+                            "builder": api.populate_languages_menu,
+                        },
                     ]},
                     "separator",
                     {"type": "menu", "label": "Help", "icon": "help", "description": TOOLTIPS["help"][0], "items": [
@@ -67,6 +69,7 @@ class TkmMenuToolObject(ToolObject):
         "show_tooltips": {"type": "check", "label": "Show Tooltips", "callback": api.set_tooltips_enabled, "get_checked": api.tooltips_enabled, "set_checked": api.set_tooltips_enabled, "tooltip": TOOLTIPS["tooltips"]},
         "main_dock_menu": {"type": "menu", "label": "Dock", "icon": "dock", "callback": partial(api.show_menu, "main_dock_menu"), "tooltip": TOOLTIPS["dock"]},
         "main_system_menu": {"type": "menu", "label": "System", "icon": "system", "callback": partial(api.show_menu, "main_system_menu"), "tooltip": TOOLTIPS["system"]},
+        "languages_menu": {"type": "menu", "label": "Languages", "icon": "globe", "callback": partial(api.show_menu, "languages_menu"), "tooltip": TOOLTIPS["languages"]},
         "help_menu": {"type": "menu", "label": "Help", "icon": "help", "callback": partial(api.show_menu, "help_menu"), "tooltip": TOOLTIPS["help"]},
         "hotkeys_window": {"type": "tool", "label": "Hotkeys", "icon": "hotkeys", "callback": api.show_hotkeys, "tooltip": TOOLTIPS["hotkeys"]},
         "workspaces_window": {"type": "tool", "label": "Workspaces", "icon": "align", "callback": api.show_workspaces, "tooltip": TOOLTIPS["workspaces"]},

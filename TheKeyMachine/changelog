@@ -14,6 +14,12 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
+0.1.33
+  - polish: Fixing startup time by optimizing processes and deduping logic
+  - bugfix: Workspaces update correcly on toolbar right click menu
+  - new: Super mode to switch Rotation Orders almost instantly
+  - new: Early stages of implementing different language translations
+
 0.1.32:
   - polish: Tool actions share consistent progress feedback with automatic time estimates
   - bugfix: Simplify and Bake sliders preserve the intended animation curve tendency

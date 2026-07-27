@@ -1,0 +1,25 @@
+{
+    "search_window": {
+        "en": {
+            "label": "Search",
+            "tooltip": [
+                "Find and run any registered TheKeyMachine command by name.",
+                "Type to filter, use Up or Down to select a result, then press Enter to run it."
+            ]
+        },
+        "es": {
+            "label": "Buscar",
+            "tooltip": [
+                "Encuentra y ejecuta cualquier comando registrado de TheKeyMachine por su nombre.",
+                "Escribe para filtrar, usa Arriba o Abajo para elegir un resultado y pulsa Intro para ejecutarlo."
+            ]
+        },
+        "fr": {
+            "label": "Rechercher",
+            "tooltip": [
+                "Trouvez et exécutez n'importe quelle commande enregistrée de TheKeyMachine par son nom.",
+                "Tapez pour filtrer, utilisez Haut ou Bas pour choisir un résultat, puis appuyez sur Entrée pour l'exécuter."
+            ]
+        }
+    }
+}

@@ -1,0 +1,268 @@
+{
+    "copy_pose": {
+        "en": {
+            "label": "Copy Pose",
+            "tooltip": [
+                "Copy the current pose from the selected controls.",
+                "The pose remains available across Maya sessions."
+            ]
+        },
+        "es": {
+            "label": "Copiar Pose",
+            "tooltip": [
+                "Copia la pose actual de los controles seleccionados.",
+                "La pose permanece disponible entre sesiones de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Copier la Pose",
+            "tooltip": [
+                "Copie la pose actuelle des contrôleurs sélectionnés.",
+                "La pose reste disponible entre les sessions Maya."
+            ]
+        }
+    },
+    "paste_pose": {
+        "en": {
+            "label": "Paste Pose",
+            "tooltip": [
+                "Paste the saved pose onto the current selection."
+            ]
+        },
+        "es": {
+            "label": "Pegar Pose",
+            "tooltip": [
+                "Pega la pose guardada sobre la selección actual."
+            ]
+        },
+        "fr": {
+            "label": "Coller la Pose",
+            "tooltip": [
+                "Colle la pose enregistrée sur la sélection actuelle."
+            ]
+        }
+    },
+    "paste_mirror_pose": {
+        "en": {
+            "label": "Paste Mirror Pose",
+            "tooltip": [
+                "Paste the saved pose onto matching opposite-side controls using mirror exceptions."
+            ]
+        },
+        "es": {
+            "label": "Pegar Pose en Espejo",
+            "tooltip": [
+                "Pega la pose guardada sobre los controles opuestos coincidentes usando las excepciones de espejo."
+            ]
+        },
+        "fr": {
+            "label": "Coller la Pose en Miroir",
+            "tooltip": [
+                "Colle la pose enregistrée sur les contrôleurs opposés correspondants en utilisant les exceptions de miroir."
+            ]
+        }
+    },
+    "paste_pose_to": {
+        "en": {
+            "label": "Paste Pose To",
+            "tooltip": [
+                "Choose a copied source control and paste its pose onto the selected targets."
+            ]
+        },
+        "es": {
+            "label": "Pegar Pose En",
+            "tooltip": [
+                "Elige un control de origen copiado y pega su pose sobre los objetivos seleccionados."
+            ]
+        },
+        "fr": {
+            "label": "Coller la Pose Sur",
+            "tooltip": [
+                "Choisissez un contrôleur source copié et collez sa pose sur les cibles sélectionnées."
+            ]
+        }
+    },
+    "export_pose_file": {
+        "en": {
+            "label": "Export Pose",
+            "tooltip": [
+                "Export the copied pose data to a JSON file."
+            ]
+        },
+        "es": {
+            "label": "Exportar Pose",
+            "tooltip": [
+                "Exporta los datos de la pose copiada a un archivo JSON."
+            ]
+        },
+        "fr": {
+            "label": "Exporter la Pose",
+            "tooltip": [
+                "Exporte les données de la pose copiée vers un fichier JSON."
+            ]
+        }
+    },
+    "import_pose_file": {
+        "en": {
+            "label": "Import Pose",
+            "tooltip": [
+                "Import copied pose data from a JSON file."
+            ]
+        },
+        "es": {
+            "label": "Importar Pose",
+            "tooltip": [
+                "Importa datos de pose copiados desde un archivo JSON."
+            ]
+        },
+        "fr": {
+            "label": "Importer la Pose",
+            "tooltip": [
+                "Importe des données de pose copiées depuis un fichier JSON."
+            ]
+        }
+    },
+    "copy_animation": {
+        "en": {
+            "label": "Copy Animation",
+            "tooltip": [
+                "Copy animation from the selected objects or controls.",
+                "The animation remains available across Maya sessions."
+            ]
+        },
+        "es": {
+            "label": "Copiar Animación",
+            "tooltip": [
+                "Copia la animación de los objetos o controles seleccionados.",
+                "La animación permanece disponible entre sesiones de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Copier l'Animation",
+            "tooltip": [
+                "Copie l'animation des objets ou contrôleurs sélectionnés.",
+                "L'animation reste disponible entre les sessions Maya."
+            ]
+        }
+    },
+    "paste_animation": {
+        "en": {
+            "label": "Paste Replace Animation",
+            "tooltip": [
+                "Replace animation on the current selection with the saved animation."
+            ]
+        },
+        "es": {
+            "label": "Pegar Animación en Reemplazo",
+            "tooltip": [
+                "Reemplaza la animación de la selección actual con la animación guardada."
+            ]
+        },
+        "fr": {
+            "label": "Coller l'Animation en Remplacement",
+            "tooltip": [
+                "Remplace l'animation de la sélection actuelle par l'animation enregistrée."
+            ]
+        }
+    },
+    "paste_insert_animation": {
+        "en": {
+            "label": "Paste Insert Animation",
+            "tooltip": [
+                "Insert the saved animation while preserving surrounding timing."
+            ]
+        },
+        "es": {
+            "label": "Pegar Animación Insertada",
+            "tooltip": [
+                "Inserta la animación guardada conservando el tiempo circundante."
+            ]
+        },
+        "fr": {
+            "label": "Coller l'Animation Insérée",
+            "tooltip": [
+                "Insère l'animation enregistrée en conservant le timing environnant."
+            ]
+        }
+    },
+    "paste_opposite_animation": {
+        "en": {
+            "label": "Paste Mirror Animation",
+            "tooltip": [
+                "Paste the saved animation onto matching opposite-side controls."
+            ]
+        },
+        "es": {
+            "label": "Pegar Animación en Espejo",
+            "tooltip": [
+                "Pega la animación guardada sobre los controles opuestos coincidentes."
+            ]
+        },
+        "fr": {
+            "label": "Coller l'Animation en Miroir",
+            "tooltip": [
+                "Colle l'animation enregistrée sur les contrôleurs opposés correspondants."
+            ]
+        }
+    },
+    "paste_animation_to": {
+        "en": {
+            "label": "Paste Animation To",
+            "tooltip": [
+                "Choose a copied source control and paste its animation onto selected targets."
+            ]
+        },
+        "es": {
+            "label": "Pegar Animación En",
+            "tooltip": [
+                "Elige un control de origen copiado y pega su animación sobre los objetivos seleccionados."
+            ]
+        },
+        "fr": {
+            "label": "Coller l'Animation Sur",
+            "tooltip": [
+                "Choisissez un contrôleur source copié et collez son animation sur les cibles sélectionnées."
+            ]
+        }
+    },
+    "export_animation_file": {
+        "en": {
+            "label": "Export Animation",
+            "tooltip": [
+                "Export the copied animation data to a JSON file."
+            ]
+        },
+        "es": {
+            "label": "Exportar Animación",
+            "tooltip": [
+                "Exporta los datos de la animación copiada a un archivo JSON."
+            ]
+        },
+        "fr": {
+            "label": "Exporter l'Animation",
+            "tooltip": [
+                "Exporte les données de l'animation copiée vers un fichier JSON."
+            ]
+        }
+    },
+    "import_animation_file": {
+        "en": {
+            "label": "Import Animation",
+            "tooltip": [
+                "Import copied animation data from a JSON file."
+            ]
+        },
+        "es": {
+            "label": "Importar Animación",
+            "tooltip": [
+                "Importa datos de animación copiados desde un archivo JSON."
+            ]
+        },
+        "fr": {
+            "label": "Importer l'Animation",
+            "tooltip": [
+                "Importe des données d'animation copiées depuis un fichier JSON."
+            ]
+        }
+    }
+}

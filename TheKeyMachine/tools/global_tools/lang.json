@@ -1,0 +1,67 @@
+{
+    "attribute_switcher_euler_filter": {
+        "en": {
+            "label": "Auto Euler Filter",
+            "tooltip": [
+                "Automatically apply an Euler filter after Attribute Switcher changes rotation order."
+            ]
+        },
+        "es": {
+            "label": "Filtro Euler Automático",
+            "tooltip": [
+                "Aplica automáticamente un filtro Euler después de que el Selector de Atributos cambie el orden de rotación."
+            ]
+        },
+        "fr": {
+            "label": "Filtre Euler Automatique",
+            "tooltip": [
+                "Applique automatiquement un filtre Euler après que le Sélecteur d'Attributs change l'ordre de rotation."
+            ]
+        }
+    },
+    "overshoot_sliders": {
+        "en": {
+            "label": "Overshoot Sliders",
+            "tooltip": [
+                "Extend slider ranges and buttons beyond 100 percent to 150 percent."
+            ]
+        },
+        "es": {
+            "label": "Sliders con Sobrepaso",
+            "tooltip": [
+                "Extiende el rango y los botones de los sliders más allá del 100 por ciento hasta el 150 por ciento."
+            ]
+        },
+        "fr": {
+            "label": "Sliders avec Dépassement",
+            "tooltip": [
+                "Étend la plage et les boutons des sliders au-delà de 100 pour cent jusqu'à 150 pour cent."
+            ]
+        }
+    },
+    "custom_graph": {
+        "en": {
+            "label": "Graph Editor Toolbar",
+            "tooltip": [
+                "Show or hide TheKeyMachine's toolbar inside every Maya Graph Editor.",
+                "This preference persists between Maya sessions."
+            ]
+        },
+        "es": {
+            "label": "Barra del Graph Editor",
+            "menu_label": "Mostrar Barra del Graph Editor",
+            "tooltip": [
+                "Muestra u oculta la barra de TheKeyMachine dentro de cada Graph Editor de Maya.",
+                "Esta preferencia persiste entre sesiones de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Barre du Graph Editor",
+            "menu_label": "Afficher la Barre du Graph Editor",
+            "tooltip": [
+                "Affiche ou masque la barre de TheKeyMachine dans chaque Graph Editor de Maya.",
+                "Cette préférence persiste entre les sessions Maya."
+            ]
+        }
+    }
+}

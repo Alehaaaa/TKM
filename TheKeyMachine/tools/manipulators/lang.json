@@ -1,0 +1,82 @@
+{
+    "smart_rotation": {
+        "en": {
+            "label": "Smart Rotation",
+            "tooltip": [
+                "Open Maya's rotate marking menu and cycle the rotate manipulator mode."
+            ]
+        },
+        "es": {
+            "label": "Rotación Inteligente",
+            "tooltip": [
+                "Abre el menú de marcado de rotación de Maya y cambia el modo del manipulador de rotación."
+            ]
+        },
+        "fr": {
+            "label": "Rotation Intelligente",
+            "tooltip": [
+                "Ouvre le menu de marquage de rotation de Maya et change le mode du manipulateur de rotation."
+            ]
+        }
+    },
+    "smart_rotation_release": {
+        "en": {
+            "label": "Smart Rotation Release",
+            "tooltip": [
+                "Close Maya's rotate marking menu when the hotkey is released."
+            ]
+        },
+        "es": {
+            "label": "Soltar Rotación Inteligente",
+            "tooltip": [
+                "Cierra el menú de marcado de rotación de Maya al soltar el atajo."
+            ]
+        },
+        "fr": {
+            "label": "Relâcher Rotation Intelligente",
+            "tooltip": [
+                "Ferme le menu de marquage de rotation de Maya en relâchant le raccourci."
+            ]
+        }
+    },
+    "smart_translation": {
+        "en": {
+            "label": "Smart Translation",
+            "tooltip": [
+                "Open Maya's move marking menu and switch the translation manipulator mode."
+            ]
+        },
+        "es": {
+            "label": "Traslación Inteligente",
+            "tooltip": [
+                "Abre el menú de marcado de movimiento de Maya y cambia el modo del manipulador de traslación."
+            ]
+        },
+        "fr": {
+            "label": "Translation Intelligente",
+            "tooltip": [
+                "Ouvre le menu de marquage de déplacement de Maya et change le mode du manipulateur de translation."
+            ]
+        }
+    },
+    "smart_translation_release": {
+        "en": {
+            "label": "Smart Translation Release",
+            "tooltip": [
+                "Close Maya's move marking menu when the hotkey is released."
+            ]
+        },
+        "es": {
+            "label": "Soltar Traslación Inteligente",
+            "tooltip": [
+                "Cierra el menú de marcado de movimiento de Maya al soltar el atajo."
+            ]
+        },
+        "fr": {
+            "label": "Relâcher Translation Intelligente",
+            "tooltip": [
+                "Ferme le menu de marquage de déplacement de Maya en relâchant le raccourci."
+            ]
+        }
+    }
+}

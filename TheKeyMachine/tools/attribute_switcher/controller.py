@@ -15,6 +15,7 @@ from TheKeyMachine.widgets import timeline as timelineWidgets
 ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE = "attribute_switcher_window"
 ATTRIBUTE_SWITCHER_GEOMETRY_KEY = "attribute_switcher_geometry"
 ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY = "attribute_switcher_stays_on_top"
+ROTATE_ORDER_LIGHTNING_MODE_KEY = "rotate_order_lightning_mode"
 
 ROTATE_ORDER_OPTIONS = ("xyz", "yzx", "zxy", "xzy", "yxz", "zyx")
 
@@ -27,6 +28,8 @@ def _as_bool(value):
 
 class AttributeSwitcherController:
     """Own Maya state, analysis, settings, and scene edits for one view."""
+
+    ROTATE_AXES = ("rotateX", "rotateY", "rotateZ")
 
     def __init__(self, view):
         self.view = view
@@ -73,6 +76,16 @@ class AttributeSwitcherController:
 
     def stays_on_top(self):
         return _as_bool(self._setting(ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY, False))
+
+    def rotate_order_lightning_enabled(self):
+        """Whether rotate order conversion uses the fast, math-only path.
+
+        Defaults to off (Normal mode): the frame-by-frame, world-matrix-
+        preserving conversion that works with every rig, including
+        animation layers, driven keys, and expressions. Lightning mode is
+        an explicit opt-in from the toolbar button's right-click menu.
+        """
+        return _as_bool(self._setting(ROTATE_ORDER_LIGHTNING_MODE_KEY, False))
 
     # Runtime and selection ------------------------------------------------
 
@@ -364,35 +377,44 @@ class AttributeSwitcherController:
             if _manage_session:
                 self.disconnect_runtime()
 
-            timeline_selection = cmds.timeControl("timeControl1", q=True, rv=True)
-            selected_range = cmds.timeControl("timeControl1", q=True, ra=True)
-            keyframes = self._collect_keyframes(
-                targets, all_frames, timeline_selection, selected_range
-            )
             sorted_targets = targets
-            if isinstance(keyframes, dict) and keyframes:
-                self._apply_multiple_frames(
-                    attribute, enum_index, keyframes, target_attributes
-                )
-            elif isinstance(keyframes, list) and keyframes:
-                cmds.currentTime(keyframes[0])
-                for target in sorted_targets:
-                    self._set_preserving_transform(
-                        target, target_attributes[target], enum_index
+            if attribute == "rotateOrder":
+                # Rotate order only ever reinterprets an object's own local
+                # rx/ry/rz -- unlike every other switchable attribute (space
+                # switches, IK/FK, ...) it has no dependency on world space,
+                # parenting, or constraints. In Lightning mode, eligible
+                # targets are converted with pure Euler math instead of the
+                # frame-by-frame, world-matrix-preserving path below. Only
+                # targets that aren't safe for that (driven keys, layers,
+                # expressions), or every target when Lightning mode is off
+                # (Normal mode), fall back to it.
+                remaining_targets = targets
+                if self.rotate_order_lightning_enabled():
+                    remaining_targets = self._switch_rotate_order_lightning(
+                        targets, target_attributes, value, operation, not _manage_session
+                    )
+                if remaining_targets:
+                    self._apply_frame_scoped(
+                        remaining_targets,
+                        attribute,
+                        enum_index,
+                        target_attributes,
+                        True,
+                        operation,
+                        temporary_keys,
+                        not _manage_session,
                     )
             else:
-                current_time = cmds.currentTime(query=True)
-                for target in sorted_targets:
-                    target_attribute = target_attributes[target]
-                    plug = "{}.{}".format(target, target_attribute)
-                    if not (cmds.keyframe(plug, query=True, keyframeCount=True) or 0):
-                        temporary_keys.setdefault(target, {}).setdefault(
-                            target_attribute, []
-                        ).append(current_time)
-                        cmds.keyframe(plug)
-                    self._set_preserving_transform(
-                        target, target_attribute, enum_index
-                    )
+                self._apply_frame_scoped(
+                    targets,
+                    attribute,
+                    enum_index,
+                    target_attributes,
+                    all_frames,
+                    operation,
+                    temporary_keys,
+                    not _manage_session,
+                )
 
             if self.view.euler_filter:
                 self.apply_euler_filter(sorted_targets)
@@ -408,17 +430,232 @@ class AttributeSwitcherController:
                     pass
         cmds.showWindow("MayaWindow")
 
+    def _apply_frame_scoped(
+        self,
+        targets,
+        attribute,
+        enum_index,
+        target_attributes,
+        all_frames,
+        operation,
+        temporary_keys,
+        step_operation,
+    ):
+        """World-matrix-preserving switch, scoped to a keyframe range.
+
+        Shared by every switchable attribute that genuinely depends on world
+        space (space switches, IK/FK, ...) and by rotateOrder's fallback for
+        targets that aren't safe for the pure-math lightning path (driven
+        keys, animation layers, expressions).
+        """
+        timeline_selection = cmds.timeControl("timeControl1", q=True, rv=True)
+        selected_range = cmds.timeControl("timeControl1", q=True, ra=True)
+        keyframes = self._collect_keyframes(
+            targets, all_frames, timeline_selection, selected_range
+        )
+        if isinstance(keyframes, dict) and keyframes:
+            self._apply_multiple_frames(
+                attribute,
+                enum_index,
+                keyframes,
+                target_attributes,
+                owns_progress=not step_operation,
+            )
+        elif isinstance(keyframes, list) and keyframes:
+            cmds.currentTime(keyframes[0])
+            for target in targets:
+                self._set_preserving_transform(
+                    target, target_attributes[target], enum_index
+                )
+            if operation is not None and step_operation:
+                operation.step()
+        else:
+            current_time = cmds.currentTime(query=True)
+            for target in targets:
+                target_attribute = target_attributes[target]
+                plug = "{}.{}".format(target, target_attribute)
+                if not (cmds.keyframe(plug, query=True, keyframeCount=True) or 0):
+                    temporary_keys.setdefault(target, {}).setdefault(
+                        target_attribute, []
+                    ).append(current_time)
+                    cmds.keyframe(plug)
+                self._set_preserving_transform(
+                    target, target_attribute, enum_index
+                )
+            if operation is not None and step_operation:
+                operation.step()
+
+    # Rotate order -- lightning path -----------------------------------------
+
+    def _rotate_order_fast_eligible(self, node):
+        """True when every rotate channel is static or driven by a single
+        plain anim curve. Animation layers, driven keys, expressions, or
+        constraints insert extra nodes between the curve and the plug and
+        need the slower, world-space-preserving fallback instead of the
+        pure-math conversion.
+        """
+        for axis in self.ROTATE_AXES:
+            plug = "{}.{}".format(node, axis)
+            try:
+                if cmds.getAttr(plug, lock=True):
+                    return False
+                source = cmds.listConnections(plug, source=True, destination=False)
+            except Exception:
+                return False
+            if not source:
+                continue
+            if len(source) != 1 or cmds.nodeType(source[0]) != "animCurveTA":
+                return False
+        return True
+
+    def _switch_rotate_order_lightning(
+        self, targets, target_attributes, new_order, operation, step_operation
+    ):
+        """Reorder keyed rotations purely mathematically wherever it's safe.
+
+        Rotate order only ever reinterprets an object's own rx/ry/rz -- it
+        has no dependency on world space, parenting, or constraints -- so
+        eligible targets are converted by reading/writing anim curve values
+        directly through time-sampled getAttr/keyframe calls, never moving
+        the playhead or forcing a dependency-graph evaluation. That is what
+        makes this so much faster than the generic world-matrix-preserving
+        path used for every other switchable attribute, which genuinely does
+        need the DG evaluated at each frame.
+
+        Returns the subset of ``targets`` that were not eligible and still
+        need the slower fallback.
+        """
+        slow_targets = []
+        for target in targets:
+            try:
+                old_order = ROTATE_ORDER_OPTIONS[cmds.getAttr(target + ".rotateOrder")]
+            except Exception:
+                slow_targets.append(target)
+                continue
+
+            rotate_order_attr = target_attributes.get(target, "rotateOrder")
+            if old_order == new_order:
+                # Nothing to reorder, but the attribute itself may still be
+                # a distinct plug alias (rare) -- keep it in sync.
+                try:
+                    cmds.setAttr(
+                        "{}.{}".format(target, rotate_order_attr),
+                        ROTATE_ORDER_OPTIONS.index(new_order),
+                    )
+                except Exception:
+                    pass
+                continue
+
+            if not self._rotate_order_fast_eligible(target):
+                slow_targets.append(target)
+                continue
+
+            try:
+                self._reorder_rotation_keys(target, old_order, new_order)
+                cmds.setAttr(
+                    "{}.{}".format(target, rotate_order_attr),
+                    ROTATE_ORDER_OPTIONS.index(new_order),
+                )
+            except Exception:
+                slow_targets.append(target)
+                continue
+
+            if operation is not None and step_operation:
+                operation.step()
+        return slow_targets
+
+    def _reorder_rotation_keys(self, target, old_order, new_order):
+        """Convert rx/ry/rz between rotate orders without touching the DG."""
+        key_times = set()
+        for axis in self.ROTATE_AXES:
+            times = cmds.keyframe(
+                "{}.{}".format(target, axis), query=True, timeChange=True
+            )
+            if times:
+                key_times.update(times)
+
+        if not key_times:
+            values = [
+                cmds.getAttr("{}.{}".format(target, axis))
+                for axis in self.ROTATE_AXES
+            ]
+            new_values = open_maya.reorder_euler_rotation(
+                values[0], values[1], values[2], old_order, new_order
+            )
+            for axis, value in zip(self.ROTATE_AXES, new_values):
+                cmds.setAttr("{}.{}".format(target, axis), value)
+            return
+
+        # A channel that was static up to now can still need distinct
+        # per-frame values after reordering -- the conversion mixes all
+        # three axes together -- so every rotate channel needs a key at
+        # every collected time before the values are rewritten.
+        for axis in self.ROTATE_AXES:
+            plug = "{}.{}".format(target, axis)
+            existing = set(cmds.keyframe(plug, query=True, timeChange=True) or [])
+            for frame in sorted(key_times - existing):
+                cmds.setKeyframe(
+                    plug, time=(frame, frame), value=cmds.getAttr(plug, time=frame)
+                )
+
+        for frame in sorted(key_times):
+            values = [
+                cmds.getAttr("{}.{}".format(target, axis), time=frame)
+                for axis in self.ROTATE_AXES
+            ]
+            new_values = open_maya.reorder_euler_rotation(
+                values[0], values[1], values[2], old_order, new_order
+            )
+            for axis, value in zip(self.ROTATE_AXES, new_values):
+                cmds.keyframe(
+                    "{}.{}".format(target, axis),
+                    edit=True,
+                    time=(frame, frame),
+                    valueChange=value,
+                )
+
     def apply_switches(self, requests):
         """Apply a staged group of attribute switches as one operation."""
         requests = list(requests or [])
         if not requests:
             return
         requests = self._sort_requests_by_influence(requests)
+
+        # Precompute the real amount of work up front. Each request's own
+        # "All Keyframes" pass (_apply_multiple_frames) used to call
+        # set_total(..., reset=True) on this shared/merged operation, which
+        # wiped out progress made by earlier requests every time -- the
+        # progress bar and ETA would jump back to 0% per attribute instead of
+        # tracking the whole batch. Establishing one combined total here, and
+        # having per-request work only step (never reset) it, keeps progress
+        # monotonic across every request regardless of scope.
+        timeline_selection = cmds.timeControl("timeControl1", q=True, rv=True)
+        selected_range = cmds.timeControl("timeControl1", q=True, ra=True)
+        total_cost = 0
+        for value, attribute, options, all_frames in requests:
+            try:
+                targets = options[value]["objects"]
+            except (KeyError, TypeError):
+                total_cost += 1
+                continue
+            if attribute == "rotateOrder":
+                # Most targets take the pure-math lightning path (one step
+                # per target, see _switch_rotate_order_lightning) instead of
+                # the frame-by-frame world-matrix pass, so estimate on
+                # object count rather than keyframe count.
+                total_cost += max(1, len(targets))
+                continue
+            keyframes = self._collect_keyframes(
+                targets, all_frames, timeline_selection, selected_range
+            )
+            total_cost += len(keyframes) * 2 if isinstance(keyframes, dict) else 1
+        total_cost = total_cost or len(requests)
+
         with toolCommon.tool_operation(
             tool_id="attribute_switcher_multi",
             label="Switch Multiple Attributes",
             progress=True,
-            progress_max=len(requests),
+            progress_max=total_cost,
             undo=True,
         ) as operation:
             self.disconnect_runtime()
@@ -433,7 +670,6 @@ class AttributeSwitcherController:
                         all_frames_override=all_frames,
                         _manage_session=False,
                     )
-                    operation.step()
             finally:
                 self.connect_runtime()
                 self.view.refresh(force=True)
@@ -445,7 +681,7 @@ class AttributeSwitcherController:
         cmds.xform(target, ws=True, matrix=transform)
 
     def _apply_multiple_frames(
-        self, attribute, value, keyframes, target_attributes=None
+        self, attribute, value, keyframes, target_attributes=None, owns_progress=True
     ):
         tint = None
         current_time = cmds.currentTime(q=True)
@@ -461,9 +697,14 @@ class AttributeSwitcherController:
             )
             operation = toolCommon.current_tool_operation()
             if operation:
-                operation.set_total(len(frames) * 2, reset=True).set_status(
-                    "Saving Positions"
-                )
+                # Only claim/reset the shared operation's total when this call
+                # owns it outright (a standalone switch). When driven by
+                # apply_switches() the total already reflects every staged
+                # request combined -- resetting it here would wipe out
+                # progress already made by earlier requests in the batch.
+                if owns_progress:
+                    operation.set_total(len(frames) * 2, reset=True)
+                operation.set_status("Saving Positions")
 
             transforms = {}
             interrupted = False

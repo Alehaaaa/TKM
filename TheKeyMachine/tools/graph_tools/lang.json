@@ -1,0 +1,222 @@
+{
+    "graph_extra_tools": {
+        "en": {
+            "label": "Graph Extras",
+            "tooltip": [
+                "Open the Graph Editor utility commands."
+            ]
+        },
+        "es": {
+            "label": "Extras del Graph",
+            "tooltip": [
+                "Abre los comandos utilitarios del Graph Editor."
+            ]
+        },
+        "fr": {
+            "label": "Extras du Graph",
+            "tooltip": [
+                "Ouvre les commandes utilitaires du Graph Editor."
+            ]
+        }
+    },
+    "graph_select_object_from_curve": {
+        "en": {
+            "label": "Select Object from Curve",
+            "tooltip": [
+                "Select scene objects associated with the selected animation curves."
+            ]
+        },
+        "es": {
+            "label": "Seleccionar Objeto desde la Curva",
+            "tooltip": [
+                "Selecciona los objetos de la escena asociados a las curvas de animación seleccionadas."
+            ]
+        },
+        "fr": {
+            "label": "Sélectionner l'Objet depuis la Courbe",
+            "tooltip": [
+                "Sélectionne les objets de la scène associés aux courbes d'animation sélectionnées."
+            ]
+        }
+    },
+    "graph_isolate_curves": {
+        "en": {
+            "label": "Isolate Curves",
+            "tooltip": [
+                "Show only selected curves in the Graph Editor."
+            ]
+        },
+        "es": {
+            "label": "Aislar Curvas",
+            "tooltip": [
+                "Muestra solo las curvas seleccionadas en el Graph Editor."
+            ]
+        },
+        "fr": {
+            "label": "Isoler les Courbes",
+            "tooltip": [
+                "Affiche uniquement les courbes sélectionnées dans le Graph Editor."
+            ]
+        }
+    },
+    "graph_flip": {
+        "en": {
+            "label": "Flip Curves",
+            "tooltip": [
+                "Invert selected curve values vertically."
+            ]
+        },
+        "es": {
+            "label": "Invertir Curvas",
+            "tooltip": [
+                "Invierte verticalmente los valores de las curvas seleccionadas."
+            ]
+        },
+        "fr": {
+            "label": "Inverser les Courbes",
+            "tooltip": [
+                "Inverse verticalement les valeurs des courbes sélectionnées."
+            ]
+        }
+    },
+    "graph_overlap_forward": {
+        "en": {
+            "label": "Overlap Forward",
+            "tooltip": [
+                "Offset selected curves progressively to create overlapping motion."
+            ]
+        },
+        "es": {
+            "label": "Solapar Hacia Adelante",
+            "tooltip": [
+                "Desfasa progresivamente las curvas seleccionadas para crear un movimiento solapado."
+            ]
+        },
+        "fr": {
+            "label": "Chevaucher Vers l'Avant",
+            "tooltip": [
+                "Décale progressivement les courbes sélectionnées pour créer un mouvement chevauché."
+            ]
+        }
+    },
+    "graph_overlap_backward": {
+        "en": {
+            "label": "Overlap Backward",
+            "tooltip": [
+                "Offset selected curves progressively to create overlapping motion."
+            ]
+        },
+        "es": {
+            "label": "Solapar Hacia Atrás",
+            "tooltip": [
+                "Desfasa progresivamente las curvas seleccionadas para crear un movimiento solapado."
+            ]
+        },
+        "fr": {
+            "label": "Chevaucher Vers l'Arrière",
+            "tooltip": [
+                "Décale progressivement les courbes sélectionnées pour créer un mouvement chevauché."
+            ]
+        }
+    },
+    "graph_toggle_mute": {
+        "en": {
+            "label": "Mute Curves",
+            "tooltip": [
+                "Toggle mute on selected curves."
+            ]
+        },
+        "es": {
+            "label": "Silenciar Curvas",
+            "tooltip": [
+                "Activa o desactiva el silencio en las curvas seleccionadas."
+            ]
+        },
+        "fr": {
+            "label": "Muter les Courbes",
+            "tooltip": [
+                "Active ou désactive la mise en sourdine des courbes sélectionnées."
+            ]
+        }
+    },
+    "graph_toggle_lock": {
+        "en": {
+            "label": "Lock Curves",
+            "tooltip": [
+                "Toggle editing locks on selected curves."
+            ]
+        },
+        "es": {
+            "label": "Bloquear Curvas",
+            "tooltip": [
+                "Activa o desactiva el bloqueo de edición en las curvas seleccionadas."
+            ]
+        },
+        "fr": {
+            "label": "Verrouiller les Courbes",
+            "tooltip": [
+                "Active ou désactive le verrouillage d'édition des courbes sélectionnées."
+            ]
+        }
+    },
+    "graph_match_keys": {
+        "en": {
+            "label": "Match Curves",
+            "tooltip": [
+                "Match selected curves to the final selected curve."
+            ]
+        },
+        "es": {
+            "label": "Igualar Curvas",
+            "tooltip": [
+                "Iguala las curvas seleccionadas a la última curva seleccionada."
+            ]
+        },
+        "fr": {
+            "label": "Aligner les Courbes",
+            "tooltip": [
+                "Aligne les courbes sélectionnées sur la dernière courbe sélectionnée."
+            ]
+        }
+    },
+    "enable_graph_filter": {
+        "en": {
+            "label": "Enable Graph Filter",
+            "tooltip": [
+                "Enable or clear Graph Editor filtering for the current selection."
+            ]
+        },
+        "es": {
+            "label": "Activar Filtro del Graph",
+            "tooltip": [
+                "Activa o limpia el filtrado del Graph Editor para la selección actual."
+            ]
+        },
+        "fr": {
+            "label": "Activer le Filtre du Graph",
+            "tooltip": [
+                "Active ou efface le filtrage du Graph Editor pour la sélection actuelle."
+            ]
+        }
+    },
+    "disable_graph_filter": {
+        "en": {
+            "label": "Disable Graph Filter",
+            "tooltip": [
+                "Enable or clear Graph Editor filtering for the current selection."
+            ]
+        },
+        "es": {
+            "label": "Desactivar Filtro del Graph",
+            "tooltip": [
+                "Activa o limpia el filtrado del Graph Editor para la selección actual."
+            ]
+        },
+        "fr": {
+            "label": "Désactiver le Filtre du Graph",
+            "tooltip": [
+                "Active ou efface le filtrage du Graph Editor pour la sélection actuelle."
+            ]
+        }
+    }
+}

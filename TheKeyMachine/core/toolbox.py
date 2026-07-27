@@ -3,6 +3,7 @@ import json
 import os
 import pkgutil
 import sys
+from types import MappingProxyType
 
 
 class ToolObject(object):
@@ -12,6 +13,9 @@ class ToolObject(object):
     TOOLS = {}
     SECTION = None
     SECTIONS = ()
+    # Set by _collect_package_definitions() to this package's __init__.py path,
+    # so i18n.load_package_lang() can find its optional lang.json.
+    _package_file = None
 
     @classmethod
     def tools(cls):
@@ -310,6 +314,7 @@ def _collect_package_definitions():
             continue
         if tool_object is None:
             continue
+        tool_object._package_file = getattr(package, "__file__", None)
         packages.append((tool_object.ORDER, module_info.name, tool_object))
 
     if import_errors:
@@ -319,9 +324,11 @@ def _collect_package_definitions():
         package_tools = tool_object.tools()
         for definition in package_tools.values():
             definition.setdefault("_package", package_name)
+            definition.setdefault("_package_file", tool_object._package_file)
         package_sections = tool_object.sections()
         for definition in package_sections.values():
             definition.setdefault("_package", package_name)
+            definition.setdefault("_package_file", tool_object._package_file)
         _merge_owned(tools, tool_owners, package_tools, package_name, "tool")
         _merge_owned(sections, section_owners, package_sections, package_name, "section")
     _validate_definition_graph(tools, sections)
@@ -338,21 +345,28 @@ def reset_package_cache():
 def _package_definitions():
     global _PACKAGE_TOOL_DEFINITIONS, _PACKAGE_SECTION_DEFINITIONS
     if _PACKAGE_TOOL_DEFINITIONS is None:
-        (
-            _PACKAGE_TOOL_DEFINITIONS,
-            _PACKAGE_SECTION_DEFINITIONS,
-        ) = _collect_package_definitions()
+        tools, sections = _collect_package_definitions()
+        # Wrap (not copy) the memoized registry. get_tool()/get_tool_section()
+        # already make their own per-item dict(...) copy before applying
+        # overrides -- nothing needs a fresh top-level copy of the whole
+        # registry on every lookup, and this used to be called on every
+        # tool/section resolution for every button on both toolbars.
+        # MappingProxyType keeps callers from accidentally mutating the
+        # shared cache while costing nothing to construct (unlike dict(...),
+        # which copies every entry).
+        _PACKAGE_TOOL_DEFINITIONS = MappingProxyType(tools)
+        _PACKAGE_SECTION_DEFINITIONS = MappingProxyType(sections)
     return _PACKAGE_TOOL_DEFINITIONS, _PACKAGE_SECTION_DEFINITIONS
 
 
 def _tool_definitions():
     package_tools, _package_sections = _package_definitions()
-    return dict(package_tools)
+    return package_tools
 
 
 def _section_definitions():
     _package_tools, package_sections = _package_definitions()
-    return dict(package_sections)
+    return package_sections
 
 
 def get_tool_definitions():
@@ -419,6 +433,8 @@ def get_tool(tool_id, **overrides):
         raise KeyError("Unknown tool id: {}".format(tool_id))
 
     tool = dict(definitions[tool_id])
+    from TheKeyMachine.core import i18n
+    tool = i18n.localize_tool(tool_id, tool)
     tool.update(overrides)
     tool.setdefault("id", tool_id)
     tool.setdefault("default", False)
@@ -457,6 +473,12 @@ def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
     section["id"] = section_id
     section["_toolbar_id"] = toolbar_id
     section.setdefault("color", COLORS.toolbar.gray.hex)
+    if section.get("label"):
+        from TheKeyMachine.core import i18n
+
+        section["label"] = i18n.localize_section_label(
+            section_id, section.get("_package_file"), section["label"]
+        )
     if not resolve_items:
         section["items"] = list(section_def.get("items", []))
         return section

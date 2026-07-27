@@ -1,0 +1,188 @@
+{
+    "align_objects": {
+        "en": {
+            "label": "Align Objects",
+            "tooltip": [
+                "Match the selected source objects to the last selected target.",
+                "Uses translation, rotation, and scale. A selected time range aligns every frame in that range."
+            ]
+        },
+        "es": {
+            "label": "Alinear Objetos",
+            "tooltip": [
+                "Alinea los objetos origen seleccionados con el último objetivo seleccionado.",
+                "Usa traslación, rotación y escala. Un rango de tiempo seleccionado alinea cada fotograma de ese rango."
+            ]
+        },
+        "fr": {
+            "label": "Aligner les Objets",
+            "tooltip": [
+                "Aligne les objets source sélectionnés sur la dernière cible sélectionnée.",
+                "Utilise la translation, la rotation et l'échelle. Une plage de temps sélectionnée aligne chaque image de cette plage."
+            ]
+        }
+    },
+    "align_objects_all_keys": {
+        "en": {
+            "label": "Align Objects All Keys",
+            "tooltip": [
+                "Match the selected source objects to the last selected target.",
+                "Uses translation, rotation, and scale. A selected time range aligns every frame in that range."
+            ]
+        },
+        "es": {
+            "label": "Alinear Objetos - Todas las Claves",
+            "tooltip": [
+                "Alinea los objetos origen seleccionados con el último objetivo seleccionado.",
+                "Usa traslación, rotación y escala. Un rango de tiempo seleccionado alinea cada fotograma de ese rango."
+            ]
+        },
+        "fr": {
+            "label": "Aligner les Objets - Toutes les Clés",
+            "tooltip": [
+                "Aligne les objets source sélectionnés sur la dernière cible sélectionnée.",
+                "Utilise la translation, la rotation et l'échelle. Une plage de temps sélectionnée aligne chaque image de cette plage."
+            ]
+        }
+    },
+    "align_object_translation": {
+        "en": {
+            "label": "Align Object Translation",
+            "tooltip": [
+                "Match only world-space translation to the last selected target."
+            ]
+        },
+        "es": {
+            "label": "Alinear Traslación de Objeto",
+            "tooltip": [
+                "Alinea solo la traslación en espacio del mundo con el último objetivo seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Aligner la Translation de l'Objet",
+            "tooltip": [
+                "Aligne uniquement la translation en espace monde sur la dernière cible sélectionnée."
+            ]
+        }
+    },
+    "align_object_translation_all_keys": {
+        "en": {
+            "label": "Align Object Translation All Keys",
+            "tooltip": [
+                "Match translation on every keyed frame of the selected source objects."
+            ]
+        },
+        "es": {
+            "label": "Alinear Traslación de Objeto - Todas las Claves",
+            "tooltip": [
+                "Alinea la traslación en cada fotograma clave de los objetos origen seleccionados."
+            ]
+        },
+        "fr": {
+            "label": "Aligner la Translation de l'Objet - Toutes les Clés",
+            "tooltip": [
+                "Aligne la translation sur chaque image clé des objets source sélectionnés."
+            ]
+        }
+    },
+    "align_object_rotation": {
+        "en": {
+            "label": "Align Object Rotation",
+            "tooltip": [
+                "Match only world-space rotation to the last selected target."
+            ]
+        },
+        "es": {
+            "label": "Alinear Rotación de Objeto",
+            "tooltip": [
+                "Alinea solo la rotación en espacio del mundo con el último objetivo seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Aligner la Rotation de l'Objet",
+            "tooltip": [
+                "Aligne uniquement la rotation en espace monde sur la dernière cible sélectionnée."
+            ]
+        }
+    },
+    "align_object_rotation_all_keys": {
+        "en": {
+            "label": "Align Object Rotation All Keys",
+            "tooltip": [
+                "Match rotation on every keyed frame of the selected source objects."
+            ]
+        },
+        "es": {
+            "label": "Alinear Rotación de Objeto - Todas las Claves",
+            "tooltip": [
+                "Alinea la rotación en cada fotograma clave de los objetos origen seleccionados."
+            ]
+        },
+        "fr": {
+            "label": "Aligner la Rotation de l'Objet - Toutes les Clés",
+            "tooltip": [
+                "Aligne la rotation sur chaque image clé des objets source sélectionnés."
+            ]
+        }
+    },
+    "align_object_scale": {
+        "en": {
+            "label": "Align Object Scale",
+            "tooltip": [
+                "Match only world-space scale to the last selected target."
+            ]
+        },
+        "es": {
+            "label": "Alinear Escala de Objeto",
+            "tooltip": [
+                "Alinea solo la escala en espacio del mundo con el último objetivo seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Aligner l'Échelle de l'Objet",
+            "tooltip": [
+                "Aligne uniquement l'échelle en espace monde sur la dernière cible sélectionnée."
+            ]
+        }
+    },
+    "align_object_scale_all_keys": {
+        "en": {
+            "label": "Align Object Scale All Keys",
+            "tooltip": [
+                "Match scale on every keyed frame of the selected source objects."
+            ]
+        },
+        "es": {
+            "label": "Alinear Escala de Objeto - Todas las Claves",
+            "tooltip": [
+                "Alinea la escala en cada fotograma clave de los objetos origen seleccionados."
+            ]
+        },
+        "fr": {
+            "label": "Aligner l'Échelle de l'Objet - Toutes les Clés",
+            "tooltip": [
+                "Aligne l'échelle sur chaque image clé des objets source sélectionnés."
+            ]
+        }
+    },
+    "align_objects_help": {
+        "en": {
+            "label": "Align Objects Help",
+            "tooltip": [
+                "Open the Align Objects documentation."
+            ]
+        },
+        "es": {
+            "label": "Ayuda de Alinear Objetos",
+            "tooltip": [
+                "Abre la documentación de Alinear Objetos."
+            ]
+        },
+        "fr": {
+            "label": "Aide Aligner les Objets",
+            "tooltip": [
+                "Ouvre la documentation d'Aligner les Objets."
+            ]
+        }
+    }
+}

@@ -25,53 +25,17 @@ def show_dock_menu(*_args):
     return _show_menu("graph_dock_menu")
 
 
-def get_widget():
-    return controller.get_widget()
-
-
-def create(*args, **kwargs):
-    return controller.create(*args, **kwargs)
-
-
-def remove():
-    return controller.remove()
-
-
-def ensure():
-    return controller.ensure()
-
-
-def apply_alignment(alignment_label=None):
-    return controller.apply_alignment(alignment_label)
-
-
-def move_dock(position=None):
-    return controller.move_dock(position)
-
-
-def get_graph_toolbar_checkbox_state():
-    return controller.get_graph_toolbar_checkbox_state()
-
-
-def is_graph_toolbar_visible():
-    return controller.is_graph_toolbar_visible()
-
-
-def emit_graph_toolbar_state():
-    return controller.emit_graph_toolbar_state()
-
-
-def sync_graph_toolbar_watch():
-    return controller.sync_graph_toolbar_watch()
-
-
-def bind_graph_toolbar_toggle(widget):
-    return controller.bind_graph_toolbar_toggle(widget)
-
-
-def set_graph_toolbar_enabled(enabled, *, apply=True):
-    return controller.set_graph_toolbar_enabled(enabled, apply=apply)
-
-
-def shutdown_graph_toolbar_runtime():
-    return controller.shutdown_graph_toolbar_runtime()
+# Every other name this module exposes (`create`, `remove`, `ensure`,
+# `get_widget`, `apply_alignment`, `move_dock`,
+# `get_graph_toolbar_checkbox_state`, `is_graph_toolbar_visible`,
+# `emit_graph_toolbar_state`, `sync_graph_toolbar_watch`,
+# `bind_graph_toolbar_toggle`, `set_graph_toolbar_enabled`,
+# `shutdown_graph_toolbar_runtime`, ...) is a pure 1:1 forward to the
+# identically-named function on `controller` -- this module is the tool
+# package's stable public facade (other packages import `...api`, not
+# `...controller`, and `runtimeManager` even resolves
+# "graph_toolbar.api" by string at shutdown), so the names need to keep
+# working, but there's no reason to hand-write a wrapper per name just to
+# call straight through. Resolve them lazily instead.
+def __getattr__(name):
+    return getattr(controller, name)

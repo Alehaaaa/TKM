@@ -1,0 +1,242 @@
+{
+    "tweener": {
+        "en": {
+            "label": "Tweener",
+            "tooltip": [
+                "Blend values between the previous and next keys."
+            ]
+        },
+        "es": {
+            "label": "Tweener",
+            "tooltip": [
+                "Mezcla los valores entre la clave anterior y la siguiente."
+            ]
+        },
+        "fr": {
+            "label": "Tweener",
+            "tooltip": [
+                "Fond les valeurs entre la clé précédente et la suivante."
+            ]
+        }
+    },
+    "tweener_worldspace": {
+        "en": {
+            "label": "Tweener World Space",
+            "tooltip": [
+                "Blend transforms between neighboring poses in world space."
+            ]
+        },
+        "es": {
+            "label": "Tweener en Espacio del Mundo",
+            "tooltip": [
+                "Mezcla los transforms entre poses vecinas en espacio del mundo."
+            ]
+        },
+        "fr": {
+            "label": "Tweener en Espace Monde",
+            "tooltip": [
+                "Fond les transforms entre poses voisines en espace monde."
+            ]
+        }
+    },
+    "blend_to_buffer": {
+        "en": {
+            "label": "Blend to Buffer",
+            "tooltip": [
+                "Blend the current pose toward the stored pose buffer."
+            ]
+        },
+        "es": {
+            "label": "Mezclar al Buffer",
+            "tooltip": [
+                "Mezcla la pose actual hacia la pose guardada en el buffer."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers le Buffer",
+            "tooltip": [
+                "Fond la pose actuelle vers la pose enregistrée dans le buffer."
+            ]
+        }
+    },
+    "blend_to_default": {
+        "en": {
+            "label": "Blend to Default",
+            "tooltip": [
+                "Blend channels toward their default values."
+            ]
+        },
+        "es": {
+            "label": "Mezclar al Predeterminado",
+            "tooltip": [
+                "Mezcla los canales hacia sus valores predeterminados."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Valeur par Défaut",
+            "tooltip": [
+                "Fond les canaux vers leurs valeurs par défaut."
+            ]
+        }
+    },
+    "blend_to_ease": {
+        "en": {
+            "label": "Blend to Ease",
+            "tooltip": [
+                "Blend the current values toward an eased interpolation."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Suavizado",
+            "tooltip": [
+                "Mezcla los valores actuales hacia una interpolación suavizada."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers l'Adoucissement",
+            "tooltip": [
+                "Fond les valeurs actuelles vers une interpolation adoucie."
+            ]
+        }
+    },
+    "blend_to_frame": {
+        "en": {
+            "label": "Blend to Frame",
+            "tooltip": [
+                "Blend toward values sampled from picked reference frames."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a un Fotograma",
+            "tooltip": [
+                "Mezcla hacia valores tomados de fotogramas de referencia elegidos."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers une Image",
+            "tooltip": [
+                "Fond vers des valeurs échantillonnées à partir d'images de référence choisies."
+            ]
+        }
+    },
+    "blend_to_frame_ws": {
+        "en": {
+            "label": "Blend to Frame World Space",
+            "tooltip": [
+                "Blend toward picked reference frames in world space."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a un Fotograma en Espacio del Mundo",
+            "tooltip": [
+                "Mezcla hacia fotogramas de referencia elegidos en espacio del mundo."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers une Image en Espace Monde",
+            "tooltip": [
+                "Fond vers des images de référence choisies en espace monde."
+            ]
+        }
+    },
+    "blend_to_neighbors": {
+        "en": {
+            "label": "Blend to Neighbors",
+            "tooltip": [
+                "Blend toward the previous or next neighboring key."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Vecinos",
+            "tooltip": [
+                "Mezcla hacia la clave vecina anterior o siguiente."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers les Voisins",
+            "tooltip": [
+                "Fond vers la clé voisine précédente ou suivante."
+            ]
+        }
+    },
+    "blend_to_neighbors_ws": {
+        "en": {
+            "label": "Blend to Neighbors World Space",
+            "tooltip": [
+                "Blend toward neighboring poses in world space."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Vecinos en Espacio del Mundo",
+            "tooltip": [
+                "Mezcla hacia poses vecinas en espacio del mundo."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers les Voisins en Espace Monde",
+            "tooltip": [
+                "Fond vers des poses voisines en espace monde."
+            ]
+        }
+    },
+    "blend_to_infinity": {
+        "en": {
+            "label": "Blend to Infinity",
+            "tooltip": [
+                "Blend toward the curve's pre-infinity or post-infinity value."
+            ]
+        },
+        "es": {
+            "label": "Mezclar al Infinito",
+            "tooltip": [
+                "Mezcla hacia el valor de pre-infinito o post-infinito de la curva."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers l'Infini",
+            "tooltip": [
+                "Fond vers la valeur de pré-infini ou post-infini de la courbe."
+            ]
+        }
+    },
+    "blend_to_infinity_ws": {
+        "en": {
+            "label": "Blend to Infinity World Space",
+            "tooltip": [
+                "Blend toward infinity values in world space."
+            ]
+        },
+        "es": {
+            "label": "Mezclar al Infinito en Espacio del Mundo",
+            "tooltip": [
+                "Mezcla hacia valores de infinito en espacio del mundo."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers l'Infini en Espace Monde",
+            "tooltip": [
+                "Fond vers des valeurs d'infini en espace monde."
+            ]
+        }
+    },
+    "blend_to_undo": {
+        "en": {
+            "label": "Blend to Undo",
+            "tooltip": [
+                "Blend back toward the state captured before this interaction."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Deshacer",
+            "tooltip": [
+                "Mezcla de vuelta hacia el estado capturado antes de esta interacción."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers Annuler",
+            "tooltip": [
+                "Fond en revenant vers l'état capturé avant cette interaction."
+            ]
+        }
+    }
+}

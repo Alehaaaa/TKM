@@ -1,0 +1,25 @@
+{
+    "depth_mover": {
+        "en": {
+            "label": "Depth Mover",
+            "tooltip": [
+                "Drag selected transforms toward or away from the active camera while preserving their screen position.",
+                "Disable the tool to restore Maya's previous interaction context."
+            ]
+        },
+        "es": {
+            "label": "Movedor de Profundidad",
+            "tooltip": [
+                "Arrastra los transforms seleccionados hacia o desde la cámara activa manteniendo su posición en pantalla.",
+                "Desactiva la herramienta para restaurar el contexto de interacción anterior de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Déplaceur de Profondeur",
+            "tooltip": [
+                "Fait glisser les transforms sélectionnés vers ou depuis la caméra active en conservant leur position à l'écran.",
+                "Désactivez l'outil pour restaurer le contexte d'interaction précédent de Maya."
+            ]
+        }
+    }
+}

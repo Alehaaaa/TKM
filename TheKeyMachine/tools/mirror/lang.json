@@ -1,0 +1,243 @@
+{
+    "select_opposite": {
+        "en": {
+            "label": "Select Opposite",
+            "tooltip": [
+                "Select the opposite-side controls matching the current selection."
+            ]
+        },
+        "es": {
+            "label": "Seleccionar Opuesto",
+            "tooltip": [
+                "Selecciona los controles del lado opuesto que coinciden con la selección actual."
+            ]
+        },
+        "fr": {
+            "label": "Sélectionner l'Opposé",
+            "tooltip": [
+                "Sélectionne les contrôleurs du côté opposé correspondant à la sélection actuelle."
+            ]
+        }
+    },
+    "opposite_add": {
+        "en": {
+            "label": "Add Opposite",
+            "tooltip": [
+                "Add the opposite-side controls to the current selection."
+            ]
+        },
+        "es": {
+            "label": "Añadir Opuesto",
+            "tooltip": [
+                "Añade los controles del lado opuesto a la selección actual."
+            ]
+        },
+        "fr": {
+            "label": "Ajouter l'Opposé",
+            "tooltip": [
+                "Ajoute les contrôleurs du côté opposé à la sélection actuelle."
+            ]
+        }
+    },
+    "opposite_copy": {
+        "en": {
+            "label": "Copy Opposite",
+            "tooltip": [
+                "Copy the selected controls' current values to their opposite-side controls.",
+                "Saved mirror exceptions are applied per channel."
+            ]
+        },
+        "es": {
+            "label": "Copiar Opuesto",
+            "tooltip": [
+                "Copia los valores actuales de los controles seleccionados a sus controles del lado opuesto.",
+                "Las excepciones de espejo guardadas se aplican por canal."
+            ]
+        },
+        "fr": {
+            "label": "Copier l'Opposé",
+            "tooltip": [
+                "Copie les valeurs actuelles des contrôleurs sélectionnés vers leurs contrôleurs du côté opposé.",
+                "Les exceptions de miroir enregistrées s'appliquent par canal."
+            ]
+        }
+    },
+    "mirror": {
+        "en": {
+            "label": "Mirror",
+            "tooltip": [
+                "Mirror the selected controls to their opposite-side equivalents.",
+                "Mirror exceptions can be configured per rig and are saved for reuse."
+            ]
+        },
+        "es": {
+            "label": "Espejo",
+            "tooltip": [
+                "Refleja los controles seleccionados en sus equivalentes del lado opuesto.",
+                "Las excepciones de espejo se pueden configurar por rig y se guardan para reutilizarlas."
+            ]
+        },
+        "fr": {
+            "label": "Miroir",
+            "tooltip": [
+                "Reflète les contrôleurs sélectionnés vers leurs équivalents du côté opposé.",
+                "Les exceptions de miroir peuvent être configurées par rig et sont enregistrées pour réutilisation."
+            ]
+        }
+    },
+    "mirror_to_right": {
+        "en": {
+            "label": "Mirror to Right",
+            "tooltip": [
+                "Copy current mirrored values from selected left-side controls to their right-side opposites.",
+                "Invert exceptions multiply saved channels by -1 before writing them to the opposite control."
+            ]
+        },
+        "es": {
+            "label": "Espejo a la Derecha",
+            "tooltip": [
+                "Copia los valores reflejados actuales de los controles izquierdos seleccionados a sus opuestos derechos.",
+                "Las excepciones de inversión multiplican por -1 los canales guardados antes de escribirlos en el control opuesto."
+            ]
+        },
+        "fr": {
+            "label": "Miroir vers la Droite",
+            "tooltip": [
+                "Copie les valeurs miroir actuelles des contrôleurs gauches sélectionnés vers leurs opposés droits.",
+                "Les exceptions d'inversion multiplient par -1 les canaux enregistrés avant de les écrire sur le contrôleur opposé."
+            ]
+        }
+    },
+    "mirror_to_left": {
+        "en": {
+            "label": "Mirror to Left",
+            "tooltip": [
+                "Copy current mirrored values from selected right-side controls to their left-side opposites.",
+                "Invert exceptions multiply saved channels by -1 before writing them to the opposite control."
+            ]
+        },
+        "es": {
+            "label": "Espejo a la Izquierda",
+            "tooltip": [
+                "Copia los valores reflejados actuales de los controles derechos seleccionados a sus opuestos izquierdos.",
+                "Las excepciones de inversión multiplican por -1 los canales guardados antes de escribirlos en el control opuesto."
+            ]
+        },
+        "fr": {
+            "label": "Miroir vers la Gauche",
+            "tooltip": [
+                "Copie les valeurs miroir actuelles des contrôleurs droits sélectionnés vers leurs opposés gauches.",
+                "Les exceptions d'inversion multiplient par -1 les canaux enregistrés avant de les écrire sur le contrôleur opposé."
+            ]
+        }
+    },
+    "mirror_all_keys": {
+        "en": {
+            "label": "Mirror All Keys",
+            "tooltip": [
+                "Copy all keyed animation from selected controls to their opposite-side controls.",
+                "Existing keys on the destination channels are replaced, and mirror exceptions are applied per channel."
+            ]
+        },
+        "es": {
+            "label": "Espejo en Todas las Claves",
+            "tooltip": [
+                "Copia toda la animación con claves de los controles seleccionados a sus controles del lado opuesto.",
+                "Las claves existentes en los canales de destino se reemplazan y las excepciones de espejo se aplican por canal."
+            ]
+        },
+        "fr": {
+            "label": "Miroir sur Toutes les Clés",
+            "tooltip": [
+                "Copie toute l'animation avec clés des contrôleurs sélectionnés vers leurs contrôleurs du côté opposé.",
+                "Les clés existantes sur les canaux de destination sont remplacées et les exceptions de miroir s'appliquent par canal."
+            ]
+        }
+    },
+    "mirror_add_invert": {
+        "en": {
+            "label": "Add Exception Invert",
+            "tooltip": [
+                "Save an Invert exception for the selected controls and Channel Box attributes.",
+                "The saved channel value is multiplied by -1 during mirror operations."
+            ]
+        },
+        "es": {
+            "label": "Añadir Excepción Invertir",
+            "tooltip": [
+                "Guarda una excepción de Inversión para los controles y atributos del Channel Box seleccionados.",
+                "El valor de canal guardado se multiplica por -1 durante las operaciones de espejo."
+            ]
+        },
+        "fr": {
+            "label": "Ajouter une Exception d'Inversion",
+            "tooltip": [
+                "Enregistre une exception d'Inversion pour les contrôleurs et attributs du Channel Box sélectionnés.",
+                "La valeur de canal enregistrée est multipliée par -1 lors des opérations de miroir."
+            ]
+        }
+    },
+    "mirror_add_keep": {
+        "en": {
+            "label": "Add Exception Keep",
+            "tooltip": [
+                "Save a Keep exception for the selected controls and Channel Box attributes.",
+                "The saved channel value transfers unchanged during mirror operations."
+            ]
+        },
+        "es": {
+            "label": "Añadir Excepción Mantener",
+            "tooltip": [
+                "Guarda una excepción de Mantener para los controles y atributos del Channel Box seleccionados.",
+                "El valor de canal guardado se transfiere sin cambios durante las operaciones de espejo."
+            ]
+        },
+        "fr": {
+            "label": "Ajouter une Exception Conserver",
+            "tooltip": [
+                "Enregistre une exception Conserver pour les contrôleurs et attributs du Channel Box sélectionnés.",
+                "La valeur de canal enregistrée est transférée sans changement lors des opérations de miroir."
+            ]
+        }
+    },
+    "mirror_remove_exc": {
+        "en": {
+            "label": "Remove Exception",
+            "tooltip": [
+                "Remove saved mirror exceptions from the selected controls and Channel Box attributes."
+            ]
+        },
+        "es": {
+            "label": "Quitar Excepción",
+            "tooltip": [
+                "Elimina las excepciones de espejo guardadas de los controles y atributos del Channel Box seleccionados."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer l'Exception",
+            "tooltip": [
+                "Supprime les exceptions de miroir enregistrées des contrôleurs et attributs du Channel Box sélectionnés."
+            ]
+        }
+    },
+    "mirror_help": {
+        "en": {
+            "label": "Help",
+            "tooltip": [
+                "Open the Mirror tool documentation."
+            ]
+        },
+        "es": {
+            "label": "Ayuda",
+            "tooltip": [
+                "Abre la documentación de la herramienta Espejo."
+            ]
+        },
+        "fr": {
+            "label": "Aide",
+            "tooltip": [
+                "Ouvre la documentation de l'outil Miroir."
+            ]
+        }
+    }
+}

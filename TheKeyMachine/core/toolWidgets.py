@@ -36,7 +36,11 @@ from TheKeyMachine.widgets import util as wutil  # type: ignore
 from TheKeyMachine.core.Qt import QtCompat, QtCore, QtGui  # type: ignore
 
 
-MAIN_SPECIAL_TOOL_KEYS = {
+# Tool keys that get special handling (bound callbacks, custom widgets, ...)
+# instead of a plain toolbutton, on both the main toolbar and the Graph
+# Editor toolbar -- the two toolbars share one tool registry, so the set of
+# keys that need special-casing is the same for both.
+TOOLBAR_SPECIAL_TOOL_KEYS = {
     "orbit",
     "selection_sets",
     "attribute_switcher",
@@ -44,13 +48,10 @@ MAIN_SPECIAL_TOOL_KEYS = {
     "TKM",
 }
 
-GRAPH_SPECIAL_TOOL_KEYS = {
-    "orbit",
-    "selection_sets",
-    "attribute_switcher",
-    "selector",
-    "TKM",
-}
+# Back-compat aliases: kept in case anything outside this module still
+# imports the toolbar-specific names.
+MAIN_SPECIAL_TOOL_KEYS = TOOLBAR_SPECIAL_TOOL_KEYS
+GRAPH_SPECIAL_TOOL_KEYS = TOOLBAR_SPECIAL_TOOL_KEYS
 
 
 def _tooltip_description(data):
@@ -472,6 +473,7 @@ def build_slider_section(
     color = section_def["color"]
     icon_color = section_def.get("icon_color", color)
     import TheKeyMachine.core.toolbox as toolbox
+    from TheKeyMachine.core import i18n
 
     toolbar_id = section_def.get("_toolbar_id")
     default_keys = [
@@ -480,7 +482,22 @@ def build_slider_section(
         if hasattr(mode, "key") and toolbox.is_pinned_by_default(toolbar_id, f"{prefix}_{mode.key}")
     ]
 
-    for mode in modes:
+    # SliderMode instances carry their own label/tooltip instead of living in
+    # the toolbox.get_tool() registry (see mods/sliders.py), but each slider
+    # package still gets a lang.json keyed the same way as any other tool.
+    # Localizing the whole list once (rather than per-mode) is what lets the
+    # widget's own mode-switch menu -- which reads straight from its stored
+    # mode list -- show every mode translated too, not just the active one.
+    package_file = section_def.get("_package_file")
+    localized_modes = i18n.localize_slider_modes(modes, package_file)
+    # Remembered so a later language change can redo this exact call and
+    # push the result straight into each already-built slider widget --
+    # see QFlatSectionWidget.refresh_translations().
+    section._tkm_slider_source_modes = modes
+    section._tkm_slider_package_file = package_file
+    section._tkm_slider_prefix = prefix
+
+    for mode in localized_modes:
         if mode == "separator":
             section.addSeparator()
             continue
@@ -489,7 +506,9 @@ def build_slider_section(
 
         key = mode.key
         label = mode.label
+        tooltip = mode.tooltip
         desc = mode.description
+
         mode_data = mode.widget_data()
         slot_key = f"{prefix}_{key}"
 
@@ -506,9 +525,9 @@ def build_slider_section(
             sessionFactory=create_session,
             tooltipTitle=label,
             tooltipDescription=desc,
-            tooltip=mode.tooltip,
+            tooltip=tooltip,
         )
-        slider.setModes(modes)
+        slider.setModes(localized_modes)
         slider.setCurrentMode(key)
 
         def make_mode_setter(slider_instance):
@@ -526,7 +545,7 @@ def build_slider_section(
             slot_key,
             default=slot_key in default_keys,
             description=desc,
-            tooltip=mode.tooltip,
+            tooltip=tooltip,
             icon=mode_data.get("icon"),
             command_icon=mode_data.get("icon"),
         )
@@ -646,7 +665,29 @@ def add_slider_section_from_data(section_def, new_section_fn, *, namespace, obje
     )
 
 
-def populate_main_toolbar_from_layout(layout_id, new_section_fn, owner):
+def _populate_toolbar_from_layout(
+    layout_id,
+    toolbar_id,
+    new_section_fn,
+    *,
+    slider_namespace,
+    slider_object_prefix,
+    add_tool_item_fn,
+    add_widget_item_fn,
+    add_group_items_fn,
+    animations_widget,
+):
+    """Shared skeleton for building a toolbar's sections from the tool registry.
+
+    The main toolbar and the Graph Editor toolbar read from the same
+    declarative tool/section definitions and walk them identically --
+    connect-entries sections, slider sections, then plain/grouped tool
+    sections. What differs between the two toolbars is *what* gets built
+    for a given tool item (a plain button, a bound special widget, or a
+    settings toggle) and the extra context that construction needs (the
+    main-window ``owner`` vs. the Graph Editor's settings-menu factory).
+    That's supplied by the caller as the ``add_*_fn`` callbacks.
+    """
     import TheKeyMachine.core.toolbox as toolbox
 
     sections = toolbox.get_toolbar_sections(layout_id, resolve_items=False)
@@ -654,18 +695,19 @@ def populate_main_toolbar_from_layout(layout_id, new_section_fn, owner):
         sec_id = section_def["id"]
 
         if section_def.get("type") == "connect_entries":
-            add_connect_entries_section(new_section_fn, "main")
+            add_connect_entries_section(new_section_fn, toolbar_id)
             continue
 
         if section_def.get("type") == "slider":
             section = add_slider_section_from_data(
                 section_def,
                 new_section_fn,
-                namespace="main_toolbar_sliders",
-                object_prefix="bar",
+                namespace=slider_namespace,
+                object_prefix=slider_object_prefix,
                 color=section_def.get("color"),
             )
             if section:
+                section._tkm_section_id = section_def["id"]
                 section.set_menu_identity(
                     section_def.get("label"),
                     toolbox.get_section_icon(section_def["id"]),
@@ -676,27 +718,92 @@ def populate_main_toolbar_from_layout(layout_id, new_section_fn, owner):
             color=section_def.get("color"),
             hiddeable=section_def.get("hiddeable", True),
         )
+        section._tkm_section_id = sec_id
         section.set_menu_identity(
             section_def.get("label"),
             toolbox.get_section_icon(sec_id),
         )
-        resolved_section = toolbox.get_tool_section(sec_id, toolbar_id="main")
+        resolved_section = toolbox.get_tool_section(sec_id, toolbar_id=toolbar_id)
 
-        if section_should_use_group_menu(section_def, resolved_section["items"], special_keys=MAIN_SPECIAL_TOOL_KEYS):
-            add_main_group_items(section, resolved_section["items"], owner)
+        if section_should_use_group_menu(
+            section_def, resolved_section["items"], special_keys=TOOLBAR_SPECIAL_TOOL_KEYS
+        ):
+            add_group_items_fn(section, resolved_section["items"])
             continue
 
         add_section_items(
             section,
             resolved_section["items"],
-            add_tool_item_fn=lambda nested_section, item: add_main_tool_item(nested_section, item, owner),
-            add_widget_item_fn=lambda nested_section, item: create_main_widget_from_data(nested_section, item, owner),
-            add_group_items_fn=lambda nested_section, group_items: add_main_group_items(nested_section, group_items, owner),
+            add_tool_item_fn=add_tool_item_fn,
+            add_widget_item_fn=add_widget_item_fn,
+            add_group_items_fn=add_group_items_fn,
         )
 
-    toolbar_widget = getattr(owner, "main_toolbar_widget", None)
-    for section in getattr(toolbar_widget, "_tkm_sections", ()) if toolbar_widget is not None else ():
+    for section in getattr(animations_widget, "_tkm_sections", ()) if animations_widget is not None else ():
         section.enable_entry_animations()
+
+    if animations_widget is not None:
+        _bind_toolbar_translation_refresh(animations_widget)
+
+
+def _refresh_toolbar_translations(toolbar_widget, *_args):
+    import TheKeyMachine.core.toolbox as toolbox
+
+    for section in getattr(toolbar_widget, "_tkm_sections", ()) or ():
+        if not wutil.is_valid_widget(section):
+            continue
+        section.refresh_translations()
+
+        # A section's menu identity (label shown in the right-click pinning
+        # menu) is set once at build time from the same translated section
+        # label -- see _populate_toolbar_from_layout -- so it needs the same
+        # explicit re-apply as its buttons/sliders on a language switch.
+        section_id = getattr(section, "_tkm_section_id", None)
+        if not section_id:
+            continue
+        section_def = toolbox.get_tool_section(section_id, resolve_items=False)
+        if section_def:
+            section.set_menu_identity(
+                section_def.get("label"),
+                toolbox.get_section_icon(section_id),
+            )
+
+
+def _bind_toolbar_translation_refresh(toolbar_widget):
+    """Keep already-built toolbar buttons in sync with language switches.
+
+    Sections are fixed for the toolbar's lifetime (this runs once per
+    toolbar build/reload, same assumption as the pinning menu), so each
+    section's own already-built buttons need an explicit refresh on
+    language change -- unlike the dropdown menus in toolMenus.py, which
+    rebuild fresh on every open and pick a switch up on their own.
+    """
+    from TheKeyMachine.core import i18n
+
+    def _on_language_changed(*_args, widget=toolbar_widget):
+        _refresh_toolbar_translations(widget)
+
+    toolCommon.replace_tracked_connection(
+        toolbar_widget,
+        "_tkm_toolbar_translation_connection",
+        i18n.bus.languageChanged,
+        _on_language_changed,
+        parent=toolbar_widget,
+    )
+
+
+def populate_main_toolbar_from_layout(layout_id, new_section_fn, owner):
+    _populate_toolbar_from_layout(
+        layout_id,
+        "main",
+        new_section_fn,
+        slider_namespace="main_toolbar_sliders",
+        slider_object_prefix="bar",
+        add_tool_item_fn=lambda nested_section, item: add_main_tool_item(nested_section, item, owner),
+        add_widget_item_fn=lambda nested_section, item: create_main_widget_from_data(nested_section, item, owner),
+        add_group_items_fn=lambda nested_section, group_items: add_main_group_items(nested_section, group_items, owner),
+        animations_widget=getattr(owner, "main_toolbar_widget", None),
+    )
 
 
 def show_welcome_shelf_prompt(anchor_button):
@@ -763,61 +870,20 @@ def add_graph_group_items(section, items, graph_settings_menu_fn, toolbar_widget
     )
 
 
-def add_graph_section_items(section, items, graph_settings_menu_fn, toolbar_widget=None):
-    add_section_items(
-        section,
-        items,
+def populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn, toolbar_widget=None):
+    _populate_toolbar_from_layout(
+        "graph",
+        "graph",
+        new_section_fn,
+        slider_namespace="graph_toolbar_sliders",
+        slider_object_prefix="graph",
         add_tool_item_fn=lambda nested_section, item: add_graph_tool_item(nested_section, item, graph_settings_menu_fn),
         add_widget_item_fn=lambda nested_section, item: create_widget_from_data(nested_section, item, owner=toolbar_widget),
         add_group_items_fn=lambda nested_section, group_items: add_graph_group_items(
-            nested_section,
-            group_items,
-            graph_settings_menu_fn,
-            toolbar_widget=toolbar_widget,
+            nested_section, group_items, graph_settings_menu_fn, toolbar_widget=toolbar_widget
         ),
+        animations_widget=toolbar_widget,
     )
-
-
-def populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn, toolbar_widget=None):
-    import TheKeyMachine.core.toolbox as toolbox
-
-    sections = toolbox.get_toolbar_sections("graph", resolve_items=False)
-    for section_def in sections:
-        if section_def.get("type") == "connect_entries":
-            add_connect_entries_section(new_section_fn, "graph")
-            continue
-
-        if section_def.get("type") == "slider":
-            section = add_slider_section_from_data(
-                section_def,
-                new_section_fn,
-                namespace="graph_toolbar_sliders",
-                object_prefix="graph",
-                color=section_def.get("color"),
-            )
-            if section:
-                section.set_menu_identity(
-                    section_def.get("label"),
-                    toolbox.get_section_icon(section_def["id"]),
-                )
-            continue
-
-        section = new_section_fn(
-            color=section_def.get("color"),
-            hiddeable=section_def.get("hiddeable", True),
-        )
-        section.set_menu_identity(
-            section_def.get("label"),
-            toolbox.get_section_icon(section_def["id"]),
-        )
-        resolved_section = toolbox.get_tool_section(section_def["id"], toolbar_id="graph")
-        if section_should_use_group_menu(section_def, resolved_section["items"], special_keys=GRAPH_SPECIAL_TOOL_KEYS):
-            add_graph_group_items(section, resolved_section["items"], graph_settings_menu_fn, toolbar_widget=toolbar_widget)
-            continue
-        add_graph_section_items(section, resolved_section["items"], graph_settings_menu_fn, toolbar_widget=toolbar_widget)
-
-    for section in getattr(toolbar_widget, "_tkm_sections", ()) if toolbar_widget is not None else ():
-        section.enable_entry_animations()
 
 
 class _ToolbarPinningEventFilter(QtCore.QObject):

@@ -109,6 +109,68 @@ def closest_euler_angle_cut(value, reference):
         return None
 
 
+_ROTATE_ORDER_ENUMS = None
+
+
+def _rotate_order_enum_map():
+    global _ROTATE_ORDER_ENUMS
+    if _ROTATE_ORDER_ENUMS is None and om is not None:
+        _ROTATE_ORDER_ENUMS = {
+            "xyz": om.MEulerRotation.kXYZ,
+            "yzx": om.MEulerRotation.kYZX,
+            "zxy": om.MEulerRotation.kZXY,
+            "xzy": om.MEulerRotation.kXZY,
+            "yxz": om.MEulerRotation.kYXZ,
+            "zyx": om.MEulerRotation.kZYX,
+        }
+    return _ROTATE_ORDER_ENUMS or {}
+
+
+def rotate_order_enum(order_name):
+    """Map a rotateOrder string ('xyz', 'zxy', ...) to its MEulerRotation constant."""
+    if om is None or not order_name:
+        return None
+    return _rotate_order_enum_map().get(str(order_name).lower())
+
+
+def reorder_euler_rotation(rx, ry, rz, from_order, to_order):
+    """Convert a local Euler rotation (rx, ry, rz) between rotate orders.
+
+    Pure math via MEulerRotation.reorderIt: a rotate-order change only ever
+    reinterprets an object's own three rotate channels, so it has no
+    dependency on world space, parenting, or the current time. Callers can
+    convert every keyframe of a rig this way without ever moving the
+    playhead or forcing a dependency-graph evaluation -- unlike attribute
+    switches that actually change effective parent space (IK/FK, space
+    switches, ...), which do need the DG evaluated at each frame.
+
+    Angles are read/written in Maya's current UI angle unit, matching
+    cmds.getAttr/cmds.keyframe.
+    """
+    if om is None:
+        return rx, ry, rz
+    from_enum = rotate_order_enum(from_order)
+    to_enum = rotate_order_enum(to_order)
+    if from_enum is None or to_enum is None or from_enum == to_enum:
+        return rx, ry, rz
+    try:
+        unit = om.MAngle.uiUnit()
+        rotation = om.MEulerRotation(
+            om.MAngle(float(rx or 0.0), unit).asRadians(),
+            om.MAngle(float(ry or 0.0), unit).asRadians(),
+            om.MAngle(float(rz or 0.0), unit).asRadians(),
+            from_enum,
+        )
+        rotation.reorderIt(to_enum)
+        return (
+            om.MAngle(rotation.x, om.MAngle.kRadians).asUnits(unit),
+            om.MAngle(rotation.y, om.MAngle.kRadians).asUnits(unit),
+            om.MAngle(rotation.z, om.MAngle.kRadians).asUnits(unit),
+        )
+    except Exception:
+        return rx, ry, rz
+
+
 def set_plug_double(node, attr, value, tolerance=0.000001):
     plug = find_plug(node, attr)
     if plug is None:

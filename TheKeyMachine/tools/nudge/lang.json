@@ -1,0 +1,222 @@
+{
+    "nudge_value": {
+        "en": {
+            "label": "Nudge Value",
+            "tooltip": [
+                "Set the frame count used by every Nudge and Inbetween command."
+            ]
+        },
+        "es": {
+            "label": "Valor de Nudge",
+            "tooltip": [
+                "Establece el número de fotogramas usado por cada comando de Nudge e Inbetween."
+            ]
+        },
+        "fr": {
+            "label": "Valeur de Nudge",
+            "tooltip": [
+                "Définit le nombre d'images utilisé par chaque commande de Nudge et d'Inbetween."
+            ]
+        }
+    },
+    "nudge_left": {
+        "en": {
+            "label": "Nudge Left",
+            "tooltip": [
+                "Move the targeted keys left by the Nudge Value."
+            ]
+        },
+        "es": {
+            "label": "Nudge Izquierda",
+            "tooltip": [
+                "Mueve las claves seleccionadas hacia la izquierda según el Valor de Nudge."
+            ]
+        },
+        "fr": {
+            "label": "Nudge Gauche",
+            "tooltip": [
+                "Déplace les clés ciblées vers la gauche selon la Valeur de Nudge."
+            ]
+        }
+    },
+    "nudge_left_all_keys": {
+        "en": {
+            "label": "Nudge Left - All Keys",
+            "tooltip": [
+                "Move every key on the targeted animation curves left."
+            ]
+        },
+        "es": {
+            "label": "Nudge Izquierda - Todas las Claves",
+            "tooltip": [
+                "Mueve todas las claves de las curvas de animación seleccionadas hacia la izquierda."
+            ]
+        },
+        "fr": {
+            "label": "Nudge Gauche - Toutes les Clés",
+            "tooltip": [
+                "Déplace toutes les clés des courbes d'animation ciblées vers la gauche."
+            ]
+        }
+    },
+    "nudge_left_scene": {
+        "en": {
+            "label": "Nudge Left - Scene",
+            "tooltip": [
+                "Move every animation key in the scene left."
+            ]
+        },
+        "es": {
+            "label": "Nudge Izquierda - Escena",
+            "tooltip": [
+                "Mueve todas las claves de animación de la escena hacia la izquierda."
+            ]
+        },
+        "fr": {
+            "label": "Nudge Gauche - Scène",
+            "tooltip": [
+                "Déplace toutes les clés d'animation de la scène vers la gauche."
+            ]
+        }
+    },
+    "nudge_right": {
+        "en": {
+            "label": "Nudge Right",
+            "tooltip": [
+                "Move the targeted keys right by the Nudge Value."
+            ]
+        },
+        "es": {
+            "label": "Nudge Derecha",
+            "tooltip": [
+                "Mueve las claves seleccionadas hacia la derecha según el Valor de Nudge."
+            ]
+        },
+        "fr": {
+            "label": "Nudge Droite",
+            "tooltip": [
+                "Déplace les clés ciblées vers la droite selon la Valeur de Nudge."
+            ]
+        }
+    },
+    "nudge_right_all_keys": {
+        "en": {
+            "label": "Nudge Right - All Keys",
+            "tooltip": [
+                "Move every key on the targeted animation curves right."
+            ]
+        },
+        "es": {
+            "label": "Nudge Derecha - Todas las Claves",
+            "tooltip": [
+                "Mueve todas las claves de las curvas de animación seleccionadas hacia la derecha."
+            ]
+        },
+        "fr": {
+            "label": "Nudge Droite - Toutes les Clés",
+            "tooltip": [
+                "Déplace toutes les clés des courbes d'animation ciblées vers la droite."
+            ]
+        }
+    },
+    "nudge_right_scene": {
+        "en": {
+            "label": "Nudge Right - Scene",
+            "tooltip": [
+                "Move every animation key in the scene right."
+            ]
+        },
+        "es": {
+            "label": "Nudge Derecha - Escena",
+            "tooltip": [
+                "Mueve todas las claves de animación de la escena hacia la derecha."
+            ]
+        },
+        "fr": {
+            "label": "Nudge Droite - Scène",
+            "tooltip": [
+                "Déplace toutes les clés d'animation de la scène vers la droite."
+            ]
+        }
+    },
+    "nudge_insert_inbetween": {
+        "en": {
+            "label": "Insert Inbetween",
+            "tooltip": [
+                "Insert time after the current frame by the Nudge Value."
+            ]
+        },
+        "es": {
+            "label": "Insertar Inbetween",
+            "tooltip": [
+                "Inserta tiempo después del fotograma actual según el Valor de Nudge."
+            ]
+        },
+        "fr": {
+            "label": "Insérer un Inbetween",
+            "tooltip": [
+                "Insère du temps après l'image actuelle selon la Valeur de Nudge."
+            ]
+        }
+    },
+    "nudge_insert_inbetween_scene": {
+        "en": {
+            "label": "Insert Inbetween - Scene",
+            "tooltip": [
+                "Insert time after the current frame on every animation curve in the scene."
+            ]
+        },
+        "es": {
+            "label": "Insertar Inbetween - Escena",
+            "tooltip": [
+                "Inserta tiempo después del fotograma actual en cada curva de animación de la escena."
+            ]
+        },
+        "fr": {
+            "label": "Insérer un Inbetween - Scène",
+            "tooltip": [
+                "Insère du temps après l'image actuelle sur chaque courbe d'animation de la scène."
+            ]
+        }
+    },
+    "nudge_remove_inbetween": {
+        "en": {
+            "label": "Remove Inbetween",
+            "tooltip": [
+                "Remove time after the current frame by the Nudge Value."
+            ]
+        },
+        "es": {
+            "label": "Quitar Inbetween",
+            "tooltip": [
+                "Elimina tiempo después del fotograma actual según el Valor de Nudge."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer un Inbetween",
+            "tooltip": [
+                "Supprime du temps après l'image actuelle selon la Valeur de Nudge."
+            ]
+        }
+    },
+    "nudge_remove_inbetween_scene": {
+        "en": {
+            "label": "Remove Inbetween - Scene",
+            "tooltip": [
+                "Remove time after the current frame from every animation curve in the scene."
+            ]
+        },
+        "es": {
+            "label": "Quitar Inbetween - Escena",
+            "tooltip": [
+                "Elimina tiempo después del fotograma actual de cada curva de animación de la escena."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer un Inbetween - Scène",
+            "tooltip": [
+                "Supprime du temps après l'image actuelle de chaque courbe d'animation de la scène."
+            ]
+        }
+    }
+}

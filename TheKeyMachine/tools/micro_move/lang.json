@@ -1,0 +1,25 @@
+{
+    "micro_move": {
+        "en": {
+            "label": "Micro Move",
+            "tooltip": [
+                "Move and rotate selected controls with fine viewport precision.",
+                "Disable the tool to restore Maya's normal move and rotate contexts."
+            ]
+        },
+        "es": {
+            "label": "Movimiento Micro",
+            "tooltip": [
+                "Mueve y rota los controles seleccionados con precisión fina en la vista.",
+                "Desactiva la herramienta para restaurar los contextos normales de mover y rotar de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Micro Déplacement",
+            "tooltip": [
+                "Déplace et fait pivoter les contrôleurs sélectionnés avec une précision fine dans la vue.",
+                "Désactivez l'outil pour restaurer les contextes normaux de déplacement et de rotation de Maya."
+            ]
+        }
+    }
+}

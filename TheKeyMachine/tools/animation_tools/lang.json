@@ -1,0 +1,508 @@
+{
+    "animation_tools": {
+        "en": {
+            "label": "Anim Curve Tools",
+            "tooltip": [
+                "Open animation editing, cleanup, Smart Key, and snapping commands."
+            ]
+        },
+        "es": {
+            "label": "Herramientas de Curvas de Animación",
+            "tooltip": [
+                "Abre los comandos de edición, limpieza, Clave Inteligente y ajuste de animación."
+            ]
+        },
+        "fr": {
+            "label": "Outils de Courbes d'Animation",
+            "tooltip": [
+                "Ouvre les commandes d'édition, de nettoyage, de Clé Intelligente et d'accrochage de l'animation."
+            ]
+        }
+    },
+    "set_smart_key": {
+        "en": {
+            "label": "Set Smart Key",
+            "tooltip": [
+                "Set a key at the current frame using the active Graph Editor, Channel Box, or object context."
+            ]
+        },
+        "es": {
+            "label": "Poner Clave Inteligente",
+            "tooltip": [
+                "Pone una clave en el fotograma actual usando el Graph Editor, el Channel Box o el contexto de objeto activo."
+            ]
+        },
+        "fr": {
+            "label": "Définir une Clé Intelligente",
+            "tooltip": [
+                "Définit une clé sur l'image actuelle en utilisant le Graph Editor, le Channel Box ou le contexte d'objet actif."
+            ]
+        }
+    },
+    "set_smart_key_all_channels": {
+        "en": {
+            "label": "Set Smart Key All Channels",
+            "tooltip": [
+                "Set keys on every keyable scalar channel of the selected objects."
+            ]
+        },
+        "es": {
+            "label": "Poner Clave Inteligente en Todos los Canales",
+            "tooltip": [
+                "Pone claves en cada canal escalar animable de los objetos seleccionados."
+            ]
+        },
+        "fr": {
+            "label": "Définir une Clé Intelligente sur Tous les Canaux",
+            "tooltip": [
+                "Définit des clés sur chaque canal scalaire animable des objets sélectionnés."
+            ]
+        }
+    },
+    "apply_smart_euler_filter": {
+        "en": {
+            "label": "Apply Smart Euler Filter",
+            "tooltip": [
+                "Apply the smart Euler filter to rotation curves in the active animation context."
+            ]
+        },
+        "es": {
+            "label": "Aplicar Filtro Euler Inteligente",
+            "tooltip": [
+                "Aplica el filtro Euler inteligente a las curvas de rotación del contexto de animación activo."
+            ]
+        },
+        "fr": {
+            "label": "Appliquer le Filtre Euler Intelligent",
+            "tooltip": [
+                "Applique le filtre Euler intelligent aux courbes de rotation du contexte d'animation actif."
+            ]
+        }
+    },
+    "snap": {
+        "en": {
+            "label": "Snap Keys",
+            "tooltip": [
+                "Move sub-frame keys onto whole frames. When the destination already has a key, keep it and merge the sub-frame key into it."
+            ]
+        },
+        "es": {
+            "label": "Ajustar Claves",
+            "tooltip": [
+                "Mueve las claves entre fotogramas a fotogramas enteros. Si el destino ya tiene una clave, la conserva y fusiona la clave intermedia en ella."
+            ]
+        },
+        "fr": {
+            "label": "Accrocher les Clés",
+            "tooltip": [
+                "Déplace les clés entre les images vers des images entières. Si la destination a déjà une clé, elle est conservée et la clé intermédiaire y est fusionnée."
+            ]
+        }
+    },
+    "clear_animation": {
+        "en": {
+            "label": "Clear Animation",
+            "tooltip": [
+                "Delete all animation from the selected objects when no narrower animation selection is active.",
+                "Selection mode deletes only the active Graph Editor keys, Channel Box channels, or Time Slider range."
+            ]
+        },
+        "es": {
+            "label": "Borrar Animación",
+            "tooltip": [
+                "Elimina toda la animación de los objetos seleccionados cuando no hay una selección de animación más específica activa.",
+                "El modo de selección elimina solo las claves activas del Graph Editor, los canales del Channel Box o el rango del Time Slider."
+            ]
+        },
+        "fr": {
+            "label": "Effacer l'Animation",
+            "tooltip": [
+                "Supprime toute l'animation des objets sélectionnés lorsqu'aucune sélection d'animation plus précise n'est active.",
+                "Le mode sélection supprime uniquement les clés actives du Graph Editor, les canaux du Channel Box ou la plage du Time Slider."
+            ]
+        }
+    },
+    "delete_all_animation": {
+        "en": {
+            "label": "Clear Animation",
+            "tooltip": [
+                "Delete all animation from the selected objects when no narrower animation selection is active.",
+                "Selection mode deletes only the active Graph Editor keys, Channel Box channels, or Time Slider range."
+            ]
+        },
+        "es": {
+            "label": "Borrar Animación",
+            "tooltip": [
+                "Elimina toda la animación de los objetos seleccionados cuando no hay una selección de animación más específica activa.",
+                "El modo de selección elimina solo las claves activas del Graph Editor, los canales del Channel Box o el rango del Time Slider."
+            ]
+        },
+        "fr": {
+            "label": "Effacer l'Animation",
+            "tooltip": [
+                "Supprime toute l'animation des objets sélectionnés lorsqu'aucune sélection d'animation plus précise n'est active.",
+                "Le mode sélection supprime uniquement les clés actives du Graph Editor, les canaux du Channel Box ou la plage du Time Slider."
+            ]
+        }
+    },
+    "delete_static_animation": {
+        "en": {
+            "label": "Remove Static Anim Curves",
+            "tooltip": [
+                "Remove animation curves whose values do not change in the active context."
+            ]
+        },
+        "es": {
+            "label": "Quitar Curvas de Animación Estáticas",
+            "tooltip": [
+                "Elimina las curvas de animación cuyos valores no cambian en el contexto activo."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer les Courbes d'Animation Statiques",
+            "tooltip": [
+                "Supprime les courbes d'animation dont les valeurs ne changent pas dans le contexte actif."
+            ]
+        }
+    },
+    "crop_animation": {
+        "en": {
+            "label": "Crop Animation",
+            "tooltip": [
+                "Keep keys inside the active range and remove keys outside it."
+            ]
+        },
+        "es": {
+            "label": "Recortar Animación",
+            "tooltip": [
+                "Conserva las claves dentro del rango activo y elimina las de fuera."
+            ]
+        },
+        "fr": {
+            "label": "Rogner l'Animation",
+            "tooltip": [
+                "Conserve les clés à l'intérieur de la plage active et supprime celles en dehors."
+            ]
+        }
+    },
+    "remove_redundant_keys": {
+        "en": {
+            "label": "Remove Redundant Keys",
+            "tooltip": [
+                "Remove redundant keys using the mode selected from the right-click menu."
+            ]
+        },
+        "es": {
+            "label": "Quitar Claves Redundantes",
+            "tooltip": [
+                "Elimina claves redundantes usando el modo seleccionado en el menú contextual."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer les Clés Redondantes",
+            "tooltip": [
+                "Supprime les clés redondantes selon le mode sélectionné dans le menu contextuel."
+            ]
+        }
+    },
+    "remove_static_anim_curves": {
+        "en": {
+            "label": "Remove Static Anim Curves",
+            "tooltip": [
+                "Remove animation curves whose values do not change in the active context."
+            ]
+        },
+        "es": {
+            "label": "Quitar Curvas de Animación Estáticas",
+            "tooltip": [
+                "Elimina las curvas de animación cuyos valores no cambian en el contexto activo."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer les Courbes d'Animation Statiques",
+            "tooltip": [
+                "Supprime les courbes d'animation dont les valeurs ne changent pas dans le contexte actif."
+            ]
+        }
+    },
+    "reverse_animation": {
+        "en": {
+            "label": "Reverse Animation",
+            "tooltip": [
+                "Reverse the active animation range in time."
+            ]
+        },
+        "es": {
+            "label": "Invertir Animación",
+            "tooltip": [
+                "Invierte en el tiempo el rango de animación activo."
+            ]
+        },
+        "fr": {
+            "label": "Inverser l'Animation",
+            "tooltip": [
+                "Inverse dans le temps la plage d'animation active."
+            ]
+        }
+    },
+    "copy_keys": {
+        "en": {
+            "label": "Copy Keys",
+            "tooltip": [
+                "Copy keys from the active animation context."
+            ]
+        },
+        "es": {
+            "label": "Copiar Claves",
+            "tooltip": [
+                "Copia claves del contexto de animación activo."
+            ]
+        },
+        "fr": {
+            "label": "Copier les Clés",
+            "tooltip": [
+                "Copie les clés du contexte d'animation actif."
+            ]
+        }
+    },
+    "cut_keys": {
+        "en": {
+            "label": "Cut Keys",
+            "tooltip": [
+                "Cut keys from the active animation context."
+            ]
+        },
+        "es": {
+            "label": "Cortar Claves",
+            "tooltip": [
+                "Corta claves del contexto de animación activo."
+            ]
+        },
+        "fr": {
+            "label": "Couper les Clés",
+            "tooltip": [
+                "Coupe les clés du contexte d'animation actif."
+            ]
+        }
+    },
+    "delete_keys": {
+        "en": {
+            "label": "Delete Keys",
+            "tooltip": [
+                "Delete keys at the active frame or selected key context."
+            ]
+        },
+        "es": {
+            "label": "Eliminar Claves",
+            "tooltip": [
+                "Elimina claves en el fotograma activo o en el contexto de claves seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer les Clés",
+            "tooltip": [
+                "Supprime les clés à l'image active ou dans le contexte de clés sélectionné."
+            ]
+        }
+    },
+    "paste_keys": {
+        "en": {
+            "label": "Paste Keys",
+            "tooltip": [
+                "Paste copied keys at the active context."
+            ]
+        },
+        "es": {
+            "label": "Pegar Claves",
+            "tooltip": [
+                "Pega las claves copiadas en el contexto activo."
+            ]
+        },
+        "fr": {
+            "label": "Coller les Clés",
+            "tooltip": [
+                "Colle les clés copiées dans le contexte actif."
+            ]
+        }
+    },
+    "paste_keys_relative": {
+        "en": {
+            "label": "Paste Keys Relative",
+            "tooltip": [
+                "Paste copied keys relative to the current frame."
+            ]
+        },
+        "es": {
+            "label": "Pegar Claves de Forma Relativa",
+            "tooltip": [
+                "Pega las claves copiadas de forma relativa al fotograma actual."
+            ]
+        },
+        "fr": {
+            "label": "Coller les Clés de Façon Relative",
+            "tooltip": [
+                "Colle les clés copiées de façon relative à l'image actuelle."
+            ]
+        }
+    },
+    "go_to_next_key": {
+        "en": {
+            "label": "Go to Next Key",
+            "tooltip": [
+                "Go to the next key on selected Graph Editor curves, or through the Time Slider keys for the active object or channel context. Falls back to the next frame when no key is available."
+            ]
+        },
+        "es": {
+            "label": "Ir a la Siguiente Clave",
+            "tooltip": [
+                "Va a la siguiente clave de las curvas seleccionadas del Graph Editor, o recorre las claves del Time Slider para el objeto o canal activo. Pasa al siguiente fotograma si no hay ninguna clave disponible."
+            ]
+        },
+        "fr": {
+            "label": "Aller à la Clé Suivante",
+            "tooltip": [
+                "Va à la clé suivante des courbes sélectionnées du Graph Editor, ou parcourt les clés du Time Slider pour l'objet ou le canal actif. Passe à l'image suivante si aucune clé n'est disponible."
+            ]
+        }
+    },
+    "go_to_previous_key": {
+        "en": {
+            "label": "Go to Previous Key",
+            "tooltip": [
+                "Go to the previous key on selected Graph Editor curves, or through the Time Slider keys for the active object or channel context. Falls back to the previous frame when no key is available."
+            ]
+        },
+        "es": {
+            "label": "Ir a la Clave Anterior",
+            "tooltip": [
+                "Va a la clave anterior de las curvas seleccionadas del Graph Editor, o recorre las claves del Time Slider para el objeto o canal activo. Pasa al fotograma anterior si no hay ninguna clave disponible."
+            ]
+        },
+        "fr": {
+            "label": "Aller à la Clé Précédente",
+            "tooltip": [
+                "Va à la clé précédente des courbes sélectionnées du Graph Editor, ou parcourt les clés du Time Slider pour l'objet ou le canal actif. Passe à l'image précédente si aucune clé n'est disponible."
+            ]
+        }
+    },
+    "go_to_next_frame": {
+        "en": {
+            "label": "Go to Next Frame",
+            "tooltip": [
+                "Move forward one frame without clamping to the playback range. Repeated triggers accumulate."
+            ]
+        },
+        "es": {
+            "label": "Ir al Siguiente Fotograma",
+            "tooltip": [
+                "Avanza un fotograma sin limitarse al rango de reproducción. Las pulsaciones repetidas se acumulan."
+            ]
+        },
+        "fr": {
+            "label": "Aller à l'Image Suivante",
+            "tooltip": [
+                "Avance d'une image sans se limiter à la plage de lecture. Les déclenchements répétés s'accumulent."
+            ]
+        }
+    },
+    "go_to_previous_frame": {
+        "en": {
+            "label": "Go to Previous Frame",
+            "tooltip": [
+                "Move backward one frame without clamping to the playback range. Repeated triggers accumulate."
+            ]
+        },
+        "es": {
+            "label": "Ir al Fotograma Anterior",
+            "tooltip": [
+                "Retrocede un fotograma sin limitarse al rango de reproducción. Las pulsaciones repetidas se acumulan."
+            ]
+        },
+        "fr": {
+            "label": "Aller à l'Image Précédente",
+            "tooltip": [
+                "Recule d'une image sans se limiter à la plage de lecture. Les déclenchements répétés s'accumulent."
+            ]
+        }
+    },
+    "clear_selected_keys": {
+        "en": {
+            "label": "Clear Key Selection",
+            "tooltip": [
+                "Clear the current Graph Editor key selection."
+            ]
+        },
+        "es": {
+            "label": "Borrar Selección de Claves",
+            "tooltip": [
+                "Borra la selección actual de claves del Graph Editor."
+            ]
+        },
+        "fr": {
+            "label": "Effacer la Sélection de Clés",
+            "tooltip": [
+                "Efface la sélection actuelle de clés du Graph Editor."
+            ]
+        }
+    },
+    "select_scene_animation": {
+        "en": {
+            "label": "Select Scene Animation",
+            "tooltip": [
+                "Select every animation curve in the scene."
+            ]
+        },
+        "es": {
+            "label": "Seleccionar Animación de la Escena",
+            "tooltip": [
+                "Selecciona cada curva de animación de la escena."
+            ]
+        },
+        "fr": {
+            "label": "Sélectionner l'Animation de la Scène",
+            "tooltip": [
+                "Sélectionne chaque courbe d'animation de la scène."
+            ]
+        }
+    },
+    "delete_keys_before_current": {
+        "en": {
+            "label": "Delete Keys Before Current Frame",
+            "tooltip": [
+                "Delete selected objects' keys before the current frame."
+            ]
+        },
+        "es": {
+            "label": "Eliminar Claves Antes del Fotograma Actual",
+            "tooltip": [
+                "Elimina las claves de los objetos seleccionados antes del fotograma actual."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer les Clés Avant l'Image Actuelle",
+            "tooltip": [
+                "Supprime les clés des objets sélectionnés avant l'image actuelle."
+            ]
+        }
+    },
+    "delete_keys_after_current": {
+        "en": {
+            "label": "Delete Keys After Current Frame",
+            "tooltip": [
+                "Delete selected objects' keys after the current frame."
+            ]
+        },
+        "es": {
+            "label": "Eliminar Claves Después del Fotograma Actual",
+            "tooltip": [
+                "Elimina las claves de los objetos seleccionados después del fotograma actual."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer les Clés Après l'Image Actuelle",
+            "tooltip": [
+                "Supprime les clés des objets sélectionnés après l'image actuelle."
+            ]
+        }
+    }
+}

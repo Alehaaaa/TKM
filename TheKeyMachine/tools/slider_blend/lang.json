@@ -1,0 +1,282 @@
+{
+    "connect_neighbors": {
+        "en": {
+            "label": "Connect to Neighbors",
+            "tooltip": [
+                "Smoothly connect the selected curve segment to its surrounding keys."
+            ]
+        },
+        "es": {
+            "label": "Conectar con Vecinos",
+            "tooltip": [
+                "Conecta suavemente el segmento de curva seleccionado con las claves que lo rodean."
+            ]
+        },
+        "fr": {
+            "label": "Connecter aux Voisins",
+            "tooltip": [
+                "Connecte en douceur le segment de courbe sélectionné aux clés environnantes."
+            ]
+        }
+    },
+    "ease_in_out": {
+        "en": {
+            "label": "Ease In | Out",
+            "tooltip": [
+                "Reshape the selected keys between ease-in and ease-out timing."
+            ]
+        },
+        "es": {
+            "label": "Suavizar Entrada | Salida",
+            "tooltip": [
+                "Cambia el ritmo de las claves seleccionadas entre suavizado de entrada y de salida."
+            ]
+        },
+        "fr": {
+            "label": "Adoucir Entrée | Sortie",
+            "tooltip": [
+                "Modifie le rythme des clés sélectionnées entre un adoucissement en entrée et en sortie."
+            ]
+        }
+    },
+    "gap_stitcher": {
+        "en": {
+            "label": "Gap Stitcher",
+            "tooltip": [
+                "Close value gaps between neighboring animation segments."
+            ]
+        },
+        "es": {
+            "label": "Cerrar Huecos",
+            "tooltip": [
+                "Cierra las diferencias de valor entre segmentos de animación vecinos."
+            ]
+        },
+        "fr": {
+            "label": "Recoudre les Écarts",
+            "tooltip": [
+                "Referme les écarts de valeur entre des segments d'animation voisins."
+            ]
+        }
+    },
+    "noise_wave": {
+        "en": {
+            "label": "Noise | Wave",
+            "tooltip": [
+                "Drag left for procedural noise or right for an alternating wave."
+            ]
+        },
+        "es": {
+            "label": "Ruido | Onda",
+            "tooltip": [
+                "Arrastra a la izquierda para ruido procedural o a la derecha para una onda alterna."
+            ]
+        },
+        "fr": {
+            "label": "Bruit | Onde",
+            "tooltip": [
+                "Faites glisser à gauche pour un bruit procédural ou à droite pour une onde alternée."
+            ]
+        }
+    },
+    "pull_push": {
+        "en": {
+            "label": "Pull | Push",
+            "tooltip": [
+                "Pull keys toward the neighboring trend or push them away."
+            ]
+        },
+        "es": {
+            "label": "Atraer | Empujar",
+            "tooltip": [
+                "Atrae las claves hacia la tendencia vecina o las aleja de ella."
+            ]
+        },
+        "fr": {
+            "label": "Tirer | Pousser",
+            "tooltip": [
+                "Attire les clés vers la tendance voisine ou les en éloigne."
+            ]
+        }
+    },
+    "simplify_bake": {
+        "en": {
+            "label": "Simplify | Bake Keys",
+            "tooltip": [
+                "Drag left to simplify keys or right to bake additional keys."
+            ]
+        },
+        "es": {
+            "label": "Simplificar | Bake de Claves",
+            "tooltip": [
+                "Arrastra a la izquierda para simplificar claves o a la derecha para hacer bake de claves adicionales."
+            ]
+        },
+        "fr": {
+            "label": "Simplifier | Bake des Clés",
+            "tooltip": [
+                "Faites glisser à gauche pour simplifier les clés ou à droite pour bake des clés supplémentaires."
+            ]
+        }
+    },
+    "smooth_rough": {
+        "en": {
+            "label": "Smooth | Rough",
+            "tooltip": [
+                "Smooth the curve or exaggerate its local variation."
+            ]
+        },
+        "es": {
+            "label": "Suavizar | Exagerar",
+            "tooltip": [
+                "Suaviza la curva o exagera su variación local."
+            ]
+        },
+        "fr": {
+            "label": "Lisser | Accentuer",
+            "tooltip": [
+                "Lisse la courbe ou accentue sa variation locale."
+            ]
+        }
+    },
+    "time_offsetter": {
+        "en": {
+            "label": "Time Offsetter",
+            "tooltip": [
+                "Offset the animation shape in time while preserving key times."
+            ]
+        },
+        "es": {
+            "label": "Desfase de Tiempo",
+            "tooltip": [
+                "Desfasa en el tiempo la forma de la animación conservando los tiempos de clave."
+            ]
+        },
+        "fr": {
+            "label": "Décaleur de Temps",
+            "tooltip": [
+                "Décale dans le temps la forme de l'animation en conservant les temps de clé."
+            ]
+        }
+    },
+    "time_offsetter_stagger": {
+        "en": {
+            "label": "Time Offsetter Stagger",
+            "tooltip": [
+                "Stagger whole-object animation while keeping channels synchronized."
+            ]
+        },
+        "es": {
+            "label": "Desfase de Tiempo Escalonado",
+            "tooltip": [
+                "Escalona la animación de todo el objeto manteniendo los canales sincronizados."
+            ]
+        },
+        "fr": {
+            "label": "Décaleur de Temps Échelonné",
+            "tooltip": [
+                "Échelonne l'animation de tout l'objet en gardant les canaux synchronisés."
+            ]
+        }
+    },
+    "scale_average": {
+        "en": {
+            "label": "Scale From Average",
+            "tooltip": [
+                "Scale selected values around their average."
+            ]
+        },
+        "es": {
+            "label": "Escalar Desde el Promedio",
+            "tooltip": [
+                "Escala los valores seleccionados en torno a su promedio."
+            ]
+        },
+        "fr": {
+            "label": "Mettre à l'Échelle Depuis la Moyenne",
+            "tooltip": [
+                "Met à l'échelle les valeurs sélectionnées autour de leur moyenne."
+            ]
+        }
+    },
+    "scale_default": {
+        "en": {
+            "label": "Scale From Default",
+            "tooltip": [
+                "Scale selected values around the channel default."
+            ]
+        },
+        "es": {
+            "label": "Escalar Desde el Valor Predeterminado",
+            "tooltip": [
+                "Escala los valores seleccionados en torno al valor predeterminado del canal."
+            ]
+        },
+        "fr": {
+            "label": "Mettre à l'Échelle Depuis la Valeur par Défaut",
+            "tooltip": [
+                "Met à l'échelle les valeurs sélectionnées autour de la valeur par défaut du canal."
+            ]
+        }
+    },
+    "scale_frame": {
+        "en": {
+            "label": "Scale From Frame",
+            "tooltip": [
+                "Scale values around picked reference frames or the current frame."
+            ]
+        },
+        "es": {
+            "label": "Escalar Desde un Fotograma",
+            "tooltip": [
+                "Escala los valores en torno a fotogramas de referencia elegidos o al fotograma actual."
+            ]
+        },
+        "fr": {
+            "label": "Mettre à l'Échelle Depuis une Image",
+            "tooltip": [
+                "Met à l'échelle les valeurs autour d'images de référence choisies ou de l'image actuelle."
+            ]
+        }
+    },
+    "scale_neighbor_left": {
+        "en": {
+            "label": "Scale From Neighbor Left",
+            "tooltip": [
+                "Scale values around the preceding key."
+            ]
+        },
+        "es": {
+            "label": "Escalar Desde el Vecino Izquierdo",
+            "tooltip": [
+                "Escala los valores en torno a la clave anterior."
+            ]
+        },
+        "fr": {
+            "label": "Mettre à l'Échelle Depuis le Voisin de Gauche",
+            "tooltip": [
+                "Met à l'échelle les valeurs autour de la clé précédente."
+            ]
+        }
+    },
+    "scale_neighbor_right": {
+        "en": {
+            "label": "Scale From Neighbor Right",
+            "tooltip": [
+                "Scale values around the following key."
+            ]
+        },
+        "es": {
+            "label": "Escalar Desde el Vecino Derecho",
+            "tooltip": [
+                "Escala los valores en torno a la clave siguiente."
+            ]
+        },
+        "fr": {
+            "label": "Mettre à l'Échelle Depuis le Voisin de Droite",
+            "tooltip": [
+                "Met à l'échelle les valeurs autour de la clé suivante."
+            ]
+        }
+    }
+}

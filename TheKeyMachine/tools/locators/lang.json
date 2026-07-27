@@ -1,0 +1,62 @@
+{
+    "create_locator": {
+        "en": {
+            "label": "Create Locator",
+            "tooltip": [
+                "Create temporary locators from the selected objects for positioning and motion reference."
+            ]
+        },
+        "es": {
+            "label": "Crear Locator",
+            "tooltip": [
+                "Crea locators temporales a partir de los objetos seleccionados como referencia de posición y movimiento."
+            ]
+        },
+        "fr": {
+            "label": "Créer un Locator",
+            "tooltip": [
+                "Crée des locators temporaires à partir des objets sélectionnés comme référence de position et de mouvement."
+            ]
+        }
+    },
+    "locator_select_temp": {
+        "en": {
+            "label": "Select Temp Locators",
+            "tooltip": [
+                "Select every temporary locator created by TheKeyMachine in the current scene."
+            ]
+        },
+        "es": {
+            "label": "Seleccionar Locators Temporales",
+            "tooltip": [
+                "Selecciona todos los locators temporales creados por TheKeyMachine en la escena actual."
+            ]
+        },
+        "fr": {
+            "label": "Sélectionner les Locators Temporaires",
+            "tooltip": [
+                "Sélectionne tous les locators temporaires créés par TheKeyMachine dans la scène actuelle."
+            ]
+        }
+    },
+    "locator_remove_temp": {
+        "en": {
+            "label": "Remove Temp Locators",
+            "tooltip": [
+                "Delete every temporary locator created by TheKeyMachine in the current scene."
+            ]
+        },
+        "es": {
+            "label": "Quitar Locators Temporales",
+            "tooltip": [
+                "Elimina todos los locators temporales creados por TheKeyMachine en la escena actual."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer les Locators Temporaires",
+            "tooltip": [
+                "Supprime tous les locators temporaires créés par TheKeyMachine dans la scène actuelle."
+            ]
+        }
+    }
+}

@@ -1,0 +1,25 @@
+{
+    "animation_offset": {
+        "en": {
+            "label": "Animation Offset",
+            "tooltip": [
+                "Offset animated controls without changing the shape of their motion.",
+                "Select animated controls, enable the tool, then transform them with Maya's manipulators."
+            ]
+        },
+        "es": {
+            "label": "Desfase de Animación",
+            "tooltip": [
+                "Desfasa los controles animados sin cambiar la forma de su movimiento.",
+                "Selecciona los controles animados, activa la herramienta y luego transfórmalos con los manipuladores de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Décalage d'Animation",
+            "tooltip": [
+                "Décale les contrôleurs animés sans changer la forme de leur mouvement.",
+                "Sélectionnez les contrôleurs animés, activez l'outil, puis transformez-les avec les manipulateurs de Maya."
+            ]
+        }
+    }
+}

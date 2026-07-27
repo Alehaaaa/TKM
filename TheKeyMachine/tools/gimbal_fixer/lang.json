@@ -1,0 +1,25 @@
+{
+    "gimbal": {
+        "en": {
+            "label": "Gimbal Fixer",
+            "tooltip": [
+                "Analyze the selected control's animated rotation and rank all six rotation orders by gimbal risk.",
+                "Choose an order to convert the animation while preserving the visible motion."
+            ]
+        },
+        "es": {
+            "label": "Corrector de Gimbal",
+            "tooltip": [
+                "Analiza la rotación animada del control seleccionado y clasifica los seis órdenes de rotación según su riesgo de gimbal.",
+                "Elige un orden para convertir la animación conservando el movimiento visible."
+            ]
+        },
+        "fr": {
+            "label": "Correcteur de Gimbal",
+            "tooltip": [
+                "Analyse la rotation animée du contrôleur sélectionné et classe les six ordres de rotation selon leur risque de gimbal.",
+                "Choisissez un ordre pour convertir l'animation en conservant le mouvement visible."
+            ]
+        }
+    }
+}

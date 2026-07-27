@@ -1,0 +1,28 @@
+{
+    "attribute_switcher": {
+        "en": {
+            "label": "Attribute Switcher",
+            "tooltip": [
+                "Switch configured attributes across selected controls from a compact floating window.",
+                "Hold Ctrl and click attribute rows to select multiple channels and switch them together.",
+                "Rotation-order changes can be Euler-filtered automatically."
+            ]
+        },
+        "es": {
+            "label": "Selector de Atributos",
+            "tooltip": [
+                "Cambia atributos configurados en los controles seleccionados desde una ventana flotante compacta.",
+                "Mantén Ctrl (⌘ en Mac) y haz clic en las filas de atributos para seleccionar varios canales y cambiarlos juntos.",
+                "Los cambios de orden de rotación pueden pasar por el filtro Euler automáticamente."
+            ]
+        },
+        "fr": {
+            "label": "Sélecteur d'Attributs",
+            "tooltip": [
+                "Change les attributs configurés sur les contrôleurs sélectionnés depuis une fenêtre flottante compacte.",
+                "Maintenez Ctrl (⌘ sur Mac) et cliquez sur les lignes d'attributs pour sélectionner plusieurs canaux et les changer ensemble.",
+                "Les changements d'ordre de rotation peuvent recevoir automatiquement un filtre Euler."
+            ]
+        }
+    }
+}

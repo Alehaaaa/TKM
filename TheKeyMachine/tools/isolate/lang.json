@@ -1,0 +1,85 @@
+{
+    "isolate_master": {
+        "en": {
+            "label": "Isolate",
+            "tooltip": [
+                "Isolate the selected character or asset in the active viewport."
+            ]
+        },
+        "es": {
+            "label": "Aislar",
+            "tooltip": [
+                "Aísla el personaje o asset seleccionado en la vista activa."
+            ]
+        },
+        "fr": {
+            "label": "Isoler",
+            "tooltip": [
+                "Isole le personnage ou l'asset sélectionné dans la vue active."
+            ]
+        }
+    },
+    "isolate_bookmarks": {
+        "en": {
+            "label": "Isolate Bookmarks",
+            "tooltip": [
+                "Save named object groups and recall them as viewport isolate selections.",
+                "Bookmarks are stored with the Maya scene."
+            ]
+        },
+        "es": {
+            "label": "Marcadores de Aislamiento",
+            "tooltip": [
+                "Guarda grupos de objetos con nombre y recupéralos como selecciones de aislamiento en la vista.",
+                "Los marcadores se guardan junto con la escena de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Signets d'Isolation",
+            "tooltip": [
+                "Enregistrez des groupes d'objets nommés et rappelez-les comme sélections d'isolation dans la vue.",
+                "Les signets sont enregistrés avec la scène Maya."
+            ]
+        }
+    },
+    "isolate_down_level": {
+        "en": {
+            "label": "Down one level",
+            "tooltip": [
+                "Keep one hierarchy level below the scene root when isolating."
+            ]
+        },
+        "es": {
+            "label": "Bajar un Nivel",
+            "tooltip": [
+                "Conserva un nivel de jerarquía por debajo de la raíz de la escena al aislar."
+            ]
+        },
+        "fr": {
+            "label": "Descendre d'un Niveau",
+            "tooltip": [
+                "Conserve un niveau de hiérarchie sous la racine de la scène lors de l'isolation."
+            ]
+        }
+    },
+    "isolate_help": {
+        "en": {
+            "label": "Help",
+            "tooltip": [
+                "Open the Isolate tool documentation."
+            ]
+        },
+        "es": {
+            "label": "Ayuda",
+            "tooltip": [
+                "Abre la documentación de la herramienta Aislar."
+            ]
+        },
+        "fr": {
+            "label": "Aide",
+            "tooltip": [
+                "Ouvre la documentation de l'outil Isoler."
+            ]
+        }
+    }
+}

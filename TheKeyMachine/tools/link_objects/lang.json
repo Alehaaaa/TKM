@@ -1,0 +1,105 @@
+{
+    "link_copy": {
+        "en": {
+            "label": "Copy Relationship",
+            "tooltip": [
+                "Copy the world-space relationship between selected objects.",
+                "Select followers first and the driver last."
+            ]
+        },
+        "es": {
+            "label": "Copiar Relación",
+            "tooltip": [
+                "Copia la relación en espacio del mundo entre los objetos seleccionados.",
+                "Selecciona primero los seguidores y al conductor al final."
+            ]
+        },
+        "fr": {
+            "label": "Copier la Relation",
+            "tooltip": [
+                "Copie la relation en espace monde entre les objets sélectionnés.",
+                "Sélectionnez d'abord les suiveurs, puis le meneur en dernier."
+            ]
+        }
+    },
+    "link_paste": {
+        "en": {
+            "label": "Paste Relationship",
+            "tooltip": [
+                "Restore the copied relationship at the current frame, or at existing relationship-object keys when a timeline range is selected."
+            ]
+        },
+        "es": {
+            "label": "Pegar Relación",
+            "tooltip": [
+                "Restaura la relación copiada en el fotograma actual, o en las claves existentes del objeto de relación cuando hay un rango de tiempo seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Coller la Relation",
+            "tooltip": [
+                "Restaure la relation copiée à l'image actuelle, ou aux clés existantes de l'objet de relation lorsqu'une plage de temps est sélectionnée."
+            ]
+        }
+    },
+    "link_paste_range": {
+        "en": {
+            "label": "Paste Relationship to Range",
+            "tooltip": [
+                "Restore the copied relationship at existing relationship-object keys in the selected timeline range, or the playback range when no range is selected."
+            ]
+        },
+        "es": {
+            "label": "Pegar Relación en Rango",
+            "tooltip": [
+                "Restaura la relación copiada en las claves existentes del objeto de relación dentro del rango de tiempo seleccionado, o en el rango de reproducción si no hay ninguno seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Coller la Relation sur la Plage",
+            "tooltip": [
+                "Restaure la relation copiée aux clés existantes de l'objet de relation dans la plage de temps sélectionnée, ou sur la plage de lecture si aucune n'est sélectionnée."
+            ]
+        }
+    },
+    "link_autolink": {
+        "en": {
+            "label": "Auto Link",
+            "tooltip": [
+                "Keep the copied followers attached to the driver while editing or changing frames."
+            ]
+        },
+        "es": {
+            "label": "Enlace Automático",
+            "tooltip": [
+                "Mantiene los seguidores copiados unidos al conductor mientras se edita o se cambian los fotogramas."
+            ]
+        },
+        "fr": {
+            "label": "Liaison Automatique",
+            "tooltip": [
+                "Garde les suiveurs copiés attachés au meneur pendant l'édition ou le changement d'image."
+            ]
+        }
+    },
+    "link_help": {
+        "en": {
+            "label": "Copy Relationship Help",
+            "tooltip": [
+                "Open the Copy Relationship documentation."
+            ]
+        },
+        "es": {
+            "label": "Ayuda de Copiar Relación",
+            "tooltip": [
+                "Abre la documentación de Copiar Relación."
+            ]
+        },
+        "fr": {
+            "label": "Aide Copier la Relation",
+            "tooltip": [
+                "Ouvre la documentation de Copier la Relation."
+            ]
+        }
+    }
+}

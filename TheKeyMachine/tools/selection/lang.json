@@ -1,0 +1,82 @@
+{
+    "selector": {
+        "en": {
+            "label": "Selector",
+            "tooltip": [
+                "Open the current selection as a compact list for quick re-selection."
+            ]
+        },
+        "es": {
+            "label": "Selector",
+            "tooltip": [
+                "Abre la selección actual como una lista compacta para volver a seleccionar rápidamente."
+            ]
+        },
+        "fr": {
+            "label": "Sélecteur",
+            "tooltip": [
+                "Ouvre la sélection actuelle sous forme de liste compacte pour resélectionner rapidement."
+            ]
+        }
+    },
+    "select_hierarchy": {
+        "en": {
+            "label": "Select Hierarchy",
+            "tooltip": [
+                "Add descendant curve controls beneath the current selection."
+            ]
+        },
+        "es": {
+            "label": "Seleccionar Jerarquía",
+            "tooltip": [
+                "Añade los controles de curva descendientes bajo la selección actual."
+            ]
+        },
+        "fr": {
+            "label": "Sélectionner la Hiérarchie",
+            "tooltip": [
+                "Ajoute les contrôleurs de courbe descendants sous la sélection actuelle."
+            ]
+        }
+    },
+    "select_rig_controls": {
+        "en": {
+            "label": "Select Rig Controls",
+            "tooltip": [
+                "Select all curve and joint controls in the selected rig hierarchy."
+            ]
+        },
+        "es": {
+            "label": "Seleccionar Controles del Rig",
+            "tooltip": [
+                "Selecciona todos los controles de curva y joint en la jerarquía del rig seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Sélectionner les Contrôleurs du Rig",
+            "tooltip": [
+                "Sélectionne tous les contrôleurs de courbe et joints dans la hiérarchie du rig sélectionné."
+            ]
+        }
+    },
+    "select_rig_controls_animated": {
+        "en": {
+            "label": "Select Animated Rig Controls",
+            "tooltip": [
+                "Select only animated curve and joint controls in the selected rig hierarchy."
+            ]
+        },
+        "es": {
+            "label": "Seleccionar Controles Animados del Rig",
+            "tooltip": [
+                "Selecciona solo los controles de curva y joint animados en la jerarquía del rig seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Sélectionner les Contrôleurs Animés du Rig",
+            "tooltip": [
+                "Sélectionne uniquement les contrôleurs de courbe et joints animés dans la hiérarchie du rig sélectionné."
+            ]
+        }
+    }
+}

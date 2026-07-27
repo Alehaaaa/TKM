@@ -1,0 +1,145 @@
+{
+    "temp_pivot": {
+        "en": {
+            "label": "Temp Pivot",
+            "tooltip": [
+                "Create a temporary pivot that drives the selected controls as one transform.",
+                "Run the tool again to finish the active pivot session."
+            ]
+        },
+        "es": {
+            "label": "Pivote Temporal",
+            "tooltip": [
+                "Crea un pivote temporal que controla los controles seleccionados como un solo transform.",
+                "Ejecuta la herramienta de nuevo para finalizar la sesión de pivote activa."
+            ]
+        },
+        "fr": {
+            "label": "Pivot Temporaire",
+            "tooltip": [
+                "Crée un pivot temporaire qui pilote les contrôleurs sélectionnés comme un seul transform.",
+                "Relancez l'outil pour terminer la session de pivot active."
+            ]
+        }
+    },
+    "temp_pivot_last_object": {
+        "en": {
+            "label": "Temp Pivot to Last Object",
+            "tooltip": [
+                "Create the temporary pivot at the last selected object's pivot."
+            ]
+        },
+        "es": {
+            "label": "Pivote Temporal en Último Objeto",
+            "tooltip": [
+                "Crea el pivote temporal en el pivote del último objeto seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Pivot Temporaire sur le Dernier Objet",
+            "tooltip": [
+                "Crée le pivot temporaire au pivot du dernier objet sélectionné."
+            ]
+        }
+    },
+    "temp_pivot_centered": {
+        "en": {
+            "label": "Temp Pivot Centered",
+            "tooltip": [
+                "Create the temporary pivot at the center of the current selection."
+            ]
+        },
+        "es": {
+            "label": "Pivote Temporal Centrado",
+            "tooltip": [
+                "Crea el pivote temporal en el centro de la selección actual."
+            ]
+        },
+        "fr": {
+            "label": "Pivot Temporaire Centré",
+            "tooltip": [
+                "Crée le pivot temporaire au centre de la sélection actuelle."
+            ]
+        }
+    },
+    "temp_pivot_worldspace": {
+        "en": {
+            "label": "Temp Pivot WorldSpace",
+            "tooltip": [
+                "Create a temporary pivot aligned to world axes."
+            ]
+        },
+        "es": {
+            "label": "Pivote Temporal en Espacio del Mundo",
+            "tooltip": [
+                "Crea un pivote temporal alineado con los ejes del mundo."
+            ]
+        },
+        "fr": {
+            "label": "Pivot Temporaire en Espace Monde",
+            "tooltip": [
+                "Crée un pivot temporaire aligné sur les axes du monde."
+            ]
+        }
+    },
+    "temp_pivot_edit": {
+        "en": {
+            "label": "Edit Temp Pivot",
+            "tooltip": [
+                "Select and edit the active temporary pivot without ending the session."
+            ]
+        },
+        "es": {
+            "label": "Editar Pivote Temporal",
+            "tooltip": [
+                "Selecciona y edita el pivote temporal activo sin terminar la sesión."
+            ]
+        },
+        "fr": {
+            "label": "Éditer le Pivot Temporaire",
+            "tooltip": [
+                "Sélectionne et édite le pivot temporaire actif sans terminer la session."
+            ]
+        }
+    },
+    "temp_pivot_reset": {
+        "en": {
+            "label": "Reset Temp Pivot",
+            "tooltip": [
+                "Reset the active pivot to its original placement and orientation."
+            ]
+        },
+        "es": {
+            "label": "Restablecer Pivote Temporal",
+            "tooltip": [
+                "Restablece el pivote activo a su colocación y orientación originales."
+            ]
+        },
+        "fr": {
+            "label": "Réinitialiser le Pivot Temporaire",
+            "tooltip": [
+                "Réinitialise le pivot actif à son emplacement et son orientation d'origine."
+            ]
+        }
+    },
+    "temp_pivot_help": {
+        "en": {
+            "label": "Help",
+            "tooltip": [
+                "Open the Temp Pivot documentation."
+            ]
+        },
+        "es": {
+            "label": "Ayuda",
+            "tooltip": [
+                "Abre la documentación de Pivote Temporal."
+            ]
+        },
+        "fr": {
+            "label": "Aide",
+            "tooltip": [
+                "Ouvre la documentation du Pivot Temporaire."
+            ]
+        }
+    }
+}

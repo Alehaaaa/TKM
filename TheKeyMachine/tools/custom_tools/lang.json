@@ -1,0 +1,25 @@
+{
+    "custom_tools": {
+        "en": {
+            "label": "Custom Tools",
+            "tooltip": [
+                "Open your custom tools and script shortcuts from a single menu.",
+                "Configure Python, MEL, and callable entries without relying on Maya shelves."
+            ]
+        },
+        "es": {
+            "label": "Herramientas Personalizadas",
+            "tooltip": [
+                "Abre tus herramientas personalizadas y accesos directos de scripts desde un solo menú.",
+                "Configura entradas de Python, MEL y funciones invocables sin depender de los shelves de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Outils Personnalisés",
+            "tooltip": [
+                "Ouvre vos outils personnalisés et raccourcis de scripts depuis un seul menu.",
+                "Configurez des entrées Python, MEL et des fonctions appelables sans dépendre des shelves de Maya."
+            ]
+        }
+    }
+}

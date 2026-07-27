@@ -181,26 +181,32 @@ def set_dock_layout(layout, *_args):
 
 
 def dock_orientation_choices():
-    from TheKeyMachine.core import toolbar
+    from TheKeyMachine.core import i18n, toolbar
 
     return [
         {
-            "label": label,
+            "label": i18n.tr("dock_orient_{}".format(value), label),
             "value": value,
-            "description": "Place the toolbar on the {} side.".format(value),
+            "description": i18n.tr(
+                "dock_orient_{}_desc".format(value),
+                "Place the toolbar on the {} side.".format(value),
+            ),
         }
         for value, label in toolbar.DOCKING_ORIENTATIONS.items()
     ]
 
 
 def dock_layout_choices():
-    from TheKeyMachine.core import toolbar
+    from TheKeyMachine.core import i18n, toolbar
 
     return [
         {
-            "label": label,
+            "label": i18n.tr("dock_area_{}".format(value), label),
             "value": value,
-            "description": "Dock the toolbar in {}.".format(label),
+            "description": i18n.tr(
+                "dock_area_{}_desc".format(value),
+                "Dock the toolbar in {}.".format(label),
+            ),
         }
         for value, label in toolbar.DOCKING_AREAS.items()
     ]
@@ -219,6 +225,22 @@ def set_alignment(alignment_name, *_args):
 def get_alignment(*_args):
     from TheKeyMachine.mods import settingsMod as settings
     return settings.get_setting("toolbar_icon_alignment", "Center")
+
+
+def alignment_choices():
+    from TheKeyMachine.core import i18n
+
+    return [
+        {
+            "label": i18n.tr("align_{}_label".format(value.lower()), "Align {}".format(value)),
+            "value": value,
+            "description": i18n.tr(
+                "align_{}_desc".format(value.lower()),
+                "Align toolbar icons to the {}.".format(value.lower()),
+            ),
+        }
+        for value in ("Left", "Center", "Right")
+    ]
 
 
 
@@ -255,3 +277,15 @@ def show_donate(*_args):
 def show_bug_report(*_args):
     from TheKeyMachine.mods import reportMod
     return reportMod.bug_report_window()
+
+
+def populate_languages_menu(menu, *_args):
+    """Populate (or repopulate) the Languages submenu in place.
+
+    Used as the ``dynamic_menu`` builder for the nested "System" submenu in
+    the TKM logo's mega-menu; ``toolMenus.build_main_system_menu`` reuses the
+    same ``toolMenus.populate_languages_menu`` implementation for the
+    standalone System button, so the two surfaces can never drift apart.
+    """
+    from TheKeyMachine.core import toolMenus
+    return toolMenus.populate_languages_menu(menu)

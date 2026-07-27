@@ -124,16 +124,6 @@ import TheKeyMachine.core.openMayaUtils as omutils
 
 
 class GimbalAnalyzer:
-    def __init__(self):
-        self.rotation_orders = {
-            "xyz": om.MEulerRotation.kXYZ,
-            "yzx": om.MEulerRotation.kYZX,
-            "zxy": om.MEulerRotation.kZXY,
-            "xzy": om.MEulerRotation.kXZY,
-            "yxz": om.MEulerRotation.kYXZ,
-            "zyx": om.MEulerRotation.kZYX,
-        }
-
     def radians_to_degrees(self, radians):
         return radians * (180.0 / math.pi)
 
@@ -152,7 +142,8 @@ class GimbalAnalyzer:
         return int(abs(((mid + 90) % 180) - 90) / 90 * 100)
 
     def convert_order_string(self, order):
-        return self.rotation_orders.get(order, om.MEulerRotation.kZYX)
+        enum = omutils.rotate_order_enum(order)
+        return enum if enum is not None else om.MEulerRotation.kZYX
 
     def get_rotation(self, obj):
         node = omutils.mobject_from_node(obj)

@@ -99,6 +99,9 @@ def make_inViewMessage(message, icon=None):
     if not icon:
         icon = ""
 
+    from TheKeyMachine.core import i18n
+    message = i18n.tr_text(message)
+
     cmds.inViewMessage(
         amg='<div style="text-align:center"><img src="' + icon + '">\n\n' + message + "\n\n\n",
         pos="midCenter",

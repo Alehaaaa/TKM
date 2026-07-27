@@ -1,0 +1,202 @@
+{
+    "share_keys": {
+        "en": {
+            "label": "Share Keys",
+            "tooltip": [
+                "Add missing shared key times across the active animation channels."
+            ]
+        },
+        "es": {
+            "label": "Compartir Claves",
+            "tooltip": [
+                "Añade los tiempos de clave que faltan entre los canales de animación activos."
+            ]
+        },
+        "fr": {
+            "label": "Partager les Clés",
+            "tooltip": [
+                "Ajoute les temps de clé manquants entre les canaux d'animation actifs."
+            ]
+        }
+    },
+    "share_keys_from_last_selected": {
+        "en": {
+            "label": "Share Keys From Last Selected",
+            "tooltip": [
+                "Use the last selected object as the source of key times for the other selected objects."
+            ]
+        },
+        "es": {
+            "label": "Compartir Claves desde el Último Seleccionado",
+            "tooltip": [
+                "Usa el último objeto seleccionado como origen de los tiempos de clave para los demás objetos seleccionados."
+            ]
+        },
+        "fr": {
+            "label": "Partager les Clés depuis le Dernier Sélectionné",
+            "tooltip": [
+                "Utilise le dernier objet sélectionné comme source des temps de clé pour les autres objets sélectionnés."
+            ]
+        }
+    },
+    "reblock": {
+        "en": {
+            "label": "Reblock",
+            "tooltip": [
+                "Re-space animation blocks while preserving their keyed poses."
+            ]
+        },
+        "es": {
+            "label": "Reblock",
+            "tooltip": [
+                "Reespacia los bloques de animación conservando sus poses clave."
+            ]
+        },
+        "fr": {
+            "label": "Reblock",
+            "tooltip": [
+                "Respace les blocs d'animation en conservant leurs poses clés."
+            ]
+        }
+    },
+    "reblock_insert": {
+        "en": {
+            "label": "Reblock Insert",
+            "tooltip": [
+                "Insert reblocked timing without replacing the destination timing."
+            ]
+        },
+        "es": {
+            "label": "Reblock Insertar",
+            "tooltip": [
+                "Inserta el nuevo espaciado del Reblock sin reemplazar el espaciado de destino."
+            ]
+        },
+        "fr": {
+            "label": "Reblock Insertion",
+            "tooltip": [
+                "Insère le nouvel espacement du Reblock sans remplacer l'espacement de destination."
+            ]
+        }
+    },
+    "bake_animation_1": {
+        "en": {
+            "label": "Bake on Ones",
+            "tooltip": [
+                "Bake the active animation context on every frame."
+            ]
+        },
+        "es": {
+            "label": "Bake en Todos los Fotogramas",
+            "tooltip": [
+                "Hace bake del contexto de animación activo en cada fotograma."
+            ]
+        },
+        "fr": {
+            "label": "Bake sur Toutes les Images",
+            "tooltip": [
+                "Effectue le bake du contexte d'animation actif sur chaque image."
+            ]
+        }
+    },
+    "bake_animation_2": {
+        "en": {
+            "label": "Bake on Twos",
+            "tooltip": [
+                "Bake the active animation context every two frames."
+            ]
+        },
+        "es": {
+            "label": "Bake Cada Dos Fotogramas",
+            "tooltip": [
+                "Hace bake del contexto de animación activo cada dos fotogramas."
+            ]
+        },
+        "fr": {
+            "label": "Bake sur Deux Images",
+            "tooltip": [
+                "Effectue le bake du contexte d'animation actif toutes les deux images."
+            ]
+        }
+    },
+    "bake_animation_3": {
+        "en": {
+            "label": "Bake on Threes",
+            "tooltip": [
+                "Bake the active animation context every three frames."
+            ]
+        },
+        "es": {
+            "label": "Bake Cada Tres Fotogramas",
+            "tooltip": [
+                "Hace bake del contexto de animación activo cada tres fotogramas."
+            ]
+        },
+        "fr": {
+            "label": "Bake sur Trois Images",
+            "tooltip": [
+                "Effectue le bake du contexte d'animation actif toutes les trois images."
+            ]
+        }
+    },
+    "bake_animation_4": {
+        "en": {
+            "label": "Bake on Fours",
+            "tooltip": [
+                "Bake the active animation context every four frames."
+            ]
+        },
+        "es": {
+            "label": "Bake Cada Cuatro Fotogramas",
+            "tooltip": [
+                "Hace bake del contexto de animación activo cada cuatro fotogramas."
+            ]
+        },
+        "fr": {
+            "label": "Bake sur Quatre Images",
+            "tooltip": [
+                "Effectue le bake du contexte d'animation actif toutes les quatre images."
+            ]
+        }
+    },
+    "bake_animation_custom": {
+        "en": {
+            "label": "Bake Custom Interval",
+            "tooltip": [
+                "Bake using a custom positive frame interval."
+            ]
+        },
+        "es": {
+            "label": "Bake con Intervalo Personalizado",
+            "tooltip": [
+                "Hace bake usando un intervalo de fotogramas personalizado."
+            ]
+        },
+        "fr": {
+            "label": "Bake avec Intervalle Personnalisé",
+            "tooltip": [
+                "Effectue le bake avec un intervalle d'images personnalisé."
+            ]
+        }
+    },
+    "bake_animation_from_last_selected": {
+        "en": {
+            "label": "Bake From Last Selected",
+            "tooltip": [
+                "Bake selected targets at the key times of the last selected object."
+            ]
+        },
+        "es": {
+            "label": "Bake desde el Último Seleccionado",
+            "tooltip": [
+                "Hace bake de los objetivos seleccionados en los tiempos de clave del último objeto seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Bake depuis le Dernier Sélectionné",
+            "tooltip": [
+                "Effectue le bake des cibles sélectionnées aux temps de clé du dernier objet sélectionné."
+            ]
+        }
+    }
+}

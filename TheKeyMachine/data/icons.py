@@ -13,6 +13,7 @@ Missing icons return ``None``.
 
 from __future__ import annotations
 
+import functools
 import os
 from TheKeyMachine.data.colors import COLORS
 
@@ -52,15 +53,19 @@ class _IconNamespace:
         raise AttributeError(name)
 
 
-def get(name: str | None, default=None):
-    if not name:
-        return default
+@functools.lru_cache(maxsize=None)
+def _resolve_icon_path(name: str):
+    """Locate the on-disk file for a bare icon name.
 
-    name = str(name).replace("\\", "/").strip("/")
-
+    Cached: TheKeyMachine's icon set is static for the life of the process
+    (nothing writes new icon files at runtime), so re-running the same
+    ``os.path.isfile`` probes for a name that's already been resolved --
+    which happens constantly, since every toolbar rebuild and menu open
+    re-looks-up the same handful of icon names -- is wasted filesystem I/O.
+    """
     if os.path.splitext(name)[1]:
         candidate = path(name)
-        return candidate if os.path.isfile(candidate) else default
+        return candidate if os.path.isfile(candidate) else None
 
     for ext in ICON_EXTENSIONS:
         candidate = path("{}{}".format(name, ext))
@@ -68,7 +73,17 @@ def get(name: str | None, default=None):
         if os.path.isfile(candidate):
             return candidate
 
-    return default
+    return None
+
+
+def get(name: str | None, default=None):
+    if not name:
+        return default
+
+    name = str(name).replace("\\", "/").strip("/")
+
+    resolved = _resolve_icon_path(name)
+    return resolved if resolved is not None else default
 
 
 def __getattr__(name):

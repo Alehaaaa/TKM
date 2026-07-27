@@ -1,0 +1,182 @@
+{
+    "default_object_values": {
+        "en": {
+            "label": "Default Pose",
+            "tooltip": [
+                "Reset targeted attributes to saved defaults or Maya's native defaults."
+            ]
+        },
+        "es": {
+            "label": "Pose Predeterminada",
+            "tooltip": [
+                "Restablece los atributos seleccionados a sus valores predeterminados guardados o a los valores nativos de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Pose par Défaut",
+            "tooltip": [
+                "Réinitialise les attributs ciblés à leurs valeurs par défaut enregistrées ou aux valeurs natives de Maya."
+            ]
+        }
+    },
+    "default_translations": {
+        "en": {
+            "label": "Default Translations",
+            "tooltip": [
+                "Reset only translation attributes to their default values."
+            ]
+        },
+        "es": {
+            "label": "Traslación Predeterminada",
+            "tooltip": [
+                "Restablece únicamente los atributos de traslación a sus valores predeterminados."
+            ]
+        },
+        "fr": {
+            "label": "Translation par Défaut",
+            "tooltip": [
+                "Réinitialise uniquement les attributs de translation à leurs valeurs par défaut."
+            ]
+        }
+    },
+    "default_rotations": {
+        "en": {
+            "label": "Default Rotations",
+            "tooltip": [
+                "Reset only rotation attributes to their default values."
+            ]
+        },
+        "es": {
+            "label": "Rotación Predeterminada",
+            "tooltip": [
+                "Restablece únicamente los atributos de rotación a sus valores predeterminados."
+            ]
+        },
+        "fr": {
+            "label": "Rotation par Défaut",
+            "tooltip": [
+                "Réinitialise uniquement les attributs de rotation à leurs valeurs par défaut."
+            ]
+        }
+    },
+    "default_scales": {
+        "en": {
+            "label": "Default Scales",
+            "tooltip": [
+                "Reset only scale attributes to their default values."
+            ]
+        },
+        "es": {
+            "label": "Escala Predeterminada",
+            "tooltip": [
+                "Restablece únicamente los atributos de escala a sus valores predeterminados."
+            ]
+        },
+        "fr": {
+            "label": "Échelle par Défaut",
+            "tooltip": [
+                "Réinitialise uniquement les attributs d'échelle à leurs valeurs par défaut."
+            ]
+        }
+    },
+    "default_trs": {
+        "en": {
+            "label": "Default Translation Rotation Scale",
+            "tooltip": [
+                "Reset translation, rotation, and scale attributes together."
+            ]
+        },
+        "es": {
+            "label": "Traslación, Rotación y Escala Predeterminadas",
+            "tooltip": [
+                "Restablece juntos los atributos de traslación, rotación y escala."
+            ]
+        },
+        "fr": {
+            "label": "Translation, Rotation et Échelle par Défaut",
+            "tooltip": [
+                "Réinitialise ensemble les attributs de translation, rotation et échelle."
+            ]
+        }
+    },
+    "default_set_defaults": {
+        "en": {
+            "label": "Save Defaults for Selected",
+            "tooltip": [
+                "Store the current keyable attribute values as custom defaults for the selected objects."
+            ]
+        },
+        "es": {
+            "label": "Guardar Predeterminados de la Selección",
+            "tooltip": [
+                "Guarda los valores actuales de los atributos clave como predeterminados personalizados para los objetos seleccionados."
+            ]
+        },
+        "fr": {
+            "label": "Enregistrer les Valeurs par Défaut de la Sélection",
+            "tooltip": [
+                "Enregistre les valeurs actuelles des attributs clés comme valeurs par défaut personnalisées pour les objets sélectionnés."
+            ]
+        }
+    },
+    "default_restore_defaults": {
+        "en": {
+            "label": "Remove Saved Defaults for Selected",
+            "tooltip": [
+                "Remove custom defaults for the selected objects without affecting other saved controls."
+            ]
+        },
+        "es": {
+            "label": "Quitar Predeterminados Guardados de la Selección",
+            "tooltip": [
+                "Elimina los predeterminados personalizados de los objetos seleccionados sin afectar a otros controles guardados."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer les Valeurs par Défaut Enregistrées de la Sélection",
+            "tooltip": [
+                "Supprime les valeurs par défaut personnalisées des objets sélectionnés sans affecter les autres contrôleurs enregistrés."
+            ]
+        }
+    },
+    "default_clear_all": {
+        "en": {
+            "label": "Clear All Saved Defaults",
+            "tooltip": [
+                "Clear every custom default saved by TheKeyMachine."
+            ]
+        },
+        "es": {
+            "label": "Borrar Todos los Predeterminados Guardados",
+            "tooltip": [
+                "Elimina todos los predeterminados personalizados guardados por TheKeyMachine."
+            ]
+        },
+        "fr": {
+            "label": "Effacer Toutes les Valeurs par Défaut Enregistrées",
+            "tooltip": [
+                "Efface toutes les valeurs par défaut personnalisées enregistrées par TheKeyMachine."
+            ]
+        }
+    },
+    "default_help": {
+        "en": {
+            "label": "Help",
+            "tooltip": [
+                "Open the Default Values documentation."
+            ]
+        },
+        "es": {
+            "label": "Ayuda",
+            "tooltip": [
+                "Abre la documentación de Valores Predeterminados."
+            ]
+        },
+        "fr": {
+            "label": "Aide",
+            "tooltip": [
+                "Ouvre la documentation des Valeurs par Défaut."
+            ]
+        }
+    }
+}

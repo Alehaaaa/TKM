@@ -1,0 +1,25 @@
+{
+    "animation_recovery": {
+        "en": {
+            "label": "Animation Recovery",
+            "tooltip": [
+                "Browse automatic animation and channel snapshots, with alerts when an older scene file is opened.",
+                "Recover with nothing selected to restore everything, or select objects to restore only those objects."
+            ]
+        },
+        "es": {
+            "label": "Recuperación de Animación",
+            "tooltip": [
+                "Explora capturas automáticas de animación y canales, con avisos cuando se abre un archivo de escena anterior.",
+                "Recupera sin nada seleccionado para restaurar todo, o selecciona objetos para restaurar solo esos objetos."
+            ]
+        },
+        "fr": {
+            "label": "Récupération d'Animation",
+            "tooltip": [
+                "Parcourez les instantanés automatiques d'animation et de canaux, avec des alertes lorsqu'un fichier de scène plus ancien est ouvert.",
+                "Récupérez sans rien sélectionner pour tout restaurer, ou sélectionnez des objets pour ne restaurer que ceux-ci."
+            ]
+        }
+    }
+}

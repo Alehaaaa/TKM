@@ -1,0 +1,85 @@
+{
+    "follow_cam": {
+        "en": {
+            "label": "Follow Cam",
+            "tooltip": [
+                "Create a camera that follows the selected object in translation and rotation.",
+                "Useful for stabilizing a moving control in view while polishing its animation."
+            ]
+        },
+        "es": {
+            "label": "Follow Cam",
+            "tooltip": [
+                "Crea una cámara que sigue al objeto seleccionado en traslación y rotación.",
+                "Útil para estabilizar en la vista un control en movimiento mientras se pule su animación."
+            ]
+        },
+        "fr": {
+            "label": "Follow Cam",
+            "tooltip": [
+                "Crée une caméra qui suit l'objet sélectionné en translation et en rotation.",
+                "Utile pour stabiliser à l'écran un contrôleur en mouvement pendant le peaufinage de son animation."
+            ]
+        }
+    },
+    "follow_cam_translation": {
+        "en": {
+            "label": "Follow only Translation",
+            "tooltip": [
+                "Create a camera that follows only the selected object's translation."
+            ]
+        },
+        "es": {
+            "label": "Follow Cam - Solo Traslación",
+            "tooltip": [
+                "Crea una cámara que sigue únicamente la traslación del objeto seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Follow Cam - Translation Seulement",
+            "tooltip": [
+                "Crée une caméra qui suit uniquement la translation de l'objet sélectionné."
+            ]
+        }
+    },
+    "follow_cam_rotation": {
+        "en": {
+            "label": "Follow only Rotation",
+            "tooltip": [
+                "Create a camera that follows only the selected object's rotation."
+            ]
+        },
+        "es": {
+            "label": "Follow Cam - Solo Rotación",
+            "tooltip": [
+                "Crea una cámara que sigue únicamente la rotación del objeto seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Follow Cam - Rotation Seulement",
+            "tooltip": [
+                "Crée une caméra qui suit uniquement la rotation de l'objet sélectionné."
+            ]
+        }
+    },
+    "follow_cam_remove": {
+        "en": {
+            "label": "Remove Follow Cam",
+            "tooltip": [
+                "Remove the active Follow Cam setup and restore the previous camera."
+            ]
+        },
+        "es": {
+            "label": "Quitar Follow Cam",
+            "tooltip": [
+                "Elimina la Follow Cam activa y restaura la cámara anterior."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer la Follow Cam",
+            "tooltip": [
+                "Supprime la Follow Cam active et restaure la caméra précédente."
+            ]
+        }
+    }
+}

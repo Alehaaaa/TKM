@@ -204,15 +204,59 @@ def _add_registered_menu(parent_menu, builder, *, command_id, command_icon=UNSET
     )
 
 
+def _declared_item_text(item, toolbox_module):
+    """Resolve a declarative menu item's live label/description.
+
+    Menu/dynamic_menu/section headers are declared once as plain Python
+    dicts at package-import time, then reused (the same dict object) on
+    every rebuild -- so a bare ``"label": "Preferences"`` string never
+    picks up a language switch on its own, unlike leaf command items, which
+    already re-resolve through ``toolbox.get_tool()`` on every rebuild.
+
+    Two ways for a declared item to opt into translation, without any
+    per-package special-casing:
+    - ``"command"``/``"id"``: reuse an existing registered tool's own
+      label/description (its ``lang.json`` entry), for items that mirror a
+      real tool one-to-one (e.g. the "Preferences" submenu mirrors the
+      standalone ``main_preferences_menu`` tool).
+    - ``"i18n_key"``: look up a chrome-only string (one with no tool id of
+      its own, like a plain section header) in ``data/lang/core.json`` via
+      ``i18n.tr()``.
+    Neither key present: fall back to the literal ``"label"``/``"description"``,
+    unchanged -- every other package's declared menus keep working exactly
+    as before.
+    """
+    label = item.get("label", "")
+    description = item.get("description", "")
+
+    command_id = item.get("command") or item.get("id")
+    if command_id:
+        tool = toolbox_module.get_tool(command_id)
+        tooltip = tool.get("tooltip")
+        label = tool.get("menu_label") or tool.get("label") or label
+        description = tool.get("description") or (tooltip if isinstance(tooltip, str) else description)
+        return label, description
+
+    i18n_key = item.get("i18n_key")
+    if i18n_key:
+        from TheKeyMachine.core import i18n
+
+        label = i18n.tr(i18n_key, label)
+        description = i18n.tr("{}_desc".format(i18n_key), description)
+
+    return label, description
+
+
 def build_declared_menu(definition, parent_widget=None):
     """Build a package-declared menu without tool-specific core code."""
     from TheKeyMachine.core import toolbox
 
+    menu_label, menu_description = _declared_item_text(definition, toolbox)
     menu = cw.MenuWidget(
         QtGui.QIcon(definition.get("icon") or ""),
-        definition.get("label", ""),
+        menu_label,
         parent=parent_widget,
-        description=definition.get("description", ""),
+        description=menu_description,
     )
     for item in definition.get("items", ()):
         if item == "separator":
@@ -347,7 +391,13 @@ def _dock_toolbar(toolbar, checked, **target):
 
 
 def build_main_dock_menu(toolbar):
-    toolbar.dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the toolbar to a different Maya area.")
+    from TheKeyMachine.core import i18n
+
+    toolbar.dock_menu = cw.MenuWidget(
+        QtGui.QIcon(icons.dock),
+        i18n.tr("dock_menu", "Dock"),
+        description=i18n.tr("dock_menu_desc", "Move the toolbar to a different Maya area."),
+    )
 
     toolbar.pos_ac_group = QtGui.QActionGroup(toolbar)
     toolbar.pos_ac_group.setExclusive(True)
@@ -355,13 +405,16 @@ def build_main_dock_menu(toolbar):
         is_current = orient == toolbar.docking_position[1]
         ori_btn = _add_checkable_action(
             toolbar.dock_menu,
-            name,
+            i18n.tr("dock_orient_{}".format(orient), name),
             toolCommon.mark_non_tool_action(
                 partial(_dock_toolbar, toolbar, orient=orient)
             ),
             checked=is_current,
             group=toolbar.pos_ac_group,
-            description="Place the toolbar on the {} side.".format(name.lower()),
+            description=i18n.tr(
+                "dock_orient_{}_desc".format(orient),
+                "Place the toolbar on the {} side.".format(name.lower()),
+            ),
         )
         if is_current:
             ori_btn.setEnabled(False)
@@ -374,13 +427,16 @@ def build_main_dock_menu(toolbar):
         is_current = layout == toolbar.docking_position[0]
         dock_btn = _add_checkable_action(
             toolbar.dock_menu,
-            name,
+            i18n.tr("dock_area_{}".format(layout), name),
             toolCommon.mark_non_tool_action(
                 partial(_dock_toolbar, toolbar, layout=layout)
             ),
             checked=is_current,
             group=toolbar.dock_ac_group,
-            description="Dock the toolbar in {}.".format(name),
+            description=i18n.tr(
+                "dock_area_{}_desc".format(layout),
+                "Dock the toolbar in {}.".format(name),
+            ),
         )
         if is_current:
             dock_btn.setEnabled(False)
@@ -434,7 +490,35 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
 
         _add_toolbar_pinning_footer(menu, toolbar_widget, sections)
 
+    # This menu is built once and cached for the toolbar's lifetime (see the
+    # module docstring above), unlike the System/Preferences/Dock/Help
+    # submenus, which are rebuilt fresh on every open and so already pick up
+    # a language change on their own. Its alignment labels and "Restore
+    # Defaults"/"Graph Editor Toolbar" footer are translated at build time,
+    # so a later language switch needs to explicitly drop this cache --
+    # tracked per toolbar instance so re-running this (it only ever runs
+    # once per toolbar) doesn't stack duplicate connections.
+    from TheKeyMachine.core import i18n
+
+    toolCommon.replace_tracked_connection(
+        toolbar_widget,
+        "_tkm_pinning_menu_language_connection",
+        i18n.bus.languageChanged,
+        partial(_invalidate_toolbar_pinning_menu, toolbar_widget),
+        parent=menu,
+    )
+
     return menu
+
+
+def _invalidate_toolbar_pinning_menu(toolbar_widget, *_args):
+    """Drop the cached pinning menu so its next open rebuilds with the new language."""
+    if not wutil.is_valid_widget(toolbar_widget):
+        return
+    menu = getattr(toolbar_widget, "_tkm_pinning_menu", None)
+    toolbar_widget._tkm_pinning_menu = None
+    if menu is not None and wutil.is_valid_widget(menu):
+        menu.deleteLater()
 
 
 def refresh_toolbar_pinning_menu(menu, toolbar_widget):
@@ -634,25 +718,25 @@ def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alig
 
 
 def _add_alignment_actions(menu, current_alignment, apply_alignment_fn, sections, names=TOOLBAR_ALIGNMENT_NAMES):
-    from TheKeyMachine.core import toolWorkspaces
+    from TheKeyMachine.core import i18n, toolWorkspaces
     group = QtGui.QActionGroup(menu)
     group.setExclusive(True)
     actions = {}
-    
+
     def apply_align(checked, a):
         if checked:
             apply_alignment_fn(a)
             is_deviating = toolWorkspaces.is_current_workspace_deviating(sections, get_alignment_fn=lambda: a)
             toolWorkspaces.mark_workspace_modified(is_deviating)
-            
+
     for label in names:
         actions[label] = _add_checkable_action(
             menu,
-            TOOLBAR_ALIGNMENT_LABEL % label,
+            i18n.tr("align_{}_label".format(label.lower()), TOOLBAR_ALIGNMENT_LABEL % label),
             toolCommon.mark_non_tool_action(partial(apply_align, a=label)),
             checked=label == current_alignment,
             group=group,
-            description=TOOLBAR_ALIGNMENT_DESC % label.lower(),
+            description=i18n.tr("align_{}_desc".format(label.lower()), TOOLBAR_ALIGNMENT_DESC % label.lower()),
             open_menu=True,
         )
     return group, actions
@@ -706,6 +790,8 @@ def _add_workspace_actions(menu, sections, apply_alignment_fn):
     return group, actions
 
 def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
+    from TheKeyMachine.core import i18n
+
     menu.addSeparator()
 
     setting_key, apply_alignment_fn = _toolbar_alignment_context(toolbar_widget)
@@ -736,15 +822,15 @@ def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
     )
     menu.addAction(
         QtGui.QIcon(icons.reload),
-        "Restore Defaults",
+        i18n.tr("restore_defaults", "Restore Defaults"),
         restore_defaults_callback,
-        description="Restore toolbar pins and alignment defaults.",
+        description=i18n.tr("restore_defaults_desc", "Restore toolbar pins and alignment defaults."),
     )
 
     graph_toolbar_action = menu.addAction(
         QtGui.QIcon(icons.customGraph),
-        "Graph Editor Toolbar",
-        description="Show or hide the TKM toolbar inside the Graph Editor.",
+        i18n.tr("graph_editor_toolbar", "Graph Editor Toolbar"),
+        description=i18n.tr("graph_editor_toolbar_desc", "Show or hide the TKM toolbar inside the Graph Editor."),
     )
     toolCommon.connect_checkable_action(
         graph_toolbar_action,
@@ -790,14 +876,25 @@ def should_show_toolbar_pinning_menu(toolbar_widget, pos):
 
 
 def build_other_sources_help_menu():
-    help_menu = cw.MenuWidget(QtGui.QIcon(icons.help), "Help")
+    from TheKeyMachine.core import i18n
+
+    help_menu = cw.MenuWidget(QtGui.QIcon(icons.help), i18n.tr("help_menu", "Help"))
     if general.config.get("BUG_REPORT", True):
         _add_toolbox_actions(help_menu, ("bug_report_window",))
         help_menu.addSeparator()
     links = (
-        ("Discord", icons.discord, "https://discord.gg/G2J5yyjz", "Open the community server."),
-        ("Documentation", icons.help, "https://thekeymachine.gitbook.io/base", "Open the docs."),
-        ("YouTube", icons.youtube, "https://www.youtube.com/@TheKeyMachineAnimationTools", "Watch tutorials and demos."),
+        (
+            i18n.tr("discord", "Discord"), icons.discord, "https://discord.gg/G2J5yyjz",
+            i18n.tr("discord_desc", "Open the community server."),
+        ),
+        (
+            i18n.tr("documentation", "Documentation"), icons.help, "https://thekeymachine.gitbook.io/base",
+            i18n.tr("documentation_desc", "Open the docs."),
+        ),
+        (
+            i18n.tr("youtube", "YouTube"), icons.youtube, "https://www.youtube.com/@TheKeyMachineAnimationTools",
+            i18n.tr("youtube_desc", "Watch tutorials and demos."),
+        ),
     )
     _add_action_specs(
         help_menu,
@@ -822,8 +919,65 @@ def add_other_sources_help_menu(parent_menu):
     )
 
 
+def populate_languages_menu(menu):
+    """(Re)fill the Languages submenu in place: current state, freshly resolved.
+
+    Shared by the standalone System button's submenu (built fresh on every
+    open via ``_add_registered_menu``, like its System/Preferences/Dock/Help
+    siblings) and the TKM logo mega-menu's nested "System" > "Languages"
+    ``dynamic_menu`` slot -- one implementation, so the two surfaces can't
+    drift apart.
+    """
+    from TheKeyMachine.core import i18n
+
+    menu.clear()
+    menu._tkm_language_fingerprint = (i18n.get_language(), i18n.get_translate_tool_names())
+
+    _add_checkable_action(
+        menu,
+        i18n.tr("translate_tool_names_label", "Translate Tool Names"),
+        toolCommon.mark_non_tool_action(
+            lambda checked: i18n.set_translate_tool_names(checked)
+        ),
+        checked=i18n.get_translate_tool_names(),
+        description=i18n.tr(
+            "translate_tool_names_desc",
+            "Also translate tool names, not just descriptions and messages.",
+        ),
+    )
+
+    menu.addSeparator()
+
+    group = QtGui.QActionGroup(menu)
+    group.setExclusive(True)
+    current_language = i18n.get_language()
+    for code, info in i18n.available_languages().items():
+        _add_checkable_action(
+            menu,
+            info.get("native") or info.get("name") or code,
+            toolCommon.mark_non_tool_action(
+                partial(_apply_checked_value, i18n.set_language, code)
+            ),
+            checked=code == current_language,
+            group=group,
+            description="{} ({})".format(info.get("name") or code, code),
+            open_menu=True,
+        )
+    return menu
+
+
+def build_languages_menu():
+    from TheKeyMachine.core import i18n
+
+    menu = cw.MenuWidget(QtGui.QIcon(icons.globe), i18n.tr("languages_menu", "Languages"))
+    populate_languages_menu(menu)
+    return menu
+
+
 def build_main_system_menu(toolbar):
-    system_menu = cw.MenuWidget(QtGui.QIcon(icons.system), "System")
+    from TheKeyMachine.core import i18n
+
+    system_menu = cw.MenuWidget(QtGui.QIcon(icons.system), i18n.tr("system_menu", "System"))
     _add_action_specs(
         system_menu,
         (
@@ -834,6 +988,12 @@ def build_main_system_menu(toolbar):
             },
             {"command_id": "toolbar_uninstall"},
         ),
+    )
+    system_menu.addSeparator()
+    _add_registered_menu(
+        system_menu,
+        build_languages_menu,
+        command_id="languages_menu",
     )
     return system_menu
 
@@ -852,11 +1012,13 @@ def build_main_preferences_menu(
     toolbar_alignment,
     update_toolbar_icon_alignment,
 ):
-    preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(icons.settings), "Preferences")
-    preferences_menu.addSection("Startup")
+    from TheKeyMachine.core import i18n
+
+    preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(icons.settings), i18n.tr("preferences_menu", "Preferences"))
+    preferences_menu.addSection(i18n.tr("startup_section", "Startup"))
     _add_action(
         preferences_menu,
-        "Create a Shelf Button",
+        i18n.tr("create_shelf_button", "Create a Shelf Button"),
         shelf.create_main_shelf_button,
         command_id="toolbar_add_shelf_button",
     )
@@ -873,7 +1035,7 @@ def build_main_preferences_menu(
         checked=show_tooltips,
     )
 
-    preferences_menu.addSection("Alignment")
+    preferences_menu.addSection(i18n.tr("alignment_section", "Alignment"))
     current_align = "Center"
     for k, v in TOOLBAR_ALIGNMENTS.items():
         if v == toolbar_alignment:
@@ -886,7 +1048,7 @@ def build_main_preferences_menu(
         update_toolbar_icon_alignment,
     )
 
-    preferences_menu.addSection("Display")
+    preferences_menu.addSection(i18n.tr("display_section", "Display"))
     return preferences_menu
 
 
@@ -941,6 +1103,7 @@ def _main_menu_builders(toolbar):
         "main_preferences_menu": partial(build_main_preferences_menu, toolbar, **common),
         "main_system_menu": partial(build_main_system_menu, toolbar),
         "main_dock_menu": partial(build_main_dock_menu, toolbar),
+        "languages_menu": build_languages_menu,
     }
 
 

@@ -1,0 +1,202 @@
+{
+    "blend_best_guess": {
+        "en": {
+            "label": "Blend to Best Guess Tangent",
+            "tooltip": [
+                "Blend toward a smooth tangent inferred from neighboring keys."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Estimada",
+            "tooltip": [
+                "Mezcla hacia una tangente suave inferida a partir de las claves vecinas."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Estimée",
+            "tooltip": [
+                "Fond vers une tangente lisse déduite des clés voisines."
+            ]
+        }
+    },
+    "blend_polished": {
+        "en": {
+            "label": "Blend to Polished Tangent",
+            "tooltip": [
+                "Blend toward a polished spline tangent."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Pulida",
+            "tooltip": [
+                "Mezcla hacia una tangente Spline pulida."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Peaufinée",
+            "tooltip": [
+                "Fond vers une tangente Spline peaufinée."
+            ]
+        }
+    },
+    "blend_flow": {
+        "en": {
+            "label": "Blend to Flow Tangent",
+            "tooltip": [
+                "Blend toward a flowing plateau tangent."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Fluida",
+            "tooltip": [
+                "Mezcla hacia una tangente Plateau fluida."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Fluide",
+            "tooltip": [
+                "Fond vers une tangente Plateau fluide."
+            ]
+        }
+    },
+    "blend_bounce": {
+        "en": {
+            "label": "Blend to Bounce Tangent",
+            "tooltip": [
+                "Blend toward a sharp bouncing tangent."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Bouncy",
+            "tooltip": [
+                "Mezcla hacia una tangente Bouncy pronunciada con rebote."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Bouncy",
+            "tooltip": [
+                "Fond vers une tangente Bouncy marquée avec rebond."
+            ]
+        }
+    },
+    "blend_auto": {
+        "en": {
+            "label": "Blend to Auto Tangent",
+            "tooltip": [
+                "Blend toward Maya Auto tangents."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Auto",
+            "tooltip": [
+                "Mezcla hacia las tangentes Auto de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Auto",
+            "tooltip": [
+                "Fond vers les tangentes Auto de Maya."
+            ]
+        }
+    },
+    "blend_spline": {
+        "en": {
+            "label": "Blend to Spline Tangent",
+            "tooltip": [
+                "Blend toward Maya Spline tangents."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Spline",
+            "tooltip": [
+                "Mezcla hacia las tangentes Spline de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Spline",
+            "tooltip": [
+                "Fond vers les tangentes Spline de Maya."
+            ]
+        }
+    },
+    "blend_clamped": {
+        "en": {
+            "label": "Blend to Clamped Tangent",
+            "tooltip": [
+                "Blend toward Maya Clamped tangents."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Clamped",
+            "tooltip": [
+                "Mezcla hacia las tangentes Clamped de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Clamped",
+            "tooltip": [
+                "Fond vers les tangentes Clamped de Maya."
+            ]
+        }
+    },
+    "blend_linear": {
+        "en": {
+            "label": "Blend to Linear Tangent",
+            "tooltip": [
+                "Blend toward Maya Linear tangents."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Linear",
+            "tooltip": [
+                "Mezcla hacia las tangentes Linear de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Linear",
+            "tooltip": [
+                "Fond vers les tangentes Linear de Maya."
+            ]
+        }
+    },
+    "blend_flat": {
+        "en": {
+            "label": "Blend to Flat Tangent",
+            "tooltip": [
+                "Blend toward Maya Flat tangents."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Flat",
+            "tooltip": [
+                "Mezcla hacia las tangentes Flat de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Flat",
+            "tooltip": [
+                "Fond vers les tangentes Flat de Maya."
+            ]
+        }
+    },
+    "blend_plateau": {
+        "en": {
+            "label": "Blend to Plateau Tangent",
+            "tooltip": [
+                "Blend toward Maya Plateau tangents."
+            ]
+        },
+        "es": {
+            "label": "Mezclar a Tangente Plateau",
+            "tooltip": [
+                "Mezcla hacia las tangentes Plateau de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Fondu vers la Tangente Plateau",
+            "tooltip": [
+                "Fond vers les tangentes Plateau de Maya."
+            ]
+        }
+    }
+}

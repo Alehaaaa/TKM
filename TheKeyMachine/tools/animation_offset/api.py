@@ -7,8 +7,16 @@ import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.data import icons
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.tools.animation_offset import widgets as offset_widgets
 import TheKeyMachine.widgets.timeline as timelineWidgets
+
+
+def _offset_widgets():
+    # Deferred: animation_offset.widgets defines the draggable-handle tint
+    # QWidget class, which is only ever needed once the tool is actually
+    # activated -- not just to register its toolbar button and callbacks.
+    from TheKeyMachine.tools.animation_offset import widgets
+
+    return widgets
 
 
 SUPPORTED_ATTR_TYPES = {
@@ -518,7 +526,7 @@ class AnimationOffsetController(QtCore.QObject):
         cmds.select(selectionMod.get_selected_objects())
         self._connect_runtime_manager()
         self._resnapshot(update_range=self._time_range is None)
-        offset_widgets.show_animation_offset_tint(
+        _offset_widgets().show_animation_offset_tint(
             timerange=self._time_range,
             color=COLORS.toolbar.purple.hex,
             owner=self._owner,

@@ -1,0 +1,48 @@
+{
+    "orbit": {
+        "en": {
+            "label": "Orbit",
+            "tooltip": [
+                "Open the configurable Orbit command palette near the cursor.",
+                "Use its radial arrangement for fast access to frequently repeated animation tools."
+            ]
+        },
+        "es": {
+            "label": "Orbit",
+            "tooltip": [
+                "Abre la paleta de comandos Orbit, configurable, cerca del cursor.",
+                "Usa su disposición radial para acceder rápidamente a las herramientas de animación que repites con más frecuencia."
+            ]
+        },
+        "fr": {
+            "label": "Orbit",
+            "tooltip": [
+                "Ouvre la palette de commandes Orbit, configurable, près du curseur.",
+                "Utilisez sa disposition radiale pour accéder rapidement aux outils d'animation que vous répétez le plus souvent."
+            ]
+        }
+    },
+    "orbit_window": {
+        "en": {
+            "label": "Orbit Window",
+            "tooltip": [
+                "Open the configurable Orbit command palette near the cursor.",
+                "Use its radial arrangement for fast access to frequently repeated animation tools."
+            ]
+        },
+        "es": {
+            "label": "Ventana Orbit",
+            "tooltip": [
+                "Abre la paleta de comandos Orbit, configurable, cerca del cursor.",
+                "Usa su disposición radial para acceder rápidamente a las herramientas de animación que repites con más frecuencia."
+            ]
+        },
+        "fr": {
+            "label": "Fenêtre Orbit",
+            "tooltip": [
+                "Ouvre la palette de commandes Orbit, configurable, près du curseur.",
+                "Utilisez sa disposition radiale pour accéder rapidement aux outils d'animation que vous répétez le plus souvent."
+            ]
+        }
+    }
+}

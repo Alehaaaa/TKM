@@ -147,7 +147,11 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             return
         if not settings.get_setting("graph_toolbar_enabled", True):
             return
-        QtCore.QTimer.singleShot(0, graphToolbarApi.create)
+        # ensure() reuses an already-valid toolbar instead of tearing it down
+        # and rebuilding every section from scratch -- this and
+        # _sync_graph_editor_on_startup() can both fire for the same
+        # already-open Graph Editor during the same startup window.
+        QtCore.QTimer.singleShot(0, graphToolbarApi.ensure)
 
     def _sync_graph_editor_on_startup(self):
         if not QtCompat.isValid(self):
@@ -157,7 +161,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         graph_vis = cmds.getPanel(vis=True) or []
         if "graphEditor1" in graph_vis:
-            QtCore.QTimer.singleShot(0, graphToolbarApi.create)
+            QtCore.QTimer.singleShot(0, graphToolbarApi.ensure)
 
     def showWindow(self):
         # Build up kwargs for the visibleChangeCommand

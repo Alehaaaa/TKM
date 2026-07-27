@@ -896,6 +896,20 @@ def _get_tool_definition(tool_id):
         return None
 
 
+try:
+    # toolbox.get_tool()'s label/tooltip can now depend on the active
+    # language (see core/i18n.py), which this lru_cache -- keyed only by
+    # tool_id -- predates and knows nothing about. Without this, switching
+    # languages would leave undo chunk names and operation status text
+    # showing whichever language was cached first until the process cache
+    # happened to evict that tool_id.
+    from TheKeyMachine.core import i18n as _i18n
+
+    _i18n.bus.languageChanged.connect(_get_tool_definition.cache_clear)
+except Exception:
+    pass
+
+
 def resolve_undo_metadata(tool_id=None, title=None, description="", tooltip=None):
     resolved_title = title or ""
     resolved_description = description or ""
@@ -1064,8 +1078,13 @@ def connect_checkable_action(action, getter=None, setter=None, signal=None):
     return action
 
 
-def add_floating_window_actions(menu, stays_on_top_getter, stays_on_top_setter, restore_position):
-    """Add the standard floating-window actions to a tool context menu."""
+def add_floating_window_actions(menu, stays_on_top_getter, stays_on_top_setter, restore_position=None):
+    """Add the standard floating-window actions to a tool context menu.
+
+    ``restore_position`` is optional: skip it for windows that always open
+    in the same place (e.g. anchored above their toolbar button) and have
+    no draggable/saved geometry worth resetting.
+    """
     always_on_top_action = menu.addAction(
         QtGui.QIcon(icons.settings),
         "Always on Top",
@@ -1076,6 +1095,9 @@ def add_floating_window_actions(menu, stays_on_top_getter, stays_on_top_setter, 
         stays_on_top_getter,
         stays_on_top_setter,
     )
+
+    if restore_position is None:
+        return always_on_top_action, None
 
     restore_position_action = menu.addAction(
         QtGui.QIcon(icons.refresh),

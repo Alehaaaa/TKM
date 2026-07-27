@@ -1,0 +1,122 @@
+{
+    "background_runners": {
+        "en": {
+            "label": "Background Runners",
+            "tooltip": [
+                "Toggle persistent automatic helpers and background tool runners."
+            ]
+        },
+        "es": {
+            "label": "Ejecutores en Segundo Plano",
+            "tooltip": [
+                "Activa o desactiva los ayudantes automáticos persistentes y los ejecutores de herramientas en segundo plano."
+            ]
+        },
+        "fr": {
+            "label": "Exécuteurs en Arrière-Plan",
+            "tooltip": [
+                "Active ou désactive les assistants automatiques persistants et les exécuteurs d'outils en arrière-plan."
+            ]
+        }
+    },
+    "background_runner_channelbox_selection_highlight": {
+        "en": {
+            "label": "Channel Box Selection Timeline Highlight",
+            "tooltip": [
+                "Toggle timeline highlighting for selected Channel Box attributes."
+            ]
+        },
+        "es": {
+            "label": "Resaltar Línea de Tiempo por Selección del Channel Box",
+            "tooltip": [
+                "Activa o desactiva el resaltado de la línea de tiempo para los atributos seleccionados del Channel Box."
+            ]
+        },
+        "fr": {
+            "label": "Surligner la Timeline selon la Sélection du Channel Box",
+            "tooltip": [
+                "Active ou désactive le surlignage de la timeline pour les attributs sélectionnés du Channel Box."
+            ]
+        }
+    },
+    "background_runner_channelbox_clear_on_selection_change": {
+        "en": {
+            "label": "Channel Box Clear Selection",
+            "tooltip": [
+                "Toggle clearing Channel Box attributes when the object selection changes."
+            ]
+        },
+        "es": {
+            "label": "Limpiar Selección del Channel Box",
+            "tooltip": [
+                "Activa o desactiva la limpieza de los atributos del Channel Box cuando cambia la selección de objetos."
+            ]
+        },
+        "fr": {
+            "label": "Effacer la Sélection du Channel Box",
+            "tooltip": [
+                "Active ou désactive l'effacement des attributs du Channel Box lorsque la sélection d'objets change."
+            ]
+        }
+    },
+    "background_runner_camera_orbit_selection": {
+        "en": {
+            "label": "Camera Orbit Selection",
+            "tooltip": [
+                "Toggle automatic camera orbit targeting from the current selection."
+            ]
+        },
+        "es": {
+            "label": "Órbita de Cámara por Selección",
+            "tooltip": [
+                "Activa o desactiva que la cámara oriente automáticamente su órbita según la selección actual."
+            ]
+        },
+        "fr": {
+            "label": "Orbite Caméra selon la Sélection",
+            "tooltip": [
+                "Active ou désactive le ciblage automatique de l'orbite caméra selon la sélection actuelle."
+            ]
+        }
+    },
+    "hide_static_animation_curves": {
+        "en": {
+            "label": "Auto Hide Static Animation Curves",
+            "tooltip": [
+                "Toggle automatic hiding of static curves in the Graph Editor."
+            ]
+        },
+        "es": {
+            "label": "Ocultar Automáticamente Curvas de Animación Estáticas",
+            "tooltip": [
+                "Activa o desactiva el ocultado automático de curvas estáticas en el Graph Editor."
+            ]
+        },
+        "fr": {
+            "label": "Masquer Automatiquement les Courbes d'Animation Statiques",
+            "tooltip": [
+                "Active ou désactive le masquage automatique des courbes statiques dans le Graph Editor."
+            ]
+        }
+    },
+    "background_runner_animation_recovery": {
+        "en": {
+            "label": "Animation Recovery",
+            "tooltip": [
+                "Toggle automatic scene-scoped animation recovery snapshots."
+            ]
+        },
+        "es": {
+            "label": "Recuperación de Animación",
+            "tooltip": [
+                "Activa o desactiva las capturas automáticas de recuperación de animación de la escena."
+            ]
+        },
+        "fr": {
+            "label": "Récupération d'Animation",
+            "tooltip": [
+                "Active ou désactive les instantanés automatiques de récupération d'animation de la scène."
+            ]
+        }
+    }
+}

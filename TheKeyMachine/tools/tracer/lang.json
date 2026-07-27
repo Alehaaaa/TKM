@@ -1,0 +1,185 @@
+{
+    "create_tracer": {
+        "en": {
+            "label": "Tracer",
+            "tooltip": [
+                "Create a viewport trail from the selected object's animated path.",
+                "Use Refresh after animation changes when Auto Update is disabled."
+            ]
+        },
+        "es": {
+            "label": "Tracer",
+            "tooltip": [
+                "Crea un rastro en la vista a partir de la trayectoria animada del objeto seleccionado.",
+                "Usa Actualizar tras cambios de animación cuando la Actualización Automática está desactivada."
+            ]
+        },
+        "fr": {
+            "label": "Tracer",
+            "tooltip": [
+                "Crée une traînée dans la vue à partir de la trajectoire animée de l'objet sélectionné.",
+                "Utilisez Actualiser après des changements d'animation lorsque la Mise à Jour Auto est désactivée."
+            ]
+        }
+    },
+    "tracer_refresh": {
+        "en": {
+            "label": "Refresh Tracer",
+            "tooltip": [
+                "Rebuild the active trail from the object's current animation."
+            ]
+        },
+        "es": {
+            "label": "Actualizar Tracer",
+            "tooltip": [
+                "Reconstruye el rastro activo a partir de la animación actual del objeto."
+            ]
+        },
+        "fr": {
+            "label": "Actualiser le Tracer",
+            "tooltip": [
+                "Reconstruit la traînée active à partir de l'animation actuelle de l'objet."
+            ]
+        }
+    },
+    "tracer_show_hide": {
+        "en": {
+            "label": "Toggle Tracer",
+            "tooltip": [
+                "Show or hide the active trail without deleting it."
+            ]
+        },
+        "es": {
+            "label": "Mostrar/Ocultar Tracer",
+            "tooltip": [
+                "Muestra u oculta el rastro activo sin eliminarlo."
+            ]
+        },
+        "fr": {
+            "label": "Afficher/Masquer le Tracer",
+            "tooltip": [
+                "Affiche ou masque la traînée active sans la supprimer."
+            ]
+        }
+    },
+    "tracer_offset_node": {
+        "en": {
+            "label": "Select Offset Object",
+            "tooltip": [
+                "Select the trail offset node so the displayed path can be repositioned."
+            ]
+        },
+        "es": {
+            "label": "Seleccionar Objeto de Desfase",
+            "tooltip": [
+                "Selecciona el nodo de desfase del rastro para poder reposicionar la trayectoria mostrada."
+            ]
+        },
+        "fr": {
+            "label": "Sélectionner l'Objet de Décalage",
+            "tooltip": [
+                "Sélectionne le nœud de décalage de la traînée pour pouvoir repositionner la trajectoire affichée."
+            ]
+        }
+    },
+    "tracer_grey": {
+        "en": {
+            "label": "Tracer Style: Grey",
+            "tooltip": [
+                "Use the neutral grey display style for the active trail."
+            ]
+        },
+        "es": {
+            "label": "Estilo de Tracer: Gris",
+            "tooltip": [
+                "Usa el estilo de visualización gris neutro para el rastro activo."
+            ]
+        },
+        "fr": {
+            "label": "Style du Tracer : Gris",
+            "tooltip": [
+                "Utilise le style d'affichage gris neutre pour la traînée active."
+            ]
+        }
+    },
+    "tracer_red": {
+        "en": {
+            "label": "Tracer Style: Red",
+            "tooltip": [
+                "Use the red display style for the active trail."
+            ]
+        },
+        "es": {
+            "label": "Estilo de Tracer: Rojo",
+            "tooltip": [
+                "Usa el estilo de visualización rojo para el rastro activo."
+            ]
+        },
+        "fr": {
+            "label": "Style du Tracer : Rouge",
+            "tooltip": [
+                "Utilise le style d'affichage rouge pour la traînée active."
+            ]
+        }
+    },
+    "tracer_blue": {
+        "en": {
+            "label": "Tracer Style: Blue",
+            "tooltip": [
+                "Use the blue display style for the active trail."
+            ]
+        },
+        "es": {
+            "label": "Estilo de Tracer: Azul",
+            "tooltip": [
+                "Usa el estilo de visualización azul para el rastro activo."
+            ]
+        },
+        "fr": {
+            "label": "Style du Tracer : Bleu",
+            "tooltip": [
+                "Utilise le style d'affichage bleu pour la traînée active."
+            ]
+        }
+    },
+    "tracer_remove": {
+        "en": {
+            "label": "Remove Tracer",
+            "tooltip": [
+                "Delete the active tracer setup from the scene."
+            ]
+        },
+        "es": {
+            "label": "Quitar Tracer",
+            "tooltip": [
+                "Elimina de la escena la configuración activa del Tracer."
+            ]
+        },
+        "fr": {
+            "label": "Supprimer le Tracer",
+            "tooltip": [
+                "Supprime de la scène la configuration active du Tracer."
+            ]
+        }
+    },
+    "tracer_connected": {
+        "en": {
+            "label": "Auto Update",
+            "tooltip": [
+                "Update the trail automatically while the source animation changes."
+            ]
+        },
+        "es": {
+            "label": "Actualización Automática",
+            "tooltip": [
+                "Actualiza el rastro automáticamente mientras cambia la animación de origen."
+            ]
+        },
+        "fr": {
+            "label": "Mise à Jour Auto",
+            "tooltip": [
+                "Met à jour la traînée automatiquement pendant que l'animation source change."
+            ]
+        }
+    }
+}

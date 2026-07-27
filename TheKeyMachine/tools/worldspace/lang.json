@@ -1,0 +1,102 @@
+{
+    "ws_copy_frame": {
+        "en": {
+            "label": "Copy World Space",
+            "tooltip": [
+                "Copy world-space transforms from the selected time range or keys, or from the current frame when nothing is selected."
+            ]
+        },
+        "es": {
+            "label": "Copiar Espacio del Mundo",
+            "tooltip": [
+                "Copia los transforms en espacio del mundo del rango de tiempo o claves seleccionadas, o del fotograma actual si no hay nada seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Copier l'Espace Monde",
+            "tooltip": [
+                "Copie les transforms en espace monde de la plage de temps ou des clés sélectionnées, ou de l'image actuelle si rien n'est sélectionné."
+            ]
+        }
+    },
+    "ws_copy_range": {
+        "en": {
+            "label": "Copy World Space - Selected Range",
+            "tooltip": [
+                "Copy world-space animation from the selected time range, or from the visible playback range when no range is selected."
+            ]
+        },
+        "es": {
+            "label": "Copiar Espacio del Mundo - Rango Seleccionado",
+            "tooltip": [
+                "Copia la animación en espacio del mundo del rango de tiempo seleccionado, o del rango de reproducción visible si no hay ninguno seleccionado."
+            ]
+        },
+        "fr": {
+            "label": "Copier l'Espace Monde - Plage Sélectionnée",
+            "tooltip": [
+                "Copie l'animation en espace monde de la plage de temps sélectionnée, ou de la plage de lecture visible si aucune n'est sélectionnée."
+            ]
+        }
+    },
+    "ws_paste_frame": {
+        "en": {
+            "label": "Paste World Space",
+            "tooltip": [
+                "Paste the copied world-space transforms onto the selected objects at the current frame."
+            ]
+        },
+        "es": {
+            "label": "Pegar Espacio del Mundo",
+            "tooltip": [
+                "Pega los transforms copiados en espacio del mundo sobre los objetos seleccionados en el fotograma actual."
+            ]
+        },
+        "fr": {
+            "label": "Coller l'Espace Monde",
+            "tooltip": [
+                "Colle les transforms copiés en espace monde sur les objets sélectionnés à l'image actuelle."
+            ]
+        }
+    },
+    "ws_paste": {
+        "en": {
+            "label": "Paste World Space - All Animation",
+            "tooltip": [
+                "Paste copied world-space animation onto the selected objects while preserving the captured timing."
+            ]
+        },
+        "es": {
+            "label": "Pegar Espacio del Mundo - Toda la Animación",
+            "tooltip": [
+                "Pega la animación copiada en espacio del mundo sobre los objetos seleccionados conservando el tiempo capturado."
+            ]
+        },
+        "fr": {
+            "label": "Coller l'Espace Monde - Toute l'Animation",
+            "tooltip": [
+                "Colle l'animation copiée en espace monde sur les objets sélectionnés en conservant le timing capturé."
+            ]
+        }
+    },
+    "worldspace_help": {
+        "en": {
+            "label": "Help - World Space",
+            "tooltip": [
+                "Open the World Space copy and paste documentation."
+            ]
+        },
+        "es": {
+            "label": "Ayuda - Espacio del Mundo",
+            "tooltip": [
+                "Abre la documentación de copiar y pegar en Espacio del Mundo."
+            ]
+        },
+        "fr": {
+            "label": "Aide - Espace Monde",
+            "tooltip": [
+                "Ouvre la documentation de copier-coller en Espace Monde."
+            ]
+        }
+    }
+}
