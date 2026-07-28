@@ -33,6 +33,7 @@ import TheKeyMachine.mods.generalMod as general
 
 from TheKeyMachine.core.Qt import QtCore, QtWidgets
 
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import customDialogs
 
 
@@ -352,9 +353,11 @@ def report_detected_exception(exc=None, context=None, source_file=None, tracebac
 
     def _show_dialog():
         global _BUG_EXCEPTION_DIALOG_PENDING
+        from TheKeyMachine.core import i18n
+
         try:
             bug_report_window(
-                dialog_title="Sorry, you found a bug!",
+                dialog_title=i18n.tr("bug_report_title_detected", "Sorry, you found a bug!"),
                 prefill_name=report_name,
                 prefill_explanation=report_explanation,
                 prefill_script_error=report_traceback,
@@ -485,9 +488,13 @@ def install_bug_exception_handler():
     return True
 
 
-def bug_report_window(*args, dialog_title="Report a Bug", prefill_name="", prefill_explanation="", prefill_script_error=""):
+def bug_report_window(*args, dialog_title=None, prefill_name="", prefill_explanation="", prefill_script_error=""):
     if not general.config.get("BUG_REPORT", True):
         return None
+    if dialog_title is None:
+        from TheKeyMachine.core import i18n
+
+        dialog_title = i18n.tr("bug_report_title", "Report a Bug")
     existing_dialog = _get_bug_report_dialog(include_hidden=True)
     if existing_dialog:
         if hasattr(existing_dialog, "apply_prefill"):
@@ -517,5 +524,6 @@ def bug_report_window(*args, dialog_title="Report a Bug", prefill_name="", prefi
     dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
     _set_bug_report_dialog(dlg)
     dlg.destroyed.connect(_clear_bug_report_dialog)
+    toolCommon.invalidate_cached_window_on_language_change(dlg, _clear_bug_report_dialog)
     dlg.show_centered()
     return dlg

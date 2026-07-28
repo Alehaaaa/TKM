@@ -17,6 +17,36 @@
             "tooltip": [
                 "Ouvre les commandes d'édition, de nettoyage, de Clé Intelligente et d'accrochage de l'animation."
             ]
+        },
+        "ca": {
+            "label": "Eines de Corbes d'Animació",
+            "tooltip": [
+                "Obre les ordres d'edició, neteja, Clau Intel·ligent i ajust de l'animació"
+            ]
+        },
+        "zh": {
+            "label": "动画曲线工具",
+            "tooltip": [
+                "打开动画编辑、清理、智能关键帧和吸附命令"
+            ]
+        },
+        "ja": {
+            "label": "アニメカーブツール",
+            "tooltip": [
+                "アニメーションの編集、クリーンアップ、スマートキー、スナップコマンドを開きます"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 커브 도구",
+            "tooltip": [
+                "애니메이션 편집, 정리, 스마트 키, 스냅 명령을 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "أدوات منحنى الحركة",
+            "tooltip": [
+                "فتح أوامر تحرير الحركة والتنظيف والمفتاح الذكي والالتقاط"
+            ]
         }
     },
     "set_smart_key": {
@@ -36,6 +66,36 @@
             "label": "Définir une Clé Intelligente",
             "tooltip": [
                 "Définit une clé sur l'image actuelle en utilisant le Graph Editor, le Channel Box ou le contexte d'objet actif."
+            ]
+        },
+        "ca": {
+            "label": "Posar Clau Intel·ligent",
+            "tooltip": [
+                "Posa una clau al fotograma actual usant el Graph Editor, el Channel Box o el context d'objecte actiu"
+            ]
+        },
+        "zh": {
+            "label": "设置智能关键帧",
+            "tooltip": [
+                "使用活动的 Graph Editor、通道盒或对象上下文在当前帧设置关键帧"
+            ]
+        },
+        "ja": {
+            "label": "スマートキーを設定",
+            "tooltip": [
+                "アクティブなGraph Editor、チャンネルボックス、またはオブジェクトコンテキストを使用して現在のフレームにキーを設定します"
+            ]
+        },
+        "ko": {
+            "label": "스마트 키 설정",
+            "tooltip": [
+                "활성 Graph Editor, 채널 박스 또는 오브젝트 컨텍스트를 사용하여 현재 프레임에 키를 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "ضبط مفتاح ذكي",
+            "tooltip": [
+                "ضبط مفتاح في الإطار الحالي باستخدام Graph Editor أو صندوق القنوات أو سياق الكائن النشط"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Définit des clés sur chaque canal scalaire animable des objets sélectionnés."
             ]
+        },
+        "ca": {
+            "label": "Posar Clau Intel·ligent a Tots els Canals",
+            "tooltip": [
+                "Posa claus a cada canal escalar animable dels objectes seleccionats"
+            ]
+        },
+        "zh": {
+            "label": "为所有通道设置智能关键帧",
+            "tooltip": [
+                "为所选对象的每个可设关键帧的标量通道设置关键帧"
+            ]
+        },
+        "ja": {
+            "label": "全チャンネルにスマートキーを設定",
+            "tooltip": [
+                "選択オブジェクトのキー設定可能なすべてのスカラーチャンネルにキーを設定します"
+            ]
+        },
+        "ko": {
+            "label": "모든 채널에 스마트 키 설정",
+            "tooltip": [
+                "선택한 오브젝트의 키 설정 가능한 모든 스칼라 채널에 키를 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "ضبط مفتاح ذكي لكل القنوات",
+            "tooltip": [
+                "ضبط مفاتيح على كل قناة عددية قابلة للتحريك في الكائنات المحددة"
+            ]
         }
     },
     "apply_smart_euler_filter": {
@@ -77,6 +167,36 @@
             "tooltip": [
                 "Applique le filtre Euler intelligent aux courbes de rotation du contexte d'animation actif."
             ]
+        },
+        "ca": {
+            "label": "Aplicar Filtre Euler Intel·ligent",
+            "tooltip": [
+                "Aplica el filtre Euler intel·ligent a les corbes de rotació del context d'animació actiu"
+            ]
+        },
+        "zh": {
+            "label": "应用智能欧拉滤波",
+            "tooltip": [
+                "将智能欧拉滤波应用于当前动画上下文的旋转曲线"
+            ]
+        },
+        "ja": {
+            "label": "スマートオイラーフィルターを適用",
+            "tooltip": [
+                "アクティブなアニメーションコンテキストの回転カーブにスマートオイラーフィルターを適用します"
+            ]
+        },
+        "ko": {
+            "label": "스마트 오일러 필터 적용",
+            "tooltip": [
+                "활성 애니메이션 컨텍스트의 회전 커브에 스마트 오일러 필터를 적용합니다"
+            ]
+        },
+        "ar": {
+            "label": "تطبيق مرشح أويلر الذكي",
+            "tooltip": [
+                "تطبيق مرشح أويلر الذكي على منحنيات الدوران في سياق الحركة النشط"
+            ]
         }
     },
     "snap": {
@@ -96,6 +216,36 @@
             "label": "Accrocher les Clés",
             "tooltip": [
                 "Déplace les clés entre les images vers des images entières. Si la destination a déjà une clé, elle est conservée et la clé intermédiaire y est fusionnée."
+            ]
+        },
+        "ca": {
+            "label": "Ajustar Claus",
+            "tooltip": [
+                "Mou les claus entre fotogrames a fotogrames sencers. Si la destinació ja té una clau, la conserva i hi fusiona la clau intermèdia"
+            ]
+        },
+        "zh": {
+            "label": "吸附关键帧",
+            "tooltip": [
+                "将子帧关键帧移动到整帧上。若目标处已有关键帧，则保留该关键帧并将子帧关键帧合并进去"
+            ]
+        },
+        "ja": {
+            "label": "キーをスナップ",
+            "tooltip": [
+                "サブフレームのキーを整数フレームに移動します。移動先に既にキーがある場合はそれを保持し、サブフレームキーをマージします"
+            ]
+        },
+        "ko": {
+            "label": "키 스냅",
+            "tooltip": [
+                "서브 프레임 키를 정수 프레임으로 이동합니다. 대상에 이미 키가 있으면 이를 유지하고 서브 프레임 키를 병합합니다"
+            ]
+        },
+        "ar": {
+            "label": "التقاط المفاتيح",
+            "tooltip": [
+                "نقل المفاتيح ذات الإطارات الفرعية إلى إطارات كاملة. إذا كانت الوجهة تحتوي بالفعل على مفتاح، يُحتفظ به ويُدمج فيه المفتاح الفرعي"
             ]
         }
     },
@@ -120,6 +270,41 @@
                 "Supprime toute l'animation des objets sélectionnés lorsqu'aucune sélection d'animation plus précise n'est active.",
                 "Le mode sélection supprime uniquement les clés actives du Graph Editor, les canaux du Channel Box ou la plage du Time Slider."
             ]
+        },
+        "ca": {
+            "label": "Esborrar Animació",
+            "tooltip": [
+                "Elimina tota l'animació dels objectes seleccionats quan no hi ha activa cap selecció d'animació més específica",
+                "El mode de selecció elimina només les claus actives del Graph Editor, els canals del Channel Box o el rang del Time Slider"
+            ]
+        },
+        "zh": {
+            "label": "清除动画",
+            "tooltip": [
+                "在没有更窄的动画选择处于活动状态时，删除所选对象的所有动画",
+                "选择模式仅删除活动的 Graph Editor 关键帧、通道盒通道或时间滑块范围"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションを消去",
+            "tooltip": [
+                "より絞り込んだアニメーション選択がアクティブでない場合、選択オブジェクトのすべてのアニメーションを削除します",
+                "選択モードでは、アクティブなGraph Editorのキー、チャンネルボックスのチャンネル、またはタイムスライダーの範囲のみを削除します"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 지우기",
+            "tooltip": [
+                "더 좁은 애니메이션 선택이 활성화되어 있지 않을 때 선택한 오브젝트의 모든 애니메이션을 삭제합니다",
+                "선택 모드는 활성 Graph Editor 키, 채널 박스 채널 또는 타임 슬라이더 범위만 삭제합니다"
+            ]
+        },
+        "ar": {
+            "label": "مسح الحركة",
+            "tooltip": [
+                "حذف كل الحركة من الكائنات المحددة عند عدم وجود تحديد حركة أضيق نشط",
+                "يحذف وضع التحديد فقط مفاتيح Graph Editor النشطة أو قنوات صندوق القنوات أو نطاق شريط الوقت"
+            ]
         }
     },
     "delete_all_animation": {
@@ -143,6 +328,41 @@
                 "Supprime toute l'animation des objets sélectionnés lorsqu'aucune sélection d'animation plus précise n'est active.",
                 "Le mode sélection supprime uniquement les clés actives du Graph Editor, les canaux du Channel Box ou la plage du Time Slider."
             ]
+        },
+        "ca": {
+            "label": "Esborrar Animació",
+            "tooltip": [
+                "Elimina tota l'animació dels objectes seleccionats quan no hi ha activa cap selecció d'animació més específica",
+                "El mode de selecció elimina només les claus actives del Graph Editor, els canals del Channel Box o el rang del Time Slider"
+            ]
+        },
+        "zh": {
+            "label": "清除动画",
+            "tooltip": [
+                "在没有更窄的动画选择处于活动状态时，删除所选对象的所有动画",
+                "选择模式仅删除活动的 Graph Editor 关键帧、通道盒通道或时间滑块范围"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションを消去",
+            "tooltip": [
+                "より絞り込んだアニメーション選択がアクティブでない場合、選択オブジェクトのすべてのアニメーションを削除します",
+                "選択モードでは、アクティブなGraph Editorのキー、チャンネルボックスのチャンネル、またはタイムスライダーの範囲のみを削除します"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 지우기",
+            "tooltip": [
+                "더 좁은 애니메이션 선택이 활성화되어 있지 않을 때 선택한 오브젝트의 모든 애니메이션을 삭제합니다",
+                "선택 모드는 활성 Graph Editor 키, 채널 박스 채널 또는 타임 슬라이더 범위만 삭제합니다"
+            ]
+        },
+        "ar": {
+            "label": "مسح الحركة",
+            "tooltip": [
+                "حذف كل الحركة من الكائنات المحددة عند عدم وجود تحديد حركة أضيق نشط",
+                "يحذف وضع التحديد فقط مفاتيح Graph Editor النشطة أو قنوات صندوق القنوات أو نطاق شريط الوقت"
+            ]
         }
     },
     "delete_static_animation": {
@@ -162,6 +382,36 @@
             "label": "Supprimer les Courbes d'Animation Statiques",
             "tooltip": [
                 "Supprime les courbes d'animation dont les valeurs ne changent pas dans le contexte actif."
+            ]
+        },
+        "ca": {
+            "label": "Treure Corbes d'Animació Estàtiques",
+            "tooltip": [
+                "Elimina les corbes d'animació els valors de les quals no canvien en el context actiu"
+            ]
+        },
+        "zh": {
+            "label": "移除静态动画曲线",
+            "tooltip": [
+                "移除在当前上下文中数值不变的动画曲线"
+            ]
+        },
+        "ja": {
+            "label": "静的アニメカーブを削除",
+            "tooltip": [
+                "アクティブなコンテキストで値が変化しないアニメーションカーブを削除します"
+            ]
+        },
+        "ko": {
+            "label": "정적 애니메이션 커브 제거",
+            "tooltip": [
+                "활성 컨텍스트에서 값이 변하지 않는 애니메이션 커브를 제거합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة منحنيات الحركة الثابتة",
+            "tooltip": [
+                "إزالة منحنيات الحركة التي لا تتغير قيمها في السياق النشط"
             ]
         }
     },
@@ -183,6 +433,36 @@
             "tooltip": [
                 "Conserve les clés à l'intérieur de la plage active et supprime celles en dehors."
             ]
+        },
+        "ca": {
+            "label": "Retallar Animació",
+            "tooltip": [
+                "Conserva les claus dins del rang actiu i elimina les de fora"
+            ]
+        },
+        "zh": {
+            "label": "裁剪动画",
+            "tooltip": [
+                "保留活动范围内的关键帧并删除范围外的关键帧"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションをクロップ",
+            "tooltip": [
+                "アクティブな範囲内のキーを保持し、範囲外のキーを削除します"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 자르기",
+            "tooltip": [
+                "활성 범위 내의 키를 유지하고 범위 밖의 키를 제거합니다"
+            ]
+        },
+        "ar": {
+            "label": "قص الحركة",
+            "tooltip": [
+                "الاحتفاظ بالمفاتيح داخل النطاق النشط وإزالة ما هو خارجه"
+            ]
         }
     },
     "remove_redundant_keys": {
@@ -202,6 +482,36 @@
             "label": "Supprimer les Clés Redondantes",
             "tooltip": [
                 "Supprime les clés redondantes selon le mode sélectionné dans le menu contextuel."
+            ]
+        },
+        "ca": {
+            "label": "Treure Claus Redundants",
+            "tooltip": [
+                "Elimina claus redundants usant el mode seleccionat al menú contextual"
+            ]
+        },
+        "zh": {
+            "label": "移除冗余关键帧",
+            "tooltip": [
+                "使用右键菜单中选择的模式移除冗余关键帧"
+            ]
+        },
+        "ja": {
+            "label": "冗長なキーを削除",
+            "tooltip": [
+                "右クリックメニューで選択したモードを使用して冗長なキーを削除します"
+            ]
+        },
+        "ko": {
+            "label": "불필요한 키 제거",
+            "tooltip": [
+                "오른쪽 클릭 메뉴에서 선택한 모드를 사용하여 불필요한 키를 제거합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة المفاتيح الزائدة",
+            "tooltip": [
+                "إزالة المفاتيح الزائدة باستخدام الوضع المحدد من قائمة النقر بالزر الأيمن"
             ]
         }
     },
@@ -223,6 +533,36 @@
             "tooltip": [
                 "Supprime les courbes d'animation dont les valeurs ne changent pas dans le contexte actif."
             ]
+        },
+        "ca": {
+            "label": "Treure Corbes d'Animació Estàtiques",
+            "tooltip": [
+                "Elimina les corbes d'animació els valors de les quals no canvien en el context actiu"
+            ]
+        },
+        "zh": {
+            "label": "移除静态动画曲线",
+            "tooltip": [
+                "移除在当前上下文中数值不变的动画曲线"
+            ]
+        },
+        "ja": {
+            "label": "静的アニメカーブを削除",
+            "tooltip": [
+                "アクティブなコンテキストで値が変化しないアニメーションカーブを削除します"
+            ]
+        },
+        "ko": {
+            "label": "정적 애니메이션 커브 제거",
+            "tooltip": [
+                "활성 컨텍스트에서 값이 변하지 않는 애니메이션 커브를 제거합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة منحنيات الحركة الثابتة",
+            "tooltip": [
+                "إزالة منحنيات الحركة التي لا تتغير قيمها في السياق النشط"
+            ]
         }
     },
     "reverse_animation": {
@@ -242,6 +582,36 @@
             "label": "Inverser l'Animation",
             "tooltip": [
                 "Inverse dans le temps la plage d'animation active."
+            ]
+        },
+        "ca": {
+            "label": "Invertir Animació",
+            "tooltip": [
+                "Inverteix en el temps el rang d'animació actiu"
+            ]
+        },
+        "zh": {
+            "label": "反转动画",
+            "tooltip": [
+                "在时间上反转当前动画范围"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションを反転",
+            "tooltip": [
+                "アクティブなアニメーション範囲を時間的に反転します"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 반전",
+            "tooltip": [
+                "활성 애니메이션 범위를 시간상으로 반전합니다"
+            ]
+        },
+        "ar": {
+            "label": "عكس الحركة",
+            "tooltip": [
+                "عكس نطاق الحركة النشط زمنيًا"
             ]
         }
     },
@@ -263,6 +633,36 @@
             "tooltip": [
                 "Copie les clés du contexte d'animation actif."
             ]
+        },
+        "ca": {
+            "label": "Copiar Claus",
+            "tooltip": [
+                "Copia claus del context d'animació actiu"
+            ]
+        },
+        "zh": {
+            "label": "复制关键帧",
+            "tooltip": [
+                "从当前动画上下文复制关键帧"
+            ]
+        },
+        "ja": {
+            "label": "キーをコピー",
+            "tooltip": [
+                "アクティブなアニメーションコンテキストからキーをコピーします"
+            ]
+        },
+        "ko": {
+            "label": "키 복사",
+            "tooltip": [
+                "활성 애니메이션 컨텍스트에서 키를 복사합니다"
+            ]
+        },
+        "ar": {
+            "label": "نسخ المفاتيح",
+            "tooltip": [
+                "نسخ المفاتيح من سياق الحركة النشط"
+            ]
         }
     },
     "cut_keys": {
@@ -282,6 +682,36 @@
             "label": "Couper les Clés",
             "tooltip": [
                 "Coupe les clés du contexte d'animation actif."
+            ]
+        },
+        "ca": {
+            "label": "Retallar Claus",
+            "tooltip": [
+                "Retalla claus del context d'animació actiu"
+            ]
+        },
+        "zh": {
+            "label": "剪切关键帧",
+            "tooltip": [
+                "从当前动画上下文剪切关键帧"
+            ]
+        },
+        "ja": {
+            "label": "キーを切り取り",
+            "tooltip": [
+                "アクティブなアニメーションコンテキストからキーを切り取ります"
+            ]
+        },
+        "ko": {
+            "label": "키 잘라내기",
+            "tooltip": [
+                "활성 애니메이션 컨텍스트에서 키를 잘라냅니다"
+            ]
+        },
+        "ar": {
+            "label": "قص المفاتيح",
+            "tooltip": [
+                "قص المفاتيح من سياق الحركة النشط"
             ]
         }
     },
@@ -303,6 +733,36 @@
             "tooltip": [
                 "Supprime les clés à l'image active ou dans le contexte de clés sélectionné."
             ]
+        },
+        "ca": {
+            "label": "Eliminar Claus",
+            "tooltip": [
+                "Elimina claus al fotograma actiu o al context de claus seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "删除关键帧",
+            "tooltip": [
+                "删除活动帧或所选关键帧上下文中的关键帧"
+            ]
+        },
+        "ja": {
+            "label": "キーを削除",
+            "tooltip": [
+                "アクティブなフレームまたは選択したキーコンテキストのキーを削除します"
+            ]
+        },
+        "ko": {
+            "label": "키 삭제",
+            "tooltip": [
+                "활성 프레임 또는 선택한 키 컨텍스트에서 키를 삭제합니다"
+            ]
+        },
+        "ar": {
+            "label": "حذف المفاتيح",
+            "tooltip": [
+                "حذف المفاتيح في الإطار النشط أو سياق المفاتيح المحدد"
+            ]
         }
     },
     "paste_keys": {
@@ -322,6 +782,36 @@
             "label": "Coller les Clés",
             "tooltip": [
                 "Colle les clés copiées dans le contexte actif."
+            ]
+        },
+        "ca": {
+            "label": "Enganxar Claus",
+            "tooltip": [
+                "Enganxa les claus copiades al context actiu"
+            ]
+        },
+        "zh": {
+            "label": "粘贴关键帧",
+            "tooltip": [
+                "将已复制的关键帧粘贴到当前上下文"
+            ]
+        },
+        "ja": {
+            "label": "キーを貼り付け",
+            "tooltip": [
+                "コピーしたキーをアクティブなコンテキストに貼り付けます"
+            ]
+        },
+        "ko": {
+            "label": "키 붙여넣기",
+            "tooltip": [
+                "복사된 키를 활성 컨텍스트에 붙여넣습니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق المفاتيح",
+            "tooltip": [
+                "لصق المفاتيح المنسوخة في السياق النشط"
             ]
         }
     },
@@ -343,6 +833,36 @@
             "tooltip": [
                 "Colle les clés copiées de façon relative à l'image actuelle."
             ]
+        },
+        "ca": {
+            "label": "Enganxar Claus de Forma Relativa",
+            "tooltip": [
+                "Enganxa les claus copiades de forma relativa al fotograma actual"
+            ]
+        },
+        "zh": {
+            "label": "相对粘贴关键帧",
+            "tooltip": [
+                "将已复制的关键帧相对于当前帧粘贴"
+            ]
+        },
+        "ja": {
+            "label": "キーを相対的に貼り付け",
+            "tooltip": [
+                "コピーしたキーを現在のフレームに対して相対的に貼り付けます"
+            ]
+        },
+        "ko": {
+            "label": "키 상대적으로 붙여넣기",
+            "tooltip": [
+                "복사된 키를 현재 프레임 기준으로 상대적으로 붙여넣습니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق المفاتيح نسبيًا",
+            "tooltip": [
+                "لصق المفاتيح المنسوخة نسبةً إلى الإطار الحالي"
+            ]
         }
     },
     "go_to_next_key": {
@@ -362,6 +882,36 @@
             "label": "Aller à la Clé Suivante",
             "tooltip": [
                 "Va à la clé suivante des courbes sélectionnées du Graph Editor, ou parcourt les clés du Time Slider pour l'objet ou le canal actif. Passe à l'image suivante si aucune clé n'est disponible."
+            ]
+        },
+        "ca": {
+            "label": "Anar a la Clau Següent",
+            "tooltip": [
+                "Va a la clau següent de les corbes seleccionades del Graph Editor, o recorre les claus del Time Slider per a l'objecte o canal actiu. Passa al fotograma següent si no hi ha cap clau disponible"
+            ]
+        },
+        "zh": {
+            "label": "跳到下一关键帧",
+            "tooltip": [
+                "跳转到所选 Graph Editor 曲线的下一个关键帧，或在活动对象/通道上下文中遍历时间滑块的关键帧。若无可用关键帧则跳到下一帧"
+            ]
+        },
+        "ja": {
+            "label": "次のキーに移動",
+            "tooltip": [
+                "選択したGraph Editorカーブの次のキーへ移動するか、アクティブなオブジェクトまたはチャンネルコンテキストのタイムスライダーキーを移動します。キーがない場合は次のフレームに移動します"
+            ]
+        },
+        "ko": {
+            "label": "다음 키로 이동",
+            "tooltip": [
+                "선택한 Graph Editor 커브의 다음 키로 이동하거나 활성 오브젝트/채널 컨텍스트의 타임 슬라이더 키를 따라 이동합니다. 키가 없으면 다음 프레임으로 이동합니다"
+            ]
+        },
+        "ar": {
+            "label": "الانتقال إلى المفتاح التالي",
+            "tooltip": [
+                "الانتقال إلى المفتاح التالي في منحنيات Graph Editor المحددة، أو التنقل عبر مفاتيح شريط الوقت لسياق الكائن أو القناة النشط. ينتقل إلى الإطار التالي عند عدم توفر مفتاح"
             ]
         }
     },
@@ -383,6 +933,36 @@
             "tooltip": [
                 "Va à la clé précédente des courbes sélectionnées du Graph Editor, ou parcourt les clés du Time Slider pour l'objet ou le canal actif. Passe à l'image précédente si aucune clé n'est disponible."
             ]
+        },
+        "ca": {
+            "label": "Anar a la Clau Anterior",
+            "tooltip": [
+                "Va a la clau anterior de les corbes seleccionades del Graph Editor, o recorre les claus del Time Slider per a l'objecte o canal actiu. Passa al fotograma anterior si no hi ha cap clau disponible"
+            ]
+        },
+        "zh": {
+            "label": "跳到上一关键帧",
+            "tooltip": [
+                "跳转到所选 Graph Editor 曲线的上一个关键帧，或在活动对象/通道上下文中遍历时间滑块的关键帧。若无可用关键帧则跳到上一帧"
+            ]
+        },
+        "ja": {
+            "label": "前のキーに移動",
+            "tooltip": [
+                "選択したGraph Editorカーブの前のキーへ移動するか、アクティブなオブジェクトまたはチャンネルコンテキストのタイムスライダーキーを移動します。キーがない場合は前のフレームに移動します"
+            ]
+        },
+        "ko": {
+            "label": "이전 키로 이동",
+            "tooltip": [
+                "선택한 Graph Editor 커브의 이전 키로 이동하거나 활성 오브젝트/채널 컨텍스트의 타임 슬라이더 키를 따라 이동합니다. 키가 없으면 이전 프레임으로 이동합니다"
+            ]
+        },
+        "ar": {
+            "label": "الانتقال إلى المفتاح السابق",
+            "tooltip": [
+                "الانتقال إلى المفتاح السابق في منحنيات Graph Editor المحددة، أو التنقل عبر مفاتيح شريط الوقت لسياق الكائن أو القناة النشط. ينتقل إلى الإطار السابق عند عدم توفر مفتاح"
+            ]
         }
     },
     "go_to_next_frame": {
@@ -402,6 +982,36 @@
             "label": "Aller à l'Image Suivante",
             "tooltip": [
                 "Avance d'une image sans se limiter à la plage de lecture. Les déclenchements répétés s'accumulent."
+            ]
+        },
+        "ca": {
+            "label": "Anar al Fotograma Següent",
+            "tooltip": [
+                "Avança un fotograma sense limitar-se al rang de reproducció. Les polsacions repetides s'acumulen"
+            ]
+        },
+        "zh": {
+            "label": "跳到下一帧",
+            "tooltip": [
+                "前进一帧，不受播放范围限制。重复触发会累加"
+            ]
+        },
+        "ja": {
+            "label": "次のフレームに移動",
+            "tooltip": [
+                "再生範囲に制限されずに1フレーム進めます。繰り返し実行すると累積します"
+            ]
+        },
+        "ko": {
+            "label": "다음 프레임으로 이동",
+            "tooltip": [
+                "재생 범위에 제한받지 않고 한 프레임 앞으로 이동합니다. 반복 실행 시 누적됩니다"
+            ]
+        },
+        "ar": {
+            "label": "الانتقال إلى الإطار التالي",
+            "tooltip": [
+                "التقدم بإطار واحد دون التقيد بنطاق التشغيل. عمليات التنفيذ المتكررة تتراكم"
             ]
         }
     },
@@ -423,6 +1033,36 @@
             "tooltip": [
                 "Recule d'une image sans se limiter à la plage de lecture. Les déclenchements répétés s'accumulent."
             ]
+        },
+        "ca": {
+            "label": "Anar al Fotograma Anterior",
+            "tooltip": [
+                "Retrocedeix un fotograma sense limitar-se al rang de reproducció. Les polsacions repetides s'acumulen"
+            ]
+        },
+        "zh": {
+            "label": "跳到上一帧",
+            "tooltip": [
+                "后退一帧，不受播放范围限制。重复触发会累加"
+            ]
+        },
+        "ja": {
+            "label": "前のフレームに移動",
+            "tooltip": [
+                "再生範囲に制限されずに1フレーム戻します。繰り返し実行すると累積します"
+            ]
+        },
+        "ko": {
+            "label": "이전 프레임으로 이동",
+            "tooltip": [
+                "재생 범위에 제한받지 않고 한 프레임 뒤로 이동합니다. 반복 실행 시 누적됩니다"
+            ]
+        },
+        "ar": {
+            "label": "الانتقال إلى الإطار السابق",
+            "tooltip": [
+                "التراجع بإطار واحد دون التقيد بنطاق التشغيل. عمليات التنفيذ المتكررة تتراكم"
+            ]
         }
     },
     "clear_selected_keys": {
@@ -442,6 +1082,36 @@
             "label": "Effacer la Sélection de Clés",
             "tooltip": [
                 "Efface la sélection actuelle de clés du Graph Editor."
+            ]
+        },
+        "ca": {
+            "label": "Esborrar Selecció de Claus",
+            "tooltip": [
+                "Esborra la selecció actual de claus del Graph Editor"
+            ]
+        },
+        "zh": {
+            "label": "清除关键帧选择",
+            "tooltip": [
+                "清除当前 Graph Editor 关键帧选择"
+            ]
+        },
+        "ja": {
+            "label": "キー選択を消去",
+            "tooltip": [
+                "現在のGraph Editorのキー選択を消去します"
+            ]
+        },
+        "ko": {
+            "label": "키 선택 지우기",
+            "tooltip": [
+                "현재 Graph Editor 키 선택을 지웁니다"
+            ]
+        },
+        "ar": {
+            "label": "مسح تحديد المفاتيح",
+            "tooltip": [
+                "مسح تحديد مفاتيح Graph Editor الحالي"
             ]
         }
     },
@@ -463,6 +1133,36 @@
             "tooltip": [
                 "Sélectionne chaque courbe d'animation de la scène."
             ]
+        },
+        "ca": {
+            "label": "Seleccionar Animació de l'Escena",
+            "tooltip": [
+                "Selecciona totes les corbes d'animació de l'escena"
+            ]
+        },
+        "zh": {
+            "label": "选择场景动画",
+            "tooltip": [
+                "选择场景中的每条动画曲线"
+            ]
+        },
+        "ja": {
+            "label": "シーンアニメーションを選択",
+            "tooltip": [
+                "シーン内のすべてのアニメーションカーブを選択します"
+            ]
+        },
+        "ko": {
+            "label": "씬 애니메이션 선택",
+            "tooltip": [
+                "씬의 모든 애니메이션 커브를 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديد حركة المشهد",
+            "tooltip": [
+                "تحديد كل منحنى حركة في المشهد"
+            ]
         }
     },
     "delete_keys_before_current": {
@@ -483,6 +1183,36 @@
             "tooltip": [
                 "Supprime les clés des objets sélectionnés avant l'image actuelle."
             ]
+        },
+        "ca": {
+            "label": "Eliminar Claus Abans del Fotograma Actual",
+            "tooltip": [
+                "Elimina les claus dels objectes seleccionats abans del fotograma actual"
+            ]
+        },
+        "zh": {
+            "label": "删除当前帧之前的关键帧",
+            "tooltip": [
+                "删除所选对象在当前帧之前的关键帧"
+            ]
+        },
+        "ja": {
+            "label": "現在のフレーム以前のキーを削除",
+            "tooltip": [
+                "選択オブジェクトの現在のフレームより前のキーを削除します"
+            ]
+        },
+        "ko": {
+            "label": "현재 프레임 이전 키 삭제",
+            "tooltip": [
+                "선택한 오브젝트의 현재 프레임 이전 키를 삭제합니다"
+            ]
+        },
+        "ar": {
+            "label": "حذف المفاتيح قبل الإطار الحالي",
+            "tooltip": [
+                "حذف مفاتيح الكائنات المحددة الواقعة قبل الإطار الحالي"
+            ]
         }
     },
     "delete_keys_after_current": {
@@ -502,6 +1232,36 @@
             "label": "Supprimer les Clés Après l'Image Actuelle",
             "tooltip": [
                 "Supprime les clés des objets sélectionnés après l'image actuelle."
+            ]
+        },
+        "ca": {
+            "label": "Eliminar Claus Després del Fotograma Actual",
+            "tooltip": [
+                "Elimina les claus dels objectes seleccionats després del fotograma actual"
+            ]
+        },
+        "zh": {
+            "label": "删除当前帧之后的关键帧",
+            "tooltip": [
+                "删除所选对象在当前帧之后的关键帧"
+            ]
+        },
+        "ja": {
+            "label": "現在のフレーム以降のキーを削除",
+            "tooltip": [
+                "選択オブジェクトの現在のフレームより後のキーを削除します"
+            ]
+        },
+        "ko": {
+            "label": "현재 프레임 이후 키 삭제",
+            "tooltip": [
+                "선택한 오브젝트의 현재 프레임 이후 키를 삭제합니다"
+            ]
+        },
+        "ar": {
+            "label": "حذف المفاتيح بعد الإطار الحالي",
+            "tooltip": [
+                "حذف مفاتيح الكائنات المحددة الواقعة بعد الإطار الحالي"
             ]
         }
     }

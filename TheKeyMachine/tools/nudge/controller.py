@@ -59,7 +59,7 @@ def _edit_keyframe_batches(operation, items, batch_size=100, **kwargs):
 def nudge_all_keys(direction):
     curves = _target_curves()
     if not curves:
-        return wutil.make_inViewMessage("No animation curves found.")
+        return wutil.make_inViewMessage("No animation curves found")
     offset = nudge_value() * int(direction)
     if not offset:
         return
@@ -84,7 +84,7 @@ def nudge_all_keys(direction):
 def nudge_scene(direction):
     curves = _scene_curves()
     if not curves:
-        return wutil.make_inViewMessage("No animation curves found in the scene.")
+        return wutil.make_inViewMessage("No animation curves found in the scene")
     offset = nudge_value() * int(direction)
     if not offset:
         return
@@ -112,7 +112,7 @@ def shift_inbetween(direction, scene=False):
         return
     curves = _scene_curves() if scene else None
     if scene and not curves:
-        return wutil.make_inViewMessage("No animation curves found in the scene.")
+        return wutil.make_inViewMessage("No animation curves found in the scene")
     current = cmds.currentTime(query=True)
     with toolCommon.tool_operation(
         tool_id="nudge_inbetween",

@@ -16,36 +16,36 @@ class TkmMenuToolObject(ToolObject):
             "menu": {
                 "label": "TheKeyMachine", "description": TOOLTIPS["menu"][0], "items": [
                     {"type": "widget", "factory": api.create_logo_action},
-                    {"type": "menu", "label": "Preferences", "icon": "settings", "description": TOOLTIPS["preferences"][0], "items": [
+                    {"type": "menu", "command": "main_preferences_menu", "label": "Preferences", "icon": "settings", "description": TOOLTIPS["preferences"][0], "items": [
                         "toolbar_add_shelf_button", {"type": "check", "command": "start_with_maya"},
                         {"type": "check", "command": "show_tooltips"}, "separator",
-                        {"type": "section", "label": "Alignment"},
+                        {"type": "section", "label": "Alignment", "i18n_key": "alignment_section"},
                         {"type": "choice", "get_value": api.get_alignment, "set_value": api.set_alignment, "items": api.alignment_choices},
                     ]},
                     "hotkeys_window",
                     "workspaces_window",
-                    {"type": "menu", "label": "Dock", "icon": "dock", "description": TOOLTIPS["dock"][0], "items": [
-                        {"type": "section", "label": "Position"},
+                    {"type": "menu", "command": "main_dock_menu", "label": "Dock", "icon": "dock", "description": TOOLTIPS["dock"][0], "items": [
+                        {"type": "section", "label": "Position", "i18n_key": "position_section"},
                         {"type": "choice", "get_value": api.get_dock_orientation, "set_value": api.set_dock_orientation, "items": api.dock_orientation_choices},
                         "separator",
-                        {"type": "section", "label": "Dock Area"},
+                        {"type": "section", "label": "Dock Area", "i18n_key": "dock_area_section"},
                         {"type": "choice", "get_value": api.get_dock_layout, "set_value": api.set_dock_layout, "items": api.dock_layout_choices},
                     ]},
-                    {"type": "menu", "label": "System", "icon": "system", "description": TOOLTIPS["system"][0], "items": [
+                    {"type": "menu", "command": "main_system_menu", "label": "System", "icon": "system", "description": TOOLTIPS["system"][0], "items": [
                         "toolbar_reload", "toolbar_unload", "toolbar_uninstall",
                         {
-                            "type": "dynamic_menu", "label": "Languages", "icon": "globe",
+                            "type": "dynamic_menu", "command": "languages_menu", "label": "Languages", "icon": "globe",
                             "description": TOOLTIPS["languages"][0],
                             "separator_before": True,
                             "builder": api.populate_languages_menu,
                         },
                     ]},
                     "separator",
-                    {"type": "menu", "label": "Help", "icon": "help", "description": TOOLTIPS["help"][0], "items": [
+                    {"type": "menu", "command": "help_menu", "label": "Help", "icon": "help", "description": TOOLTIPS["help"][0], "items": [
                         "bug_report_window", "separator",
-                        {"label": "Documentation", "icon": "help", "description": "Open TheKeyMachine documentation.", "callback": partial(api.open_url, "https://thekeymachine.gitbook.io/base")},
-                        {"label": "Discord", "icon": "discord", "description": "Open the TheKeyMachine Discord community.", "callback": partial(api.open_url, "https://discord.gg/G2J5yyjz")},
-                        {"label": "YouTube", "icon": "youtube", "description": "Open TheKeyMachine tutorials on YouTube.", "callback": partial(api.open_url, "https://www.youtube.com/@TheKeyMachineAnimationTools")},
+                        {"label": "Documentation", "icon": "help", "description": "Open TheKeyMachine documentation.", "i18n_key": "documentation", "callback": partial(api.open_url, "https://thekeymachine.gitbook.io/base")},
+                        {"label": "Discord", "icon": "discord", "description": "Open the TheKeyMachine Discord community.", "i18n_key": "discord", "callback": partial(api.open_url, "https://discord.gg/G2J5yyjz")},
+                        {"label": "YouTube", "icon": "youtube", "description": "Open TheKeyMachine tutorials on YouTube.", "i18n_key": "youtube", "callback": partial(api.open_url, "https://www.youtube.com/@TheKeyMachineAnimationTools")},
                     ]},
                     "donate_window", "check_for_updates", "about_window",
                     {

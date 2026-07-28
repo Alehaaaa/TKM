@@ -459,8 +459,13 @@ class ToolPinButton(QtWidgets.QToolButton):
 
 class WorkspacesWindow(customDialogs.QFlatDialog):
     def __init__(self, parent=None):
+        from TheKeyMachine.core import i18n, toolbox
+
         super().__init__(parent=parent)
-        self.setWindowTitle("Workspaces")
+        # Reuses the workspaces_window tool's own lang.json label -- same
+        # word already translated for its menu entry.
+        workspaces_label = toolbox.get_tool("workspaces_window").get("label") or "Workspaces"
+        self.setWindowTitle(workspaces_label)
         self.resize(DPI(1080), DPI(620))
         self.setMinimumSize(DPI(1000), DPI(540))
 
@@ -482,7 +487,7 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         self.addWindowHeader(
             parentLayout=main_layout,
             icon=icons.align,
-            text="Workspaces",
+            text=workspaces_label,
             textColor="#d8d8d8",
         )
 
@@ -491,12 +496,18 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         columns_layout.setSpacing(DPI(10))
         main_layout.addLayout(columns_layout, 1)
 
-        self.workspace_column = _Column("Workspace", self)
-        self.toolbar_column = _Column("Toolbar", self)
-        self.position_column = _Column("Position", self)
-        self.alignment_column = _Column("Alignment", self)
-        self.group_column = _Column("Color Group", self, list_widget_cls=ReorderableListWidget)
-        self.tools_column = _Column("Tools", self)
+        self.workspace_column = _Column(i18n.tr("workspaces_column_workspace", "Workspace"), self)
+        self.toolbar_column = _Column(i18n.tr("workspaces_column_toolbar", "Toolbar"), self)
+        # "Position" reuses the dock menu's own "Position" section id.
+        self.position_column = _Column(i18n.tr("position_section", "Position"), self)
+        self.alignment_column = _Column(i18n.tr("workspaces_column_alignment", "Alignment"), self)
+        self.group_column = _Column(
+            i18n.tr("workspaces_column_color_group", "Color Group"),
+            self,
+            list_widget_cls=ReorderableListWidget,
+        )
+        # "Tools" reuses the Hotkeys editor's own panel-header word.
+        self.tools_column = _Column(i18n.tr("hotkeys_panel_tools", "Tools"), self)
 
         for column in (
             self.workspace_column,
@@ -538,31 +549,47 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         # always reflects whichever workspace is currently selected.
         if controller.is_custom_workspace(self._current_workspace_id):
             second_button = customDialogs.QFlatDialogButton(
-                "Delete Workspace", callback=self._delete_workspace, icon=icons.get("trash")
+                "Delete Workspace",
+                callback=self._delete_workspace,
+                icon=icons.get("trash"),
+                i18n_key="workspaces_delete_button",
             )
         else:
+            # Reuses the toolbar pinning menu's own "Restore Defaults" word.
             second_button = customDialogs.QFlatDialogButton(
-                "Restore Defaults", callback=self._restore_defaults, icon=icons.reload
+                "Restore Defaults", callback=self._restore_defaults, icon=icons.reload,
+                i18n_key="restore_defaults",
             )
 
         self.setBottomBar(
             buttons=[
                 customDialogs.QFlatDialogButton(
-                    "New Workspace", callback=self._create_new_workspace, icon=icons.add
+                    "New Workspace",
+                    callback=self._create_new_workspace,
+                    icon=icons.add,
+                    i18n_key="workspaces_new_button",
                 ),
                 second_button,
                 customDialogs.QFlatDialogButton(
-                    "Import", callback=self._import_workspaces, icon=icons.get("import")
+                    "Import", callback=self._import_workspaces, icon=icons.get("import"),
+                    i18n_key="workspaces_import_button",
                 ),
                 customDialogs.QFlatDialogButton(
-                    "Export", callback=self._export_workspaces, icon=icons.get("export")
+                    "Export", callback=self._export_workspaces, icon=icons.get("export"),
+                    i18n_key="workspaces_export_button",
                 ),
             ],
             closeButton=True,
         )
 
     def _import_workspaces(self, *_args):
-        result = cmds.fileDialog2(fileMode=1, caption="Import Workspaces", fileFilter="JSON Files (*.json)")
+        from TheKeyMachine.core import i18n
+
+        result = cmds.fileDialog2(
+            fileMode=1,
+            caption=i18n.tr("workspaces_import_caption", "Import Workspaces"),
+            fileFilter="JSON Files (*.json)",
+        )
         if not result:
             return
         try:
@@ -578,7 +605,13 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         self._refresh_workspace_list()
 
     def _export_workspaces(self, *_args):
-        result = cmds.fileDialog2(fileMode=0, caption="Export Workspaces", fileFilter="JSON Files (*.json)")
+        from TheKeyMachine.core import i18n
+
+        result = cmds.fileDialog2(
+            fileMode=0,
+            caption=i18n.tr("workspaces_export_caption", "Export Workspaces"),
+            fileFilter="JSON Files (*.json)",
+        )
         if not result:
             return
         path = result[0]
@@ -591,17 +624,17 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
             cmds.warning("Could not export workspaces: {}".format(exc))
 
     def _restore_defaults(self, *_args):
-        from TheKeyMachine.core import toolWorkspaces
+        from TheKeyMachine.core import i18n, toolWorkspaces
 
         ws_id = controller.get_active_workspace()
         ws_name = toolWorkspaces.get_active_workspace_name()
         clicked = customDialogs.QFlatConfirmDialog.question(
             self,
-            "Restore Defaults",
-            "Restore the '{}' workspace defaults?".format(ws_name),
+            i18n.tr("restore_defaults", "Restore Defaults"),
+            i18n.tr("workspaces_restore_message", "Restore the '{}' workspace defaults?").format(ws_name),
             buttons=[customDialogs.QFlatConfirmDialog.Yes, customDialogs.QFlatConfirmDialog.Cancel],
             highlight=customDialogs.QFlatConfirmDialog.Yes,
-            title="Restore toolbar defaults?",
+            title=i18n.tr("workspaces_restore_heading", "Restore toolbar defaults?"),
             icon=icons.warning,
         )
         if clicked != customDialogs.QFlatConfirmDialog.Yes:
@@ -613,6 +646,8 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         self._refresh_group_list()
 
     def _delete_workspace(self, *_args):
+        from TheKeyMachine.core import i18n
+
         ws_id = self._current_workspace_id
         if not ws_id or not controller.is_custom_workspace(ws_id):
             return
@@ -622,11 +657,13 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         )
         clicked = customDialogs.QFlatConfirmDialog.question(
             self,
-            "Delete Workspace",
-            "Delete the '{}' workspace? This cannot be undone.".format(ws_name),
+            i18n.tr("workspaces_delete_button", "Delete Workspace"),
+            i18n.tr(
+                "workspaces_delete_message", "Delete the '{}' workspace? This cannot be undone."
+            ).format(ws_name),
             buttons=[customDialogs.QFlatConfirmDialog.Yes, customDialogs.QFlatConfirmDialog.Cancel],
             highlight=customDialogs.QFlatConfirmDialog.Yes,
-            title="Delete workspace?",
+            title=i18n.tr("workspaces_delete_heading", "Delete workspace?"),
             icon=icons.warning,
         )
         if clicked != customDialogs.QFlatConfirmDialog.Yes:
@@ -713,7 +750,7 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         list_widget = self.toolbar_column.list_widget
         list_widget.clear()
         self._toolbar_rows = {}
-        for row_index, entry in enumerate(controller.TOOLBARS):
+        for row_index, entry in enumerate(controller.get_toolbars()):
             item = QtWidgets.QListWidgetItem(list_widget)
             row = SelectableRow(entry["label"], row_index=row_index)
             row.clicked.connect(lambda toolbar_id=entry["id"]: self._select_toolbar(toolbar_id))
@@ -764,7 +801,7 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
         list_widget.clear()
         self._alignment_rows = {}
         current = controller.get_current_alignment(self._current_toolbar_id)
-        for row_index, (alignment_name, label, description) in enumerate(controller.ALIGNMENT_OPTIONS):
+        for row_index, (alignment_name, label, description) in enumerate(controller.get_alignment_options()):
             item = QtWidgets.QListWidgetItem(list_widget)
             row = SelectableRow(label, description=description, row_index=row_index)
             row.clicked.connect(lambda alignment_name=alignment_name: self._select_alignment(alignment_name))

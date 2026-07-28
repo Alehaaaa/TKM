@@ -17,6 +17,36 @@
             "tooltip": [
                 "Ouvre le menu de marquage de rotation de Maya et change le mode du manipulateur de rotation."
             ]
+        },
+        "ca": {
+            "label": "Rotació Intel·ligent",
+            "tooltip": [
+                "Obre el menú de marcatge de rotació de Maya i canvia el mode del manipulador de rotació"
+            ]
+        },
+        "zh": {
+            "label": "智能旋转",
+            "tooltip": [
+                "打开 Maya 的旋转标记菜单并循环切换旋转操纵器模式"
+            ]
+        },
+        "ja": {
+            "label": "スマート回転",
+            "tooltip": [
+                "Mayaの回転マーキングメニューを開き、回転マニピュレータモードを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "스마트 회전",
+            "tooltip": [
+                "Maya의 회전 마킹 메뉴를 열고 회전 매니퓰레이터 모드를 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "دوران ذكي",
+            "tooltip": [
+                "افتح قائمة تحديد الدوران في Maya وبدّل وضع أداة التحكم في الدوران"
+            ]
         }
     },
     "smart_rotation_release": {
@@ -36,6 +66,36 @@
             "label": "Relâcher Rotation Intelligente",
             "tooltip": [
                 "Ferme le menu de marquage de rotation de Maya en relâchant le raccourci."
+            ]
+        },
+        "ca": {
+            "label": "Deixar Anar Rotació Intel·ligent",
+            "tooltip": [
+                "Tanca el menú de marcatge de rotació de Maya en deixar anar la drecera"
+            ]
+        },
+        "zh": {
+            "label": "释放智能旋转",
+            "tooltip": [
+                "释放快捷键时关闭 Maya 的旋转标记菜单"
+            ]
+        },
+        "ja": {
+            "label": "スマート回転リリース",
+            "tooltip": [
+                "ホットキーを離すとMayaの回転マーキングメニューを閉じます"
+            ]
+        },
+        "ko": {
+            "label": "스마트 회전 릴리스",
+            "tooltip": [
+                "단축키를 놓으면 Maya의 회전 마킹 메뉴를 닫습니다"
+            ]
+        },
+        "ar": {
+            "label": "تحرير الدوران الذكي",
+            "tooltip": [
+                "إغلاق قائمة تحديد الدوران في Maya عند تحرير مفتاح الاختصار"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Ouvre le menu de marquage de déplacement de Maya et change le mode du manipulateur de translation."
             ]
+        },
+        "ca": {
+            "label": "Translació Intel·ligent",
+            "tooltip": [
+                "Obre el menú de marcatge de moviment de Maya i canvia el mode del manipulador de translació"
+            ]
+        },
+        "zh": {
+            "label": "智能位移",
+            "tooltip": [
+                "打开 Maya 的移动标记菜单并切换位移操纵器模式"
+            ]
+        },
+        "ja": {
+            "label": "スマート移動",
+            "tooltip": [
+                "Mayaの移動マーキングメニューを開き、移動マニピュレータモードを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "스마트 이동",
+            "tooltip": [
+                "Maya의 이동 마킹 메뉴를 열고 이동 매니퓰레이터 모드를 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "انتقال ذكي",
+            "tooltip": [
+                "افتح قائمة تحديد التحريك في Maya وبدّل وضع أداة التحكم في الانتقال"
+            ]
         }
     },
     "smart_translation_release": {
@@ -77,6 +167,62 @@
             "tooltip": [
                 "Ferme le menu de marquage de déplacement de Maya en relâchant le raccourci."
             ]
+        },
+        "ca": {
+            "label": "Deixar Anar Translació Intel·ligent",
+            "tooltip": [
+                "Tanca el menú de marcatge de moviment de Maya en deixar anar la drecera"
+            ]
+        },
+        "zh": {
+            "label": "释放智能位移",
+            "tooltip": [
+                "释放快捷键时关闭 Maya 的移动标记菜单"
+            ]
+        },
+        "ja": {
+            "label": "スマート移動リリース",
+            "tooltip": [
+                "ホットキーを離すとMayaの移動マーキングメニューを閉じます"
+            ]
+        },
+        "ko": {
+            "label": "스마트 이동 릴리스",
+            "tooltip": [
+                "단축키를 놓으면 Maya의 이동 마킹 메뉴를 닫습니다"
+            ]
+        },
+        "ar": {
+            "label": "تحرير الانتقال الذكي",
+            "tooltip": [
+                "إغلاق قائمة تحديد التحريك في Maya عند تحرير مفتاح الاختصار"
+            ]
+        }
+    },
+    "manipulator_tools": {
+        "en": {
+            "label": "Manipulators"
+        },
+        "es": {
+            "label": "Manipuladores"
+        },
+        "fr": {
+            "label": "Manipulateurs"
+        },
+        "ca": {
+            "label": "Manipuladors"
+        },
+        "zh": {
+            "label": "操纵器"
+        },
+        "ja": {
+            "label": "マニピュレータ"
+        },
+        "ko": {
+            "label": "매니퓰레이터"
+        },
+        "ar": {
+            "label": "أدوات التحكم"
         }
     }
 }

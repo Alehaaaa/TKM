@@ -21,18 +21,7 @@ class ShareKeysToolObject(ToolObject):
                         "type": "choice",
                         "get_value": api.get_share_keys_mode,
                         "set_value": api.set_share_keys_mode,
-                        "items": [
-                            {
-                                "value": api.SHARE_KEYS_MODE_PRESERVE_TANGENT,
-                                "label": "Keep Tangent Type",
-                                "description": "Add missing keys without changing tangent type.",
-                            },
-                            {
-                                "value": api.SHARE_KEYS_MODE_PRESERVE_SHAPE,
-                                "label": "Keep Anim Curve Shape",
-                                "description": "Insert missing keys while preserving animation curve shape.",
-                            },
-                        ],
+                        "items": api.share_keys_mode_choices,
                     },
                     "separator",
                     "share_keys_from_last_selected",
@@ -53,23 +42,7 @@ class ShareKeysToolObject(ToolObject):
                         "type": "choice",
                         "get_value": api.get_bake_tangent_mode,
                         "set_value": api.set_bake_tangent_mode,
-                        "items": [
-                            {
-                                "value": api.BAKE_TANGENT_MODE_STEP,
-                                "label": "Bake To Step Tangent",
-                                "description": "Bake keys, then turn baked tangents to stepped.",
-                            },
-                            {
-                                "value": api.BAKE_TANGENT_MODE_KEEP_TYPE,
-                                "label": "Keep Tangent Type",
-                                "description": "Bake keys without forcing the baked keys to stepped tangents.",
-                            },
-                            {
-                                "value": api.BAKE_TANGENT_MODE_KEEP_SHAPE,
-                                "label": "Keep Animation Curve Shapes",
-                                "description": "Bake while preserving animation curve shapes where Maya can do so.",
-                            },
-                        ],
+                        "items": api.bake_tangent_mode_choices,
                     },
                     "separator",
                     "bake_animation_2",

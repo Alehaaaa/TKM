@@ -17,6 +17,36 @@
             "tooltip": [
                 "Fond vers une tangente lisse déduite des clés voisines."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Estimada",
+            "tooltip": [
+                "Mescla cap a una tangent suau inferida a partir de les claus veïnes"
+            ]
+        },
+        "zh": {
+            "label": "混合到最佳猜测切线",
+            "tooltip": [
+                "混合到根据相邻关键帧推断出的平滑切线"
+            ]
+        },
+        "ja": {
+            "label": "推定タンジェントにブレンド",
+            "tooltip": [
+                "隣接キーから推定した滑らかなタンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "추정 탄젠트로 블렌드",
+            "tooltip": [
+                "인접 키에서 추정한 부드러운 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس مقدَّر",
+            "tooltip": [
+                "المزج نحو مماس ناعم مستنتج من المفاتيح المجاورة"
+            ]
         }
     },
     "blend_polished": {
@@ -36,6 +66,36 @@
             "label": "Fondu vers la Tangente Peaufinée",
             "tooltip": [
                 "Fond vers une tangente Spline peaufinée."
+            ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Polida",
+            "tooltip": [
+                "Mescla cap a una tangent Spline polida"
+            ]
+        },
+        "zh": {
+            "label": "混合到精修切线",
+            "tooltip": [
+                "混合到经过精修的样条切线"
+            ]
+        },
+        "ja": {
+            "label": "洗練タンジェントにブレンド",
+            "tooltip": [
+                "洗練されたスプラインタンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "다듬어진 탄젠트로 블렌드",
+            "tooltip": [
+                "다듬어진 스플라인 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس مصقول",
+            "tooltip": [
+                "المزج نحو مماس سبلاين مصقول"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Fond vers une tangente Plateau fluide."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Fluida",
+            "tooltip": [
+                "Mescla cap a una tangent Plateau fluida"
+            ]
+        },
+        "zh": {
+            "label": "混合到流动切线",
+            "tooltip": [
+                "混合到流畅的高原切线"
+            ]
+        },
+        "ja": {
+            "label": "フロータンジェントにブレンド",
+            "tooltip": [
+                "流れるようなプラトータンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "플로우 탄젠트로 블렌드",
+            "tooltip": [
+                "유려한 플래토 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس انسيابي",
+            "tooltip": [
+                "المزج نحو مماس هضبي انسيابي"
+            ]
         }
     },
     "blend_bounce": {
@@ -76,6 +166,36 @@
             "label": "Fondu vers la Tangente Bouncy",
             "tooltip": [
                 "Fond vers une tangente Bouncy marquée avec rebond."
+            ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Bouncy",
+            "tooltip": [
+                "Mescla cap a una tangent Bouncy pronunciada amb rebot"
+            ]
+        },
+        "zh": {
+            "label": "混合到弹跳切线",
+            "tooltip": [
+                "混合到带有明显反弹的弹性切线"
+            ]
+        },
+        "ja": {
+            "label": "バウンスタンジェントにブレンド",
+            "tooltip": [
+                "跳ねるような鋭いバウンシータンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "바운스 탄젠트로 블렌드",
+            "tooltip": [
+                "튀는 듯한 날카로운 바운시 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس مرتد",
+            "tooltip": [
+                "المزج نحو مماس مرتد حاد"
             ]
         }
     },
@@ -97,6 +217,36 @@
             "tooltip": [
                 "Fond vers les tangentes Auto de Maya."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Auto",
+            "tooltip": [
+                "Mescla cap a les tangents Auto de Maya"
+            ]
+        },
+        "zh": {
+            "label": "混合到自动切线",
+            "tooltip": [
+                "混合到 Maya 的自动切线"
+            ]
+        },
+        "ja": {
+            "label": "オートタンジェントにブレンド",
+            "tooltip": [
+                "Mayaのオートタンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "자동 탄젠트로 블렌드",
+            "tooltip": [
+                "Maya의 자동 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس تلقائي",
+            "tooltip": [
+                "المزج نحو المماسات التلقائية في Maya"
+            ]
         }
     },
     "blend_spline": {
@@ -116,6 +266,36 @@
             "label": "Fondu vers la Tangente Spline",
             "tooltip": [
                 "Fond vers les tangentes Spline de Maya."
+            ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Spline",
+            "tooltip": [
+                "Mescla cap a les tangents Spline de Maya"
+            ]
+        },
+        "zh": {
+            "label": "混合到样条切线",
+            "tooltip": [
+                "混合到 Maya 的样条切线"
+            ]
+        },
+        "ja": {
+            "label": "スプラインタンジェントにブレンド",
+            "tooltip": [
+                "Mayaのスプラインタンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "스플라인 탄젠트로 블렌드",
+            "tooltip": [
+                "Maya의 스플라인 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس سبلاين",
+            "tooltip": [
+                "المزج نحو مماسات سبلاين في Maya"
             ]
         }
     },
@@ -137,6 +317,36 @@
             "tooltip": [
                 "Fond vers les tangentes Clamped de Maya."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Clamped",
+            "tooltip": [
+                "Mescla cap a les tangents Clamped de Maya"
+            ]
+        },
+        "zh": {
+            "label": "混合到钳制切线",
+            "tooltip": [
+                "混合到 Maya 的钳制切线"
+            ]
+        },
+        "ja": {
+            "label": "クランプタンジェントにブレンド",
+            "tooltip": [
+                "Mayaのクランプタンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "클램프 탄젠트로 블렌드",
+            "tooltip": [
+                "Maya의 클램프 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس مقيّد",
+            "tooltip": [
+                "المزج نحو المماسات المقيّدة في Maya"
+            ]
         }
     },
     "blend_linear": {
@@ -156,6 +366,36 @@
             "label": "Fondu vers la Tangente Linear",
             "tooltip": [
                 "Fond vers les tangentes Linear de Maya."
+            ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Linear",
+            "tooltip": [
+                "Mescla cap a les tangents Linear de Maya"
+            ]
+        },
+        "zh": {
+            "label": "混合到线性切线",
+            "tooltip": [
+                "混合到 Maya 的线性切线"
+            ]
+        },
+        "ja": {
+            "label": "リニアタンジェントにブレンド",
+            "tooltip": [
+                "Mayaのリニアタンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "선형 탄젠트로 블렌드",
+            "tooltip": [
+                "Maya의 선형 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس خطي",
+            "tooltip": [
+                "المزج نحو المماسات الخطية في Maya"
             ]
         }
     },
@@ -177,6 +417,36 @@
             "tooltip": [
                 "Fond vers les tangentes Flat de Maya."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Flat",
+            "tooltip": [
+                "Mescla cap a les tangents Flat de Maya"
+            ]
+        },
+        "zh": {
+            "label": "混合到平坦切线",
+            "tooltip": [
+                "混合到 Maya 的平坦切线"
+            ]
+        },
+        "ja": {
+            "label": "フラットタンジェントにブレンド",
+            "tooltip": [
+                "Mayaのフラットタンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "플랫 탄젠트로 블렌드",
+            "tooltip": [
+                "Maya의 플랫 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس مسطح",
+            "tooltip": [
+                "المزج نحو المماسات المسطحة في Maya"
+            ]
         }
     },
     "blend_plateau": {
@@ -197,6 +467,62 @@
             "tooltip": [
                 "Fond vers les tangentes Plateau de Maya."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a Tangent Plateau",
+            "tooltip": [
+                "Mescla cap a les tangents Plateau de Maya"
+            ]
+        },
+        "zh": {
+            "label": "混合到高原切线",
+            "tooltip": [
+                "混合到 Maya 的高原切线"
+            ]
+        },
+        "ja": {
+            "label": "プラトータンジェントにブレンド",
+            "tooltip": [
+                "Mayaのプラトータンジェントにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "플래토 탄젠트로 블렌드",
+            "tooltip": [
+                "Maya의 플래토 탄젠트로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى مماس هضبي",
+            "tooltip": [
+                "المزج نحو المماسات الهضبية في Maya"
+            ]
+        }
+    },
+    "slider_tangent": {
+        "en": {
+            "label": "Tangent Sliders"
+        },
+        "es": {
+            "label": "Deslizadores de Tangentes"
+        },
+        "fr": {
+            "label": "Curseurs de Tangentes"
+        },
+        "ca": {
+            "label": "Controls Lliscants de Tangents"
+        },
+        "zh": {
+            "label": "切线滑块"
+        },
+        "ja": {
+            "label": "タンジェントスライダー"
+        },
+        "ko": {
+            "label": "탄젠트 슬라이더"
+        },
+        "ar": {
+            "label": "أشرطة تمرير المماسات"
         }
     }
 }

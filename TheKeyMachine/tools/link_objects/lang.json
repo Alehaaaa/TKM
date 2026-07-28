@@ -20,6 +20,41 @@
                 "Copie la relation en espace monde entre les objets sélectionnés.",
                 "Sélectionnez d'abord les suiveurs, puis le meneur en dernier."
             ]
+        },
+        "ca": {
+            "label": "Copiar Relació",
+            "tooltip": [
+                "Copia la relació en espai del món entre els objectes seleccionats",
+                "Selecciona primer els seguidors i el conductor al final"
+            ]
+        },
+        "zh": {
+            "label": "复制关系",
+            "tooltip": [
+                "复制所选对象之间的世界空间关系",
+                "先选择跟随者，最后选择驱动者"
+            ]
+        },
+        "ja": {
+            "label": "関係をコピー",
+            "tooltip": [
+                "選択したオブジェクト間のワールドスペース関係をコピーします",
+                "先にフォロワーを選択し、最後にドライバーを選択してください"
+            ]
+        },
+        "ko": {
+            "label": "관계 복사",
+            "tooltip": [
+                "선택한 오브젝트 간의 월드 스페이스 관계를 복사합니다",
+                "먼저 팔로워를 선택하고 마지막에 드라이버를 선택하세요"
+            ]
+        },
+        "ar": {
+            "label": "نسخ العلاقة",
+            "tooltip": [
+                "نسخ العلاقة في الفضاء العالمي بين الكائنات المحددة",
+                "حدد التابعين أولاً ثم القائد أخيرًا"
+            ]
         }
     },
     "link_paste": {
@@ -39,6 +74,36 @@
             "label": "Coller la Relation",
             "tooltip": [
                 "Restaure la relation copiée à l'image actuelle, ou aux clés existantes de l'objet de relation lorsqu'une plage de temps est sélectionnée."
+            ]
+        },
+        "ca": {
+            "label": "Enganxar Relació",
+            "tooltip": [
+                "Restaura la relació copiada al fotograma actual, o a les claus existents de l'objecte de relació quan hi ha un rang de temps seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "粘贴关系",
+            "tooltip": [
+                "在当前帧恢复复制的关系，若选择了时间范围，则在关系对象已有的关键帧处恢复"
+            ]
+        },
+        "ja": {
+            "label": "関係を貼り付け",
+            "tooltip": [
+                "現在のフレームでコピーした関係を復元します。タイムレンジが選択されている場合は関係オブジェクトの既存キーで復元します"
+            ]
+        },
+        "ko": {
+            "label": "관계 붙여넣기",
+            "tooltip": [
+                "현재 프레임에 복사한 관계를 복원하거나, 타임라인 범위가 선택된 경우 관계 오브젝트의 기존 키에 복원합니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق العلاقة",
+            "tooltip": [
+                "استعادة العلاقة المنسوخة عند الإطار الحالي، أو عند مفاتيح كائن العلاقة الموجودة عند تحديد نطاق زمني"
             ]
         }
     },
@@ -60,6 +125,36 @@
             "tooltip": [
                 "Restaure la relation copiée aux clés existantes de l'objet de relation dans la plage de temps sélectionnée, ou sur la plage de lecture si aucune n'est sélectionnée."
             ]
+        },
+        "ca": {
+            "label": "Enganxar Relació en Rang",
+            "tooltip": [
+                "Restaura la relació copiada a les claus existents de l'objecte de relació dins del rang de temps seleccionat, o al rang de reproducció si no n'hi ha cap seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "粘贴关系到范围",
+            "tooltip": [
+                "在所选时间范围内关系对象已有的关键帧处恢复复制的关系，若未选择范围则使用播放范围"
+            ]
+        },
+        "ja": {
+            "label": "関係を範囲に貼り付け",
+            "tooltip": [
+                "選択したタイムレンジ内の関係オブジェクトの既存キーでコピーした関係を復元します。範囲が未選択の場合は再生範囲を使用します"
+            ]
+        },
+        "ko": {
+            "label": "관계를 범위에 붙여넣기",
+            "tooltip": [
+                "선택한 시간 범위 내 관계 오브젝트의 기존 키에 복사한 관계를 복원하거나, 범위가 없으면 재생 범위를 사용합니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق العلاقة في نطاق",
+            "tooltip": [
+                "استعادة العلاقة المنسوخة عند مفاتيح كائن العلاقة الموجودة ضمن النطاق الزمني المحدد، أو نطاق التشغيل عند عدم تحديد نطاق"
+            ]
         }
     },
     "link_autolink": {
@@ -79,6 +174,36 @@
             "label": "Liaison Automatique",
             "tooltip": [
                 "Garde les suiveurs copiés attachés au meneur pendant l'édition ou le changement d'image."
+            ]
+        },
+        "ca": {
+            "label": "Enllaç Automàtic",
+            "tooltip": [
+                "Manté els seguidors copiats units al conductor mentre s'edita o es canvien els fotogrames"
+            ]
+        },
+        "zh": {
+            "label": "自动链接",
+            "tooltip": [
+                "在编辑或切换帧时保持复制的跟随者与驱动者相连"
+            ]
+        },
+        "ja": {
+            "label": "オートリンク",
+            "tooltip": [
+                "編集中やフレーム変更中もコピーしたフォロワーをドライバーに接続したままにします"
+            ]
+        },
+        "ko": {
+            "label": "자동 링크",
+            "tooltip": [
+                "편집하거나 프레임을 변경하는 동안 복사한 팔로워를 드라이버에 계속 연결합니다"
+            ]
+        },
+        "ar": {
+            "label": "ربط تلقائي",
+            "tooltip": [
+                "إبقاء التابعين المنسوخين مرتبطين بالقائد أثناء التحرير أو تغيير الإطارات"
             ]
         }
     },
@@ -100,6 +225,88 @@
             "tooltip": [
                 "Ouvre la documentation de Copier la Relation."
             ]
+        },
+        "ca": {
+            "label": "Ajuda de Copiar Relació",
+            "tooltip": [
+                "Obre la documentació de Copiar Relació"
+            ]
+        },
+        "zh": {
+            "label": "复制关系帮助",
+            "tooltip": [
+                "打开复制关系文档"
+            ]
+        },
+        "ja": {
+            "label": "関係のコピー ヘルプ",
+            "tooltip": [
+                "関係のコピーのドキュメントを開きます"
+            ]
+        },
+        "ko": {
+            "label": "관계 복사 도움말",
+            "tooltip": [
+                "관계 복사 문서를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساعدة نسخ العلاقة",
+            "tooltip": [
+                "فتح توثيق نسخ العلاقة"
+            ]
+        }
+    },
+    "link_tools": {
+        "en": {
+            "label": "Relationships & Worldspace"
+        },
+        "es": {
+            "label": "Relaciones y Espacio del Mundo"
+        },
+        "fr": {
+            "label": "Relations et Espace Monde"
+        },
+        "ca": {
+            "label": "Relacions i Espai del Món"
+        },
+        "zh": {
+            "label": "关系与世界空间"
+        },
+        "ja": {
+            "label": "関係とワールドスペース"
+        },
+        "ko": {
+            "label": "관계 및 월드 스페이스"
+        },
+        "ar": {
+            "label": "العلاقات والفضاء العالمي"
+        }
+    },
+    "relationship_tools": {
+        "en": {
+            "label": "Relationships"
+        },
+        "es": {
+            "label": "Relaciones"
+        },
+        "fr": {
+            "label": "Relations"
+        },
+        "ca": {
+            "label": "Relacions"
+        },
+        "zh": {
+            "label": "关系"
+        },
+        "ja": {
+            "label": "関係"
+        },
+        "ko": {
+            "label": "관계"
+        },
+        "ar": {
+            "label": "العلاقات"
         }
     }
 }

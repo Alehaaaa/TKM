@@ -36,6 +36,75 @@ def _status_description(description="", status_description=None, tooltip=None):
     return resolved_description
 
 
+def refresh_tool_button_translation(widget, tool_id, shortcuts=None, shortcut_variants=None):
+    """Re-apply a single already-built widget's translated tooltip/status text.
+
+    One lookup path (``toolbox.get_tool()``, the same ``lang.json``-backed
+    resolution every other translated surface uses) shared by
+    ``QFlatSectionWidget.refresh_translations()`` for its own tracked
+    widgets *and* by any standalone button built outside the section
+    pipeline -- e.g. the main toolbar's own TKM logo button, which lives in
+    its own layout rather than any section. No separate logic per caller.
+
+    Most widgets added via ``addWidget()`` are TooltipMixin buttons/sliders
+    and get their live floating tooltip re-pushed via ``setToolTipData()``.
+    A handful (e.g. nudge/widgets.py's "Nudge Value", a bare ``QSpinBox``)
+    have no such mixin -- ``addWidget()`` falls back to a plain, one-time
+    ``HelpSystem.push()`` (native Qt status tip) for those, so the refresh
+    mirrors that same fallback instead of silently doing nothing for them.
+
+    ``shortcuts``/``shortcut_variants`` are optional freshly-translated
+    replacements for a button's modifier-key hint list and held-modifier
+    variant states (see ``toolbox._apply_shortcuts`` and
+    ``QFlatButtonBase.setShortcutVariants``) -- both are resolved once at
+    build time from the *section*, not from ``toolbox.get_tool()`` alone,
+    so a caller with section context (``QFlatSectionWidget.refresh_translations``)
+    passes the re-resolved values through here instead of this function
+    re-deriving them itself. Callers without that context (the standalone
+    TKM button) simply omit them and the widget's existing values are kept.
+    """
+    if not QtCompat.isValid(widget):
+        return False
+    import TheKeyMachine.core.toolbox as toolbox
+
+    try:
+        tool = toolbox.get_tool(tool_id)
+    except KeyError:
+        return False
+    label = tool.get("menu_label") or tool.get("label") or ""
+    tooltip = tool.get("tooltip")
+    description = tool.get("description") or (tooltip if isinstance(tooltip, str) else "")
+
+    if hasattr(widget, "setToolTipData"):
+        # setToolTipData()/setData() replace the widget's *entire* tooltip
+        # state -- any field left out of this call reverts to setData()'s
+        # own default (e.g. shortcuts=None -> []). Translation only ever
+        # changes text/description/tooltip, so every other field (shortcuts,
+        # icon, command identity) must be carried forward from what's
+        # already there, the same way addWidget()'s own refresh does.
+        existing = getattr(widget, "_toolTipData", {}) or {}
+        resolved_shortcuts = shortcuts if shortcuts is not None else existing.get("shortcuts", [])
+        status_description = _status_description(description=description, tooltip=tooltip)
+        widget.setToolTipData(
+            text=label,
+            description=description,
+            shortcuts=resolved_shortcuts,
+            tooltip=tooltip,
+            icon=existing.get("icon"),
+            status_title=label,
+            status_description=status_description,
+            command_id=existing.get("command_id"),
+            command_label=existing.get("command_label") or label,
+            command_icon=existing.get("command_icon") or existing.get("icon"),
+        )
+    else:
+        HelpSystem.push(widget, label, description or "")
+
+    if shortcut_variants is not None and hasattr(widget, "setShortcutVariants"):
+        widget.setShortcutVariants(shortcut_variants)
+    return True
+
+
 def _help_title(text="", status_title=None, tooltip=None):
     resolved_title, _description = toolCommon.resolve_status_metadata(
         title=text,
@@ -2748,28 +2817,58 @@ class QFlatSectionWidget(QtWidgets.QWidget):
 
         import TheKeyMachine.core.toolbox as toolbox
 
+        # A tool's modifier-key hint list and held-modifier variant states
+        # (e.g. holding Ctrl+Shift over "Nudge Left" to show "Nudge Left -
+        # All Keys") are resolved once from the *section* definition, via
+        # toolbox._apply_shortcuts -- toolbox.get_tool(key) alone never sees
+        # them, since they aren't part of a tool's own definition. Without
+        # re-resolving them here too, a language switch retranslated the
+        # button's own label/tooltip but left every one of its held-modifier
+        # variant names frozen in whatever language was active when the
+        # section was first built.
+        #
+        # toolbox.resolve_section_shortcuts() is the cheap, targeted way to
+        # get that fresh data: it skips every item that doesn't declare
+        # "shortcuts" (most don't) and every item outside this section's own
+        # tracked widget keys, instead of re-resolving the whole section
+        # (icons, default-pin state, every other item) just to reach the
+        # one or two rows that actually have shortcuts.
+        section_id = getattr(self, "_tkm_section_id", None)
+        shortcuts_by_id = (
+            toolbox.resolve_section_shortcuts(section_id, wanted_ids=self._widgets.keys())
+            if section_id
+            else {}
+        )
+
         for key, widget in self._widgets.items():
-            if not QtCompat.isValid(widget) or not hasattr(widget, "setToolTipData"):
+            if not QtCompat.isValid(widget):
                 continue
             try:
                 tool = toolbox.get_tool(key)
             except KeyError:
                 continue
-            label = tool.get("menu_label") or tool.get("label") or ""
-            tooltip = tool.get("tooltip")
-            description = tool.get("description") or (tooltip if isinstance(tooltip, str) else "")
-            status_description = _status_description(description=description, tooltip=tooltip)
-            widget.setToolTipData(
-                text=label,
-                description=description,
-                tooltip=tooltip,
-                status_title=label,
-                status_description=status_description,
+
+            resolved_shortcuts, resolved_variants = shortcuts_by_id.get(key, (None, None))
+            # Pushing the fresh tooltip straight into the widget only works
+            # for TooltipMixin widgets (buttons, sliders); a plain Qt widget
+            # added via addWidget() -- e.g. nudge/widgets.py's QFlatSpinBox,
+            # which is a bare QSpinBox -- has no setToolTipData of its own.
+            # That must not also block refreshing its *pin-menu* entry
+            # below: the checkbox row in the section's right-click menu
+            # reads straight from ``_menu_metadata``, independent of whether
+            # the widget itself can show a live tooltip.
+            refresh_tool_button_translation(
+                widget,
+                key,
+                shortcuts=resolved_shortcuts,
+                shortcut_variants=resolved_variants,
             )
+
             entry = next((item for item in self._menu_metadata if item.get("id") == key), None)
             if entry is not None:
-                entry["label"] = label
-                entry["description"] = description
+                entry["label"] = tool.get("menu_label") or tool.get("label") or ""
+                tooltip = tool.get("tooltip")
+                entry["description"] = tool.get("description") or (tooltip if isinstance(tooltip, str) else "")
                 entry["tooltip"] = tooltip
 
     def _on_slider_current_mode_changed(self, widget, old_key, new_key):
@@ -3036,10 +3135,16 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     command_icon=action_help.get("command_icon") or action_help.get("icon"),
                 )
                 self._bind_pin_menu_action(menu, action, key, self._is_pin_key_checked(key))
+        from TheKeyMachine.core import i18n
+
         menu.addSeparator()
-        pin_def_action = menu.addAction(QtGui.QIcon(icons.dot_round), "Pin Defaults", open=True)
+        pin_def_action = menu.addAction(
+            QtGui.QIcon(icons.dot_round), i18n.tr("pin_defaults", "Pin Defaults"), open=True
+        )
         pin_def_action.triggered.connect(lambda: self.pin_widget_defaults(menu=menu))
-        pin_all_action = menu.addAction(QtGui.QIcon(icons.dot_round), "Pin All", open=True)
+        pin_all_action = menu.addAction(
+            QtGui.QIcon(icons.dot_round), i18n.tr("pin_all", "Pin All"), open=True
+        )
         pin_all_action.triggered.connect(lambda: self.pin_widget_all(menu=menu))
 
     def _build_menu(self):

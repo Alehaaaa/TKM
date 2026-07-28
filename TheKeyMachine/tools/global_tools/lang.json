@@ -17,6 +17,36 @@
             "tooltip": [
                 "Applique automatiquement un filtre Euler après que le Sélecteur d'Attributs change l'ordre de rotation."
             ]
+        },
+        "ca": {
+            "label": "Filtre Euler Automàtic",
+            "tooltip": [
+                "Aplica automàticament un filtre Euler quan el Selector d'Atributs canvia l'ordre de rotació"
+            ]
+        },
+        "zh": {
+            "label": "自动欧拉滤波",
+            "tooltip": [
+                "在属性切换器更改旋转顺序后自动应用欧拉滤波"
+            ]
+        },
+        "ja": {
+            "label": "自動オイラーフィルタ",
+            "tooltip": [
+                "アトリビュートスイッチャーが回転順序を変更した後、自動的にオイラーフィルタを適用します"
+            ]
+        },
+        "ko": {
+            "label": "자동 오일러 필터",
+            "tooltip": [
+                "속성 전환기가 회전 순서를 변경한 후 오일러 필터를 자동으로 적용합니다"
+            ]
+        },
+        "ar": {
+            "label": "مرشح أويلر تلقائي",
+            "tooltip": [
+                "تطبيق مرشح أويلر تلقائيًا بعد تغيير محول الخصائص لترتيب الدوران"
+            ]
         }
     },
     "overshoot_sliders": {
@@ -36,6 +66,36 @@
             "label": "Sliders avec Dépassement",
             "tooltip": [
                 "Étend la plage et les boutons des sliders au-delà de 100 pour cent jusqu'à 150 pour cent."
+            ]
+        },
+        "ca": {
+            "label": "Controls Lliscants amb Sobrepàs",
+            "tooltip": [
+                "Estén el rang i els botons dels controls lliscants més enllà del 100 per cent fins al 150 per cent"
+            ]
+        },
+        "zh": {
+            "label": "滑块超限",
+            "tooltip": [
+                "将滑块范围和按钮从 100% 扩展到 150%"
+            ]
+        },
+        "ja": {
+            "label": "スライダーのオーバーシュート",
+            "tooltip": [
+                "スライダーの範囲とボタンを100パーセントを超えて150パーセントまで拡張します"
+            ]
+        },
+        "ko": {
+            "label": "슬라이더 오버슈트",
+            "tooltip": [
+                "슬라이더 범위와 버튼을 100퍼센트를 넘어 150퍼센트까지 확장합니다"
+            ]
+        },
+        "ar": {
+            "label": "تجاوز أشرطة التمرير",
+            "tooltip": [
+                "توسيع نطاق أشرطة التمرير وأزرارها إلى ما بعد 100 بالمئة حتى 150 بالمئة"
             ]
         }
     },
@@ -62,6 +122,72 @@
                 "Affiche ou masque la barre de TheKeyMachine dans chaque Graph Editor de Maya.",
                 "Cette préférence persiste entre les sessions Maya."
             ]
+        },
+        "ca": {
+            "label": "Barra del Graph Editor",
+            "menu_label": "Mostrar Barra del Graph Editor",
+            "tooltip": [
+                "Mostra o amaga la barra de TheKeyMachine dins de cada Graph Editor de Maya",
+                "Aquesta preferència es manté entre sessions de Maya"
+            ]
+        },
+        "zh": {
+            "label": "Graph Editor 工具栏",
+            "menu_label": "显示 Graph Editor 工具栏",
+            "tooltip": [
+                "在每个 Maya Graph Editor 中显示或隐藏 TheKeyMachine 的工具栏",
+                "此偏好设置会在 Maya 会话之间保留"
+            ]
+        },
+        "ja": {
+            "label": "Graph Editor ツールバー",
+            "menu_label": "Graph Editor ツールバーを表示",
+            "tooltip": [
+                "すべてのMaya Graph EditorでTheKeyMachineのツールバーを表示または非表示にします",
+                "この設定はMayaセッション間で保持されます"
+            ]
+        },
+        "ko": {
+            "label": "Graph Editor 툴바",
+            "menu_label": "Graph Editor 툴바 표시",
+            "tooltip": [
+                "모든 Maya Graph Editor 내에서 TheKeyMachine의 툴바를 표시하거나 숨깁니다",
+                "이 설정은 Maya 세션 간에 유지됩니다"
+            ]
+        },
+        "ar": {
+            "label": "شريط أدوات Graph Editor",
+            "menu_label": "إظهار شريط أدوات Graph Editor",
+            "tooltip": [
+                "إظهار أو إخفاء شريط أدوات TheKeyMachine داخل كل Graph Editor في Maya",
+                "يستمر هذا التفضيل بين جلسات Maya"
+            ]
+        }
+    },
+    "global_tools": {
+        "en": {
+            "label": "Global Tools"
+        },
+        "es": {
+            "label": "Herramientas Globales"
+        },
+        "fr": {
+            "label": "Outils Globaux"
+        },
+        "ca": {
+            "label": "Eines Globals"
+        },
+        "zh": {
+            "label": "全局工具"
+        },
+        "ja": {
+            "label": "グローバルツール"
+        },
+        "ko": {
+            "label": "전역 도구"
+        },
+        "ar": {
+            "label": "الأدوات العامة"
         }
     }
 }

@@ -17,6 +17,36 @@
             "tooltip": [
                 "Réinitialise les attributs ciblés à leurs valeurs par défaut enregistrées ou aux valeurs natives de Maya."
             ]
+        },
+        "ca": {
+            "label": "Pose Predeterminada",
+            "tooltip": [
+                "Restableix els atributs seleccionats als seus valors predeterminats desats o als valors natius de Maya"
+            ]
+        },
+        "zh": {
+            "label": "默认姿态",
+            "tooltip": [
+                "将目标属性重置为已保存的默认值或 Maya 的原生默认值"
+            ]
+        },
+        "ja": {
+            "label": "デフォルトポーズ",
+            "tooltip": [
+                "対象アトリビュートを保存済みのデフォルト値またはMayaのネイティブデフォルト値にリセットします"
+            ]
+        },
+        "ko": {
+            "label": "기본 포즈",
+            "tooltip": [
+                "대상 속성을 저장된 기본값 또는 Maya의 기본값으로 재설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "الوضعية الافتراضية",
+            "tooltip": [
+                "إعادة تعيين الخصائص المستهدفة إلى القيم الافتراضية المحفوظة أو القيم الافتراضية الأصلية في Maya"
+            ]
         }
     },
     "default_translations": {
@@ -36,6 +66,36 @@
             "label": "Translation par Défaut",
             "tooltip": [
                 "Réinitialise uniquement les attributs de translation à leurs valeurs par défaut."
+            ]
+        },
+        "ca": {
+            "label": "Translació Predeterminada",
+            "tooltip": [
+                "Restableix únicament els atributs de translació als seus valors predeterminats"
+            ]
+        },
+        "zh": {
+            "label": "默认位移",
+            "tooltip": [
+                "仅将位移属性重置为其默认值"
+            ]
+        },
+        "ja": {
+            "label": "デフォルト移動",
+            "tooltip": [
+                "移動アトリビュートのみをデフォルト値にリセットします"
+            ]
+        },
+        "ko": {
+            "label": "기본 이동",
+            "tooltip": [
+                "이동 속성만 기본값으로 재설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "الانتقال الافتراضي",
+            "tooltip": [
+                "إعادة تعيين خصائص الانتقال فقط إلى قيمها الافتراضية"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Réinitialise uniquement les attributs de rotation à leurs valeurs par défaut."
             ]
+        },
+        "ca": {
+            "label": "Rotació Predeterminada",
+            "tooltip": [
+                "Restableix únicament els atributs de rotació als seus valors predeterminats"
+            ]
+        },
+        "zh": {
+            "label": "默认旋转",
+            "tooltip": [
+                "仅将旋转属性重置为其默认值"
+            ]
+        },
+        "ja": {
+            "label": "デフォルト回転",
+            "tooltip": [
+                "回転アトリビュートのみをデフォルト値にリセットします"
+            ]
+        },
+        "ko": {
+            "label": "기본 회전",
+            "tooltip": [
+                "회전 속성만 기본값으로 재설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "الدوران الافتراضي",
+            "tooltip": [
+                "إعادة تعيين خصائص الدوران فقط إلى قيمها الافتراضية"
+            ]
         }
     },
     "default_scales": {
@@ -76,6 +166,36 @@
             "label": "Échelle par Défaut",
             "tooltip": [
                 "Réinitialise uniquement les attributs d'échelle à leurs valeurs par défaut."
+            ]
+        },
+        "ca": {
+            "label": "Escala Predeterminada",
+            "tooltip": [
+                "Restableix únicament els atributs d'escala als seus valors predeterminats"
+            ]
+        },
+        "zh": {
+            "label": "默认缩放",
+            "tooltip": [
+                "仅将缩放属性重置为其默认值"
+            ]
+        },
+        "ja": {
+            "label": "デフォルトスケール",
+            "tooltip": [
+                "スケールアトリビュートのみをデフォルト値にリセットします"
+            ]
+        },
+        "ko": {
+            "label": "기본 스케일",
+            "tooltip": [
+                "스케일 속성만 기본값으로 재설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "القياس الافتراضي",
+            "tooltip": [
+                "إعادة تعيين خصائص القياس فقط إلى قيمها الافتراضية"
             ]
         }
     },
@@ -97,6 +217,36 @@
             "tooltip": [
                 "Réinitialise ensemble les attributs de translation, rotation et échelle."
             ]
+        },
+        "ca": {
+            "label": "Translació, Rotació i Escala Predeterminades",
+            "tooltip": [
+                "Restableix junts els atributs de translació, rotació i escala"
+            ]
+        },
+        "zh": {
+            "label": "默认位移旋转缩放",
+            "tooltip": [
+                "同时重置位移、旋转和缩放属性"
+            ]
+        },
+        "ja": {
+            "label": "デフォルト移動回転スケール",
+            "tooltip": [
+                "移動・回転・スケールのアトリビュートをまとめてリセットします"
+            ]
+        },
+        "ko": {
+            "label": "기본 이동 회전 스케일",
+            "tooltip": [
+                "이동, 회전, 스케일 속성을 함께 재설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "الانتقال والدوران والقياس الافتراضي",
+            "tooltip": [
+                "إعادة تعيين خصائص الانتقال والدوران والقياس معًا"
+            ]
         }
     },
     "default_set_defaults": {
@@ -116,6 +266,36 @@
             "label": "Enregistrer les Valeurs par Défaut de la Sélection",
             "tooltip": [
                 "Enregistre les valeurs actuelles des attributs clés comme valeurs par défaut personnalisées pour les objets sélectionnés."
+            ]
+        },
+        "ca": {
+            "label": "Desar Predeterminats de la Selecció",
+            "tooltip": [
+                "Desa els valors actuals dels atributs clau com a predeterminats personalitzats per als objectes seleccionats"
+            ]
+        },
+        "zh": {
+            "label": "为所选保存默认值",
+            "tooltip": [
+                "将当前可设关键帧属性值存储为所选对象的自定义默认值"
+            ]
+        },
+        "ja": {
+            "label": "選択にデフォルトを保存",
+            "tooltip": [
+                "現在のキー設定可能なアトリビュート値を、選択オブジェクトのカスタムデフォルトとして保存します"
+            ]
+        },
+        "ko": {
+            "label": "선택 항목의 기본값 저장",
+            "tooltip": [
+                "현재 키 설정 가능한 속성 값을 선택한 오브젝트의 사용자 지정 기본값으로 저장합니다"
+            ]
+        },
+        "ar": {
+            "label": "حفظ الافتراضيات للتحديد",
+            "tooltip": [
+                "تخزين قيم الخصائص القابلة للتحريك الحالية كقيم افتراضية مخصصة للكائنات المحددة"
             ]
         }
     },
@@ -137,6 +317,36 @@
             "tooltip": [
                 "Supprime les valeurs par défaut personnalisées des objets sélectionnés sans affecter les autres contrôleurs enregistrés."
             ]
+        },
+        "ca": {
+            "label": "Eliminar Predeterminats Desats de la Selecció",
+            "tooltip": [
+                "Elimina els predeterminats personalitzats dels objectes seleccionats sense afectar altres controls desats"
+            ]
+        },
+        "zh": {
+            "label": "移除所选的已保存默认值",
+            "tooltip": [
+                "移除所选对象的自定义默认值，而不影响其他已保存的控制器"
+            ]
+        },
+        "ja": {
+            "label": "選択の保存済みデフォルトを削除",
+            "tooltip": [
+                "他の保存済みコントローラに影響を与えずに、選択オブジェクトのカスタムデフォルトを削除します"
+            ]
+        },
+        "ko": {
+            "label": "선택 항목의 저장된 기본값 제거",
+            "tooltip": [
+                "다른 저장된 컨트롤에 영향을 주지 않고 선택한 오브젝트의 사용자 지정 기본값을 제거합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة الافتراضيات المحفوظة للتحديد",
+            "tooltip": [
+                "إزالة القيم الافتراضية المخصصة للكائنات المحددة دون التأثير على المتحكمات المحفوظة الأخرى"
+            ]
         }
     },
     "default_clear_all": {
@@ -156,6 +366,36 @@
             "label": "Effacer Toutes les Valeurs par Défaut Enregistrées",
             "tooltip": [
                 "Efface toutes les valeurs par défaut personnalisées enregistrées par TheKeyMachine."
+            ]
+        },
+        "ca": {
+            "label": "Esborrar Tots els Predeterminats Desats",
+            "tooltip": [
+                "Esborra tots els predeterminats personalitzats desats per TheKeyMachine"
+            ]
+        },
+        "zh": {
+            "label": "清除所有已保存的默认值",
+            "tooltip": [
+                "清除 TheKeyMachine 保存的所有自定义默认值"
+            ]
+        },
+        "ja": {
+            "label": "保存済みのデフォルトをすべて消去",
+            "tooltip": [
+                "TheKeyMachineが保存したカスタムデフォルトをすべて消去します"
+            ]
+        },
+        "ko": {
+            "label": "저장된 모든 기본값 지우기",
+            "tooltip": [
+                "TheKeyMachine이 저장한 모든 사용자 지정 기본값을 지웁니다"
+            ]
+        },
+        "ar": {
+            "label": "مسح كل الافتراضيات المحفوظة",
+            "tooltip": [
+                "مسح كل القيم الافتراضية المخصصة المحفوظة بواسطة TheKeyMachine"
             ]
         }
     },
@@ -177,6 +417,62 @@
             "tooltip": [
                 "Ouvre la documentation des Valeurs par Défaut."
             ]
+        },
+        "ca": {
+            "label": "Ajuda",
+            "tooltip": [
+                "Obre la documentació de Valors Predeterminats"
+            ]
+        },
+        "zh": {
+            "label": "帮助",
+            "tooltip": [
+                "打开默认值文档"
+            ]
+        },
+        "ja": {
+            "label": "ヘルプ",
+            "tooltip": [
+                "デフォルト値のドキュメントを開きます"
+            ]
+        },
+        "ko": {
+            "label": "도움말",
+            "tooltip": [
+                "기본값 문서를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساعدة",
+            "tooltip": [
+                "فتح توثيق القيم الافتراضية"
+            ]
+        }
+    },
+    "default_tools": {
+        "en": {
+            "label": "Default"
+        },
+        "es": {
+            "label": "Predeterminado"
+        },
+        "fr": {
+            "label": "Par Défaut"
+        },
+        "ca": {
+            "label": "Predeterminat"
+        },
+        "zh": {
+            "label": "默认"
+        },
+        "ja": {
+            "label": "デフォルト"
+        },
+        "ko": {
+            "label": "기본값"
+        },
+        "ar": {
+            "label": "الافتراضي"
         }
     }
 }

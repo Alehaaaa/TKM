@@ -17,6 +17,36 @@
             "tooltip": [
                 "Sélectionne les contrôleurs du côté opposé correspondant à la sélection actuelle."
             ]
+        },
+        "ca": {
+            "label": "Seleccionar Oposat",
+            "tooltip": [
+                "Selecciona els controls del costat oposat que coincideixen amb la selecció actual"
+            ]
+        },
+        "zh": {
+            "label": "选择对侧",
+            "tooltip": [
+                "选择与当前选择相对应的对侧控制器"
+            ]
+        },
+        "ja": {
+            "label": "反対側を選択",
+            "tooltip": [
+                "現在の選択に対応する反対側のコントローラを選択します"
+            ]
+        },
+        "ko": {
+            "label": "반대쪽 선택",
+            "tooltip": [
+                "현재 선택 항목에 대응하는 반대쪽 컨트롤을 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديد الجانب المقابل",
+            "tooltip": [
+                "تحديد متحكمات الجانب المقابل المطابقة للتحديد الحالي"
+            ]
         }
     },
     "opposite_add": {
@@ -36,6 +66,36 @@
             "label": "Ajouter l'Opposé",
             "tooltip": [
                 "Ajoute les contrôleurs du côté opposé à la sélection actuelle."
+            ]
+        },
+        "ca": {
+            "label": "Afegir Oposat",
+            "tooltip": [
+                "Afegeix els controls del costat oposat a la selecció actual"
+            ]
+        },
+        "zh": {
+            "label": "添加对侧",
+            "tooltip": [
+                "将对侧控制器添加到当前选择"
+            ]
+        },
+        "ja": {
+            "label": "反対側を追加",
+            "tooltip": [
+                "反対側のコントローラを現在の選択に追加します"
+            ]
+        },
+        "ko": {
+            "label": "반대쪽 추가",
+            "tooltip": [
+                "반대쪽 컨트롤을 현재 선택 항목에 추가합니다"
+            ]
+        },
+        "ar": {
+            "label": "إضافة الجانب المقابل",
+            "tooltip": [
+                "إضافة متحكمات الجانب المقابل إلى التحديد الحالي"
             ]
         }
     },
@@ -60,6 +120,41 @@
                 "Copie les valeurs actuelles des contrôleurs sélectionnés vers leurs contrôleurs du côté opposé.",
                 "Les exceptions de miroir enregistrées s'appliquent par canal."
             ]
+        },
+        "ca": {
+            "label": "Copiar Oposat",
+            "tooltip": [
+                "Copia els valors actuals dels controls seleccionats als seus controls del costat oposat",
+                "Les excepcions de mirall desades s'apliquen per canal"
+            ]
+        },
+        "zh": {
+            "label": "复制到对侧",
+            "tooltip": [
+                "将所选控制器的当前值复制到其对侧控制器",
+                "已保存的镜像例外会按通道应用"
+            ]
+        },
+        "ja": {
+            "label": "反対側にコピー",
+            "tooltip": [
+                "選択したコントローラの現在の値を反対側のコントローラにコピーします",
+                "保存済みのミラー例外はチャンネルごとに適用されます"
+            ]
+        },
+        "ko": {
+            "label": "반대쪽으로 복사",
+            "tooltip": [
+                "선택한 컨트롤의 현재 값을 반대쪽 컨트롤로 복사합니다",
+                "저장된 미러 예외는 채널별로 적용됩니다"
+            ]
+        },
+        "ar": {
+            "label": "نسخ إلى الجانب المقابل",
+            "tooltip": [
+                "نسخ القيم الحالية للمتحكمات المحددة إلى متحكمات الجانب المقابل",
+                "تُطبَّق استثناءات المرآة المحفوظة لكل قناة"
+            ]
         }
     },
     "mirror": {
@@ -82,6 +177,41 @@
             "tooltip": [
                 "Reflète les contrôleurs sélectionnés vers leurs équivalents du côté opposé.",
                 "Les exceptions de miroir peuvent être configurées par rig et sont enregistrées pour réutilisation."
+            ]
+        },
+        "ca": {
+            "label": "Mirall",
+            "tooltip": [
+                "Reflecteix els controls seleccionats als seus equivalents del costat oposat",
+                "Les excepcions de mirall es poden configurar per rig i es desen per reutilitzar-les"
+            ]
+        },
+        "zh": {
+            "label": "镜像",
+            "tooltip": [
+                "将所选控制器镜像到其对侧的对应控制器",
+                "镜像例外可按绑定进行配置并保存以便重复使用"
+            ]
+        },
+        "ja": {
+            "label": "ミラー",
+            "tooltip": [
+                "選択したコントローラを反対側の対応コントローラにミラーリングします",
+                "ミラー例外はリグごとに設定でき、再利用のために保存されます"
+            ]
+        },
+        "ko": {
+            "label": "미러",
+            "tooltip": [
+                "선택한 컨트롤을 반대쪽의 대응 컨트롤로 미러링합니다",
+                "미러 예외는 리그별로 구성할 수 있으며 재사용을 위해 저장됩니다"
+            ]
+        },
+        "ar": {
+            "label": "مرآة",
+            "tooltip": [
+                "عكس المتحكمات المحددة إلى مكافئاتها في الجانب المقابل",
+                "يمكن تهيئة استثناءات المرآة لكل ريغ وتُحفظ لإعادة الاستخدام"
             ]
         }
     },
@@ -106,6 +236,41 @@
                 "Copie les valeurs miroir actuelles des contrôleurs gauches sélectionnés vers leurs opposés droits.",
                 "Les exceptions d'inversion multiplient par -1 les canaux enregistrés avant de les écrire sur le contrôleur opposé."
             ]
+        },
+        "ca": {
+            "label": "Mirall a la Dreta",
+            "tooltip": [
+                "Copia els valors reflectits actuals dels controls esquerres seleccionats als seus oposats drets",
+                "Les excepcions d'inversió multipliquen per -1 els canals desats abans d'escriure'ls al control oposat"
+            ]
+        },
+        "zh": {
+            "label": "镜像到右侧",
+            "tooltip": [
+                "将所选左侧控制器当前的镜像值复制到其右侧对应控制器",
+                "反转例外会在写入对侧控制器之前将已保存通道乘以 -1"
+            ]
+        },
+        "ja": {
+            "label": "右にミラー",
+            "tooltip": [
+                "選択した左側コントローラの現在のミラー値を右側の対応コントローラにコピーします",
+                "反転例外は保存済みチャンネルを-1倍してから反対側のコントローラに書き込みます"
+            ]
+        },
+        "ko": {
+            "label": "오른쪽으로 미러",
+            "tooltip": [
+                "선택한 왼쪽 컨트롤의 현재 미러 값을 오른쪽 대응 컨트롤로 복사합니다",
+                "반전 예외는 저장된 채널에 -1을 곱한 뒤 반대쪽 컨트롤에 씁니다"
+            ]
+        },
+        "ar": {
+            "label": "مرآة إلى اليمين",
+            "tooltip": [
+                "نسخ القيم المعكوسة الحالية من المتحكمات اليسرى المحددة إلى مقابلاتها اليمنى",
+                "تضرب استثناءات العكس القنوات المحفوظة في -1 قبل كتابتها في المتحكم المقابل"
+            ]
         }
     },
     "mirror_to_left": {
@@ -128,6 +293,41 @@
             "tooltip": [
                 "Copie les valeurs miroir actuelles des contrôleurs droits sélectionnés vers leurs opposés gauches.",
                 "Les exceptions d'inversion multiplient par -1 les canaux enregistrés avant de les écrire sur le contrôleur opposé."
+            ]
+        },
+        "ca": {
+            "label": "Mirall a l'Esquerra",
+            "tooltip": [
+                "Copia els valors reflectits actuals dels controls drets seleccionats als seus oposats esquerres",
+                "Les excepcions d'inversió multipliquen per -1 els canals desats abans d'escriure'ls al control oposat"
+            ]
+        },
+        "zh": {
+            "label": "镜像到左侧",
+            "tooltip": [
+                "将所选右侧控制器当前的镜像值复制到其左侧对应控制器",
+                "反转例外会在写入对侧控制器之前将已保存通道乘以 -1"
+            ]
+        },
+        "ja": {
+            "label": "左にミラー",
+            "tooltip": [
+                "選択した右側コントローラの現在のミラー値を左側の対応コントローラにコピーします",
+                "反転例外は保存済みチャンネルを-1倍してから反対側のコントローラに書き込みます"
+            ]
+        },
+        "ko": {
+            "label": "왼쪽으로 미러",
+            "tooltip": [
+                "선택한 오른쪽 컨트롤의 현재 미러 값을 왼쪽 대응 컨트롤로 복사합니다",
+                "반전 예외는 저장된 채널에 -1을 곱한 뒤 반대쪽 컨트롤에 씁니다"
+            ]
+        },
+        "ar": {
+            "label": "مرآة إلى اليسار",
+            "tooltip": [
+                "نسخ القيم المعكوسة الحالية من المتحكمات اليمنى المحددة إلى مقابلاتها اليسرى",
+                "تضرب استثناءات العكس القنوات المحفوظة في -1 قبل كتابتها في المتحكم المقابل"
             ]
         }
     },
@@ -152,6 +352,41 @@
                 "Copie toute l'animation avec clés des contrôleurs sélectionnés vers leurs contrôleurs du côté opposé.",
                 "Les clés existantes sur les canaux de destination sont remplacées et les exceptions de miroir s'appliquent par canal."
             ]
+        },
+        "ca": {
+            "label": "Mirall en Totes les Claus",
+            "tooltip": [
+                "Copia tota l'animació amb claus dels controls seleccionats als seus controls del costat oposat",
+                "Les claus existents als canals de destinació es reemplacen i les excepcions de mirall s'apliquen per canal"
+            ]
+        },
+        "zh": {
+            "label": "全部关键帧镜像",
+            "tooltip": [
+                "将所选控制器上所有已设置关键帧的动画复制到其对侧控制器",
+                "目标通道上已有的关键帧会被替换，镜像例外按通道应用"
+            ]
+        },
+        "ja": {
+            "label": "全キーをミラー",
+            "tooltip": [
+                "選択したコントローラのキー付きアニメーションをすべて反対側のコントローラにコピーします",
+                "宛先チャンネルの既存キーは置き換えられ、ミラー例外はチャンネルごとに適用されます"
+            ]
+        },
+        "ko": {
+            "label": "모든 키 미러",
+            "tooltip": [
+                "선택한 컨트롤의 모든 키 애니메이션을 반대쪽 컨트롤로 복사합니다",
+                "대상 채널의 기존 키는 대체되며 미러 예외는 채널별로 적용됩니다"
+            ]
+        },
+        "ar": {
+            "label": "مرآة كل المفاتيح",
+            "tooltip": [
+                "نسخ كل الحركة ذات المفاتيح من المتحكمات المحددة إلى متحكمات الجانب المقابل",
+                "تُستبدل المفاتيح الموجودة في قنوات الوجهة وتُطبَّق استثناءات المرآة لكل قناة"
+            ]
         }
     },
     "mirror_add_invert": {
@@ -174,6 +409,41 @@
             "tooltip": [
                 "Enregistre une exception d'Inversion pour les contrôleurs et attributs du Channel Box sélectionnés.",
                 "La valeur de canal enregistrée est multipliée par -1 lors des opérations de miroir."
+            ]
+        },
+        "ca": {
+            "label": "Afegir Excepció Invertir",
+            "tooltip": [
+                "Desa una excepció d'Inversió per als controls i atributs del Channel Box seleccionats",
+                "El valor de canal desat es multiplica per -1 durant les operacions de mirall"
+            ]
+        },
+        "zh": {
+            "label": "添加反转例外",
+            "tooltip": [
+                "为所选控制器和通道盒属性保存一个反转例外",
+                "在镜像操作期间，保存的通道值会乘以 -1"
+            ]
+        },
+        "ja": {
+            "label": "反転例外を追加",
+            "tooltip": [
+                "選択したコントローラとチャンネルボックスアトリビュートに反転例外を保存します",
+                "ミラー操作中、保存済みチャンネル値は-1倍されます"
+            ]
+        },
+        "ko": {
+            "label": "반전 예외 추가",
+            "tooltip": [
+                "선택한 컨트롤과 채널 박스 속성에 대한 반전 예외를 저장합니다",
+                "미러 작업 중 저장된 채널 값에 -1이 곱해집니다"
+            ]
+        },
+        "ar": {
+            "label": "إضافة استثناء عكس",
+            "tooltip": [
+                "حفظ استثناء عكس للمتحكمات والخصائص المحددة في صندوق القنوات",
+                "تُضرب قيمة القناة المحفوظة في -1 أثناء عمليات المرآة"
             ]
         }
     },
@@ -198,6 +468,41 @@
                 "Enregistre une exception Conserver pour les contrôleurs et attributs du Channel Box sélectionnés.",
                 "La valeur de canal enregistrée est transférée sans changement lors des opérations de miroir."
             ]
+        },
+        "ca": {
+            "label": "Afegir Excepció Mantenir",
+            "tooltip": [
+                "Desa una excepció de Mantenir per als controls i atributs del Channel Box seleccionats",
+                "El valor de canal desat es transfereix sense canvis durant les operacions de mirall"
+            ]
+        },
+        "zh": {
+            "label": "添加保持例外",
+            "tooltip": [
+                "为所选控制器和通道盒属性保存一个保持例外",
+                "在镜像操作期间，保存的通道值将原样传递"
+            ]
+        },
+        "ja": {
+            "label": "維持例外を追加",
+            "tooltip": [
+                "選択したコントローラとチャンネルボックスアトリビュートに維持例外を保存します",
+                "ミラー操作中、保存済みチャンネル値は変更なく転送されます"
+            ]
+        },
+        "ko": {
+            "label": "유지 예외 추가",
+            "tooltip": [
+                "선택한 컨트롤과 채널 박스 속성에 대한 유지 예외를 저장합니다",
+                "미러 작업 중 저장된 채널 값은 변경 없이 전달됩니다"
+            ]
+        },
+        "ar": {
+            "label": "إضافة استثناء إبقاء",
+            "tooltip": [
+                "حفظ استثناء إبقاء للمتحكمات والخصائص المحددة في صندوق القنوات",
+                "تُنقل قيمة القناة المحفوظة دون تغيير أثناء عمليات المرآة"
+            ]
         }
     },
     "mirror_remove_exc": {
@@ -217,6 +522,36 @@
             "label": "Supprimer l'Exception",
             "tooltip": [
                 "Supprime les exceptions de miroir enregistrées des contrôleurs et attributs du Channel Box sélectionnés."
+            ]
+        },
+        "ca": {
+            "label": "Eliminar Excepció",
+            "tooltip": [
+                "Elimina les excepcions de mirall desades dels controls i atributs del Channel Box seleccionats"
+            ]
+        },
+        "zh": {
+            "label": "移除例外",
+            "tooltip": [
+                "从所选控制器和通道盒属性中移除已保存的镜像例外"
+            ]
+        },
+        "ja": {
+            "label": "例外を削除",
+            "tooltip": [
+                "選択したコントローラとチャンネルボックスアトリビュートから保存済みのミラー例外を削除します"
+            ]
+        },
+        "ko": {
+            "label": "예외 제거",
+            "tooltip": [
+                "선택한 컨트롤과 채널 박스 속성에서 저장된 미러 예외를 제거합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة الاستثناء",
+            "tooltip": [
+                "إزالة استثناءات المرآة المحفوظة من المتحكمات والخصائص المحددة في صندوق القنوات"
             ]
         }
     },
@@ -238,6 +573,88 @@
             "tooltip": [
                 "Ouvre la documentation de l'outil Miroir."
             ]
+        },
+        "ca": {
+            "label": "Ajuda",
+            "tooltip": [
+                "Obre la documentació de l'eina Mirall"
+            ]
+        },
+        "zh": {
+            "label": "帮助",
+            "tooltip": [
+                "打开镜像工具文档"
+            ]
+        },
+        "ja": {
+            "label": "ヘルプ",
+            "tooltip": [
+                "ミラーツールのドキュメントを開きます"
+            ]
+        },
+        "ko": {
+            "label": "도움말",
+            "tooltip": [
+                "미러 도구 문서를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساعدة",
+            "tooltip": [
+                "فتح توثيق أداة المرآة"
+            ]
+        }
+    },
+    "opposite_tools": {
+        "en": {
+            "label": "Opposite"
+        },
+        "es": {
+            "label": "Opuesto"
+        },
+        "fr": {
+            "label": "Opposé"
+        },
+        "ca": {
+            "label": "Oposat"
+        },
+        "zh": {
+            "label": "对侧"
+        },
+        "ja": {
+            "label": "反対側"
+        },
+        "ko": {
+            "label": "반대쪽"
+        },
+        "ar": {
+            "label": "الجانب المقابل"
+        }
+    },
+    "mirror_tools": {
+        "en": {
+            "label": "Mirror"
+        },
+        "es": {
+            "label": "Espejo"
+        },
+        "fr": {
+            "label": "Miroir"
+        },
+        "ca": {
+            "label": "Mirall"
+        },
+        "zh": {
+            "label": "镜像"
+        },
+        "ja": {
+            "label": "ミラー"
+        },
+        "ko": {
+            "label": "미러"
+        },
+        "ar": {
+            "label": "المرآة"
         }
     }
 }

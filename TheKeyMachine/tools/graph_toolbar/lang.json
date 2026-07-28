@@ -17,6 +17,36 @@
             "tooltip": [
                 "Ouvre les réglages de la barre du Graph Editor."
             ]
+        },
+        "ca": {
+            "label": "Ajustos de la Barra del Graph",
+            "tooltip": [
+                "Obre els ajustos de la barra del Graph Editor"
+            ]
+        },
+        "zh": {
+            "label": "Graph 工具栏设置",
+            "tooltip": [
+                "打开 Graph Editor 工具栏设置"
+            ]
+        },
+        "ja": {
+            "label": "Graph ツールバー設定",
+            "tooltip": [
+                "Graph Editor ツールバーの設定を開きます"
+            ]
+        },
+        "ko": {
+            "label": "Graph 툴바 설정",
+            "tooltip": [
+                "Graph Editor 툴바 설정을 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "إعدادات شريط Graph",
+            "tooltip": [
+                "فتح إعدادات شريط أدوات Graph Editor"
+            ]
         }
     },
     "graph_dock_menu": {
@@ -36,6 +66,36 @@
             "label": "Ancrage de la Barre du Graph",
             "tooltip": [
                 "Choisit où la barre du Graph Editor est ancrée."
+            ]
+        },
+        "ca": {
+            "label": "Acoblament de la Barra del Graph",
+            "tooltip": [
+                "Tria on s'acobla la barra del Graph Editor"
+            ]
+        },
+        "zh": {
+            "label": "Graph 工具栏停靠",
+            "tooltip": [
+                "选择 Graph Editor 工具栏的停靠位置"
+            ]
+        },
+        "ja": {
+            "label": "Graph ツールバードック",
+            "tooltip": [
+                "Graph Editor ツールバーのドッキング先を選択します"
+            ]
+        },
+        "ko": {
+            "label": "Graph 툴바 도킹",
+            "tooltip": [
+                "Graph Editor 툴바가 도킹될 위치를 선택하세요"
+            ]
+        },
+        "ar": {
+            "label": "إرساء شريط Graph",
+            "tooltip": [
+                "اختر مكان إرساء شريط أدوات Graph Editor"
             ]
         }
     }

@@ -17,6 +17,36 @@
             "tooltip": [
                 "Crée, organise, renomme et rappelle des ensembles de sélection persistants enregistrés avec la scène Maya."
             ]
+        },
+        "ca": {
+            "label": "Conjunts de Selecció",
+            "tooltip": [
+                "Crea, organitza, canvia el nom i recupera conjunts de selecció persistents desats amb l'escena de Maya"
+            ]
+        },
+        "zh": {
+            "label": "选择集",
+            "tooltip": [
+                "创建、整理、重命名并调用与 Maya 场景一起保存的持久选择集"
+            ]
+        },
+        "ja": {
+            "label": "セレクションセット",
+            "tooltip": [
+                "Mayaシーンと共に保存される永続的なセレクションセットを作成・整理・名前変更・呼び出しします"
+            ]
+        },
+        "ko": {
+            "label": "선택 세트",
+            "tooltip": [
+                "Maya 씬과 함께 저장되는 영구 선택 세트를 생성, 정리, 이름 변경 및 불러오기 합니다"
+            ]
+        },
+        "ar": {
+            "label": "مجموعات التحديد",
+            "tooltip": [
+                "إنشاء وتنظيم وإعادة تسمية واستدعاء مجموعات تحديد دائمة محفوظة مع مشهد Maya"
+            ]
         }
     },
     "selection_sets_quick_export": {
@@ -36,6 +66,36 @@
             "label": "Export Rapide",
             "tooltip": [
                 "Exporte immédiatement tous les ensembles de sélection vers le fichier de transfert rapide configuré."
+            ]
+        },
+        "ca": {
+            "label": "Exportació Ràpida",
+            "tooltip": [
+                "Exporta tots els conjunts de selecció immediatament al fitxer de transferència ràpida configurat"
+            ]
+        },
+        "zh": {
+            "label": "快速导出",
+            "tooltip": [
+                "立即将所有选择集导出到已配置的快速传输文件"
+            ]
+        },
+        "ja": {
+            "label": "クイックエクスポート",
+            "tooltip": [
+                "すべてのセレクションセットを設定済みのクイック転送ファイルに即座にエクスポートします"
+            ]
+        },
+        "ko": {
+            "label": "빠른 내보내기",
+            "tooltip": [
+                "구성된 빠른 전송 파일로 모든 선택 세트를 즉시 내보냅니다"
+            ]
+        },
+        "ar": {
+            "label": "تصدير سريع",
+            "tooltip": [
+                "تصدير كل مجموعات التحديد فورًا إلى ملف النقل السريع المُهيأ"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Importe immédiatement des ensembles de sélection depuis le fichier de transfert rapide configuré."
             ]
+        },
+        "ca": {
+            "label": "Importació Ràpida",
+            "tooltip": [
+                "Importa conjunts de selecció immediatament des del fitxer de transferència ràpida configurat"
+            ]
+        },
+        "zh": {
+            "label": "快速导入",
+            "tooltip": [
+                "立即从已配置的快速传输文件导入选择集"
+            ]
+        },
+        "ja": {
+            "label": "クイックインポート",
+            "tooltip": [
+                "設定済みのクイック転送ファイルからセレクションセットを即座にインポートします"
+            ]
+        },
+        "ko": {
+            "label": "빠른 가져오기",
+            "tooltip": [
+                "구성된 빠른 전송 파일에서 선택 세트를 즉시 가져옵니다"
+            ]
+        },
+        "ar": {
+            "label": "استيراد سريع",
+            "tooltip": [
+                "استيراد مجموعات التحديد فورًا من ملف النقل السريع المُهيأ"
+            ]
         }
     },
     "selection_sets_export": {
@@ -77,6 +167,36 @@
             "tooltip": [
                 "Choisissez un fichier et exportez tous les ensembles de sélection de TheKeyMachine."
             ]
+        },
+        "ca": {
+            "label": "Exportar",
+            "tooltip": [
+                "Tria un fitxer i exporta tots els conjunts de selecció de TheKeyMachine"
+            ]
+        },
+        "zh": {
+            "label": "导出",
+            "tooltip": [
+                "选择一个文件并导出所有 TheKeyMachine 选择集"
+            ]
+        },
+        "ja": {
+            "label": "エクスポート",
+            "tooltip": [
+                "ファイルを選んで、すべてのTheKeyMachineセレクションセットをエクスポートします"
+            ]
+        },
+        "ko": {
+            "label": "내보내기",
+            "tooltip": [
+                "파일을 선택하고 모든 TheKeyMachine 선택 세트를 내보냅니다"
+            ]
+        },
+        "ar": {
+            "label": "تصدير",
+            "tooltip": [
+                "اختر ملفًا وصدّر كل مجموعات تحديد TheKeyMachine"
+            ]
         }
     },
     "selection_sets_import": {
@@ -96,6 +216,36 @@
             "label": "Importer",
             "tooltip": [
                 "Choisissez un fichier et importez ses ensembles de sélection dans la scène actuelle."
+            ]
+        },
+        "ca": {
+            "label": "Importar",
+            "tooltip": [
+                "Tria un fitxer i importa els seus conjunts de selecció a l'escena actual"
+            ]
+        },
+        "zh": {
+            "label": "导入",
+            "tooltip": [
+                "选择一个文件并将其选择集导入当前场景"
+            ]
+        },
+        "ja": {
+            "label": "インポート",
+            "tooltip": [
+                "ファイルを選んで、そのセレクションセットを現在のシーンにインポートします"
+            ]
+        },
+        "ko": {
+            "label": "가져오기",
+            "tooltip": [
+                "파일을 선택하고 해당 선택 세트를 현재 씬으로 가져옵니다"
+            ]
+        },
+        "ar": {
+            "label": "استيراد",
+            "tooltip": [
+                "اختر ملفًا واستورد مجموعات التحديد الخاصة به إلى المشهد الحالي"
             ]
         }
     },
@@ -120,6 +270,67 @@
                 "Supprime tous les ensembles de sélection de TheKeyMachine de la scène actuelle.",
                 "Cette action demande une confirmation."
             ]
+        },
+        "ca": {
+            "label": "Esborrar Tots els Conjunts de Selecció",
+            "tooltip": [
+                "Elimina tots els conjunts de selecció de TheKeyMachine de l'escena actual",
+                "Aquesta acció demanarà confirmació"
+            ]
+        },
+        "zh": {
+            "label": "清除所有选择集",
+            "tooltip": [
+                "从当前场景中删除所有 TheKeyMachine 选择集",
+                "此操作会要求确认"
+            ]
+        },
+        "ja": {
+            "label": "すべてのセレクションセットを消去",
+            "tooltip": [
+                "現在のシーンからすべてのTheKeyMachineセレクションセットを削除します",
+                "この操作には確認が必要です"
+            ]
+        },
+        "ko": {
+            "label": "모든 선택 세트 지우기",
+            "tooltip": [
+                "현재 씬에서 모든 TheKeyMachine 선택 세트를 삭제합니다",
+                "이 작업은 확인을 요청합니다"
+            ]
+        },
+        "ar": {
+            "label": "مسح كل مجموعات التحديد",
+            "tooltip": [
+                "حذف كل مجموعات تحديد TheKeyMachine من المشهد الحالي",
+                "يطلب هذا الإجراء تأكيدًا"
+            ]
+        }
+    },
+    "selection_set_tools": {
+        "en": {
+            "label": "Selection Sets"
+        },
+        "es": {
+            "label": "Conjuntos de Selección"
+        },
+        "fr": {
+            "label": "Ensembles de Sélection"
+        },
+        "ca": {
+            "label": "Conjunts de Selecció"
+        },
+        "zh": {
+            "label": "选择集"
+        },
+        "ja": {
+            "label": "セレクションセット"
+        },
+        "ko": {
+            "label": "선택 세트"
+        },
+        "ar": {
+            "label": "مجموعات التحديد"
         }
     }
 }

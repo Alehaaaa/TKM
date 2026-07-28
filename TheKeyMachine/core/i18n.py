@@ -4,17 +4,24 @@ Design mirrors ``toolbox.load_tooltips``: every tool package that wants
 translated labels/tooltips owns one small ``lang.json`` file next to its
 ``tooltip.json`` (added only where translations exist -- packages without one
 simply fall back to their English source strings, so nothing else has to
-change). Chrome strings that aren't tied to a single tool id (menu section
-headers, alignment labels, etc.) live in one shared ``data/lang/core.json``.
+change). Chrome strings that aren't tied to a single tool id split across two
+shared files by kind: ``data/lang/ui.json`` for menu section headers,
+alignment labels, and similar always-visible chrome text (looked up via
+``tr()``), and ``data/lang/messages.json`` for transient in-view/status
+messages (looked up via ``tr_text()``). Keeping them apart mirrors how they're
+actually consulted -- ``tr()`` always has a literal English default from its
+caller and never needs an ``"en"`` entry, while ``tr_text()`` reverse-indexes
+every entry's own ``"en"`` field -- so mixing the two shapes in one file was
+just an artifact of history, not a real relationship between them.
 
 This module is the *only* place language state, the available-language
 registry, and string lookup are implemented -- ``toolbox.get_tool`` and the
 handful of hardcoded chrome labels in ``toolMenus.py`` call into it, but none
 of them duplicate its logic.
 
-Loading is cheap and lazy: the language registry and the shared core strings
-are tiny JSON files read once and cached; a package's ``lang.json`` is only
-ever read the first time one of its tools is resolved, exactly like
+Loading is cheap and lazy: the language registry and the two shared string
+files are tiny JSON files read once and cached; a package's ``lang.json`` is
+only ever read the first time one of its tools is resolved, exactly like
 ``load_tooltips`` already does for tooltips. Nothing is parsed for a language
 the user never selects beyond the couple of KB already loaded for the
 registry itself.
@@ -32,10 +39,12 @@ TRANSLATE_TOOL_NAMES_SETTING = "translate_tool_names"
 
 _DATA_LANG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lang")
 _LANGUAGES_FILE = os.path.join(_DATA_LANG_DIR, "languages.json")
-_CORE_STRINGS_FILE = os.path.join(_DATA_LANG_DIR, "core.json")
+_UI_STRINGS_FILE = os.path.join(_DATA_LANG_DIR, "ui.json")
+_MESSAGES_STRINGS_FILE = os.path.join(_DATA_LANG_DIR, "messages.json")
 
 _languages_cache = None
-_core_strings_cache = None
+_ui_strings_cache = None
+_messages_strings_cache = None
 _package_lang_cache = {}
 
 
@@ -100,7 +109,13 @@ def set_language(code):
 def get_translate_tool_names():
     from TheKeyMachine.mods import settingsMod as settings
 
-    return bool(settings.get_setting(TRANSLATE_TOOL_NAMES_SETTING, False))
+    # Defaults on: picking a language is expected to translate everything
+    # visible -- tool/section names included -- not just tooltip bodies.
+    # Labels are the bold title line of every tooltip and every menu row's
+    # clickable text, so leaving this off by default made most of the UI
+    # read as "still English" even with a language selected. The preference
+    # remains available for anyone who wants to keep original tool names.
+    return bool(settings.get_setting(TRANSLATE_TOOL_NAMES_SETTING, True))
 
 
 def set_translate_tool_names(enabled):
@@ -113,13 +128,18 @@ def set_translate_tool_names(enabled):
     bus.languageChanged.emit()
 
 
-def _core_strings():
-    global _core_strings_cache
-    if _core_strings_cache is None:
-        _core_strings_cache = _load_json(_CORE_STRINGS_FILE, default={"ui": {}, "messages": {}})
-        _core_strings_cache.setdefault("ui", {})
-        _core_strings_cache.setdefault("messages", {})
-    return _core_strings_cache
+def _ui_strings():
+    global _ui_strings_cache
+    if _ui_strings_cache is None:
+        _ui_strings_cache = _load_json(_UI_STRINGS_FILE, default={})
+    return _ui_strings_cache
+
+
+def _messages_strings():
+    global _messages_strings_cache
+    if _messages_strings_cache is None:
+        _messages_strings_cache = _load_json(_MESSAGES_STRINGS_FILE, default={})
+    return _messages_strings_cache
 
 
 def tr(key, default=""):
@@ -127,31 +147,61 @@ def tr(key, default=""):
 
     Menu section headers, alignment labels, and similar cross-cutting UI
     text look themselves up here by a short id, backed by
-    ``data/lang/core.json``. Falls back to ``default`` (the English source)
+    ``data/lang/ui.json``. Falls back to ``default`` (the English source)
     whenever the active language is English or the key/language has no
     translation yet -- switching to a not-yet-translated string never raises.
     """
     lang = get_language()
     if lang == SOURCE_LANGUAGE:
         return default
-    translated = _core_strings()["ui"].get(key, {}).get(lang)
+    translated = _ui_strings().get(key, {}).get(lang)
     return translated or default
 
 
-def tr_text(message):
-    """Translate a literal display string (in-view messages, status text) by exact match.
+_message_id_index_cache = None
 
-    Lets call sites like ``wutil.make_inViewMessage("Select at least one
-    object")`` keep passing plain English text -- the source string doubles
-    as its own translation key, so nothing at the call site needs to change
-    when a translation becomes available (or stays untranslated).
+
+def _message_id_index():
+    """Map each message's English source text back to its invented id.
+
+    ``data/lang/messages.json`` is keyed by invented ids (e.g.
+    ``"select_at_least_one_object"``), each carrying its own ``"en"`` source
+    text alongside ``es``/``fr`` -- the same id-keyed shape every other
+    translation table in this codebase uses, rather than the raw English
+    sentence itself as the key. Call sites like
+    ``wutil.make_inViewMessage("Select at least one object")`` still just
+    pass plain English text though, so this index is what lets ``tr_text()``
+    map that text back to its id without every one of its ~30 call sites
+    needing to start passing an id explicitly.
+    """
+    global _message_id_index_cache
+    if _message_id_index_cache is None:
+        index = {}
+        for message_id, entry in _messages_strings().items():
+            en_text = entry.get("en")
+            if en_text:
+                index[en_text] = message_id
+        _message_id_index_cache = index
+    return _message_id_index_cache
+
+
+def tr_text(message):
+    """Translate a literal display string (in-view messages, status text).
+
+    Looks the message up by its invented id (via ``_message_id_index()``),
+    not by using the raw sentence itself as the translation key. Falls back
+    to the original English text whenever the active language is English,
+    or the message/language has no translation yet.
     """
     if not message:
         return message
     lang = get_language()
     if lang == SOURCE_LANGUAGE:
         return message
-    translated = _core_strings()["messages"].get(message, {}).get(lang)
+    message_id = _message_id_index().get(message)
+    if not message_id:
+        return message
+    translated = _messages_strings().get(message_id, {}).get(lang)
     return translated or message
 
 
@@ -267,6 +317,33 @@ def localize_label_tooltip(key, package_file, label, tooltip):
         new_tooltip = _translate_tooltip(tooltip, translated_tooltip)
 
     return new_label, new_tooltip
+
+
+def localize_menu_action(key, package_file, label, description=None, tooltip=None):
+    """Translate a plain label/description/tooltip trio for a one-off menu action.
+
+    Some tool-specific right-click menu actions (e.g. an exclusive
+    ``QActionGroup`` choice like Attribute Switcher's Normal/Super
+    rotate-order mode) don't fit ``localize_tool`` (no registered tool id
+    of their own) or ``localize_label_tooltip``/``localize_slider_modes``
+    (their tooltip is a single string handed straight to ``addAction``, not
+    the list-of-lines shape those two splice translated strings into).
+    Same per-package ``lang.json`` lookup and "Translate Tool Names" gate as
+    everything else, just returning the trio as flat strings since that's
+    the shape these actions actually pass around. Returns the inputs
+    unchanged for any field missing from the translation entry.
+    """
+    entry = _lookup_translation(key, package_file)
+    if not entry:
+        return label, description, tooltip
+
+    new_label = label
+    if get_translate_tool_names():
+        new_label = entry.get("label") or label
+
+    new_description = entry.get("description") or description
+    new_tooltip = entry.get("tooltip") or tooltip
+    return new_label, new_description, new_tooltip
 
 
 def localize_slider_modes(modes, package_file):

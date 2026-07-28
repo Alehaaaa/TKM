@@ -20,6 +20,41 @@
                 "Crée un pivot temporaire qui pilote les contrôleurs sélectionnés comme un seul transform.",
                 "Relancez l'outil pour terminer la session de pivot active."
             ]
+        },
+        "ca": {
+            "label": "Pivot Temporal",
+            "tooltip": [
+                "Crea un pivot temporal que controla els controls seleccionats com un sol transform",
+                "Executa l'eina de nou per finalitzar la sessió de pivot activa"
+            ]
+        },
+        "zh": {
+            "label": "临时轴心点",
+            "tooltip": [
+                "创建一个临时轴心点，将所选控制器作为单个变换来驱动",
+                "再次运行该工具可结束当前的轴心点会话"
+            ]
+        },
+        "ja": {
+            "label": "テンポラリピボット",
+            "tooltip": [
+                "選択したコントローラを1つのトランスフォームとして駆動する一時的なピボットを作成します",
+                "ツールを再実行するとアクティブなピボットセッションを終了します"
+            ]
+        },
+        "ko": {
+            "label": "임시 피벗",
+            "tooltip": [
+                "선택한 컨트롤을 하나의 트랜스폼처럼 구동하는 임시 피벗을 생성합니다",
+                "도구를 다시 실행하면 활성 피벗 세션이 종료됩니다"
+            ]
+        },
+        "ar": {
+            "label": "محور مؤقت",
+            "tooltip": [
+                "إنشاء محور مؤقت يقود المتحكمات المحددة كتحويل واحد",
+                "شغّل الأداة مرة أخرى لإنهاء جلسة المحور النشطة"
+            ]
         }
     },
     "temp_pivot_last_object": {
@@ -39,6 +74,36 @@
             "label": "Pivot Temporaire sur le Dernier Objet",
             "tooltip": [
                 "Crée le pivot temporaire au pivot du dernier objet sélectionné."
+            ]
+        },
+        "ca": {
+            "label": "Pivot Temporal a l'Últim Objecte",
+            "tooltip": [
+                "Crea el pivot temporal al pivot de l'últim objecte seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "临时轴心点到最后对象",
+            "tooltip": [
+                "在最后选择对象的轴心点处创建临时轴心点"
+            ]
+        },
+        "ja": {
+            "label": "最後のオブジェクトにテンポラリピボット",
+            "tooltip": [
+                "最後に選択したオブジェクトのピボットに一時的なピボットを作成します"
+            ]
+        },
+        "ko": {
+            "label": "마지막 오브젝트에 임시 피벗",
+            "tooltip": [
+                "마지막으로 선택한 오브젝트의 피벗 위치에 임시 피벗을 생성합니다"
+            ]
+        },
+        "ar": {
+            "label": "محور مؤقت عند آخر كائن",
+            "tooltip": [
+                "إنشاء المحور المؤقت عند محور آخر كائن محدد"
             ]
         }
     },
@@ -60,6 +125,36 @@
             "tooltip": [
                 "Crée le pivot temporaire au centre de la sélection actuelle."
             ]
+        },
+        "ca": {
+            "label": "Pivot Temporal Centrat",
+            "tooltip": [
+                "Crea el pivot temporal al centre de la selecció actual"
+            ]
+        },
+        "zh": {
+            "label": "居中临时轴心点",
+            "tooltip": [
+                "在当前选择的中心创建临时轴心点"
+            ]
+        },
+        "ja": {
+            "label": "中心にテンポラリピボット",
+            "tooltip": [
+                "現在の選択の中心に一時的なピボットを作成します"
+            ]
+        },
+        "ko": {
+            "label": "가운데 임시 피벗",
+            "tooltip": [
+                "현재 선택 항목의 중심에 임시 피벗을 생성합니다"
+            ]
+        },
+        "ar": {
+            "label": "محور مؤقت في المنتصف",
+            "tooltip": [
+                "إنشاء المحور المؤقت في مركز التحديد الحالي"
+            ]
         }
     },
     "temp_pivot_worldspace": {
@@ -79,6 +174,36 @@
             "label": "Pivot Temporaire en Espace Monde",
             "tooltip": [
                 "Crée un pivot temporaire aligné sur les axes du monde."
+            ]
+        },
+        "ca": {
+            "label": "Pivot Temporal en Espai del Món",
+            "tooltip": [
+                "Crea un pivot temporal alineat amb els eixos del món"
+            ]
+        },
+        "zh": {
+            "label": "世界空间临时轴心点",
+            "tooltip": [
+                "创建一个与世界坐标轴对齐的临时轴心点"
+            ]
+        },
+        "ja": {
+            "label": "ワールドスペーステンポラリピボット",
+            "tooltip": [
+                "ワールド軸に整列した一時的なピボットを作成します"
+            ]
+        },
+        "ko": {
+            "label": "월드 스페이스 임시 피벗",
+            "tooltip": [
+                "월드 축에 정렬된 임시 피벗을 생성합니다"
+            ]
+        },
+        "ar": {
+            "label": "محور مؤقت بالفضاء العالمي",
+            "tooltip": [
+                "إنشاء محور مؤقت محاذٍ لمحاور العالم"
             ]
         }
     },
@@ -100,6 +225,36 @@
             "tooltip": [
                 "Sélectionne et édite le pivot temporaire actif sans terminer la session."
             ]
+        },
+        "ca": {
+            "label": "Editar Pivot Temporal",
+            "tooltip": [
+                "Selecciona i edita el pivot temporal actiu sense finalitzar la sessió"
+            ]
+        },
+        "zh": {
+            "label": "编辑临时轴心点",
+            "tooltip": [
+                "选择并编辑活动的临时轴心点，而不结束会话"
+            ]
+        },
+        "ja": {
+            "label": "テンポラリピボットを編集",
+            "tooltip": [
+                "セッションを終了せずにアクティブな一時ピボットを選択・編集します"
+            ]
+        },
+        "ko": {
+            "label": "임시 피벗 편집",
+            "tooltip": [
+                "세션을 종료하지 않고 활성 임시 피벗을 선택하고 편집합니다"
+            ]
+        },
+        "ar": {
+            "label": "تعديل المحور المؤقت",
+            "tooltip": [
+                "تحديد وتعديل المحور المؤقت النشط دون إنهاء الجلسة"
+            ]
         }
     },
     "temp_pivot_reset": {
@@ -119,6 +274,36 @@
             "label": "Réinitialiser le Pivot Temporaire",
             "tooltip": [
                 "Réinitialise le pivot actif à son emplacement et son orientation d'origine."
+            ]
+        },
+        "ca": {
+            "label": "Restablir Pivot Temporal",
+            "tooltip": [
+                "Restableix el pivot actiu a la seva posició i orientació originals"
+            ]
+        },
+        "zh": {
+            "label": "重置临时轴心点",
+            "tooltip": [
+                "将活动轴心点重置为其原始位置和方向"
+            ]
+        },
+        "ja": {
+            "label": "テンポラリピボットをリセット",
+            "tooltip": [
+                "アクティブなピボットを元の位置と向きにリセットします"
+            ]
+        },
+        "ko": {
+            "label": "임시 피벗 재설정",
+            "tooltip": [
+                "활성 피벗을 원래 위치와 방향으로 재설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "إعادة تعيين المحور المؤقت",
+            "tooltip": [
+                "إعادة تعيين المحور النشط إلى موضعه واتجاهه الأصليين"
             ]
         }
     },
@@ -140,6 +325,62 @@
             "tooltip": [
                 "Ouvre la documentation du Pivot Temporaire."
             ]
+        },
+        "ca": {
+            "label": "Ajuda",
+            "tooltip": [
+                "Obre la documentació de Pivot Temporal"
+            ]
+        },
+        "zh": {
+            "label": "帮助",
+            "tooltip": [
+                "打开临时轴心点文档"
+            ]
+        },
+        "ja": {
+            "label": "ヘルプ",
+            "tooltip": [
+                "テンポラリピボットのドキュメントを開きます"
+            ]
+        },
+        "ko": {
+            "label": "도움말",
+            "tooltip": [
+                "임시 피벗 문서를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساعدة",
+            "tooltip": [
+                "فتح توثيق المحور المؤقت"
+            ]
+        }
+    },
+    "temp_pivot_tools": {
+        "en": {
+            "label": "Temp Pivot"
+        },
+        "es": {
+            "label": "Pivote Temporal"
+        },
+        "fr": {
+            "label": "Pivot Temporaire"
+        },
+        "ca": {
+            "label": "Pivot Temporal"
+        },
+        "zh": {
+            "label": "临时轴心点"
+        },
+        "ja": {
+            "label": "テンポラリピボット"
+        },
+        "ko": {
+            "label": "임시 피벗"
+        },
+        "ar": {
+            "label": "محور مؤقت"
         }
     }
 }

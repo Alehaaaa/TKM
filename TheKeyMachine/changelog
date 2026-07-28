@@ -14,9 +14,14 @@
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 
-0.1.33
+0.1.34:
+  - bugfix: Tooltips, shortcuts, and right-click action menus (including Bake, Share Keys, and Remove Redundant Keys) stay translated after switching languages
+  - bugfix: Windows like About, Donate, Hotkeys, and Workspaces refresh immediately when you switch languages instead of needing a restart
+  - new: Added Catalan, Chinese, Japanese, Korean, and Arabic translations across every menu, dialog, and hotkey editor
+
+0.1.33:
   - polish: Fixing startup time by optimizing processes and deduping logic
-  - bugfix: Workspaces update correcly on toolbar right click menu
+  - bugfix: Workspaces update correctly on toolbar right click menu
   - new: Super mode to switch Rotation Orders almost instantly
   - new: Early stages of implementing different language translations
 

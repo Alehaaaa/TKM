@@ -20,6 +20,67 @@
                 "Trouvez et exécutez n'importe quelle commande enregistrée de TheKeyMachine par son nom.",
                 "Tapez pour filtrer, utilisez Haut ou Bas pour choisir un résultat, puis appuyez sur Entrée pour l'exécuter."
             ]
+        },
+        "ca": {
+            "label": "Cercar",
+            "tooltip": [
+                "Troba i executa qualsevol ordre registrada de TheKeyMachine pel seu nom",
+                "Escriu per filtrar, usa Amunt o Avall per triar un resultat i prem Retorn per executar-lo"
+            ]
+        },
+        "zh": {
+            "label": "搜索",
+            "tooltip": [
+                "按名称查找并运行任何已注册的 TheKeyMachine 命令",
+                "输入以筛选，使用上下方向键选择结果，然后按回车运行"
+            ]
+        },
+        "ja": {
+            "label": "検索",
+            "tooltip": [
+                "登録済みのTheKeyMachineコマンドを名前で検索して実行します",
+                "入力して絞り込み、上下キーで結果を選択し、Enterで実行します"
+            ]
+        },
+        "ko": {
+            "label": "검색",
+            "tooltip": [
+                "등록된 TheKeyMachine 명령을 이름으로 찾아 실행합니다",
+                "입력하여 필터링하고, 위/아래 키로 결과를 선택한 다음 Enter를 눌러 실행하세요"
+            ]
+        },
+        "ar": {
+            "label": "بحث",
+            "tooltip": [
+                "ابحث عن أي أمر مسجل في TheKeyMachine بالاسم وشغّله",
+                "اكتب للتصفية، واستخدم لأعلى أو لأسفل لاختيار نتيجة، ثم اضغط Enter لتشغيلها"
+            ]
+        }
+    },
+    "search_tools": {
+        "en": {
+            "label": "Search"
+        },
+        "es": {
+            "label": "Buscar"
+        },
+        "fr": {
+            "label": "Rechercher"
+        },
+        "ca": {
+            "label": "Cercar"
+        },
+        "zh": {
+            "label": "搜索"
+        },
+        "ja": {
+            "label": "検索"
+        },
+        "ko": {
+            "label": "검색"
+        },
+        "ar": {
+            "label": "بحث"
         }
     }
 }

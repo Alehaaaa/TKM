@@ -548,12 +548,31 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         tkm_tool = toolbox.get_tool("TKM")
         self.tkm_btn = cw.create_tool_button_from_data(tkm_tool)
         self.tkm_btn.setObjectName("TKM_toolbar_button")
-        
+
         self.tkm_layout = QtWidgets.QVBoxLayout()
         self.tkm_layout.setContentsMargins(0, 6, 0, 0)
         self.tkm_layout.addWidget(self.tkm_btn)
         self.tkm_layout.addStretch()
         self.main_layout.insertLayout(0, self.tkm_layout)
+
+        # This button lives outside every section (it's pulled into its own
+        # layout above, not added via toolWidgets.add_tool_button), so it
+        # isn't reached by _bind_toolbar_translation_refresh's per-section
+        # loop -- refresh it directly the same way, through the same
+        # lang.json-backed lookup every other translated button uses.
+        from TheKeyMachine.core import i18n
+        from TheKeyMachine.tools import common as toolCommon
+
+        def _on_tkm_button_language_changed(*_args, button=self.tkm_btn):
+            cw.refresh_tool_button_translation(button, "TKM")
+
+        toolCommon.replace_tracked_connection(
+            self.tkm_btn,
+            "_tkm_button_translation_connection",
+            i18n.bus.languageChanged,
+            _on_tkm_button_language_changed,
+            parent=self.tkm_btn,
+        )
 
 
 

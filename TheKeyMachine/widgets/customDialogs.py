@@ -36,6 +36,48 @@ def _parent_widget_for_layout(layout, fallback=None):
     return parent or fallback
 
 
+# Standard dialog-button vocabulary, reused verbatim across the whole app --
+# both via the QFlatDialog.Yes/No/Ok/Cancel/Close presets below and as plain
+# literal strings passed straight into QFlatDialogButton() by individual
+# dialogs (e.g. an "Apply" or "Close" button built ad hoc in some tool's own
+# bottom bar). Every one of those still funnels through _defineButtons(), so
+# resolving the translation there -- keyed by the literal English name -- is
+# the single place this vocabulary translates for every dialog in the app.
+# Feature-specific button words ("Save As", "Import Hotkeys", "Send bug", ...)
+# are not reused across contexts and are translated at their own call site.
+_STANDARD_BUTTON_I18N_IDS = {
+    "Yes": "dialog_button_yes",
+    "No": "dialog_button_no",
+    "Ok": "dialog_button_ok",
+    "Cancel": "dialog_button_cancel",
+    "Close": "close",  # reuse the existing "Close" menu-action translation
+    "Apply": "dialog_button_apply",
+    "Save": "dialog_button_save",
+}
+
+
+def _translate_button_name(name, i18n_key=None):
+    """Resolve a dialog button's displayed text for the current language.
+
+    ``i18n_key`` is the same opt-in used by declared menu items
+    (``core.toolMenus._declared_item_text``): a caller with a feature-
+    specific button word (e.g. "Send bug") passes its own key instead of
+    growing this module's standard-word table. Without one, ``name`` falls
+    back to the shared Yes/No/Ok/Cancel/Close/Apply vocabulary above.
+    """
+    if i18n_key:
+        from TheKeyMachine.core import i18n
+
+        return i18n.tr(i18n_key, name)
+
+    key = _STANDARD_BUTTON_I18N_IDS.get(name)
+    if not key:
+        return name
+    from TheKeyMachine.core import i18n
+
+    return i18n.tr(key, name)
+
+
 class QFlatDialogButton(dict):
     """A dictionary subclass that supports the | operator to return a list of buttons."""
 
@@ -244,12 +286,17 @@ class QFlatDialog(QFlatWindowMixin, QtWidgets.QDialog):
                 if btn_data == self._highlighted or config.get("name") == self._highlighted:
                     is_highlighted = True
 
+            canonical_name = config.get("name", "Button")
             btn = cw.QFlatButton(
-                text=config.get("name", "Button"),
+                text=_translate_button_name(canonical_name, config.get("i18n_key")),
                 background=config.get("background", "#5D5D5D"),
                 icon=config.get("icon"),
                 highlight=is_highlighted,
             )
+            # Recognize this button by its untranslated English name later
+            # (see _ensure_close_button()) -- btn.text() itself is translated
+            # and can no longer be compared against literal words like "close".
+            btn.setProperty("tkm_dialog_button_name", canonical_name)
 
             callback = config.get("callback")
             if callback and callable(callback):
@@ -305,9 +352,11 @@ class QFlatDialog(QFlatWindowMixin, QtWidgets.QDialog):
             self.setBottomBar(closeButton=True)
             return
 
-        # Check if a close button already exists (avoid duplicates)
+        # Check if a close button already exists (avoid duplicates). Matched
+        # by the untranslated English name stashed in _defineButtons(), since
+        # btn.text() is translated and no longer comparable to "close".
         for btn in self.bottomBar.findChildren(QtWidgets.QPushButton):
-            if btn.text().lower() in ("close", "cancel"):
+            if str(btn.property("tkm_dialog_button_name") or btn.text()).lower() in ("close", "cancel"):
                 return
 
         # Create close config
@@ -1223,11 +1272,13 @@ class QFlatBugReportDialog(QFlatDialog):
         submit_callback=None,
         prepare_callback=None,
         worker_class=None,
-        dialog_title="Report a Bug",
+        dialog_title=None,
         prefill_name="",
         prefill_explanation="",
         prefill_script_error="",
     ):
+        from TheKeyMachine.core import i18n
+
         self._submit_callback = submit_callback
         self._prepare_callback = prepare_callback
         self._worker_class = worker_class
@@ -1235,7 +1286,7 @@ class QFlatBugReportDialog(QFlatDialog):
         self._submitted_successfully = False
         self._send_button = None
         super().__init__(parent=parent)
-        self.setWindowTitle(dialog_title)
+        self.setWindowTitle(dialog_title or i18n.tr("bug_report_title", "Report a Bug"))
         # More horizontal / less tall default footprint.
         self.setMinimumSize(DPI(600), DPI(450))
 
@@ -1255,7 +1306,10 @@ class QFlatBugReportDialog(QFlatDialog):
         )
 
         subtitle = QtWidgets.QLabel(
-            "Have you found a bug? Please fill the report and I will do my best to fix it in the next update.",
+            i18n.tr(
+                "bug_report_subtitle",
+                "Have you found a bug? Please fill the report and I will do my best to fix it in the next update.",
+            ),
             content_widget,
         )
         subtitle.setAlignment(QtCore.Qt.AlignLeft)
@@ -1272,13 +1326,18 @@ class QFlatBugReportDialog(QFlatDialog):
         self.status_label.setVisible(False)
 
         self.name_input = QtWidgets.QLineEdit(content_widget)
-        self.name_input.setPlaceholderText("* Your name")
+        self.name_input.setPlaceholderText(i18n.tr("bug_report_name_placeholder", "* Your name"))
         self.name_input.setMaxLength(50)
         if prefill_name:
             self.name_input.setText(prefill_name)
 
         self.explanation_textbox = QtWidgets.QTextEdit(content_widget)
-        self.explanation_textbox.setPlaceholderText("* Describe what happened, what you expected, and the steps to reproduce it.")
+        self.explanation_textbox.setPlaceholderText(
+            i18n.tr(
+                "bug_report_explanation_placeholder",
+                "* Describe what happened, what you expected, and the steps to reproduce it.",
+            )
+        )
         self.explanation_textbox.setAcceptRichText(False)
         self.explanation_textbox.setMinimumHeight(DPI(110))
         self.explanation_textbox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
@@ -1288,7 +1347,10 @@ class QFlatBugReportDialog(QFlatDialog):
 
         self.script_error_textbox = QtWidgets.QTextEdit(content_widget)
         self.script_error_textbox.setPlaceholderText(
-            "Paste the last Script Editor lines here. Include the traceback or exact error if you have it."
+            i18n.tr(
+                "bug_report_script_error_placeholder",
+                "Paste the last Script Editor lines here. Include the traceback or exact error if you have it.",
+            )
         )
         self.script_error_textbox.setAcceptRichText(False)
         self.script_error_textbox.setMinimumHeight(DPI(80))
@@ -1326,7 +1388,9 @@ class QFlatBugReportDialog(QFlatDialog):
 
         self.root_layout.addWidget(content_widget, 1)
 
-        send_cfg = QFlatDialogButton("Send bug", highlight=True, icon=icons.apply)
+        send_cfg = QFlatDialogButton(
+            "Send bug", highlight=True, icon=icons.apply, i18n_key="bug_report_send_button"
+        )
         send_cfg["callback"] = self._on_send_clicked
         self.setBottomBar([send_cfg], closeButton=True, highlight="Send bug")
         self._send_button = self._find_button("Send bug")
@@ -1349,7 +1413,12 @@ class QFlatBugReportDialog(QFlatDialog):
         if not self.bottomBar:
             return None
         for btn in self.bottomBar.findChildren(QtWidgets.QPushButton):
-            if btn.text().strip().lower() == name.lower():
+            # Match by the untranslated English name stashed in
+            # _defineButtons() -- btn.text() is translated and no longer
+            # comparable to a literal English name like "Send bug".
+            stored_name = btn.property("tkm_dialog_button_name")
+            candidate = str(stored_name) if stored_name else btn.text()
+            if candidate.strip().lower() == name.lower():
                 return btn
         return None
 
@@ -1391,9 +1460,14 @@ class QFlatBugReportDialog(QFlatDialog):
         }
 
     def _validate(self):
+        from TheKeyMachine.core import i18n
+
         name, explanation = self._required_values()
         if not name or not explanation:
-            self._set_status("Please fill in the required fields.", error=True)
+            self._set_status(
+                i18n.tr("bug_report_status_missing_fields", "Please fill in the required fields."),
+                error=True,
+            )
             return None
         return {
             "name": name,
@@ -1429,12 +1503,18 @@ class QFlatBugReportDialog(QFlatDialog):
         widget.blockSignals(False)
 
     def _on_send_clicked(self):
+        from TheKeyMachine.core import i18n
+
         payload = self._validate()
         if not payload:
             return
 
+        unavailable_message = i18n.tr(
+            "bug_report_status_unavailable", "Bug reporting is unavailable right now."
+        )
+
         if not self._submit_callback:
-            self._set_status("Bug reporting is unavailable right now.", error=True)
+            self._set_status(unavailable_message, error=True)
             return
 
         if self._submit_worker and self._submit_worker.isRunning():
@@ -1445,14 +1525,17 @@ class QFlatBugReportDialog(QFlatDialog):
                 payload = self._prepare_callback(**payload)
             except Exception as exc:
                 print("[TheKeyMachine] Bug report preparation failed:", exc)
-                self._set_status("Failed to prepare the report.", error=True)
+                self._set_status(
+                    i18n.tr("bug_report_status_prepare_failed", "Failed to prepare the report."),
+                    error=True,
+                )
                 return
 
-        self._set_status("Sending bug report...", error=False)
+        self._set_status(i18n.tr("bug_report_status_sending", "Sending bug report..."), error=False)
         self._set_send_enabled(False)
 
         if self._worker_class is None:
-            self._set_status("Bug reporting is unavailable right now.", error=True)
+            self._set_status(unavailable_message, error=True)
             self._set_send_enabled(True)
             return
 
@@ -1462,20 +1545,32 @@ class QFlatBugReportDialog(QFlatDialog):
         self._submit_worker.start()
 
     def _on_submit_finished(self, success, error):
+        from TheKeyMachine.core import i18n
+
         if success:
             self._submitted_successfully = True
-            self._set_status("Report sent successfully. Thanks!", error=False)
+            self._set_status(
+                i18n.tr("bug_report_status_success", "Report sent successfully. Thanks!"), error=False
+            )
             self._set_send_enabled(False)
         else:
             if error:
                 print("[TheKeyMachine] Bug report submission failed:", error)
-            self._set_status("Failed to send the report. Try again later.", error=True)
+            self._set_status(
+                i18n.tr("bug_report_status_failed", "Failed to send the report. Try again later."),
+                error=True,
+            )
             self._set_send_enabled(True)
         self._submit_worker = None
 
     def closeEvent(self, event):
         if self._submit_worker and self._submit_worker.isRunning():
-            self._set_status("Sending bug report. Please wait...", error=False)
+            from TheKeyMachine.core import i18n
+
+            self._set_status(
+                i18n.tr("bug_report_status_sending_wait", "Sending bug report. Please wait..."),
+                error=False,
+            )
             event.ignore()
             return
         QFlatDialog.closeEvent(self, event)

@@ -1,6 +1,7 @@
 """Custom Tools menu construction."""
 
 from TheKeyMachine.core.Qt import QtGui
+from TheKeyMachine.core import i18n
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools.custom_tools import controller
 
@@ -24,8 +25,8 @@ def build_menu(menu, source_widget=None):
     menu.addSeparator()
     menu.addAction(
         QtGui.QIcon(icons.settings),
-        "Open config file",
+        i18n.tr("open_config_file", "Open config file"),
         callback=controller.open_config,
-        description="Open the Custom Tools configuration file.",
+        description=i18n.tr("open_config_file_desc", "Open the Custom Tools configuration file."),
     )
     return False

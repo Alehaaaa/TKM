@@ -40,18 +40,7 @@ class AnimationToolsToolObject(ToolObject):
                     "type": "choice",
                     "get_value": api.get_remove_redundant_mode,
                     "set_value": api.set_remove_redundant_mode,
-                    "items": [
-                        {
-                            "label": "Only Affect Flat Keys",
-                            "value": api.REMOVE_REDUNDANT_MODE_FLAT,
-                            "description": TOOLTIPS["remove_redundant_flat"][0],
-                        },
-                        {
-                            "label": "All Redundant",
-                            "value": api.REMOVE_REDUNDANT_MODE_ALL,
-                            "description": TOOLTIPS["remove_redundant_all"][0],
-                        },
-                    ],
+                    "items": api.remove_redundant_mode_choices,
                 },
             ]},
         },

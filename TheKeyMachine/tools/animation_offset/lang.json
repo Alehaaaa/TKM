@@ -20,6 +20,67 @@
                 "Décale les contrôleurs animés sans changer la forme de leur mouvement.",
                 "Sélectionnez les contrôleurs animés, activez l'outil, puis transformez-les avec les manipulateurs de Maya."
             ]
+        },
+        "ca": {
+            "label": "Desfase d'Animació",
+            "tooltip": [
+                "Desfasa els controls animats sense canviar la forma del seu moviment",
+                "Selecciona els controls animats, activa l'eina i després transforma'ls amb els manipuladors de Maya"
+            ]
+        },
+        "zh": {
+            "label": "动画偏移",
+            "tooltip": [
+                "在不改变运动形状的情况下偏移已设置动画的控制器",
+                "选择已设置动画的控制器，启用该工具，然后使用 Maya 的操纵器对其进行变换"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションオフセット",
+            "tooltip": [
+                "動きの形を変えずにアニメーション済みコントローラをオフセットします",
+                "アニメーション済みコントローラを選択してツールを有効にし、Mayaのマニピュレータで変換します"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 오프셋",
+            "tooltip": [
+                "움직임의 형태를 바꾸지 않고 애니메이션된 컨트롤을 오프셋합니다",
+                "애니메이션된 컨트롤을 선택하고 도구를 활성화한 다음 Maya의 매니퓰레이터로 변환하세요"
+            ]
+        },
+        "ar": {
+            "label": "إزاحة الحركة",
+            "tooltip": [
+                "إزاحة المتحكمات المتحركة دون تغيير شكل حركتها",
+                "حدد المتحكمات المتحركة، فعّل الأداة، ثم حوّلها باستخدام أدوات التحكم في Maya"
+            ]
+        }
+    },
+    "animation_offset_tools": {
+        "en": {
+            "label": "Animation Offset"
+        },
+        "es": {
+            "label": "Desfase de Animación"
+        },
+        "fr": {
+            "label": "Décalage d'Animation"
+        },
+        "ca": {
+            "label": "Desfase d'Animació"
+        },
+        "zh": {
+            "label": "动画偏移"
+        },
+        "ja": {
+            "label": "アニメーションオフセット"
+        },
+        "ko": {
+            "label": "애니메이션 오프셋"
+        },
+        "ar": {
+            "label": "إزاحة الحركة"
         }
     }
 }

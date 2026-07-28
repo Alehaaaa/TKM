@@ -7,15 +7,45 @@
             ]
         },
         "es": {
-            "label": "Valor de Nudge",
+            "label": "Valor de Empujón",
             "tooltip": [
-                "Establece el número de fotogramas usado por cada comando de Nudge e Inbetween."
+                "Establece el número de fotogramas usado por cada comando de Empujón e Inbetween."
             ]
         },
         "fr": {
-            "label": "Valeur de Nudge",
+            "label": "Valeur de Pichenette",
             "tooltip": [
-                "Définit le nombre d'images utilisé par chaque commande de Nudge et d'Inbetween."
+                "Définit le nombre d'images utilisé par chaque commande de Pichenette et d'Inbetween."
+            ]
+        },
+        "ca": {
+            "label": "Valor d'Empenta",
+            "tooltip": [
+                "Estableix el nombre de fotogrames utilitzat per cada ordre d'Empenta i Inbetween"
+            ]
+        },
+        "zh": {
+            "label": "微移值",
+            "tooltip": [
+                "设置每个微移和 Inbetween 命令使用的帧数"
+            ]
+        },
+        "ja": {
+            "label": "微動値",
+            "tooltip": [
+                "すべての微動およびInbetweenコマンドで使用するフレーム数を設定します"
+            ]
+        },
+        "ko": {
+            "label": "미세 이동 값",
+            "tooltip": [
+                "모든 미세 이동 및 Inbetween 명령에 사용되는 프레임 수를 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "قيمة الإزاحة الطفيفة",
+            "tooltip": [
+                "تعيين عدد الإطارات المستخدم في كل أمر إزاحة طفيفة و Inbetween"
             ]
         }
     },
@@ -27,15 +57,45 @@
             ]
         },
         "es": {
-            "label": "Nudge Izquierda",
+            "label": "Empujón Izquierda",
             "tooltip": [
-                "Mueve las claves seleccionadas hacia la izquierda según el Valor de Nudge."
+                "Mueve las claves seleccionadas hacia la izquierda según el Valor de Empujón."
             ]
         },
         "fr": {
-            "label": "Nudge Gauche",
+            "label": "Pichenette Gauche",
             "tooltip": [
-                "Déplace les clés ciblées vers la gauche selon la Valeur de Nudge."
+                "Déplace les clés ciblées vers la gauche selon la Valeur de Pichenette."
+            ]
+        },
+        "ca": {
+            "label": "Empenta Esquerra",
+            "tooltip": [
+                "Mou les claus seleccionades cap a l'esquerra segons el Valor d'Empenta"
+            ]
+        },
+        "zh": {
+            "label": "向左微移",
+            "tooltip": [
+                "按微移值将目标关键帧向左移动"
+            ]
+        },
+        "ja": {
+            "label": "左に微動",
+            "tooltip": [
+                "対象キーを微動値の分だけ左に移動します"
+            ]
+        },
+        "ko": {
+            "label": "왼쪽으로 미세 이동",
+            "tooltip": [
+                "대상 키를 미세 이동 값만큼 왼쪽으로 이동합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزاحة طفيفة لليسار",
+            "tooltip": [
+                "تحريك المفاتيح المستهدفة لليسار بمقدار قيمة الإزاحة الطفيفة"
             ]
         }
     },
@@ -47,15 +107,45 @@
             ]
         },
         "es": {
-            "label": "Nudge Izquierda - Todas las Claves",
+            "label": "Empujón Izquierda - Todas las Claves",
             "tooltip": [
                 "Mueve todas las claves de las curvas de animación seleccionadas hacia la izquierda."
             ]
         },
         "fr": {
-            "label": "Nudge Gauche - Toutes les Clés",
+            "label": "Pichenette Gauche - Toutes les Clés",
             "tooltip": [
                 "Déplace toutes les clés des courbes d'animation ciblées vers la gauche."
+            ]
+        },
+        "ca": {
+            "label": "Empenta Esquerra - Totes les Claus",
+            "tooltip": [
+                "Mou totes les claus de les corbes d'animació seleccionades cap a l'esquerra"
+            ]
+        },
+        "zh": {
+            "label": "向左微移 - 所有关键帧",
+            "tooltip": [
+                "将目标动画曲线上的每个关键帧都向左移动"
+            ]
+        },
+        "ja": {
+            "label": "左に微動 - 全キー",
+            "tooltip": [
+                "対象アニメーションカーブ上のすべてのキーを左に移動します"
+            ]
+        },
+        "ko": {
+            "label": "왼쪽으로 미세 이동 - 모든 키",
+            "tooltip": [
+                "대상 애니메이션 커브의 모든 키를 왼쪽으로 이동합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزاحة طفيفة لليسار - كل المفاتيح",
+            "tooltip": [
+                "تحريك كل مفتاح على منحنيات الحركة المستهدفة لليسار"
             ]
         }
     },
@@ -67,15 +157,45 @@
             ]
         },
         "es": {
-            "label": "Nudge Izquierda - Escena",
+            "label": "Empujón Izquierda - Escena",
             "tooltip": [
                 "Mueve todas las claves de animación de la escena hacia la izquierda."
             ]
         },
         "fr": {
-            "label": "Nudge Gauche - Scène",
+            "label": "Pichenette Gauche - Scène",
             "tooltip": [
                 "Déplace toutes les clés d'animation de la scène vers la gauche."
+            ]
+        },
+        "ca": {
+            "label": "Empenta Esquerra - Escena",
+            "tooltip": [
+                "Mou totes les claus d'animació de l'escena cap a l'esquerra"
+            ]
+        },
+        "zh": {
+            "label": "向左微移 - 场景",
+            "tooltip": [
+                "将场景中的每个动画关键帧都向左移动"
+            ]
+        },
+        "ja": {
+            "label": "左に微動 - シーン",
+            "tooltip": [
+                "シーン内のすべてのアニメーションキーを左に移動します"
+            ]
+        },
+        "ko": {
+            "label": "왼쪽으로 미세 이동 - 씬",
+            "tooltip": [
+                "씬의 모든 애니메이션 키를 왼쪽으로 이동합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزاحة طفيفة لليسار - المشهد",
+            "tooltip": [
+                "تحريك كل مفتاح حركة في المشهد لليسار"
             ]
         }
     },
@@ -87,15 +207,45 @@
             ]
         },
         "es": {
-            "label": "Nudge Derecha",
+            "label": "Empujón Derecha",
             "tooltip": [
-                "Mueve las claves seleccionadas hacia la derecha según el Valor de Nudge."
+                "Mueve las claves seleccionadas hacia la derecha según el Valor de Empujón."
             ]
         },
         "fr": {
-            "label": "Nudge Droite",
+            "label": "Pichenette Droite",
             "tooltip": [
-                "Déplace les clés ciblées vers la droite selon la Valeur de Nudge."
+                "Déplace les clés ciblées vers la droite selon la Valeur de Pichenette."
+            ]
+        },
+        "ca": {
+            "label": "Empenta Dreta",
+            "tooltip": [
+                "Mou les claus seleccionades cap a la dreta segons el Valor d'Empenta"
+            ]
+        },
+        "zh": {
+            "label": "向右微移",
+            "tooltip": [
+                "按微移值将目标关键帧向右移动"
+            ]
+        },
+        "ja": {
+            "label": "右に微動",
+            "tooltip": [
+                "対象キーを微動値の分だけ右に移動します"
+            ]
+        },
+        "ko": {
+            "label": "오른쪽으로 미세 이동",
+            "tooltip": [
+                "대상 키를 미세 이동 값만큼 오른쪽으로 이동합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزاحة طفيفة لليمين",
+            "tooltip": [
+                "تحريك المفاتيح المستهدفة لليمين بمقدار قيمة الإزاحة الطفيفة"
             ]
         }
     },
@@ -107,15 +257,45 @@
             ]
         },
         "es": {
-            "label": "Nudge Derecha - Todas las Claves",
+            "label": "Empujón Derecha - Todas las Claves",
             "tooltip": [
                 "Mueve todas las claves de las curvas de animación seleccionadas hacia la derecha."
             ]
         },
         "fr": {
-            "label": "Nudge Droite - Toutes les Clés",
+            "label": "Pichenette Droite - Toutes les Clés",
             "tooltip": [
                 "Déplace toutes les clés des courbes d'animation ciblées vers la droite."
+            ]
+        },
+        "ca": {
+            "label": "Empenta Dreta - Totes les Claus",
+            "tooltip": [
+                "Mou totes les claus de les corbes d'animació seleccionades cap a la dreta"
+            ]
+        },
+        "zh": {
+            "label": "向右微移 - 所有关键帧",
+            "tooltip": [
+                "将目标动画曲线上的每个关键帧都向右移动"
+            ]
+        },
+        "ja": {
+            "label": "右に微動 - 全キー",
+            "tooltip": [
+                "対象アニメーションカーブ上のすべてのキーを右に移動します"
+            ]
+        },
+        "ko": {
+            "label": "오른쪽으로 미세 이동 - 모든 키",
+            "tooltip": [
+                "대상 애니메이션 커브의 모든 키를 오른쪽으로 이동합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزاحة طفيفة لليمين - كل المفاتيح",
+            "tooltip": [
+                "تحريك كل مفتاح على منحنيات الحركة المستهدفة لليمين"
             ]
         }
     },
@@ -127,15 +307,45 @@
             ]
         },
         "es": {
-            "label": "Nudge Derecha - Escena",
+            "label": "Empujón Derecha - Escena",
             "tooltip": [
                 "Mueve todas las claves de animación de la escena hacia la derecha."
             ]
         },
         "fr": {
-            "label": "Nudge Droite - Scène",
+            "label": "Pichenette Droite - Scène",
             "tooltip": [
                 "Déplace toutes les clés d'animation de la scène vers la droite."
+            ]
+        },
+        "ca": {
+            "label": "Empenta Dreta - Escena",
+            "tooltip": [
+                "Mou totes les claus d'animació de l'escena cap a la dreta"
+            ]
+        },
+        "zh": {
+            "label": "向右微移 - 场景",
+            "tooltip": [
+                "将场景中的每个动画关键帧都向右移动"
+            ]
+        },
+        "ja": {
+            "label": "右に微動 - シーン",
+            "tooltip": [
+                "シーン内のすべてのアニメーションキーを右に移動します"
+            ]
+        },
+        "ko": {
+            "label": "오른쪽으로 미세 이동 - 씬",
+            "tooltip": [
+                "씬의 모든 애니메이션 키를 오른쪽으로 이동합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزاحة طفيفة لليمين - المشهد",
+            "tooltip": [
+                "تحريك كل مفتاح حركة في المشهد لليمين"
             ]
         }
     },
@@ -149,13 +359,43 @@
         "es": {
             "label": "Insertar Inbetween",
             "tooltip": [
-                "Inserta tiempo después del fotograma actual según el Valor de Nudge."
+                "Inserta tiempo después del fotograma actual según el Valor de Empujón."
             ]
         },
         "fr": {
             "label": "Insérer un Inbetween",
             "tooltip": [
-                "Insère du temps après l'image actuelle selon la Valeur de Nudge."
+                "Insère du temps après l'image actuelle selon la Valeur de Pichenette."
+            ]
+        },
+        "ca": {
+            "label": "Inserir Inbetween",
+            "tooltip": [
+                "Insereix temps després del fotograma actual segons el Valor d'Empenta"
+            ]
+        },
+        "zh": {
+            "label": "插入 Inbetween",
+            "tooltip": [
+                "按微移值在当前帧之后插入时间"
+            ]
+        },
+        "ja": {
+            "label": "Inbetweenを挿入",
+            "tooltip": [
+                "微動値の分だけ現在のフレームの後に時間を挿入します"
+            ]
+        },
+        "ko": {
+            "label": "Inbetween 삽입",
+            "tooltip": [
+                "미세 이동 값만큼 현재 프레임 뒤에 시간을 삽입합니다"
+            ]
+        },
+        "ar": {
+            "label": "إدراج Inbetween",
+            "tooltip": [
+                "إدراج وقت بعد الإطار الحالي بمقدار قيمة الإزاحة الطفيفة"
             ]
         }
     },
@@ -177,6 +417,36 @@
             "tooltip": [
                 "Insère du temps après l'image actuelle sur chaque courbe d'animation de la scène."
             ]
+        },
+        "ca": {
+            "label": "Inserir Inbetween - Escena",
+            "tooltip": [
+                "Insereix temps després del fotograma actual a cada corba d'animació de l'escena"
+            ]
+        },
+        "zh": {
+            "label": "插入 Inbetween - 场景",
+            "tooltip": [
+                "在场景中每条动画曲线的当前帧之后插入时间"
+            ]
+        },
+        "ja": {
+            "label": "Inbetweenを挿入 - シーン",
+            "tooltip": [
+                "シーン内のすべてのアニメーションカーブの現在のフレームの後に時間を挿入します"
+            ]
+        },
+        "ko": {
+            "label": "Inbetween 삽입 - 씬",
+            "tooltip": [
+                "씬의 모든 애니메이션 커브에서 현재 프레임 뒤에 시간을 삽입합니다"
+            ]
+        },
+        "ar": {
+            "label": "إدراج Inbetween - المشهد",
+            "tooltip": [
+                "إدراج وقت بعد الإطار الحالي في كل منحنى حركة بالمشهد"
+            ]
         }
     },
     "nudge_remove_inbetween": {
@@ -189,13 +459,43 @@
         "es": {
             "label": "Quitar Inbetween",
             "tooltip": [
-                "Elimina tiempo después del fotograma actual según el Valor de Nudge."
+                "Elimina tiempo después del fotograma actual según el Valor de Empujón."
             ]
         },
         "fr": {
             "label": "Supprimer un Inbetween",
             "tooltip": [
-                "Supprime du temps après l'image actuelle selon la Valeur de Nudge."
+                "Supprime du temps après l'image actuelle selon la Valeur de Pichenette."
+            ]
+        },
+        "ca": {
+            "label": "Eliminar Inbetween",
+            "tooltip": [
+                "Elimina temps després del fotograma actual segons el Valor d'Empenta"
+            ]
+        },
+        "zh": {
+            "label": "移除 Inbetween",
+            "tooltip": [
+                "按微移值移除当前帧之后的时间"
+            ]
+        },
+        "ja": {
+            "label": "Inbetweenを削除",
+            "tooltip": [
+                "微動値の分だけ現在のフレームの後の時間を削除します"
+            ]
+        },
+        "ko": {
+            "label": "Inbetween 제거",
+            "tooltip": [
+                "미세 이동 값만큼 현재 프레임 뒤의 시간을 제거합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة Inbetween",
+            "tooltip": [
+                "إزالة الوقت بعد الإطار الحالي بمقدار قيمة الإزاحة الطفيفة"
             ]
         }
     },
@@ -217,6 +517,62 @@
             "tooltip": [
                 "Supprime du temps après l'image actuelle de chaque courbe d'animation de la scène."
             ]
+        },
+        "ca": {
+            "label": "Eliminar Inbetween - Escena",
+            "tooltip": [
+                "Elimina temps després del fotograma actual de cada corba d'animació de l'escena"
+            ]
+        },
+        "zh": {
+            "label": "移除 Inbetween - 场景",
+            "tooltip": [
+                "移除场景中每条动画曲线当前帧之后的时间"
+            ]
+        },
+        "ja": {
+            "label": "Inbetweenを削除 - シーン",
+            "tooltip": [
+                "シーン内のすべてのアニメーションカーブの現在のフレームの後の時間を削除します"
+            ]
+        },
+        "ko": {
+            "label": "Inbetween 제거 - 씬",
+            "tooltip": [
+                "씬의 모든 애니메이션 커브에서 현재 프레임 뒤의 시간을 제거합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة Inbetween - المشهد",
+            "tooltip": [
+                "إزالة الوقت بعد الإطار الحالي من كل منحنى حركة بالمشهد"
+            ]
+        }
+    },
+    "nudge_tools": {
+        "en": {
+            "label": "Nudge"
+        },
+        "es": {
+            "label": "Empujón"
+        },
+        "fr": {
+            "label": "Pichenette"
+        },
+        "ca": {
+            "label": "Empenta"
+        },
+        "zh": {
+            "label": "微移"
+        },
+        "ja": {
+            "label": "微動"
+        },
+        "ko": {
+            "label": "미세 이동"
+        },
+        "ar": {
+            "label": "إزاحة طفيفة"
         }
     }
 }

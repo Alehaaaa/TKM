@@ -57,7 +57,7 @@ def _stored_default(node, attr, data):
 def save_selected():
     selected = selectionMod.get_selected_objects(long=True)
     if not selected:
-        return wutil.make_inViewMessage("Select at least one object.")
+        return wutil.make_inViewMessage("Select at least one object")
     data = _load_data()
     operation = toolCommon.current_tool_operation()
     if operation:
@@ -73,13 +73,13 @@ def save_selected():
         if operation:
             operation.step()
     _save_data(data)
-    wutil.make_inViewMessage("Default values saved.")
+    wutil.make_inViewMessage("Default values saved")
 
 
 def remove_selected():
     selected = selectionMod.get_selected_objects(long=True)
     if not selected:
-        return wutil.make_inViewMessage("Select at least one object.")
+        return wutil.make_inViewMessage("Select at least one object")
     data = _load_data()
     operation = toolCommon.current_tool_operation()
     if operation:
@@ -96,14 +96,14 @@ def remove_selected():
         if operation:
             operation.step()
     _save_data(data)
-    wutil.make_inViewMessage("Saved defaults removed for the selection.")
+    wutil.make_inViewMessage("Saved defaults removed for the selection")
 
 
 def clear_all():
     if not os.path.isfile(_data_path()):
-        return wutil.make_inViewMessage("No saved default values found.")
+        return wutil.make_inViewMessage("No saved default values found")
     _save_data({})
-    wutil.make_inViewMessage("All saved default values cleared.")
+    wutil.make_inViewMessage("All saved default values cleared")
 
 
 def _matches(attr, translations, rotations, scales):
@@ -127,7 +127,7 @@ def apply_defaults(translations=False, rotations=False, scales=False):
     )
     selected = target_info["target_objects"]
     if not selected and not target_info["target_plugs"]:
-        return wutil.make_inViewMessage("Select objects, channels, or Graph Editor keys.")
+        return wutil.make_inViewMessage("Select objects, channels, or Graph Editor keys")
 
     with toolCommon.tool_operation(
         tool_id=tool_id,

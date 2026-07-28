@@ -20,6 +20,41 @@
                 "Copie la pose actuelle des contrôleurs sélectionnés.",
                 "La pose reste disponible entre les sessions Maya."
             ]
+        },
+        "ca": {
+            "label": "Copiar Pose",
+            "tooltip": [
+                "Copia la pose actual dels controls seleccionats",
+                "La pose roman disponible entre sessions de Maya"
+            ]
+        },
+        "zh": {
+            "label": "复制姿态",
+            "tooltip": [
+                "复制所选控制器的当前姿态",
+                "该姿态可在不同 Maya 会话之间保留"
+            ]
+        },
+        "ja": {
+            "label": "ポーズをコピー",
+            "tooltip": [
+                "選択したコントローラの現在のポーズをコピーします",
+                "ポーズはMayaセッションをまたいで利用できます"
+            ]
+        },
+        "ko": {
+            "label": "포즈 복사",
+            "tooltip": [
+                "선택한 컨트롤의 현재 포즈를 복사합니다",
+                "포즈는 Maya 세션 간에도 유지됩니다"
+            ]
+        },
+        "ar": {
+            "label": "نسخ الوضعية",
+            "tooltip": [
+                "نسخ الوضعية الحالية من المتحكمات المحددة",
+                "تظل الوضعية متاحة عبر جلسات Maya"
+            ]
         }
     },
     "paste_pose": {
@@ -39,6 +74,36 @@
             "label": "Coller la Pose",
             "tooltip": [
                 "Colle la pose enregistrée sur la sélection actuelle."
+            ]
+        },
+        "ca": {
+            "label": "Enganxar Pose",
+            "tooltip": [
+                "Enganxa la pose desada sobre la selecció actual"
+            ]
+        },
+        "zh": {
+            "label": "粘贴姿态",
+            "tooltip": [
+                "将已保存的姿态粘贴到当前选择上"
+            ]
+        },
+        "ja": {
+            "label": "ポーズを貼り付け",
+            "tooltip": [
+                "保存済みのポーズを現在の選択に貼り付けます"
+            ]
+        },
+        "ko": {
+            "label": "포즈 붙여넣기",
+            "tooltip": [
+                "저장된 포즈를 현재 선택 항목에 붙여넣습니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق الوضعية",
+            "tooltip": [
+                "لصق الوضعية المحفوظة على التحديد الحالي"
             ]
         }
     },
@@ -60,6 +125,36 @@
             "tooltip": [
                 "Colle la pose enregistrée sur les contrôleurs opposés correspondants en utilisant les exceptions de miroir."
             ]
+        },
+        "ca": {
+            "label": "Enganxar Pose en Mirall",
+            "tooltip": [
+                "Enganxa la pose desada sobre els controls oposats coincidents usant les excepcions de mirall"
+            ]
+        },
+        "zh": {
+            "label": "粘贴镜像姿态",
+            "tooltip": [
+                "使用镜像例外将已保存的姿态粘贴到对应的对侧控制器上"
+            ]
+        },
+        "ja": {
+            "label": "ミラーポーズを貼り付け",
+            "tooltip": [
+                "ミラー例外を使用して、保存済みのポーズを対応する反対側のコントローラに貼り付けます"
+            ]
+        },
+        "ko": {
+            "label": "미러 포즈 붙여넣기",
+            "tooltip": [
+                "미러 예외를 사용하여 저장된 포즈를 대응하는 반대쪽 컨트롤에 붙여넣습니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق الوضعية المعكوسة",
+            "tooltip": [
+                "لصق الوضعية المحفوظة على متحكمات الجانب المقابل المطابقة باستخدام استثناءات المرآة"
+            ]
         }
     },
     "paste_pose_to": {
@@ -79,6 +174,36 @@
             "label": "Coller la Pose Sur",
             "tooltip": [
                 "Choisissez un contrôleur source copié et collez sa pose sur les cibles sélectionnées."
+            ]
+        },
+        "ca": {
+            "label": "Enganxar Pose A",
+            "tooltip": [
+                "Tria un control d'origen copiat i enganxa la seva pose sobre els objectius seleccionats"
+            ]
+        },
+        "zh": {
+            "label": "粘贴姿态到",
+            "tooltip": [
+                "选择一个已复制的源控制器，并将其姿态粘贴到所选目标上"
+            ]
+        },
+        "ja": {
+            "label": "ポーズを貼り付け先",
+            "tooltip": [
+                "コピー済みのソースコントローラを選び、そのポーズを選択ターゲットに貼り付けます"
+            ]
+        },
+        "ko": {
+            "label": "포즈 붙여넣기 대상",
+            "tooltip": [
+                "복사된 소스 컨트롤을 선택하고 그 포즈를 선택한 대상에 붙여넣습니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق الوضعية إلى",
+            "tooltip": [
+                "اختيار متحكم مصدر منسوخ ولصق وضعيته على الأهداف المحددة"
             ]
         }
     },
@@ -100,6 +225,36 @@
             "tooltip": [
                 "Exporte les données de la pose copiée vers un fichier JSON."
             ]
+        },
+        "ca": {
+            "label": "Exportar Pose",
+            "tooltip": [
+                "Exporta les dades de la pose copiada a un fitxer JSON"
+            ]
+        },
+        "zh": {
+            "label": "导出姿态",
+            "tooltip": [
+                "将已复制的姿态数据导出为 JSON 文件"
+            ]
+        },
+        "ja": {
+            "label": "ポーズをエクスポート",
+            "tooltip": [
+                "コピーしたポーズデータをJSONファイルにエクスポートします"
+            ]
+        },
+        "ko": {
+            "label": "포즈 내보내기",
+            "tooltip": [
+                "복사된 포즈 데이터를 JSON 파일로 내보냅니다"
+            ]
+        },
+        "ar": {
+            "label": "تصدير الوضعية",
+            "tooltip": [
+                "تصدير بيانات الوضعية المنسوخة إلى ملف JSON"
+            ]
         }
     },
     "import_pose_file": {
@@ -119,6 +274,36 @@
             "label": "Importer la Pose",
             "tooltip": [
                 "Importe des données de pose copiées depuis un fichier JSON."
+            ]
+        },
+        "ca": {
+            "label": "Importar Pose",
+            "tooltip": [
+                "Importa dades de pose copiades des d'un fitxer JSON"
+            ]
+        },
+        "zh": {
+            "label": "导入姿态",
+            "tooltip": [
+                "从 JSON 文件导入已复制的姿态数据"
+            ]
+        },
+        "ja": {
+            "label": "ポーズをインポート",
+            "tooltip": [
+                "JSONファイルからコピーされたポーズデータをインポートします"
+            ]
+        },
+        "ko": {
+            "label": "포즈 가져오기",
+            "tooltip": [
+                "JSON 파일에서 복사된 포즈 데이터를 가져옵니다"
+            ]
+        },
+        "ar": {
+            "label": "استيراد الوضعية",
+            "tooltip": [
+                "استيراد بيانات الوضعية المنسوخة من ملف JSON"
             ]
         }
     },
@@ -143,6 +328,41 @@
                 "Copie l'animation des objets ou contrôleurs sélectionnés.",
                 "L'animation reste disponible entre les sessions Maya."
             ]
+        },
+        "ca": {
+            "label": "Copiar Animació",
+            "tooltip": [
+                "Copia l'animació dels objectes o controls seleccionats",
+                "L'animació roman disponible entre sessions de Maya"
+            ]
+        },
+        "zh": {
+            "label": "复制动画",
+            "tooltip": [
+                "复制所选对象或控制器的动画",
+                "该动画可在不同 Maya 会话之间保留"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションをコピー",
+            "tooltip": [
+                "選択したオブジェクトまたはコントローラのアニメーションをコピーします",
+                "アニメーションはMayaセッションをまたいで利用できます"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 복사",
+            "tooltip": [
+                "선택한 오브젝트 또는 컨트롤의 애니메이션을 복사합니다",
+                "애니메이션은 Maya 세션 간에도 유지됩니다"
+            ]
+        },
+        "ar": {
+            "label": "نسخ الحركة",
+            "tooltip": [
+                "نسخ الحركة من الكائنات أو المتحكمات المحددة",
+                "تظل الحركة متاحة عبر جلسات Maya"
+            ]
         }
     },
     "paste_animation": {
@@ -162,6 +382,36 @@
             "label": "Coller l'Animation en Remplacement",
             "tooltip": [
                 "Remplace l'animation de la sélection actuelle par l'animation enregistrée."
+            ]
+        },
+        "ca": {
+            "label": "Enganxar Animació en Reemplaçament",
+            "tooltip": [
+                "Reemplaça l'animació de la selecció actual per l'animació desada"
+            ]
+        },
+        "zh": {
+            "label": "粘贴替换动画",
+            "tooltip": [
+                "用已保存的动画替换当前选择的动画"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションを貼り付けて置換",
+            "tooltip": [
+                "現在の選択のアニメーションを保存済みのアニメーションに置き換えます"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 붙여넣기(교체)",
+            "tooltip": [
+                "현재 선택 항목의 애니메이션을 저장된 애니메이션으로 교체합니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق واستبدال الحركة",
+            "tooltip": [
+                "استبدال حركة التحديد الحالي بالحركة المحفوظة"
             ]
         }
     },
@@ -183,6 +433,36 @@
             "tooltip": [
                 "Insère l'animation enregistrée en conservant le timing environnant."
             ]
+        },
+        "ca": {
+            "label": "Enganxar Animació Inserida",
+            "tooltip": [
+                "Insereix l'animació desada conservant el temps circumdant"
+            ]
+        },
+        "zh": {
+            "label": "粘贴插入动画",
+            "tooltip": [
+                "插入已保存的动画，同时保留周围的时序"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションを挿入して貼り付け",
+            "tooltip": [
+                "周囲のタイミングを維持しながら保存済みのアニメーションを挿入します"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 삽입 붙여넣기",
+            "tooltip": [
+                "주변 타이밍을 유지하면서 저장된 애니메이션을 삽입합니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق وإدراج الحركة",
+            "tooltip": [
+                "إدراج الحركة المحفوظة مع الحفاظ على التوقيت المحيط"
+            ]
         }
     },
     "paste_opposite_animation": {
@@ -202,6 +482,36 @@
             "label": "Coller l'Animation en Miroir",
             "tooltip": [
                 "Colle l'animation enregistrée sur les contrôleurs opposés correspondants."
+            ]
+        },
+        "ca": {
+            "label": "Enganxar Animació en Mirall",
+            "tooltip": [
+                "Enganxa l'animació desada sobre els controls oposats coincidents"
+            ]
+        },
+        "zh": {
+            "label": "粘贴镜像动画",
+            "tooltip": [
+                "将已保存的动画粘贴到对应的对侧控制器上"
+            ]
+        },
+        "ja": {
+            "label": "ミラーアニメーションを貼り付け",
+            "tooltip": [
+                "保存済みのアニメーションを対応する反対側のコントローラに貼り付けます"
+            ]
+        },
+        "ko": {
+            "label": "미러 애니메이션 붙여넣기",
+            "tooltip": [
+                "저장된 애니메이션을 대응하는 반대쪽 컨트롤에 붙여넣습니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق الحركة المعكوسة",
+            "tooltip": [
+                "لصق الحركة المحفوظة على متحكمات الجانب المقابل المطابقة"
             ]
         }
     },
@@ -223,6 +533,36 @@
             "tooltip": [
                 "Choisissez un contrôleur source copié et collez son animation sur les cibles sélectionnées."
             ]
+        },
+        "ca": {
+            "label": "Enganxar Animació A",
+            "tooltip": [
+                "Tria un control d'origen copiat i enganxa la seva animació sobre els objectius seleccionats"
+            ]
+        },
+        "zh": {
+            "label": "粘贴动画到",
+            "tooltip": [
+                "选择一个已复制的源控制器，并将其动画粘贴到所选目标上"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションを貼り付け先",
+            "tooltip": [
+                "コピー済みのソースコントローラを選び、そのアニメーションを選択ターゲットに貼り付けます"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 붙여넣기 대상",
+            "tooltip": [
+                "복사된 소스 컨트롤을 선택하고 그 애니메이션을 선택한 대상에 붙여넣습니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق الحركة إلى",
+            "tooltip": [
+                "اختيار متحكم مصدر منسوخ ولصق حركته على الأهداف المحددة"
+            ]
         }
     },
     "export_animation_file": {
@@ -242,6 +582,36 @@
             "label": "Exporter l'Animation",
             "tooltip": [
                 "Exporte les données de l'animation copiée vers un fichier JSON."
+            ]
+        },
+        "ca": {
+            "label": "Exportar Animació",
+            "tooltip": [
+                "Exporta les dades de l'animació copiada a un fitxer JSON"
+            ]
+        },
+        "zh": {
+            "label": "导出动画",
+            "tooltip": [
+                "将已复制的动画数据导出为 JSON 文件"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションをエクスポート",
+            "tooltip": [
+                "コピーしたアニメーションデータをJSONファイルにエクスポートします"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 내보내기",
+            "tooltip": [
+                "복사된 애니메이션 데이터를 JSON 파일로 내보냅니다"
+            ]
+        },
+        "ar": {
+            "label": "تصدير الحركة",
+            "tooltip": [
+                "تصدير بيانات الحركة المنسوخة إلى ملف JSON"
             ]
         }
     },
@@ -263,6 +633,62 @@
             "tooltip": [
                 "Importe des données d'animation copiées depuis un fichier JSON."
             ]
+        },
+        "ca": {
+            "label": "Importar Animació",
+            "tooltip": [
+                "Importa dades d'animació copiades des d'un fitxer JSON"
+            ]
+        },
+        "zh": {
+            "label": "导入动画",
+            "tooltip": [
+                "从 JSON 文件导入已复制的动画数据"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションをインポート",
+            "tooltip": [
+                "JSONファイルからコピーされたアニメーションデータをインポートします"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 가져오기",
+            "tooltip": [
+                "JSON 파일에서 복사된 애니메이션 데이터를 가져옵니다"
+            ]
+        },
+        "ar": {
+            "label": "استيراد الحركة",
+            "tooltip": [
+                "استيراد بيانات الحركة المنسوخة من ملف JSON"
+            ]
+        }
+    },
+    "pose_animation_section": {
+        "en": {
+            "label": "Pose & Animation"
+        },
+        "es": {
+            "label": "Pose y Animación"
+        },
+        "fr": {
+            "label": "Pose et Animation"
+        },
+        "ca": {
+            "label": "Pose i Animació"
+        },
+        "zh": {
+            "label": "姿态与动画"
+        },
+        "ja": {
+            "label": "ポーズとアニメーション"
+        },
+        "ko": {
+            "label": "포즈 및 애니메이션"
+        },
+        "ar": {
+            "label": "الوضعية والحركة"
         }
     }
 }

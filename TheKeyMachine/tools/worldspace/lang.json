@@ -17,6 +17,36 @@
             "tooltip": [
                 "Copie les transforms en espace monde de la plage de temps ou des clés sélectionnées, ou de l'image actuelle si rien n'est sélectionné."
             ]
+        },
+        "ca": {
+            "label": "Copiar Espai del Món",
+            "tooltip": [
+                "Copia els transforms en espai del món del rang de temps o claus seleccionades, o del fotograma actual si no hi ha res seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "复制世界空间",
+            "tooltip": [
+                "从所选时间范围或关键帧复制世界空间变换，若未选择任何内容则从当前帧复制"
+            ]
+        },
+        "ja": {
+            "label": "ワールドスペースをコピー",
+            "tooltip": [
+                "選択したタイムレンジまたはキーからワールドスペーストランスフォームをコピーします。何も選択されていない場合は現在のフレームからコピーします"
+            ]
+        },
+        "ko": {
+            "label": "월드 스페이스 복사",
+            "tooltip": [
+                "선택한 시간 범위 또는 키에서 월드 스페이스 트랜스폼을 복사하며, 아무것도 선택되지 않은 경우 현재 프레임에서 복사합니다"
+            ]
+        },
+        "ar": {
+            "label": "نسخ الفضاء العالمي",
+            "tooltip": [
+                "نسخ التحويلات في الفضاء العالمي من نطاق الزمن أو المفاتيح المحددة، أو من الإطار الحالي عند عدم تحديد شيء"
+            ]
         }
     },
     "ws_copy_range": {
@@ -36,6 +66,36 @@
             "label": "Copier l'Espace Monde - Plage Sélectionnée",
             "tooltip": [
                 "Copie l'animation en espace monde de la plage de temps sélectionnée, ou de la plage de lecture visible si aucune n'est sélectionnée."
+            ]
+        },
+        "ca": {
+            "label": "Copiar Espai del Món - Rang Seleccionat",
+            "tooltip": [
+                "Copia l'animació en espai del món del rang de temps seleccionat, o del rang de reproducció visible si no n'hi ha cap seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "复制世界空间 - 所选范围",
+            "tooltip": [
+                "从所选时间范围复制世界空间动画，若未选择范围则从可见播放范围复制"
+            ]
+        },
+        "ja": {
+            "label": "ワールドスペースをコピー - 選択範囲",
+            "tooltip": [
+                "選択したタイムレンジからワールドスペースアニメーションをコピーします。範囲が未選択の場合は表示中の再生範囲からコピーします"
+            ]
+        },
+        "ko": {
+            "label": "월드 스페이스 복사 - 선택 범위",
+            "tooltip": [
+                "선택한 시간 범위에서 월드 스페이스 애니메이션을 복사하며, 범위가 선택되지 않은 경우 표시된 재생 범위에서 복사합니다"
+            ]
+        },
+        "ar": {
+            "label": "نسخ الفضاء العالمي - النطاق المحدد",
+            "tooltip": [
+                "نسخ الحركة في الفضاء العالمي من نطاق الزمن المحدد، أو من نطاق التشغيل المرئي عند عدم تحديد نطاق"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Colle les transforms copiés en espace monde sur les objets sélectionnés à l'image actuelle."
             ]
+        },
+        "ca": {
+            "label": "Enganxar Espai del Món",
+            "tooltip": [
+                "Enganxa els transforms copiats en espai del món sobre els objectes seleccionats al fotograma actual"
+            ]
+        },
+        "zh": {
+            "label": "粘贴世界空间",
+            "tooltip": [
+                "将复制的世界空间变换粘贴到所选对象的当前帧"
+            ]
+        },
+        "ja": {
+            "label": "ワールドスペースを貼り付け",
+            "tooltip": [
+                "コピーしたワールドスペーストランスフォームを、選択オブジェクトの現在のフレームに貼り付けます"
+            ]
+        },
+        "ko": {
+            "label": "월드 스페이스 붙여넣기",
+            "tooltip": [
+                "복사한 월드 스페이스 트랜스폼을 선택한 오브젝트의 현재 프레임에 붙여넣습니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق الفضاء العالمي",
+            "tooltip": [
+                "لصق التحويلات المنسوخة في الفضاء العالمي على الكائنات المحددة عند الإطار الحالي"
+            ]
         }
     },
     "ws_paste": {
@@ -76,6 +166,36 @@
             "label": "Coller l'Espace Monde - Toute l'Animation",
             "tooltip": [
                 "Colle l'animation copiée en espace monde sur les objets sélectionnés en conservant le timing capturé."
+            ]
+        },
+        "ca": {
+            "label": "Enganxar Espai del Món - Tota l'Animació",
+            "tooltip": [
+                "Enganxa l'animació copiada en espai del món sobre els objectes seleccionats conservant el temps capturat"
+            ]
+        },
+        "zh": {
+            "label": "粘贴世界空间 - 全部动画",
+            "tooltip": [
+                "将复制的世界空间动画粘贴到所选对象，同时保留捕获的时间信息"
+            ]
+        },
+        "ja": {
+            "label": "ワールドスペースを貼り付け - 全アニメーション",
+            "tooltip": [
+                "キャプチャしたタイミングを保持したまま、コピーしたワールドスペースアニメーションを選択オブジェクトに貼り付けます"
+            ]
+        },
+        "ko": {
+            "label": "월드 스페이스 붙여넣기 - 전체 애니메이션",
+            "tooltip": [
+                "캡처된 타이밍을 유지하면서 복사한 월드 스페이스 애니메이션을 선택한 오브젝트에 붙여넣습니다"
+            ]
+        },
+        "ar": {
+            "label": "لصق الفضاء العالمي - كل الحركة",
+            "tooltip": [
+                "لصق الحركة المنسوخة في الفضاء العالمي على الكائنات المحددة مع الحفاظ على التوقيت الملتقط"
             ]
         }
     },
@@ -97,6 +217,62 @@
             "tooltip": [
                 "Ouvre la documentation de copier-coller en Espace Monde."
             ]
+        },
+        "ca": {
+            "label": "Ajuda - Espai del Món",
+            "tooltip": [
+                "Obre la documentació de copiar i enganxar en Espai del Món"
+            ]
+        },
+        "zh": {
+            "label": "帮助 - 世界空间",
+            "tooltip": [
+                "打开世界空间复制粘贴文档"
+            ]
+        },
+        "ja": {
+            "label": "ヘルプ - ワールドスペース",
+            "tooltip": [
+                "ワールドスペースのコピー＆ペーストのドキュメントを開きます"
+            ]
+        },
+        "ko": {
+            "label": "도움말 - 월드 스페이스",
+            "tooltip": [
+                "월드 스페이스 복사 및 붙여넣기 문서를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساعدة - الفضاء العالمي",
+            "tooltip": [
+                "فتح توثيق نسخ ولصق الفضاء العالمي"
+            ]
+        }
+    },
+    "worldspace_tools": {
+        "en": {
+            "label": "Worldspace"
+        },
+        "es": {
+            "label": "Espacio del Mundo"
+        },
+        "fr": {
+            "label": "Espace Monde"
+        },
+        "ca": {
+            "label": "Espai del Món"
+        },
+        "zh": {
+            "label": "世界空间"
+        },
+        "ja": {
+            "label": "ワールドスペース"
+        },
+        "ko": {
+            "label": "월드 스페이스"
+        },
+        "ar": {
+            "label": "الفضاء العالمي"
         }
     }
 }

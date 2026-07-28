@@ -862,7 +862,25 @@ def _append_toolbox_item_rows(section, seen, title_lookup, icon_lookup, trigger_
 
 
 def _slider_modes_from_section(section_data):
-    return section_data.get("modes", [])
+    """Return a section's slider modes, translated into the active language.
+
+    ``section_data["modes"]`` is the raw list of ``SliderMode`` objects
+    straight from the package's own SECTION declaration -- the same object
+    ``toolWidgets.build_slider_section`` starts from when it builds the main
+    toolbar's slider widgets, and that function always calls
+    ``i18n.localize_slider_modes()`` on it before using it for exactly this
+    reason. This code path (the Hotkeys editor's per-mode/per-percentage
+    rows, and Search's catalog -- ``search.controller.build_command_rows()``
+    reuses this same catalog builder) skipped that call, so both surfaces
+    kept showing every slider mode's English label/tooltip regardless of
+    the active language.
+    """
+    from TheKeyMachine.core import i18n
+
+    modes = section_data.get("modes", [])
+    if not modes:
+        return modes
+    return i18n.localize_slider_modes(modes, section_data.get("_package_file"))
 
 
 def _slider_mode_icon(mode):
@@ -935,6 +953,22 @@ def _append_background_runner_rows(section, seen, title_lookup, icon_lookup, tri
         # (backgroundRunners.RUNNER_COMMAND_IDS) -- one table, not a second
         # hardcoded copy that can drift out of sync with it.
         command_name = spec.get("command_id", runner_id)
+        # Same "prefer the registered tool's translated text over the raw
+        # spec" rule background_runners/widgets.py's own dropdown menu
+        # already applies -- backgroundRunners.py's specs carry only
+        # hardcoded English label/description, so reading them directly
+        # here (as this used to) left every runner row in the Hotkeys
+        # editor, and in Search (search.controller.build_command_rows()
+        # reuses this same catalog builder), untranslated even though the
+        # dropdown menu itself was already fixed to translate.
+        tool = toolbox.get_tool(command_name) if trigger.has_command(command_name) else {}
+        tooltip = tool.get("tooltip")
+        # backgroundRunners.py's specs only ever carry a plain "label" (no
+        # "menu_label") -- matching that shape exactly, rather than also
+        # checking a "menu_label" key on spec that can never be set, keeps
+        # this fallback chain honest about what it's actually falling back to.
+        title = tool.get("menu_label") or tool.get("label") or spec.get("label") or _humanize(runner_id)
+        description = tool.get("description") or (tooltip if isinstance(tooltip, str) else None) or spec.get("description") or "Toggle this background runner."
         _append_section_row(
             section,
             seen,
@@ -943,9 +977,10 @@ def _append_background_runner_rows(section, seen, title_lookup, icon_lookup, tri
             trigger_commands,
             {
                 "command": command_name,
-                "title": spec.get("menu_label") or spec.get("label") or _humanize(runner_id),
+                "title": title,
                 "icon": spec.get("icon"),
-                "description": spec.get("description") or "Toggle this background runner.",
+                "description": description,
+                "tooltip": tooltip,
                 "checkable": True,
                 "get_checked": spec.get("get_enabled"),
                 "set_checked": lambda enabled, rid=runner_id: backgroundRunners.set_runner_enabled(rid, enabled),
@@ -982,9 +1017,18 @@ def _append_connect_entry_rows(section, seen, title_lookup, icon_lookup, trigger
 def _iter_hotkey_tool_sections():
     seen = set()
 
-    for section_id, section_data in toolbox.get_section_definitions().items():
-        if section_data.get("hotkey_only") and section_data.get("hotkeys") is not False:
+    # get_section_definitions() is the raw, untranslated package registry --
+    # only used here to find which section ids are hotkey_only. The section
+    # itself is then re-fetched through get_tool_section() (resolve_items
+    # left False since only "label"/"_package_file" are needed here), the
+    # same call every other section-label lookup in this codebase goes
+    # through, so a hotkey_only section's title gets the same live
+    # translation as everything else instead of the raw package-declared
+    # English text.
+    for section_id, raw_section_data in toolbox.get_section_definitions().items():
+        if raw_section_data.get("hotkey_only") and raw_section_data.get("hotkeys") is not False:
             seen.add(section_id)
+            section_data = toolbox.get_tool_section(section_id, resolve_items=False) or raw_section_data
             yield section_id, section_data
 
     for layout_id in ("main", "graph"):
@@ -1110,10 +1154,12 @@ class HotkeyCaptureEdit(QtWidgets.QLineEdit):
     comboChanged = QtCore.Signal(object)
 
     def __init__(self, parent=None):
+        from TheKeyMachine.core import i18n
+
         super().__init__(parent)
         self._combo = None
         self._updating = False
-        self.setPlaceholderText("Type a hotkey")
+        self.setPlaceholderText(i18n.tr("hotkeys_capture_placeholder", "Type a hotkey"))
         self.setReadOnly(False)
         self.setFixedWidth(wutil.DPI(120))
         self.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
@@ -1504,18 +1550,23 @@ class HotkeyItemList(QtWidgets.QListWidget):
 
 class TriggerHotkeysDialog(cd.QFlatDialog):
     def __init__(self, parent=None):
+        from TheKeyMachine.core import i18n
+
         super().__init__(parent=parent)
-        self.setWindowTitle("TheKeyMachine Hotkeys")
+        self.setWindowTitle(i18n.tr("hotkeys_dialog_title", "TheKeyMachine Hotkeys"))
         self.resize(wutil.DPI(980), wutil.DPI(720))
 
         self._initialize_state()
         main = QtWidgets.QWidget(self)
         main_layout = QtWidgets.QVBoxLayout(main)
         main_layout.setSpacing(wutil.DPI(8))
+        # Reuses the hotkeys_window tool's own lang.json label -- same word
+        # already translated for its menu entry.
+        header_text = toolbox.get_tool("hotkeys_window").get("label") or "Hotkeys"
         self.addWindowHeader(
             parentLayout=main_layout,
             icon=icons.hotkeys,
-            text="Hotkeys",
+            text=header_text,
             textColor="#d8d8d8",
         )
 
@@ -1544,6 +1595,8 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         self._build_timer.timeout.connect(self._populate_next_batch)
 
     def _build_content(self, parent):
+        from TheKeyMachine.core import i18n
+
         content_layout = QtWidgets.QGridLayout()
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setHorizontalSpacing(wutil.DPI(12))
@@ -1554,10 +1607,12 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
 
         left_widget = self._build_section_panel(parent)
         right_widget = self._build_command_panel(parent)
-        self.tools_title = QtWidgets.QLabel("Tools", parent)
+        self.tools_title = QtWidgets.QLabel(i18n.tr("hotkeys_panel_tools", "Tools"), parent)
         self.tools_title.setObjectName("HotkeyToolsTitle")
         self.tools_title.setStyleSheet("#HotkeyToolsTitle{color:#bcbcbc;font-size:%spx;}" % wutil.DPI(11))
-        self.section_title = QtWidgets.QLabel("Hotkeys", parent)
+        # Reuses the hotkeys_window tool's own lang.json label.
+        hotkeys_label = toolbox.get_tool("hotkeys_window").get("label") or "Hotkeys"
+        self.section_title = QtWidgets.QLabel(hotkeys_label, parent)
         self.section_title.setObjectName("HotkeySectionHeader")
         self.section_title.setStyleSheet("#HotkeySectionHeader{color:#bcbcbc;font-size:%spx;}" % wutil.DPI(11))
 
@@ -1604,9 +1659,18 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
     def _build_bottom_bar(self):
         self.setBottomBar(
             buttons=[
-                cd.QFlatDialogButton("Import Hotkeys", callback=self.import_hotkeys, icon=icons.get('import')),
-                cd.QFlatDialogButton("Export Hotkeys", callback=self.export_hotkeys, icon=icons.get('export')),
-                cd.QFlatDialogButton("Clear TKM Hotkeys", callback=self.clear_hotkeys, icon=icons.trash),
+                cd.QFlatDialogButton(
+                    "Import Hotkeys", callback=self.import_hotkeys, icon=icons.get('import'),
+                    i18n_key="hotkeys_import_button",
+                ),
+                cd.QFlatDialogButton(
+                    "Export Hotkeys", callback=self.export_hotkeys, icon=icons.get('export'),
+                    i18n_key="hotkeys_export_button",
+                ),
+                cd.QFlatDialogButton(
+                    "Clear TKM Hotkeys", callback=self.clear_hotkeys, icon=icons.trash,
+                    i18n_key="hotkeys_clear_button",
+                ),
                 cd.QFlatDialogButton("Apply", callback=self.apply_hotkeys, icon=icons.apply),
                 cd.QFlatDialogButton("Close", callback=self.request_close, icon=icons.close),
             ],
@@ -1916,11 +1980,16 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
             cmds.warning("Could not export hotkeys: {}".format(exc))
 
     def clear_hotkeys(self):
+        from TheKeyMachine.core import i18n
+
         result = cd.QFlatConfirmDialog.question(
             self,
-            "Clear hotkeys",
-            title="Clear current hotkeys?",
-            message="This will clear the hotkeys currently shown in the editor. You can still cancel before applying.",
+            i18n.tr("hotkeys_clear_dialog_title", "Clear hotkeys"),
+            title=i18n.tr("hotkeys_clear_dialog_heading", "Clear current hotkeys?"),
+            message=i18n.tr(
+                "hotkeys_clear_dialog_message",
+                "This will clear the hotkeys currently shown in the editor. You can still cancel before applying.",
+            ),
             buttons=[cd.QFlatConfirmDialog.Yes, cd.QFlatConfirmDialog.Cancel],
             highlight="Yes",
         )
@@ -1961,16 +2030,23 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
             self.close()
             return
 
+        from TheKeyMachine.core import i18n
+
         self._close_prompt_open = True
         result = cd.QFlatConfirmDialog.question(
             self,
-            "Unsaved hotkeys",
-            title="Save hotkey changes?",
-            message="You have unsaved hotkey changes. Save them, discard them, or cancel and keep editing.",
+            i18n.tr("hotkeys_unsaved_dialog_title", "Unsaved hotkeys"),
+            title=i18n.tr("hotkeys_unsaved_dialog_heading", "Save hotkey changes?"),
+            message=i18n.tr(
+                "hotkeys_unsaved_dialog_message",
+                "You have unsaved hotkey changes. Save them, discard them, or cancel and keep editing.",
+            ),
             icon=icons.warning,
             buttons=[
                 cd.QFlatDialogButton("Save", positive=True, icon=icons.apply),
-                cd.QFlatDialogButton("Discard", positive=False, icon=icons.trash),
+                cd.QFlatDialogButton(
+                    "Discard", positive=False, icon=icons.trash, i18n_key="hotkeys_discard_button"
+                ),
                 cd.QFlatDialogButton("Cancel", positive=False, icon=icons.cancel),
             ],
             highlight="Save",
@@ -2011,6 +2087,11 @@ def show_hotkeys_window(*_args):
 
     dialog = TriggerHotkeysDialog(parent=wutil.get_maya_qt())
     manager.register_managed_widget(dialog, key=HOTKEYS_WINDOW_KEY)
+
+    def _clear_hotkeys_ref(manager=manager):
+        manager.clear_managed_widget(HOTKEYS_WINDOW_KEY)
+
+    toolCommon.invalidate_cached_window_on_language_change(dialog, _clear_hotkeys_ref)
     dialog.show()
     dialog.raise_()
     dialog.activateWindow()

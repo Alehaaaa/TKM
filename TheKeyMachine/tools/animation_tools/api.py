@@ -67,6 +67,35 @@ def set_remove_redundant_mode(mode):
     return controller.set_remove_redundant_mode(mode)
 
 
+def remove_redundant_mode_choices():
+    """Live-translated choice list for the Remove Redundant Keys menu's mode picker.
+
+    Built fresh on every menu open (see ``core.toolMenus.build_declared_menu``'s
+    ``"choice"`` handling, which calls this instead of a static list), the
+    same pattern already used by ``tkm_menu.api``'s alignment/dock choices.
+    """
+    from TheKeyMachine.core import i18n
+
+    return [
+        {
+            "value": REMOVE_REDUNDANT_MODE_FLAT,
+            "label": i18n.tr("remove_redundant_mode_flat", "Only Affect Flat Keys"),
+            "description": i18n.tr(
+                "remove_redundant_mode_flat_desc",
+                "Remove only interior keys from flat-value runs. Non-flat motion keys are left untouched.",
+            ),
+        },
+        {
+            "value": REMOVE_REDUNDANT_MODE_ALL,
+            "label": i18n.tr("remove_redundant_mode_all", "All Redundant"),
+            "description": i18n.tr(
+                "remove_redundant_mode_all_desc",
+                "Simplify all redundant keys on the active curves while preserving the current key selection.",
+            ),
+        },
+    ]
+
+
 def remove_static_anim_curves(*args):
     return controller.remove_static_anim_curves(*args)
 

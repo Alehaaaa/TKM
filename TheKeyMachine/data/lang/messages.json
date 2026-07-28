@@ -1,0 +1,112 @@
+{
+    "no_animation_curves_found": {
+        "en": "No animation curves found",
+        "es": "No se encontraron curvas de animación",
+        "fr": "Aucune courbe d'animation trouvée",
+        "ca": "No s'han trobat corbes d'animació",
+        "zh": "未找到动画曲线",
+        "ja": "アニメーションカーブが見つかりません",
+        "ko": "애니메이션 커브를 찾을 수 없습니다",
+        "ar": "لم يتم العثور على منحنيات حركة"
+    },
+    "no_animation_curves_found_in_scene": {
+        "en": "No animation curves found in the scene",
+        "es": "No se encontraron curvas de animación en la escena",
+        "fr": "Aucune courbe d'animation trouvée dans la scène",
+        "ca": "No s'han trobat corbes d'animació a l'escena",
+        "zh": "场景中未找到动画曲线",
+        "ja": "シーン内にアニメーションカーブが見つかりません",
+        "ko": "씬에서 애니메이션 커브를 찾을 수 없습니다",
+        "ar": "لم يتم العثور على منحنيات حركة في المشهد"
+    },
+    "default_values_saved": {
+        "en": "Default values saved",
+        "es": "Valores predeterminados guardados",
+        "fr": "Valeurs par défaut enregistrées",
+        "ca": "Valors predeterminats desats",
+        "zh": "默认值已保存",
+        "ja": "デフォルト値を保存しました",
+        "ko": "기본값이 저장되었습니다",
+        "ar": "تم حفظ القيم الافتراضية"
+    },
+    "saved_defaults_removed_for_selection": {
+        "en": "Saved defaults removed for the selection",
+        "es": "Valores predeterminados guardados eliminados para la selección",
+        "fr": "Valeurs par défaut enregistrées supprimées pour la sélection",
+        "ca": "S'han eliminat els valors predeterminats desats per a la selecció",
+        "zh": "已移除所选对象保存的默认值",
+        "ja": "選択オブジェクトの保存済みデフォルト値を削除しました",
+        "ko": "선택 항목에 대해 저장된 기본값이 제거되었습니다",
+        "ar": "تمت إزالة القيم الافتراضية المحفوظة للتحديد"
+    },
+    "no_saved_default_values_found": {
+        "en": "No saved default values found",
+        "es": "No se encontraron valores predeterminados guardados",
+        "fr": "Aucune valeur par défaut enregistrée trouvée",
+        "ca": "No s'han trobat valors predeterminats desats",
+        "zh": "未找到已保存的默认值",
+        "ja": "保存済みのデフォルト値が見つかりません",
+        "ko": "저장된 기본값을 찾을 수 없습니다",
+        "ar": "لم يتم العثور على قيم افتراضية محفوظة"
+    },
+    "all_saved_default_values_cleared": {
+        "en": "All saved default values cleared",
+        "es": "Todos los valores predeterminados guardados fueron eliminados",
+        "fr": "Toutes les valeurs par défaut enregistrées ont été effacées",
+        "ca": "S'han eliminat tots els valors predeterminats desats",
+        "zh": "已清除所有已保存的默认值",
+        "ja": "保存済みのデフォルト値をすべて消去しました",
+        "ko": "저장된 모든 기본값이 삭제되었습니다",
+        "ar": "تم مسح جميع القيم الافتراضية المحفوظة"
+    },
+    "select_objects_channels_or_graph_editor_keys": {
+        "en": "Select objects, channels, or Graph Editor keys",
+        "es": "Selecciona objetos, canales o claves del Graph Editor",
+        "fr": "Sélectionnez des objets, des canaux ou des clés du Graph Editor",
+        "ca": "Selecciona objectes, canals o claus del Graph Editor",
+        "zh": "请选择对象、通道或 Graph Editor 中的关键帧",
+        "ja": "オブジェクト、チャンネル、またはGraph Editorのキーを選択してください",
+        "ko": "오브젝트, 채널 또는 Graph Editor 키를 선택하세요",
+        "ar": "حدد كائنات أو قنوات أو مفاتيح من Graph Editor"
+    },
+    "select_at_least_one_object": {
+        "en": "Select at least one object",
+        "es": "Selecciona al menos un objeto",
+        "fr": "Sélectionnez au moins un objet",
+        "ca": "Selecciona almenys un objecte",
+        "zh": "请至少选择一个对象",
+        "ja": "少なくとも1つのオブジェクトを選択してください",
+        "ko": "하나 이상의 오브젝트를 선택하세요",
+        "ar": "حدد كائنًا واحدًا على الأقل"
+    },
+    "follow_cam_focus_viewport_required": {
+        "en": "Focus a model viewport before creating Follow Cam",
+        "es": "Enfoca una vista de modelo antes de crear la Cámara de Seguimiento",
+        "fr": "Sélectionnez une vue 3D avant de créer la Caméra de Suivi",
+        "ca": "Enfoca una vista de model abans de crear la Càmera de Seguiment",
+        "zh": "创建跟随摄像机前请先激活一个视图",
+        "ja": "追従カメラを作成する前にビューポートを選択してください",
+        "ko": "추적 카메라를 만들기 전에 뷰포트를 선택하세요",
+        "ar": "ركّز على منفذ عرض قبل إنشاء كاميرا المتابعة"
+    },
+    "follow_cam_no_valid_camera": {
+        "en": "The active viewport has no valid camera",
+        "es": "La vista activa no tiene una cámara válida",
+        "fr": "La vue active n'a pas de caméra valide",
+        "ca": "La vista activa no té una càmera vàlida",
+        "zh": "当前视图没有有效的摄像机",
+        "ja": "アクティブなビューポートに有効なカメラがありません",
+        "ko": "활성 뷰포트에 유효한 카메라가 없습니다",
+        "ar": "منفذ العرض النشط لا يحتوي على كاميرا صالحة"
+    },
+    "follow_cam_not_in_scene": {
+        "en": "No followCam in the scene",
+        "es": "No hay ninguna Cámara de Seguimiento en la escena",
+        "fr": "Aucune Caméra de Suivi dans la scène",
+        "ca": "No hi ha cap Càmera de Seguiment a l'escena",
+        "zh": "场景中没有跟随摄像机",
+        "ja": "シーンに追従カメラがありません",
+        "ko": "씬에 추적 카메라가 없습니다",
+        "ar": "لا توجد كاميرا متابعة في المشهد"
+    }
+}

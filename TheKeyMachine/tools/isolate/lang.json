@@ -17,6 +17,36 @@
             "tooltip": [
                 "Isole le personnage ou l'asset sélectionné dans la vue active."
             ]
+        },
+        "ca": {
+            "label": "Aïllar",
+            "tooltip": [
+                "Aïlla el personatge o asset seleccionat a la vista activa"
+            ]
+        },
+        "zh": {
+            "label": "隔离",
+            "tooltip": [
+                "在当前视图中隔离所选角色或资产"
+            ]
+        },
+        "ja": {
+            "label": "アイソレート",
+            "tooltip": [
+                "アクティブなビューポートで選択したキャラクターまたはアセットを分離表示します"
+            ]
+        },
+        "ko": {
+            "label": "격리",
+            "tooltip": [
+                "활성 뷰포트에서 선택한 캐릭터 또는 에셋을 격리합니다"
+            ]
+        },
+        "ar": {
+            "label": "عزل",
+            "tooltip": [
+                "عزل الشخصية أو الأصل المحدد في منفذ العرض النشط"
+            ]
         }
     },
     "isolate_bookmarks": {
@@ -40,6 +70,41 @@
                 "Enregistrez des groupes d'objets nommés et rappelez-les comme sélections d'isolation dans la vue.",
                 "Les signets sont enregistrés avec la scène Maya."
             ]
+        },
+        "ca": {
+            "label": "Marcadors d'Aïllament",
+            "tooltip": [
+                "Desa grups d'objectes amb nom i recupera'ls com a seleccions d'aïllament a la vista",
+                "Els marcadors es desen junt amb l'escena de Maya"
+            ]
+        },
+        "zh": {
+            "label": "隔离书签",
+            "tooltip": [
+                "保存命名的对象组，并将其作为视口隔离选择进行调用",
+                "书签会与 Maya 场景一起保存"
+            ]
+        },
+        "ja": {
+            "label": "アイソレートブックマーク",
+            "tooltip": [
+                "名前付きオブジェクトグループを保存し、ビューポートのアイソレート選択として呼び出します",
+                "ブックマークはMayaシーンと共に保存されます"
+            ]
+        },
+        "ko": {
+            "label": "격리 북마크",
+            "tooltip": [
+                "이름이 지정된 오브젝트 그룹을 저장하고 뷰포트 격리 선택으로 불러옵니다",
+                "북마크는 Maya 씬과 함께 저장됩니다"
+            ]
+        },
+        "ar": {
+            "label": "إشارات مرجعية للعزل",
+            "tooltip": [
+                "احفظ مجموعات كائنات مسماة واستدعِها كتحديدات عزل في منفذ العرض",
+                "تُحفظ الإشارات المرجعية مع مشهد Maya"
+            ]
         }
     },
     "isolate_down_level": {
@@ -59,6 +124,36 @@
             "label": "Descendre d'un Niveau",
             "tooltip": [
                 "Conserve un niveau de hiérarchie sous la racine de la scène lors de l'isolation."
+            ]
+        },
+        "ca": {
+            "label": "Baixar un Nivell",
+            "tooltip": [
+                "Conserva un nivell de jerarquia per sota de l'arrel de l'escena en aïllar"
+            ]
+        },
+        "zh": {
+            "label": "下降一级",
+            "tooltip": [
+                "隔离时保留场景根下方一级层级"
+            ]
+        },
+        "ja": {
+            "label": "1レベル下げる",
+            "tooltip": [
+                "アイソレート時にシーンルートの1階層下を保持します"
+            ]
+        },
+        "ko": {
+            "label": "한 단계 아래로",
+            "tooltip": [
+                "격리 시 씬 루트 아래 한 계층을 유지합니다"
+            ]
+        },
+        "ar": {
+            "label": "النزول مستوى واحد",
+            "tooltip": [
+                "الاحتفاظ بمستوى تسلسل هرمي واحد أسفل جذر المشهد عند العزل"
             ]
         }
     },
@@ -80,6 +175,62 @@
             "tooltip": [
                 "Ouvre la documentation de l'outil Isoler."
             ]
+        },
+        "ca": {
+            "label": "Ajuda",
+            "tooltip": [
+                "Obre la documentació de l'eina Aïllar"
+            ]
+        },
+        "zh": {
+            "label": "帮助",
+            "tooltip": [
+                "打开隔离工具文档"
+            ]
+        },
+        "ja": {
+            "label": "ヘルプ",
+            "tooltip": [
+                "アイソレートツールのドキュメントを開きます"
+            ]
+        },
+        "ko": {
+            "label": "도움말",
+            "tooltip": [
+                "격리 도구 문서를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساعدة",
+            "tooltip": [
+                "فتح توثيق أداة العزل"
+            ]
+        }
+    },
+    "isolate_tools": {
+        "en": {
+            "label": "Isolate"
+        },
+        "es": {
+            "label": "Aislar"
+        },
+        "fr": {
+            "label": "Isoler"
+        },
+        "ca": {
+            "label": "Aïllar"
+        },
+        "zh": {
+            "label": "隔离"
+        },
+        "ja": {
+            "label": "アイソレート"
+        },
+        "ko": {
+            "label": "격리"
+        },
+        "ar": {
+            "label": "عزل"
         }
     }
 }

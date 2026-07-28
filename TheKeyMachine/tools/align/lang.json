@@ -20,6 +20,41 @@
                 "Aligne les objets source sélectionnés sur la dernière cible sélectionnée.",
                 "Utilise la translation, la rotation et l'échelle. Une plage de temps sélectionnée aligne chaque image de cette plage."
             ]
+        },
+        "ca": {
+            "label": "Alinear Objectes",
+            "tooltip": [
+                "Alinea els objectes origen seleccionats amb l'últim objectiu seleccionat",
+                "Usa translació, rotació i escala. Un rang de temps seleccionat alinea cada fotograma d'aquest rang"
+            ]
+        },
+        "zh": {
+            "label": "对齐对象",
+            "tooltip": [
+                "将所选源对象与最后选择的目标对齐",
+                "使用位移、旋转和缩放。若选择了时间范围，则对齐该范围内的每一帧"
+            ]
+        },
+        "ja": {
+            "label": "オブジェクトを整列",
+            "tooltip": [
+                "選択したソースオブジェクトを最後に選択したターゲットに合わせます",
+                "移動・回転・スケールを使用します。タイムレンジが選択されている場合はその範囲の全フレームを整列します"
+            ]
+        },
+        "ko": {
+            "label": "오브젝트 정렬",
+            "tooltip": [
+                "선택한 소스 오브젝트를 마지막으로 선택한 대상에 맞춥니다",
+                "이동, 회전, 스케일을 사용합니다. 시간 범위가 선택된 경우 해당 범위의 모든 프레임을 정렬합니다"
+            ]
+        },
+        "ar": {
+            "label": "محاذاة الكائنات",
+            "tooltip": [
+                "مطابقة الكائنات المصدر المحددة مع آخر هدف محدد",
+                "يستخدم الانتقال والدوران والقياس. يؤدي تحديد نطاق زمني إلى محاذاة كل إطار ضمن ذلك النطاق"
+            ]
         }
     },
     "align_objects_all_keys": {
@@ -43,6 +78,41 @@
                 "Aligne les objets source sélectionnés sur la dernière cible sélectionnée.",
                 "Utilise la translation, la rotation et l'échelle. Une plage de temps sélectionnée aligne chaque image de cette plage."
             ]
+        },
+        "ca": {
+            "label": "Alinear Objectes - Totes les Claus",
+            "tooltip": [
+                "Alinea els objectes origen seleccionats amb l'últim objectiu seleccionat",
+                "Usa translació, rotació i escala. Un rang de temps seleccionat alinea cada fotograma d'aquest rang"
+            ]
+        },
+        "zh": {
+            "label": "对齐对象 - 所有关键帧",
+            "tooltip": [
+                "将所选源对象与最后选择的目标对齐",
+                "使用位移、旋转和缩放。若选择了时间范围，则对齐该范围内的每一帧"
+            ]
+        },
+        "ja": {
+            "label": "オブジェクトを整列 - 全キー",
+            "tooltip": [
+                "選択したソースオブジェクトを最後に選択したターゲットに合わせます",
+                "移動・回転・スケールを使用します。タイムレンジが選択されている場合はその範囲の全フレームを整列します"
+            ]
+        },
+        "ko": {
+            "label": "오브젝트 정렬 - 모든 키",
+            "tooltip": [
+                "선택한 소스 오브젝트를 마지막으로 선택한 대상에 맞춥니다",
+                "이동, 회전, 스케일을 사용합니다. 시간 범위가 선택된 경우 해당 범위의 모든 프레임을 정렬합니다"
+            ]
+        },
+        "ar": {
+            "label": "محاذاة الكائنات - كل المفاتيح",
+            "tooltip": [
+                "مطابقة الكائنات المصدر المحددة مع آخر هدف محدد",
+                "يستخدم الانتقال والدوران والقياس. يؤدي تحديد نطاق زمني إلى محاذاة كل إطار ضمن ذلك النطاق"
+            ]
         }
     },
     "align_object_translation": {
@@ -62,6 +132,36 @@
             "label": "Aligner la Translation de l'Objet",
             "tooltip": [
                 "Aligne uniquement la translation en espace monde sur la dernière cible sélectionnée."
+            ]
+        },
+        "ca": {
+            "label": "Alinear Translació d'Objecte",
+            "tooltip": [
+                "Alinea només la translació en espai del món amb l'últim objectiu seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "对齐对象位移",
+            "tooltip": [
+                "仅将世界空间位移与最后选择的目标对齐"
+            ]
+        },
+        "ja": {
+            "label": "オブジェクトの移動を整列",
+            "tooltip": [
+                "ワールドスペースの移動のみを、最後に選択したターゲットに合わせます"
+            ]
+        },
+        "ko": {
+            "label": "오브젝트 이동 정렬",
+            "tooltip": [
+                "월드 스페이스 이동만 마지막으로 선택한 대상에 맞춥니다"
+            ]
+        },
+        "ar": {
+            "label": "محاذاة انتقال الكائن",
+            "tooltip": [
+                "مطابقة الانتقال في الفضاء العالمي فقط مع آخر هدف محدد"
             ]
         }
     },
@@ -83,6 +183,36 @@
             "tooltip": [
                 "Aligne la translation sur chaque image clé des objets source sélectionnés."
             ]
+        },
+        "ca": {
+            "label": "Alinear Translació d'Objecte - Totes les Claus",
+            "tooltip": [
+                "Alinea la translació a cada fotograma clau dels objectes origen seleccionats"
+            ]
+        },
+        "zh": {
+            "label": "对齐对象位移 - 所有关键帧",
+            "tooltip": [
+                "在所选源对象的每个关键帧上对齐位移"
+            ]
+        },
+        "ja": {
+            "label": "オブジェクトの移動を整列 - 全キー",
+            "tooltip": [
+                "選択したソースオブジェクトのすべてのキーフレームで移動を整列します"
+            ]
+        },
+        "ko": {
+            "label": "오브젝트 이동 정렬 - 모든 키",
+            "tooltip": [
+                "선택한 소스 오브젝트의 모든 키 프레임에서 이동을 정렬합니다"
+            ]
+        },
+        "ar": {
+            "label": "محاذاة انتقال الكائن - كل المفاتيح",
+            "tooltip": [
+                "مطابقة الانتقال في كل إطار مفتاح للكائنات المصدر المحددة"
+            ]
         }
     },
     "align_object_rotation": {
@@ -102,6 +232,36 @@
             "label": "Aligner la Rotation de l'Objet",
             "tooltip": [
                 "Aligne uniquement la rotation en espace monde sur la dernière cible sélectionnée."
+            ]
+        },
+        "ca": {
+            "label": "Alinear Rotació d'Objecte",
+            "tooltip": [
+                "Alinea només la rotació en espai del món amb l'últim objectiu seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "对齐对象旋转",
+            "tooltip": [
+                "仅将世界空间旋转与最后选择的目标对齐"
+            ]
+        },
+        "ja": {
+            "label": "オブジェクトの回転を整列",
+            "tooltip": [
+                "ワールドスペースの回転のみを、最後に選択したターゲットに合わせます"
+            ]
+        },
+        "ko": {
+            "label": "오브젝트 회전 정렬",
+            "tooltip": [
+                "월드 스페이스 회전만 마지막으로 선택한 대상에 맞춥니다"
+            ]
+        },
+        "ar": {
+            "label": "محاذاة دوران الكائن",
+            "tooltip": [
+                "مطابقة الدوران في الفضاء العالمي فقط مع آخر هدف محدد"
             ]
         }
     },
@@ -123,6 +283,36 @@
             "tooltip": [
                 "Aligne la rotation sur chaque image clé des objets source sélectionnés."
             ]
+        },
+        "ca": {
+            "label": "Alinear Rotació d'Objecte - Totes les Claus",
+            "tooltip": [
+                "Alinea la rotació a cada fotograma clau dels objectes origen seleccionats"
+            ]
+        },
+        "zh": {
+            "label": "对齐对象旋转 - 所有关键帧",
+            "tooltip": [
+                "在所选源对象的每个关键帧上对齐旋转"
+            ]
+        },
+        "ja": {
+            "label": "オブジェクトの回転を整列 - 全キー",
+            "tooltip": [
+                "選択したソースオブジェクトのすべてのキーフレームで回転を整列します"
+            ]
+        },
+        "ko": {
+            "label": "오브젝트 회전 정렬 - 모든 키",
+            "tooltip": [
+                "선택한 소스 오브젝트의 모든 키 프레임에서 회전을 정렬합니다"
+            ]
+        },
+        "ar": {
+            "label": "محاذاة دوران الكائن - كل المفاتيح",
+            "tooltip": [
+                "مطابقة الدوران في كل إطار مفتاح للكائنات المصدر المحددة"
+            ]
         }
     },
     "align_object_scale": {
@@ -142,6 +332,36 @@
             "label": "Aligner l'Échelle de l'Objet",
             "tooltip": [
                 "Aligne uniquement l'échelle en espace monde sur la dernière cible sélectionnée."
+            ]
+        },
+        "ca": {
+            "label": "Alinear Escala d'Objecte",
+            "tooltip": [
+                "Alinea només l'escala en espai del món amb l'últim objectiu seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "对齐对象缩放",
+            "tooltip": [
+                "仅将世界空间缩放与最后选择的目标对齐"
+            ]
+        },
+        "ja": {
+            "label": "オブジェクトのスケールを整列",
+            "tooltip": [
+                "ワールドスペースのスケールのみを、最後に選択したターゲットに合わせます"
+            ]
+        },
+        "ko": {
+            "label": "오브젝트 스케일 정렬",
+            "tooltip": [
+                "월드 스페이스 스케일만 마지막으로 선택한 대상에 맞춥니다"
+            ]
+        },
+        "ar": {
+            "label": "محاذاة قياس الكائن",
+            "tooltip": [
+                "مطابقة القياس في الفضاء العالمي فقط مع آخر هدف محدد"
             ]
         }
     },
@@ -163,6 +383,36 @@
             "tooltip": [
                 "Aligne l'échelle sur chaque image clé des objets source sélectionnés."
             ]
+        },
+        "ca": {
+            "label": "Alinear Escala d'Objecte - Totes les Claus",
+            "tooltip": [
+                "Alinea l'escala a cada fotograma clau dels objectes origen seleccionats"
+            ]
+        },
+        "zh": {
+            "label": "对齐对象缩放 - 所有关键帧",
+            "tooltip": [
+                "在所选源对象的每个关键帧上对齐缩放"
+            ]
+        },
+        "ja": {
+            "label": "オブジェクトのスケールを整列 - 全キー",
+            "tooltip": [
+                "選択したソースオブジェクトのすべてのキーフレームでスケールを整列します"
+            ]
+        },
+        "ko": {
+            "label": "오브젝트 스케일 정렬 - 모든 키",
+            "tooltip": [
+                "선택한 소스 오브젝트의 모든 키 프레임에서 스케일을 정렬합니다"
+            ]
+        },
+        "ar": {
+            "label": "محاذاة قياس الكائن - كل المفاتيح",
+            "tooltip": [
+                "مطابقة القياس في كل إطار مفتاح للكائنات المصدر المحددة"
+            ]
         }
     },
     "align_objects_help": {
@@ -183,6 +433,62 @@
             "tooltip": [
                 "Ouvre la documentation d'Aligner les Objets."
             ]
+        },
+        "ca": {
+            "label": "Ajuda d'Alinear Objectes",
+            "tooltip": [
+                "Obre la documentació d'Alinear Objectes"
+            ]
+        },
+        "zh": {
+            "label": "对齐对象帮助",
+            "tooltip": [
+                "打开对齐对象文档"
+            ]
+        },
+        "ja": {
+            "label": "オブジェクトを整列 ヘルプ",
+            "tooltip": [
+                "オブジェクトを整列のドキュメントを開きます"
+            ]
+        },
+        "ko": {
+            "label": "오브젝트 정렬 도움말",
+            "tooltip": [
+                "오브젝트 정렬 문서를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساعدة محاذاة الكائنات",
+            "tooltip": [
+                "فتح توثيق محاذاة الكائنات"
+            ]
+        }
+    },
+    "align_tools": {
+        "en": {
+            "label": "Align Objects"
+        },
+        "es": {
+            "label": "Alinear Objetos"
+        },
+        "fr": {
+            "label": "Aligner les Objets"
+        },
+        "ca": {
+            "label": "Alinear Objectes"
+        },
+        "zh": {
+            "label": "对齐对象"
+        },
+        "ja": {
+            "label": "オブジェクトを整列"
+        },
+        "ko": {
+            "label": "오브젝트 정렬"
+        },
+        "ar": {
+            "label": "محاذاة الكائنات"
         }
     }
 }

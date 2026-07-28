@@ -1405,6 +1405,47 @@ def clear_tracked_connection(owner, attr_name):
     return True
 
 
+def invalidate_cached_window_on_language_change(dialog, clear_ref):
+    """Force a cached singleton window to rebuild fresh on its next open.
+
+    Windows like the About/Donate/Version History/Hotkeys/Workspaces dialogs
+    translate their static chrome (title, headers, buttons) once at
+    construction, then get cached as a module-level singleton and simply
+    re-shown on every later "open" call -- so a language switch while the
+    window is closed (but not deleted -- these all set
+    ``WA_DeleteOnClose=False``) never gets picked up on reopen. Hooking the
+    same ``i18n.bus.languageChanged`` signal every already-open toolbar
+    button listens to (see ``core.toolWidgets._bind_toolbar_translation_refresh``)
+    and tearing the cached instance down here means the next open call finds
+    no valid cached widget and builds a fresh one, picking up the current
+    language for free -- no per-dialog ``refresh_translations()`` method to
+    keep in sync by hand.
+
+    ``clear_ref`` is a zero-arg callback that nulls out the caller's own
+    module-level singleton variable (a plain Python global can't be passed
+    by reference, so each caller supplies its own tiny setter).
+    """
+    from TheKeyMachine.core import i18n
+
+    def _on_language_changed(*_args, dialog=dialog, clear_ref=clear_ref):
+        clear_ref()
+        try:
+            dialog.close()
+        finally:
+            try:
+                dialog.deleteLater()
+            except Exception:
+                pass
+
+    replace_tracked_connection(
+        dialog,
+        "_tkm_singleton_language_invalidation",
+        i18n.bus.languageChanged,
+        _on_language_changed,
+        parent=dialog,
+    )
+
+
 def replace_tracked_connection(owner, attr_name, signal, callback, parent=None):
     clear_tracked_connection(owner, attr_name)
     relay = _SignalRelay(callback, parent=parent)

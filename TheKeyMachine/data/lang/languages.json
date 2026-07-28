@@ -1,5 +1,10 @@
 {
     "en": {"name": "English", "native": "English"},
     "es": {"name": "Spanish", "native": "Español"},
-    "fr": {"name": "French", "native": "Français"}
+    "fr": {"name": "French", "native": "Français"},
+    "ca": {"name": "Catalan", "native": "Català"},
+    "zh": {"name": "Chinese", "native": "中文"},
+    "ja": {"name": "Japanese", "native": "日本語"},
+    "ko": {"name": "Korean", "native": "한국어"},
+    "ar": {"name": "Arabic", "native": "العربية"}
 }

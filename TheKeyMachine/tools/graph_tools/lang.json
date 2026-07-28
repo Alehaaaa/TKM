@@ -17,6 +17,36 @@
             "tooltip": [
                 "Ouvre les commandes utilitaires du Graph Editor."
             ]
+        },
+        "ca": {
+            "label": "Extres del Graph",
+            "tooltip": [
+                "Obre les ordres utilitàries del Graph Editor"
+            ]
+        },
+        "zh": {
+            "label": "曲线图额外功能",
+            "tooltip": [
+                "打开 Graph Editor 实用命令"
+            ]
+        },
+        "ja": {
+            "label": "グラフエクストラ",
+            "tooltip": [
+                "Graph Editorのユーティリティコマンドを開きます"
+            ]
+        },
+        "ko": {
+            "label": "그래프 추가 기능",
+            "tooltip": [
+                "Graph Editor 유틸리티 명령을 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "إضافات الرسم البياني",
+            "tooltip": [
+                "فتح أوامر أدوات Graph Editor المساعدة"
+            ]
         }
     },
     "graph_select_object_from_curve": {
@@ -36,6 +66,36 @@
             "label": "Sélectionner l'Objet depuis la Courbe",
             "tooltip": [
                 "Sélectionne les objets de la scène associés aux courbes d'animation sélectionnées."
+            ]
+        },
+        "ca": {
+            "label": "Seleccionar Objecte des de la Corba",
+            "tooltip": [
+                "Selecciona els objectes de l'escena associats a les corbes d'animació seleccionades"
+            ]
+        },
+        "zh": {
+            "label": "从曲线选择对象",
+            "tooltip": [
+                "选择与所选动画曲线关联的场景对象"
+            ]
+        },
+        "ja": {
+            "label": "カーブからオブジェクトを選択",
+            "tooltip": [
+                "選択したアニメーションカーブに関連付けられたシーンオブジェクトを選択します"
+            ]
+        },
+        "ko": {
+            "label": "커브에서 오브젝트 선택",
+            "tooltip": [
+                "선택한 애니메이션 커브와 연결된 씬 오브젝트를 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديد الكائن من المنحنى",
+            "tooltip": [
+                "تحديد كائنات المشهد المرتبطة بمنحنيات الحركة المحددة"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Affiche uniquement les courbes sélectionnées dans le Graph Editor."
             ]
+        },
+        "ca": {
+            "label": "Aïllar Corbes",
+            "tooltip": [
+                "Mostra només les corbes seleccionades al Graph Editor"
+            ]
+        },
+        "zh": {
+            "label": "隔离曲线",
+            "tooltip": [
+                "仅在 Graph Editor 中显示所选曲线"
+            ]
+        },
+        "ja": {
+            "label": "カーブを分離",
+            "tooltip": [
+                "Graph Editorに選択したカーブのみを表示します"
+            ]
+        },
+        "ko": {
+            "label": "커브 격리",
+            "tooltip": [
+                "Graph Editor에 선택한 커브만 표시합니다"
+            ]
+        },
+        "ar": {
+            "label": "عزل المنحنيات",
+            "tooltip": [
+                "إظهار المنحنيات المحددة فقط في Graph Editor"
+            ]
         }
     },
     "graph_flip": {
@@ -76,6 +166,36 @@
             "label": "Inverser les Courbes",
             "tooltip": [
                 "Inverse verticalement les valeurs des courbes sélectionnées."
+            ]
+        },
+        "ca": {
+            "label": "Invertir Corbes",
+            "tooltip": [
+                "Inverteix verticalment els valors de les corbes seleccionades"
+            ]
+        },
+        "zh": {
+            "label": "翻转曲线",
+            "tooltip": [
+                "垂直反转所选曲线的数值"
+            ]
+        },
+        "ja": {
+            "label": "カーブを反転",
+            "tooltip": [
+                "選択したカーブの値を垂直方向に反転します"
+            ]
+        },
+        "ko": {
+            "label": "커브 반전",
+            "tooltip": [
+                "선택한 커브 값을 수직으로 반전합니다"
+            ]
+        },
+        "ar": {
+            "label": "قلب المنحنيات",
+            "tooltip": [
+                "عكس قيم المنحنيات المحددة عموديًا"
             ]
         }
     },
@@ -97,6 +217,36 @@
             "tooltip": [
                 "Décale progressivement les courbes sélectionnées pour créer un mouvement chevauché."
             ]
+        },
+        "ca": {
+            "label": "Solapar Cap Endavant",
+            "tooltip": [
+                "Desfasa progressivament les corbes seleccionades per crear un moviment solapat"
+            ]
+        },
+        "zh": {
+            "label": "向前重叠",
+            "tooltip": [
+                "逐步偏移所选曲线以产生重叠运动"
+            ]
+        },
+        "ja": {
+            "label": "前方にオーバーラップ",
+            "tooltip": [
+                "選択したカーブを段階的にオフセットし、重なり合う動きを作成します"
+            ]
+        },
+        "ko": {
+            "label": "앞으로 오버랩",
+            "tooltip": [
+                "선택한 커브를 점진적으로 오프셋하여 겹치는 움직임을 만듭니다"
+            ]
+        },
+        "ar": {
+            "label": "تراكب للأمام",
+            "tooltip": [
+                "إزاحة المنحنيات المحددة تدريجيًا لإنشاء حركة متراكبة"
+            ]
         }
     },
     "graph_overlap_backward": {
@@ -116,6 +266,36 @@
             "label": "Chevaucher Vers l'Arrière",
             "tooltip": [
                 "Décale progressivement les courbes sélectionnées pour créer un mouvement chevauché."
+            ]
+        },
+        "ca": {
+            "label": "Solapar Cap Enrere",
+            "tooltip": [
+                "Desfasa progressivament les corbes seleccionades per crear un moviment solapat"
+            ]
+        },
+        "zh": {
+            "label": "向后重叠",
+            "tooltip": [
+                "逐步偏移所选曲线以产生重叠运动"
+            ]
+        },
+        "ja": {
+            "label": "後方にオーバーラップ",
+            "tooltip": [
+                "選択したカーブを段階的にオフセットし、重なり合う動きを作成します"
+            ]
+        },
+        "ko": {
+            "label": "뒤로 오버랩",
+            "tooltip": [
+                "선택한 커브를 점진적으로 오프셋하여 겹치는 움직임을 만듭니다"
+            ]
+        },
+        "ar": {
+            "label": "تراكب للخلف",
+            "tooltip": [
+                "إزاحة المنحنيات المحددة تدريجيًا لإنشاء حركة متراكبة"
             ]
         }
     },
@@ -137,6 +317,36 @@
             "tooltip": [
                 "Active ou désactive la mise en sourdine des courbes sélectionnées."
             ]
+        },
+        "ca": {
+            "label": "Silenciar Corbes",
+            "tooltip": [
+                "Activa o desactiva el silenci a les corbes seleccionades"
+            ]
+        },
+        "zh": {
+            "label": "静音曲线",
+            "tooltip": [
+                "切换所选曲线的静音状态"
+            ]
+        },
+        "ja": {
+            "label": "カーブをミュート",
+            "tooltip": [
+                "選択したカーブのミュートを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "커브 음소거",
+            "tooltip": [
+                "선택한 커브의 음소거를 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "كتم المنحنيات",
+            "tooltip": [
+                "تبديل كتم الصوت على المنحنيات المحددة"
+            ]
         }
     },
     "graph_toggle_lock": {
@@ -156,6 +366,36 @@
             "label": "Verrouiller les Courbes",
             "tooltip": [
                 "Active ou désactive le verrouillage d'édition des courbes sélectionnées."
+            ]
+        },
+        "ca": {
+            "label": "Bloquejar Corbes",
+            "tooltip": [
+                "Activa o desactiva el bloqueig d'edició a les corbes seleccionades"
+            ]
+        },
+        "zh": {
+            "label": "锁定曲线",
+            "tooltip": [
+                "切换所选曲线的编辑锁定状态"
+            ]
+        },
+        "ja": {
+            "label": "カーブをロック",
+            "tooltip": [
+                "選択したカーブの編集ロックを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "커브 잠금",
+            "tooltip": [
+                "선택한 커브의 편집 잠금을 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "قفل المنحنيات",
+            "tooltip": [
+                "تبديل قفل التحرير على المنحنيات المحددة"
             ]
         }
     },
@@ -177,6 +417,36 @@
             "tooltip": [
                 "Aligne les courbes sélectionnées sur la dernière courbe sélectionnée."
             ]
+        },
+        "ca": {
+            "label": "Igualar Corbes",
+            "tooltip": [
+                "Iguala les corbes seleccionades a l'última corba seleccionada"
+            ]
+        },
+        "zh": {
+            "label": "匹配曲线",
+            "tooltip": [
+                "将所选曲线匹配到最后选择的曲线"
+            ]
+        },
+        "ja": {
+            "label": "カーブを一致",
+            "tooltip": [
+                "選択したカーブを最後に選択したカーブに一致させます"
+            ]
+        },
+        "ko": {
+            "label": "커브 일치",
+            "tooltip": [
+                "선택한 커브를 마지막으로 선택한 커브에 맞춥니다"
+            ]
+        },
+        "ar": {
+            "label": "مطابقة المنحنيات",
+            "tooltip": [
+                "مطابقة المنحنيات المحددة مع آخر منحنى محدد"
+            ]
         }
     },
     "enable_graph_filter": {
@@ -196,6 +466,36 @@
             "label": "Activer le Filtre du Graph",
             "tooltip": [
                 "Active ou efface le filtrage du Graph Editor pour la sélection actuelle."
+            ]
+        },
+        "ca": {
+            "label": "Activar Filtre del Graph",
+            "tooltip": [
+                "Activa o neteja el filtratge del Graph Editor per a la selecció actual"
+            ]
+        },
+        "zh": {
+            "label": "启用曲线图过滤",
+            "tooltip": [
+                "为当前选择启用或清除 Graph Editor 过滤"
+            ]
+        },
+        "ja": {
+            "label": "グラフフィルターを有効化",
+            "tooltip": [
+                "現在の選択に対してGraph Editorのフィルタリングを有効化またはクリアします"
+            ]
+        },
+        "ko": {
+            "label": "그래프 필터 사용",
+            "tooltip": [
+                "현재 선택 항목에 대해 Graph Editor 필터링을 사용하거나 지웁니다"
+            ]
+        },
+        "ar": {
+            "label": "تفعيل مرشح الرسم البياني",
+            "tooltip": [
+                "تفعيل أو مسح تصفية Graph Editor للتحديد الحالي"
             ]
         }
     },
@@ -217,6 +517,62 @@
             "tooltip": [
                 "Active ou efface le filtrage du Graph Editor pour la sélection actuelle."
             ]
+        },
+        "ca": {
+            "label": "Desactivar Filtre del Graph",
+            "tooltip": [
+                "Activa o neteja el filtratge del Graph Editor per a la selecció actual"
+            ]
+        },
+        "zh": {
+            "label": "禁用曲线图过滤",
+            "tooltip": [
+                "为当前选择启用或清除 Graph Editor 过滤"
+            ]
+        },
+        "ja": {
+            "label": "グラフフィルターを無効化",
+            "tooltip": [
+                "現在の選択に対してGraph Editorのフィルタリングを有効化またはクリアします"
+            ]
+        },
+        "ko": {
+            "label": "그래프 필터 사용 안 함",
+            "tooltip": [
+                "현재 선택 항목에 대해 Graph Editor 필터링을 사용하거나 지웁니다"
+            ]
+        },
+        "ar": {
+            "label": "تعطيل مرشح الرسم البياني",
+            "tooltip": [
+                "تفعيل أو مسح تصفية Graph Editor للتحديد الحالي"
+            ]
+        }
+    },
+    "graph_tools": {
+        "en": {
+            "label": "Graph Tools"
+        },
+        "es": {
+            "label": "Herramientas de Graph Editor"
+        },
+        "fr": {
+            "label": "Outils du Graph Editor"
+        },
+        "ca": {
+            "label": "Eines de Graph Editor"
+        },
+        "zh": {
+            "label": "曲线图工具"
+        },
+        "ja": {
+            "label": "グラフエディタツール"
+        },
+        "ko": {
+            "label": "그래프 에디터 도구"
+        },
+        "ar": {
+            "label": "أدوات محرر الرسم البياني"
         }
     }
 }

@@ -20,6 +20,67 @@
                 "Déplace et fait pivoter les contrôleurs sélectionnés avec une précision fine dans la vue.",
                 "Désactivez l'outil pour restaurer les contextes normaux de déplacement et de rotation de Maya."
             ]
+        },
+        "ca": {
+            "label": "Micro Moviment",
+            "tooltip": [
+                "Mou i gira els controls seleccionats amb precisió fina a la vista",
+                "Desactiva l'eina per restaurar els contextos normals de moure i girar de Maya"
+            ]
+        },
+        "zh": {
+            "label": "微移动",
+            "tooltip": [
+                "以精细的视口精度移动和旋转所选控制器",
+                "禁用该工具可恢复 Maya 正常的移动和旋转上下文"
+            ]
+        },
+        "ja": {
+            "label": "マイクロムーブ",
+            "tooltip": [
+                "細かいビューポート精度で選択したコントローラを移動・回転します",
+                "ツールを無効にするとMayaの通常の移動・回転コンテキストに戻ります"
+            ]
+        },
+        "ko": {
+            "label": "마이크로 이동",
+            "tooltip": [
+                "세밀한 뷰포트 정밀도로 선택한 컨트롤을 이동하고 회전합니다",
+                "도구를 비활성화하면 Maya의 일반 이동 및 회전 컨텍스트로 복원됩니다"
+            ]
+        },
+        "ar": {
+            "label": "التحريك الدقيق",
+            "tooltip": [
+                "حرّك ودوّر المتحكمات المحددة بدقة عرض دقيقة",
+                "عطّل الأداة لاستعادة سياقي التحريك والتدوير العاديين في Maya"
+            ]
+        }
+    },
+    "movers_tools": {
+        "en": {
+            "label": "Movers"
+        },
+        "es": {
+            "label": "Movimiento"
+        },
+        "fr": {
+            "label": "Déplacement"
+        },
+        "ca": {
+            "label": "Moviment"
+        },
+        "zh": {
+            "label": "移动"
+        },
+        "ja": {
+            "label": "移動"
+        },
+        "ko": {
+            "label": "이동"
+        },
+        "ar": {
+            "label": "الحركة"
         }
     }
 }

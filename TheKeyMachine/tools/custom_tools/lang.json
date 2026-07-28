@@ -20,6 +20,67 @@
                 "Ouvre vos outils personnalisés et raccourcis de scripts depuis un seul menu.",
                 "Configurez des entrées Python, MEL et des fonctions appelables sans dépendre des shelves de Maya."
             ]
+        },
+        "ca": {
+            "label": "Eines Personalitzades",
+            "tooltip": [
+                "Obre les teves eines personalitzades i dreceres d'scripts des d'un sol menú",
+                "Configura entrades de Python, MEL i funcions invocables sense dependre dels shelves de Maya"
+            ]
+        },
+        "zh": {
+            "label": "自定义工具",
+            "tooltip": [
+                "从一个菜单中打开你的自定义工具和脚本快捷方式",
+                "无需依赖 Maya 工具架即可配置 Python、MEL 和可调用条目"
+            ]
+        },
+        "ja": {
+            "label": "カスタムツール",
+            "tooltip": [
+                "1つのメニューからカスタムツールとスクリプトショートカットを開きます",
+                "Mayaのシェルフに頼らずにPython、MEL、実行可能項目を設定します"
+            ]
+        },
+        "ko": {
+            "label": "사용자 지정 도구",
+            "tooltip": [
+                "하나의 메뉴에서 사용자 지정 도구와 스크립트 바로가기를 엽니다",
+                "Maya 셸프에 의존하지 않고 Python, MEL 및 호출 가능한 항목을 구성합니다"
+            ]
+        },
+        "ar": {
+            "label": "أدوات مخصصة",
+            "tooltip": [
+                "افتح أدواتك المخصصة واختصارات النصوص البرمجية من قائمة واحدة",
+                "قم بتكوين إدخالات Python وMEL والإدخالات القابلة للاستدعاء دون الاعتماد على أرفف Maya"
+            ]
+        }
+    },
+    "custom_tools_section": {
+        "en": {
+            "label": "Custom Tools"
+        },
+        "es": {
+            "label": "Herramientas Personalizadas"
+        },
+        "fr": {
+            "label": "Outils Personnalisés"
+        },
+        "ca": {
+            "label": "Eines Personalitzades"
+        },
+        "zh": {
+            "label": "自定义工具"
+        },
+        "ja": {
+            "label": "カスタムツール"
+        },
+        "ko": {
+            "label": "사용자 지정 도구"
+        },
+        "ar": {
+            "label": "أدوات مخصصة"
         }
     }
 }

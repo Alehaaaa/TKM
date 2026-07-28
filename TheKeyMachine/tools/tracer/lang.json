@@ -8,17 +8,52 @@
             ]
         },
         "es": {
-            "label": "Tracer",
+            "label": "Trazador",
             "tooltip": [
                 "Crea un rastro en la vista a partir de la trayectoria animada del objeto seleccionado.",
                 "Usa Actualizar tras cambios de animación cuando la Actualización Automática está desactivada."
             ]
         },
         "fr": {
-            "label": "Tracer",
+            "label": "Traceur",
             "tooltip": [
                 "Crée une traînée dans la vue à partir de la trajectoire animée de l'objet sélectionné.",
                 "Utilisez Actualiser après des changements d'animation lorsque la Mise à Jour Auto est désactivée."
+            ]
+        },
+        "ca": {
+            "label": "Traçador",
+            "tooltip": [
+                "Crea un rastre a la vista a partir de la trajectòria animada de l'objecte seleccionat",
+                "Usa Actualitzar després de canvis d'animació quan l'Actualització Automàtica està desactivada"
+            ]
+        },
+        "zh": {
+            "label": "轨迹描绘器",
+            "tooltip": [
+                "根据所选对象的动画路径在视口中创建轨迹",
+                "禁用自动更新时，动画更改后请使用刷新"
+            ]
+        },
+        "ja": {
+            "label": "軌跡ツール",
+            "tooltip": [
+                "選択したオブジェクトのアニメーションパスからビューポートに軌跡を作成します",
+                "自動更新が無効な場合、アニメーション変更後は更新を使用してください"
+            ]
+        },
+        "ko": {
+            "label": "궤적 도구",
+            "tooltip": [
+                "선택한 오브젝트의 애니메이션 경로로부터 뷰포트 궤적을 생성합니다",
+                "자동 업데이트가 꺼져 있을 때는 애니메이션 변경 후 새로고침을 사용하세요"
+            ]
+        },
+        "ar": {
+            "label": "راسم المسار",
+            "tooltip": [
+                "أنشئ أثرًا في منفذ العرض من المسار المتحرك للكائن المحدد",
+                "استخدم التحديث بعد تغييرات الحركة عند تعطيل التحديث التلقائي"
             ]
         }
     },
@@ -30,15 +65,45 @@
             ]
         },
         "es": {
-            "label": "Actualizar Tracer",
+            "label": "Actualizar Trazador",
             "tooltip": [
                 "Reconstruye el rastro activo a partir de la animación actual del objeto."
             ]
         },
         "fr": {
-            "label": "Actualiser le Tracer",
+            "label": "Actualiser le Traceur",
             "tooltip": [
                 "Reconstruit la traînée active à partir de l'animation actuelle de l'objet."
+            ]
+        },
+        "ca": {
+            "label": "Actualitzar Traçador",
+            "tooltip": [
+                "Reconstrueix el rastre actiu a partir de l'animació actual de l'objecte"
+            ]
+        },
+        "zh": {
+            "label": "刷新轨迹",
+            "tooltip": [
+                "根据对象当前的动画重建活动轨迹"
+            ]
+        },
+        "ja": {
+            "label": "軌跡を更新",
+            "tooltip": [
+                "オブジェクトの現在のアニメーションからアクティブな軌跡を再構築します"
+            ]
+        },
+        "ko": {
+            "label": "궤적 새로고침",
+            "tooltip": [
+                "오브젝트의 현재 애니메이션을 기반으로 활성 궤적을 다시 생성합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديث المسار",
+            "tooltip": [
+                "إعادة بناء الأثر النشط من الحركة الحالية للكائن"
             ]
         }
     },
@@ -50,15 +115,45 @@
             ]
         },
         "es": {
-            "label": "Mostrar/Ocultar Tracer",
+            "label": "Mostrar/Ocultar Trazador",
             "tooltip": [
                 "Muestra u oculta el rastro activo sin eliminarlo."
             ]
         },
         "fr": {
-            "label": "Afficher/Masquer le Tracer",
+            "label": "Afficher/Masquer le Traceur",
             "tooltip": [
                 "Affiche ou masque la traînée active sans la supprimer."
+            ]
+        },
+        "ca": {
+            "label": "Mostrar/Amagar Traçador",
+            "tooltip": [
+                "Mostra o amaga el rastre actiu sense eliminar-lo"
+            ]
+        },
+        "zh": {
+            "label": "显示/隐藏轨迹",
+            "tooltip": [
+                "显示或隐藏活动轨迹而不删除它"
+            ]
+        },
+        "ja": {
+            "label": "軌跡の表示/非表示",
+            "tooltip": [
+                "削除せずにアクティブな軌跡を表示または非表示にします"
+            ]
+        },
+        "ko": {
+            "label": "궤적 표시/숨기기",
+            "tooltip": [
+                "삭제하지 않고 활성 궤적을 표시하거나 숨깁니다"
+            ]
+        },
+        "ar": {
+            "label": "إظهار/إخفاء المسار",
+            "tooltip": [
+                "إظهار أو إخفاء الأثر النشط دون حذفه"
             ]
         }
     },
@@ -80,6 +175,36 @@
             "tooltip": [
                 "Sélectionne le nœud de décalage de la traînée pour pouvoir repositionner la trajectoire affichée."
             ]
+        },
+        "ca": {
+            "label": "Seleccionar Objecte de Desfase",
+            "tooltip": [
+                "Selecciona el node de desfase del rastre per poder reposicionar la trajectòria mostrada"
+            ]
+        },
+        "zh": {
+            "label": "选择偏移对象",
+            "tooltip": [
+                "选择轨迹偏移节点，以便重新定位显示的路径"
+            ]
+        },
+        "ja": {
+            "label": "オフセットオブジェクトを選択",
+            "tooltip": [
+                "表示されているパスを再配置できるよう、軌跡のオフセットノードを選択します"
+            ]
+        },
+        "ko": {
+            "label": "오프셋 오브젝트 선택",
+            "tooltip": [
+                "표시된 경로를 재배치할 수 있도록 궤적 오프셋 노드를 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديد كائن الإزاحة",
+            "tooltip": [
+                "حدد عقدة إزاحة الأثر لإعادة وضع المسار المعروض"
+            ]
         }
     },
     "tracer_grey": {
@@ -90,15 +215,45 @@
             ]
         },
         "es": {
-            "label": "Estilo de Tracer: Gris",
+            "label": "Estilo de Trazador: Gris",
             "tooltip": [
                 "Usa el estilo de visualización gris neutro para el rastro activo."
             ]
         },
         "fr": {
-            "label": "Style du Tracer : Gris",
+            "label": "Style du Traceur : Gris",
             "tooltip": [
                 "Utilise le style d'affichage gris neutre pour la traînée active."
+            ]
+        },
+        "ca": {
+            "label": "Estil de Traçador: Gris",
+            "tooltip": [
+                "Usa l'estil de visualització gris neutre per al rastre actiu"
+            ]
+        },
+        "zh": {
+            "label": "轨迹样式：灰色",
+            "tooltip": [
+                "为活动轨迹使用中性灰色显示样式"
+            ]
+        },
+        "ja": {
+            "label": "軌跡スタイル：グレー",
+            "tooltip": [
+                "アクティブな軌跡にニュートラルなグレー表示スタイルを使用します"
+            ]
+        },
+        "ko": {
+            "label": "궤적 스타일: 회색",
+            "tooltip": [
+                "활성 궤적에 중립적인 회색 표시 스타일을 사용합니다"
+            ]
+        },
+        "ar": {
+            "label": "نمط المسار: رمادي",
+            "tooltip": [
+                "استخدم نمط العرض الرمادي المحايد للأثر النشط"
             ]
         }
     },
@@ -110,15 +265,45 @@
             ]
         },
         "es": {
-            "label": "Estilo de Tracer: Rojo",
+            "label": "Estilo de Trazador: Rojo",
             "tooltip": [
                 "Usa el estilo de visualización rojo para el rastro activo."
             ]
         },
         "fr": {
-            "label": "Style du Tracer : Rouge",
+            "label": "Style du Traceur : Rouge",
             "tooltip": [
                 "Utilise le style d'affichage rouge pour la traînée active."
+            ]
+        },
+        "ca": {
+            "label": "Estil de Traçador: Vermell",
+            "tooltip": [
+                "Usa l'estil de visualització vermell per al rastre actiu"
+            ]
+        },
+        "zh": {
+            "label": "轨迹样式：红色",
+            "tooltip": [
+                "为活动轨迹使用红色显示样式"
+            ]
+        },
+        "ja": {
+            "label": "軌跡スタイル：レッド",
+            "tooltip": [
+                "アクティブな軌跡に赤色表示スタイルを使用します"
+            ]
+        },
+        "ko": {
+            "label": "궤적 스타일: 빨강",
+            "tooltip": [
+                "활성 궤적에 빨간색 표시 스타일을 사용합니다"
+            ]
+        },
+        "ar": {
+            "label": "نمط المسار: أحمر",
+            "tooltip": [
+                "استخدم نمط العرض الأحمر للأثر النشط"
             ]
         }
     },
@@ -130,15 +315,45 @@
             ]
         },
         "es": {
-            "label": "Estilo de Tracer: Azul",
+            "label": "Estilo de Trazador: Azul",
             "tooltip": [
                 "Usa el estilo de visualización azul para el rastro activo."
             ]
         },
         "fr": {
-            "label": "Style du Tracer : Bleu",
+            "label": "Style du Traceur : Bleu",
             "tooltip": [
                 "Utilise le style d'affichage bleu pour la traînée active."
+            ]
+        },
+        "ca": {
+            "label": "Estil de Traçador: Blau",
+            "tooltip": [
+                "Usa l'estil de visualització blau per al rastre actiu"
+            ]
+        },
+        "zh": {
+            "label": "轨迹样式：蓝色",
+            "tooltip": [
+                "为活动轨迹使用蓝色显示样式"
+            ]
+        },
+        "ja": {
+            "label": "軌跡スタイル：ブルー",
+            "tooltip": [
+                "アクティブな軌跡に青色表示スタイルを使用します"
+            ]
+        },
+        "ko": {
+            "label": "궤적 스타일: 파랑",
+            "tooltip": [
+                "활성 궤적에 파란색 표시 스타일을 사용합니다"
+            ]
+        },
+        "ar": {
+            "label": "نمط المسار: أزرق",
+            "tooltip": [
+                "استخدم نمط العرض الأزرق للأثر النشط"
             ]
         }
     },
@@ -150,15 +365,45 @@
             ]
         },
         "es": {
-            "label": "Quitar Tracer",
+            "label": "Quitar Trazador",
             "tooltip": [
-                "Elimina de la escena la configuración activa del Tracer."
+                "Elimina de la escena la configuración activa del Trazador."
             ]
         },
         "fr": {
-            "label": "Supprimer le Tracer",
+            "label": "Supprimer le Traceur",
             "tooltip": [
-                "Supprime de la scène la configuration active du Tracer."
+                "Supprime de la scène la configuration active du Traceur."
+            ]
+        },
+        "ca": {
+            "label": "Eliminar Traçador",
+            "tooltip": [
+                "Elimina de l'escena la configuració activa del Traçador"
+            ]
+        },
+        "zh": {
+            "label": "移除轨迹",
+            "tooltip": [
+                "从场景中删除活动的轨迹描绘器设置"
+            ]
+        },
+        "ja": {
+            "label": "軌跡を削除",
+            "tooltip": [
+                "シーンからアクティブな軌跡設定を削除します"
+            ]
+        },
+        "ko": {
+            "label": "궤적 제거",
+            "tooltip": [
+                "씬에서 활성 궤적 설정을 삭제합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة المسار",
+            "tooltip": [
+                "حذف إعداد المسار النشط من المشهد"
             ]
         }
     },
@@ -180,6 +425,62 @@
             "tooltip": [
                 "Met à jour la traînée automatiquement pendant que l'animation source change."
             ]
+        },
+        "ca": {
+            "label": "Actualització Automàtica",
+            "tooltip": [
+                "Actualitza el rastre automàticament mentre canvia l'animació d'origen"
+            ]
+        },
+        "zh": {
+            "label": "自动更新",
+            "tooltip": [
+                "源动画变化时自动更新轨迹"
+            ]
+        },
+        "ja": {
+            "label": "自動更新",
+            "tooltip": [
+                "元のアニメーションが変化する間、軌跡を自動的に更新します"
+            ]
+        },
+        "ko": {
+            "label": "자동 업데이트",
+            "tooltip": [
+                "원본 애니메이션이 변경되는 동안 궤적을 자동으로 업데이트합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديث تلقائي",
+            "tooltip": [
+                "تحديث الأثر تلقائيًا أثناء تغيّر الحركة المصدر"
+            ]
+        }
+    },
+    "tracer_tools": {
+        "en": {
+            "label": "Tracer"
+        },
+        "es": {
+            "label": "Trazador"
+        },
+        "fr": {
+            "label": "Traceur"
+        },
+        "ca": {
+            "label": "Traçador"
+        },
+        "zh": {
+            "label": "轨迹描绘器"
+        },
+        "ja": {
+            "label": "軌跡ツール"
+        },
+        "ko": {
+            "label": "궤적 도구"
+        },
+        "ar": {
+            "label": "راسم المسار"
         }
     }
 }

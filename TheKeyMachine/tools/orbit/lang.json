@@ -8,17 +8,52 @@
             ]
         },
         "es": {
-            "label": "Orbit",
+            "label": "Órbita",
             "tooltip": [
-                "Abre la paleta de comandos Orbit, configurable, cerca del cursor.",
+                "Abre la paleta de comandos de Órbita, configurable, cerca del cursor.",
                 "Usa su disposición radial para acceder rápidamente a las herramientas de animación que repites con más frecuencia."
             ]
         },
         "fr": {
-            "label": "Orbit",
+            "label": "Orbite",
             "tooltip": [
-                "Ouvre la palette de commandes Orbit, configurable, près du curseur.",
+                "Ouvre la palette de commandes d'Orbite, configurable, près du curseur.",
                 "Utilisez sa disposition radiale pour accéder rapidement aux outils d'animation que vous répétez le plus souvent."
+            ]
+        },
+        "ca": {
+            "label": "Òrbita",
+            "tooltip": [
+                "Obre la paleta de comandes d'Òrbita, configurable, prop del cursor",
+                "Utilitza la seva disposició radial per accedir ràpidament a les eines d'animació que repeteixes més sovint"
+            ]
+        },
+        "zh": {
+            "label": "轨道",
+            "tooltip": [
+                "在光标附近打开可配置的轨道命令面板",
+                "利用其径向布局快速访问常用的动画工具"
+            ]
+        },
+        "ja": {
+            "label": "軌道",
+            "tooltip": [
+                "カーソル付近に設定可能な軌道コマンドパレットを開きます",
+                "放射状レイアウトを使って、よく使うアニメーションツールに素早くアクセスできます"
+            ]
+        },
+        "ko": {
+            "label": "궤도",
+            "tooltip": [
+                "커서 근처에 구성 가능한 궤도 명령 팔레트를 엽니다",
+                "방사형 배치를 사용해 자주 반복하는 애니메이션 도구에 빠르게 접근하세요"
+            ]
+        },
+        "ar": {
+            "label": "المدار",
+            "tooltip": [
+                "افتح لوحة أوامر المدار القابلة للتخصيص بالقرب من المؤشر",
+                "استخدم ترتيبها الشعاعي للوصول السريع إلى أدوات الحركة المتكررة"
             ]
         }
     },
@@ -31,18 +66,79 @@
             ]
         },
         "es": {
-            "label": "Ventana Orbit",
+            "label": "Ventana de Órbita",
             "tooltip": [
-                "Abre la paleta de comandos Orbit, configurable, cerca del cursor.",
+                "Abre la paleta de comandos de Órbita, configurable, cerca del cursor.",
                 "Usa su disposición radial para acceder rápidamente a las herramientas de animación que repites con más frecuencia."
             ]
         },
         "fr": {
-            "label": "Fenêtre Orbit",
+            "label": "Fenêtre d'Orbite",
             "tooltip": [
-                "Ouvre la palette de commandes Orbit, configurable, près du curseur.",
+                "Ouvre la palette de commandes d'Orbite, configurable, près du curseur.",
                 "Utilisez sa disposition radiale pour accéder rapidement aux outils d'animation que vous répétez le plus souvent."
             ]
+        },
+        "ca": {
+            "label": "Finestra d'Òrbita",
+            "tooltip": [
+                "Obre la paleta de comandes d'Òrbita, configurable, prop del cursor",
+                "Utilitza la seva disposició radial per accedir ràpidament a les eines d'animació que repeteixes més sovint"
+            ]
+        },
+        "zh": {
+            "label": "轨道窗口",
+            "tooltip": [
+                "在光标附近打开可配置的轨道命令面板",
+                "利用其径向布局快速访问常用的动画工具"
+            ]
+        },
+        "ja": {
+            "label": "軌道ウィンドウ",
+            "tooltip": [
+                "カーソル付近に設定可能な軌道コマンドパレットを開きます",
+                "放射状レイアウトを使って、よく使うアニメーションツールに素早くアクセスできます"
+            ]
+        },
+        "ko": {
+            "label": "궤도 창",
+            "tooltip": [
+                "커서 근처에 구성 가능한 궤도 명령 팔레트를 엽니다",
+                "방사형 배치를 사용해 자주 반복하는 애니메이션 도구에 빠르게 접근하세요"
+            ]
+        },
+        "ar": {
+            "label": "نافذة المدار",
+            "tooltip": [
+                "افتح لوحة أوامر المدار القابلة للتخصيص بالقرب من المؤشر",
+                "استخدم ترتيبها الشعاعي للوصول السريع إلى أدوات الحركة المتكررة"
+            ]
+        }
+    },
+    "orbit_tools": {
+        "en": {
+            "label": "Orbit"
+        },
+        "es": {
+            "label": "Órbita"
+        },
+        "fr": {
+            "label": "Orbite"
+        },
+        "ca": {
+            "label": "Òrbita"
+        },
+        "zh": {
+            "label": "轨道"
+        },
+        "ja": {
+            "label": "軌道"
+        },
+        "ko": {
+            "label": "궤도"
+        },
+        "ar": {
+            "label": "المدار"
         }
     }
 }

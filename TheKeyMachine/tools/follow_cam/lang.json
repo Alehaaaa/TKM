@@ -8,17 +8,52 @@
             ]
         },
         "es": {
-            "label": "Follow Cam",
+            "label": "Cámara de Seguimiento",
             "tooltip": [
                 "Crea una cámara que sigue al objeto seleccionado en traslación y rotación.",
                 "Útil para estabilizar en la vista un control en movimiento mientras se pule su animación."
             ]
         },
         "fr": {
-            "label": "Follow Cam",
+            "label": "Caméra de Suivi",
             "tooltip": [
                 "Crée une caméra qui suit l'objet sélectionné en translation et en rotation.",
                 "Utile pour stabiliser à l'écran un contrôleur en mouvement pendant le peaufinage de son animation."
+            ]
+        },
+        "ca": {
+            "label": "Càmera de Seguiment",
+            "tooltip": [
+                "Crea una càmera que segueix l'objecte seleccionat en translació i rotació",
+                "Útil per estabilitzar a la vista un control en moviment mentre es poleix la seva animació"
+            ]
+        },
+        "zh": {
+            "label": "跟随摄像机",
+            "tooltip": [
+                "创建一台在位移和旋转上跟随所选对象的摄像机",
+                "适用于在打磨动画时稳定视图中移动的控制器"
+            ]
+        },
+        "ja": {
+            "label": "追従カメラ",
+            "tooltip": [
+                "選択したオブジェクトの移動と回転に追従するカメラを作成します",
+                "アニメーションを仕上げる際、動くコントローラをビュー内で安定させるのに便利です"
+            ]
+        },
+        "ko": {
+            "label": "추적 카메라",
+            "tooltip": [
+                "선택한 오브젝트의 이동과 회전을 따라가는 카메라를 생성합니다",
+                "애니메이션을 다듬는 동안 움직이는 컨트롤을 뷰에서 안정시키는 데 유용합니다"
+            ]
+        },
+        "ar": {
+            "label": "كاميرا المتابعة",
+            "tooltip": [
+                "أنشئ كاميرا تتابع الكائن المحدد انتقالاً ودورانًا",
+                "مفيدة لتثبيت متحكم متحرك في العرض أثناء صقل حركته"
             ]
         }
     },
@@ -30,15 +65,45 @@
             ]
         },
         "es": {
-            "label": "Follow Cam - Solo Traslación",
+            "label": "Cámara de Seguimiento - Solo Traslación",
             "tooltip": [
                 "Crea una cámara que sigue únicamente la traslación del objeto seleccionado."
             ]
         },
         "fr": {
-            "label": "Follow Cam - Translation Seulement",
+            "label": "Caméra de Suivi - Translation Seulement",
             "tooltip": [
                 "Crée une caméra qui suit uniquement la translation de l'objet sélectionné."
+            ]
+        },
+        "ca": {
+            "label": "Càmera de Seguiment - Només Translació",
+            "tooltip": [
+                "Crea una càmera que segueix únicament la translació de l'objecte seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "跟随摄像机 - 仅位移",
+            "tooltip": [
+                "创建一台仅跟随所选对象位移的摄像机"
+            ]
+        },
+        "ja": {
+            "label": "追従カメラ - 移動のみ",
+            "tooltip": [
+                "選択したオブジェクトの移動のみに追従するカメラを作成します"
+            ]
+        },
+        "ko": {
+            "label": "추적 카메라 - 이동만",
+            "tooltip": [
+                "선택한 오브젝트의 이동만 따라가는 카메라를 생성합니다"
+            ]
+        },
+        "ar": {
+            "label": "كاميرا المتابعة - انتقال فقط",
+            "tooltip": [
+                "أنشئ كاميرا تتابع انتقال الكائن المحدد فقط"
             ]
         }
     },
@@ -50,15 +115,45 @@
             ]
         },
         "es": {
-            "label": "Follow Cam - Solo Rotación",
+            "label": "Cámara de Seguimiento - Solo Rotación",
             "tooltip": [
                 "Crea una cámara que sigue únicamente la rotación del objeto seleccionado."
             ]
         },
         "fr": {
-            "label": "Follow Cam - Rotation Seulement",
+            "label": "Caméra de Suivi - Rotation Seulement",
             "tooltip": [
                 "Crée une caméra qui suit uniquement la rotation de l'objet sélectionné."
+            ]
+        },
+        "ca": {
+            "label": "Càmera de Seguiment - Només Rotació",
+            "tooltip": [
+                "Crea una càmera que segueix únicament la rotació de l'objecte seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "跟随摄像机 - 仅旋转",
+            "tooltip": [
+                "创建一台仅跟随所选对象旋转的摄像机"
+            ]
+        },
+        "ja": {
+            "label": "追従カメラ - 回転のみ",
+            "tooltip": [
+                "選択したオブジェクトの回転のみに追従するカメラを作成します"
+            ]
+        },
+        "ko": {
+            "label": "추적 카메라 - 회전만",
+            "tooltip": [
+                "선택한 오브젝트의 회전만 따라가는 카메라를 생성합니다"
+            ]
+        },
+        "ar": {
+            "label": "كاميرا المتابعة - دوران فقط",
+            "tooltip": [
+                "أنشئ كاميرا تتابع دوران الكائن المحدد فقط"
             ]
         }
     },
@@ -70,16 +165,72 @@
             ]
         },
         "es": {
-            "label": "Quitar Follow Cam",
+            "label": "Quitar Cámara de Seguimiento",
             "tooltip": [
-                "Elimina la Follow Cam activa y restaura la cámara anterior."
+                "Elimina la Cámara de Seguimiento activa y restaura la cámara anterior."
             ]
         },
         "fr": {
-            "label": "Supprimer la Follow Cam",
+            "label": "Supprimer la Caméra de Suivi",
             "tooltip": [
-                "Supprime la Follow Cam active et restaure la caméra précédente."
+                "Supprime la Caméra de Suivi active et restaure la caméra précédente."
             ]
+        },
+        "ca": {
+            "label": "Eliminar Càmera de Seguiment",
+            "tooltip": [
+                "Elimina la Càmera de Seguiment activa i restaura la càmera anterior"
+            ]
+        },
+        "zh": {
+            "label": "移除跟随摄像机",
+            "tooltip": [
+                "移除活动的跟随摄像机设置并恢复之前的摄像机"
+            ]
+        },
+        "ja": {
+            "label": "追従カメラを削除",
+            "tooltip": [
+                "アクティブな追従カメラ設定を削除し、以前のカメラに戻します"
+            ]
+        },
+        "ko": {
+            "label": "추적 카메라 제거",
+            "tooltip": [
+                "활성 추적 카메라 설정을 제거하고 이전 카메라로 복원합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة كاميرا المتابعة",
+            "tooltip": [
+                "إزالة إعداد كاميرا المتابعة النشط واستعادة الكاميرا السابقة"
+            ]
+        }
+    },
+    "follow_cam_tools": {
+        "en": {
+            "label": "Follow Cam"
+        },
+        "es": {
+            "label": "Cámara de Seguimiento"
+        },
+        "fr": {
+            "label": "Caméra de Suivi"
+        },
+        "ca": {
+            "label": "Càmera de Seguiment"
+        },
+        "zh": {
+            "label": "跟随摄像机"
+        },
+        "ja": {
+            "label": "追従カメラ"
+        },
+        "ko": {
+            "label": "추적 카메라"
+        },
+        "ar": {
+            "label": "كاميرا المتابعة"
         }
     }
 }

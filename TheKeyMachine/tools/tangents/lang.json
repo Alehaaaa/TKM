@@ -17,6 +17,36 @@
             "tooltip": [
                 "Fait correspondre la première et la dernière clé des courbes sélectionnées du Graph Editor pour créer un cycle sans coupure."
             ]
+        },
+        "ca": {
+            "label": "Igualador de Cicles",
+            "tooltip": [
+                "Iguala la primera i l'última clau de les corbes seleccionades del Graph Editor per crear un cicle sense talls"
+            ]
+        },
+        "zh": {
+            "label": "循环匹配器",
+            "tooltip": [
+                "匹配所选 Graph Editor 曲线的首尾关键帧以创建无缝循环"
+            ]
+        },
+        "ja": {
+            "label": "サイクルマッチャー",
+            "tooltip": [
+                "選択したGraph Editorカーブの最初と最後のキーを一致させ、シームレスなサイクルを作成します"
+            ]
+        },
+        "ko": {
+            "label": "사이클 매처",
+            "tooltip": [
+                "선택한 Graph Editor 커브의 처음과 마지막 키를 맞춰 매끄러운 사이클을 만듭니다"
+            ]
+        },
+        "ar": {
+            "label": "مطابق الدورة",
+            "tooltip": [
+                "مطابقة أول وآخر مفتاح في منحنيات Graph Editor المحددة لإنشاء دورة سلسة"
+            ]
         }
     },
     "tangent_bouncy": {
@@ -36,6 +66,36 @@
             "label": "Tangente Bouncy",
             "tooltip": [
                 "Ajuste des angles de tangente exagérés qui ajoutent un rebond contrôlé autour des clés ciblées."
+            ]
+        },
+        "ca": {
+            "label": "Tangent Bouncy",
+            "tooltip": [
+                "Ajusta angles de tangent exagerats que afegeixen un rebot controlat al voltant de les claus objectiu"
+            ]
+        },
+        "zh": {
+            "label": "弹性切线",
+            "tooltip": [
+                "拟合夸张的切线角度，为目标关键帧周围添加可控的过冲效果"
+            ]
+        },
+        "ja": {
+            "label": "バウンシータンジェント",
+            "tooltip": [
+                "対象キーの周囲に制御されたオーバーシュートを加える誇張したタンジェント角度を設定します"
+            ]
+        },
+        "ko": {
+            "label": "바운시 탄젠트",
+            "tooltip": [
+                "대상 키 주변에 제어된 오버슈트를 추가하는 과장된 탄젠트 각도를 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "مماس مرتد",
+            "tooltip": [
+                "ملاءمة زوايا مماس مبالغ فيها تضيف تجاوزًا محكومًا حول المفاتيح المستهدفة"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Définit des tangentes Auto sur les clés ciblées."
             ]
+        },
+        "ca": {
+            "label": "Tangent Auto",
+            "tooltip": [
+                "Posa tangents automàtiques a les claus objectiu"
+            ]
+        },
+        "zh": {
+            "label": "自动切线",
+            "tooltip": [
+                "为目标关键帧设置自动切线"
+            ]
+        },
+        "ja": {
+            "label": "オートタンジェント",
+            "tooltip": [
+                "対象キーに自動タンジェントを設定します"
+            ]
+        },
+        "ko": {
+            "label": "자동 탄젠트",
+            "tooltip": [
+                "대상 키에 자동 탄젠트를 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "مماس تلقائي",
+            "tooltip": [
+                "ضبط مماسات تلقائية على المفاتيح المستهدفة"
+            ]
         }
     },
     "tangent_spline": {
@@ -76,6 +166,36 @@
             "label": "Tangente Spline",
             "tooltip": [
                 "Définit des tangentes Spline lisses sur les clés ciblées."
+            ]
+        },
+        "ca": {
+            "label": "Tangent Spline",
+            "tooltip": [
+                "Posa tangents Spline suaus a les claus objectiu"
+            ]
+        },
+        "zh": {
+            "label": "样条切线",
+            "tooltip": [
+                "为目标关键帧设置平滑的样条切线"
+            ]
+        },
+        "ja": {
+            "label": "スプラインタンジェント",
+            "tooltip": [
+                "対象キーに滑らかなスプラインタンジェントを設定します"
+            ]
+        },
+        "ko": {
+            "label": "스플라인 탄젠트",
+            "tooltip": [
+                "대상 키에 부드러운 스플라인 탄젠트를 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "مماس سبلاين",
+            "tooltip": [
+                "ضبط مماسات سبلاين ناعمة على المفاتيح المستهدفة"
             ]
         }
     },
@@ -97,6 +217,36 @@
             "tooltip": [
                 "Définit des tangentes Clamped pour lisser le mouvement en limitant le dépassement près de valeurs égales."
             ]
+        },
+        "ca": {
+            "label": "Tangent Clamped",
+            "tooltip": [
+                "Posa tangents Clamped per suavitzar el moviment limitant el rebot prop de valors iguals"
+            ]
+        },
+        "zh": {
+            "label": "钳制切线",
+            "tooltip": [
+                "设置钳制切线以平滑运动，同时限制数值相近处的过冲"
+            ]
+        },
+        "ja": {
+            "label": "クランプタンジェント",
+            "tooltip": [
+                "等しい値付近のオーバーシュートを抑えつつ動きを滑らかにするクランプタンジェントを設定します"
+            ]
+        },
+        "ko": {
+            "label": "클램프 탄젠트",
+            "tooltip": [
+                "값이 비슷한 구간의 오버슈트를 제한하면서 움직임을 매끄럽게 하는 클램프 탄젠트를 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "مماس مقيّد",
+            "tooltip": [
+                "ضبط مماسات مقيّدة لتنعيم الحركة مع الحد من التجاوز قرب القيم المتساوية"
+            ]
         }
     },
     "tangent_linear": {
@@ -116,6 +266,36 @@
             "label": "Tangente Linear",
             "tooltip": [
                 "Définit une interpolation Linear droite à travers les clés ciblées."
+            ]
+        },
+        "ca": {
+            "label": "Tangent Linear",
+            "tooltip": [
+                "Posa interpolació Linear recta a través de les claus objectiu"
+            ]
+        },
+        "zh": {
+            "label": "线性切线",
+            "tooltip": [
+                "在目标关键帧之间设置直线线性插值"
+            ]
+        },
+        "ja": {
+            "label": "リニアタンジェント",
+            "tooltip": [
+                "対象キー間に直線的なリニア補間を設定します"
+            ]
+        },
+        "ko": {
+            "label": "선형 탄젠트",
+            "tooltip": [
+                "대상 키 사이에 직선 선형 보간을 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "مماس خطي",
+            "tooltip": [
+                "ضبط استيفاء خطي مستقيم عبر المفاتيح المستهدفة"
             ]
         }
     },
@@ -137,6 +317,36 @@
             "tooltip": [
                 "Définit des tangentes Flat horizontales sur les clés ciblées."
             ]
+        },
+        "ca": {
+            "label": "Tangent Flat",
+            "tooltip": [
+                "Posa tangents Flat horitzontals a les claus objectiu"
+            ]
+        },
+        "zh": {
+            "label": "平坦切线",
+            "tooltip": [
+                "为目标关键帧设置水平平坦切线"
+            ]
+        },
+        "ja": {
+            "label": "フラットタンジェント",
+            "tooltip": [
+                "対象キーに水平なフラットタンジェントを設定します"
+            ]
+        },
+        "ko": {
+            "label": "플랫 탄젠트",
+            "tooltip": [
+                "대상 키에 수평 플랫 탄젠트를 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "مماس مسطح",
+            "tooltip": [
+                "ضبط مماسات أفقية مسطحة على المفاتيح المستهدفة"
+            ]
         }
     },
     "tangent_step": {
@@ -156,6 +366,36 @@
             "label": "Tangente Step",
             "tooltip": [
                 "Maintient chaque valeur de clé jusqu'à la clé suivante."
+            ]
+        },
+        "ca": {
+            "label": "Tangent Step",
+            "tooltip": [
+                "Manté cada valor de clau fins a la següent clau"
+            ]
+        },
+        "zh": {
+            "label": "阶梯切线",
+            "tooltip": [
+                "保持每个关键帧值直到下一个关键帧"
+            ]
+        },
+        "ja": {
+            "label": "ステップタンジェント",
+            "tooltip": [
+                "各キーの値を次のキーまで保持します"
+            ]
+        },
+        "ko": {
+            "label": "스텝 탄젠트",
+            "tooltip": [
+                "각 키 값을 다음 키까지 유지합니다"
+            ]
+        },
+        "ar": {
+            "label": "مماس متدرج",
+            "tooltip": [
+                "الاحتفاظ بقيمة كل مفتاح حتى المفتاح التالي"
             ]
         }
     },
@@ -177,6 +417,62 @@
             "tooltip": [
                 "Définit des tangentes Plateau pour lisser les extrema en réduisant le dépassement."
             ]
+        },
+        "ca": {
+            "label": "Tangent Plateau",
+            "tooltip": [
+                "Posa tangents Plateau per suavitzar els extrems reduint el rebot"
+            ]
+        },
+        "zh": {
+            "label": "高原切线",
+            "tooltip": [
+                "设置高原切线以平滑极值并减少过冲"
+            ]
+        },
+        "ja": {
+            "label": "プラトータンジェント",
+            "tooltip": [
+                "オーバーシュートを抑えつつ極値を滑らかにするプラトータンジェントを設定します"
+            ]
+        },
+        "ko": {
+            "label": "플래토 탄젠트",
+            "tooltip": [
+                "오버슈트를 줄이면서 극값을 매끄럽게 하는 플래토 탄젠트를 설정합니다"
+            ]
+        },
+        "ar": {
+            "label": "مماس هضبي",
+            "tooltip": [
+                "ضبط مماسات هضبية لتنعيم القيم القصوى مع تقليل التجاوز"
+            ]
+        }
+    },
+    "tangents": {
+        "en": {
+            "label": "Tangents"
+        },
+        "es": {
+            "label": "Tangentes"
+        },
+        "fr": {
+            "label": "Tangentes"
+        },
+        "ca": {
+            "label": "Tangents"
+        },
+        "zh": {
+            "label": "切线"
+        },
+        "ja": {
+            "label": "タンジェント"
+        },
+        "ko": {
+            "label": "탄젠트"
+        },
+        "ar": {
+            "label": "المماسات"
         }
     }
 }

@@ -204,7 +204,7 @@ def _add_registered_menu(parent_menu, builder, *, command_id, command_icon=UNSET
     )
 
 
-def _declared_item_text(item, toolbox_module):
+def _declared_item_text(item, toolbox_module, fallback_command_id=None):
     """Resolve a declarative menu item's live label/description.
 
     Menu/dynamic_menu/section headers are declared once as plain Python
@@ -220,7 +220,7 @@ def _declared_item_text(item, toolbox_module):
       real tool one-to-one (e.g. the "Preferences" submenu mirrors the
       standalone ``main_preferences_menu`` tool).
     - ``"i18n_key"``: look up a chrome-only string (one with no tool id of
-      its own, like a plain section header) in ``data/lang/core.json`` via
+      its own, like a plain section header) in ``data/lang/ui.json`` via
       ``i18n.tr()``.
     Neither key present: fall back to the literal ``"label"``/``"description"``,
     unchanged -- every other package's declared menus keep working exactly
@@ -229,7 +229,7 @@ def _declared_item_text(item, toolbox_module):
     label = item.get("label", "")
     description = item.get("description", "")
 
-    command_id = item.get("command") or item.get("id")
+    command_id = item.get("command") or item.get("id") or fallback_command_id
     if command_id:
         tool = toolbox_module.get_tool(command_id)
         tooltip = tool.get("tooltip")
@@ -247,11 +247,11 @@ def _declared_item_text(item, toolbox_module):
     return label, description
 
 
-def build_declared_menu(definition, parent_widget=None):
+def build_declared_menu(definition, parent_widget=None, owner_command_id=None):
     """Build a package-declared menu without tool-specific core code."""
     from TheKeyMachine.core import toolbox
 
-    menu_label, menu_description = _declared_item_text(definition, toolbox)
+    menu_label, menu_description = _declared_item_text(definition, toolbox, fallback_command_id=owner_command_id)
     menu = cw.MenuWidget(
         QtGui.QIcon(definition.get("icon") or ""),
         menu_label,
@@ -310,30 +310,39 @@ def build_declared_menu(definition, parent_widget=None):
                 )
             continue
         if item_type == "section":
-            menu.addSection(item.get("label", ""))
+            label, _description = _declared_item_text(item, toolbox)
+            menu.addSection(label)
             continue
         if item_type == "dynamic_menu":
             builder = item.get("builder")
             if not callable(builder):
                 raise TypeError("Declared dynamic menu requires a callable builder")
+            label, description = _declared_item_text(item, toolbox)
             child = cw.MenuWidget(
                 _qicon(item.get("icon")),
-                item.get("label", ""),
+                label,
                 parent=menu,
-                description=item.get("description", ""),
+                description=description,
             )
             placeholder = child.addAction("Loading…")
             placeholder.setEnabled(False)
             child.aboutToShow.connect(partial(builder, child))
-            menu.addMenu(child, description=item.get("description", ""))
+            menu.addMenu(child, description=description)
             continue
         if item_type == "menu":
             child = build_declared_menu(item, parent_widget=menu)
-            menu.addMenu(child, description=item.get("description", ""))
+            _label, description = _declared_item_text(item, toolbox)
+            menu.addMenu(child, description=description)
             continue
 
         command_id = item.get("command") or item.get("id")
         fields = {key: item[key] for key in ("label", "callback", "icon", "description", "tooltip") if key in item}
+        if not command_id:
+            label, description = _declared_item_text(item, toolbox)
+            if "label" in fields:
+                fields["label"] = label
+            if "description" in fields:
+                fields["description"] = description
         if item_type == "check":
             tool = toolbox.get_tool(command_id, **fields) if command_id else fields
             action = _add_checkable_action(
@@ -454,6 +463,8 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
     by ``refresh_toolbar_pinning_menu`` right before the (cached) menu pops
     back up.
     """
+    from TheKeyMachine.core import i18n
+
     menu = cw.MenuWidget(parent_widget, tearoff=False)
     from TheKeyMachine.tools.tkm_menu import api as tkmMenuApi
 
@@ -469,7 +480,7 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
         label = getattr(section, "menu_label", lambda: "Tools")().replace("&", "&&")
         section_menu = cw.OpenMenuWidget(QtGui.QIcon(icon_path or ""), label)
         section.populate_pinning_menu(section_menu)
-        menu.addMenu(section_menu, description="Pin tools in {}.".format(label))
+        menu.addMenu(section_menu, description=i18n.tr("pin_tools_in", "Pin tools in {}.").format(label))
         menu._tkm_section_menus.append((section, section_menu))
 
     if sections:
@@ -1178,13 +1189,19 @@ def build_main_settings_menu(
 
 
 def build_graph_settings_submenu(apply_alignment_fn):
-    settings_menu = cw.MenuWidget(QtGui.QIcon(icons.settings), "Settings", description="Tool configuration and preferences.")
+    from TheKeyMachine.core import i18n
 
-    settings_menu.addSection("Graph toolbar")
+    settings_menu = cw.MenuWidget(
+        QtGui.QIcon(icons.settings),
+        i18n.tr("settings_menu", "Settings"),
+        description=i18n.tr("settings_menu_desc", "Tool configuration and preferences."),
+    )
+
+    settings_menu.addSection(i18n.tr("graph_toolbar_section", "Graph toolbar"))
     graph_toolbar_action = settings_menu.addAction(
         QtGui.QIcon(icons.customGraph),
-        "Graph Editor Toolbar",
-        description="Show or hide the TKM toolbar inside the Graph Editor.",
+        i18n.tr("graph_editor_toolbar", "Graph Editor Toolbar"),
+        description=i18n.tr("graph_editor_toolbar_desc", "Show or hide the TKM toolbar inside the Graph Editor."),
     )
     toolCommon.connect_checkable_action(
         graph_toolbar_action,
@@ -1193,7 +1210,7 @@ def build_graph_settings_submenu(apply_alignment_fn):
         signal=graphToolbarApi.custom_graph_bus.graph_toolbar_enabled_changed,
     )
 
-    settings_menu.addSection("Toolbar's icons alignment")
+    settings_menu.addSection(i18n.tr("toolbar_icons_alignment_section", "Toolbar's icons alignment"))
     current_align = settings.get_setting("graph_toolbar_alignment", "Center")
     settings_menu._tkm_alignment_group, settings_menu._tkm_alignment_actions = _add_alignment_actions(
         settings_menu,
@@ -1201,22 +1218,28 @@ def build_graph_settings_submenu(apply_alignment_fn):
         apply_alignment_fn,
     )
 
-    settings_menu.addSection("General")
+    settings_menu.addSection(i18n.tr("general_section", "General"))
     settings_menu.addAction(
         QtGui.QIcon(icons.close),
-        "Close",
+        i18n.tr("close", "Close"),
         toolCommon.mark_non_tool_action(
             lambda: QtCore.QTimer.singleShot(
                 0, lambda: graphToolbarApi.set_graph_toolbar_enabled(False)
             )
         ),
-        description="Hide the TKM Graph Editor toolbar and keep it disabled.",
+        description=i18n.tr("close_graph_toolbar_desc", "Hide the TKM Graph Editor toolbar and keep it disabled."),
     )
     return settings_menu
 
 
 def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, move_dock_fn):
-    dock_menu = cw.MenuWidget(QtGui.QIcon(icons.dock), "Dock", description="Move the Graph Editor toolbar.")
+    from TheKeyMachine.core import i18n
+
+    dock_menu = cw.MenuWidget(
+        QtGui.QIcon(icons.dock),
+        i18n.tr("dock_menu", "Dock"),
+        description=i18n.tr("graph_dock_menu_desc", "Move the Graph Editor toolbar."),
+    )
     dock_group = QtGui.QActionGroup(dock_menu)
     dock_group.setExclusive(True)
 
@@ -1224,12 +1247,12 @@ def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, mov
     for position, label, description in dock_options:
         dock_actions[position] = _add_checkable_action(
             dock_menu,
-            label,
+            i18n.tr("graph_dock_{}".format(position), label),
             toolCommon.mark_non_tool_action(
                 partial(_apply_checked_value, move_dock_fn, position)
             ),
             group=dock_group,
-            description=description,
+            description=i18n.tr("graph_dock_{}_desc".format(position), description),
         )
 
     current_position = settings.get_setting(dock_setting, default_dock_position)

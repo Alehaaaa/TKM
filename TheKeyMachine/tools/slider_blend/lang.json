@@ -17,6 +17,36 @@
             "tooltip": [
                 "Connecte en douceur le segment de courbe sélectionné aux clés environnantes."
             ]
+        },
+        "ca": {
+            "label": "Connectar amb Veïns",
+            "tooltip": [
+                "Connecta suaument el segment de corba seleccionat amb les claus que l'envolten"
+            ]
+        },
+        "zh": {
+            "label": "连接相邻",
+            "tooltip": [
+                "将所选曲线段与其周围关键帧平滑连接"
+            ]
+        },
+        "ja": {
+            "label": "隣接に接続",
+            "tooltip": [
+                "選択したカーブセグメントを周囲のキーに滑らかに接続します"
+            ]
+        },
+        "ko": {
+            "label": "이웃에 연결",
+            "tooltip": [
+                "선택한 커브 구간을 주변 키와 부드럽게 연결합니다"
+            ]
+        },
+        "ar": {
+            "label": "الاتصال بالمجاورين",
+            "tooltip": [
+                "ربط جزء المنحنى المحدد بسلاسة بالمفاتيح المحيطة به"
+            ]
         }
     },
     "ease_in_out": {
@@ -36,6 +66,36 @@
             "label": "Adoucir Entrée | Sortie",
             "tooltip": [
                 "Modifie le rythme des clés sélectionnées entre un adoucissement en entrée et en sortie."
+            ]
+        },
+        "ca": {
+            "label": "Suavitzar Entrada | Sortida",
+            "tooltip": [
+                "Canvia el ritme de les claus seleccionades entre suavitzat d'entrada i de sortida"
+            ]
+        },
+        "zh": {
+            "label": "缓入 | 缓出",
+            "tooltip": [
+                "在缓入和缓出节奏之间重塑所选关键帧"
+            ]
+        },
+        "ja": {
+            "label": "イーズイン | アウト",
+            "tooltip": [
+                "選択したキーをイーズインとイーズアウトのタイミングの間で変形します"
+            ]
+        },
+        "ko": {
+            "label": "이즈 인 | 아웃",
+            "tooltip": [
+                "선택한 키를 이즈인과 이즈아웃 타이밍 사이에서 다시 형성합니다"
+            ]
+        },
+        "ar": {
+            "label": "تسارع دخول | خروج",
+            "tooltip": [
+                "إعادة تشكيل المفاتيح المحددة بين توقيت التسارع عند الدخول والخروج"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Referme les écarts de valeur entre des segments d'animation voisins."
             ]
+        },
+        "ca": {
+            "label": "Cosidor de Buits",
+            "tooltip": [
+                "Tanca les diferències de valor entre segments d'animació veïns"
+            ]
+        },
+        "zh": {
+            "label": "缝合间隙",
+            "tooltip": [
+                "消除相邻动画片段之间的数值差距"
+            ]
+        },
+        "ja": {
+            "label": "ギャップスティッチャー",
+            "tooltip": [
+                "隣接するアニメーションセグメント間の値のギャップを埋めます"
+            ]
+        },
+        "ko": {
+            "label": "간격 봉합",
+            "tooltip": [
+                "인접한 애니메이션 구간 사이의 값 차이를 메웁니다"
+            ]
+        },
+        "ar": {
+            "label": "خياطة الفجوات",
+            "tooltip": [
+                "إغلاق فجوات القيم بين أجزاء الحركة المتجاورة"
+            ]
         }
     },
     "noise_wave": {
@@ -76,6 +166,36 @@
             "label": "Bruit | Onde",
             "tooltip": [
                 "Faites glisser à gauche pour un bruit procédural ou à droite pour une onde alternée."
+            ]
+        },
+        "ca": {
+            "label": "Soroll | Ona",
+            "tooltip": [
+                "Arrossega cap a l'esquerra per a soroll procedural o cap a la dreta per a una ona alterna"
+            ]
+        },
+        "zh": {
+            "label": "噪声 | 波形",
+            "tooltip": [
+                "向左拖动生成程序化噪声，向右拖动生成交替波形"
+            ]
+        },
+        "ja": {
+            "label": "ノイズ | ウェーブ",
+            "tooltip": [
+                "左にドラッグでプロシージャルノイズ、右にドラッグで交互のウェーブになります"
+            ]
+        },
+        "ko": {
+            "label": "노이즈 | 웨이브",
+            "tooltip": [
+                "왼쪽으로 드래그하면 절차적 노이즈, 오른쪽으로 드래그하면 교대 웨이브가 생성됩니다"
+            ]
+        },
+        "ar": {
+            "label": "ضوضاء | موجة",
+            "tooltip": [
+                "اسحب لليسار للحصول على ضوضاء إجرائية أو لليمين للحصول على موجة متناوبة"
             ]
         }
     },
@@ -97,6 +217,36 @@
             "tooltip": [
                 "Attire les clés vers la tendance voisine ou les en éloigne."
             ]
+        },
+        "ca": {
+            "label": "Atraure | Empènyer",
+            "tooltip": [
+                "Atrau les claus cap a la tendència veïna o les allunya"
+            ]
+        },
+        "zh": {
+            "label": "拉近 | 推离",
+            "tooltip": [
+                "将关键帧拉向相邻趋势或推离趋势"
+            ]
+        },
+        "ja": {
+            "label": "引く | 押す",
+            "tooltip": [
+                "キーを隣接するトレンドに引き寄せるか、そこから押し離します"
+            ]
+        },
+        "ko": {
+            "label": "당기기 | 밀기",
+            "tooltip": [
+                "키를 인접한 추세 쪽으로 당기거나 밀어냅니다"
+            ]
+        },
+        "ar": {
+            "label": "سحب | دفع",
+            "tooltip": [
+                "سحب المفاتيح نحو الاتجاه المجاور أو دفعها بعيدًا عنه"
+            ]
         }
     },
     "simplify_bake": {
@@ -107,15 +257,45 @@
             ]
         },
         "es": {
-            "label": "Simplificar | Bake de Claves",
+            "label": "Simplificar | Hornear Claves",
             "tooltip": [
-                "Arrastra a la izquierda para simplificar claves o a la derecha para hacer bake de claves adicionales."
+                "Arrastra a la izquierda para simplificar claves o a la derecha para hornear claves adicionales."
             ]
         },
         "fr": {
-            "label": "Simplifier | Bake des Clés",
+            "label": "Simplifier | Convertir des Clés",
             "tooltip": [
-                "Faites glisser à gauche pour simplifier les clés ou à droite pour bake des clés supplémentaires."
+                "Faites glisser à gauche pour simplifier les clés ou à droite pour convertir des clés supplémentaires."
+            ]
+        },
+        "ca": {
+            "label": "Simplificar | Hornejar Claus",
+            "tooltip": [
+                "Arrossega cap a l'esquerra per simplificar claus o cap a la dreta per hornejar claus addicionals"
+            ]
+        },
+        "zh": {
+            "label": "简化 | 烘焙关键帧",
+            "tooltip": [
+                "向左拖动简化关键帧，向右拖动烘焙额外的关键帧"
+            ]
+        },
+        "ja": {
+            "label": "簡略化 | キーをベイク",
+            "tooltip": [
+                "左にドラッグでキーを簡略化、右にドラッグで追加のキーをベイクします"
+            ]
+        },
+        "ko": {
+            "label": "단순화 | 키 베이크",
+            "tooltip": [
+                "왼쪽으로 드래그하면 키를 단순화하고, 오른쪽으로 드래그하면 추가 키를 베이크합니다"
+            ]
+        },
+        "ar": {
+            "label": "تبسيط | خَبز المفاتيح",
+            "tooltip": [
+                "اسحب لليسار لتبسيط المفاتيح أو لليمين لخَبز مفاتيح إضافية"
             ]
         }
     },
@@ -137,6 +317,36 @@
             "tooltip": [
                 "Lisse la courbe ou accentue sa variation locale."
             ]
+        },
+        "ca": {
+            "label": "Suavitzar | Exagerar",
+            "tooltip": [
+                "Suavitza la corba o exagera la seva variació local"
+            ]
+        },
+        "zh": {
+            "label": "平滑 | 粗糙",
+            "tooltip": [
+                "平滑曲线或夸大其局部变化"
+            ]
+        },
+        "ja": {
+            "label": "スムーズ | ラフ",
+            "tooltip": [
+                "カーブを滑らかにするか、局所的な変化を誇張します"
+            ]
+        },
+        "ko": {
+            "label": "매끄럽게 | 거칠게",
+            "tooltip": [
+                "커브를 매끄럽게 하거나 국소 변화를 과장합니다"
+            ]
+        },
+        "ar": {
+            "label": "تنعيم | تخشين",
+            "tooltip": [
+                "تنعيم المنحنى أو تضخيم تباينه المحلي"
+            ]
         }
     },
     "time_offsetter": {
@@ -156,6 +366,36 @@
             "label": "Décaleur de Temps",
             "tooltip": [
                 "Décale dans le temps la forme de l'animation en conservant les temps de clé."
+            ]
+        },
+        "ca": {
+            "label": "Desfasador de Temps",
+            "tooltip": [
+                "Desfasa en el temps la forma de l'animació conservant els temps de clau"
+            ]
+        },
+        "zh": {
+            "label": "时间偏移器",
+            "tooltip": [
+                "在保留关键帧时间的同时，在时间上偏移动画形状"
+            ]
+        },
+        "ja": {
+            "label": "タイムオフセッター",
+            "tooltip": [
+                "キー時間を維持しながらアニメーション形状を時間方向にオフセットします"
+            ]
+        },
+        "ko": {
+            "label": "타임 오프셋터",
+            "tooltip": [
+                "키 시간을 유지하면서 애니메이션 형태를 시간축으로 오프셋합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزيح الزمن",
+            "tooltip": [
+                "إزاحة شكل الحركة زمنيًا مع الحفاظ على أوقات المفاتيح"
             ]
         }
     },
@@ -177,6 +417,36 @@
             "tooltip": [
                 "Échelonne l'animation de tout l'objet en gardant les canaux synchronisés."
             ]
+        },
+        "ca": {
+            "label": "Desfasador de Temps Escalonat",
+            "tooltip": [
+                "Escalona l'animació de tot l'objecte mantenint els canals sincronitzats"
+            ]
+        },
+        "zh": {
+            "label": "交错时间偏移器",
+            "tooltip": [
+                "在保持各通道同步的同时，交错整个对象的动画"
+            ]
+        },
+        "ja": {
+            "label": "スタガードタイムオフセッター",
+            "tooltip": [
+                "チャンネルの同期を保ちながらオブジェクト全体のアニメーションをずらします"
+            ]
+        },
+        "ko": {
+            "label": "스태거 타임 오프셋터",
+            "tooltip": [
+                "채널 동기화를 유지하면서 전체 오브젝트 애니메이션을 어긋나게 배치합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزيح الزمن المتدرج",
+            "tooltip": [
+                "تعرّج حركة الكائن بأكمله مع إبقاء القنوات متزامنة"
+            ]
         }
     },
     "scale_average": {
@@ -196,6 +466,36 @@
             "label": "Mettre à l'Échelle Depuis la Moyenne",
             "tooltip": [
                 "Met à l'échelle les valeurs sélectionnées autour de leur moyenne."
+            ]
+        },
+        "ca": {
+            "label": "Escalar Des de la Mitjana",
+            "tooltip": [
+                "Escala els valors seleccionats al voltant de la seva mitjana"
+            ]
+        },
+        "zh": {
+            "label": "从平均值缩放",
+            "tooltip": [
+                "围绕所选值的平均值进行缩放"
+            ]
+        },
+        "ja": {
+            "label": "平均からスケール",
+            "tooltip": [
+                "選択した値をその平均値を中心にスケールします"
+            ]
+        },
+        "ko": {
+            "label": "평균값 기준 스케일",
+            "tooltip": [
+                "선택한 값을 평균값을 기준으로 스케일합니다"
+            ]
+        },
+        "ar": {
+            "label": "قياس من المتوسط",
+            "tooltip": [
+                "قياس القيم المحددة حول متوسطها"
             ]
         }
     },
@@ -217,6 +517,36 @@
             "tooltip": [
                 "Met à l'échelle les valeurs sélectionnées autour de la valeur par défaut du canal."
             ]
+        },
+        "ca": {
+            "label": "Escalar Des del Valor Predeterminat",
+            "tooltip": [
+                "Escala els valors seleccionats al voltant del valor predeterminat del canal"
+            ]
+        },
+        "zh": {
+            "label": "从默认值缩放",
+            "tooltip": [
+                "围绕通道默认值进行缩放"
+            ]
+        },
+        "ja": {
+            "label": "デフォルトからスケール",
+            "tooltip": [
+                "選択した値をチャンネルのデフォルト値を中心にスケールします"
+            ]
+        },
+        "ko": {
+            "label": "기본값 기준 스케일",
+            "tooltip": [
+                "선택한 값을 채널 기본값을 기준으로 스케일합니다"
+            ]
+        },
+        "ar": {
+            "label": "قياس من الافتراضي",
+            "tooltip": [
+                "قياس القيم المحددة حول القيمة الافتراضية للقناة"
+            ]
         }
     },
     "scale_frame": {
@@ -236,6 +566,36 @@
             "label": "Mettre à l'Échelle Depuis une Image",
             "tooltip": [
                 "Met à l'échelle les valeurs autour d'images de référence choisies ou de l'image actuelle."
+            ]
+        },
+        "ca": {
+            "label": "Escalar Des d'un Fotograma",
+            "tooltip": [
+                "Escala els valors al voltant de fotogrames de referència triats o del fotograma actual"
+            ]
+        },
+        "zh": {
+            "label": "从帧缩放",
+            "tooltip": [
+                "围绕选定的参考帧或当前帧进行缩放"
+            ]
+        },
+        "ja": {
+            "label": "フレームからスケール",
+            "tooltip": [
+                "選択した参照フレームまたは現在のフレームを中心に値をスケールします"
+            ]
+        },
+        "ko": {
+            "label": "프레임 기준 스케일",
+            "tooltip": [
+                "선택한 참조 프레임 또는 현재 프레임을 기준으로 값을 스케일합니다"
+            ]
+        },
+        "ar": {
+            "label": "قياس من إطار",
+            "tooltip": [
+                "قياس القيم حول إطارات مرجعية مختارة أو الإطار الحالي"
             ]
         }
     },
@@ -257,6 +617,36 @@
             "tooltip": [
                 "Met à l'échelle les valeurs autour de la clé précédente."
             ]
+        },
+        "ca": {
+            "label": "Escalar Des del Veí Esquerre",
+            "tooltip": [
+                "Escala els valors al voltant de la clau anterior"
+            ]
+        },
+        "zh": {
+            "label": "从左侧邻帧缩放",
+            "tooltip": [
+                "围绕前一个关键帧进行缩放"
+            ]
+        },
+        "ja": {
+            "label": "左隣からスケール",
+            "tooltip": [
+                "直前のキーを中心に値をスケールします"
+            ]
+        },
+        "ko": {
+            "label": "왼쪽 이웃 기준 스케일",
+            "tooltip": [
+                "이전 키를 기준으로 값을 스케일합니다"
+            ]
+        },
+        "ar": {
+            "label": "قياس من المجاور الأيسر",
+            "tooltip": [
+                "قياس القيم حول المفتاح السابق"
+            ]
         }
     },
     "scale_neighbor_right": {
@@ -277,6 +667,62 @@
             "tooltip": [
                 "Met à l'échelle les valeurs autour de la clé suivante."
             ]
+        },
+        "ca": {
+            "label": "Escalar Des del Veí Dret",
+            "tooltip": [
+                "Escala els valors al voltant de la clau següent"
+            ]
+        },
+        "zh": {
+            "label": "从右侧邻帧缩放",
+            "tooltip": [
+                "围绕下一个关键帧进行缩放"
+            ]
+        },
+        "ja": {
+            "label": "右隣からスケール",
+            "tooltip": [
+                "直後のキーを中心に値をスケールします"
+            ]
+        },
+        "ko": {
+            "label": "오른쪽 이웃 기준 스케일",
+            "tooltip": [
+                "다음 키를 기준으로 값을 스케일합니다"
+            ]
+        },
+        "ar": {
+            "label": "قياس من المجاور الأيمن",
+            "tooltip": [
+                "قياس القيم حول المفتاح التالي"
+            ]
+        }
+    },
+    "slider_blend": {
+        "en": {
+            "label": "Blend Sliders"
+        },
+        "es": {
+            "label": "Deslizadores de Mezcla"
+        },
+        "fr": {
+            "label": "Curseurs de Fondu"
+        },
+        "ca": {
+            "label": "Controls Lliscants de Mescla"
+        },
+        "zh": {
+            "label": "混合滑块"
+        },
+        "ja": {
+            "label": "ブレンドスライダー"
+        },
+        "ko": {
+            "label": "블렌드 슬라이더"
+        },
+        "ar": {
+            "label": "أشرطة تمرير المزج"
         }
     }
 }

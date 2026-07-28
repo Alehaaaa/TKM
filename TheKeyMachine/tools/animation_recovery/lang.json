@@ -20,6 +20,67 @@
                 "Parcourez les instantanés automatiques d'animation et de canaux, avec des alertes lorsqu'un fichier de scène plus ancien est ouvert.",
                 "Récupérez sans rien sélectionner pour tout restaurer, ou sélectionnez des objets pour ne restaurer que ceux-ci."
             ]
+        },
+        "ca": {
+            "label": "Recuperació d'Animació",
+            "tooltip": [
+                "Explora captures automàtiques d'animació i canals, amb avisos quan s'obre un fitxer d'escena anterior",
+                "Recupera sense res seleccionat per restaurar-ho tot, o selecciona objectes per restaurar només aquests"
+            ]
+        },
+        "zh": {
+            "label": "动画恢复",
+            "tooltip": [
+                "浏览自动动画和通道快照，当打开较旧的场景文件时会发出提示",
+                "在未选择任何内容的情况下恢复以还原全部内容，或选择对象仅还原这些对象"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションリカバリー",
+            "tooltip": [
+                "自動アニメーション・チャンネルスナップショットを閲覧し、古いシーンファイルを開いた際に警告を表示します",
+                "何も選択せずに復元するとすべてが復元され、オブジェクトを選択するとそのオブジェクトのみ復元されます"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 복구",
+            "tooltip": [
+                "자동 애니메이션 및 채널 스냅샷을 탐색하며, 이전 씬 파일을 열면 알림이 표시됩니다",
+                "아무것도 선택하지 않고 복구하면 전체가 복원되고, 오브젝트를 선택하면 해당 오브젝트만 복원됩니다"
+            ]
+        },
+        "ar": {
+            "label": "استرجاع الحركة",
+            "tooltip": [
+                "تصفح لقطات الحركة والقنوات التلقائية، مع تنبيهات عند فتح ملف مشهد أقدم",
+                "استرجع دون تحديد أي شيء لاستعادة كل شيء، أو حدد كائنات لاستعادة تلك الكائنات فقط"
+            ]
+        }
+    },
+    "animation_recovery_tools": {
+        "en": {
+            "label": "Animation Recovery"
+        },
+        "es": {
+            "label": "Recuperación de Animación"
+        },
+        "fr": {
+            "label": "Récupération d'Animation"
+        },
+        "ca": {
+            "label": "Recuperació d'Animació"
+        },
+        "zh": {
+            "label": "动画恢复"
+        },
+        "ja": {
+            "label": "アニメーションリカバリー"
+        },
+        "ko": {
+            "label": "애니메이션 복구"
+        },
+        "ar": {
+            "label": "استرجاع الحركة"
         }
     }
 }

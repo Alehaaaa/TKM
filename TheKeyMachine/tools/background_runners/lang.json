@@ -17,6 +17,36 @@
             "tooltip": [
                 "Active ou désactive les assistants automatiques persistants et les exécuteurs d'outils en arrière-plan."
             ]
+        },
+        "ca": {
+            "label": "Executors en Segon Pla",
+            "tooltip": [
+                "Activa o desactiva els ajudants automàtics persistents i els executors d'eines en segon pla"
+            ]
+        },
+        "zh": {
+            "label": "后台运行器",
+            "tooltip": [
+                "切换持久的自动辅助功能和后台工具运行器"
+            ]
+        },
+        "ja": {
+            "label": "バックグラウンドランナー",
+            "tooltip": [
+                "常駐する自動ヘルパーとバックグラウンドツールランナーを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "백그라운드 러너",
+            "tooltip": [
+                "지속적인 자동 도우미 및 백그라운드 도구 러너를 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "المشغلات الخلفية",
+            "tooltip": [
+                "تبديل المساعدات التلقائية الدائمة ومشغلات الأدوات الخلفية"
+            ]
         }
     },
     "background_runner_channelbox_selection_highlight": {
@@ -36,6 +66,36 @@
             "label": "Surligner la Timeline selon la Sélection du Channel Box",
             "tooltip": [
                 "Active ou désactive le surlignage de la timeline pour les attributs sélectionnés du Channel Box."
+            ]
+        },
+        "ca": {
+            "label": "Ressaltar Línia de Temps per Selecció del Channel Box",
+            "tooltip": [
+                "Activa o desactiva el ressaltat de la línia de temps per als atributs seleccionats del Channel Box"
+            ]
+        },
+        "zh": {
+            "label": "通道盒选择时间线高亮",
+            "tooltip": [
+                "切换所选通道盒属性的时间线高亮显示"
+            ]
+        },
+        "ja": {
+            "label": "チャンネルボックス選択タイムラインハイライト",
+            "tooltip": [
+                "選択したチャンネルボックスアトリビュートのタイムラインハイライトを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "채널 박스 선택 타임라인 강조",
+            "tooltip": [
+                "선택한 채널 박스 속성의 타임라인 강조 표시를 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "تمييز الجدول الزمني لتحديد صندوق القنوات",
+            "tooltip": [
+                "تبديل تمييز الجدول الزمني للخصائص المحددة في صندوق القنوات"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Active ou désactive l'effacement des attributs du Channel Box lorsque la sélection d'objets change."
             ]
+        },
+        "ca": {
+            "label": "Netejar Selecció del Channel Box",
+            "tooltip": [
+                "Activa o desactiva la neteja dels atributs del Channel Box quan canvia la selecció d'objectes"
+            ]
+        },
+        "zh": {
+            "label": "通道盒选择清除",
+            "tooltip": [
+                "在对象选择更改时切换通道盒属性的清除"
+            ]
+        },
+        "ja": {
+            "label": "チャンネルボックス選択クリア",
+            "tooltip": [
+                "オブジェクトの選択が変わった際にチャンネルボックスアトリビュートをクリアするかを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "채널 박스 선택 지우기",
+            "tooltip": [
+                "오브젝트 선택이 변경될 때 채널 박스 속성 지우기를 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "مسح تحديد صندوق القنوات",
+            "tooltip": [
+                "تبديل مسح خصائص صندوق القنوات عند تغيّر تحديد الكائن"
+            ]
         }
     },
     "background_runner_camera_orbit_selection": {
@@ -76,6 +166,36 @@
             "label": "Orbite Caméra selon la Sélection",
             "tooltip": [
                 "Active ou désactive le ciblage automatique de l'orbite caméra selon la sélection actuelle."
+            ]
+        },
+        "ca": {
+            "label": "Òrbita de Càmera per Selecció",
+            "tooltip": [
+                "Activa o desactiva que la càmera orienti automàticament la seva òrbita segons la selecció actual"
+            ]
+        },
+        "zh": {
+            "label": "摄像机按选择轨道",
+            "tooltip": [
+                "切换摄像机是否根据当前选择自动定位轨道目标"
+            ]
+        },
+        "ja": {
+            "label": "選択に応じたカメラ軌道",
+            "tooltip": [
+                "現在の選択に応じてカメラの軌道ターゲットを自動設定するかを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "선택에 따른 카메라 궤도",
+            "tooltip": [
+                "현재 선택 항목에 따라 카메라 궤도 대상을 자동 설정할지 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "مدار الكاميرا حسب التحديد",
+            "tooltip": [
+                "تبديل توجيه مدار الكاميرا تلقائيًا حسب التحديد الحالي"
             ]
         }
     },
@@ -97,6 +217,36 @@
             "tooltip": [
                 "Active ou désactive le masquage automatique des courbes statiques dans le Graph Editor."
             ]
+        },
+        "ca": {
+            "label": "Amagar Automàticament Corbes d'Animació Estàtiques",
+            "tooltip": [
+                "Activa o desactiva l'ocultació automàtica de corbes estàtiques al Graph Editor"
+            ]
+        },
+        "zh": {
+            "label": "自动隐藏静态动画曲线",
+            "tooltip": [
+                "切换 Graph Editor 中静态曲线的自动隐藏"
+            ]
+        },
+        "ja": {
+            "label": "静的アニメーションカーブを自動非表示",
+            "tooltip": [
+                "Graph Editorで静的カーブを自動的に非表示にするかを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "정적 애니메이션 커브 자동 숨기기",
+            "tooltip": [
+                "Graph Editor에서 정적 커브의 자동 숨기기를 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "إخفاء منحنيات الحركة الثابتة تلقائيًا",
+            "tooltip": [
+                "تبديل الإخفاء التلقائي للمنحنيات الثابتة في Graph Editor"
+            ]
         }
     },
     "background_runner_animation_recovery": {
@@ -117,6 +267,62 @@
             "tooltip": [
                 "Active ou désactive les instantanés automatiques de récupération d'animation de la scène."
             ]
+        },
+        "ca": {
+            "label": "Recuperació d'Animació",
+            "tooltip": [
+                "Activa o desactiva les captures automàtiques de recuperació d'animació de l'escena"
+            ]
+        },
+        "zh": {
+            "label": "动画恢复",
+            "tooltip": [
+                "切换场景范围内动画恢复快照的自动创建"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションリカバリー",
+            "tooltip": [
+                "シーン単位の自動アニメーションリカバリースナップショットを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 복구",
+            "tooltip": [
+                "씬 범위의 자동 애니메이션 복구 스냅샷을 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "استرجاع الحركة",
+            "tooltip": [
+                "تبديل لقطات استرجاع الحركة التلقائية الخاصة بالمشهد"
+            ]
+        }
+    },
+    "background_runner_tools": {
+        "en": {
+            "label": "Background Runners"
+        },
+        "es": {
+            "label": "Ejecutores en Segundo Plano"
+        },
+        "fr": {
+            "label": "Exécuteurs en Arrière-Plan"
+        },
+        "ca": {
+            "label": "Executors en Segon Pla"
+        },
+        "zh": {
+            "label": "后台运行器"
+        },
+        "ja": {
+            "label": "バックグラウンドランナー"
+        },
+        "ko": {
+            "label": "백그라운드 러너"
+        },
+        "ar": {
+            "label": "المشغلات الخلفية"
         }
     }
 }

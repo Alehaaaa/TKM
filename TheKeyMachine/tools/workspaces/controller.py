@@ -47,6 +47,54 @@ ALIGNMENT_OPTIONS = (
 WORKSPACES_NAMESPACE = toolWorkspaces.WORKSPACES_NAMESPACE
 
 
+def get_toolbars():
+    """Live-translated ``TOOLBARS`` for the Toolbar column.
+
+    "Graph Editor Toolbar" reuses the exact same id already translated for
+    the toolbar pinning menu's own entry; "Main Toolbar" gets its own id
+    since nothing else in the app names that toolbar as a menu item.
+    """
+    from TheKeyMachine.core import i18n
+
+    return [
+        {"id": "main", "label": i18n.tr("workspaces_toolbar_main", "Main Toolbar")},
+        {"id": "graph", "label": i18n.tr("graph_editor_toolbar", "Graph Editor Toolbar")},
+    ]
+
+
+def get_alignment_options():
+    """Live-translated ``ALIGNMENT_OPTIONS`` for the Alignment column.
+
+    Left/Center/Right reuse the exact ids already translated for the
+    toolbar's own Alignment choice menu (``tkm_menu.api.alignment_choices``);
+    "Single Line" is unique to the Workspaces editor and gets its own id.
+    """
+    from TheKeyMachine.core import i18n
+
+    options = [
+        (
+            value,
+            i18n.tr("align_{}_label".format(value.lower()), "Align {}".format(value)),
+            i18n.tr(
+                "align_{}_desc".format(value.lower()),
+                "Align toolbar icons to the {}.".format(value.lower()),
+            ),
+        )
+        for value in ("Left", "Center", "Right")
+    ]
+    options.append(
+        (
+            "Single Line",
+            i18n.tr("workspaces_align_single_line", "Single Line"),
+            i18n.tr(
+                "workspaces_align_single_line_desc",
+                "Keep every section on a single row without wrapping.",
+            ),
+        )
+    )
+    return options
+
+
 # --------------------------------------------------------------------------- live widgets
 
 def get_toolbar_instance():
@@ -71,19 +119,46 @@ def get_toolbar_widget(toolbar_id):
 
 def get_position_options(toolbar_id):
     """List of ``(position_id, label, description)`` rows for the Position column."""
+    from TheKeyMachine.core import i18n
+
     if toolbar_id == "graph":
         from TheKeyMachine.tools.graph_toolbar import api as graph_api
 
-        return list(graph_api.DOCK_OPTIONS)
+        # graph_api.DOCK_OPTIONS is the raw (id, English label, English
+        # description) data the graph toolbar's own dock menu also reads --
+        # see core.toolMenus.build_graph_dock_menu, which translates the same
+        # tuple at its point of use via the same "graph_dock_{id}" ids rather
+        # than baking translation into the tuple itself (language can change
+        # at runtime; a module-level constant can't).
+        return [
+            (
+                position,
+                i18n.tr("graph_dock_{}".format(position), label),
+                i18n.tr("graph_dock_{}_desc".format(position), description),
+            )
+            for position, label, description in graph_api.DOCK_OPTIONS
+        ]
 
     from TheKeyMachine.core import toolbar as toolbar_module
 
     options = []
     for orient, orient_label in toolbar_module.DOCKING_ORIENTATIONS.items():
+        # Bare "Top"/"Bottom" translations, distinct from dock_orient_{orient}
+        # (used by the main dock menu, phrased as "To Top"/"To Bottom" --
+        # correct there, but the wrong grammar to splice into "{orient} of
+        # {area}" below).
+        orient_word = i18n.tr(
+            "position_orient_{}".format(orient), orient_label.replace("To ", "")
+        )
         for area, area_label in toolbar_module.DOCKING_AREAS.items():
             position_id = "{}::{}".format(area, orient)
-            label = "{} of {}".format(orient_label.replace("To ", ""), area_label)
-            description = "Dock the toolbar {} the {}.".format(orient_label.lower(), area_label)
+            area_word = i18n.tr("dock_area_{}".format(area), area_label)
+            label = i18n.tr("workspace_position_label", "{orient} of {area}").format(
+                orient=orient_word, area=area_word
+            )
+            description = i18n.tr("workspace_position_desc", "Dock the toolbar {position}.").format(
+                position=label
+            )
             options.append((position_id, label, description))
     return options
 

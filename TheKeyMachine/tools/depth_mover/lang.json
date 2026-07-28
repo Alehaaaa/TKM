@@ -20,6 +20,41 @@
                 "Fait glisser les transforms sélectionnés vers ou depuis la caméra active en conservant leur position à l'écran.",
                 "Désactivez l'outil pour restaurer le contexte d'interaction précédent de Maya."
             ]
+        },
+        "ca": {
+            "label": "Desplaçador de Profunditat",
+            "tooltip": [
+                "Arrossega els transforms seleccionats cap a o des de la càmera activa mantenint la seva posició en pantalla",
+                "Desactiva l'eina per restaurar el context d'interacció anterior de Maya"
+            ]
+        },
+        "zh": {
+            "label": "深度移动器",
+            "tooltip": [
+                "拖动所选变换朝向或远离当前摄像机，同时保持其屏幕位置不变",
+                "禁用该工具可恢复 Maya 之前的交互上下文"
+            ]
+        },
+        "ja": {
+            "label": "デプスムーバー",
+            "tooltip": [
+                "画面上の位置を保ったまま、選択したトランスフォームをアクティブカメラに近づけたり遠ざけたりします",
+                "ツールを無効にするとMayaの以前の操作コンテキストに戻ります"
+            ]
+        },
+        "ko": {
+            "label": "뎁스 무버",
+            "tooltip": [
+                "화면상의 위치를 유지하면서 선택한 트랜스폼을 활성 카메라 쪽으로 또는 반대로 드래그합니다",
+                "도구를 비활성화하면 Maya의 이전 상호작용 컨텍스트로 복원됩니다"
+            ]
+        },
+        "ar": {
+            "label": "محرك العمق",
+            "tooltip": [
+                "اسحب التحويلات المحددة نحو الكاميرا النشطة أو بعيدًا عنها مع الحفاظ على موضعها على الشاشة",
+                "عطّل الأداة لاستعادة سياق التفاعل السابق في Maya"
+            ]
         }
     }
 }

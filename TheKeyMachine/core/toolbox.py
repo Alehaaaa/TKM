@@ -441,8 +441,14 @@ def get_tool(tool_id, **overrides):
 
     menu_definition = tool.get("menu")
     if isinstance(menu_definition, dict):
-        tool["menu"] = lambda _menu, source_widget=None, definition=menu_definition: toolMenus.build_declared_menu(
-            definition, parent_widget=source_widget
+        # A tool's own right-click "menu" dict is declared once, inline,
+        # right next to its "label"/"tooltip" -- it has no "command"/"id" of
+        # its own to translate by, but it always belongs to *this* tool_id,
+        # so pass that along as the fallback lang.json key instead of
+        # requiring every package to redundantly repeat "command": tool_id
+        # on every such menu (see toolMenus._declared_item_text).
+        tool["menu"] = lambda _menu, source_widget=None, definition=menu_definition, owner_id=tool_id: toolMenus.build_declared_menu(
+            definition, parent_widget=source_widget, owner_command_id=owner_id
         )
 
     callback = tool.get("callback")
@@ -461,6 +467,23 @@ def is_tool_available(tool_id):
     definition = _tool_definitions().get(tool_id, {})
     available = definition.get("available", True)
     return bool(available() if callable(available) else available)
+
+
+_ITEM_OVERRIDE_EXCLUDED_KEYS = {"id", "section", "shortcuts", "default"}
+
+
+def _item_overrides(item):
+    """Fields on a section item that override its tool definition's own.
+
+    A section item is mostly identity (``"id"``) plus layout/behavior keys
+    that don't belong on the tool itself (``"section"``, ``"shortcuts"``,
+    ``"default"``) -- everything else is a per-placement override passed
+    straight through to ``get_tool(tool_id, **overrides)``. Both
+    ``get_tool_section``'s item-resolution loop and
+    ``resolve_section_shortcuts``'s targeted re-resolution need exactly this
+    same split, so it lives here once instead of twice.
+    """
+    return {key: value for key, value in item.items() if key not in _ITEM_OVERRIDE_EXCLUDED_KEYS}
 
 
 def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
@@ -497,12 +520,61 @@ def get_tool_section(section_id, resolve_items=True, toolbar_id=None):
         tool_id = item.get("id")
         if not tool_id or not is_tool_available(tool_id):
             continue
-        overrides = {key: value for key, value in item.items() if key not in {"id", "section", "shortcuts", "default"}}
-        tool = get_tool(tool_id, **overrides)
+        tool = get_tool(tool_id, **_item_overrides(item))
         tool["default"] = is_pinned_by_default(toolbar_id, tool_id)
         resolved.append(_apply_shortcuts(tool, item))
     section["items"] = resolved
     return section
+
+
+def resolve_section_shortcuts(section_id, wanted_ids=None):
+    """Freshly re-translate just the modifier-key shortcut data for a section.
+
+    A tool's "shortcuts" hint list and held-modifier "shortcut_variants"
+    (see ``_apply_shortcuts``) are baked into its widget once, at build
+    time -- unlike a plain label/tooltip, they aren't recoverable from
+    ``get_tool(tool_id)`` alone, since they live on the *section* item, not
+    the tool definition. A translation refresh still needs fresh, re-localized
+    copies of them, but only for the handful of items in a section that
+    actually declare "shortcuts" (most don't). Reusing
+    ``get_tool_section``'s full ``resolve_items=True`` pass would also
+    re-resolve every item's icon and default-pin state for nothing, so this
+    walks the raw (unresolved) item list directly and calls the same
+    ``get_tool`` + ``_apply_shortcuts`` pair only for items that need it,
+    optionally further limited to ``wanted_ids`` (a caller's already-built
+    widget keys, letting it skip items it isn't even tracking).
+
+    Returns ``{item_id: (shortcuts, shortcut_variants)}``.
+    """
+    section = get_tool_section(section_id, resolve_items=False)
+    if not section:
+        return {}
+
+    wanted = set(wanted_ids) if wanted_ids is not None else None
+    resolved = {}
+
+    def _walk(items):
+        for item in items or ():
+            if not isinstance(item, dict):
+                continue
+            section_ref = item.get("section")
+            if section_ref:
+                nested = get_tool_section(section_ref, resolve_items=False)
+                if nested:
+                    _walk(nested.get("items", []))
+                continue
+            item_id = item.get("id")
+            if not item_id or not item.get("shortcuts"):
+                continue
+            if wanted is not None and item_id not in wanted:
+                continue
+            if not is_tool_available(item_id):
+                continue
+            tool = _apply_shortcuts(get_tool(item_id, **_item_overrides(item)), item)
+            resolved[item_id] = (tool.get("shortcuts", []), tool.get("shortcut_variants", []))
+
+    _walk(section.get("items", []))
+    return resolved
 
 
 def get_section_icon(section_id):

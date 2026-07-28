@@ -17,6 +17,36 @@
             "tooltip": [
                 "Ajoute les temps de clé manquants entre les canaux d'animation actifs."
             ]
+        },
+        "ca": {
+            "label": "Compartir Claus",
+            "tooltip": [
+                "Afegeix els temps de clau compartits que falten entre els canals d'animació actius"
+            ]
+        },
+        "zh": {
+            "label": "共享关键帧",
+            "tooltip": [
+                "在活动动画通道之间添加缺失的共享关键帧时间"
+            ]
+        },
+        "ja": {
+            "label": "キーを共有",
+            "tooltip": [
+                "アクティブなアニメーションチャンネル間で不足している共有キー時間を追加します"
+            ]
+        },
+        "ko": {
+            "label": "키 공유",
+            "tooltip": [
+                "활성 애니메이션 채널 간에 누락된 공유 키 시간을 추가합니다"
+            ]
+        },
+        "ar": {
+            "label": "مشاركة المفاتيح",
+            "tooltip": [
+                "إضافة أوقات المفاتيح المشتركة المفقودة بين قنوات الحركة النشطة"
+            ]
         }
     },
     "share_keys_from_last_selected": {
@@ -36,6 +66,36 @@
             "label": "Partager les Clés depuis le Dernier Sélectionné",
             "tooltip": [
                 "Utilise le dernier objet sélectionné comme source des temps de clé pour les autres objets sélectionnés."
+            ]
+        },
+        "ca": {
+            "label": "Compartir Claus des de l'Últim Seleccionat",
+            "tooltip": [
+                "Usa l'últim objecte seleccionat com a origen dels temps de clau per als altres objectes seleccionats"
+            ]
+        },
+        "zh": {
+            "label": "从最后选择的对象共享关键帧",
+            "tooltip": [
+                "使用最后选择的对象作为其他所选对象的关键帧时间来源"
+            ]
+        },
+        "ja": {
+            "label": "最後の選択からキーを共有",
+            "tooltip": [
+                "最後に選択したオブジェクトを他の選択オブジェクトのキー時間のソースとして使用します"
+            ]
+        },
+        "ko": {
+            "label": "마지막 선택 항목에서 키 공유",
+            "tooltip": [
+                "마지막으로 선택한 오브젝트를 다른 선택 오브젝트의 키 시간 소스로 사용합니다"
+            ]
+        },
+        "ar": {
+            "label": "مشاركة المفاتيح من آخر تحديد",
+            "tooltip": [
+                "استخدام آخر كائن محدد كمصدر لأوقات المفاتيح للكائنات المحددة الأخرى"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Respace les blocs d'animation en conservant leurs poses clés."
             ]
+        },
+        "ca": {
+            "label": "Reblock",
+            "tooltip": [
+                "Reespaia els blocs d'animació conservant les seves poses clau"
+            ]
+        },
+        "zh": {
+            "label": "重排间距",
+            "tooltip": [
+                "在保留关键姿态的同时重新分布动画块的间距"
+            ]
+        },
+        "ja": {
+            "label": "リブロック",
+            "tooltip": [
+                "キーポーズを維持しながらアニメーションブロックの間隔を再配置します"
+            ]
+        },
+        "ko": {
+            "label": "리블록",
+            "tooltip": [
+                "키 포즈를 유지하면서 애니메이션 블록의 간격을 재배치합니다"
+            ]
+        },
+        "ar": {
+            "label": "إعادة التقسيم",
+            "tooltip": [
+                "إعادة توزيع مسافات كتل الحركة مع الحفاظ على أوضاع المفاتيح"
+            ]
         }
     },
     "reblock_insert": {
@@ -77,6 +167,36 @@
             "tooltip": [
                 "Insère le nouvel espacement du Reblock sans remplacer l'espacement de destination."
             ]
+        },
+        "ca": {
+            "label": "Reblock Inserir",
+            "tooltip": [
+                "Insereix el nou espaiat del Reblock sense reemplaçar l'espaiat de destinació"
+            ]
+        },
+        "zh": {
+            "label": "插入重排间距",
+            "tooltip": [
+                "插入重新排布后的时序，而不替换目标时序"
+            ]
+        },
+        "ja": {
+            "label": "リブロック挿入",
+            "tooltip": [
+                "宛先のタイミングを置き換えずに、リブロックしたタイミングを挿入します"
+            ]
+        },
+        "ko": {
+            "label": "리블록 삽입",
+            "tooltip": [
+                "대상 타이밍을 대체하지 않고 리블록된 타이밍을 삽입합니다"
+            ]
+        },
+        "ar": {
+            "label": "إدراج إعادة التقسيم",
+            "tooltip": [
+                "إدراج التوقيت المعاد تقسيمه دون استبدال توقيت الوجهة"
+            ]
         }
     },
     "bake_animation_1": {
@@ -87,15 +207,45 @@
             ]
         },
         "es": {
-            "label": "Bake en Todos los Fotogramas",
+            "label": "Horneado en Todos los Fotogramas",
             "tooltip": [
-                "Hace bake del contexto de animación activo en cada fotograma."
+                "Hornea el contexto de animación activo en cada fotograma."
             ]
         },
         "fr": {
-            "label": "Bake sur Toutes les Images",
+            "label": "Conversion sur Toutes les Images",
             "tooltip": [
-                "Effectue le bake du contexte d'animation actif sur chaque image."
+                "Convertit le contexte d'animation actif sur chaque image."
+            ]
+        },
+        "ca": {
+            "label": "Horneig en Tots els Fotogrames",
+            "tooltip": [
+                "Hornea el context d'animació actiu en cada fotograma"
+            ]
+        },
+        "zh": {
+            "label": "逐帧烘焙",
+            "tooltip": [
+                "在每一帧烘焙当前动画上下文"
+            ]
+        },
+        "ja": {
+            "label": "全フレームでベイク",
+            "tooltip": [
+                "アクティブなアニメーションコンテキストを毎フレームベイクします"
+            ]
+        },
+        "ko": {
+            "label": "모든 프레임에 베이크",
+            "tooltip": [
+                "활성 애니메이션 컨텍스트를 매 프레임마다 베이크합니다"
+            ]
+        },
+        "ar": {
+            "label": "خَبز على كل إطار",
+            "tooltip": [
+                "خَبز سياق الحركة النشط في كل إطار"
             ]
         }
     },
@@ -107,15 +257,45 @@
             ]
         },
         "es": {
-            "label": "Bake Cada Dos Fotogramas",
+            "label": "Horneado Cada Dos Fotogramas",
             "tooltip": [
-                "Hace bake del contexto de animación activo cada dos fotogramas."
+                "Hornea el contexto de animación activo cada dos fotogramas."
             ]
         },
         "fr": {
-            "label": "Bake sur Deux Images",
+            "label": "Conversion sur Deux Images",
             "tooltip": [
-                "Effectue le bake du contexte d'animation actif toutes les deux images."
+                "Convertit le contexte d'animation actif toutes les deux images."
+            ]
+        },
+        "ca": {
+            "label": "Horneig Cada Dos Fotogrames",
+            "tooltip": [
+                "Hornea el context d'animació actiu cada dos fotogrames"
+            ]
+        },
+        "zh": {
+            "label": "每两帧烘焙",
+            "tooltip": [
+                "每两帧烘焙当前动画上下文"
+            ]
+        },
+        "ja": {
+            "label": "2フレームごとにベイク",
+            "tooltip": [
+                "アクティブなアニメーションコンテキストを2フレームごとにベイクします"
+            ]
+        },
+        "ko": {
+            "label": "두 프레임마다 베이크",
+            "tooltip": [
+                "활성 애니메이션 컨텍스트를 두 프레임마다 베이크합니다"
+            ]
+        },
+        "ar": {
+            "label": "خَبز كل إطارين",
+            "tooltip": [
+                "خَبز سياق الحركة النشط كل إطارين"
             ]
         }
     },
@@ -127,15 +307,45 @@
             ]
         },
         "es": {
-            "label": "Bake Cada Tres Fotogramas",
+            "label": "Horneado Cada Tres Fotogramas",
             "tooltip": [
-                "Hace bake del contexto de animación activo cada tres fotogramas."
+                "Hornea el contexto de animación activo cada tres fotogramas."
             ]
         },
         "fr": {
-            "label": "Bake sur Trois Images",
+            "label": "Conversion sur Trois Images",
             "tooltip": [
-                "Effectue le bake du contexte d'animation actif toutes les trois images."
+                "Convertit le contexte d'animation actif toutes les trois images."
+            ]
+        },
+        "ca": {
+            "label": "Horneig Cada Tres Fotogrames",
+            "tooltip": [
+                "Hornea el context d'animació actiu cada tres fotogrames"
+            ]
+        },
+        "zh": {
+            "label": "每三帧烘焙",
+            "tooltip": [
+                "每三帧烘焙当前动画上下文"
+            ]
+        },
+        "ja": {
+            "label": "3フレームごとにベイク",
+            "tooltip": [
+                "アクティブなアニメーションコンテキストを3フレームごとにベイクします"
+            ]
+        },
+        "ko": {
+            "label": "세 프레임마다 베이크",
+            "tooltip": [
+                "활성 애니메이션 컨텍스트를 세 프레임마다 베이크합니다"
+            ]
+        },
+        "ar": {
+            "label": "خَبز كل ثلاثة إطارات",
+            "tooltip": [
+                "خَبز سياق الحركة النشط كل ثلاثة إطارات"
             ]
         }
     },
@@ -147,15 +357,45 @@
             ]
         },
         "es": {
-            "label": "Bake Cada Cuatro Fotogramas",
+            "label": "Horneado Cada Cuatro Fotogramas",
             "tooltip": [
-                "Hace bake del contexto de animación activo cada cuatro fotogramas."
+                "Hornea el contexto de animación activo cada cuatro fotogramas."
             ]
         },
         "fr": {
-            "label": "Bake sur Quatre Images",
+            "label": "Conversion sur Quatre Images",
             "tooltip": [
-                "Effectue le bake du contexte d'animation actif toutes les quatre images."
+                "Convertit le contexte d'animation actif toutes les quatre images."
+            ]
+        },
+        "ca": {
+            "label": "Horneig Cada Quatre Fotogrames",
+            "tooltip": [
+                "Hornea el context d'animació actiu cada quatre fotogrames"
+            ]
+        },
+        "zh": {
+            "label": "每四帧烘焙",
+            "tooltip": [
+                "每四帧烘焙当前动画上下文"
+            ]
+        },
+        "ja": {
+            "label": "4フレームごとにベイク",
+            "tooltip": [
+                "アクティブなアニメーションコンテキストを4フレームごとにベイクします"
+            ]
+        },
+        "ko": {
+            "label": "네 프레임마다 베이크",
+            "tooltip": [
+                "활성 애니메이션 컨텍스트를 네 프레임마다 베이크합니다"
+            ]
+        },
+        "ar": {
+            "label": "خَبز كل أربعة إطارات",
+            "tooltip": [
+                "خَبز سياق الحركة النشط كل أربعة إطارات"
             ]
         }
     },
@@ -167,15 +407,45 @@
             ]
         },
         "es": {
-            "label": "Bake con Intervalo Personalizado",
+            "label": "Horneado con Intervalo Personalizado",
             "tooltip": [
-                "Hace bake usando un intervalo de fotogramas personalizado."
+                "Hornea usando un intervalo de fotogramas personalizado."
             ]
         },
         "fr": {
-            "label": "Bake avec Intervalle Personnalisé",
+            "label": "Conversion avec Intervalle Personnalisé",
             "tooltip": [
-                "Effectue le bake avec un intervalle d'images personnalisé."
+                "Convertit avec un intervalle d'images personnalisé."
+            ]
+        },
+        "ca": {
+            "label": "Horneig amb Interval Personalitzat",
+            "tooltip": [
+                "Hornea usant un interval de fotogrames personalitzat"
+            ]
+        },
+        "zh": {
+            "label": "自定义间隔烘焙",
+            "tooltip": [
+                "使用自定义的正整数帧间隔进行烘焙"
+            ]
+        },
+        "ja": {
+            "label": "カスタム間隔でベイク",
+            "tooltip": [
+                "カスタムの正のフレーム間隔を使ってベイクします"
+            ]
+        },
+        "ko": {
+            "label": "사용자 지정 간격 베이크",
+            "tooltip": [
+                "사용자 지정 양의 프레임 간격을 사용하여 베이크합니다"
+            ]
+        },
+        "ar": {
+            "label": "خَبز بفاصل مخصص",
+            "tooltip": [
+                "الخبز باستخدام فاصل إطارات موجب مخصص"
             ]
         }
     },
@@ -187,16 +457,98 @@
             ]
         },
         "es": {
-            "label": "Bake desde el Último Seleccionado",
+            "label": "Horneado desde el Último Seleccionado",
             "tooltip": [
-                "Hace bake de los objetivos seleccionados en los tiempos de clave del último objeto seleccionado."
+                "Hornea los objetivos seleccionados en los tiempos de clave del último objeto seleccionado."
             ]
         },
         "fr": {
-            "label": "Bake depuis le Dernier Sélectionné",
+            "label": "Conversion depuis le Dernier Sélectionné",
             "tooltip": [
-                "Effectue le bake des cibles sélectionnées aux temps de clé du dernier objet sélectionné."
+                "Convertit les cibles sélectionnées aux temps de clé du dernier objet sélectionné."
             ]
+        },
+        "ca": {
+            "label": "Horneig des de l'Últim Seleccionat",
+            "tooltip": [
+                "Hornea els objectius seleccionats en els temps de clau de l'últim objecte seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "从最后选择的对象烘焙",
+            "tooltip": [
+                "在最后选择对象的关键帧时间上烘焙所选目标"
+            ]
+        },
+        "ja": {
+            "label": "最後の選択からベイク",
+            "tooltip": [
+                "最後に選択したオブジェクトのキー時間で選択ターゲットをベイクします"
+            ]
+        },
+        "ko": {
+            "label": "마지막 선택 항목에서 베이크",
+            "tooltip": [
+                "마지막으로 선택한 오브젝트의 키 시간에 선택한 대상을 베이크합니다"
+            ]
+        },
+        "ar": {
+            "label": "خَبز من آخر تحديد",
+            "tooltip": [
+                "خَبز الأهداف المحددة عند أوقات مفاتيح آخر كائن محدد"
+            ]
+        }
+    },
+    "key_sync_tools": {
+        "en": {
+            "label": "Key Sync"
+        },
+        "es": {
+            "label": "Sincronización de Claves"
+        },
+        "fr": {
+            "label": "Synchronisation des Clés"
+        },
+        "ca": {
+            "label": "Sincronització de Claus"
+        },
+        "zh": {
+            "label": "关键帧同步"
+        },
+        "ja": {
+            "label": "キー同期"
+        },
+        "ko": {
+            "label": "키 동기화"
+        },
+        "ar": {
+            "label": "مزامنة المفاتيح"
+        }
+    },
+    "bake_tools": {
+        "en": {
+            "label": "Bake"
+        },
+        "es": {
+            "label": "Horneado"
+        },
+        "fr": {
+            "label": "Conversion"
+        },
+        "ca": {
+            "label": "Horneig"
+        },
+        "zh": {
+            "label": "烘焙"
+        },
+        "ja": {
+            "label": "ベイク"
+        },
+        "ko": {
+            "label": "베이크"
+        },
+        "ar": {
+            "label": "الخَبز"
         }
     }
 }

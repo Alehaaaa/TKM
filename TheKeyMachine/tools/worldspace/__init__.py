@@ -59,7 +59,6 @@ class WorldspaceToolObject(ToolObject):
             "items": [
                 {
                     "id": "ws_copy_frame",
-                    "label": "Copy World Space",
                     "shortcuts": [
                         {"id": "ws_paste_frame", "keys": [QtCore.Qt.Key_Control]},
                         {"id": "ws_copy_range", "keys": [QtCore.Qt.Key_Shift]},

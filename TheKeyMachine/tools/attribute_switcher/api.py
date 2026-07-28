@@ -236,17 +236,29 @@ def _set_rotate_order_mode(checked, lightning):
 
 def _add_rotate_order_mode_actions(menu):
     """Normal vs Lightning rotate-order conversion, as an exclusive choice."""
+    from TheKeyMachine.core import i18n
+
     lightning_enabled = is_rotate_order_lightning_enabled()
 
-    menu.addSection("Rotate Order Conversion")
+    section_label, _desc, _tooltip = i18n.localize_menu_action(
+        "rotate_order_section", __file__, "Rotate Order Conversion"
+    )
+    menu.addSection(section_label)
 
     group = QtGui.QActionGroup(menu)
     group.setExclusive(True)
 
-    normal_action = menu.addAction(
+    normal_label, normal_description, normal_tooltip = i18n.localize_menu_action(
+        "rotate_order_normal_mode",
+        __file__,
         "Normal Mode",
         description="Convert rotate order by preserving world orientation at every keyframe.",
         tooltip="Slower, but safe for every rig -- including animation layers, driven keys, and expressions.",
+    )
+    normal_action = menu.addAction(
+        normal_label,
+        description=normal_description,
+        tooltip=normal_tooltip,
         callback=toolCommon.mark_non_tool_action(
             partial(_set_rotate_order_mode, lightning=False)
         ),
@@ -255,10 +267,17 @@ def _add_rotate_order_mode_actions(menu):
     normal_action.setChecked(not lightning_enabled)
     group.addAction(normal_action)
 
-    lightning_action = menu.addAction(
+    lightning_label, lightning_description, lightning_tooltip = i18n.localize_menu_action(
+        "rotate_order_lightning_mode",
+        __file__,
         "Super Mode",
         description="Convert rotate order with pure math on the keyed rotation values, skipping per-frame evaluation.",
         tooltip="Much faster. Automatically falls back to Normal Mode for rigs it can't safely fast-path (animation layers, driven keys, expressions).",
+    )
+    lightning_action = menu.addAction(
+        lightning_label,
+        description=lightning_description,
+        tooltip=lightning_tooltip,
         callback=toolCommon.mark_non_tool_action(
             partial(_set_rotate_order_mode, lightning=True)
         ),

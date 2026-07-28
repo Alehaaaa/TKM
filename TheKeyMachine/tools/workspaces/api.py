@@ -17,6 +17,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 """
 
 from TheKeyMachine.core.Qt import QtCore
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets.util import is_valid_widget
 
 _workspaces_window = None
@@ -37,11 +38,11 @@ def show_workspaces_window(*_args, parent=None):
     dlg = widgets.WorkspacesWindow(parent=parent)
     dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
 
-    def _clear_ref(*_a):
+    def _clear_ref():
         global _workspaces_window
         _workspaces_window = None
 
-    dlg.destroyed.connect(_clear_ref)
+    toolCommon.invalidate_cached_window_on_language_change(dlg, _clear_ref)
     _workspaces_window = dlg
     dlg.show()
     dlg.raise_()

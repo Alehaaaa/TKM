@@ -17,6 +17,36 @@
             "tooltip": [
                 "Crée des locators temporaires à partir des objets sélectionnés comme référence de position et de mouvement."
             ]
+        },
+        "ca": {
+            "label": "Crear Locator",
+            "tooltip": [
+                "Crea locators temporals a partir dels objectes seleccionats com a referència de posició i moviment"
+            ]
+        },
+        "zh": {
+            "label": "创建 Locator",
+            "tooltip": [
+                "从所选对象创建临时 Locator，用作位置和运动参考"
+            ]
+        },
+        "ja": {
+            "label": "Locatorを作成",
+            "tooltip": [
+                "選択したオブジェクトから、位置と動きの参照用に一時的なLocatorを作成します"
+            ]
+        },
+        "ko": {
+            "label": "Locator 생성",
+            "tooltip": [
+                "선택한 오브젝트로부터 위치 및 동작 참조용 임시 Locator를 생성합니다"
+            ]
+        },
+        "ar": {
+            "label": "إنشاء Locator",
+            "tooltip": [
+                "إنشاء Locators مؤقتة من الكائنات المحددة كمرجع للموضع والحركة"
+            ]
         }
     },
     "locator_select_temp": {
@@ -36,6 +66,36 @@
             "label": "Sélectionner les Locators Temporaires",
             "tooltip": [
                 "Sélectionne tous les locators temporaires créés par TheKeyMachine dans la scène actuelle."
+            ]
+        },
+        "ca": {
+            "label": "Seleccionar Locators Temporals",
+            "tooltip": [
+                "Selecciona tots els locators temporals creats per TheKeyMachine a l'escena actual"
+            ]
+        },
+        "zh": {
+            "label": "选择临时 Locator",
+            "tooltip": [
+                "选择当前场景中由 TheKeyMachine 创建的所有临时 Locator"
+            ]
+        },
+        "ja": {
+            "label": "一時Locatorを選択",
+            "tooltip": [
+                "現在のシーンでTheKeyMachineが作成したすべての一時Locatorを選択します"
+            ]
+        },
+        "ko": {
+            "label": "임시 Locator 선택",
+            "tooltip": [
+                "현재 씬에서 TheKeyMachine이 생성한 모든 임시 Locator를 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديد Locators المؤقتة",
+            "tooltip": [
+                "تحديد كل Locator مؤقت أنشأه TheKeyMachine في المشهد الحالي"
             ]
         }
     },
@@ -57,6 +117,62 @@
             "tooltip": [
                 "Supprime tous les locators temporaires créés par TheKeyMachine dans la scène actuelle."
             ]
+        },
+        "ca": {
+            "label": "Eliminar Locators Temporals",
+            "tooltip": [
+                "Elimina tots els locators temporals creats per TheKeyMachine a l'escena actual"
+            ]
+        },
+        "zh": {
+            "label": "移除临时 Locator",
+            "tooltip": [
+                "删除当前场景中由 TheKeyMachine 创建的所有临时 Locator"
+            ]
+        },
+        "ja": {
+            "label": "一時Locatorを削除",
+            "tooltip": [
+                "現在のシーンでTheKeyMachineが作成したすべての一時Locatorを削除します"
+            ]
+        },
+        "ko": {
+            "label": "임시 Locator 제거",
+            "tooltip": [
+                "현재 씬에서 TheKeyMachine이 생성한 모든 임시 Locator를 삭제합니다"
+            ]
+        },
+        "ar": {
+            "label": "إزالة Locators المؤقتة",
+            "tooltip": [
+                "حذف كل Locator مؤقت أنشأه TheKeyMachine في المشهد الحالي"
+            ]
+        }
+    },
+    "locator_tools": {
+        "en": {
+            "label": "Locators"
+        },
+        "es": {
+            "label": "Locators"
+        },
+        "fr": {
+            "label": "Locators"
+        },
+        "ca": {
+            "label": "Locators"
+        },
+        "zh": {
+            "label": "Locators"
+        },
+        "ja": {
+            "label": "Locators"
+        },
+        "ko": {
+            "label": "Locators"
+        },
+        "ar": {
+            "label": "Locators"
         }
     }
 }

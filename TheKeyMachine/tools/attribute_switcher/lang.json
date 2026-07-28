@@ -23,6 +23,182 @@
                 "Maintenez Ctrl (⌘ sur Mac) et cliquez sur les lignes d'attributs pour sélectionner plusieurs canaux et les changer ensemble.",
                 "Les changements d'ordre de rotation peuvent recevoir automatiquement un filtre Euler."
             ]
+        },
+        "ca": {
+            "label": "Selector d'Atributs",
+            "tooltip": [
+                "Canvia atributs configurats en els controls seleccionats des d'una finestra flotant compacta",
+                "Mantén Ctrl (⌘ a Mac) i fes clic a les files d'atributs per seleccionar diversos canals i canviar-los junts",
+                "Els canvis d'ordre de rotació poden passar automàticament pel filtre Euler"
+            ]
+        },
+        "zh": {
+            "label": "属性切换器",
+            "tooltip": [
+                "通过一个紧凑的浮动窗口在所选控制器上切换已配置的属性",
+                "按住 Ctrl（Mac 上为 ⌘）并点击属性行可多选通道并一起切换",
+                "旋转顺序的更改可自动应用欧拉滤波"
+            ]
+        },
+        "ja": {
+            "label": "アトリビュートスイッチャー",
+            "tooltip": [
+                "コンパクトなフローティングウィンドウから、選択したコントローラの設定済みアトリビュートを切り替えます",
+                "Ctrl（Macでは⌘）を押しながらアトリビュート行をクリックすると複数のチャンネルをまとめて切り替えられます",
+                "回転順序の変更にはオイラーフィルタを自動的に適用できます"
+            ]
+        },
+        "ko": {
+            "label": "속성 전환기",
+            "tooltip": [
+                "작고 떠 있는 창에서 선택한 컨트롤의 구성된 속성을 전환합니다",
+                "Ctrl(Mac에서는 ⌘)을 누른 채 속성 행을 클릭하면 여러 채널을 선택해 함께 전환할 수 있습니다",
+                "회전 순서 변경 시 오일러 필터를 자동으로 적용할 수 있습니다"
+            ]
+        },
+        "ar": {
+            "label": "محول الخصائص",
+            "tooltip": [
+                "بدّل الخصائص المُهيأة عبر المتحكمات المحددة من نافذة عائمة مدمجة",
+                "اضغط مع الاستمرار على Ctrl (⌘ على Mac) وانقر على صفوف الخصائص لتحديد عدة قنوات وتبديلها معًا",
+                "يمكن تطبيق مرشح أويلر تلقائيًا عند تغيير ترتيب الدوران"
+            ]
+        }
+    },
+    "attribute_tools": {
+        "en": {
+            "label": "Attribute Switcher"
+        },
+        "es": {
+            "label": "Selector de Atributos"
+        },
+        "fr": {
+            "label": "Sélecteur d'Attributs"
+        },
+        "ca": {
+            "label": "Selector d'Atributs"
+        },
+        "zh": {
+            "label": "属性切换器"
+        },
+        "ja": {
+            "label": "アトリビュートスイッチャー"
+        },
+        "ko": {
+            "label": "속성 전환기"
+        },
+        "ar": {
+            "label": "محول الخصائص"
+        }
+    },
+    "rotate_order_section": {
+        "en": {
+            "label": "Rotate Order Conversion"
+        },
+        "es": {
+            "label": "Conversión de Orden de Rotación"
+        },
+        "fr": {
+            "label": "Conversion de l'Ordre de Rotation"
+        },
+        "ca": {
+            "label": "Conversió de l'Ordre de Rotació"
+        },
+        "zh": {
+            "label": "旋转顺序转换"
+        },
+        "ja": {
+            "label": "回転順序変換"
+        },
+        "ko": {
+            "label": "회전 순서 변환"
+        },
+        "ar": {
+            "label": "تحويل ترتيب الدوران"
+        }
+    },
+    "rotate_order_normal_mode": {
+        "en": {
+            "label": "Normal Mode",
+            "description": "Convert rotate order by preserving world orientation at every keyframe.",
+            "tooltip": "Slower, but safe for every rig -- including animation layers, driven keys, and expressions."
+        },
+        "es": {
+            "label": "Modo Normal",
+            "description": "Convierte el orden de rotación preservando la orientación en el espacio del mundo en cada fotograma clave.",
+            "tooltip": "Más lento, pero seguro para cualquier rig, incluidas las capas de animación, las claves controladas y las expresiones."
+        },
+        "fr": {
+            "label": "Mode Normal",
+            "description": "Convertit l'ordre de rotation en préservant l'orientation dans l'espace monde à chaque image clé.",
+            "tooltip": "Plus lent, mais sûr pour tous les rigs -- y compris les calques d'animation, les clés pilotées et les expressions."
+        },
+        "ca": {
+            "label": "Mode Normal",
+            "description": "Converteix l'ordre de rotació preservant l'orientació en l'espai del món a cada fotograma clau",
+            "tooltip": "Més lent, però segur per a qualsevol rig, incloses les capes d'animació, les claus controlades i les expressions"
+        },
+        "zh": {
+            "label": "普通模式",
+            "description": "在每个关键帧上保持世界方向不变地转换旋转顺序",
+            "tooltip": "速度较慢，但对任何绑定都安全，包括动画层、受控关键帧和表达式"
+        },
+        "ja": {
+            "label": "ノーマルモード",
+            "description": "各キーフレームでワールド方向を保持しながら回転順序を変換します",
+            "tooltip": "低速ですが、アニメーションレイヤー、ドリブンキー、式を含むあらゆるリグに対して安全です"
+        },
+        "ko": {
+            "label": "일반 모드",
+            "description": "각 키프레임에서 월드 방향을 유지하면서 회전 순서를 변환합니다",
+            "tooltip": "속도는 느리지만 애니메이션 레이어, 드리븐 키, 표현식을 포함한 모든 리그에서 안전합니다"
+        },
+        "ar": {
+            "label": "الوضع العادي",
+            "description": "تحويل ترتيب الدوران مع الحفاظ على الاتجاه في الفضاء العالمي عند كل إطار مفتاحي",
+            "tooltip": "أبطأ، لكنه آمن لأي ريغ -- بما في ذلك طبقات الحركة والمفاتيح المُدارة والتعبيرات"
+        }
+    },
+    "rotate_order_lightning_mode": {
+        "en": {
+            "label": "Super Mode",
+            "description": "Convert rotate order with pure math on the keyed rotation values, skipping per-frame evaluation.",
+            "tooltip": "Much faster. Automatically falls back to Normal Mode for rigs it can't safely fast-path (animation layers, driven keys, expressions)."
+        },
+        "es": {
+            "label": "Modo Súper",
+            "description": "Convierte el orden de rotación con matemáticas puras sobre los valores de rotación con clave, sin evaluar fotograma a fotograma.",
+            "tooltip": "Mucho más rápido. Recurre automáticamente al Modo Normal en los rigs que no puede procesar de forma rápida y segura (capas de animación, claves controladas, expresiones)."
+        },
+        "fr": {
+            "label": "Mode Super",
+            "description": "Convertit l'ordre de rotation par un calcul purement mathématique sur les valeurs de rotation clées, sans évaluation image par image.",
+            "tooltip": "Beaucoup plus rapide. Revient automatiquement au Mode Normal pour les rigs qu'il ne peut pas accélérer en toute sécurité (calques d'animation, clés pilotées, expressions)."
+        },
+        "ca": {
+            "label": "Mode Súper",
+            "description": "Converteix l'ordre de rotació amb matemàtiques pures sobre els valors de rotació amb clau, sense avaluació fotograma a fotograma",
+            "tooltip": "Molt més ràpid. Recorre automàticament al Mode Normal en els rigs que no pot processar de manera ràpida i segura (capes d'animació, claus controlades, expressions)"
+        },
+        "zh": {
+            "label": "超级模式",
+            "description": "对已设置关键帧的旋转值进行纯数学运算来转换旋转顺序，跳过逐帧求值",
+            "tooltip": "速度快得多。对于无法安全加速处理的绑定（动画层、受控关键帧、表达式），会自动回退到普通模式"
+        },
+        "ja": {
+            "label": "スーパーモード",
+            "description": "フレームごとの評価を省略し、キー付き回転値に対する純粋な数学計算で回転順序を変換します",
+            "tooltip": "非常に高速です。安全に高速処理できないリグ（アニメーションレイヤー、ドリブンキー、式）では自動的にノーマルモードにフォールバックします"
+        },
+        "ko": {
+            "label": "슈퍼 모드",
+            "description": "프레임별 평가를 건너뛰고 키 설정된 회전 값에 대해 순수 수학 연산으로 회전 순서를 변환합니다",
+            "tooltip": "훨씬 빠릅니다. 안전하게 고속 처리할 수 없는 리그(애니메이션 레이어, 드리븐 키, 표현식)의 경우 자동으로 일반 모드로 대체됩니다"
+        },
+        "ar": {
+            "label": "الوضع الفائق",
+            "description": "تحويل ترتيب الدوران باستخدام حسابات رياضية بحتة على قيم الدوران ذات المفاتيح، متجاوزًا التقييم لكل إطار",
+            "tooltip": "أسرع بكثير. يعود تلقائيًا إلى الوضع العادي للريغات التي لا يمكن تسريعها بأمان (طبقات الحركة، المفاتيح المُدارة، التعبيرات)"
         }
     }
 }

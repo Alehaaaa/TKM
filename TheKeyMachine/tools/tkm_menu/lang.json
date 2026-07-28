@@ -17,6 +17,36 @@
             "tooltip": [
                 "Ouvre les préférences, l'ancrage, la maintenance, les mises à jour et l'aide de TheKeyMachine."
             ]
+        },
+        "ca": {
+            "label": "TheKeyMachine",
+            "tooltip": [
+                "Obre les preferències, l'acoblament, el manteniment, les actualitzacions i l'ajuda de TheKeyMachine"
+            ]
+        },
+        "zh": {
+            "label": "TheKeyMachine",
+            "tooltip": [
+                "打开 TheKeyMachine 的偏好设置、停靠、维护、更新和帮助"
+            ]
+        },
+        "ja": {
+            "label": "TheKeyMachine",
+            "tooltip": [
+                "TheKeyMachineの環境設定、ドッキング、メンテナンス、アップデート、ヘルプを開きます"
+            ]
+        },
+        "ko": {
+            "label": "TheKeyMachine",
+            "tooltip": [
+                "TheKeyMachine의 환경설정, 도킹, 유지관리, 업데이트, 도움말을 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "TheKeyMachine",
+            "tooltip": [
+                "فتح تفضيلات وإرساء وصيانة وتحديثات ومساعدة TheKeyMachine"
+            ]
         }
     },
     "toolbar_toggle": {
@@ -36,6 +66,36 @@
             "label": "Basculer la Barre d'Outils",
             "tooltip": [
                 "Affiche ou masque la barre d'outils principale de TheKeyMachine."
+            ]
+        },
+        "ca": {
+            "label": "Alternar Barra d'Eines",
+            "tooltip": [
+                "Mostra o amaga la barra d'eines principal de TheKeyMachine"
+            ]
+        },
+        "zh": {
+            "label": "切换工具栏",
+            "tooltip": [
+                "显示或隐藏 TheKeyMachine 主工具栏"
+            ]
+        },
+        "ja": {
+            "label": "ツールバーを切り替え",
+            "tooltip": [
+                "TheKeyMachineのメインツールバーを表示または非表示にします"
+            ]
+        },
+        "ko": {
+            "label": "툴바 전환",
+            "tooltip": [
+                "TheKeyMachine 메인 툴바를 표시하거나 숨깁니다"
+            ]
+        },
+        "ar": {
+            "label": "تبديل شريط الأدوات",
+            "tooltip": [
+                "إظهار أو إخفاء شريط أدوات TheKeyMachine الرئيسي"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Ajoute un bouton à l'étagère Maya actuelle qui active ou désactive TheKeyMachine."
             ]
+        },
+        "ca": {
+            "label": "Afegir Botó al Shelf",
+            "tooltip": [
+                "Afegeix un botó al shelf actual de Maya que activa o desactiva TheKeyMachine"
+            ]
+        },
+        "zh": {
+            "label": "在工具架添加按钮",
+            "tooltip": [
+                "在当前 Maya 工具架上添加一个用于切换 TheKeyMachine 的按钮"
+            ]
+        },
+        "ja": {
+            "label": "シェルフに切替ボタンを追加",
+            "tooltip": [
+                "現在のMayaシェルフにTheKeyMachineを切り替えるボタンを追加します"
+            ]
+        },
+        "ko": {
+            "label": "셸프에 토글 버튼 추가",
+            "tooltip": [
+                "현재 Maya 셸프에 TheKeyMachine을 켜고 끄는 버튼을 추가합니다"
+            ]
+        },
+        "ar": {
+            "label": "إضافة زر تبديل إلى الرف",
+            "tooltip": [
+                "إضافة زر إلى رف Maya الحالي لتبديل TheKeyMachine"
+            ]
         }
     },
     "toolbar_reload": {
@@ -77,6 +167,36 @@
             "tooltip": [
                 "Propose d'enregistrer la scène, arrête proprement l'exécution en cours, recharge les modules de TheKeyMachine et reconstruit la barre d'outils."
             ]
+        },
+        "ca": {
+            "label": "Recarregar",
+            "tooltip": [
+                "Demana desar l'escena, atura netament l'execució actual, recarrega els mòduls de TheKeyMachine i reconstrueix la barra d'eines"
+            ]
+        },
+        "zh": {
+            "label": "重新加载",
+            "tooltip": [
+                "提示保存场景，随后干净地停止当前运行环境、重新加载 TheKeyMachine 模块并重建工具栏"
+            ]
+        },
+        "ja": {
+            "label": "リロード",
+            "tooltip": [
+                "シーンの保存を促し、現在のランタイムを正しく停止した後、TheKeyMachineモジュールを再読み込みしてツールバーを再構築します"
+            ]
+        },
+        "ko": {
+            "label": "다시 로드",
+            "tooltip": [
+                "씬 저장을 요청한 후 현재 런타임을 깔끔하게 중지하고 TheKeyMachine 모듈을 다시 로드하여 툴바를 재구성합니다"
+            ]
+        },
+        "ar": {
+            "label": "إعادة التحميل",
+            "tooltip": [
+                "مطالبة بحفظ المشهد، ثم إيقاف بيئة التشغيل الحالية بشكل نظيف وإعادة تحميل وحدات TheKeyMachine وإعادة بناء شريط الأدوات"
+            ]
         }
     },
     "toolbar_unload": {
@@ -96,6 +216,36 @@
             "label": "Décharger",
             "tooltip": [
                 "Ferme TheKeyMachine et supprime ses callbacks, script jobs, interface temporaire et état d'exécution."
+            ]
+        },
+        "ca": {
+            "label": "Descarregar",
+            "tooltip": [
+                "Tanca TheKeyMachine i elimina els seus callbacks, script jobs, interfície temporal i estat d'execució"
+            ]
+        },
+        "zh": {
+            "label": "卸载",
+            "tooltip": [
+                "关闭 TheKeyMachine 并移除其回调、脚本任务、临时界面和运行状态"
+            ]
+        },
+        "ja": {
+            "label": "アンロード",
+            "tooltip": [
+                "TheKeyMachineを閉じ、そのコールバック、スクリプトジョブ、一時的なUI、ランタイム状態を削除します"
+            ]
+        },
+        "ko": {
+            "label": "언로드",
+            "tooltip": [
+                "TheKeyMachine을 닫고 콜백, 스크립트 작업, 임시 UI, 런타임 상태를 제거합니다"
+            ]
+        },
+        "ar": {
+            "label": "إلغاء التحميل",
+            "tooltip": [
+                "إغلاق TheKeyMachine وإزالة استدعاءاته ومهام السكربت وواجهته المؤقتة وحالة التشغيل"
             ]
         }
     },
@@ -120,6 +270,41 @@
                 "Supprime l'intégration de TheKeyMachine au démarrage de Maya et ses fichiers installés.",
                 "Cette action demande une confirmation."
             ]
+        },
+        "ca": {
+            "label": "Desinstal·lar",
+            "tooltip": [
+                "Elimina la integració de TheKeyMachine amb l'inici de Maya i els seus fitxers instal·lats",
+                "Aquesta acció demana confirmació"
+            ]
+        },
+        "zh": {
+            "label": "卸载安装",
+            "tooltip": [
+                "移除 TheKeyMachine 与 Maya 启动的集成以及已安装的文件",
+                "此操作需要确认"
+            ]
+        },
+        "ja": {
+            "label": "アンインストール",
+            "tooltip": [
+                "TheKeyMachineのMaya起動時統合とインストール済みファイルを削除します",
+                "この操作には確認が必要です"
+            ]
+        },
+        "ko": {
+            "label": "제거",
+            "tooltip": [
+                "TheKeyMachine의 Maya 시작 통합 및 설치된 파일을 제거합니다",
+                "이 작업은 확인이 필요합니다"
+            ]
+        },
+        "ar": {
+            "label": "إلغاء التثبيت",
+            "tooltip": [
+                "إزالة تكامل TheKeyMachine مع بدء تشغيل Maya والملفات المثبتة",
+                "يطلب هذا الإجراء تأكيدًا"
+            ]
         }
     },
     "check_for_updates": {
@@ -139,6 +324,36 @@
             "label": "Vérifier les Mises à Jour",
             "tooltip": [
                 "Vérifie s'il existe une nouvelle version de TheKeyMachine et ouvre le programme de mise à jour si disponible."
+            ]
+        },
+        "ca": {
+            "label": "Cercar Actualitzacions",
+            "tooltip": [
+                "Comprova si hi ha una nova versió de TheKeyMachine i obre l'actualitzador si n'hi ha una de disponible"
+            ]
+        },
+        "zh": {
+            "label": "检查更新",
+            "tooltip": [
+                "检查是否有较新的 TheKeyMachine 版本，如有可用则打开更新程序"
+            ]
+        },
+        "ja": {
+            "label": "アップデートを確認",
+            "tooltip": [
+                "新しいTheKeyMachineのリリースを確認し、利用可能であればアップデーターを開きます"
+            ]
+        },
+        "ko": {
+            "label": "업데이트 확인",
+            "tooltip": [
+                "새로운 TheKeyMachine 릴리스를 확인하고, 있으면 업데이트 프로그램을 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "التحقق من التحديثات",
+            "tooltip": [
+                "التحقق من وجود إصدار أحدث من TheKeyMachine وفتح أداة التحديث إذا كان متاحًا"
             ]
         }
     },
@@ -160,6 +375,36 @@
             "tooltip": [
                 "Ouvre les préférences de comportement, d'apparence, de démarrage et d'interaction de la barre d'outils."
             ]
+        },
+        "ca": {
+            "label": "Preferències",
+            "tooltip": [
+                "Obre les preferències de comportament, aparença, inici i interacció de la barra d'eines"
+            ]
+        },
+        "zh": {
+            "label": "偏好设置",
+            "tooltip": [
+                "打开工具栏的行为、外观、启动和交互偏好设置"
+            ]
+        },
+        "ja": {
+            "label": "環境設定",
+            "tooltip": [
+                "ツールバーの動作、外観、起動、操作に関する環境設定を開きます"
+            ]
+        },
+        "ko": {
+            "label": "환경설정",
+            "tooltip": [
+                "툴바의 동작, 모양, 시작, 상호작용 환경설정을 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "التفضيلات",
+            "tooltip": [
+                "فتح تفضيلات سلوك شريط الأدوات ومظهره وبدء تشغيله وتفاعله"
+            ]
         }
     },
     "start_with_maya": {
@@ -179,6 +424,36 @@
             "label": "Démarrer avec Maya",
             "tooltip": [
                 "Charge TheKeyMachine automatiquement au démarrage de Maya."
+            ]
+        },
+        "ca": {
+            "label": "Iniciar amb Maya",
+            "tooltip": [
+                "Carrega TheKeyMachine automàticament en iniciar Maya"
+            ]
+        },
+        "zh": {
+            "label": "随 Maya 启动",
+            "tooltip": [
+                "在 Maya 启动时自动加载 TheKeyMachine"
+            ]
+        },
+        "ja": {
+            "label": "Mayaと共に起動",
+            "tooltip": [
+                "Maya起動時にTheKeyMachineを自動的に読み込みます"
+            ]
+        },
+        "ko": {
+            "label": "Maya와 함께 시작",
+            "tooltip": [
+                "Maya 시작 시 TheKeyMachine을 자동으로 로드합니다"
+            ]
+        },
+        "ar": {
+            "label": "البدء مع Maya",
+            "tooltip": [
+                "تحميل TheKeyMachine تلقائيًا عند بدء تشغيل Maya"
             ]
         }
     },
@@ -200,6 +475,36 @@
             "tooltip": [
                 "Affiche des infobulles enrichies, avec des détails d'interaction et des exemples animés."
             ]
+        },
+        "ca": {
+            "label": "Mostrar Tooltips",
+            "tooltip": [
+                "Mostra tooltips enriquits, amb detalls d'interacció i exemples animats"
+            ]
+        },
+        "zh": {
+            "label": "显示工具提示",
+            "tooltip": [
+                "显示包含交互细节和动画示例的丰富工具提示"
+            ]
+        },
+        "ja": {
+            "label": "ツールチップを表示",
+            "tooltip": [
+                "操作の詳細やアニメーション例を含むリッチなツールチップを表示します"
+            ]
+        },
+        "ko": {
+            "label": "툴팁 표시",
+            "tooltip": [
+                "상호작용 세부정보와 애니메이션 예시가 포함된 풍부한 툴팁을 표시합니다"
+            ]
+        },
+        "ar": {
+            "label": "إظهار التلميحات",
+            "tooltip": [
+                "إظهار تلميحات غنية تتضمن تفاصيل التفاعل وأمثلة متحركة"
+            ]
         }
     },
     "main_dock_menu": {
@@ -219,6 +524,36 @@
             "label": "Ancrage",
             "tooltip": [
                 "Déplace la barre d'outils entre les zones d'ancrage de Maya et choisit son emplacement en haut ou en bas."
+            ]
+        },
+        "ca": {
+            "label": "Acoblar",
+            "tooltip": [
+                "Mou la barra d'eines entre les àrees d'acoblament de Maya i tria la seva posició superior o inferior"
+            ]
+        },
+        "zh": {
+            "label": "停靠",
+            "tooltip": [
+                "在 Maya 停靠区域之间移动工具栏，并选择其顶部或底部位置"
+            ]
+        },
+        "ja": {
+            "label": "ドック",
+            "tooltip": [
+                "Mayaのドックエリア間でツールバーを移動し、上部または下部の配置を選択します"
+            ]
+        },
+        "ko": {
+            "label": "도킹",
+            "tooltip": [
+                "Maya 도킹 영역 사이에서 툴바를 이동하고 상단 또는 하단 배치를 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "الإرساء",
+            "tooltip": [
+                "نقل شريط الأدوات بين مناطق الإرساء في Maya واختيار موضعه العلوي أو السفلي"
             ]
         }
     },
@@ -240,6 +575,36 @@
             "tooltip": [
                 "Ouvre les actions de maintenance de rechargement, déchargement et désinstallation."
             ]
+        },
+        "ca": {
+            "label": "Sistema",
+            "tooltip": [
+                "Obre les accions de manteniment de recàrrega, descàrrega i desinstal·lació"
+            ]
+        },
+        "zh": {
+            "label": "系统",
+            "tooltip": [
+                "打开重新加载、卸载和卸载安装的维护操作"
+            ]
+        },
+        "ja": {
+            "label": "システム",
+            "tooltip": [
+                "リロード、アンロード、アンインストールのメンテナンス操作を開きます"
+            ]
+        },
+        "ko": {
+            "label": "시스템",
+            "tooltip": [
+                "다시 로드, 언로드, 제거 유지관리 작업을 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "النظام",
+            "tooltip": [
+                "فتح إجراءات الصيانة الخاصة بإعادة التحميل وإلغاء التحميل وإلغاء التثبيت"
+            ]
         }
     },
     "languages_menu": {
@@ -259,6 +624,36 @@
             "label": "Langues",
             "tooltip": [
                 "Choisit la langue de la barre d'outils et si les noms des outils sont également traduits."
+            ]
+        },
+        "ca": {
+            "label": "Idiomes",
+            "tooltip": [
+                "Tria l'idioma de la barra d'eines i si els noms de les eines també es tradueixen"
+            ]
+        },
+        "zh": {
+            "label": "语言",
+            "tooltip": [
+                "选择工具栏的语言，以及是否同时翻译工具名称"
+            ]
+        },
+        "ja": {
+            "label": "言語",
+            "tooltip": [
+                "ツールバーの言語と、ツール名も翻訳するかどうかを選択します"
+            ]
+        },
+        "ko": {
+            "label": "언어",
+            "tooltip": [
+                "툴바 언어와 도구 이름도 번역할지 여부를 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "اللغات",
+            "tooltip": [
+                "اختيار لغة شريط الأدوات وما إذا كان سيتم ترجمة أسماء الأدوات أيضًا"
             ]
         }
     },
@@ -280,6 +675,36 @@
             "tooltip": [
                 "Ouvre la documentation, l'assistance, la communauté et les informations du projet."
             ]
+        },
+        "ca": {
+            "label": "Ajuda",
+            "tooltip": [
+                "Obre la documentació, el suport, la comunitat i la informació del projecte"
+            ]
+        },
+        "zh": {
+            "label": "帮助",
+            "tooltip": [
+                "打开文档、支持、社区和项目信息"
+            ]
+        },
+        "ja": {
+            "label": "ヘルプ",
+            "tooltip": [
+                "ドキュメント、サポート、コミュニティ、プロジェクト情報を開きます"
+            ]
+        },
+        "ko": {
+            "label": "도움말",
+            "tooltip": [
+                "문서, 지원, 커뮤니티, 프로젝트 정보를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساعدة",
+            "tooltip": [
+                "فتح التوثيق والدعم والمجتمع ومعلومات المشروع"
+            ]
         }
     },
     "hotkeys_window": {
@@ -299,6 +724,36 @@
             "label": "Raccourcis Clavier",
             "tooltip": [
                 "Ouvre l'éditeur de raccourcis clavier pour assigner des commandes de TheKeyMachine."
+            ]
+        },
+        "ca": {
+            "label": "Dreceres de Teclat",
+            "tooltip": [
+                "Obre l'editor de dreceres de teclat per assignar ordres de TheKeyMachine"
+            ]
+        },
+        "zh": {
+            "label": "快捷键",
+            "tooltip": [
+                "打开快捷键编辑器以分配 TheKeyMachine 命令"
+            ]
+        },
+        "ja": {
+            "label": "ホットキー",
+            "tooltip": [
+                "TheKeyMachineコマンドを割り当てるためのホットキーエディタを開きます"
+            ]
+        },
+        "ko": {
+            "label": "단축키",
+            "tooltip": [
+                "TheKeyMachine 명령을 할당하기 위한 단축키 편집기를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "اختصارات لوحة المفاتيح",
+            "tooltip": [
+                "فتح محرر اختصارات لوحة المفاتيح لتعيين أوامر TheKeyMachine"
             ]
         }
     },
@@ -320,6 +775,36 @@
             "tooltip": [
                 "Ouvre l'éditeur d'Espaces de Travail pour personnaliser l'ancrage, l'alignement, l'ordre des sections et les outils épinglés."
             ]
+        },
+        "ca": {
+            "label": "Espais de Treball",
+            "tooltip": [
+                "Obre l'editor d'Espais de Treball per personalitzar l'acoblament, l'alineació, l'ordre de seccions i les eines ancorades"
+            ]
+        },
+        "zh": {
+            "label": "工作区",
+            "tooltip": [
+                "打开工作区编辑器以自定义工具栏的停靠、对齐、分区顺序和固定工具"
+            ]
+        },
+        "ja": {
+            "label": "ワークスペース",
+            "tooltip": [
+                "ツールバーのドッキング、配置、セクション順序、ピン留めツールをカスタマイズするワークスペースエディタを開きます"
+            ]
+        },
+        "ko": {
+            "label": "워크스페이스",
+            "tooltip": [
+                "툴바 도킹, 정렬, 섹션 순서, 고정된 도구를 사용자 지정하는 워크스페이스 편집기를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساحات العمل",
+            "tooltip": [
+                "فتح محرر مساحات العمل لتخصيص إرساء شريط الأدوات ومحاذاته وترتيب أقسامه والأدوات المثبتة فيه"
+            ]
         }
     },
     "version_history_window": {
@@ -339,6 +824,36 @@
             "label": "Historique des Versions",
             "tooltip": [
                 "Consulte les notes de version et les changements des versions installées de TheKeyMachine."
+            ]
+        },
+        "ca": {
+            "label": "Historial de Versions",
+            "tooltip": [
+                "Revisa les notes de versió i els canvis de les versions instal·lades de TheKeyMachine"
+            ]
+        },
+        "zh": {
+            "label": "版本历史",
+            "tooltip": [
+                "查看已安装 TheKeyMachine 版本的发行说明和变更"
+            ]
+        },
+        "ja": {
+            "label": "バージョン履歴",
+            "tooltip": [
+                "インストール済みTheKeyMachineバージョンのリリースノートと変更点を確認します"
+            ]
+        },
+        "ko": {
+            "label": "버전 기록",
+            "tooltip": [
+                "설치된 TheKeyMachine 버전의 릴리스 노트와 변경사항을 검토합니다"
+            ]
+        },
+        "ar": {
+            "label": "سجل الإصدارات",
+            "tooltip": [
+                "مراجعة ملاحظات الإصدار والتغييرات لإصدارات TheKeyMachine المثبتة"
             ]
         }
     },
@@ -360,6 +875,36 @@
             "tooltip": [
                 "Affiche la version installée, les crédits, la licence et les informations du projet."
             ]
+        },
+        "ca": {
+            "label": "Quant a",
+            "tooltip": [
+                "Mostra la versió instal·lada, els crèdits, la llicència i la informació del projecte"
+            ]
+        },
+        "zh": {
+            "label": "关于",
+            "tooltip": [
+                "显示已安装版本、制作人员、许可证和项目信息"
+            ]
+        },
+        "ja": {
+            "label": "バージョン情報",
+            "tooltip": [
+                "インストール済みバージョン、クレジット、ライセンス、プロジェクト情報を表示します"
+            ]
+        },
+        "ko": {
+            "label": "정보",
+            "tooltip": [
+                "설치된 버전, 크레딧, 라이선스, 프로젝트 정보를 표시합니다"
+            ]
+        },
+        "ar": {
+            "label": "حول",
+            "tooltip": [
+                "عرض الإصدار المثبت وبيانات الاعتماد والترخيص ومعلومات المشروع"
+            ]
         }
     },
     "donate_window": {
@@ -379,6 +924,36 @@
             "label": "Faire un Don",
             "tooltip": [
                 "Ouvre la page de soutien au projet dans votre navigateur."
+            ]
+        },
+        "ca": {
+            "label": "Donar",
+            "tooltip": [
+                "Obre la pàgina de suport al projecte al navegador"
+            ]
+        },
+        "zh": {
+            "label": "捐赠",
+            "tooltip": [
+                "在浏览器中打开项目支持页面"
+            ]
+        },
+        "ja": {
+            "label": "寄付",
+            "tooltip": [
+                "ブラウザでプロジェクト支援ページを開きます"
+            ]
+        },
+        "ko": {
+            "label": "후원",
+            "tooltip": [
+                "브라우저에서 프로젝트 후원 페이지를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "تبرع",
+            "tooltip": [
+                "فتح صفحة دعم المشروع في المتصفح"
             ]
         }
     },
@@ -400,6 +975,62 @@
             "tooltip": [
                 "Crée un rapport de bug avec les détails de l'environnement et des fichiers de diagnostic optionnels."
             ]
+        },
+        "ca": {
+            "label": "Informe d'Error",
+            "tooltip": [
+                "Crea un informe d'error amb detalls de l'entorn i adjunts de diagnòstic opcionals"
+            ]
+        },
+        "zh": {
+            "label": "错误报告",
+            "tooltip": [
+                "创建包含环境详情和可选诊断附件的错误报告"
+            ]
+        },
+        "ja": {
+            "label": "バグレポート",
+            "tooltip": [
+                "環境の詳細とオプションの診断用添付ファイルを含むバグレポートを作成します"
+            ]
+        },
+        "ko": {
+            "label": "버그 신고",
+            "tooltip": [
+                "환경 세부정보와 선택적 진단 첨부 파일이 포함된 버그 신고를 작성합니다"
+            ]
+        },
+        "ar": {
+            "label": "الإبلاغ عن خلل",
+            "tooltip": [
+                "إنشاء تقرير خلل يتضمن تفاصيل البيئة ومرفقات تشخيصية اختيارية"
+            ]
+        }
+    },
+    "system": {
+        "en": {
+            "label": "TKM Menu"
+        },
+        "es": {
+            "label": "Menú TKM"
+        },
+        "fr": {
+            "label": "Menu TKM"
+        },
+        "ca": {
+            "label": "Menú TKM"
+        },
+        "zh": {
+            "label": "TKM 菜单"
+        },
+        "ja": {
+            "label": "TKMメニュー"
+        },
+        "ko": {
+            "label": "TKM 메뉴"
+        },
+        "ar": {
+            "label": "قائمة TKM"
         }
     }
 }

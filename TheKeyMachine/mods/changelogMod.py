@@ -92,6 +92,9 @@ def escape_text(text):
     return xml_escape(str(text or ""))
 
 
+_NUMERIC_VERSION_RE = re.compile(r"^\d+(?:\.\d+)*$")
+
+
 def parse_changelog_sections(raw):
     sections = []
     current = None
@@ -101,8 +104,15 @@ def parse_changelog_sections(raw):
         if not line or line.startswith("#"):
             continue
 
-        if line.endswith(":") and not line.startswith("-"):
-            current = {"version": line[:-1].strip(), "entries": []}
+        # A header is normally colon-terminated (covers both plain versions
+        # like "0.1.32:" and labeled ones like "pre-0.1.60:"). A bare numeric
+        # version ("0.1.33", missing its colon) is also accepted as a
+        # fallback -- that exact typo once silently swallowed a whole
+        # version's entries into whatever section came before it (or
+        # nowhere, if it was the first section in the file).
+        is_header = (line.endswith(":") and not line.startswith("-")) or _NUMERIC_VERSION_RE.match(line)
+        if is_header:
+            current = {"version": line.rstrip(":").strip(), "entries": []}
             sections.append(current)
             continue
 

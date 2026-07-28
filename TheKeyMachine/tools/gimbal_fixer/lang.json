@@ -20,6 +20,41 @@
                 "Analyse la rotation animée du contrôleur sélectionné et classe les six ordres de rotation selon leur risque de gimbal.",
                 "Choisissez un ordre pour convertir l'animation en conservant le mouvement visible."
             ]
+        },
+        "ca": {
+            "label": "Corrector de Gimbal",
+            "tooltip": [
+                "Analitza la rotació animada del control seleccionat i classifica els sis ordres de rotació segons el seu risc de gimbal",
+                "Tria un ordre per convertir l'animació conservant el moviment visible"
+            ]
+        },
+        "zh": {
+            "label": "万向节修复器",
+            "tooltip": [
+                "分析所选控制器的动画旋转，并按万向节锁风险对全部六种旋转顺序进行排序",
+                "选择一种顺序来转换动画，同时保持可见运动不变"
+            ]
+        },
+        "ja": {
+            "label": "ジンバル修正ツール",
+            "tooltip": [
+                "選択したコントローラのアニメーション回転を解析し、ジンバルロックのリスクで6つの回転順序をランク付けします",
+                "見た目の動きを保ったままアニメーションを変換する順序を選択します"
+            ]
+        },
+        "ko": {
+            "label": "짐벌 수정기",
+            "tooltip": [
+                "선택한 컨트롤의 애니메이션 회전을 분석하여 짐벌 위험도에 따라 6가지 회전 순서의 순위를 매깁니다",
+                "보이는 동작을 유지하면서 애니메이션을 변환할 순서를 선택하세요"
+            ]
+        },
+        "ar": {
+            "label": "مصحح الجمبل",
+            "tooltip": [
+                "تحليل الدوران المتحرك للمتحكم المحدد وترتيب كل ترتيبات الدوران الستة حسب خطر الجمبل",
+                "اختر ترتيبًا لتحويل الحركة مع الحفاظ على الحركة المرئية"
+            ]
         }
     }
 }

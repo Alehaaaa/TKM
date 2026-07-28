@@ -17,6 +17,36 @@
             "tooltip": [
                 "Ouvre la sélection actuelle sous forme de liste compacte pour resélectionner rapidement."
             ]
+        },
+        "ca": {
+            "label": "Selector",
+            "tooltip": [
+                "Obre la selecció actual com una llista compacta per tornar a seleccionar ràpidament"
+            ]
+        },
+        "zh": {
+            "label": "选择器",
+            "tooltip": [
+                "将当前选择打开为紧凑列表，便于快速重新选择"
+            ]
+        },
+        "ja": {
+            "label": "セレクター",
+            "tooltip": [
+                "現在の選択をコンパクトなリストとして開き、素早く再選択できます"
+            ]
+        },
+        "ko": {
+            "label": "선택기",
+            "tooltip": [
+                "빠르게 다시 선택할 수 있도록 현재 선택 항목을 간단한 목록으로 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "المحدد",
+            "tooltip": [
+                "افتح التحديد الحالي كقائمة مدمجة لإعادة التحديد بسرعة"
+            ]
         }
     },
     "select_hierarchy": {
@@ -36,6 +66,36 @@
             "label": "Sélectionner la Hiérarchie",
             "tooltip": [
                 "Ajoute les contrôleurs de courbe descendants sous la sélection actuelle."
+            ]
+        },
+        "ca": {
+            "label": "Seleccionar Jerarquia",
+            "tooltip": [
+                "Afegeix els controls de corba descendents sota la selecció actual"
+            ]
+        },
+        "zh": {
+            "label": "选择层级",
+            "tooltip": [
+                "在当前选择下方添加子级曲线控制器"
+            ]
+        },
+        "ja": {
+            "label": "階層を選択",
+            "tooltip": [
+                "現在の選択の下にある子カーブコントローラを追加します"
+            ]
+        },
+        "ko": {
+            "label": "계층 선택",
+            "tooltip": [
+                "현재 선택 항목 아래의 하위 커브 컨트롤을 추가합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديد التسلسل الهرمي",
+            "tooltip": [
+                "إضافة متحكمات المنحنى التابعة أسفل التحديد الحالي"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Sélectionne tous les contrôleurs de courbe et joints dans la hiérarchie du rig sélectionné."
             ]
+        },
+        "ca": {
+            "label": "Seleccionar Controls del Rig",
+            "tooltip": [
+                "Selecciona tots els controls de corba i joint a la jerarquia del rig seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "选择绑定控制器",
+            "tooltip": [
+                "选择所选绑定层级中的所有曲线和关节控制器"
+            ]
+        },
+        "ja": {
+            "label": "リグコントローラを選択",
+            "tooltip": [
+                "選択したリグ階層内のすべてのカーブおよびジョイントコントローラを選択します"
+            ]
+        },
+        "ko": {
+            "label": "리그 컨트롤 선택",
+            "tooltip": [
+                "선택한 리그 계층의 모든 커브 및 조인트 컨트롤을 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديد متحكمات الريغ",
+            "tooltip": [
+                "تحديد كل متحكمات المنحنى والمفصل في التسلسل الهرمي المحدد للريغ"
+            ]
         }
     },
     "select_rig_controls_animated": {
@@ -77,6 +167,62 @@
             "tooltip": [
                 "Sélectionne uniquement les contrôleurs de courbe et joints animés dans la hiérarchie du rig sélectionné."
             ]
+        },
+        "ca": {
+            "label": "Seleccionar Controls Animats del Rig",
+            "tooltip": [
+                "Selecciona només els controls de corba i joint animats a la jerarquia del rig seleccionat"
+            ]
+        },
+        "zh": {
+            "label": "选择已设置动画的绑定控制器",
+            "tooltip": [
+                "仅选择所选绑定层级中已设置动画的曲线和关节控制器"
+            ]
+        },
+        "ja": {
+            "label": "アニメーション済みリグコントローラを選択",
+            "tooltip": [
+                "選択したリグ階層内のアニメーション済みカーブ・ジョイントコントローラのみを選択します"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션된 리그 컨트롤 선택",
+            "tooltip": [
+                "선택한 리그 계층에서 애니메이션된 커브 및 조인트 컨트롤만 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديد متحكمات الريغ المتحركة",
+            "tooltip": [
+                "تحديد متحكمات المنحنى والمفصل المتحركة فقط في التسلسل الهرمي المحدد للريغ"
+            ]
+        }
+    },
+    "selection_tools": {
+        "en": {
+            "label": "Selection"
+        },
+        "es": {
+            "label": "Selección"
+        },
+        "fr": {
+            "label": "Sélection"
+        },
+        "ca": {
+            "label": "Selecció"
+        },
+        "zh": {
+            "label": "选择"
+        },
+        "ja": {
+            "label": "選択"
+        },
+        "ko": {
+            "label": "선택"
+        },
+        "ar": {
+            "label": "التحديد"
         }
     }
 }

@@ -17,6 +17,36 @@
             "tooltip": [
                 "Fond les valeurs entre la clé précédente et la suivante."
             ]
+        },
+        "ca": {
+            "label": "Tweener",
+            "tooltip": [
+                "Mescla els valors entre la clau anterior i la següent"
+            ]
+        },
+        "zh": {
+            "label": "补间器",
+            "tooltip": [
+                "在前后关键帧之间混合数值"
+            ]
+        },
+        "ja": {
+            "label": "トゥイーナー",
+            "tooltip": [
+                "前後のキー間で値をブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "트위너",
+            "tooltip": [
+                "이전 키와 다음 키 사이의 값을 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "التوسيط الزمني",
+            "tooltip": [
+                "مزج القيم بين المفتاح السابق والتالي"
+            ]
         }
     },
     "tweener_worldspace": {
@@ -36,6 +66,36 @@
             "label": "Tweener en Espace Monde",
             "tooltip": [
                 "Fond les transforms entre poses voisines en espace monde."
+            ]
+        },
+        "ca": {
+            "label": "Tweener en Espai del Món",
+            "tooltip": [
+                "Mescla els transforms entre poses veïnes en espai del món"
+            ]
+        },
+        "zh": {
+            "label": "世界空间补间器",
+            "tooltip": [
+                "在世界空间中混合相邻姿态之间的变换"
+            ]
+        },
+        "ja": {
+            "label": "ワールドスペーストゥイーナー",
+            "tooltip": [
+                "ワールドスペースで隣接ポーズ間のトランスフォームをブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "월드 스페이스 트위너",
+            "tooltip": [
+                "월드 스페이스에서 인접한 포즈 간의 트랜스폼을 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "التوسيط في الفضاء العالمي",
+            "tooltip": [
+                "مزج التحويلات بين الأوضاع المجاورة في الفضاء العالمي"
             ]
         }
     },
@@ -57,6 +117,36 @@
             "tooltip": [
                 "Fond la pose actuelle vers la pose enregistrée dans le buffer."
             ]
+        },
+        "ca": {
+            "label": "Mesclar al Buffer",
+            "tooltip": [
+                "Mescla la pose actual cap a la pose desada al buffer"
+            ]
+        },
+        "zh": {
+            "label": "混合到缓冲区",
+            "tooltip": [
+                "将当前姿态混合到已存储的姿态缓冲区"
+            ]
+        },
+        "ja": {
+            "label": "バッファにブレンド",
+            "tooltip": [
+                "現在のポーズを保存済みのポーズバッファにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "버퍼로 블렌드",
+            "tooltip": [
+                "현재 포즈를 저장된 포즈 버퍼로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى المخزن المؤقت",
+            "tooltip": [
+                "مزج الوضعية الحالية نحو الوضعية المخزنة في المخزن المؤقت"
+            ]
         }
     },
     "blend_to_default": {
@@ -76,6 +166,36 @@
             "label": "Fondu vers la Valeur par Défaut",
             "tooltip": [
                 "Fond les canaux vers leurs valeurs par défaut."
+            ]
+        },
+        "ca": {
+            "label": "Mesclar al Predeterminat",
+            "tooltip": [
+                "Mescla els canals cap als seus valors predeterminats"
+            ]
+        },
+        "zh": {
+            "label": "混合到默认值",
+            "tooltip": [
+                "将通道混合到其默认值"
+            ]
+        },
+        "ja": {
+            "label": "デフォルトにブレンド",
+            "tooltip": [
+                "チャンネルをデフォルト値にブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "기본값으로 블렌드",
+            "tooltip": [
+                "채널을 기본값으로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى الافتراضي",
+            "tooltip": [
+                "مزج القنوات نحو قيمها الافتراضية"
             ]
         }
     },
@@ -97,6 +217,36 @@
             "tooltip": [
                 "Fond les valeurs actuelles vers une interpolation adoucie."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a Suavitzat",
+            "tooltip": [
+                "Mescla els valors actuals cap a una interpolació suavitzada"
+            ]
+        },
+        "zh": {
+            "label": "混合到缓动",
+            "tooltip": [
+                "将当前值混合为缓动插值"
+            ]
+        },
+        "ja": {
+            "label": "イーズにブレンド",
+            "tooltip": [
+                "現在の値をイーズ補間にブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "이즈로 블렌드",
+            "tooltip": [
+                "현재 값을 이즈 보간으로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى التسارع",
+            "tooltip": [
+                "مزج القيم الحالية نحو استيفاء متسارع"
+            ]
         }
     },
     "blend_to_frame": {
@@ -116,6 +266,36 @@
             "label": "Fondu vers une Image",
             "tooltip": [
                 "Fond vers des valeurs échantillonnées à partir d'images de référence choisies."
+            ]
+        },
+        "ca": {
+            "label": "Mesclar a un Fotograma",
+            "tooltip": [
+                "Mescla cap a valors mostrejats de fotogrames de referència triats"
+            ]
+        },
+        "zh": {
+            "label": "混合到帧",
+            "tooltip": [
+                "混合到从所选参考帧采样的数值"
+            ]
+        },
+        "ja": {
+            "label": "フレームにブレンド",
+            "tooltip": [
+                "選択した参照フレームからサンプリングした値にブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "프레임으로 블렌드",
+            "tooltip": [
+                "선택한 참조 프레임에서 샘플링한 값으로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى إطار",
+            "tooltip": [
+                "المزج نحو قيم مأخوذة من إطارات مرجعية مختارة"
             ]
         }
     },
@@ -137,6 +317,36 @@
             "tooltip": [
                 "Fond vers des images de référence choisies en espace monde."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a un Fotograma en Espai del Món",
+            "tooltip": [
+                "Mescla cap a fotogrames de referència triats en espai del món"
+            ]
+        },
+        "zh": {
+            "label": "世界空间混合到帧",
+            "tooltip": [
+                "在世界空间中混合到所选参考帧"
+            ]
+        },
+        "ja": {
+            "label": "ワールドスペースでフレームにブレンド",
+            "tooltip": [
+                "ワールドスペースで選択した参照フレームにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "월드 스페이스 프레임으로 블렌드",
+            "tooltip": [
+                "월드 스페이스에서 선택한 참조 프레임으로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى إطار في الفضاء العالمي",
+            "tooltip": [
+                "المزج نحو إطارات مرجعية مختارة في الفضاء العالمي"
+            ]
         }
     },
     "blend_to_neighbors": {
@@ -156,6 +366,36 @@
             "label": "Fondu vers les Voisins",
             "tooltip": [
                 "Fond vers la clé voisine précédente ou suivante."
+            ]
+        },
+        "ca": {
+            "label": "Mesclar a Veïns",
+            "tooltip": [
+                "Mescla cap a la clau veïna anterior o següent"
+            ]
+        },
+        "zh": {
+            "label": "混合到相邻",
+            "tooltip": [
+                "混合到前一个或下一个相邻关键帧"
+            ]
+        },
+        "ja": {
+            "label": "隣接にブレンド",
+            "tooltip": [
+                "直前または直後の隣接キーにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "이웃으로 블렌드",
+            "tooltip": [
+                "이전 또는 다음 인접 키로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى المجاورين",
+            "tooltip": [
+                "المزج نحو المفتاح المجاور السابق أو التالي"
             ]
         }
     },
@@ -177,6 +417,36 @@
             "tooltip": [
                 "Fond vers des poses voisines en espace monde."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a Veïns en Espai del Món",
+            "tooltip": [
+                "Mescla cap a poses veïnes en espai del món"
+            ]
+        },
+        "zh": {
+            "label": "世界空间混合到相邻",
+            "tooltip": [
+                "在世界空间中混合到相邻姿态"
+            ]
+        },
+        "ja": {
+            "label": "ワールドスペースで隣接にブレンド",
+            "tooltip": [
+                "ワールドスペースで隣接するポーズにブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "월드 스페이스 이웃으로 블렌드",
+            "tooltip": [
+                "월드 스페이스에서 인접한 포즈로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى المجاورين في الفضاء العالمي",
+            "tooltip": [
+                "المزج نحو الأوضاع المجاورة في الفضاء العالمي"
+            ]
         }
     },
     "blend_to_infinity": {
@@ -196,6 +466,36 @@
             "label": "Fondu vers l'Infini",
             "tooltip": [
                 "Fond vers la valeur de pré-infini ou post-infini de la courbe."
+            ]
+        },
+        "ca": {
+            "label": "Mesclar a l'Infinit",
+            "tooltip": [
+                "Mescla cap al valor de pre-infinit o post-infinit de la corba"
+            ]
+        },
+        "zh": {
+            "label": "混合到无穷",
+            "tooltip": [
+                "混合到曲线的前无穷或后无穷值"
+            ]
+        },
+        "ja": {
+            "label": "無限にブレンド",
+            "tooltip": [
+                "カーブのプレインフィニティまたはポストインフィニティ値にブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "무한대로 블렌드",
+            "tooltip": [
+                "커브의 사전 무한대 또는 사후 무한대 값으로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى اللانهاية",
+            "tooltip": [
+                "المزج نحو قيمة ما قبل أو ما بعد اللانهاية للمنحنى"
             ]
         }
     },
@@ -217,6 +517,36 @@
             "tooltip": [
                 "Fond vers des valeurs d'infini en espace monde."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a l'Infinit en Espai del Món",
+            "tooltip": [
+                "Mescla cap a valors d'infinit en espai del món"
+            ]
+        },
+        "zh": {
+            "label": "世界空间混合到无穷",
+            "tooltip": [
+                "在世界空间中混合到无穷值"
+            ]
+        },
+        "ja": {
+            "label": "ワールドスペースで無限にブレンド",
+            "tooltip": [
+                "ワールドスペースで無限値にブレンドします"
+            ]
+        },
+        "ko": {
+            "label": "월드 스페이스 무한대로 블렌드",
+            "tooltip": [
+                "월드 스페이스에서 무한대 값으로 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى اللانهاية في الفضاء العالمي",
+            "tooltip": [
+                "المزج نحو قيم اللانهاية في الفضاء العالمي"
+            ]
         }
     },
     "blend_to_undo": {
@@ -237,6 +567,62 @@
             "tooltip": [
                 "Fond en revenant vers l'état capturé avant cette interaction."
             ]
+        },
+        "ca": {
+            "label": "Mesclar a Desfer",
+            "tooltip": [
+                "Mescla de tornada cap a l'estat capturat abans d'aquesta interacció"
+            ]
+        },
+        "zh": {
+            "label": "混合到撤销",
+            "tooltip": [
+                "混合回此次交互之前捕获的状态"
+            ]
+        },
+        "ja": {
+            "label": "アンドゥにブレンド",
+            "tooltip": [
+                "この操作前にキャプチャした状態にブレンドして戻します"
+            ]
+        },
+        "ko": {
+            "label": "실행 취소로 블렌드",
+            "tooltip": [
+                "이 조작 전에 캡처된 상태로 다시 블렌드합니다"
+            ]
+        },
+        "ar": {
+            "label": "مزج إلى التراجع",
+            "tooltip": [
+                "المزج للعودة نحو الحالة الملتقطة قبل هذا التفاعل"
+            ]
+        }
+    },
+    "slider_tween": {
+        "en": {
+            "label": "Tween Sliders"
+        },
+        "es": {
+            "label": "Deslizadores Tween"
+        },
+        "fr": {
+            "label": "Curseurs Tween"
+        },
+        "ca": {
+            "label": "Controls Lliscants Tween"
+        },
+        "zh": {
+            "label": "补间滑块"
+        },
+        "ja": {
+            "label": "トゥイーンスライダー"
+        },
+        "ko": {
+            "label": "트윈 슬라이더"
+        },
+        "ar": {
+            "label": "أشرطة تمرير التوسيط"
         }
     }
 }
