@@ -530,15 +530,11 @@ def build_slider_section(
         slider.setModes(localized_modes)
         slider.setCurrentMode(key)
 
-        def make_mode_setter(slider_instance):
-            def setter(new_mode, temporary=False):
-                slider_instance.setCurrentMode(new_mode, temporary=temporary)
-                if not temporary:
-                    slider_instance.startModeTransition()
-
-            return setter
-
-        slider.modeRequested.connect(make_mode_setter(slider))
+        # A permanent mode-switch request (right-click) and a temporary one
+        # (modifier-preview) are both routed to the section itself, exactly
+        # like every other slider/toolbutton event this loop wires up via
+        # section.addWidget() below -- see
+        # QFlatSectionWidget._on_slider_mode_requested.
         section.addWidget(
             slider,
             label,

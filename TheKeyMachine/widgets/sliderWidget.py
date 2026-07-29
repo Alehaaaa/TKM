@@ -80,6 +80,12 @@ def _slider_command_name(prefix: str, mode: str, value: int) -> str:
 class SliderButton(cw.TooltipMixin, QtWidgets.QToolButton):
     """Flat square-indicator button that emits its signed percent on click."""
 
+    # Floor for _refresh_icon()'s clamp, as a fraction of the full
+    # DPI-scaled handle size: the icon shrinks with this button's own box
+    # when space is tight, but never past this -- a narrower button than
+    # that just clips/overflows rather than shrinking the icon further.
+    MIN_ICON_SIZE_RATIO: ClassVar[float] = 0.4
+
     def __init__(self, parent: QtWidgets.QWidget, *, percent: int, color: str, worldSpace: bool = False, frameButton: bool = False):
         super().__init__(parent)
         self._percent = percent
@@ -97,6 +103,14 @@ class SliderButton(cw.TooltipMixin, QtWidgets.QToolButton):
         self._box_sz = wutil.DPI(7) if (self._frameButton or abs(percent) == 100) else wutil.DPI(3)
         self.setFixedHeight(parent.height())
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        # QToolButton's own minimumSizeHint normally grows with its current
+        # iconSize, which fights _refresh_icon()'s width-based clamp below:
+        # the layout won't compress this button under its self-reported
+        # minimum, so it was never actually reaching a width small enough
+        # for the clamp to bite, no matter how many siblings it had to share
+        # the row with. Uncoupling the floor from the icon lets the layout
+        # actually shrink the button, so _refresh_icon() sees the real width.
+        self.setMinimumWidth(0)
 
         self.setStyleSheet(
             f"QToolButton {{ background: none; border-radius: 0; }}"
@@ -144,11 +158,27 @@ class SliderButton(cw.TooltipMixin, QtWidgets.QToolButton):
     def _refresh_icon(self):
         """setIcon()-based glyph: world-space uses the exported, per-slider-type
         globe icon (same asset pipeline as the big/small squares), otherwise the
-        mode-specific square icon file. No manual painting."""
+        mode-specific square icon file. No manual painting.
+
+        All of a side's buttons (7 value buttons, or 8 with the frame-picker
+        pair shown) still divide the overlay's width equally, so this
+        button's own actual box can be narrower than the DPI-scaled handle
+        size. The icon shrinks with that box rather than overflowing it --
+        but only down to MIN_ICON_SIZE_RATIO of its full size; past that
+        point it holds still and lets the button clip it instead of
+        shrinking into an unreadable speck.
+        """
         icon = self._worldSpaceIcon if self._worldSpace else self._squareIcon
         self.setIcon(icon)
-        icon_canvas_size = wutil.DPI(SliderHandle.HANDLE_SIZE)
+        max_canvas_size = wutil.DPI(SliderHandle.HANDLE_SIZE)
+        min_canvas_size = max(1, round(max_canvas_size * self.MIN_ICON_SIZE_RATIO))
+        available = max(0, min(self.width(), self.height()) - wutil.DPI(2))
+        icon_canvas_size = max(min_canvas_size, min(max_canvas_size, available or max_canvas_size))
         self.setIconSize(QtCore.QSize(icon_canvas_size, icon_canvas_size))
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._refresh_icon()
 
     def _update_tooltip(self):
         title = self._tooltip_title or "Value"
@@ -297,6 +327,7 @@ class SliderHandle(cw.TooltipMixin, QtWidgets.QSlider):
     PERCENT_SCALE: ClassVar[int] = 1000
 
     DEFAULT_WIDTH: ClassVar[int] = 200
+    MIN_WIDTH_RATIO: ClassVar[float] = 0.6
     DEFAULT_HEIGHT: ClassVar[int] = 24
     THIN_GROOVE_HEIGHT: ClassVar[int] = 10
     HANDLE_SIZE: ClassVar[int] = 24
@@ -354,8 +385,13 @@ class SliderHandle(cw.TooltipMixin, QtWidgets.QSlider):
         self._text_font = QtGui.QFont()
         self._text_font.setPixelSize(int(wutil.DPI(self.TEXT_FONT_SIZE)))
 
-        # size
-        self.setFixedWidth(wutil.DPI(self.DEFAULT_WIDTH))
+        # size -- width is a range, not fixed: DEFAULT_WIDTH is the size this
+        # pops up to whenever there's room for it, but it can be compressed
+        # down to MIN_WIDTH_RATIO of that (by the section's own layout,
+        # alongside its sibling sliders/buttons) when the section can't grow
+        # any wider to fit everyone at full size.
+        self.setMinimumWidth(wutil.DPI(int(self.DEFAULT_WIDTH * self.MIN_WIDTH_RATIO)))
+        self.setMaximumWidth(wutil.DPI(self.DEFAULT_WIDTH))
         self.setFixedHeight(wutil.DPI(self.DEFAULT_HEIGHT))
 
         self._apply_stylesheet(thick=False)
@@ -417,6 +453,12 @@ class SliderHandle(cw.TooltipMixin, QtWidgets.QSlider):
         return os.path.isabs(value) or os.path.splitext(value)[1].lower() in {".svg", ".png", ".jpg", ".jpeg", ".bmp", ".ico"}
 
     # --- public helpers ---------------------------------------------------------
+    def sizeHint(self) -> QtCore.QSize:
+        # The size this widget pops up to whenever the section's layout has
+        # room to give it -- see the min/maximumWidth range set in __init__
+        # for how far it can be compressed instead when it doesn't.
+        return QtCore.QSize(wutil.DPI(self.DEFAULT_WIDTH), wutil.DPI(self.DEFAULT_HEIGHT))
+
     def handle_size(self) -> int:
         return wutil.DPI(self.HANDLE_SIZE)
 
@@ -736,8 +778,12 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
     dragStarted = QtCore.Signal()
     dragFinished = QtCore.Signal()
     modeSelected = QtCore.Signal(str)
-    modeRequested = QtCore.Signal(str, bool)
-    currentModeChanged = QtCore.Signal(object, object, object)
+    # (self, mode_key, temporary) -- a request to display mode_key. A
+    # temporary request (modifier-preview / mid-click) is transient and
+    # handled by this widget alone; a permanent request is forwarded to the
+    # owning section as a request to swap which of its per-mode widgets is
+    # pinned/visible -- see QFlatSectionWidget._on_slider_mode_requested.
+    modeRequested = QtCore.Signal(object, str, bool)
 
     def __init__(
         self,
@@ -1053,37 +1099,46 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
             self._setCurrentMode(active_mode)
 
     def setCurrentMode(self, identifier: str, temporary: bool = False):
-        """Updates the current mode and adjusts UI accordingly."""
+        """Updates the current mode and adjusts UI accordingly.
+
+        A permanent switch (temporary=False) only ever happens once, when
+        this widget is first built for its dedicated mode (see
+        toolWidgets.build_slider_section) -- after that, a slider's own mode
+        is fixed for its lifetime, exactly like a toolbutton's identity.
+        What looks like "switching modes" from the user's side is handled a
+        level up, by QFlatSectionWidget: swapping which of a section's
+        already-built, per-mode widgets is pinned (visible). A temporary
+        switch (modifier-preview / mid-click) is the one case that still
+        mutates this widget's own presentation in place, since it's a
+        transient overlay that never touches pin state.
+        """
         found = None
         for m in self._modes:
             if isinstance(m, SliderMode) and (m.key == identifier or m.label == identifier):
                 found = m
                 break
 
-        if found:
-            if temporary:
-                if self._current_mode and found.key == self._current_mode.key:
-                    self._temporary_mode = None
-                    self._setCurrentMode(self._current_mode)
-                else:
-                    self._temporary_mode = found
-                    self._setCurrentMode(found)
-            else:
-                old_key = self._current_mode.key if self._current_mode else None
-                if old_key == found.key:
-                    return False
-                self._current_mode = found
-                self._temporary_mode = None
-                self._setCurrentMode(found)
-                self.currentModeChanged.emit(self, old_key, found.key)
-                return True
-        else:
+        if found is None:
             # Fallback for initialization or unknown keys
-            old_key = self._current_mode.key if self._current_mode else None
             self._current_mode = None
             self._temporary_mode = None
-            if old_key:
-                self.currentModeChanged.emit(self, old_key, None)
+            return False
+
+        if temporary:
+            if self._current_mode and found.key == self._current_mode.key:
+                self._temporary_mode = None
+                self._setCurrentMode(self._current_mode)
+            else:
+                self._temporary_mode = found
+                self._setCurrentMode(found)
+            return True
+
+        if self._current_mode and found.key == self._current_mode.key:
+            return False
+        self._current_mode = found
+        self._temporary_mode = None
+        self._setCurrentMode(found)
+        return True
 
     def setTemporaryMode(self, mask: int, requires_mid_click: bool = False) -> bool:
         if not self.idle() or not self._is_pointer_over_widget():
@@ -1098,13 +1153,13 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
             return False
         if not self._temporary_mode and self._current_mode and self._current_mode.key == mode.key:
             return False
-        self.modeRequested.emit(mode.key, True)
+        self.modeRequested.emit(self, mode.key, True)
         return True
 
     def resetDefaultMode(self):
         if not self._temporary_mode or not self._current_mode:
             return False
-        self.modeRequested.emit(self._current_mode.key, True)
+        self.modeRequested.emit(self, self._current_mode.key, True)
         return True
 
     def setTooltipInfo(self, title: str, description: str = "", tooltip=None):
@@ -1344,10 +1399,14 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
             is_current = active and (mode.key == active.key or mode.label == active.label)
             act.setChecked(is_current)
 
-            # Use the section's visible modes so this menu matches the pinning menu live.
+            # Selecting a mode swaps a pin -- disable modes that are already
+            # pinned (visible) on another slot of this section, the same
+            # check the section's own pinning menu uses.
             is_already_pinned = False
-            if section and hasattr(section, "_visible_slider_mode_keys"):
-                is_already_pinned = mode.key in section._visible_slider_mode_keys() and not is_current
+            if section and self._section_prefix and hasattr(section, "_is_pin_key_checked"):
+                is_already_pinned = not is_current and section._is_pin_key_checked(
+                    f"{self._section_prefix}_{mode.key}"
+                )
 
             if is_already_pinned:
                 act.setEnabled(False)
@@ -1355,7 +1414,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
             if not is_current and not is_already_pinned:
                 def _select_mode(_checked=False, mode_key=mode.key):
                     self.modeSelected.emit(mode_key)
-                    self.modeRequested.emit(mode_key, False)
+                    self.modeRequested.emit(self, mode_key, False)
 
                 act.triggered.connect(_select_mode)
 
@@ -1391,42 +1450,60 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
         self._leftOverlay.raise_()
         self._rightOverlay.raise_()
 
-    def startModeTransition(self):
-        """Briefly highlight the slider after a permanent mode change."""
+    def startModeTransition(self, flashes: int = 3, interval: int = 40):
+        """Flash the slider fully white a few times after a permanent mode change.
+
+        Restores the original plain blink -- flat white, square corners, no
+        easing -- in place of the single fading rgba overlay that had
+        replaced it: toggles a solid-white overlay's visibility on a timer
+        instead of animating its opacity.
+
+        This can start while the section's own reveal-in animation
+        (QFlatSectionWidget._animate_widget_reveal) is still growing this
+        widget's maximumWidth from zero, so the overlay's geometry is
+        re-read fresh on every tick rather than captured once -- a
+        one-time rect() at the moment this is called can be the
+        momentarily-collapsed, pre-grow size, which made the blink
+        invisible.
+        """
         if self._mode_transition is not None:
             self._mode_transition.stop()
-            self._mode_transition.deleteLater()
             self._mode_transition = None
         if self._mode_transition_overlay is not None:
             self._mode_transition_overlay.deleteLater()
+            self._mode_transition_overlay = None
 
         overlay = QtWidgets.QWidget(self)
         overlay.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
-        overlay.setStyleSheet("background-color: rgba(255, 255, 255, 72); border-radius: 3px;")
+        overlay.setStyleSheet("background-color: white;")
         overlay.setGeometry(self.rect())
         overlay.raise_()
-        effect = QtWidgets.QGraphicsOpacityEffect(overlay)
-        overlay.setGraphicsEffect(effect)
-        effect.setOpacity(1.0)
-
-        animation = QtCore.QPropertyAnimation(effect, b"opacity", self)
-        animation.setDuration(160)
-        animation.setStartValue(1.0)
-        animation.setEndValue(0.0)
-        animation.setEasingCurve(QtCore.QEasingCurve.OutCubic)
-        self._mode_transition = animation
         self._mode_transition_overlay = overlay
 
-        def _finish(target_animation=animation, target_overlay=overlay):
-            if self._mode_transition is target_animation:
-                self._mode_transition = None
-            if self._mode_transition_overlay is target_overlay:
-                self._mode_transition_overlay = None
-            target_overlay.deleteLater()
-            target_animation.deleteLater()
+        state = {"count": 0}
+        timer = QtCore.QTimer(self)
+        timer.setInterval(interval)
+        self._mode_transition = timer
 
-        animation.finished.connect(_finish)
-        animation.start()
+        def _tick(target_overlay=overlay, target_timer=timer):
+            if not wutil.is_valid_widget(target_overlay):
+                target_timer.stop()
+                return
+            if state["count"] >= flashes * 2:
+                target_timer.stop()
+                if self._mode_transition is target_timer:
+                    self._mode_transition = None
+                if self._mode_transition_overlay is target_overlay:
+                    self._mode_transition_overlay = None
+                target_overlay.deleteLater()
+                return
+            target_overlay.setGeometry(self.rect())
+            target_overlay.raise_()
+            target_overlay.setVisible(state["count"] % 2 == 0)
+            state["count"] += 1
+
+        timer.timeout.connect(_tick)
+        timer.start()
 
     ############### SIGNAL PLUMBING METHODS ###############
 

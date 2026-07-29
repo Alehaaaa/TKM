@@ -2308,6 +2308,22 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self._restore_entry_constraints(state)
 
     def _animate_widget_in(self, widget, start_width=None):
+        """Reveal *widget*, animated -- the one path every pin/unpin uses.
+
+        The default technique clips the whole section to its old width and
+        grows it out to its new one: cheap, and it reads well for the
+        ordinary case (a single pin) where the section's total width
+        genuinely grows. That check can legitimately come back false even
+        though *widget* really is being newly revealed -- e.g. a slider mode
+        switch (QFlatSectionWidget._on_slider_mode_requested) unpins one
+        same-size widget and pins another in the same transaction, so the
+        section's total width never moves, or a bulk "Pin All" reveals
+        several widgets in one pass and this only ever tracks the first. When
+        there's nothing for the section-level clip to grow into, fall back
+        to growing just this one widget's own width in place instead, so a
+        reveal is never silently instant -- for a toolbutton exactly as much
+        as for a slider, since neither is special-cased here.
+        """
         if widget is None or not QtCompat.isValid(widget):
             return
         if start_width is None:
@@ -2330,6 +2346,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if start_width >= target_width:
             self._restore_entry_constraints(state)
             self._refresh_layout()
+            self._animate_widget_reveal(widget)
             return
 
         width_animation = QtCore.QPropertyAnimation(self, b"maximumWidth", self)
@@ -2487,24 +2504,19 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         if is_valid_widget(widget) and hasattr(widget, "on_added_to_section"):
             widget.on_added_to_section(self, key)
 
-        # If the widget is a mode-aware slider, restore its saved mode assignment
-        if is_valid_widget(widget) and hasattr(widget, "_current_mode"):
-            cm = getattr(widget, "_current_mode", None)
-            if cm is not None:
-                widget._tkm_default_mode_key = cm.key
-            if hasattr(widget, "currentModeChanged"):
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", RuntimeWarning)
-                    try:
-                        widget.currentModeChanged.disconnect(self._on_slider_current_mode_changed)
-                    except (RuntimeError, TypeError):
-                        pass
-                widget.currentModeChanged.connect(self._on_slider_current_mode_changed)
-
-            if cm:
-                saved_mode_key = self._get_setting(f"slider_mode_{key}", cm.key)
-                if saved_mode_key != cm.key and hasattr(widget, "setCurrentMode"):
-                    widget.setCurrentMode(saved_mode_key)
+        # A slider's own mode is fixed for its lifetime -- one widget, one
+        # mode, exactly like a toolbutton's tool_id. What looks like
+        # "switching modes" (sliderWidget._show_context_menu / modifier
+        # preview) is a request routed here, not a change the widget makes
+        # to itself -- see _on_slider_mode_requested.
+        if is_valid_widget(widget) and hasattr(widget, "modeRequested"):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                try:
+                    widget.modeRequested.disconnect(self._on_slider_mode_requested)
+                except (RuntimeError, TypeError):
+                    pass
+            widget.modeRequested.connect(self._on_slider_mode_requested)
 
         if self._hiddeable:
             if pinnable is not False:
@@ -2517,8 +2529,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                     "command_icon": command_icon or icon,
                     "tooltip_enabled": tooltip_enabled,
                     "default": default,
-                    "stable_help": hasattr(widget, "_tkm_default_mode_key"),
-                    "mode_key": getattr(widget, "_tkm_default_mode_key", None),
                 }
                 existing_entry = next((m for m in self._menu_metadata if m.get("id") == key), None)
                 if existing_entry:
@@ -2712,9 +2722,10 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         """Apply a set of pin states as one visibility and layout transaction.
 
         Every pin key -- slider or toolbutton -- maps to exactly one widget
-        slot and only ever touches that slot's visibility. A slider's mode
-        (what it currently displays) is a separate concern handled via
-        right-click / _on_slider_current_mode_changed, not here.
+        with a fixed identity for that widget's lifetime (a slider's mode
+        included -- see _on_slider_mode_requested). A permanent slider mode
+        "switch" is exactly two calls into this: unpin the slot the request
+        came from, pin the slot for the requested mode.
         """
         start_width = self.width() if self.isVisible() else 0
         self._cancel_entry_animation()
@@ -2726,6 +2737,17 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             if widget is None or not QtCompat.isValid(widget):
                 continue
             visible = bool(visible)
+            if not visible:
+                # Hiding a widget that currently owns keyboard focus (e.g. a
+                # slider mode swap hides the very widget the user just
+                # right-clicked -- see _on_slider_mode_requested) makes Qt
+                # auto-hand focus to whatever's next in the *global* focus
+                # chain, unrelated to this section entirely (observed:
+                # the Nudge Value field). Clear focus explicitly first so
+                # there's nothing for Qt to hand off.
+                focus_widget = QtWidgets.QApplication.focusWidget()
+                if focus_widget is not None and (focus_widget is widget or widget.isAncestorOf(focus_widget)):
+                    focus_widget.clearFocus()
             if visible and widget.isHidden() and reveal_widget is None:
                 reveal_widget = widget
             widget.setVisible(visible)
@@ -2871,50 +2893,106 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 entry["description"] = tool.get("description") or (tooltip if isinstance(tooltip, str) else "")
                 entry["tooltip"] = tooltip
 
-    def _on_slider_current_mode_changed(self, widget, old_key, new_key):
-        """Persist which mode a slot displays. Does not touch any pin/visibility state.
+    def _on_slider_mode_requested(self, widget, new_mode_key, temporary):
+        """Handle a slider asking to display a different mode.
 
-        A slot's pin key always means "is this slot's widget visible" -- the
-        same as a toolbutton. Switching what content a visible slot shows
-        (via right-click) is an orthogonal, per-slot preference, so it must
-        never flip another slot's pin setting.
+        A temporary request (modifier held / mid-click preview) never
+        touches pin state -- it's a transient overlay the widget reverts on
+        its own -- so it is forwarded straight back to the widget.
+
+        A permanent request means "swap which of this section's
+        already-built, per-mode widgets is visible": every mode already has
+        its own dedicated, fixed-identity widget (see
+        toolWidgets.build_slider_section), so this is exactly an unpin/pin
+        pair -- the same transaction, through the same
+        _apply_widget_pin_states(), that a toolbutton's pin toggle uses (and
+        which keeps the pin menu, the Workspaces editor, and the toolbar's
+        own right-click menu in sync the same way it already does for every
+        other pin change, via pinsChanged). The requesting widget's own mode
+        never changes, and its layout position is never touched -- exactly
+        like unpinning/pinning any toolbutton, the section's widgets stay in
+        their one fixed, declared order (the same order the pin menu lists
+        them in) and only ever show or hide in place.
         """
-        slot_key = next((k for k, v in self._widgets.items() if v is widget), None)
-        if not slot_key:
+        if not QtCompat.isValid(widget):
             return
-        if new_key:
-            self._set_setting(f"slider_mode_{slot_key}", new_key)
 
-        if QtCompat.isValid(widget):
-            widget.updateGeometry()
-            widget.update()
-        layout = self.layout()
-        if layout is not None:
-            layout.invalidate()
-        self._sync_section_visibility()
-        self.pinsChanged.emit()
-        self._refresh_layout()
+        if temporary:
+            if hasattr(widget, "setCurrentMode"):
+                widget.setCurrentMode(new_mode_key, temporary=True)
+            return
+
+        prefix = getattr(self, "_tkm_slider_prefix", "")
+        own_key = next((k for k, v in self._widgets.items() if v is widget), None)
+        if not own_key or not prefix:
+            return
+
+        target_key = f"{prefix}_{new_mode_key}"
+        if target_key == own_key or target_key not in self._widgets:
+            return
+
+        # Exactly the same call a toolbutton's pin toggle makes -- no
+        # animation branching here. _apply_widget_pin_states() ->
+        # _animate_widget_in() already knows how to reveal target_key's
+        # widget whether or not the section's total width happens to move.
+        self._apply_widget_pin_states({own_key: False, target_key: True})
+
+        target_widget = self._widgets.get(target_key)
+        if QtCompat.isValid(target_widget) and hasattr(target_widget, "startModeTransition"):
+            target_widget.startModeTransition()
+
+    def _animate_widget_reveal(self, widget):
+        """Grow *widget* in from zero width in place.
+
+        Same visual language as _animate_widget_in's own section-level clip
+        (duration, easing) but applied to this one widget's own
+        maximumWidth instead -- _animate_widget_in's fallback for whenever
+        the section-level version has no width delta to animate.
+        """
+        if not QtCompat.isValid(widget):
+            return
+        original_max = widget.maximumWidth()
+        target_width = max(widget.sizeHint().width(), widget.width(), 1)
+
+        existing = getattr(widget, "_tkm_reveal_animation", None)
+        if existing is not None:
+            existing.stop()
+            existing.deleteLater()
+            widget._tkm_reveal_animation = None
+
+        widget.setMaximumWidth(0)
+
+        animation = QtCore.QPropertyAnimation(widget, b"maximumWidth", widget)
+        animation.setDuration(self.ENTRY_ANIMATION_MS)
+        animation.setStartValue(0)
+        animation.setEndValue(target_width)
+        animation.setEasingCurve(QtCore.QEasingCurve.OutCubic)
+        animation.valueChanged.connect(lambda _value: self._refresh_layout())
+
+        def _finish(target_widget=widget, restore_max=original_max, target_animation=animation):
+            if QtCompat.isValid(target_widget):
+                if getattr(target_widget, "_tkm_reveal_animation", None) is target_animation:
+                    target_widget._tkm_reveal_animation = None
+                target_widget.setMaximumWidth(restore_max)
+            target_animation.deleteLater()
+
+        animation.finished.connect(_finish)
+        widget._tkm_reveal_animation = animation
+        animation.start()
 
     def pin_widget_defaults(self, menu=None):
-        """Restore original slider modes and widget visibility defaults."""
-        mode_settings = {}
-        for key, widget in self._widgets.items():
-            default_mode_key = getattr(widget, "_tkm_default_mode_key", None)
-            if not default_mode_key or not hasattr(widget, "setCurrentMode"):
-                continue
-            blocked = widget.blockSignals(True)
-            try:
-                widget.setCurrentMode(default_mode_key)
-            finally:
-                widget.blockSignals(blocked)
-            mode_settings[f"slider_mode_{key}"] = default_mode_key
+        """Restore each widget slot's default visibility.
 
+        A slider's own mode is fixed for its lifetime (see
+        _on_slider_mode_requested), so -- same as a toolbutton -- there is
+        nothing left to restore per-widget beyond visibility.
+        """
         states = {
             item["id"]: bool(item.get("default", True))
             for item in self._menu_metadata
             if item.get("type") == "widget" and item.get("id")
         }
-        self._apply_widget_pin_states(states, menu=menu, additional_settings=mode_settings)
+        self._apply_widget_pin_states(states, menu=menu)
 
     def pin_widget_all(self, menu=None):
         """Show every pinnable widget without changing slider modes."""
@@ -2932,23 +3010,6 @@ class QFlatSectionWidget(QtWidgets.QWidget):
             self._apply_widget_pin(key, bool(checked))
 
         return handler
-
-    def _visible_slider_mode_keys(self):
-        """Modes currently shown by some *visible* slot in this section.
-
-        Used only to warn a slot's own mode-select menu (sliderWidget.py)
-        that a candidate mode is already being displayed elsewhere, so a
-        user doesn't end up with two visible slots showing the same content.
-        Not used for pin-menu checked state -- see _is_pin_key_checked.
-        """
-        modes = set()
-        for widget in self._widgets.values():
-            if not QtCompat.isValid(widget) or widget.isHidden() or not hasattr(widget, "_current_mode"):
-                continue
-            current_mode = getattr(widget, "_current_mode", None)
-            if current_mode:
-                modes.add(current_mode.key)
-        return modes
 
     def _is_pin_key_checked(self, key):
         """A pin key is checked iff its own widget slot is visible.
@@ -3118,13 +3179,12 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 if widget is None or not QtCompat.isValid(widget):
                     continue
                 action_help = dict(item)
-                if not item.get("stable_help"):
-                    widget_help = self._widget_help_data(widget)
-                    for field in (
-                        "description", "tooltip", "shortcuts", "icon", "command_id", "command_icon",
-                    ):
-                        if field in widget_help and widget_help[field] is not None:
-                            action_help[field] = widget_help[field]
+                widget_help = self._widget_help_data(widget)
+                for field in (
+                    "description", "tooltip", "shortcuts", "icon", "command_id", "command_icon",
+                ):
+                    if field in widget_help and widget_help[field] is not None:
+                        action_help[field] = widget_help[field]
                 action = self._add_checkable_menu_action(
                     menu, key, item["label"], self._is_pin_key_checked(key), self._make_toggle_handler(key),
                     description=action_help.get("description") or "",
