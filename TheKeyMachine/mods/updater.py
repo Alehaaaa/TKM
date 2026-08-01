@@ -5,6 +5,7 @@ import json
 import shutil
 import zipfile
 import sys
+import importlib
 import maya.cmds as cmds
 from TheKeyMachine.tools import common as toolCommon
 
@@ -18,13 +19,6 @@ else:
     import httplib
 
     responses = httplib.responses
-
-try:
-    from importlib import reload
-except ImportError:
-    from imp import reload
-except ImportError:
-    pass
 
 from TheKeyMachine.core.Qt import QtCore, QtGui
 
@@ -45,6 +39,7 @@ NO_SERVER_ERROR = "<hl>%s %s</hl>\nCould not sync with the server."
 _REPO_ARCHIVE_REF = None
 DOWNLOAD_PROGRESS_UNITS = 1000
 DOWNLOAD_PROGRESS_UPDATE_MS = 80
+DOWNLOAD_ETA_MIN_BYTES = 262144
 
 # SSL Context
 unverified_ssl_context = ssl.create_default_context()
@@ -80,6 +75,67 @@ def compare_versions(version1, version2):
     return 0
 
 
+def _download_status(downloaded, total_size, elapsed_ms):
+    label = "Downloading Update"
+    if (
+        total_size <= 0
+        or downloaded <= 0
+        or elapsed_ms <= 0
+        or downloaded < min(total_size, DOWNLOAD_ETA_MIN_BYTES)
+    ):
+        return label
+
+    remaining = max(0, total_size - downloaded)
+    if remaining <= 0:
+        return label
+
+    bytes_per_second = downloaded / max(0.001, elapsed_ms / 1000.0)
+    if bytes_per_second <= 0:
+        return label
+    eta = toolCommon.format_eta(remaining / bytes_per_second)
+    return "{}, about {}".format(label, eta) if eta else label
+
+
+def _reopen_after_install():
+    try:
+        importlib.invalidate_caches()
+    except Exception:
+        pass
+
+    for module_name in list(sys.modules.keys()):
+        if module_name == "TheKeyMachine" or module_name.startswith("TheKeyMachine."):
+            try:
+                del sys.modules[module_name]
+            except KeyError:
+                pass
+
+    import TheKeyMachine.core.toolbar as toolbar
+
+    return toolbar.show(cleanup_existing=False)
+
+
+def _response_header(response, name, default=None):
+    getheader = getattr(response, "getheader", None)
+    if callable(getheader):
+        return getheader(name, default)
+
+    info = getattr(response, "info", None)
+    headers = info() if callable(info) else None
+    for getter_name in ("getheader", "get"):
+        get = getattr(headers, getter_name, None)
+        if callable(get):
+            return get(name, default)
+    return default
+
+
+def _response_status(response):
+    getcode = getattr(response, "getcode", None)
+    status = getattr(response, "status", None)
+    status = status if status is not None else getattr(response, "code", None)
+    status = status if status is not None else (getcode() if callable(getcode) else 200)
+    return int(status or 200)
+
+
 def _repo_parts():
     if "raw.githubusercontent.com" not in REPO:
         return None
@@ -101,7 +157,7 @@ def download(downloadUrl, saveFile):
         return
 
     try:
-        total_size = response.getheader("Content-Length")
+        total_size = _response_header(response, "Content-Length")
         total_size = int(total_size) if total_size else 0
         block_size = 65536
 
@@ -140,11 +196,14 @@ def download(downloadUrl, saveFile):
                             now - last_update_ms >= DOWNLOAD_PROGRESS_UPDATE_MS
                             or target_units >= DOWNLOAD_PROGRESS_UNITS
                         ):
-                            operation.step(target_units - displayed_units)
+                            operation.step(
+                                target_units - displayed_units,
+                                exact_status=_download_status(downloaded, total_size, now),
+                            )
                             displayed_units = target_units
                             last_update_ms = now
                     elif now - last_update_ms >= DOWNLOAD_PROGRESS_UPDATE_MS:
-                        operation.step()
+                        operation.step(exact_status="Downloading Update")
                         last_update_ms = now
 
             if total_size > 0 and displayed_units < DOWNLOAD_PROGRESS_UNITS:
@@ -170,16 +229,23 @@ def _repo_archive_ref():
 
     owner, repo, branch = repo_parts
     api_url = "https://api.github.com/repos/%s/%s/commits/%s" % (owner, repo, branch)
+    response = None
     try:
         req = urllib_request.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib_request.urlopen(
+        response = urllib_request.urlopen(
             req, context=unverified_ssl_context, timeout=10
-        ) as response:
-            if response.status == 200:
-                data = json.loads(response.read().decode("utf-8"))
-                sha = data.get("sha", sha)
+        )
+        if _response_status(response) == 200:
+            data = json.loads(response.read().decode("utf-8"))
+            sha = data.get("sha", sha)
     except Exception:
         pass
+    finally:
+        try:
+            if response is not None:
+                response.close()
+        except Exception:
+            pass
     _REPO_ARCHIVE_REF = sha
     return _REPO_ARCHIVE_REF
 
@@ -290,18 +356,19 @@ def _fetch_repo_file(filename):
 
 
 def _download_text(url):
+    response = None
     try:
-        with urllib_request.urlopen(
+        response = urllib_request.urlopen(
             url, context=unverified_ssl_context, timeout=30
-        ) as response:
-            if response.status == 200:
-                text = response.read().decode("utf-8")
-                if not text:
-                    return False, NO_DATA_ERROR
-                return True, text
-            else:
-                error_message = responses.get(response.status, "Unknown Error")
-                return False, NO_SERVER_ERROR % (response.status, error_message)
+        )
+        status = _response_status(response)
+        if status == 200:
+            text = response.read().decode("utf-8")
+            if not text:
+                return False, NO_DATA_ERROR
+            return True, text
+        error_message = responses.get(status, "Unknown Error")
+        return False, NO_SERVER_ERROR % (status, error_message)
     except urllib_error.URLError as e:
         reason = getattr(e, "reason", e)
         return False, "Network error: %s" % reason
@@ -309,6 +376,12 @@ def _download_text(url):
         return False, "Connection timed out."
     except Exception as e:
         return False, "Unexpected error: %s" % e
+    finally:
+        try:
+            if response is not None:
+                response.close()
+        except Exception:
+            pass
 
 
 def get_latest_version():
@@ -500,14 +573,28 @@ def check_for_updates(anchor_widget=None, warning=True, force=False):
                     settings.set_setting("skip_updates", False)
 
                     def _post_update():
-                        import TheKeyMachine
-                        TheKeyMachine.reload()
+                        reopen_error = None
+                        try:
+                            _reopen_after_install()
+                        except Exception as error:
+                            reopen_error = error
+                            cmds.warning(
+                                "TheKeyMachine was updated but could not reopen: {}".format(error)
+                            )
 
+                        message = "You have successfully updated the tool!"
+                        if reopen_error is not None:
+                            message += (
+                                "<br><br>\nThe files were updated, but TheKeyMachine could not reopen automatically. "
+                                "Please restart Maya."
+                            )
+                        else:
+                            message += "<br><br>\nPlease restart Maya if you experience any issues."
                         QFlatConfirmDialog.information(
                             None,
                             "Updated",
-                            title=f"Installed TheKeyMachine {latest_version}",
-                            message="You have successfully updated the tool!<br><br>\nPlease restart Maya if you experience any issues.",
+                            title="Installed TheKeyMachine {}".format(latest_version),
+                            message=message,
                             icon=icons.success,
                             closeButton=True,
                         )

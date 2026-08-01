@@ -83,15 +83,25 @@ def mark_non_tool_action(callback):
     return callback
 
 
-def _format_eta(seconds):
+def format_eta(seconds):
     try:
         seconds = max(0, int(round(float(seconds))))
     except Exception:
         return ""
     if seconds < 60:
-        return "{} seconds left".format(seconds)
+        unit = "second" if seconds == 1 else "seconds"
+        return "{} {} left".format(seconds, unit)
     minutes, seconds = divmod(seconds, 60)
-    return "{} minutes {} seconds left".format(minutes, seconds)
+    if minutes < 60:
+        minute_unit = "minute" if minutes == 1 else "minutes"
+        second_unit = "second" if seconds == 1 else "seconds"
+        return "{} {} {} {} left".format(
+            minutes, minute_unit, seconds, second_unit
+        )
+    hours, minutes = divmod(minutes, 60)
+    hour_unit = "hour" if hours == 1 else "hours"
+    minute_unit = "minute" if minutes == 1 else "minutes"
+    return "{} {} {} {} left".format(hours, hour_unit, minutes, minute_unit)
 
 
 class AdaptiveProgress(object):
@@ -122,6 +132,7 @@ class AdaptiveProgress(object):
         self._last_status_update_ms = -1
         self._last_progress_update_ms = -1
         self._last_status_label = self.label
+        self._exact_status_text = None
         self._timer = QtCore.QElapsedTimer()
         self._timer.start()
         self._show_timer = QtCore.QTimer()
@@ -153,9 +164,13 @@ class AdaptiveProgress(object):
                 pass
         return self
 
-    def set_status(self, status):
+    def set_status(self, status, exact=False):
         if status:
-            self.label = status
+            if exact:
+                self._exact_status_text = status
+            else:
+                self.label = status
+                self._exact_status_text = None
         if self._active and self._bar:
             try:
                 cmds.progressBar(self._bar, edit=True, status=self._status_text())
@@ -224,6 +239,9 @@ class AdaptiveProgress(object):
             pass
 
     def _status_text(self):
+        if self._exact_status_text:
+            return self._exact_status_text
+
         title = format_tool_label(self.label)
         if self.max_value:
             # Total is already known (most TKM tools compute it upfront), so
@@ -233,7 +251,7 @@ class AdaptiveProgress(object):
             if self.value > 0:
                 elapsed_seconds = max(0.001, self._timer.elapsed() / 1000.0)
                 remaining = (elapsed_seconds / float(self.value)) * max(0, self.max_value - self.value)
-                eta = _format_eta(remaining)
+                eta = format_eta(remaining)
                 if eta:
                     return "{}... about {}".format(title, eta)
             return "{}... {}/{}".format(title, self.value, self.max_value)
@@ -244,7 +262,7 @@ class AdaptiveProgress(object):
         # actually passed that a bare label would look stuck.
         elapsed_seconds = max(0.0, self._timer.elapsed() / 1000.0)
         if self.estimated_seconds and self.estimated_seconds > elapsed_seconds:
-            eta = _format_eta(self.estimated_seconds - elapsed_seconds)
+            eta = format_eta(self.estimated_seconds - elapsed_seconds)
             if eta:
                 return "{}... about {}".format(title, eta)
         if elapsed_seconds >= 1.0:
@@ -258,7 +276,7 @@ class AdaptiveProgress(object):
     def elapsed_seconds(self):
         return max(0.0, self._timer.elapsed() / 1000.0)
 
-    def step(self, amount=1, status=None):
+    def step(self, amount=1, status=None, exact_status=None):
         amount = int(amount or 1)
         if self.max_value:
             self.value = min(self.max_value, self.value + amount)
@@ -270,11 +288,15 @@ class AdaptiveProgress(object):
         if not self._active or not self._bar:
             return False
         try:
-            if status:
+            if exact_status:
+                self._exact_status_text = exact_status
+            elif status:
                 self.label = status
+                self._exact_status_text = None
             now = self._timer.elapsed()
             progress_due = (
                 status
+                or exact_status
                 or self._last_progress_update_ms < 0
                 or now - self._last_progress_update_ms >= 50
                 or (self.max_value and self.value >= self.max_value)
@@ -283,6 +305,7 @@ class AdaptiveProgress(object):
                 return self._cancelled
             status_due = (
                 status
+                or exact_status
                 or self._last_status_update_ms < 0
                 or now - self._last_status_update_ms >= self.update_interval_ms
                 or (self.max_value and self.value >= self.max_value)
@@ -411,10 +434,10 @@ class ToolOperation(object):
         progress = self.progress
         return bool(progress and progress.cancelled)
 
-    def step(self, amount=1, status=None):
+    def step(self, amount=1, status=None, exact_status=None):
         if not self.progress:
             return False
-        return self.progress.step(amount=amount, status=status)
+        return self.progress.step(amount=amount, status=status, exact_status=exact_status)
 
     def start(self):
         if self.progress:
@@ -425,9 +448,9 @@ class ToolOperation(object):
             self.progress.set_total(total, reset=reset)
         return self
 
-    def set_status(self, status):
+    def set_status(self, status, exact=False):
         if self.progress:
-            self.progress.set_status(status)
+            self.progress.set_status(status, exact=exact)
         return self
 
     def iterate(self, iterable, total=None, status=None):
