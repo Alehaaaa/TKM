@@ -12,10 +12,22 @@ from typing import Dict, Optional
 
 from maya import cmds
 
+try:
+    from maya.api import OpenMaya as om  # type: ignore
+except ImportError:  # pragma: no cover
+    om = None
+
+try:
+    from maya.api import OpenMayaAnim as oma  # type: ignore
+except ImportError:  # pragma: no cover
+    oma = None
+
 from TheKeyMachine.core.Qt import QtCore, QtGui  # type: ignore
 
 import TheKeyMachine.mods.settingsMod as settings
 import TheKeyMachine.core.openMayaUtils as omutils
+from TheKeyMachine.core import animlayers
+from TheKeyMachine.core import maya_version
 from TheKeyMachine.data import icons
 from TheKeyMachine.widgets import timeline as timelineWidgets
 from TheKeyMachine.widgets import util as wutil
@@ -27,7 +39,9 @@ CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID = "channelbox_clear_on_selection_change"
 CAMERA_ORBIT_SELECTION_ID = "camera_orbit_selection"
 HIDE_STATIC_CURVES_ID = "hide_static_animation_curves"
 ANIMATION_RECOVERY_ID = "animation_recovery"
+ANIM_LAYER_WEIGHTS_ID = "anim_layer_weights"
 CHANNELBOX_TINT_KEY = "background_runner:channelbox_selection_highlight"
+ANIM_LAYER_WEIGHTS_TINT_KEY = "background_runner:anim_layer_weights"
 
 # The registered trigger command id for each runner -- see
 # tools/background_runners/__init__.py's TOOLS dict, which is the actual
@@ -40,6 +54,7 @@ RUNNER_COMMAND_IDS = {
     CAMERA_ORBIT_SELECTION_ID: "background_runner_camera_orbit_selection",
     HIDE_STATIC_CURVES_ID: "hide_static_animation_curves",
     ANIMATION_RECOVERY_ID: "background_runner_animation_recovery",
+    ANIM_LAYER_WEIGHTS_ID: "background_runner_anim_layer_weights",
 }
 
 _CONTROLLER: Optional["BackgroundRunnerController"] = None
@@ -101,6 +116,10 @@ def toggle_hide_static_animation_curves():
 
 def toggle_animation_recovery():
     return toggle_runner_enabled(ANIMATION_RECOVERY_ID)
+
+
+def toggle_anim_layer_weights():
+    return toggle_runner_enabled(ANIM_LAYER_WEIGHTS_ID)
 
 
 def _emit_runner_triggered(manager, runner_id):
@@ -663,6 +682,520 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
             _emit_runner_triggered(self._manager, HIDE_STATIC_CURVES_ID)
 
 
+MIN_CURVE_SAMPLES = 50
+MAX_CURVE_SAMPLES = 500
+
+
+def _evaluate_weight_curve(curve_name, key_times, start_frame, end_frame):
+    """Densely sample a weight curve through its own curve function set.
+
+    ``cmds.keyframe`` only reports key values, then some kind of fitted
+    line has to guess at the shape between them -- which drifts from the
+    real curve for anything but simple even spline tangents (linear
+    segments, stepped keys, weighted/broken tangents all read differently).
+    Evaluating the curve itself through ``MFnAnimCurve.evaluate()`` instead
+    reproduces the exact value Maya would show at every sampled frame,
+    tangents and pre/post-infinity behavior included, because it *is* the
+    same evaluation Maya itself runs -- no separate approximation to keep
+    in sync with. One sample per frame (capped for very long ranges) is
+    dense enough that the result reads as a smooth curve without needing
+    any curve-fitting of our own.
+    """
+    if oma is None or om is None:
+        return None
+    curve_mobject = omutils.mobject_from_node(curve_name)
+    if curve_mobject is None:
+        return None
+    try:
+        curve_fn = oma.MFnAnimCurve(curve_mobject)
+    except Exception:
+        return None
+
+    span = max(1.0, float(end_frame - start_frame))
+    sample_count = int(max(MIN_CURVE_SAMPLES, min(MAX_CURVE_SAMPLES, round(span) + 1)))
+    time_unit = om.MTime.uiUnit()
+
+    frames = set(key_times)
+    frames.update(
+        start_frame + (span * index) / (sample_count - 1) for index in range(sample_count)
+    )
+
+    samples = []
+    for frame in sorted(frames):
+        try:
+            value = curve_fn.evaluate(om.MTime(frame, time_unit))
+        except Exception:
+            continue
+        samples.append((frame, max(0.0, min(1.0, value))))
+    return tuple(samples) if len(samples) >= 2 else None
+
+
+def _weight_curve_domain():
+    """A frame domain to sample weight curves across, wider than what's
+    currently framed on the timeline.
+
+    Reframing the timeline -- dragging the range bar, zooming, "frame all"
+    -- doesn't go through any of the runner's callbacks (it isn't a scene
+    edit), so sampling would otherwise go stale the moment a reframe brings
+    unsampled frames into view. Sampling the union of the scene's overall
+    animation range and the current playback range, padded by half that
+    span on each side, comfortably covers ordinary reframing without
+    needing a resample; ``AnimLayerWeightsTint`` renormalizes the mapping
+    against the live playback range on every paint regardless (see its
+    ``paintEvent``), so this only has to provide the data.
+    """
+    playback_start, playback_end = timelineWidgets.get_playback_range()
+    try:
+        anim_start = cmds.playbackOptions(query=True, animationStartTime=True)
+        anim_end = cmds.playbackOptions(query=True, animationEndTime=True)
+    except Exception:
+        anim_start, anim_end = playback_start, playback_end
+
+    domain_start = min(playback_start, anim_start)
+    domain_end = max(playback_end, anim_end)
+    margin = max(10.0, (domain_end - domain_start) * 0.5)
+    return domain_start - margin, domain_end + margin
+
+
+def _layer_weight_points(layer_name, start_frame, end_frame):
+    """Return raw ``(frame, value)`` weight-curve points for one layer.
+
+    ``frame`` is an actual scene frame number, left unnormalized -- the
+    widget maps frame to x against whatever the playback range is *at paint
+    time*, so a range edit (dragging the timeline's min/max) doesn't leave
+    already-resolved curves stretched against a stale range until the next
+    recompute. ``value`` is the layer weight clamped to 0..1. A layer with
+    no weight animation curve (a static weight -- most commonly 1.0, an
+    untouched layer) resolves to a flat pair spanning ``start_frame`` to
+    ``end_frame``, so it always draws a steady line rather than nothing.
+    Returns ``None`` when the layer has no readable weight plug at all.
+    """
+    weight_plug = "{}.weight".format(layer_name)
+    if not cmds.objExists(weight_plug):
+        return None
+
+    try:
+        curves = cmds.listConnections(
+            weight_plug, source=True, destination=False, type="animCurve"
+        ) or []
+    except Exception:
+        curves = []
+
+    if not curves:
+        try:
+            value = max(0.0, min(1.0, float(cmds.getAttr(weight_plug))))
+        except Exception:
+            value = 1.0
+        return ((start_frame, value), (end_frame, value))
+
+    try:
+        times = cmds.keyframe(weight_plug, query=True, timeChange=True) or []
+        values = cmds.keyframe(weight_plug, query=True, valueChange=True) or []
+    except Exception:
+        times, values = [], []
+    if not times or len(times) != len(values):
+        return None
+
+    keys = sorted(zip(times, values))
+
+    sampled = _evaluate_weight_curve(curves[0], [t for t, _ in keys], start_frame, end_frame)
+    if sampled:
+        return sampled
+
+    # Fallback for the rare case OpenMayaAnim evaluation isn't available:
+    # approximate from keyframe values directly, holding flat outside the
+    # first/last key the way Maya's default pre/post-infinity behaves.
+    samples = []
+    first_time, first_value = keys[0]
+    last_time, last_value = keys[-1]
+    if first_time > start_frame:
+        samples.append((start_frame, first_value))
+    samples.extend(keys)
+    if last_time < end_frame:
+        samples.append((end_frame, last_value))
+
+    return tuple((time, max(0.0, min(1.0, value))) for time, value in samples)
+
+
+def _value_at_frame(points, frame):
+    """Linearly interpolate a resolved weight curve's value at ``frame``.
+
+    ``points`` is the same dense ``(frame, value)`` sequence used to paint
+    the curve, sorted by frame and pre-sampled across a domain wider than
+    any one visible range (see ``_weight_curve_domain``), so this holds up
+    across a reframe without needing new data -- clamping to the nearest
+    end for a frame that still falls outside it.
+    """
+    if not points:
+        return 0.0
+    if frame <= points[0][0]:
+        return points[0][1]
+    if frame >= points[-1][0]:
+        return points[-1][1]
+
+    previous_frame, previous_value = points[0]
+    for next_frame, next_value in points[1:]:
+        if next_frame >= frame:
+            if next_frame == previous_frame:
+                return next_value
+            t = (frame - previous_frame) / (next_frame - previous_frame)
+            return previous_value + (next_value - previous_value) * t
+        previous_frame, previous_value = next_frame, next_value
+    return points[-1][1]
+
+
+class AnimLayerWeightsTint(timelineWidgets.TimelineTint):
+    """Full-width timeline overlay plotting anim-layer weight curves.
+
+    No background wash -- ``TimelineTint``'s own fill is skipped entirely
+    (see ``paintEvent``) so only the curves, and the selected layer's name
+    tag, are visible over the timeline.
+    """
+
+    CURVE_COLOR = (255, 255, 255)
+    HIGHLIGHTED_ALPHA = 140
+    HIGHLIGHTED_WIDTH = 1.4
+    NORMAL_ALPHA = 80
+    NORMAL_WIDTH = 1.2
+
+    # Black composited over the timeline at one-third opacity lands at the
+    # same visual intensity as the previous opaque ~30 RGB muted shade on
+    # Maya's usual ~45 RGB timeline, while adapting naturally to its theme.
+    MUTED_COLOR = (0, 0, 0)
+    MUTED_ALPHA = 90
+    UNSELECTED_MUTED_ALPHA = 45
+    # Pen-width multiples: long, loosely spaced dashes rather than Qt's
+    # tighter default pattern.
+    MUTED_DASH_PATTERN = (6.0, 6.0)
+
+    LABEL_TEXT_COLOR = QtGui.QColor(20, 20, 20, 235)
+    LABEL_FONT_SIZE = 10
+    LABEL_PAD_X = 4
+    LABEL_PAD_Y = 1
+    LABEL_LEFT_INSET = 4
+    LABEL_GAP = 3
+
+    def __init__(self, parent=None, z_index=-2):
+        self._layer_curves = ()
+        super().__init__(
+            timerange=timelineWidgets.get_playback_range(),
+            color=(0, 0, 0, 0),
+            duration_ms=None,
+            parent=parent,
+            center_line=False,
+            icon=None,
+            full_width=True,
+            icon_scale=1.0,
+            z_index=z_index,
+        )
+
+    def set_layer_curves(self, layer_curves):
+        self._layer_curves = tuple(layer_curves or ())
+        self.update()
+
+    def paintEvent(self, event):
+        # Deliberately not calling super().paintEvent(): TimelineTint's fill
+        # is what would draw the background wash, which this overlay never
+        # wants -- only the curves themselves should be visible.
+        if not self._parent_widget or not self._layer_curves:
+            return
+
+        rect = self._current_tint_rect()
+        if rect.isEmpty():
+            return
+        rect = self._graph_rect(rect)
+        if rect.isEmpty():
+            return
+
+        # Read the live playback range rather than trusting whatever range
+        # was current when the points were resolved -- dragging the
+        # timeline's min/max doesn't go through any of the runner's
+        # callbacks, so this is what keeps an already-resolved curve (and
+        # the layer-name tag below) correctly placed against the ruler
+        # after a range edit instead of drawing against a stale one. The
+        # points themselves are pre-sampled across a much wider domain than
+        # the visible range (see AnimLayerWeightsRunner._recompute), so
+        # whatever a reframe newly brings into view is already covered
+        # without waiting for another recompute.
+        start_frame, end_frame = timelineWidgets.get_playback_range()
+        span = float(end_frame - start_frame) or 1.0
+        margin = min(rect.height() * 0.5, wutil.DPI(3))
+        usable_height = max(1.0, rect.height() - margin * 2.0)
+
+        def map_point(frame, value):
+            return QtCore.QPointF(
+                rect.left() + ((frame - start_frame) / span) * rect.width(),
+                rect.bottom() - margin - value * usable_height,
+            )
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        for layer_curve in self._layer_curves:
+            self._paint_layer_curve(painter, layer_curve, map_point)
+        # Drawn in its own pass, after every curve, so a label never ends up
+        # underneath another layer's line.
+        for layer_curve in self._layer_curves:
+            # Muting a layer removes its name tag even if it remains selected.
+            # Every selected, active layer keeps the tag, including a layer
+            # whose weight curve is completely flat.
+            if layer_curve.get("selected") and not layer_curve.get("muted"):
+                self._paint_layer_label(painter, rect, layer_curve, start_frame, map_point)
+        painter.end()
+
+    # Maya 2024 and later's redesigned time slider needs its plotting area
+    # pulled in from the raw control rect.
+    GRAPH_INSET_2024 = 6
+
+    def _graph_rect(self, rect):
+        """The area within ``rect`` actually available for plotting.
+
+        Everything downstream -- curve mapping, the label's flip-side
+        midline, its clamped position -- reads from this one rect, so
+        insetting it here is the single place that needs to know about the
+        Maya-2024-and-later time slider's extra top/bottom chrome.
+        """
+        if not maya_version.is_at_least(2024):
+            return rect
+        inset = wutil.DPI(self.GRAPH_INSET_2024)
+        if rect.height() <= inset * 2:
+            return rect
+        return rect.adjusted(0, inset, 0, -inset)
+
+    def _paint_layer_curve(self, painter, layer_curve, map_point):
+        points = layer_curve.get("points") or ()
+        if len(points) < 2:
+            return
+
+        # Points are already densely sampled from the real curve evaluation
+        # (see _evaluate_weight_curve), so connecting them with straight
+        # segments reproduces the actual curve -- sharp corners (stepped
+        # tangents) included -- instead of a further curve-fit smoothing
+        # them into a shape that no longer matches the real animCurve.
+        path = QtGui.QPainterPath()
+        path.moveTo(map_point(*points[0]))
+        for frame, value in points[1:]:
+            path.lineTo(map_point(frame, value))
+
+        pen = QtGui.QPen()
+        if layer_curve.get("muted"):
+            # A muted layer's weight doesn't drive anything right now, so
+            # it recedes into the timeline itself rather than competing
+            # with the active curves -- same idea as the pen, just dashed
+            # and dark instead of bright, so it still reads as "present but
+            # off" rather than disappearing outright.
+            pen.setColor(
+                self._muted_color(selected=bool(layer_curve.get("selected")))
+            )
+            pen.setStyle(QtCore.Qt.CustomDashLine)
+            pen.setDashPattern(self.MUTED_DASH_PATTERN)
+            pen.setWidthF(wutil.DPI(self.NORMAL_WIDTH))
+        else:
+            selected = bool(layer_curve.get("selected"))
+            alpha = self.HIGHLIGHTED_ALPHA if selected else self.NORMAL_ALPHA
+            width = self.HIGHLIGHTED_WIDTH if selected else self.NORMAL_WIDTH
+            pen.setColor(QtGui.QColor(*self.CURVE_COLOR, alpha))
+            pen.setWidthF(wutil.DPI(width))
+        pen.setCapStyle(QtCore.Qt.RoundCap)
+        pen.setJoinStyle(QtCore.Qt.RoundJoin)
+        painter.setPen(pen)
+        painter.drawPath(path)
+
+    def _muted_color(self, selected=False):
+        alpha = self.MUTED_ALPHA if selected else self.UNSELECTED_MUTED_ALPHA
+        return QtGui.QColor(*self.MUTED_COLOR, alpha)
+
+    def _paint_layer_label(self, painter, rect, layer_curve, start_frame, map_point):
+        name = layer_curve.get("name")
+        points = layer_curve.get("points") or ()
+        # A single resolved point is enough to anchor the label. Curve drawing
+        # itself still requires two points, but selected unmuted layers should
+        # never lose their name merely because their weight is flat.
+        if not name or not points:
+            return
+
+        # Pinned to the left edge of whatever's currently visible, at the
+        # height of the curve's own value there -- both re-derived from the
+        # live rect/range every paint, so the tag tracks a reframe on its
+        # own instead of needing a fresh recompute to catch up.
+        anchor = map_point(start_frame, _value_at_frame(points, start_frame))
+
+        font = QtGui.QFont(painter.font())
+        font.setPixelSize(int(round(wutil.DPI(self.LABEL_FONT_SIZE))))
+        metrics = QtGui.QFontMetricsF(font)
+        pad_x, pad_y = wutil.DPI(self.LABEL_PAD_X), wutil.DPI(self.LABEL_PAD_Y)
+        box_width = metrics.horizontalAdvance(name) + pad_x * 2
+        box_height = metrics.height() + pad_y * 2
+
+        box_left = rect.left() + wutil.DPI(self.LABEL_LEFT_INSET)
+        gap = wutil.DPI(self.LABEL_GAP)
+        # Flip above/below the curve point based on which half of the strip
+        # it falls in, so the tag stays inside the timeline instead of
+        # being clipped by a widget only ever a couple dozen pixels tall.
+        if anchor.y() <= rect.top() + rect.height() * 0.5:
+            box_top = anchor.y() + gap
+        else:
+            box_top = anchor.y() - gap - box_height
+        box_top = max(rect.top(), min(rect.bottom() - box_height, box_top))
+
+        box_rect = QtCore.QRectF(box_left, box_top, box_width, box_height)
+        radius = min(box_height * 0.5, wutil.DPI(4))
+
+        alpha = self.HIGHLIGHTED_ALPHA
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(*self.CURVE_COLOR, alpha))
+        painter.drawRoundedRect(box_rect, radius, radius)
+
+        painter.setFont(font)
+        painter.setPen(self.LABEL_TEXT_COLOR)
+        painter.drawText(box_rect, QtCore.Qt.AlignCenter, name)
+
+
+def _is_authored_attribute_change(msg):
+    """Filter an ``MNodeMessage`` bitmask down to edits worth reacting to.
+
+    Excludes plain evaluation/dirty-propagation firings (what a connected,
+    animated plug generates on every time change during playback) so only
+    an explicit ``setAttr``-style edit or a connection being made/broken --
+    a curve getting keyed or unkeyed -- triggers a recompute.
+    """
+    if om is None:
+        return True
+    mask = (
+        om.MNodeMessage.kAttributeSet
+        | om.MNodeMessage.kConnectionMade
+        | om.MNodeMessage.kConnectionBroken
+    )
+    return bool(msg & mask)
+
+
+class AnimLayerWeightsRunner(QtCore.QObject):
+    """Keep the timeline weight-curve plot in sync with the scene's anim layers.
+
+    Callback-driven, no polling. Maya has no selection-changed event for the
+    Anim Layer Editor the way it does for scene selection, but ``selected``
+    and ``mute`` (like ``weight`` itself) are genuine attributes on the
+    animLayer node -- see ``core.animlayers.AnimationLayer.refresh()``, which
+    already reads them the same way -- so one ``MNodeMessage`` attribute-
+    changed callback per layer node covers select/mute/weight edits without
+    a polling timer. Layer creation, deletion, and rename go through Maya's
+    own ``animLayerRebuild`` / ``animLayerRefresh`` events, the same events
+    used by Maya's native Animation Layer Editor. They also fire on undo/redo
+    when Maya rebuilds or refreshes that editor state.
+    Weight *curve* edits -- keys added, moved, or removed on an already-keyed
+    weight -- go through Maya's batched anim-curve-edited callback, the same
+    one ``animation_recovery`` already relies on for exactly this reason: it
+    fires on authored curve edits (and their undo/redo), not on ordinary
+    playback evaluation.
+    """
+
+    STRUCTURE_KEY = "background_runner:anim_layer_weights_structure"
+    NODE_WATCH_KEY = "background_runner:anim_layer_weights_watch"
+    CURVE_EDIT_KEY = "background_runner:anim_layer_weights_curve_edit"
+    WATCHED_ATTRIBUTES = frozenset(("selected", "mute", "weight"))
+
+    def __init__(self, manager, parent=None):
+        super().__init__(parent or manager)
+        self._manager = manager
+        self._last_curves_key = None
+        self._structure_refresh_timer = QtCore.QTimer(self)
+        self._structure_refresh_timer.setSingleShot(True)
+        self._structure_refresh_timer.setInterval(0)
+        self._structure_refresh_timer.timeout.connect(self._apply_layer_structure_change)
+
+    def start(self):
+        for event_name in ("animLayerRebuild", "animLayerRefresh"):
+            self._manager.add_scriptjob(
+                event=event_name,
+                key=self.STRUCTURE_KEY,
+                callback=self._schedule_layer_structure_change,
+            )
+        self._manager.add_anim_curve_edited_callback(
+            self._on_curve_edited, key=self.CURVE_EDIT_KEY,
+        )
+        self._watch_layer_nodes()
+        self._recompute(force=True)
+
+    def stop(self):
+        self._structure_refresh_timer.stop()
+        self._manager.disconnect_callbacks(self.STRUCTURE_KEY)
+        self._manager.disconnect_callbacks(self.CURVE_EDIT_KEY)
+        self._manager.disconnect_callbacks(self.NODE_WATCH_KEY)
+        self._manager.clear_managed_widget(ANIM_LAYER_WEIGHTS_TINT_KEY)
+        self._last_curves_key = None
+
+    def _schedule_layer_structure_change(self, *_args):
+        # Maya can emit both refresh and rebuild for one layer edit. Coalesce
+        # them, and wait until the command has finished changing the layer
+        # graph before querying names or attaching callbacks to new nodes.
+        self._structure_refresh_timer.start()
+
+    def _apply_layer_structure_change(self):
+        # The layer set itself changed shape -- rebuild the node watch list
+        # from scratch rather than trying to diff it against the old one.
+        self._watch_layer_nodes()
+        self._recompute()
+
+    def _on_curve_edited(self, *_args):
+        self._recompute()
+
+    def _watch_layer_nodes(self):
+        self._manager.disconnect_callbacks(self.NODE_WATCH_KEY)
+        for layer_name in animlayers.scene_layer_names(include_root=False):
+            self._manager.add_node_attribute_changed_callback(
+                layer_name,
+                self._on_layer_attribute_changed,
+                key=self.NODE_WATCH_KEY,
+            )
+
+    def _on_layer_attribute_changed(self, msg, plug, *_args):
+        if not _is_authored_attribute_change(msg):
+            return
+        try:
+            attribute_name = plug.partialName(useLongNames=True)
+        except Exception:
+            return
+        if attribute_name not in self.WATCHED_ATTRIBUTES:
+            return
+        self._recompute()
+
+    def _recompute(self, force=False):
+        start_frame, end_frame = _weight_curve_domain()
+
+        layer_curves = []
+        for layer_name in animlayers.scene_layer_names(include_root=False):
+            layer = animlayers.AnimationLayer(layer_name)
+            points = _layer_weight_points(layer_name, start_frame, end_frame)
+            if not points:
+                continue
+            layer_curves.append(
+                {
+                    "name": layer_name,
+                    "selected": bool(layer.selected),
+                    "muted": bool(layer.muted),
+                    "points": points,
+                }
+            )
+
+        curves_key = tuple(
+            (entry["name"], entry["selected"], entry["muted"], entry["points"])
+            for entry in layer_curves
+        )
+        if not force and curves_key == self._last_curves_key:
+            return
+        self._last_curves_key = curves_key
+
+        if not layer_curves:
+            self._manager.clear_managed_widget(ANIM_LAYER_WEIGHTS_TINT_KEY)
+            return
+
+        widget = AnimLayerWeightsTint()
+        widget.set_layer_curves(layer_curves)
+        self._manager.register_managed_widget(
+            widget, key=ANIM_LAYER_WEIGHTS_TINT_KEY, owner=self._manager
+        )
+        _emit_runner_triggered(self._manager, ANIM_LAYER_WEIGHTS_ID)
+
+
 class BackgroundRunnerController(QtCore.QObject):
     def __init__(self, manager):
         super().__init__(manager)
@@ -672,6 +1205,7 @@ class BackgroundRunnerController(QtCore.QObject):
             CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID: ChannelBoxClearOnSelectionChangeRunner(manager, parent=self),
             CAMERA_ORBIT_SELECTION_ID: CameraOrbitSelectionRunner(manager, parent=self),
             HIDE_STATIC_CURVES_ID: HideStaticAnimationCurvesRunner(manager, parent=self),
+            ANIM_LAYER_WEIGHTS_ID: AnimLayerWeightsRunner(manager, parent=self),
         }
 
     def start_enabled(self):
@@ -863,6 +1397,20 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
                 namespace=RUNNER_SETTINGS_NAMESPACE,
             ),
             "changed_signal": _background_runner_signal(CAMERA_ORBIT_SELECTION_ID),
+        },
+        ANIM_LAYER_WEIGHTS_ID: {
+            "id": ANIM_LAYER_WEIGHTS_ID,
+            "label": "Anim Layer Weights",
+            "icon": icons.customGraph,
+            "description": "Plot animation-layer weight curves over the timeline; muted layers show dimmed and dashed.",
+            "default": False,
+            "get_enabled": lambda: get_runner_enabled(ANIM_LAYER_WEIGHTS_ID, False),
+            "set_enabled": lambda enabled: settings.set_setting(
+                _runner_setting_key(ANIM_LAYER_WEIGHTS_ID),
+                bool(enabled),
+                namespace=RUNNER_SETTINGS_NAMESPACE,
+            ),
+            "changed_signal": _background_runner_signal(ANIM_LAYER_WEIGHTS_ID),
         },
     }
     for runner_id, spec in specs.items():

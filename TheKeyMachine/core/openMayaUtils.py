@@ -318,6 +318,81 @@ def _last_key_before(fn, time, unit):
     return _first_key_after(fn, time - 0.0000000001, unit) - 1
 
 
+def move_anim_curve_keys(
+    curves,
+    start_time,
+    end_time,
+    offset,
+    cancelled=None,
+    progress=None,
+    tolerance=0.000001,
+):
+    """Move keys in an inclusive range directly through MFnAnimCurve.
+
+    Destination collisions are removed to match ``keyframe -option over``.
+    A single MAnimCurveChange cache rolls the complete edit back if any API
+    operation fails, so callers never receive a partially moved curve set.
+    """
+    if om is None or oma is None:
+        return False
+    try:
+        lower, upper = sorted((float(start_time), float(end_time)))
+        offset = float(offset)
+        tolerance = abs(float(tolerance))
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if not offset:
+        return False
+
+    functions = _anim_curve_fns(curves)
+    if not functions:
+        return False
+    unit = time_unit()
+    change = oma.MAnimCurveChange()
+    moved_keys = 0
+    try:
+        for fn in functions:
+            if cancelled and cancelled():
+                change.undoIt()
+                return False
+
+            key_count = _anim_curve_key_count(fn)
+            source_times = []
+            for index in range(key_count):
+                time = _anim_curve_input(fn, index, unit)
+                if lower - tolerance <= time <= upper + tolerance:
+                    source_times.append(time)
+            if source_times:
+                target_times = [time + offset for time in source_times]
+                collision_indices = []
+                for index in range(key_count):
+                    time = _anim_curve_input(fn, index, unit)
+                    is_source = any(abs(time - source) <= tolerance for source in source_times)
+                    is_target = any(abs(time - target) <= tolerance for target in target_times)
+                    if is_target and not is_source:
+                        collision_indices.append(index)
+                for index in reversed(collision_indices):
+                    fn.remove(index, change=change)
+
+                ordered_times = sorted(source_times, reverse=offset > 0)
+                for source in ordered_times:
+                    index = fn.find(om.MTime(source, unit))
+                    if index is None:
+                        raise RuntimeError("Could not resolve anim-curve key at {}".format(source))
+                    fn.setInput(index, om.MTime(source + offset, unit), change=change)
+                    moved_keys += 1
+
+            if progress:
+                progress()
+    except Exception:
+        try:
+            change.undoIt()
+        except Exception:
+            pass
+        return False
+    return bool(moved_keys)
+
+
 def step_anim_curve_key_time(
     curves,
     current,
@@ -437,11 +512,29 @@ def _command_matrix_values(raw):
 
 def world_matrix_at_time(node, time=None):
     """Evaluate a world matrix without changing Maya's current time."""
+    return matrix_array_plug_at_time(node, "worldMatrix", time=time)
+
+
+def parent_inverse_matrix_at_time(node, time=None):
+    """Evaluate a node's parentInverseMatrix without changing current time.
+
+    Unlike ``worldMatrix``, this is agnostic to *how* the parent space is
+    produced -- a plain DAG parent, a constraint, a blend network, anything
+    -- so it lets callers ask "what local matrix would keep this baseline
+    world matrix, under whatever is driving the parent chain right now" via
+    pure matrix math, without needing to know or care what that mechanism
+    is.
+    """
+    return matrix_array_plug_at_time(node, "parentInverseMatrix", time=time)
+
+
+def matrix_array_plug_at_time(node, attr, index=0, time=None):
+    """Evaluate a matrix-array plug (``attr[index]``) without moving time."""
     if om is not None:
         try:
-            plug = find_plug(node, "worldMatrix")
+            plug = find_plug(node, attr)
             if plug is not None:
-                plug = plug.elementByLogicalIndex(0)
+                plug = plug.elementByLogicalIndex(index)
                 context = (
                     om.MDGContext.kNormal
                     if time is None
@@ -459,8 +552,59 @@ def world_matrix_at_time(node, time=None):
 
         kwargs = {"time": float(time)} if time is not None else {}
         return _command_matrix_values(
-            cmds.getAttr("{}.worldMatrix[0]".format(node), **kwargs)
+            cmds.getAttr("{}.{}[{}]".format(node, attr, index), **kwargs)
         )
+    except Exception:
+        return None
+
+
+def multiply_matrices(a, b):
+    """Multiply two flat 16-value matrices using Maya's row-vector
+    convention (``a`` applied first): ``result = a * b``.
+    """
+    if om is None or a is None or b is None:
+        return None
+    try:
+        return _matrix_values(om.MMatrix(a) * om.MMatrix(b))
+    except Exception:
+        return None
+
+
+def decompose_local_matrix(values, rotate_order):
+    """Decompose a flat 16-value local matrix into translate/rotate/scale.
+
+    This assumes ``values`` already represents the node's local matrix with
+    *default* (zero/identity) rotate and scale pivots and rotate axis --
+    callers must verify that's actually true for the node (see
+    ``_switch_fast_eligible`` in the Attribute Switcher controller) before
+    trusting the result, since a node with custom pivots needs the extra
+    pivot-compensation terms this does not attempt to reproduce.
+
+    Returns a dict with "translate", "rotate" (in the given rotate order,
+    Maya's current UI angle unit) and "scale", or None on failure.
+    """
+    if om is None:
+        return None
+    try:
+        matrix = om.MMatrix(values)
+        xform = om.MTransformationMatrix(matrix)
+        order = rotate_order_enum(rotate_order)
+        if order is None:
+            order = om.MEulerRotation.kXYZ
+        rotation = xform.rotation(asQuaternion=False)
+        rotation.reorderIt(order)
+        translation = xform.translation(om.MSpace.kTransform)
+        scale = xform.scale(om.MSpace.kTransform)
+        unit = om.MAngle.uiUnit()
+        return {
+            "translate": (translation.x, translation.y, translation.z),
+            "rotate": (
+                om.MAngle(rotation.x, om.MAngle.kRadians).asUnits(unit),
+                om.MAngle(rotation.y, om.MAngle.kRadians).asUnits(unit),
+                om.MAngle(rotation.z, om.MAngle.kRadians).asUnits(unit),
+            ),
+            "scale": tuple(scale),
+        }
     except Exception:
         return None
 

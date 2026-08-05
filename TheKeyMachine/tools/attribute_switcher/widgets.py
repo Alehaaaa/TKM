@@ -187,7 +187,7 @@ class FloatingWidget(cd.QFlatDialog):
 
     BORDER_RADIUS = wutil.DPI(5)
     AUTO_CLOSE_DIST = wutil.DPI(10)
-    AUTO_CLOSE_PERIOD_MS = 300
+    AUTO_CLOSE_POLL_MS = 200
     # Newly shown/positioned popups can report stale geometry for a moment
     # (present_beside_cursor() moves+shows before the window manager has
     # finished applying it), which made _is_cursor_within_bounds() see the
@@ -207,12 +207,13 @@ class FloatingWidget(cd.QFlatDialog):
         self._drag_start_pos = QtCore.QPoint()
 
         self._auto_close_active = True if popup else None
+        self._auto_close_armed = False
+        self._auto_close_origin = None
         self._shown_elapsed = QtCore.QElapsedTimer()
 
-        # Event-driven auto-close mechanism
+        # Focus-independent cursor-distance monitor
         self._auto_close_timer = QtCore.QTimer(self)
-        self._auto_close_timer.setSingleShot(True)
-        self._auto_close_timer.setInterval(200)
+        self._auto_close_timer.setInterval(self.AUTO_CLOSE_POLL_MS)
         self._auto_close_timer.timeout.connect(self._process_auto_close_request)
 
         self._setup_ui()
@@ -222,38 +223,75 @@ class FloatingWidget(cd.QFlatDialog):
         # Restart the grace window every time the popup (re)appears, not just
         # on first construction -- a reused/hidden-then-reshown widget can hit
         # the same stale-geometry window.
+        self._auto_close_timer.stop()
+        self._auto_close_armed = False
+        self._auto_close_origin = QtGui.QCursor.pos()
         self._shown_elapsed.start()
         cd.QFlatDialog.showEvent(self, event)
+        self._ensure_auto_close_monitor()
 
     def enterEvent(self, event):
-        self._auto_close_timer.stop()
+        if self._auto_close_active is True and self._is_cursor_within_bounds():
+            self._auto_close_armed = True
+        self._ensure_auto_close_monitor()
         cd.QFlatDialog.enterEvent(self, event)
 
     def leaveEvent(self, event):
-        if self._auto_close_active:
-            self._auto_close_timer.start()
+        self._ensure_auto_close_monitor()
         cd.QFlatDialog.leaveEvent(self, event)
+
+    def _ensure_auto_close_monitor(self):
+        """Poll global cursor distance while a transient popup is visible.
+
+        A top-level Qt tool window does not reliably receive mouse-move or
+        leave events after the pointer crosses into Maya or another native
+        window. Polling ``QCursor.pos()`` keeps distance-based closing
+        independent of application focus and event delivery.
+        """
+        if (
+            self._auto_close_active is True
+            and self.isVisible()
+            and not self._auto_close_timer.isActive()
+        ):
+            self._auto_close_timer.start()
 
     def _process_auto_close_request(self):
         """Evaluates whether the window should close based on current cursor position."""
         if not self._auto_close_active or not self.isVisible():
+            self._auto_close_timer.stop()
             return
 
-        if not self._shown_elapsed.isValid() or not self._shown_elapsed.hasExpired(self.AUTO_CLOSE_GRACE_MS):
+        if not self._shown_elapsed.isValid():
             return
-
-        if self._is_cursor_within_bounds():
-            return  # Cursor is in a valid interaction zone
+        remaining_grace = self.AUTO_CLOSE_GRACE_MS - self._shown_elapsed.elapsed()
+        if remaining_grace > 0:
+            return
 
         cursor_pos = QtGui.QCursor.pos()
+        if self._is_cursor_within_bounds():
+            self._auto_close_armed = True
+            return
+
         bounds = self.frameGeometry()
+        cursor_distance = self._distance_from_rect(cursor_pos, bounds)
+        allowed_distance = self.AUTO_CLOSE_DIST
+        if not self._auto_close_armed and self._auto_close_origin is not None:
+            # Toolbar popups intentionally open offset from the click. Use that
+            # stable launch distance as the pre-interaction baseline, so an
+            # untouched popup stays open while movement farther away closes it.
+            allowed_distance += self._distance_from_rect(
+                self._auto_close_origin, bounds
+            )
 
-        # Calculate Manhattan distance slop for a more forgiving interaction feel
-        dx = max(bounds.left() - cursor_pos.x(), 0, cursor_pos.x() - bounds.right())
-        dy = max(bounds.top() - cursor_pos.y(), 0, cursor_pos.y() - bounds.bottom())
-
-        if (dx * dx + dy * dy) > (self.AUTO_CLOSE_DIST * self.AUTO_CLOSE_DIST):
+        if cursor_distance > allowed_distance:
             self.close()
+
+    @staticmethod
+    def _distance_from_rect(point, rect):
+        """Return the shortest screen-space distance from a point to a rectangle."""
+        dx = max(rect.left() - point.x(), 0, point.x() - rect.right())
+        dy = max(rect.top() - point.y(), 0, point.y() - rect.bottom())
+        return (dx * dx + dy * dy) ** 0.5
 
     def _is_cursor_within_bounds(self):
         """Geometric intersection check for the main widget and its active sub-popups."""
@@ -318,16 +356,18 @@ class FloatingWidget(cd.QFlatDialog):
 
     def showBottomBar(self):
         """Disables auto-kill and adds a default close button if no bar exists."""
+        self._disable_auto_close()
         if hasattr(self, "_refresh_footer"):
             self._refresh_footer()
         elif not self.bottomBar:
             self.setBottomBar(closeButton=True)
-        self._disable_auto_close()
 
     def set_popup_mode(self, popup):
         """Reset the presentation mode when a reusable window is opened again."""
         self._auto_close_timer.stop()
         self._auto_close_active = True if popup else None
+        self._auto_close_armed = False
+        self._auto_close_origin = None
         if hasattr(self, "_refresh_footer"):
             self._refresh_footer()
 
@@ -364,15 +404,15 @@ class FloatingWidget(cd.QFlatDialog):
                 self.showBottomBar()
             elif self._auto_close_active is False:
                 # Resume tracking after small click/drag
-                self._auto_close_active = True
                 self._resume_auto_close()
 
         cd.QFlatDialog.mouseReleaseEvent(self, e)
 
     def _resume_auto_close(self):
-        """Restarts the auto-close timer if the cursor is currently outside the bounds."""
-        if self._auto_close_active is True and not self._is_cursor_within_bounds():
-            self._auto_close_timer.start()
+        """Resume distance monitoring after a temporary interaction pause."""
+        if self._auto_close_active is False:
+            self._auto_close_active = True
+        self._ensure_auto_close_monitor()
 
     def _suspend_auto_close(self):
         """Pauses the auto-close timer and updates tracking state."""
@@ -386,6 +426,8 @@ class FloatingWidget(cd.QFlatDialog):
         if hasattr(self, "_auto_close_timer") and self._auto_close_timer:
             self._auto_close_timer.stop()
         self._auto_close_active = None
+        self._auto_close_armed = False
+        self._auto_close_origin = None
 
     def closeEvent(self, e):
         self._disable_auto_close()
@@ -1840,7 +1882,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
     def _refresh_footer(self):
         """Updates the interaction bar based on whether valid switches exist."""
         # Show Close only if not in popup mode (pinned)
-        should_close = not self._auto_close_active
+        should_close = self._auto_close_active is None
         has_bottom_bar = bool(
             self.bottomBar and wutil.is_valid_widget(self.bottomBar)
         )
@@ -1903,12 +1945,6 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
             return
 
         self._is_ui_hovered = is_active
-
-        # Toggle auto-close based on interaction
-        if self._is_ui_hovered:
-            self._auto_close_timer.stop()
-        else:
-            self._resume_auto_close()
 
         for (enum_attr, _), (attr_item, _) in self._active_switch_widgets.items():
             if not wutil.is_valid_widget(attr_item):

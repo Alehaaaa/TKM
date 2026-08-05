@@ -4,5 +4,6 @@
   "channelbox_clear_on_selection_change": ["Toggle clearing Channel Box attributes when the object selection changes."],
   "camera_orbit_selection": ["Toggle automatic camera orbit targeting from the current selection."],
   "hide_static_animation_curves": ["Toggle automatic hiding of static curves in the Graph Editor."],
-  "animation_recovery": ["Toggle automatic scene-scoped animation recovery snapshots."]
+  "animation_recovery": ["Toggle automatic scene-scoped animation recovery snapshots."],
+  "anim_layer_weights": ["Toggle a timeline overlay plotting animation-layer weight curves; muted layers show dimmed and dashed."]
 }

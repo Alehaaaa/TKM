@@ -153,7 +153,7 @@ class LayerCache(object):
         names = scene_layer_names(include_root=True)
         graph_names = [
             _layer_name(layer)
-            for layer in _scene_layers()
+            for layer in scene_layer_objects()
         ]
         graph_names = [name for name in graph_names if name]
         if graph_names:
@@ -233,7 +233,7 @@ def _root_layer():
         return None
 
 
-def _scene_layers():
+def scene_layer_objects():
     if om is None:
         return []
     root = _root_layer()
@@ -268,58 +268,15 @@ def has_anim_layers():
     return bool(scene_layer_names(include_root=False))
 
 
-def anim_curve_for_layer(plug, layer):
-    if om is None or plug is None or layer is None:
-        return None
-
-    root_layer = _root_layer()
-    is_root = bool(root_layer and layer == root_layer)
-    scene_layers = _scene_layers()
-
+def _curve_from_blend_input(plug, blend_node, is_root):
+    """Return the animCurve connected to one blend node input."""
     try:
-        iterator = om.MItDependencyGraph(
-            plug,
-            om.MFn.kInvalid,
-            direction=om.MItDependencyGraph.kUpstream,
-            traversal=om.MItDependencyGraph.kBreadthFirst,
-            level=om.MItDependencyGraph.kNodeLevel,
-        )
-    except Exception:
-        return None
-
-    target_blend = None
-    while not iterator.isDone():
-        current_node = iterator.currentNode()
-        if current_node in scene_layers:
-            iterator.prune()
-        iterator.next()
-
-        if current_node.apiType() not in BLEND_NODE_TYPES:
-            continue
-
-        if is_root:
-            target_blend = current_node
-            continue
-
-        try:
-            node_fn = omutils.dependency_node_fn(current_node)
-            layer_plug = node_fn.findPlug("wa", True)
-            if layer_plug and layer == layer_plug.source().node():
-                target_blend = current_node
-                break
-        except Exception:
-            pass
-
-    if target_blend is None:
-        return None
-
-    try:
-        node_fn = omutils.dependency_node_fn(target_blend)
+        node_fn = omutils.dependency_node_fn(blend_node)
         input_plug = node_fn.findPlug("ia" if is_root else "ib", True)
     except Exception:
         return None
 
-    if target_blend.apiType() in BLEND_NODE_ROTATION_TYPES:
+    if blend_node.apiType() in BLEND_NODE_ROTATION_TYPES:
         child_index = 0
         try:
             if plug.isChild:
@@ -343,6 +300,69 @@ def anim_curve_for_layer(plug, layer):
     return None
 
 
+def _anim_curves_for_layer_graph(plug, scene_layers):
+    """Resolve every layer curve with one upstream traversal of ``plug``."""
+    if om is None or plug is None or not scene_layers:
+        return {}
+    root_layer = scene_layers[0]
+    root_name = omutils.mobject_name(root_layer, absolute=False)
+    scene_layer_names = {
+        omutils.mobject_name(layer, absolute=False)
+        for layer in scene_layers
+    }
+    try:
+        iterator = om.MItDependencyGraph(
+            plug,
+            om.MFn.kInvalid,
+            direction=om.MItDependencyGraph.kUpstream,
+            traversal=om.MItDependencyGraph.kBreadthFirst,
+            level=om.MItDependencyGraph.kNodeLevel,
+        )
+    except Exception:
+        return {}
+
+    root_blend = None
+    layer_blends = {}
+    while not iterator.isDone():
+        current_node = iterator.currentNode()
+        current_name = omutils.mobject_name(current_node, absolute=False)
+        if current_name in scene_layer_names:
+            iterator.prune()
+        iterator.next()
+        if current_node.apiType() not in BLEND_NODE_TYPES:
+            continue
+
+        root_blend = current_node
+        try:
+            node_fn = omutils.dependency_node_fn(current_node)
+            layer_node = node_fn.findPlug("wa", True).source().node()
+            layer_name = omutils.mobject_name(layer_node, absolute=False)
+        except Exception:
+            layer_name = None
+        if layer_name and layer_name != root_name and layer_name in scene_layer_names:
+            layer_blends.setdefault(layer_name, current_node)
+
+    curves = {}
+    if root_blend is not None and root_name:
+        curve = _curve_from_blend_input(plug, root_blend, True)
+        if curve:
+            curves[root_name] = curve
+    for layer_name, blend_node in layer_blends.items():
+        curve = _curve_from_blend_input(plug, blend_node, False)
+        if curve:
+            curves[layer_name] = curve
+    return curves
+
+
+def anim_curve_for_layer(plug, layer, scene_layers=None):
+    """Resolve the exact animCurve for a layer with one blend-chain walk."""
+    if om is None or plug is None or layer is None:
+        return None
+    scene_layers = scene_layers or scene_layer_objects()
+    layer_name = omutils.mobject_name(layer, absolute=False)
+    return _anim_curves_for_layer_graph(plug, scene_layers).get(layer_name)
+
+
 def _layer_name(layer):
     if layer is None:
         return None
@@ -358,7 +378,7 @@ def _layer_graph_for_plug(plug_name, scene_layers=None):
 
     ``scene_layers`` lets a caller that already walked the graph (e.g.
     ``get_anim_curves_from_plugs`` resolving many plugs at once) pass it
-    straight through instead of re-walking it -- ``_scene_layers()`` was
+    straight through instead of re-walking it -- ``scene_layer_objects()`` was
     otherwise re-querying the whole animLayer graph from Maya once per plug,
     which dominated resolution time for any sizeable selection.
     """
@@ -368,15 +388,15 @@ def _layer_graph_for_plug(plug_name, scene_layers=None):
     if plug is None:
         return None, None, []
     if scene_layers is None:
-        scene_layers = _scene_layers()
+        scene_layers = scene_layer_objects()
     if not scene_layers:
         return plug, None, []
-    # _scene_layers() always appends the root before any children, so the
+    # scene_layer_objects() always appends the root before any children, so the
     # first entry is the root layer -- no separate _root_layer() call needed.
     return plug, scene_layers[0], scene_layers
 
 
-def _direct_anim_curve_for_plug(plug_name):
+def _unlayered_anim_curve_for_plug(plug_name):
     if cmds is None:
         return None
     try:
@@ -385,10 +405,40 @@ def _direct_anim_curve_for_plug(plug_name):
             source=True,
             destination=False,
             type="animCurve",
+            skipConversionNodes=True,
         ) or []
     except _COMMAND_ERRORS:
         curves = []
     return curves[0] if curves else None
+
+
+def _direct_anim_curve_from_plug(plug):
+    """Fast OpenMaya check for a curve connected directly to a plug."""
+    try:
+        source_node = plug.source().node()
+        if source_node and source_node.apiType() in ANIM_CURVE_TYPES:
+            return omutils.mobject_name(source_node)
+    except Exception:
+        pass
+    return None
+
+
+def _base_anim_curve_for_plug(
+    plug_name,
+    plug,
+    root_layer,
+    scene_layers,
+):
+    """Resolve BaseAnimation whether Maya uses a blend input or a direct curve."""
+    direct_curve = _direct_anim_curve_from_plug(plug)
+    if direct_curve:
+        return direct_curve
+    curve = anim_curve_for_layer(
+        plug,
+        root_layer,
+        scene_layers=scene_layers,
+    )
+    return curve or _unlayered_anim_curve_for_plug(plug_name)
 
 
 def get_anim_curves_by_layer_for_plug(plug_name, scene_layers=None):
@@ -402,16 +452,31 @@ def get_anim_curves_by_layer_for_plug(plug_name, scene_layers=None):
     plug, root_layer, scene_layers = _layer_graph_for_plug(plug_name, scene_layers=scene_layers)
     if plug is None:
         return []
+    if not scene_layers:
+        curve = _unlayered_anim_curve_for_plug(plug_name)
+        return [
+            {"layer": None, "curve": curve, "root": True}
+        ] if curve else []
 
     entries = []
+    layer_curves = _anim_curves_for_layer_graph(plug, scene_layers)
     for layer in scene_layers:
-        curve = anim_curve_for_layer(plug, layer)
+        is_root = bool(root_layer and layer == root_layer)
+        layer_name = _layer_name(layer)
+        curve = (
+            (
+                _direct_anim_curve_from_plug(plug)
+                or layer_curves.get(layer_name)
+                or _unlayered_anim_curve_for_plug(plug_name)
+            )
+            if is_root
+            else layer_curves.get(layer_name)
+        )
         if not curve:
             continue
-        is_root = bool(root_layer and layer == root_layer)
         entries.append(
             {
-                "layer": None if is_root else _layer_name(layer),
+                "layer": None if is_root else layer_name,
                 "curve": curve,
                 "root": is_root,
             }
@@ -500,7 +565,7 @@ def _layer_parent(layer_name):
     list" issue as the accumulation-mode ones -- it's the last remaining
     cmds.animLayer query flag in the normal refresh path. A parent layer
     connects to a child through the child's ``message`` plug into the
-    parent's ``childrenLayers`` array (the same link ``_scene_layers()``
+    parent's ``childrenLayers`` array (the same link ``scene_layer_objects()``
     already walks via OpenMaya), so ``listConnections`` -- a different,
     unaffected command -- can read it back directly.
     """
@@ -554,6 +619,112 @@ def capture_context():
     return cache.reset().capture()
 
 
+def curve_tool_context():
+    """Return the editable layer scope used by object-based curve tools.
+
+    An explicit layer-editor selection limits the scope to those editable
+    layers. With no explicit selection, every unlocked layer participates.
+    Names are returned (including the real root-layer name) because Maya's
+    curve commands operate on node names rather than ``BASE_LAYER_ID``.
+    """
+    context = capture_context()
+    root_name = context.get("root_name")
+    layers = context.get("layers") or {}
+    selected_ids = list(context.get("selected") or [])
+    selected_unlocked_ids = list(context.get("selected_unlocked") or [])
+    explicit = bool(selected_ids)
+    scope_ids = selected_unlocked_ids if explicit else [
+        layer_id
+        for layer_id, metadata in layers.items()
+        if not metadata.get("locked")
+    ]
+
+    def _name(layer_id):
+        if layer_id == BASE_LAYER_ID:
+            return root_name
+        return layer_name_for_id(layer_id, context=context)
+
+    scope_names = [name for name in (_name(layer_id) for layer_id in scope_ids) if name]
+    selected_names = [name for name in (_name(layer_id) for layer_id in selected_ids) if name]
+    selected_unlocked_names = [
+        name for name in (_name(layer_id) for layer_id in selected_unlocked_ids) if name
+    ]
+    active_id = context.get("active")
+    active_name = _name(active_id) if active_id else (
+        scope_names[-1] if scope_names else None
+    )
+    # capture_context() refreshed these objects immediately above. Reuse that
+    # one command-local graph instead of walking Maya's layer hierarchy twice.
+    live_scene_layers = []
+    for layer in cache.scene_layers:
+        layer_object = layer.layer
+        if isinstance(layer_object, str):
+            layer_object = omutils.mobject_from_node(layer_object)
+        if layer_object is not None:
+            live_scene_layers.append(layer_object)
+    return {
+        "has_layers": bool(context.get("has_layers")),
+        "root_name": root_name,
+        "selected": selected_names,
+        "selected_unlocked": selected_unlocked_names,
+        "selection_explicit": explicit,
+        "scope_layer_names": list(dict.fromkeys(scope_names)),
+        "active_layer": active_name,
+        "context": context,
+        "scene_layers": live_scene_layers,
+    }
+
+
+def weight_curves(layer_name):
+    """Return animCurves driving one animation layer's weight plug."""
+    if not layer_name or cmds is None:
+        return []
+    weight_plug = "{}.weight".format(layer_name)
+    try:
+        curves = cmds.listConnections(
+            weight_plug,
+            source=True,
+            destination=False,
+            type="animCurve",
+            skipConversionNodes=True,
+        ) or []
+    except _COMMAND_ERRORS:
+        curves = []
+    if isinstance(curves, str):
+        curves = [curves]
+    return list(dict.fromkeys(curves))
+
+
+def get_anim_curve_layer_map_for_plugs(
+    plug_names,
+    layer_names,
+    scene_layers=None,
+):
+    """Return reliable ``animCurve -> animLayer`` ownership for plugs.
+
+    This deliberately uses the OpenMaya blend-chain traversal instead of
+    ``animLayer -q -animCurves``, whose result is inconsistent for selected
+    non-base layers in several Maya versions.
+    """
+    requested = set(layer_names or [])
+    if not requested:
+        return {}
+    if scene_layers is None:
+        scene_layers = scene_layer_objects()
+    root_name = root_layer_name()
+    ownership = {}
+    for plug_name in dict.fromkeys(plug_names or []):
+        for entry in get_anim_curves_by_layer_for_plug(
+            plug_name,
+            scene_layers=scene_layers,
+        ):
+            layer_name = root_name if entry.get("root") else entry.get("layer")
+            curve = entry.get("curve")
+            if layer_name in requested and curve:
+                ownership[curve] = layer_name
+    return ownership
+
+
 def layer_id_for_name(layer_name):
     return BASE_LAYER_ID if not layer_name or layer_name == root_layer_name() else layer_name
 
@@ -599,7 +770,7 @@ def layer_contains_plug(layer_name, plug_name):
     return layer_name in affected
 
 
-def selected_destination_for_plug(plug_name, context=None):
+def selected_destination_for_plug(plug_name, context=None, resolve_membership=True):
     """Resolve the current paste/key destination for one plug.
 
     A selected, unlocked non-root layer is the destination for as long as
@@ -625,7 +796,11 @@ def selected_destination_for_plug(plug_name, context=None):
         }
 
     layer_name = layer_name_for_id(layer_id, context)
-    member = layer_contains_plug(layer_name, plug_name)
+    member = (
+        layer_contains_plug(layer_name, plug_name)
+        if resolve_membership
+        else None
+    )
     metadata = (context.get("layers") or {}).get(layer_id) or layer_metadata(layer_name)
     return {
         "layer": layer_name,
@@ -642,7 +817,14 @@ def group_attributes_by_destination(node, attributes, context=None):
     blocked = []
     for attribute in attributes or []:
         plug = "{}.{}".format(node, attribute)
-        destination = selected_destination_for_plug(plug, context=context)
+        # Grouping only needs the destination and lock state. Membership is
+        # informational and querying the full layer attribute list once per
+        # channel is prohibitively expensive for Smart Key-sized selections.
+        destination = selected_destination_for_plug(
+            plug,
+            context=context,
+            resolve_membership=False,
+        )
         if destination.get("blocked"):
             blocked.append(attribute)
             continue
@@ -726,16 +908,23 @@ def get_anim_curve_for_plug(
     if plug is None:
         return None
     if not scene_layers:
-        return _direct_anim_curve_for_plug(plug_name)
+        return _unlayered_anim_curve_for_plug(plug_name)
     if layer_selector is not None:
-        cache.reset()
         try:
             target_layer = layer_selector(plug)
         except Exception:
             return None
-        return (
-            anim_curve_for_layer(plug, target_layer)
-            or _direct_anim_curve_for_plug(plug_name)
+        if target_layer == root_layer:
+            return _base_anim_curve_for_plug(
+                plug_name,
+                plug,
+                root_layer,
+                scene_layers,
+            )
+        return anim_curve_for_layer(
+            plug,
+            target_layer,
+            scene_layers=scene_layers,
         )
 
     if layer_name:
@@ -744,20 +933,20 @@ def get_anim_curve_for_plug(
                 # A specific, named non-root layer was requested. If it has
                 # no curve yet for this plug, that's a real answer -- a
                 # freshly created layer legitimately has none yet -- not an
-                # invitation to substitute _direct_anim_curve_for_plug's
-                # unlayered lookup, which finds the first animCurve directly
-                # connected to the plug with no regard for which layer it
-                # actually belongs to. On a plug already animated on
-                # BaseAnimation, that fallback silently returned Base's
-                # curve for an AnimLayer1 request, so callers like
-                # _cut_destination_keys ended up cutting Base's keys while
-                # believing they were touching the new layer.
-                return anim_curve_for_layer(plug, layer)
+                # invitation to substitute the unlayered lookup, which has no
+                # layer ownership information.
+                return anim_curve_for_layer(
+                    plug,
+                    layer,
+                    scene_layers=scene_layers,
+                )
         return None
 
-    return (
-        anim_curve_for_layer(plug, root_layer)
-        or _direct_anim_curve_for_plug(plug_name)
+    return _base_anim_curve_for_plug(
+        plug_name,
+        plug,
+        root_layer,
+        scene_layers,
     )
 
 
@@ -773,7 +962,7 @@ def get_anim_curves_from_plugs(
     meant hundreds of redundant re-walks of the same, unchanged graph.
     """
     curves = []
-    scene_layers = _scene_layers()
+    scene_layers = scene_layer_objects()
     for plug_name in dict.fromkeys(plugs or []):
         if not plug_name:
             continue
@@ -790,9 +979,6 @@ def get_anim_curves_from_plugs(
                 scene_layers=scene_layers,
             )
             resolved = [curve] if curve else []
-        if include_all_layers and not resolved:
-            curve = get_anim_curve_for_plug(plug_name, scene_layers=scene_layers)
-            resolved = [curve] if curve else []
         for curve in resolved:
             if curve and curve not in curves:
                 curves.append(curve)
@@ -807,6 +993,62 @@ def add_plug_to_layer(layer_name, plug_name):
         return True
     except _COMMAND_ERRORS:
         return False
+
+
+def ensure_layer_destination(
+    layer_id,
+    metadata,
+    plug_name,
+    existing_layer_names=None,
+):
+    """Resolve/create one pasted layer and ensure that it owns ``plug_name``.
+
+    Returns a small result dictionary so animation and pose paste use the same
+    creation, lock, and membership policy.
+    """
+    if layer_id in (None, BASE_LAYER_ID):
+        return {
+            "layer": None,
+            "created": False,
+            "blocked": False,
+            "member": True,
+        }
+
+    metadata = dict(metadata or {})
+    layer_name = metadata.get("name") or layer_id
+    known_layers = existing_layer_names
+    if known_layers is None:
+        known_layers = set(scene_layer_names(include_root=False))
+    exists = layer_name in known_layers
+    if exists:
+        current_metadata = layer_metadata(layer_name)
+        if current_metadata.get("locked"):
+            return {
+                "layer": layer_name,
+                "created": False,
+                "blocked": True,
+                "member": False,
+            }
+    else:
+        layer_name = create_layer(metadata)
+        if not layer_name:
+            return {
+                "layer": None,
+                "created": False,
+                "blocked": False,
+                "member": False,
+            }
+        known_layers.add(layer_name)
+
+    member = not plug_name or layer_contains_plug(layer_name, plug_name)
+    if plug_name and not member:
+        member = add_plug_to_layer(layer_name, plug_name)
+    return {
+        "layer": layer_name,
+        "created": not exists,
+        "blocked": False,
+        "member": bool(member),
+    }
 
 
 def create_layer(metadata):
@@ -887,11 +1129,19 @@ def prepare_paste_context(copied_context, plugs):
     )
     if not metadata or metadata.get("locked"):
         return current, {}
-    layer_name = create_layer(metadata)
-    if not layer_name:
+    plug_names = list(dict.fromkeys(plugs or []))
+    first_plug = plug_names[0] if plug_names else None
+    destination = ensure_layer_destination(
+        source_id,
+        metadata,
+        first_plug,
+    )
+    layer_name = destination.get("layer")
+    if not layer_name or destination.get("blocked") or not destination.get("member"):
         return current, {}
-    for plug in dict.fromkeys(plugs or []):
-        add_plug_to_layer(layer_name, plug)
+    for plug in plug_names[1:]:
+        if not layer_contains_plug(layer_name, plug):
+            add_plug_to_layer(layer_name, plug)
     try:
         root_name = root_layer_name()
         if root_name:
@@ -899,7 +1149,8 @@ def prepare_paste_context(copied_context, plugs):
         cmds.animLayer(layer_name, edit=True, selected=True, preferred=True)
     except _COMMAND_ERRORS:
         pass
-    return capture_context(), {layer_name: metadata}
+    created_layers = {layer_name: metadata} if destination.get("created") else {}
+    return capture_context(), created_layers
 
 
 def restore_created_layer_states(created_layers):

@@ -24,12 +24,9 @@ Usage::
         root.set_attr("tkmAnimationRecoverySceneId", new_id, dataType="string")
 """
 
-from contextlib import contextmanager
-
 from maya import cmds
 
 import TheKeyMachine.mods.generalMod as general
-import TheKeyMachine.mods.selectionMod as selectionMod
 
 
 ROOT_NAME = "TheKeyMachine"
@@ -40,17 +37,6 @@ _LOCKED_TRANSFORM_ATTRS = (
     "scaleX", "scaleY", "scaleZ",
     "visibility",
 )
-
-
-@contextmanager
-def _preserve_selection():
-    """Creating/reparenting scene nodes must not disturb the user's selection."""
-    previous_selection = selectionMod.get_selected_objects()
-    try:
-        yield
-    finally:
-        if previous_selection:
-            cmds.select(previous_selection, replace=True)
 
 
 class TkmSceneNode:
@@ -82,29 +68,30 @@ class TkmSceneNode:
     def root(cls):
         """Return TheKeyMachine's root scene node, creating it if missing."""
         if not cmds.objExists(ROOT_NAME):
-            with _preserve_selection():
-                node = cmds.container(type="dagContainer", name=ROOT_NAME)
-                cmds.setAttr(node + ".iconName", general.get_tkm_node_image(), type="string")
-                cls(node).lock_transform()
-                cmds.addAttr(
-                    node,
-                    longName="version",
-                    niceName="version",
-                    attributeType="enum",
-                    enumName="v{} {}".format(
-                        general.get_thekeymachine_version(),
-                        general.get_thekeymachine_stage_version(),
-                    ),
-                    keyable=True,
-                )
-                cmds.addAttr(
-                    node,
-                    longName="series",
-                    niceName="series",
-                    attributeType="enum",
-                    enumName=general.get_thekeymachine_codename(),
-                    keyable=True,
-                )
+            node = cmds.createNode(
+                "dagContainer", name=ROOT_NAME, skipSelect=True
+            )
+            cmds.setAttr(node + ".iconName", general.get_tkm_node_image(), type="string")
+            cls(node).lock_transform()
+            cmds.addAttr(
+                node,
+                longName="version",
+                niceName="version",
+                attributeType="enum",
+                enumName="v{} {}".format(
+                    general.get_thekeymachine_version(),
+                    general.get_thekeymachine_stage_version(),
+                ),
+                keyable=True,
+            )
+            cmds.addAttr(
+                node,
+                longName="series",
+                niceName="series",
+                attributeType="enum",
+                enumName=general.get_thekeymachine_codename(),
+                keyable=True,
+            )
         return cls(ROOT_NAME)
 
     @classmethod
@@ -125,14 +112,15 @@ class TkmSceneNode:
         regardless of *node_type*.
         """
         if not cmds.objExists(name):
-            with _preserve_selection():
-                if icon:
-                    node = cmds.container(type="dagContainer", name=name)
-                    cmds.setAttr(node + ".iconName", icon, type="string")
-                else:
-                    node = cmds.createNode(node_type, name=name)
-                if lock_transform:
-                    TkmSceneNode(node).lock_transform()
+            node = cmds.createNode(
+                "dagContainer" if icon else node_type,
+                name=name,
+                skipSelect=True,
+            )
+            if icon:
+                cmds.setAttr(node + ".iconName", icon, type="string")
+            if lock_transform:
+                TkmSceneNode(node).lock_transform()
         else:
             node = name
 

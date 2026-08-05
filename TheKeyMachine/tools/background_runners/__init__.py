@@ -38,6 +38,11 @@ class BackgroundRunnersToolObject(ToolObject):
             "callback": api.toggle_animation_recovery,
             "tooltip": TOOLTIPS["animation_recovery"],
         },
+        "background_runner_anim_layer_weights": {
+            "type": "tool", "label": "Anim Layer Weights",
+            "callback": api.toggle_anim_layer_weights,
+            "tooltip": TOOLTIPS["anim_layer_weights"],
+        },
     }
     SECTION = {
         "id": "background_runner_tools",

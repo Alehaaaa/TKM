@@ -22,17 +22,18 @@ def get_selected_objects(long=False, ordered=False, orderedSelection=None):
     if orderedSelection is not None:
         ordered = bool(orderedSelection)
 
-    if ordered:
-        return _ls_selected(long=long, ordered=True)
-
     if om is None:
-        return _ls_selected(long=long)
+        return _ls_selected(long=long, ordered=ordered)
 
     try:
+        # MGlobal returns the active list in selection order, so both ordered
+        # and unordered callers can use this read-only path. In particular,
+        # it avoids the common query-and-reselect pattern that clears Maya's
+        # highlighted time-slider range.
         selection_list = om.MGlobal.getActiveSelectionList()
         selection_strings = selection_list.getSelectionStrings()
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        return _ls_selected(long=long)
+        return _ls_selected(long=long, ordered=ordered)
 
     if not selection_strings:
         return []
@@ -60,9 +61,20 @@ def get_selected_object_count():
 
 
 def get_selected_time_range():
-    """Base range-selection query. Maya's rangeArray end is exclusive (one frame
-    past the last actually-selected key); normalize it to an inclusive end here
-    so every caller sees the same, correct last frame."""
+    """Return Maya's highlighted Time Slider range with inclusive endpoints."""
+    # Maya 2024+ owns the visible selection through playbackOptions. The old
+    # timeControl rangeArray can keep reporting the current-frame fallback in
+    # that mode, which made every animation-layer tool miss the real range.
+    try:
+        if cmds.playbackOptions(query=True, selectionVisible=True):
+            start = cmds.playbackOptions(query=True, selectionStartTime=True)
+            end = cmds.playbackOptions(query=True, selectionEndTime=True)
+            if start is not None and end is not None:
+                return start, max(start, end)
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
+
+    # Legacy Maya reports rangeArray's end one frame past the inclusive end.
     time_range = _query_playback_slider(rangeArray=True)
     if not time_range or len(time_range) < 2:
         return None
@@ -205,9 +217,15 @@ def get_anim_curves_for_nodes(nodes, include_shapes=False):
     return _unique(curves)
 
 
-def get_attribute_plugs_from_nodes(nodes):
-    """Resolve ``obj.attr`` plugs for every node's channel-box selection (or
-    its keyable scalar attributes, if nothing is highlighted there).
+def get_attribute_plugs_from_nodes(
+    nodes,
+    selected_only=False,
+    selected_channels=None,
+):
+    """Resolve ``obj.attr`` plugs for every node's Channel Box selection.
+
+    Unless ``selected_only`` is true, fall back to the nodes' keyable scalar
+    attributes when nothing is highlighted.
 
     Existence is checked with one ``listAttr`` per node instead of one
     ``objExists`` per candidate plug -- for many selected controls with many
@@ -218,21 +236,40 @@ def get_attribute_plugs_from_nodes(nodes):
     if not nodes:
         return [], "none"
 
-    selected_channels = get_selected_channels()
+    if selected_channels is None:
+        selected_channels = get_selected_channels()
+    selected_channels = _unique(selected_channels)
 
     if selected_channels:
         plugs = []
         for obj in nodes:
             try:
                 node_attrs = set(cmds.listAttr(obj) or [])
+                # Channel Box queries may return Maya's short attribute names
+                # (for example ``tx``), while listAttr's default result uses
+                # long names (``translateX``). Accept both representations so
+                # a real Channel Box restriction cannot be mistaken for an
+                # empty selection and expanded to every keyable channel.
+                node_attrs.update(cmds.listAttr(obj, shortNames=True) or [])
             except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 node_attrs = set()
             for attr in selected_channels:
                 if attr in node_attrs:
-                    plugs.append("{}.{}".format(obj, attr))
+                    try:
+                        canonical_attr = cmds.attributeQuery(
+                            attr,
+                            node=obj,
+                            longName=True,
+                        )
+                    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                        canonical_attr = attr
+                    plugs.append("{}.{}".format(obj, canonical_attr or attr))
 
         if plugs:
             return _unique(plugs), "channel_box"
+
+    if selected_only:
+        return [], "none"
 
     # get_keyable_scalar_attributes() already queries the live, visible,
     # keyable, scalar attributes of each object -- every name it returns
@@ -321,13 +358,6 @@ def attribute_names_from_plugs(plugs):
     return _unique(attrs)
 
 
-def _selected_object_attribute_plugs():
-    nodes = get_selected_objects()
-    if not nodes:
-        return [], "none"
-    return get_attribute_plugs_from_nodes(nodes)
-
-
 def _resolve_graph_outliner_items(items):
     plugs = []
     curves = []
@@ -371,32 +401,94 @@ def get_graph_editor_outliner_items():
         return []
 
 
-def get_graph_editor_selected_curves():
+def get_graph_editor_explicitly_selected_curves():
     if not is_graph_editor_visible():
         return []
     try:
-        selected_curves = cmds.keyframe(query=True, selected=True, name=True) or []
+        return cmds.keyframe(query=True, selected=True, name=True) or []
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        selected_curves = []
+        return []
+
+
+def get_graph_editor_selected_curves():
+    selected_curves = get_graph_editor_explicitly_selected_curves()
     if selected_curves:
         return selected_curves
     _plugs, curves = _resolve_graph_outliner_items(get_graph_editor_outliner_items())
     return curves
 
 
-def get_graph_editor_selected_keyframes():
+def get_graph_editor_selected_tangent_curves():
+    """Return curves owning selected tangent handles, including handle-only selections."""
+    if not is_graph_editor_visible():
+        return []
+    try:
+        curves = cmds.keyTangent(
+            query=True,
+            selected=True,
+            name=True,
+        ) or []
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        curves = []
+    if curves:
+        return _unique(curves)
+
+    _plugs, candidates = _resolve_graph_outliner_items(
+        get_graph_editor_outliner_items()
+    )
+    selected = []
+    for curve in candidates:
+        try:
+            frames = cmds.keyTangent(
+                curve,
+                query=True,
+                selected=True,
+                timeChange=True,
+            ) or []
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            frames = []
+        if frames:
+            selected.append(curve)
+    return _unique(selected)
+
+
+def get_graph_editor_selected_keyframes(include_tangents=False):
+    """Return exact selected Graph Editor key times, optionally from handles."""
     anim_curves = get_graph_editor_selected_curves()
+    if include_tangents:
+        anim_curves = _unique(
+            anim_curves + get_graph_editor_selected_tangent_curves()
+        )
     if not anim_curves:
         return []
 
-    selected_frames = set(get_graph_editor_selected_frames())
     keyframes = []
     for curve in anim_curves:
         try:
-            curve_frames = cmds.keyframe(curve, query=True, selected=True) or []
+            curve_frames = cmds.keyframe(
+                curve,
+                query=True,
+                selected=True,
+                timeChange=True,
+            ) or []
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             curve_frames = []
-        keyframes.extend((curve, frame) for frame in curve_frames if int(frame) in selected_frames)
+        if include_tangents:
+            try:
+                curve_frames.extend(
+                    cmds.keyTangent(
+                        curve,
+                        query=True,
+                        selected=True,
+                        timeChange=True,
+                    ) or []
+                )
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+        for frame in curve_frames:
+            pair = (curve, float(frame))
+            if pair not in keyframes:
+                keyframes.append(pair)
 
     return keyframes
 
@@ -411,80 +503,6 @@ def get_target_curves():
         return cmds.keyframe(query=True, name=True, sl=True) or []
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return []
-
-
-def get_selected_object_curves():
-    plugs, _source = _selected_object_attribute_plugs()
-    return get_anim_curves_from_plugs(plugs)
-
-
-def _resolve_slider_targets():
-    """Resolve slider targets once, then expose plug/curve views for each slider family."""
-    time_range = get_selected_time_range()
-
-    try:
-        selected_key_curves = cmds.keyframe(query=True, selected=True, name=True) or []
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        selected_key_curves = []
-    if selected_key_curves:
-        return {
-            "plugs": get_anim_curve_output_plugs(selected_key_curves),
-            "curves": _unique(selected_key_curves),
-            "source": "graph_editor",
-            "time_range": time_range,
-            "has_graph_keys": True,
-        }
-
-    graph_items = get_graph_editor_outliner_items()
-    if graph_items:
-        graph_plugs, graph_curves = _resolve_graph_outliner_items(graph_items)
-        if graph_plugs or graph_curves:
-            return {
-                "plugs": graph_plugs,
-                "curves": graph_curves,
-                "source": "graph_editor_outliner",
-                "time_range": time_range,
-                "has_graph_keys": False,
-            }
-
-    try:
-        selected_graph_curves = cmds.keyframe(query=True, name=True, sl=True) or []
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        selected_graph_curves = []
-    if selected_graph_curves:
-        return {
-            "plugs": get_anim_curve_output_plugs(selected_graph_curves),
-            "curves": _unique(selected_graph_curves),
-            "source": "graph_editor",
-            "time_range": time_range,
-            "has_graph_keys": True,
-        }
-
-    plugs, source = _selected_object_attribute_plugs()
-    if plugs:
-        return {
-            "plugs": plugs,
-            "curves": get_anim_curves_from_plugs(plugs),
-            "source": source,
-            "time_range": time_range,
-            "has_graph_keys": False,
-        }
-
-    return {"plugs": [], "curves": [], "source": "none", "time_range": time_range, "has_graph_keys": False}
-
-
-def resolve_target_context():
-    return dict(_resolve_slider_targets())
-
-
-def resolve_target_attribute_plugs():
-    targets = resolve_target_context()
-    return targets["plugs"], targets["source"], targets["time_range"], targets["has_graph_keys"]
-
-
-def resolve_target_curves():
-    targets = resolve_target_context()
-    return targets["curves"], targets["source"], targets["time_range"], targets["has_graph_keys"]
 
 
 _PLAYBACK_SLIDER = None
@@ -553,16 +571,6 @@ def _normalize_slider_range(range_array):
     return start, end
 
 
-def _normalize_frames(frames):
-    normalized = set()
-    for frame in frames or []:
-        try:
-            normalized.add(int(round(frame)))
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            continue
-    return sorted(normalized)
-
-
 def get_graph_editor_selected_tangent_frames():
     if not is_graph_editor_visible():
         return []
@@ -570,7 +578,7 @@ def get_graph_editor_selected_tangent_frames():
         tangent_frames = cmds.keyTangent(query=True, selected=True, timeChange=True) or []
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         tangent_frames = []
-    return _normalize_frames(tangent_frames)
+    return sorted(set(float(frame) for frame in tangent_frames))
 
 
 def get_graph_editor_selected_frames(include_tangents=True):
@@ -592,7 +600,7 @@ def get_graph_editor_selected_frames(include_tangents=True):
             frames.extend(get_graph_editor_selected_tangent_frames())
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
-    return _normalize_frames(frames)
+    return sorted(set(float(frame) for frame in frames))
 
 
 def get_graph_editor_selected_range(include_tangents=True):

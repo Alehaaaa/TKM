@@ -11,7 +11,7 @@ def _normalize_frames(frames):
     normalized = []
     for frame in frames or ():
         try:
-            normalized.append(int(round(frame)))
+            normalized.append(float(frame))
         except (TypeError, ValueError):
             continue
     return sorted(set(normalized))
@@ -30,9 +30,11 @@ def _filter_targets_by_scope(targets, key_scope):
 
 def _collect_targets(key_scope="selection"):
     default_mode = "all_animation" if key_scope == "all" else "current_frame"
-    target_info, _plugs, _objects, _channels = animation_context.resolve_command_targets(
+    target_info = animation_context.resolve_tool_context(
         default_mode=default_mode,
+        include_channels=True,
         include_shapes=True,
+        resolve_curves=True,
     )
     if not target_info.get("target_objects") and not target_info.get("target_plugs"):
         return {}, target_info.get("time_context")
@@ -40,16 +42,16 @@ def _collect_targets(key_scope="selection"):
     selected = []
     time_context = target_info.get("time_context")
     if key_scope != "all" and time_context and time_context.mode == "graph_editor_keys":
-        selected = selectionMod.get_graph_editor_selected_keyframes()
+        selected = target_info.get("selected_keyframes") or []
     if selected:
         by_curve = {}
         for curve, frame in selected:
-            by_curve.setdefault(curve, set()).add(int(frame))
+            by_curve.setdefault(curve, set()).add(float(frame))
         targets = {curve: sorted(frames) for curve, frames in by_curve.items()}
     else:
         targets = {
             curve: _normalize_frames(animation_context.key_times(curve, target_info))
-            for curve in animation_context.curves(target_info)
+            for curve in target_info["selected_curves"]
         }
     return _filter_targets_by_scope(targets, key_scope), time_context
 
@@ -81,7 +83,7 @@ def set_maya_default(tangent_type):
 def set_tangent(tangent_type, handle_mode="both", key_scope="selection", tint_color=None):
     targets, time_context = _collect_targets(key_scope)
     if not targets:
-        return wutil.make_inViewMessage("No animation curves available to set tangents.")
+        return animation_context.notify_empty("keys", "edit")
     timerange = _target_range(targets) or (time_context.timerange if time_context else None)
     tint = timeline.begin_timeline_tint(
         timerange=timerange,
@@ -116,9 +118,11 @@ def _filter_bouncy_targets(targets, key_scope):
 
 def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle_adjustment_factor=1.3):
     default_mode = "all_animation" if key_scope == "all" else "current_frame"
-    target_info, _plugs, _objects, _channels = animation_context.resolve_command_targets(
+    target_info = animation_context.resolve_tool_context(
         default_mode=default_mode,
+        include_channels=True,
         include_shapes=True,
+        resolve_curves=True,
     )
     selected = target_info.get("selected_keyframes") or []
     if selected and key_scope != "all":
@@ -126,7 +130,7 @@ def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle
     else:
         targets = []
         seen = set()
-        for curve in animation_context.curves(target_info):
+        for curve in target_info["selected_curves"]:
             for frame in animation_context.key_times(curve, target_info):
                 item = (curve, float(frame))
                 if item not in seen:
@@ -134,9 +138,9 @@ def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle
                     targets.append(item)
     targets = _filter_bouncy_targets(targets, key_scope)
     if not targets:
-        return wutil.make_inViewMessage("No animation curves available to set tangents.")
+        return animation_context.notify_empty("keys", "edit")
 
-    frames = sorted({int(frame) for _curve, frame in targets})
+    frames = sorted({float(frame) for _curve, frame in targets})
     timerange = (frames[0], frames[-1]) if frames else None
     tint = timeline.begin_timeline_tint(
         timerange=timerange,
@@ -178,7 +182,13 @@ def _copy_key_state(curve, source_time, target_time):
 
 
 def match_cycle(target_key="last"):
-    curves = selectionMod.get_graph_editor_selected_curves()
+    target_info = animation_context.resolve_tool_context(
+        default_mode="all_animation",
+        include_channels=True,
+        include_shapes=True,
+        resolve_curves=True,
+    )
+    curves = target_info["selected_curves"]
     operation = toolCommon.current_tool_operation()
     if operation:
         operation.set_total(len(curves))

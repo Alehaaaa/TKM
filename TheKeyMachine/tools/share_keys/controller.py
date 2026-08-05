@@ -67,8 +67,22 @@ def _unique(items):
     return list(dict.fromkeys(items or []))
 
 
-def _anim_curves_for_objects(objects):
-    return selectionMod.get_anim_curves_for_nodes(objects)
+def _curves_by_object(target_info, objects):
+    """Resolve each object's exact plugs through the shared layer scope."""
+    plugs_by_object = {obj: [] for obj in objects or []}
+    for plug in target_info.get("target_plugs") or []:
+        if not plug or "." not in plug:
+            continue
+        obj = plug.rsplit(".", 1)[0]
+        if obj in plugs_by_object:
+            plugs_by_object[obj].append(plug)
+    return {
+        obj: animation_context.resolve_curves_for_plugs(
+            target_info,
+            plugs_by_object.get(obj) or [],
+        )
+        for obj in objects or []
+    }
 
 
 def _set_missing_keys(curves, frames, insert=False, operation=None):
@@ -182,42 +196,23 @@ relative_data = {}
 
 
 def share_keys(*args):
-    target_info = animation_context.resolve_targets(
-        default_mode="all_animation", ordered_selection=True, long_names=True
+    target_info = animation_context.resolve_tool_context(
+        default_mode="all_animation",
+        include_shapes=True,
+        resolve_curves=True,
     )
-    objetos = target_info["target_objects"]
-    target_plugs = target_info["target_plugs"]
-    time_context = target_info["time_context"]
-
-    if not objetos and not target_plugs:
+    if not target_info["target_objects"] and target_info.get("source") != "graph_editor":
         return wutil.make_inViewMessage("Select at least one object")
 
-    all_frames = set()
-    object_plug_frames = {obj: {} for obj in objetos}
-
-    for plug in target_plugs:
-        if not cmds.objExists(plug) or "." not in plug:
-            continue
-        obj = plug.split(".", 1)[0]
-        if time_context.mode == "all_animation":
-            plug_frames = cmds.keyframe(plug, query=True, timeChange=True) or []
-        else:
-            plug_frames = (
-                cmds.keyframe(
-                    plug, query=True, time=time_context.timerange, timeChange=True
-                )
-                or []
-            )
-        normalized_frames = {
-            int(frame) if int(frame) == frame else frame for frame in plug_frames
-        }
-        if not normalized_frames:
-            continue
-        object_plug_frames.setdefault(obj, {})[plug] = normalized_frames
-        all_frames.update(normalized_frames)
+    curves = _unique(target_info["selected_curves"])
+    frames_by_curve = {
+        curve: set(_normalize_key_frames(animation_context.key_times(curve, target_info)))
+        for curve in curves
+    }
+    all_frames = set().union(*frames_by_curve.values()) if frames_by_curve else set()
 
     if not all_frames:
-        return wutil.make_inViewMessage("No keys found in selection")
+        return animation_context.notify_empty("keys", "share")
 
     shared_frames = sorted(all_frames)
     preserve_curve_shape = get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE
@@ -226,43 +221,34 @@ def share_keys(*args):
         tool_id="share_keys",
         label="Share Keys",
         progress=True,
-        progress_max=sum(
-            len(plugs) * len(shared_frames) for plugs in object_plug_frames.values()
-        ),
+        progress_max=len(curves) * len(shared_frames),
         undo=True,
         tint="range",
         timerange=(int(shared_frames[0]), int(shared_frames[-1])),
     ) as operation:
         operation.start()
-        for objeto in objetos:
-            for plug, existing_frames in object_plug_frames.get(objeto, {}).items():
-                node_name, attribute_name = plug.split(".", 1)
-                for frame in shared_frames:
-                    if operation.cancelled:
-                        return
-                    if frame not in existing_frames:
-                        set_keyframe_kwargs = {
-                            "attribute": attribute_name,
-                            "time": (frame,),
-                        }
-                        if preserve_curve_shape:
-                            set_keyframe_kwargs["insert"] = True
-                        cmds.setKeyframe(node_name, **set_keyframe_kwargs)
-                    operation.step()
+        _set_missing_keys(
+            curves,
+            shared_frames,
+            insert=preserve_curve_shape,
+            operation=operation,
+        )
 
 
-def _frames_from_last_selected(time_context=None):
-    selection = selectionMod.get_selected_objects(orderedSelection=True, long=True)
+def _frames_from_last_selected(target_info):
+    selection = target_info.get("target_objects") or []
     if len(selection) < 2:
         wutil.make_inViewMessage("Select targets, then the source object last")
         return None, [], []
 
     source = selection[-1]
     targets = selection[:-1]
-    query_kwargs = {"query": True, "timeChange": True}
-    if time_context and time_context.mode != "all_animation":
-        query_kwargs["time"] = time_context.timerange
-    frames = cmds.keyframe(source, **query_kwargs) or []
+    source_curves = _curves_by_object(target_info, [source]).get(source) or []
+    frames = [
+        frame
+        for curve in source_curves
+        for frame in animation_context.key_times(curve, target_info)
+    ]
     frames = _normalize_key_frames(frames)
     if not frames:
         wutil.make_inViewMessage("Last selected object has no keys")
@@ -301,15 +287,18 @@ def _bake_curves_to_source_frames(curves, frames, operation=None, preserve_shape
 
 
 def share_keys_from_last_selected(*args):
-    time_context = timelineWidgets.resolve_time_context(default_mode="all_animation")
-    _source, targets, frames = _frames_from_last_selected(time_context)
+    target_info = animation_context.resolve_tool_context(
+        default_mode="all_animation",
+        include_graph=False,
+        include_shapes=True,
+        resolve_curves=False,
+    )
+    _source, targets, frames = _frames_from_last_selected(target_info)
     if not frames:
         return
 
     keep_curve_shape = get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE
-    curves_by_target = {
-        target: _anim_curves_for_objects([target]) for target in targets
-    }
+    curves_by_target = _curves_by_object(target_info, targets)
     with toolCommon.tool_operation(
         tool_id="share_keys",
         label="Share Keys",
@@ -335,27 +324,31 @@ def share_keys_from_last_selected(*args):
 # ______________________________________ ReBlock Move
 def reblock_move(*args):
     """Adjust animation curves to match the majority keyframe timing pattern."""
-    objects = selectionMod.get_selected_objects(long=True)
-    if not objects:
+    target_info = animation_context.resolve_tool_context(
+        default_mode="all_animation",
+        include_shapes=True,
+        resolve_curves=True,
+    )
+    if not target_info["target_objects"]:
         return
 
-    curves = selectionMod.get_anim_curves_for_nodes(objects, include_shapes=True)
+    curves = target_info["selected_curves"]
     if not curves:
-        return wutil.make_inViewMessage("No animation curves found")
+        return animation_context.notify_empty("animation", "reblock")
 
     profiles = Counter()
     frames_by_curve = {}
 
     for curve in curves:
-        keyframes = cmds.keyframe(curve, query=True, timeChange=True)
-        if keyframes is None:
+        keyframes = animation_context.key_times(curve, target_info)
+        if not keyframes:
             continue
         frames = tuple(sorted(keyframes))
         frames_by_curve[curve] = frames
         profiles[frames] += 1
 
     if not profiles:
-        return wutil.make_inViewMessage("No animation curves found")
+        return animation_context.notify_empty("keys", "reblock")
 
     majority_profile, _ = profiles.most_common(1)[0]
 
@@ -375,55 +368,51 @@ def reblock_move(*args):
                 continue
 
             if frames != majority_profile:
-                # Add missing keys preserving the curve shape
-                if len(frames) < len(majority_profile):
-                    for frame in majority_profile:
-                        if frame not in frames:
-                            cmds.setKeyframe(curve, time=(frame,), insert=True)
-                # Delete excess keys
-                elif len(frames) > len(majority_profile):
-                    for frame in frames:
-                        if frame not in majority_profile:
-                            cmds.cutKey(curve, time=(frame, frame), option="keys")
-
-                updated_keyframes = cmds.keyframe(curve, query=True, timeChange=True)
-                frames = tuple(sorted(updated_keyframes or []))
-
-                is_ahead = frames[0] > majority_profile[0] if frames else False
-                key_range = range(min(len(frames), len(majority_profile)))
-
-                # Shift keys in the appropriate direction to avoid collisions
-                for i in key_range if is_ahead else reversed(key_range):
-                    src_frame = frames[i]
-                    dst_frame = majority_profile[i]
-                    if src_frame != dst_frame:
-                        try:
-                            cmds.keyframe(
-                                curve,
-                                edit=True,
-                                time=(src_frame,),
-                                timeChange=dst_frame,
-                            )
-                        except Exception:
-                            pass
+                shape_data = curveFitting.capture([curve], majority_profile)
+                if not shape_data.get(curve):
+                    operation.step()
+                    continue
+                remove_frames = [
+                    frame for frame in frames if frame not in majority_profile
+                ]
+                if remove_frames:
+                    cmds.cutKey(
+                        curve,
+                        time=[(frame, frame) for frame in remove_frames],
+                        clear=True,
+                    )
+                curveFitting.apply(
+                    shape_data,
+                    preserve_tangent_types=True,
+                )
             operation.step()
 
 
 def reblock_insert(*args):
-    """Align keyframes across objects by inserting missing keys at the closest majority keyframe time."""
-    objects = selectionMod.get_selected_objects()
-    if len(objects) < 2:
-        return wutil.make_inViewMessage("Select at least 2 objects")
+    """Insert missing strict-majority key times across resolved curves."""
+    target_info = animation_context.resolve_tool_context(
+        default_mode="all_animation",
+        include_shapes=True,
+        resolve_curves=True,
+    )
+    curves = _unique(target_info["selected_curves"])
+    if len(curves) < 2:
+        return wutil.make_inViewMessage("Select at least 2 animated channels")
 
-    all_keyframes = []
-    for obj in objects:
-        keyframes = cmds.keyframe(obj, query=True, timeChange=True)
-        if keyframes is not None:
-            all_keyframes.extend(keyframes)
+    frames_by_curve = {
+        curve: _normalize_key_frames(animation_context.key_times(curve, target_info))
+        for curve in curves
+    }
+    all_keyframes = [
+        frame
+        for frames in frames_by_curve.values()
+        for frame in frames
+    ]
 
     frame_counts = Counter(all_keyframes)
+    minimum_count = len(curves) // 2 + 1
     majority_frames = {
-        frame for frame, count in frame_counts.items() if count >= len(objects) / 2
+        frame for frame, count in frame_counts.items() if count >= minimum_count
     }
     if not majority_frames:
         return wutil.make_inViewMessage("No shared key pattern found")
@@ -432,33 +421,18 @@ def reblock_insert(*args):
         tool_id="reblock_insert",
         label="ReBlock Insert",
         progress=True,
-        progress_max=len(objects),
+        progress_max=len(curves),
         undo=True,
     ) as operation:
-        for obj in objects:
+        for curve in curves:
             if operation.cancelled:
                 return
-            obj_frames = set(cmds.keyframe(obj, query=True, timeChange=True) or [])
-
-            for frame in obj_frames:
-                if frame not in majority_frames:
-                    closest_majority = min(
-                        majority_frames, key=lambda x: abs(x - frame)
-                    )
-                    values = cmds.keyframe(
-                        obj, query=True, time=(frame, frame), valueChange=True
-                    )
-                    if values:
-                        try:
-                            cmds.setKeyframe(
-                                obj,
-                                time=(closest_majority,),
-                                value=values[0],
-                                insert=True,
-                            )
-                            cmds.cutKey(obj, time=(frame, frame))
-                        except Exception:
-                            pass
+            existing_frames = set(frames_by_curve.get(curve) or [])
+            for frame in sorted(majority_frames - existing_frames):
+                try:
+                    cmds.setKeyframe(curve, time=(frame,), insert=True)
+                except (RuntimeError, ValueError, TypeError):
+                    pass
             operation.step()
 
 
@@ -493,8 +467,10 @@ def bake_animation(bake_interval=1, window=None):
     )
 
     try:
-        target_info = animation_context.resolve_targets(
-            default_mode="all_animation", ordered_selection=True, long_names=True
+        target_info = animation_context.resolve_tool_context(
+            default_mode="all_animation",
+            include_shapes=True,
+            resolve_curves=True,
         )
         selected_objects = target_info["target_objects"]
         selected_channels = target_info["selected_channels"]
@@ -506,8 +482,6 @@ def bake_animation(bake_interval=1, window=None):
         start_frame, end_frame = time_context.timerange
         bake_tangent_mode = get_bake_tangent_mode()
         curves_to_update = _unique(target_info["selected_curves"])
-        if not curves_to_update:
-            curves_to_update = _anim_curves_for_objects(selected_objects)
 
         tangent_types_by_curve = {}
         curve_shape_data = {}
@@ -597,15 +571,18 @@ def bake_animation(bake_interval=1, window=None):
 
 
 def bake_animation_from_last_selected(*args):
-    time_context = timelineWidgets.resolve_time_context(default_mode="all_animation")
-    _source, targets, frames = _frames_from_last_selected(time_context)
+    target_info = animation_context.resolve_tool_context(
+        default_mode="all_animation",
+        include_graph=False,
+        include_shapes=True,
+        resolve_curves=False,
+    )
+    _source, targets, frames = _frames_from_last_selected(target_info)
     if not frames:
         return
 
     current_time = cmds.currentTime(query=True)
-    curves_by_target = {
-        target: _anim_curves_for_objects([target]) for target in targets
-    }
+    curves_by_target = _curves_by_object(target_info, targets)
     try:
         with toolCommon.tool_operation(
             tool_id="bake_animation_1",

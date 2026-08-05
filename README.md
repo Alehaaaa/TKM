@@ -4,7 +4,7 @@
 
 # TheKeyMachine, animation toolbar
 
-![Version](https://img.shields.io/badge/version-0.1.34-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.35-blue.svg)
 
 Maintained by <b>Alehaaaa</b> at <a href="https://alehaaaa.github.io">alehaaaa.github.io</a>. Originally developed by <b>Rodrigo Torres</b> at <a href="https://www.rodritorres.com">rodritorres.com</a>.
 
@@ -29,10 +29,11 @@ Supports Maya 2022+ on Windows, Linux, and macOS.
 - `Bake on Ones / Twos / Threes / Fours / Custom` for fixed or custom sampling
 - `Clear Selection` to remove key selection quickly
 - `Select Scene Anim` to collect animation curves from the scene
-- `Anim Curve Tools` for selection-aware clear/copy/cut/paste/crop/reverse/filter workflows
+- `Anim Curve Tools` use selected objects and animation layers, prioritize highlighted Time Slider ranges, and include layer-weight animation
+- key copy, cut, and crop share a tangent-aware clipboard; paste supports Graph Editor anchors, channel remapping, and relative value offsets
 - `Set Smart Key` for animated curves, selected channels, Graph Editor keys, highlighted ranges, exact subframes, and unanimated objects in mixed selections
 - `Smart Euler Filter`, redundant-key removal, and static-curve cleanup that respect the active selection context
-- `Snap Keys` works from object or key/range selection and merges multiple subframe keys into the closest whole-frame key
+- `Snap Keys` uses selected objects and animation layers (including layer-weight keys), prioritizes the highlighted Time Slider range, and merges multiple subframe keys into the closest whole-frame key
 - nudge, inbetween, bake, tangent, and background-runner actions use clearer toolbar icons
 
 ### Tangents

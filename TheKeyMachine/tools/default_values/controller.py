@@ -120,10 +120,9 @@ def apply_defaults(translations=False, rotations=False, scales=False):
         "default_scales" if scales else "default_object_values"
     )
     data = _load_data()
-    target_info = animation_context.resolve_targets(
+    target_info = animation_context.resolve_tool_context(
         default_mode="current_frame",
-        ordered_selection=True,
-        long_names=True,
+        include_channels=True,
     )
     selected = target_info["target_objects"]
     if not selected and not target_info["target_plugs"]:

@@ -11,7 +11,10 @@ def _operation(tool_id, label):
 
 
 def match_keys(*_args):
-    target_info, curves = animation_context.resolve_curve_context()
+    target_info = animation_context.resolve_tool_context(
+        include_channels=True, include_shapes=True, resolve_curves=True
+    )
+    curves = target_info["selected_curves"]
     if len(curves) < 2:
         return wutil.make_inViewMessage("Select at least two animation curves")
     source_values = animation_context.key_data(curves[-1], target_info)
@@ -36,7 +39,10 @@ def match_keys(*_args):
 
 
 def flip_curves(*_args):
-    target_info, curves = animation_context.resolve_curve_context()
+    target_info = animation_context.resolve_tool_context(
+        include_channels=True, include_shapes=True, resolve_curves=True
+    )
+    curves = target_info["selected_curves"]
     if not curves:
         return wutil.make_inViewMessage("Select at least one animation curve")
     flipped = False
@@ -56,11 +62,14 @@ def flip_curves(*_args):
                 cmds.scaleKey(curve, valueScale=-1, valuePivot=pivot, **kwargs)
             flipped = True
     if not flipped:
-        return wutil.make_inViewMessage("No keys found")
+        return animation_context.notify_empty("keys")
 
 
 def overlap_curves(direction, *_args):
-    target_info, curves = animation_context.resolve_curve_context()
+    target_info = animation_context.resolve_tool_context(
+        include_channels=True, include_shapes=True, resolve_curves=True
+    )
+    curves = target_info["selected_curves"]
     if not curves:
         return wutil.make_inViewMessage("Select animation curves, channels, or animated objects")
     direction = 1 if direction >= 0 else -1

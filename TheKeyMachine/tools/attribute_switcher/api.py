@@ -10,7 +10,7 @@ from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools.attribute_switcher.controller import (
     ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
     ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY,
-    ROTATE_ORDER_LIGHTNING_MODE_KEY,
+    SUPER_MODE_KEY,
 )
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
 from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
@@ -26,8 +26,8 @@ __all__ = [
     "set_euler_filter_enabled",
     "is_stay_on_top",
     "set_stay_on_top",
-    "is_rotate_order_lightning_enabled",
-    "set_rotate_order_lightning_enabled",
+    "is_super_mode_enabled",
+    "set_super_mode_enabled",
     "bind_attribute_switcher_toolbar_button",
 ]
 
@@ -59,11 +59,11 @@ def is_stay_on_top():
     )
 
 
-def is_rotate_order_lightning_enabled():
+def is_super_mode_enabled():
     """Return whether rotate order conversion uses the fast, math-only path.
 
     Off by default (Normal mode): the frame-by-frame, world-matrix-
-    preserving conversion that works with every rig. Lightning mode skips
+    preserving conversion that works with every rig. Super mode skips
     that for eligible controls and converts keyed rotations with pure
     Euler math instead, at the cost of automatically falling back to
     Normal for rigs it can't safely fast-path (animation layers, driven
@@ -71,17 +71,17 @@ def is_rotate_order_lightning_enabled():
     """
     return bool(
         settings.get_setting(
-            ROTATE_ORDER_LIGHTNING_MODE_KEY,
+            SUPER_MODE_KEY,
             False,
             namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
         )
     )
 
 
-def set_rotate_order_lightning_enabled(enabled):
-    """Switch the Attribute Switcher between Normal and Lightning rotate-order modes."""
+def set_super_mode_enabled(enabled):
+    """Switch the Attribute Switcher between Normal and Super modes."""
     settings.set_setting(
-        ROTATE_ORDER_LIGHTNING_MODE_KEY,
+        SUPER_MODE_KEY,
         bool(enabled),
         namespace=ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
     )
@@ -225,23 +225,30 @@ def set_stay_on_top(enabled):
         dlg.activateWindow()
 
 
-def _set_rotate_order_mode(checked, lightning):
+def _set_rotate_order_mode(checked, super_mode):
     # Checkable actions in an exclusive QActionGroup both re-emit their
     # toggle when the selection changes -- the one being unchecked as well
     # as the one being checked -- so only act on the action actually being
     # turned on.
     if checked:
-        set_rotate_order_lightning_enabled(lightning)
+        set_super_mode_enabled(super_mode)
 
 
 def _add_rotate_order_mode_actions(menu):
-    """Normal vs Lightning rotate-order conversion, as an exclusive choice."""
+    """Normal vs Super mode, as an exclusive choice.
+
+    Covers every switch the Attribute Switcher can apply, not just rotate
+    order: Super mode skips per-frame evaluation with pure math wherever
+    it's safe to do so (rotate order always; other switches only for plain,
+    default-pivot, non-joint transforms), falling back to Normal mode for
+    anything it can't safely fast-path.
+    """
     from TheKeyMachine.core import i18n
 
-    lightning_enabled = is_rotate_order_lightning_enabled()
+    super_mode_enabled = is_super_mode_enabled()
 
     section_label, _desc, _tooltip = i18n.localize_menu_action(
-        "rotate_order_section", __file__, "Rotate Order Conversion"
+        "rotate_order_section", __file__, "Switch Speed"
     )
     menu.addSection(section_label)
 
@@ -252,39 +259,39 @@ def _add_rotate_order_mode_actions(menu):
         "rotate_order_normal_mode",
         __file__,
         "Normal Mode",
-        description="Convert rotate order by preserving world orientation at every keyframe.",
-        tooltip="Slower, but safe for every rig -- including animation layers, driven keys, and expressions.",
+        description="Preserve world position and orientation by evaluating the scene at every keyframe.",
+        tooltip="Slower, but safe for every rig and every switchable attribute -- including animation layers, driven keys, expressions, and joints.",
     )
     normal_action = menu.addAction(
         normal_label,
         description=normal_description,
         tooltip=normal_tooltip,
         callback=toolCommon.mark_non_tool_action(
-            partial(_set_rotate_order_mode, lightning=False)
+            partial(_set_rotate_order_mode, super_mode=False)
         ),
     )
     normal_action.setCheckable(True)
-    normal_action.setChecked(not lightning_enabled)
+    normal_action.setChecked(not super_mode_enabled)
     group.addAction(normal_action)
 
-    lightning_label, lightning_description, lightning_tooltip = i18n.localize_menu_action(
+    super_label, super_description, super_tooltip = i18n.localize_menu_action(
         "rotate_order_lightning_mode",
         __file__,
         "Super Mode",
-        description="Convert rotate order with pure math on the keyed rotation values, skipping per-frame evaluation.",
-        tooltip="Much faster. Automatically falls back to Normal Mode for rigs it can't safely fast-path (animation layers, driven keys, expressions).",
+        description="Skip per-frame evaluation with pure math wherever it's safe to do so.",
+        tooltip="Much faster. Automatically falls back to Normal Mode for anything it can't safely fast-path (joints, custom pivots, animation layers, driven keys, expressions).",
     )
-    lightning_action = menu.addAction(
-        lightning_label,
-        description=lightning_description,
-        tooltip=lightning_tooltip,
+    super_action = menu.addAction(
+        super_label,
+        description=super_description,
+        tooltip=super_tooltip,
         callback=toolCommon.mark_non_tool_action(
-            partial(_set_rotate_order_mode, lightning=True)
+            partial(_set_rotate_order_mode, super_mode=True)
         ),
     )
-    lightning_action.setCheckable(True)
-    lightning_action.setChecked(lightning_enabled)
-    group.addAction(lightning_action)
+    super_action.setCheckable(True)
+    super_action.setChecked(super_mode_enabled)
+    group.addAction(super_action)
 
     return group
 

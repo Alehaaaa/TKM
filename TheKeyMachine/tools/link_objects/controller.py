@@ -304,7 +304,9 @@ def paste_relationship(*_args, tool_operation=None, anchor_widget=None, **_kwarg
     if not data:
         return False
 
-    target_info = animation_context.resolve_targets(default_mode="current_frame")
+    target_info = animation_context.resolve_tool_context(
+        default_mode="current_frame", include_channels=True
+    )
     time_context = target_info["time_context"]
     layer_context, created_layers = _relationship_paste_context(data)
     if time_context.mode in ("graph_editor_keys", "time_slider_range"):

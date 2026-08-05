@@ -23,6 +23,10 @@ def toggle_animation_recovery(*_args):
     return backgroundRunners.toggle_animation_recovery()
 
 
+def toggle_anim_layer_weights(*_args):
+    return backgroundRunners.toggle_anim_layer_weights()
+
+
 def turn_all_off(*_args):
     return backgroundRunners.turn_all_runners_off()
 

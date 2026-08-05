@@ -68,13 +68,15 @@ from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wu
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
 
 
-class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
+class SelectionSetCreationDialog(
+    customDialogs.ActivationAutoCloseMixin,
+    customDialogs.QFlatCloseableFloatingWidget,
+):
     def __init__(self, controller, parent=None, on_created=None, on_rejected=None):
         super().__init__(popup=False, parent=parent)
         self.controller = controller
         self.on_created = on_created
         self.on_rejected = on_rejected
-        self._opened = False
         self._completed = False
         self._selected_color = selectionSetsApi.SELECTION_COLORS.default
         self._color_buttons = {}
@@ -191,7 +193,6 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        self._opened = True
         self._compress_to_contents()
         self.place_near_cursor()
         QtCore.QTimer.singleShot(0, self._focus_name_field)
@@ -204,12 +205,6 @@ class SelectionSetCreationDialog(customDialogs.QFlatCloseableFloatingWidget):
         self.adjustSize()
         target_size = self.sizeHint().expandedTo(QtCore.QSize(self.minimumWidth(), 0))
         self.setFixedSize(target_size)
-
-    def changeEvent(self, event):
-        if event.type() == QtCore.QEvent.ActivationChange and self._opened and not self.isActiveWindow():
-            self.close()
-            return
-        super().changeEvent(event)
 
     def closeEvent(self, event):
         if not self._completed and callable(self.on_rejected):

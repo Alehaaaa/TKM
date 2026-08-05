@@ -125,8 +125,8 @@ def align_selected_objects(*_args, **kwargs):
                 )
                 set_keys = True
             else:
-                time_context = animation_context.resolve_targets(
-                    default_mode="current_frame"
+                time_context = animation_context.resolve_tool_context(
+                    default_mode="current_frame", include_channels=True
                 )["time_context"]
                 if time_context.mode in ("graph_editor_keys", "time_slider_range"):
                     frames = _target_keyframes_for_context(

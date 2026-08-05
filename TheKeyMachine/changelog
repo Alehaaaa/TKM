@@ -13,6 +13,15 @@
 # Rule: do not include repo housekeeping, docs, funding, metadata, or asset-only changes.
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
+# Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
+
+0.1.35:
+  - polish: Tool progress is steadier, more responsive, and less intrusive
+  - bugfix: Selection Sets and toolbar popups close reliably after losing focus
+  - bugfix: Smart Key and Snap Keys run faster while respecting Channel Box channels, highlighted ranges, and selected animation layers
+  - bugfix: World Space frame pastes keep timeline feedback and cleanup reliable
+  - new: Anim Layer Weights displays live layer-weight curves on the timeline
+  - changed: Anim Curve Tools share consistent targeting, concise feedback, and a tangent-aware key clipboard with channel remapping and relative pasting
 
 0.1.34:
   - bugfix: Tooltips, shortcuts, and right-click action menus (including Bake, Share Keys, and Remove Redundant Keys) stay translated after switching languages

@@ -32,6 +32,7 @@ from typing import Any, Optional
 
 _SLOTS: dict = {
     "animation":        ("copy_animation",  "copy_animation_data.json"),
+    "curve_keys":       ("copy_animation",  "curve_keys_data.json"),
     "pose":             ("copy_pose",        "copy_pose_data.json"),
     "selection_sets":   ("selection_sets",   "selection_sets_data.json"),
     "worldspace":       ("copy_worldspace", "copy_worldspace_data.json"),

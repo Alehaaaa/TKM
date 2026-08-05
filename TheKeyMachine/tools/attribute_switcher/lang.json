@@ -93,7 +93,7 @@
     },
     "rotate_order_section": {
         "en": {
-            "label": "Rotate Order Conversion"
+            "label": "Switch Speed"
         },
         "es": {
             "label": "Conversión de Orden de Rotación"
@@ -120,8 +120,8 @@
     "rotate_order_normal_mode": {
         "en": {
             "label": "Normal Mode",
-            "description": "Convert rotate order by preserving world orientation at every keyframe.",
-            "tooltip": "Slower, but safe for every rig -- including animation layers, driven keys, and expressions."
+            "description": "Preserve world position and orientation by evaluating the scene at every keyframe.",
+            "tooltip": "Slower, but safe for every rig and every switchable attribute -- including animation layers, driven keys, expressions, and joints."
         },
         "es": {
             "label": "Modo Normal",
@@ -162,8 +162,8 @@
     "rotate_order_lightning_mode": {
         "en": {
             "label": "Super Mode",
-            "description": "Convert rotate order with pure math on the keyed rotation values, skipping per-frame evaluation.",
-            "tooltip": "Much faster. Automatically falls back to Normal Mode for rigs it can't safely fast-path (animation layers, driven keys, expressions)."
+            "description": "Skip per-frame evaluation with pure math wherever it's safe to do so.",
+            "tooltip": "Much faster. Automatically falls back to Normal Mode for anything it can't safely fast-path (joints, custom pivots, animation layers, driven keys, expressions)."
         },
         "es": {
             "label": "Modo Súper",

@@ -299,6 +299,56 @@
             ]
         }
     },
+    "background_runner_anim_layer_weights": {
+        "en": {
+            "label": "Anim Layer Weights",
+            "tooltip": [
+                "Toggle a timeline overlay plotting animation-layer weight curves; muted layers show dimmed and dashed."
+            ]
+        },
+        "es": {
+            "label": "Pesos de Capas de Animación",
+            "tooltip": [
+                "Activa o desactiva una superposición en la línea de tiempo que muestra las curvas de peso de las capas de animación; las capas silenciadas se muestran atenuadas y discontinuas."
+            ]
+        },
+        "fr": {
+            "label": "Poids des Calques d'Animation",
+            "tooltip": [
+                "Active ou désactive une superposition sur la timeline affichant les courbes de poids des calques d'animation ; les calques muets s'affichent atténués et en pointillés."
+            ]
+        },
+        "ca": {
+            "label": "Pesos de Capes d'Animació",
+            "tooltip": [
+                "Activa o desactiva una superposició a la línia de temps que mostra les corbes de pes de les capes d'animació; les capes silenciades es mostren atenuades i discontínues"
+            ]
+        },
+        "zh": {
+            "label": "动画层权重",
+            "tooltip": [
+                "切换在时间线上叠加显示动画层权重曲线;静音的层以变暗虚线显示"
+            ]
+        },
+        "ja": {
+            "label": "アニメーションレイヤーのウェイト",
+            "tooltip": [
+                "アニメーションレイヤーのウェイトカーブをタイムラインに重ねて表示するかを切り替えます。ミュートされたレイヤーは暗く破線で表示されます"
+            ]
+        },
+        "ko": {
+            "label": "애니메이션 레이어 가중치",
+            "tooltip": [
+                "애니메이션 레이어 가중치 커브를 타임라인에 오버레이 표시할지 전환합니다. 음소거된 레이어는 어둡게 점선으로 표시됩니다"
+            ]
+        },
+        "ar": {
+            "label": "أوزان طبقات الحركة",
+            "tooltip": [
+                "تبديل تراكب على الجدول الزمني يعرض منحنيات وزن طبقات الحركة؛ تظهر الطبقات المكتومة داكنة ومتقطعة"
+            ]
+        }
+    },
     "background_runner_tools": {
         "en": {
             "label": "Background Runners"

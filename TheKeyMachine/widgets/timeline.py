@@ -1,9 +1,12 @@
+from contextlib import contextmanager
 from dataclasses import dataclass
+import math
 
 from maya import cmds, OpenMayaUI as omui
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
+from TheKeyMachine.core import maya_version
 import TheKeyMachine.core.runtimeManager as runtime
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.data.colors import COLORS
@@ -60,6 +63,15 @@ def get_animation_data_timerange(animation_data, frame_key="keyframes"):
 
 _active_frame_picker = None
 FRAME_PICKER_COLOR = (235, 235, 235, 125)
+_TIME_SLIDER_UPDATE_DEPTH = 0
+def _set_native_selected_range(start_frame, end_frame):
+    """Set the visible range endpoints through Maya's native 2024+ API."""
+    cmds.playbackOptions(
+        edit=True,
+        selectionStartTime=start_frame,
+        selectionEndTime=end_frame,
+        selectionVisible=True,
+    )
 
 
 class TimelineFramePicker(QtCore.QObject):
@@ -246,23 +258,35 @@ def begin_frame_picker(
     return _active_frame_picker
 
 
-def resolve_time_context(default_mode="all_animation"):
-    graph_editor_frames = selectionMod.get_graph_editor_selected_frames()
+def resolve_time_context(default_mode="all_animation", graph_frames=None):
+    time_slider_range = selectionMod.get_selected_time_slider_range()
+    if time_slider_range:
+        start_frame, end_frame = time_slider_range
+        first_whole = int(math.ceil(start_frame))
+        last_whole = int(math.floor(end_frame))
+        selected_frames = (
+            tuple(range(first_whole, last_whole + 1))
+            if last_whole >= first_whole
+            else (start_frame, end_frame)
+        )
+        return TimeContext(
+            mode="time_slider_range",
+            start_frame=start_frame,
+            end_frame=end_frame,
+            frames=selected_frames,
+        )
+
+    graph_editor_frames = (
+        selectionMod.get_graph_editor_selected_frames()
+        if graph_frames is None
+        else sorted(set(float(frame) for frame in graph_frames))
+    )
     if graph_editor_frames:
         return TimeContext(
             mode="graph_editor_keys",
             start_frame=graph_editor_frames[0],
             end_frame=graph_editor_frames[-1],
             frames=tuple(graph_editor_frames),
-        )
-
-    time_slider_range = selectionMod.get_selected_time_slider_range()
-    if time_slider_range:
-        return TimeContext(
-            mode="time_slider_range",
-            start_frame=time_slider_range[0],
-            end_frame=time_slider_range[1],
-            frames=tuple(range(time_slider_range[0], time_slider_range[1] + 1)),
         )
 
     if default_mode == "current_frame":
@@ -278,10 +302,203 @@ def resolve_time_context(default_mode="all_animation"):
     )
 
 
+def _time_slider_input_context():
+    app = QtWidgets.QApplication.instance()
+    slider = TimelineTint.get_timeline_widget()
+    if not app or not slider or slider.width() <= 0:
+        return None
+
+    playback_start = float(cmds.playbackOptions(query=True, minTime=True))
+    playback_end = float(cmds.playbackOptions(query=True, maxTime=True))
+    span = playback_end - playback_start + 1.0
+    if span <= 0:
+        return None
+
+    width = float(slider.width())
+    step = (width - (width * 0.01)) / span
+
+    def position(frame):
+        x = int((float(frame) - playback_start) * step + (width * 0.005))
+        return QtCore.QPoint(x, int(slider.height() / 2.0))
+
+    return app, slider, playback_start, playback_end, position
+
+
+def _send_time_slider_mouse_event(app, slider, event_type, position, button, buttons, modifier):
+    event = QtGui.QMouseEvent(event_type, position, button, buttons, modifier)
+    app.sendEvent(slider, event)
+
+
+@contextmanager
+def suspend_time_slider_updates():
+    """Prevent intermediate time-slider redraws and restore its prior state."""
+    global _TIME_SLIDER_UPDATE_DEPTH
+    if _TIME_SLIDER_UPDATE_DEPTH:
+        _TIME_SLIDER_UPDATE_DEPTH += 1
+        try:
+            yield
+        finally:
+            _TIME_SLIDER_UPDATE_DEPTH -= 1
+        return
+
+    _TIME_SLIDER_UPDATE_DEPTH = 1
+    slider_name = None
+    was_managed = True
+    manage_changed = False
+    refresh_suspended = False
+    try:
+        slider_name = selectionMod.get_playback_slider()
+        cmds.refresh(suspend=True)
+        refresh_suspended = True
+        queried_state = cmds.timeControl(slider_name, query=True, manage=True)
+        if queried_state is not None:
+            was_managed = bool(queried_state)
+        cmds.timeControl(slider_name, edit=True, manage=False)
+        manage_changed = True
+        yield
+    finally:
+        try:
+            if manage_changed and slider_name:
+                cmds.timeControl(slider_name, edit=True, manage=was_managed)
+        finally:
+            if refresh_suspended:
+                cmds.refresh(suspend=False)
+            _TIME_SLIDER_UPDATE_DEPTH = 0
+
+
+def _restore_current_frame(current_frame, playback_start):
+    """Force Maya to repaint its range without leaving the playhead displaced."""
+    if cmds.currentTime(query=True) == current_frame:
+        return
+    adjacent_frame = current_frame - 1 if current_frame > playback_start else current_frame + 1
+    cmds.currentTime(adjacent_frame, edit=True)
+    cmds.currentTime(current_frame, edit=True)
+
+
+def _clear_selected_range_input(context, selected_range):
+    app, slider, playback_start, playback_end, position = context
+    if selected_range:
+        start_frame, end_frame = selected_range
+        space_before = start_frame - playback_start
+        space_after = playback_end - end_frame
+        clear_frame = (
+            end_frame + (space_after * 0.5)
+            if space_after >= space_before
+            else playback_start + (space_before * 0.5)
+        )
+    else:
+        clear_frame = cmds.currentTime(query=True)
+
+    clear_position = position(clear_frame)
+    for event_type, button, buttons in (
+        (QtCore.QEvent.MouseButtonPress, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton),
+        (QtCore.QEvent.MouseButtonRelease, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton),
+    ):
+        _send_time_slider_mouse_event(
+            app, slider, event_type, clear_position, button, buttons, QtCore.Qt.NoModifier
+        )
+
+
+def clear_selected_range():
+    """Clear the highlighted time-slider range without changing object selection."""
+    if maya_version.supports_playback_selection():
+        cmds.playbackOptions(edit=True, selectionVisible=False)
+        return True
+
+    context = _time_slider_input_context()
+    if not context:
+        return False
+
+    current_frame = cmds.currentTime(query=True)
+    selected_range = selectionMod.get_selected_time_slider_range()
+    with suspend_time_slider_updates():
+        _clear_selected_range_input(context, selected_range)
+        context[0].processEvents()
+        playback_start = context[2]
+        _restore_current_frame(current_frame, playback_start)
+    return True
+
+
+def move_selected_range(offset):
+    """Move the existing highlighted range without changing object selection."""
+    try:
+        offset = float(offset)
+    except (TypeError, ValueError):
+        return False
+    if not offset:
+        return False
+
+    if maya_version.supports_playback_selection():
+        if not cmds.playbackOptions(query=True, selectionVisible=True):
+            return False
+        start_frame = cmds.playbackOptions(query=True, selectionStartTime=True)
+        end_frame = cmds.playbackOptions(query=True, selectionEndTime=True)
+        cmds.playbackOptions(
+            edit=True,
+            selectionStartTime=start_frame + offset,
+            selectionEndTime=end_frame + offset,
+            selectionVisible=True,
+        )
+        return True
+
+    selected_range = selectionMod.get_selected_time_slider_range()
+    if not selected_range:
+        return False
+    start_frame, end_frame = selected_range
+    moved_start = start_frame + offset
+    moved_end = end_frame + offset
+    return select_time_slider_range((moved_start, moved_end))
+
+
+def select_time_slider_range(frames):
+    """Highlight the inclusive range covered by ``frames`` on Maya's time slider."""
+    frames = list(frames or [])
+    if not frames:
+        return False
+
+    start_frame, end_frame = min(frames), max(frames)
+    if maya_version.supports_playback_selection():
+        _set_native_selected_range(start_frame, end_frame)
+        return True
+
+    context = _time_slider_input_context()
+    if not context:
+        return False
+    app, slider, playback_start, _playback_end, position = context
+
+    start_position = position(start_frame + 1)
+    # Maya reports rangeArray's end one frame past the inclusive selection.
+    end_position = position(end_frame + 1)
+    current_frame = cmds.currentTime(query=True)
+
+    with suspend_time_slider_updates():
+        _clear_selected_range_input(context, (start_frame, end_frame))
+        # Maya caches the time-slider hover position as its drag origin.
+        # Prime it explicitly so backward drags do not retain the old end.
+        _send_time_slider_mouse_event(
+            app, slider, QtCore.QEvent.MouseMove, start_position,
+            QtCore.Qt.NoButton, QtCore.Qt.NoButton, QtCore.Qt.ShiftModifier,
+        )
+        _send_time_slider_mouse_event(
+            app, slider, QtCore.QEvent.MouseButtonPress, start_position,
+            QtCore.Qt.LeftButton, QtCore.Qt.LeftButton, QtCore.Qt.ShiftModifier,
+        )
+        _send_time_slider_mouse_event(
+            app, slider, QtCore.QEvent.MouseMove, end_position,
+            QtCore.Qt.LeftButton, QtCore.Qt.LeftButton, QtCore.Qt.ShiftModifier,
+        )
+        _send_time_slider_mouse_event(
+            app, slider, QtCore.QEvent.MouseButtonRelease, end_position,
+            QtCore.Qt.LeftButton, QtCore.Qt.LeftButton, QtCore.Qt.ShiftModifier,
+        )
+        app.processEvents()
+        _restore_current_frame(current_frame, playback_start)
+    return True
+
+
 def clear_time_slider_selection():
-    """Clear Maya's highlighted time range without changing object selection."""
-    selected_objects = selectionMod.get_selected_objects()
-    cmds.select(selected_objects, replace=True) if selected_objects else cmds.select(clear=True)
+    """Backward-compatible alias for :func:`clear_selected_range`."""
+    return clear_selected_range()
 
 
 class TimelineTint(QtWidgets.QWidget):

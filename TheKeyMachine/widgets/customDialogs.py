@@ -1170,28 +1170,54 @@ class QFlatToolBarDialog(QFlatFloatingWidget):
         self.mainLayout.addLayout(title_layout)
 
 
-class QFlatToolBarPopupDialog(QFlatToolBarDialog):
+class ActivationAutoCloseMixin:
+    """Close a transient window only after it has genuinely been active.
+
+    Qt can emit ``ActivationChange`` while window flags are being configured
+    and while a hidden widget is being constructed.  Those events are not
+    user-driven deactivation and must never arm auto-close.
+    """
+
+    _activation_auto_close_enabled = True
+
+    def showEvent(self, event):
+        self._activation_auto_close_armed = False
+        super().showEvent(event)
+
+    def changeEvent(self, event):
+        if (
+            self._activation_auto_close_enabled
+            and event.type() == QtCore.QEvent.ActivationChange
+        ):
+            should_close = False
+            if self.isVisible():
+                if self.isActiveWindow():
+                    self._activation_auto_close_armed = True
+                else:
+                    should_close = getattr(
+                        self, "_activation_auto_close_armed", False
+                    )
+
+            super().changeEvent(event)
+            if should_close:
+                self.close()
+            return
+
+        super().changeEvent(event)
+
+
+class QFlatToolBarPopupDialog(ActivationAutoCloseMixin, QFlatToolBarDialog):
     """
     Toolbar-style popup dialog that closes after activation changes.
     """
 
     def __init__(self, parent=None, native_popup=False, *args, **kwargs):
         self._native_popup = bool(native_popup)
-        self._opened = False
+        self._activation_auto_close_enabled = not self._native_popup
+        self._activation_auto_close_armed = False
         super().__init__(parent=parent, *args, **kwargs)
         if self._native_popup:
             self.setWindowFlags(QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
-
-    def changeEvent(self, event):
-        if self._native_popup:
-            super().changeEvent(event)
-            return
-        if event.type() == QtCore.QEvent.ActivationChange:
-            if self._opened:
-                self.close()
-            self._opened = True
-            return
-        super().changeEvent(event)
 
 
 class QFlatPinnableToolBarPopupDialog(QFlatToolBarPopupDialog):
@@ -1232,7 +1258,7 @@ class QFlatPinnableToolBarPopupDialog(QFlatToolBarPopupDialog):
         """Restore transient or pinned presentation when reusing the window."""
         self._popup = bool(popup)
         self._pinned = not popup
-        self._opened = False
+        self._activation_auto_close_armed = False
         self._refresh_action_bar()
 
     def _pin_after_reposition(self):

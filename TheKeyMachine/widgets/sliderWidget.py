@@ -7,6 +7,7 @@ import traceback
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 import TheKeyMachine.mods.reportMod as report
+from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.util as wutil
 import TheKeyMachine.widgets.customWidgets as cw
 import TheKeyMachine.mods.settingsMod as settings
@@ -32,6 +33,15 @@ No A/B picks. Context menu on right-click.
 SLIDER_HANDLE_NEUTRAL_HEX = "#444444"
 SLIDER_VALUE_TEXT_HEX = "#747474"
 SLIDER_FRAME_BUTTON_COLOR = "#d7d7d7"
+
+# How long a single live drag-tick is allowed to take before this slider
+# gives up on per-move ("autorefresh") updates and falls back to applying
+# once on release. Higher than tools/common.py's general
+# SlowOperationGuard default (150ms) on purpose -- a slider tick is
+# expected to be quick but occasionally janky mouse-move bursts shouldn't
+# be enough to bump a drag into post-release mode; only a genuinely slow
+# command should.
+SLIDER_SLOW_UPDATE_MS = 1000
 
 
 def _slider_button_variant(value):
@@ -816,6 +826,11 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
         self._sessionFactory = sessionFactory
         self._sliderSession = None
         self._drag_active = False
+        self._suspend_auto_update = False
+        # Shared with tool_operation()'s threaded-execution model: one
+        # definition of "this tick was too slow" instead of an ad hoc timer
+        # here -- see tools/common.py's SlowOperationGuard.
+        self._slow_update_guard = toolCommon.SlowOperationGuard(threshold_ms=SLIDER_SLOW_UPDATE_MS)
         self._framePicker = None
         self._pickedFrames = {}
 
@@ -1512,6 +1527,7 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
         self._cancel_frame_picker()
         self._finish_active_session()
         self._suspend_auto_update = False
+        self._slow_update_guard.reset()
         try:
             if self._start_slider_interaction(preview=True) is None:
                 return
@@ -1685,15 +1701,17 @@ class QFlatSliderWidget(cw.TooltipMixin, QtWidgets.QWidget):
         if session is None:
             return
 
-        timer = QtCore.QElapsedTimer()
-        timer.start()
+        with self._slow_update_guard.measure():
+            try:
+                self._dragCommand(session.mode, value, session=session)
+            except Exception as exc:
+                self._on_drag_error(exc)
 
-        try:
-            self._dragCommand(session.mode, value, session=session)
-        except Exception as exc:
-            self._on_drag_error(exc)
-
-        if timer.elapsed() >= 150:
+        if self._slow_update_guard.is_slow:
+            # This tick (or an earlier one this drag) was slow enough that
+            # live per-move updates can't keep up -- stop calling the drag
+            # command on every move and switch to post-release refresh: the
+            # value still applies once, on drag finish (_commit_slider_value).
             self._suspend_auto_update = True
 
     def _commit_slider_value(self, value: float, require_existing_session: bool = False):

@@ -35,6 +35,10 @@ def toggle_animation_recovery(*args):
     return controller.toggle_animation_recovery(*args)
 
 
+def toggle_anim_layer_weights(*args):
+    return controller.toggle_anim_layer_weights(*args)
+
+
 def turn_all_off(*args):
     return controller.turn_all_off(*args)
 

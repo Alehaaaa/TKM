@@ -24,6 +24,13 @@ class OperationPolicy:
     progress: bool = True
     undo: bool = True
     suspend_refresh: bool = False
+    preserve_time_selection: bool = False
+    # Opt-in only: running a callback's normal (untouched) body on a worker
+    # thread would call cmds/OpenMaya off the main thread and can crash
+    # Maya. Only set this True for a callback that's been migrated to route
+    # every Maya API call through the tool_operation it receives (see
+    # tools/common.py's ToolOperation.run_on_main / run_on_worker_thread).
+    threaded: bool = False
 
 
 def _policy_from_definition(command_name: str, definition, callback: Optional[Callable] = None) -> OperationPolicy:
@@ -33,6 +40,10 @@ def _policy_from_definition(command_name: str, definition, callback: Optional[Ca
             progress=bool(explicit.get("progress", True)),
             undo=bool(explicit.get("undo", True)),
             suspend_refresh=bool(explicit.get("suspend_refresh", False)),
+            preserve_time_selection=bool(
+                explicit.get("preserve_time_selection", False)
+            ),
+            threaded=bool(explicit.get("threaded", False)),
         )
     if getattr(callback, "_tkm_non_tool_action", False):
         return OperationPolicy(progress=False, undo=False)
@@ -87,11 +98,20 @@ def _make_dispatched_command(name: str, callback: Callable) -> Callable:
             progress=policy.progress,
             undo=policy.undo,
             suspend_refresh=policy.suspend_refresh,
+            preserve_time_selection=policy.preserve_time_selection,
         ) as operation:
             call_kwargs = dict(kwargs)
             call_kwargs.setdefault("anchor_widget", anchor_widget)
             call_kwargs.setdefault("tool_operation", operation)
-            return callback(*args, **_supported_callback_kwargs(callback, call_kwargs))
+            call_kwargs = _supported_callback_kwargs(callback, call_kwargs)
+            if policy.threaded:
+                # Runs callback on a worker thread so the main thread's Qt
+                # event loop stays free to dispatch the progress bar's
+                # Cancel click while callback is working -- see
+                # tools/common.py's run_on_worker_thread for the mechanics
+                # and the thread-safety contract this callback must honor.
+                return toolCommon.run_on_worker_thread(callback, *args, **call_kwargs)
+            return callback(*args, **call_kwargs)
 
     _dispatch.__name__ = name
     _dispatch._tkm_tool_dispatch = True
@@ -270,7 +290,11 @@ def register_slider_mode(prefix: str, mode: str) -> None:
     if execute is None:
         raise ValueError("Unknown slider type: {}".format(prefix))
     for value in SLIDER_BUTTON_VALUES:
-        register_command(slider_command_name(prefix, mode, value), _slider_callback(execute, mode, value))
+        register_command(
+            slider_command_name(prefix, mode, value),
+            _slider_callback(execute, mode, value),
+            policy=OperationPolicy(progress=False, undo=False),
+        )
 
 
 def slider_command_name(prefix: str, mode: str, value: int = 0) -> str:

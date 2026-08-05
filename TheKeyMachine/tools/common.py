@@ -1,7 +1,9 @@
 from contextlib import contextmanager
 from functools import lru_cache
 import inspect
+import threading
 import time
+import traceback
 import warnings
 
 import maya.cmds as cmds  # type: ignore
@@ -104,6 +106,98 @@ def format_eta(seconds):
     return "{} {} {} {} left".format(hours, hour_unit, minutes, minute_unit)
 
 
+def _quantize_eta_seconds(seconds):
+    """Round a raw remaining-time estimate to a "round" display value.
+
+    A countdown that ticks 47s, 46s, 44s, 39s, 41s... reads as broken even
+    when the underlying estimate is reasonable -- people expect a steady,
+    coarse number, not an exact one. Coarser buckets the longer the
+    remaining time is, since precision that far out is noise anyway.
+    """
+    seconds = max(0.0, float(seconds))
+    if seconds < 10:
+        step = 1
+    elif seconds < 60:
+        step = 5
+    else:
+        step = 15
+    return step * round(seconds / step)
+
+
+class _EtaEstimator(object):
+    """Turns noisy per-step timing into a steady remaining-time prediction.
+
+    ``AdaptiveProgress`` used to recompute "elapsed / done * remaining"
+    from scratch on every status refresh. That ratio is exact but swings
+    wildly step to step (one slightly slow or fast item shifts the whole
+    projection), which is what made the ETA fluctuate enough to feel
+    useless. This keeps an exponentially smoothed seconds-per-unit rate
+    instead of the raw instantaneous one, and only lets the *displayed*
+    number change when it's actually moved meaningfully or enough time has
+    passed -- a steady prediction rather than a live-recalculated one.
+    """
+
+    # Weight given to each new sample when smoothing the rate. Low enough
+    # that a single unusually slow/fast step barely nudges the estimate.
+    _RATE_SMOOTHING = 0.2
+    # Don't refresh the displayed number more often than this even if the
+    # underlying estimate keeps moving -- caps how "live" it looks.
+    _MIN_REFRESH_MS = 1000
+
+    def __init__(self):
+        self._rate_per_unit = None
+        self._last_sampled_value = None
+        self._displayed_seconds = None
+        self._last_refresh_ms = -1
+
+    def reset(self):
+        self._rate_per_unit = None
+        self._last_sampled_value = None
+        self._displayed_seconds = None
+        self._last_refresh_ms = -1
+
+    def estimate(self, elapsed_ms, value, max_value):
+        """Return a steady remaining-seconds figure, or None if not ready."""
+        if not value or not max_value or value >= max_value:
+            return None
+
+        elapsed_seconds = max(0.001, elapsed_ms / 1000.0)
+        # _status_text() (and therefore this) gets called both when value
+        # actually advances (step()) and on the plain polling timer
+        # (_poll_status(), on a fixed interval regardless of progress). Only
+        # take a new rate sample when value has moved since the last one --
+        # otherwise a stall between steps would look like "still working at
+        # a slower and slower rate" every single poll tick and drag the
+        # smoothed rate around on timing noise rather than real work.
+        if value != self._last_sampled_value:
+            instantaneous_rate = elapsed_seconds / float(value)
+            if self._rate_per_unit is None:
+                self._rate_per_unit = instantaneous_rate
+            else:
+                self._rate_per_unit += self._RATE_SMOOTHING * (
+                    instantaneous_rate - self._rate_per_unit
+                )
+            self._last_sampled_value = value
+
+        if self._rate_per_unit is None:
+            return None
+        remaining = self._rate_per_unit * max(0, max_value - value)
+
+        displayed = self._displayed_seconds
+        stale = (
+            displayed is None
+            or elapsed_ms - self._last_refresh_ms >= self._MIN_REFRESH_MS
+        )
+        moved_enough = displayed is not None and abs(remaining - displayed) >= max(
+            2.0, displayed * 0.2
+        )
+        if stale or moved_enough:
+            displayed = _quantize_eta_seconds(remaining)
+            self._displayed_seconds = displayed
+            self._last_refresh_ms = elapsed_ms
+        return displayed
+
+
 class AdaptiveProgress(object):
     def __init__(
         self,
@@ -124,6 +218,7 @@ class AdaptiveProgress(object):
         self.update_interval_ms = max(100, int(update_interval_ms or 1000))
         self.estimated_seconds = float(estimated_seconds) if estimated_seconds else None
         self.value = 0
+        self._eta = _EtaEstimator()
         self._bar = None
         self._active = False
         self._finished = False
@@ -149,6 +244,7 @@ class AdaptiveProgress(object):
         if reset:
             self.value = 0
             self._timer.restart()
+            self._eta.reset()
         elif self.max_value:
             self.value = min(self.value, self.max_value)
         if self._active and self._bar:
@@ -249,9 +345,8 @@ class AdaptiveProgress(object):
             # from the first frame instead of a placeholder that implies an
             # open-ended wait most operations never actually have.
             if self.value > 0:
-                elapsed_seconds = max(0.001, self._timer.elapsed() / 1000.0)
-                remaining = (elapsed_seconds / float(self.value)) * max(0, self.max_value - self.value)
-                eta = format_eta(remaining)
+                remaining = self._eta.estimate(self._timer.elapsed(), self.value, self.max_value)
+                eta = format_eta(remaining) if remaining is not None else ""
                 if eta:
                     return "{}... about {}".format(title, eta)
             return "{}... {}/{}".format(title, self.value, self.max_value)
@@ -262,7 +357,10 @@ class AdaptiveProgress(object):
         # actually passed that a bare label would look stuck.
         elapsed_seconds = max(0.0, self._timer.elapsed() / 1000.0)
         if self.estimated_seconds and self.estimated_seconds > elapsed_seconds:
-            eta = format_eta(self.estimated_seconds - elapsed_seconds)
+            # A fixed prior estimate counting straight down is already
+            # steady (nothing here is being recomputed from live samples);
+            # just quantize it so it doesn't tick by exact seconds either.
+            eta = format_eta(_quantize_eta_seconds(self.estimated_seconds - elapsed_seconds))
             if eta:
                 return "{}... about {}".format(title, eta)
         if elapsed_seconds >= 1.0:
@@ -416,6 +514,191 @@ def suspend_maya_refresh(enabled=True):
         _release_refresh_suspension(acquired)
 
 
+# --- threaded tool operations -------------------------------------------------
+#
+# A synchronous tool that loops over Maya cmds calls on the main thread never
+# gives Qt a chance to dispatch a queued Cancel click on the progress bar
+# until the loop itself pauses to check -- so cancellation can be "checked"
+# every step and still not actually register in time. Running the callback
+# on a worker thread instead keeps the main thread's event loop free the
+# entire time the tool is working, so a Cancel press gets processed (and
+# operation.cancelled reflects it) immediately instead of only between
+# batches.
+#
+# Maya's cmds/OpenMaya API is not safe to call from a non-main thread, so a
+# threaded callback can't just keep calling cmds directly -- every actual
+# scene edit has to hop back onto the main thread via
+# ToolOperation.run_on_main(). This is opt-in per tool (see
+# core/trigger.py's OperationPolicy.threaded): a callback that hasn't been
+# migrated to route its Maya calls through run_on_main() must not be marked
+# threaded, or it will call cmds off the main thread and can crash Maya.
+
+_MAIN_THREAD_MARSHAL = None
+
+
+class _MainThreadMarshal(QtCore.QObject):
+    """Runs a callable on the main/GUI thread and blocks the caller for it.
+
+    Instantiated once, lazily, the first time it's needed -- always from the
+    main thread (tool_operation() only ever starts from a UI action), so its
+    own affinity is correct without an explicit moveToThread().
+    """
+
+    _request = QtCore.Signal(object)
+
+    def __init__(self):
+        super().__init__()
+        self._request.connect(self._run, QtCore.Qt.QueuedConnection)
+
+    def _run(self, job):
+        fn, args, kwargs, event, box = job
+        try:
+            box["value"] = fn(*args, **kwargs)
+        except Exception as exc:
+            # Printed here, at the true point of failure on the main
+            # thread, since the exception re-raised on the worker thread
+            # below will only show the marshal round trip in its own
+            # traceback, not where inside fn it actually broke.
+            print(traceback.format_exc())
+            box["error"] = exc
+        finally:
+            event.set()
+
+    def call(self, fn, *args, **kwargs):
+        if QtCore.QThread.currentThread() is self.thread():
+            # Already on the main thread (e.g. a threaded=True tool whose
+            # callback also has a non-threaded code path) -- run inline,
+            # no round trip, no risk of deadlocking on our own event loop.
+            return fn(*args, **kwargs)
+
+        event = threading.Event()
+        box = {}
+        self._request.emit((fn, args, kwargs, event, box))
+        event.wait()
+        if "error" in box:
+            raise box["error"]
+        return box.get("value")
+
+
+def _get_main_thread_marshal():
+    global _MAIN_THREAD_MARSHAL
+    if _MAIN_THREAD_MARSHAL is None:
+        _MAIN_THREAD_MARSHAL = _MainThreadMarshal()
+    return _MAIN_THREAD_MARSHAL
+
+
+class _ToolWorkerThread(QtCore.QThread):
+    """Runs one callable off the GUI thread and reports back via signals."""
+
+    succeeded = QtCore.Signal(object)
+    failed = QtCore.Signal(object)
+
+    def __init__(self, fn, args, kwargs, parent=None):
+        super().__init__(parent)
+        self._fn = fn
+        self._args = args
+        self._kwargs = kwargs
+
+    def run(self):
+        try:
+            result = self._fn(*self._args, **self._kwargs)
+        except Exception as exc:
+            self.failed.emit((exc, traceback.format_exc()))
+            return
+        self.succeeded.emit(result)
+
+
+def run_on_worker_thread(fn, *args, **kwargs):
+    """Run ``fn`` on a worker thread; block the caller without blocking Qt.
+
+    From the caller's point of view this behaves like calling ``fn``
+    directly -- it returns fn's result, or re-raises its exception, once
+    fn has finished. The difference is that a local QEventLoop, not the
+    call stack, is what's waiting: the main thread's event loop keeps
+    running (painting, dispatching a progress bar Cancel click) the whole
+    time fn executes elsewhere.
+
+    ``fn`` must not call Maya's cmds/OpenMaya API directly -- it should
+    route those calls through the ``tool_operation`` it was handed (see
+    ToolOperation.run_on_main), which marshals them back onto this thread.
+    """
+    worker = _ToolWorkerThread(fn, args, kwargs)
+    loop = QtCore.QEventLoop()
+    outcome = {}
+
+    def _on_succeeded(result):
+        outcome["value"] = result
+        loop.quit()
+
+    def _on_failed(payload):
+        outcome["error"] = payload
+        loop.quit()
+
+    worker.succeeded.connect(_on_succeeded)
+    worker.failed.connect(_on_failed)
+    worker.start()
+    loop.exec_()
+    worker.wait()
+    worker.deleteLater()
+
+    if "error" in outcome:
+        exc, traceback_text = outcome["error"]
+        print(traceback_text)
+        raise exc
+    return outcome.get("value")
+
+
+# Tool progress stays invisible for quick actions and only opens once an
+# operation has run long enough for progress and ETA feedback to be useful.
+PROGRESS_SHOW_DELAY_MS = 150
+
+
+# Shared "is this taking too long" heuristic. Long operations use threading
+# to stay responsive while they run; interactive
+# controls that call some per-tick command on every input event (sliders
+# today) can't thread their way out of a slow tick the same way -- there's
+# nothing to cancel mid-tick -- so instead they fall back from applying
+# every tick live ("autorefresh") to applying once on release
+# ("post-release refresh") the moment a tick stops keeping up. One
+# threshold/one guard class for that decision, shared by every control that
+# needs it, instead of each reimplementing its own elapsed-time check.
+SLOW_OPERATION_MS = 150
+
+
+class SlowOperationGuard(object):
+    """Detects when repeated live updates have gotten too slow to keep live.
+
+    Usage: create one per interaction (e.g. per slider drag), call
+    ``reset()`` when the interaction starts, and wrap each live-update tick
+    in ``with guard.measure(): ...``. Once any tick is slow, ``is_slow``
+    latches True for the rest of the interaction -- a command that's slow
+    once tends to be slow again (same busy scene, same heavy rig), and
+    flipping live updates back on mid-interaction would be a worse surprise
+    than staying in post-release mode for the rest of it.
+    """
+
+    def __init__(self, threshold_ms=SLOW_OPERATION_MS):
+        self.threshold_ms = threshold_ms
+        self._is_slow = False
+
+    def reset(self):
+        self._is_slow = False
+
+    @property
+    def is_slow(self):
+        return self._is_slow
+
+    @contextmanager
+    def measure(self):
+        timer = QtCore.QElapsedTimer()
+        timer.start()
+        try:
+            yield
+        finally:
+            if timer.elapsed() >= self.threshold_ms:
+                self._is_slow = True
+
+
 class ToolOperation(object):
     def __init__(self, tool_id=None, label=None, progress=None, tint_session=None, anchor_widget=None):
         self.tool_id = tool_id
@@ -428,35 +711,79 @@ class ToolOperation(object):
         self.timerange = None
         self.success_message = None
         self.refresh_suspended = False
+        self.preserved_time_selection = None
 
     @property
     def cancelled(self):
+        # A plain bool read -- safe from a threaded operation's worker
+        # thread without marshaling. It's kept current by AdaptiveProgress's
+        # own main-thread timer/step polling regardless of which thread
+        # this property is read from.
         progress = self.progress
         return bool(progress and progress.cancelled)
+
+    def run_on_main(self, fn, *args, **kwargs):
+        """Run ``fn`` on the main thread and return its result.
+
+        A threaded tool's callback (see core/trigger.py's
+        OperationPolicy.threaded / common.run_on_worker_thread) must route
+        every Maya cmds/OpenMaya call through this -- Maya's API is not
+        safe to call directly from the worker thread the callback runs on.
+        Safe and cheap to call unconditionally: when already on the main
+        thread it just calls ``fn`` inline, no round trip.
+        """
+        return _get_main_thread_marshal().call(fn, *args, **kwargs)
 
     def step(self, amount=1, status=None, exact_status=None):
         if not self.progress:
             return False
-        return self.progress.step(amount=amount, status=status, exact_status=exact_status)
+        return self.run_on_main(
+            self.progress.step,
+            amount=amount,
+            status=status,
+            exact_status=exact_status,
+        )
 
     def start(self):
         if self.progress:
-            self.progress.start()
+            self.run_on_main(self.progress.start)
 
     def set_total(self, total, reset=False):
         if self.progress:
-            self.progress.set_total(total, reset=reset)
+            self.run_on_main(self.progress.set_total, total, reset=reset)
         return self
 
     def set_status(self, status, exact=False):
         if self.progress:
-            self.progress.set_status(status, exact=exact)
+            self.run_on_main(self.progress.set_status, status, exact=exact)
         return self
 
     def iterate(self, iterable, total=None, status=None):
+        """Yield work items and advance once after each completed item.
+
+        Implemented here (rather than delegating to
+        ``AdaptiveProgress.iterate()``) so every step goes through
+        ``run_on_main``/``cancelled`` above and stays safe to drive from a
+        threaded operation's worker thread, not just the main thread.
+        """
         if not self.progress:
-            return iter(iterable)
-        return self.progress.iterate(iterable, total=total, status=status)
+            for item in iterable:
+                yield item
+            return
+        if total is None:
+            try:
+                total = len(iterable)
+            except (TypeError, AttributeError):
+                total = None
+        if total is not None:
+            self.set_total(total)
+        if status:
+            self.set_status(status)
+        for item in iterable:
+            if self.cancelled:
+                break
+            yield item
+            self.step()
 
 
 _TOOL_OPERATION_STACK = []
@@ -543,8 +870,35 @@ def tool_operation(
     anchor_widget=None,
     show_success_message=True,
     suspend_refresh=True,
+    preserve_time_selection=False,
 ):
     _t_start = time.perf_counter() if _DEBUG_TIMING else None
+
+    # tool_operation() only ever starts from the main thread (a UI action,
+    # hotkey, or shelf click) -- never from a threaded operation's own
+    # worker thread. Touching the marshal singleton here, this early,
+    # guarantees it's constructed (and therefore thread-affined) on the
+    # main thread before a threaded=True operation could spawn a worker
+    # that needs it.
+    _get_main_thread_marshal()
+
+    # Several tools nest a second tool_operation() call inside their own
+    # callback as a helper (the "merge into parent" branch just below) --
+    # that's fine on the main thread, but unlike operation.step()/set_total()
+    # etc., tool_operation() itself (tint, undo chunk, refresh suspension)
+    # is not marshaled, so entering it from a threaded=True tool's worker
+    # thread would call Maya/Qt directly off the main thread. Fail loudly
+    # here instead of letting that corrupt Maya state or crash unpredictably
+    # later -- a threaded callback that needs a nested tool_operation() has
+    # to call it via operation.run_on_main() instead.
+    _app = QtCore.QCoreApplication.instance()
+    if _app is not None and QtCore.QThread.currentThread() is not _app.thread():
+        raise RuntimeError(
+            "tool_operation() was entered from a non-main thread. A "
+            "threaded=True tool's callback must not call tool_operation() "
+            "(directly or via a helper) from its worker thread -- route "
+            "Maya/Qt work through operation.run_on_main() instead."
+        )
 
     if tint_color is None and tool_id:
         try:
@@ -555,6 +909,17 @@ def tool_operation(
             tint_color = None
 
     _t_tint_color = time.perf_counter() if _DEBUG_TIMING else None
+
+    preserved_time_selection = None
+    if preserve_time_selection:
+        try:
+            from TheKeyMachine.core import animation_context
+
+            preserved_time_selection = (
+                animation_context.capture_time_slider_selection()
+            )
+        except Exception:
+            preserved_time_selection = None
 
     parent_operation = current_tool_operation()
     if parent_operation is not None:
@@ -576,6 +941,12 @@ def tool_operation(
             parent_operation.progress.set_total(progress_max, reset=True)
         if timerange:
             parent_operation.timerange = timerange
+        if (
+            preserve_time_selection
+            and preserved_time_selection
+            and not parent_operation.preserved_time_selection
+        ):
+            parent_operation.preserved_time_selection = preserved_time_selection
         ensure_operation_tint(
             parent_operation,
             tint=tint,
@@ -595,7 +966,7 @@ def tool_operation(
             label or humanize_tool_name(tool_id) or "Processing",
             progress_max,
             interruptable=interruptable,
-            show_after_ms=200,
+            show_after_ms=PROGRESS_SHOW_DELAY_MS,
             min_steps=10,
             update_interval_ms=250,
             estimated_seconds=_TOOL_DURATION_ESTIMATES.get(estimate_key),
@@ -618,6 +989,7 @@ def tool_operation(
         tint_session=tint_session,
         anchor_widget=anchor_widget,
     )
+    operation.preserved_time_selection = preserved_time_selection
     if timerange:
         operation.timerange = timerange
     chunk_opened = False
@@ -696,9 +1068,17 @@ def tool_operation(
                 operation.tint_session.finish()
             except Exception:
                 pass
-        close_undo_chunk(chunk_opened)
-        
         _release_refresh_suspension(refresh_suspended)
+        close_undo_chunk(chunk_opened)
+        if operation.preserved_time_selection:
+            try:
+                from TheKeyMachine.core import animation_context
+
+                animation_context.restore_time_slider_selection(
+                    operation.preserved_time_selection
+                )
+            except Exception:
+                pass
 
 
 @contextmanager
@@ -792,6 +1172,8 @@ def run_tool_callback(button, callback, *args, **kwargs):
             call_kwargs,
             injected_keys=("anchor_widget", "tool_operation"),
         )
+        if policy is not None and policy.threaded:
+            return run_on_worker_thread(callback, *args, **call_kwargs)
         return callback(*args, **call_kwargs)
 
 def _split_lines(raw):

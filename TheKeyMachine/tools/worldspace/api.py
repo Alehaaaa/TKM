@@ -70,10 +70,9 @@ def _copy_worldspace_frames(selected_objects, frames, timerange, tool_id, label)
 
 
 def _worldspace_copy(default_mode, tool_id, label):
-    target_info = animation_context.resolve_targets(
+    target_info = animation_context.resolve_tool_context(
         default_mode=default_mode,
-        ordered_selection=True,
-        long_names=True,
+        include_channels=True,
     )
     selected_objects = list(dict.fromkeys(target_info.get("target_objects") or []))
     if not selected_objects:
@@ -106,7 +105,7 @@ def _worldspace_copy(default_mode, tool_id, label):
         )
     finally:
         if selected_range:
-            timelineWidgets.clear_time_slider_selection()
+            timelineWidgets.clear_selected_range()
 
 
 def worldspace_copy_frame(*args):
@@ -122,18 +121,20 @@ def worldspace_copy_animation(*args):
 
 
 def paste_worldspace_single_frame(*args):
-    operation_manager = None
-    operation_context = None
-    tint_session = None
-    try:
-        operation_manager = toolCommon.tool_operation(
-            tool_id="ws_paste_frame",
-            label="Paste World Space Frame",
-            progress=False,
-            undo=True,
-        )
-        operation_context = operation_manager.__enter__()
-
+    # frame_range (needed for the tint) isn't known until the clipboard
+    # payload is loaded and inspected below, so -- like every other
+    # timerange-dependent tint in this codebase -- it's requested via
+    # ensure_operation_tint() once it's known, rather than passed to
+    # tool_operation() up front. tool_operation()'s own teardown finishes
+    # whatever tint_session ends up on the operation, on every exit path
+    # (early return, cancel, or exception), so there's nothing to track
+    # or finish by hand here.
+    with toolCommon.tool_operation(
+        tool_id="ws_paste_frame",
+        label="Paste World Space Frame",
+        progress=False,
+        undo=True,
+    ) as operation:
         # Load from clipboard
         payload = clipboard.load(
             WORLDSPACE_CLIPBOARD,
@@ -172,10 +173,12 @@ def paste_worldspace_single_frame(*args):
             else None
         )
         if frame_range:
-            tint_session = timelineWidgets.begin_timeline_tint(
+            toolCommon.ensure_operation_tint(
+                operation,
+                tint="range",
                 timerange=frame_range,
-                color=toolbox.get_tool_tint_color("ws_paste_frame"),
-                key="ws_paste_frame",
+                tint_key="ws_paste_frame",
+                tint_color=toolbox.get_tool_tint_color("ws_paste_frame"),
             )
 
         target_objects = list(
@@ -198,7 +201,7 @@ def paste_worldspace_single_frame(*args):
         if source_count > 1 and target_count != source_count:
             return wutil.make_inViewMessage(selection_mismatch_message)
 
-        operation_context.set_total(len(target_objects))
+        operation.set_total(len(target_objects))
 
         def _first_frame_values(obj_name):
             obj_data = animation_data.get(obj_name) or {}
@@ -213,16 +216,16 @@ def paste_worldspace_single_frame(*args):
             if not values:
                 return wutil.make_inViewMessage("No World Space data found")
             for obj in target_objects:
-                if operation_context.cancelled:
+                if operation.cancelled:
                     return
                 if cmds.objExists(obj):
                     _apply_worldspace_values(obj, values)
-                operation_context.step()
+                operation.step()
             return
 
         # Multi-source: paste in order (source[0]->target[0], ...)
         for idx, target_obj in enumerate(target_objects):
-            if operation_context.cancelled:
+            if operation.cancelled:
                 return
             source_obj = ordered_sources[idx]
             values = _first_frame_values(source_obj)
@@ -230,18 +233,7 @@ def paste_worldspace_single_frame(*args):
                 return wutil.make_inViewMessage("No World Space data found")
             if cmds.objExists(target_obj):
                 _apply_worldspace_values(target_obj, values)
-            operation_context.step()
-
-        return
-
-    finally:
-        if tint_session:
-            tint_session.finish()
-        if operation_manager and operation_context is not None:
-            try:
-                operation_manager.__exit__(None, None, None)
-            except Exception:
-                pass
+            operation.step()
 
 
 def _worldspace_frame_number(frame_key):

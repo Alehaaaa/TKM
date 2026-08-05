@@ -14,7 +14,7 @@ except ImportError:
     oma = None
 
 import TheKeyMachine.core.runtimeManager as runtime
-from TheKeyMachine.mods.sliders import animlayers as slider_animlayers
+from TheKeyMachine.core import animation_context
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.mods.selectionMod as selectionMod
 import TheKeyMachine.widgets.timeline as timelineWidgets
@@ -151,9 +151,19 @@ def lerp_towards(left, right, t, current):
 
 def resolve_keyframe_targets(session=None):
     """Unified entry for resolving attribute plugs and affected times."""
-    plugs, src, time_range, has_graph_keys = (
-        selectionMod.resolve_target_attribute_plugs()
+    target_info = animation_context.resolve_tool_context(
+        default_mode="current_frame",
+        include_shapes=True,
+        resolve_curves=True,
     )
+    plugs = target_info["target_plugs"]
+    time_context = target_info["time_context"]
+    time_range = (
+        time_context.timerange
+        if time_context.mode == "time_slider_range"
+        else None
+    )
+    has_graph_keys = bool(target_info["selected_keyframes"])
     if not plugs:
         return {}, time_range
 
@@ -192,12 +202,19 @@ def resolve_keyframe_targets(session=None):
 
 def resolve_curve_targets(session=None):
     """Unified entry for resolving whole curves and affected times."""
-    plugs, src, time_range, has_graph_keys = (
-        selectionMod.resolve_target_attribute_plugs()
+    target_info = animation_context.resolve_tool_context(
+        default_mode="current_frame",
+        include_shapes=True,
+        resolve_curves=True,
     )
-    curves = slider_animlayers.get_slider_anim_curves_from_plugs(plugs)
-    if not curves:
-        curves, src, time_range, has_graph_keys = selectionMod.resolve_target_curves()
+    curves = target_info["selected_curves"]
+    time_context = target_info["time_context"]
+    time_range = (
+        time_context.timerange
+        if time_context.mode == "time_slider_range"
+        else None
+    )
+    has_graph_keys = bool(target_info["selected_keyframes"])
     if not curves:
         return [], {}, time_range, has_graph_keys
 
@@ -205,14 +222,7 @@ def resolve_curve_targets(session=None):
 
     times_map = {}
     for c in curves:
-        if has_graph_keys:
-            ks = cmds.keyframe(c, q=True, selected=True, timeChange=True) or [curr]
-        elif time_range:
-            ks = cmds.keyframe(
-                c, q=True, time=(time_range[0], time_range[1]), timeChange=True
-            ) or [curr]
-        else:
-            ks = [curr]
+        ks = animation_context.key_times(c, target_info) or [curr]
         times_map[c] = sorted({float(t) for t in ks})
     return curves, times_map, time_range, has_graph_keys
 

@@ -773,51 +773,41 @@ def _scene_node():
 
 def ensure_scene_id():
     """Create animation recovery's own TKM child node and persist its scene ID."""
-    previous_selection = cmds.ls(selection=True, long=True) or []
-    try:
-        node = TkmSceneNode.root().child(SCENE_NODE, lock_transform=True, icon=icons.animation_recovery).name
-        plug = "{}.{}".format(node, SCENE_ID_ATTRIBUTE)
-        if not cmds.objExists(plug):
+    node = TkmSceneNode.root().child(SCENE_NODE, lock_transform=True, icon=icons.animation_recovery).name
+    plug = "{}.{}".format(node, SCENE_ID_ATTRIBUTE)
+    if not cmds.objExists(plug):
+        cmds.addAttr(
+            node,
+            longName=SCENE_ID_ATTRIBUTE,
+            niceName="Animation Recovery Scene ID",
+            dataType="string",
+        )
+    else:
+        try:
             cmds.addAttr(
-                node,
-                longName=SCENE_ID_ATTRIBUTE,
+                plug,
+                edit=True,
                 niceName="Animation Recovery Scene ID",
-                dataType="string",
+                hidden=False,
             )
-        else:
-            try:
-                cmds.addAttr(
-                    plug,
-                    edit=True,
-                    niceName="Animation Recovery Scene ID",
-                    hidden=False,
-                )
-            except Exception:
-                pass
-        try:
-            scene_id = cmds.getAttr(plug) or ""
-        except Exception:
-            scene_id = ""
-        if not scene_id:
-            try:
-                cmds.setAttr(plug, lock=False)
-            except Exception:
-                pass
-            scene_id = six.text_type(uuid.uuid4())
-            cmds.setAttr(plug, scene_id, type="string")
-        try:
-            cmds.setAttr(plug, lock=True, keyable=False, channelBox=False)
         except Exception:
             pass
-        return scene_id
-    finally:
+    try:
+        scene_id = cmds.getAttr(plug) or ""
+    except Exception:
+        scene_id = ""
+    if not scene_id:
         try:
-            if previous_selection:
-                cmds.select(previous_selection, replace=True)
-            else:
-                cmds.select(clear=True)
+            cmds.setAttr(plug, lock=False)
         except Exception:
             pass
+        scene_id = six.text_type(uuid.uuid4())
+        cmds.setAttr(plug, scene_id, type="string")
+    try:
+        cmds.setAttr(plug, lock=True, keyable=False, channelBox=False)
+    except Exception:
+        pass
+    return scene_id
 
 
 def current_scene_id(create=False):

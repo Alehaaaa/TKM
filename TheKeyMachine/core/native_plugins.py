@@ -4,10 +4,10 @@ import contextlib
 import logging
 import os
 import platform
-import re
 import sys
 
 from maya import cmds, mel
+from TheKeyMachine.core import maya_version
 
 
 _PLUGIN_SPECS = {}
@@ -15,11 +15,7 @@ _PLUGIN_SPECS = {}
 
 def maya_major_version(value=None):
     """Return the four-digit Maya release used by the native binary matrix."""
-    value = cmds.about(version=True) if value is None else value
-    match = re.search(r"\d{4}", str(value))
-    if not match:
-        raise RuntimeError("Could not determine the Maya version from {!r}.".format(value))
-    return match.group(0)
+    return str(maya_version.major_version(value))
 
 
 def platform_name(value=None):
