@@ -75,6 +75,7 @@ def _reason_text(value):
         "scene_save": "Scene Save",
         "recovery": "Recovered Point",
         "transform": "Attribute Change",
+        "layer": "Animation Layer Change",
     }.get(value, "Animation Change")
 
 

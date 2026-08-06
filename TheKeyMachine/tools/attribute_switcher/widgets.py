@@ -856,6 +856,7 @@ class MultiAttributeSwitchDialog(FloatingWidget):
         FloatingWidget.__init__(self, popup=False, parent=parent_dialog)
         self.parent_dialog = parent_dialog
         self.entries = list(entries or [])
+        self._prepare_gimbal_results()
         self._selected_options = {}
         self._option_groups = []
         self._column_widgets = []
@@ -863,6 +864,22 @@ class MultiAttributeSwitchDialog(FloatingWidget):
         self.setWindowTitle("Switch Multiple Attributes")
         self.setMinimumWidth(wutil.DPI(220))
         self._build_ui()
+
+    def _prepare_gimbal_results(self):
+        """Run deferred rotate-order analysis only for staged multi rows."""
+        for item, _options_map in self.entries:
+            if item.enum_attr != "rotateOrder":
+                continue
+            try:
+                combined = self.parent_dialog.controller.analyze_group_gimbal(
+                    item.objects_map
+                )
+            except Exception as exc:
+                self.parent_dialog.controller.warning(
+                    "Error analyzing staged rotate orders: {}".format(exc)
+                )
+                combined = {}
+            item.gimbal_info = combined
 
     def _build_ui(self):
         title = QtWidgets.QLabel(
@@ -985,7 +1002,12 @@ class MultiAttributeSwitchDialog(FloatingWidget):
                 if option not in options_map:
                     continue
                 option_count += 1
-                button = QtWidgets.QPushButton(option, column)
+                display_option = option
+                gimbal = item.gimbal_info.get(option, {})
+                gimbal_label = gimbal.get("label", "")
+                if item.enum_attr == "rotateOrder" and gimbal_label:
+                    display_option = "{} ({})".format(option, gimbal_label)
+                button = QtWidgets.QPushButton(display_option, column)
                 button.setCheckable(True)
                 _configure_option_button(button)
                 _connect_checkable_button(

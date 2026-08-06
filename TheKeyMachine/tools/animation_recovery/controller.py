@@ -20,6 +20,7 @@ except ImportError:
     om = None
 
 from TheKeyMachine.core import six
+from TheKeyMachine.core import animlayers
 from TheKeyMachine.core import toolbox
 from TheKeyMachine.core.Qt import QtCore
 from TheKeyMachine.core.scene_nodes import TkmSceneNode
@@ -38,6 +39,7 @@ RUNTIME_ANIMATION_KEY = "animation_recovery:animation"
 RUNTIME_SCENE_KEY = "animation_recovery:scene"
 RUNTIME_TRANSFORM_KEY = "animation_recovery:transforms"
 RUNTIME_LAYER_KEY = "animation_recovery:layers"
+RUNTIME_LAYER_ATTRIBUTE_KEY = "animation_recovery:layer_attributes"
 SCENE_NODE = "Animation_Recovery"
 # Animation recovery owns this child node under the TKM root; tools must never
 # stamp their own attributes onto the root itself (TheKeyMachine only ever
@@ -48,7 +50,7 @@ SCENE_ID_ATTRIBUTE = "tkmAnimationRecoverySceneId"
 # needs no create/lock/unlock dance -- unlike a node attribute, it is exactly
 # the right weight for a value stamped on every single snapshot.
 CHECKPOINT_FILEINFO_KEY = "tkm_animationRecoveryLastCheckpoint"
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 BASELINE_INTERVAL = 50
 MAX_BASELINE_GENERATIONS = 20
 SNAPSHOT_DELAY_MS = 350
@@ -61,6 +63,7 @@ REASON_CODES = {
     "scene_save": 2,
     "recovery": 3,
     "transform": 4,
+    "layer": 5,
 }
 REASONS_BY_CODE = {code: reason for reason, code in REASON_CODES.items()}
 
@@ -98,13 +101,7 @@ def _parse_filename_timestamp(path):
     try:
         return datetime.fromtimestamp(float(value))
     except (TypeError, ValueError, OverflowError):
-        pass
-    for date_format in ("%Y-%m-%d_%H-%M-%S-%f", "%Y%m%dT%H%M%S_%f"):
-        try:
-            return datetime.strptime(value, date_format)
-        except (TypeError, ValueError):
-            continue
-    return datetime.fromtimestamp(os.path.getmtime(path))
+        return datetime.fromtimestamp(os.path.getmtime(path))
 
 
 def _filename_timestamp_value(path):
@@ -120,12 +117,12 @@ def _pack_endpoint(endpoint):
 
 
 def _unpack_endpoint(endpoint):
-    plug = endpoint[0] if endpoint else None
+    plug = endpoint[0]
     node, attribute = _split_plug(plug)
     return {
         "plug": plug,
         "node": node,
-        "node_uuid": endpoint[1] if len(endpoint) > 1 else None,
+        "node_uuid": endpoint[1],
         "attribute": attribute,
     }
 
@@ -144,9 +141,9 @@ def _unpack_layer_ref(layer_ref):
     if not layer_ref:
         return None
     return {
-        "name": layer_ref[0] if len(layer_ref) > 0 else None,
-        "uuid": layer_ref[1] if len(layer_ref) > 1 else None,
-        "plug": layer_ref[2] if len(layer_ref) > 2 else None,
+        "name": layer_ref[0],
+        "uuid": layer_ref[1],
+        "plug": layer_ref[2],
     }
 
 
@@ -170,7 +167,7 @@ def _pack_curve(curve):
 
 
 def _unpack_curve(curve):
-    tangent_values = curve[6] if len(curve) > 6 else []
+    tangent_values = curve[6]
     tangent_keys = ("itt", "ott", "ia", "oa", "iw", "ow")
     return {
         "name": curve[0],
@@ -180,7 +177,7 @@ def _unpack_curve(curve):
         "positions": curve[4],
         "values": curve[5],
         "tangents": {
-            key: tangent_values[index] if index < len(tangent_values) else []
+            key: tangent_values[index]
             for index, key in enumerate(tangent_keys)
         },
         "weighted_tangents": bool(curve[7]),
@@ -188,7 +185,7 @@ def _unpack_curve(curve):
         "post_infinity": curve[9],
         "input_connections": [_unpack_endpoint(item) for item in curve[10]],
         "output_connections": [_unpack_endpoint(item) for item in curve[11]],
-        "layer": _unpack_layer_ref(curve[12]) if len(curve) > 12 else None,
+        "layer": _unpack_layer_ref(curve[12]),
     }
 
 
@@ -204,21 +201,25 @@ def _pack_layer(layer):
         1 if layer.get("passthrough") else 0,
         1 if layer.get("lock") else 0,
         layer.get("attributes") or [],
+        layer.get("rotation_accumulation_mode"),
+        layer.get("scale_accumulation_mode"),
     ]
 
 
 def _unpack_layer(layer):
     return {
-        "name": layer[0] if len(layer) > 0 else None,
-        "uuid": layer[1] if len(layer) > 1 else None,
-        "parent": layer[2] if len(layer) > 2 else None,
-        "weight": layer[3] if len(layer) > 3 else 1.0,
-        "mute": bool(layer[4]) if len(layer) > 4 else False,
-        "solo": bool(layer[5]) if len(layer) > 5 else False,
-        "override": bool(layer[6]) if len(layer) > 6 else False,
-        "passthrough": bool(layer[7]) if len(layer) > 7 else True,
-        "lock": bool(layer[8]) if len(layer) > 8 else False,
-        "attributes": list(layer[9]) if len(layer) > 9 and layer[9] else [],
+        "name": layer[0],
+        "uuid": layer[1],
+        "parent": layer[2],
+        "weight": layer[3],
+        "mute": bool(layer[4]),
+        "solo": bool(layer[5]),
+        "override": bool(layer[6]),
+        "passthrough": bool(layer[7]),
+        "lock": bool(layer[8]),
+        "attributes": list(layer[9] or []),
+        "rotation_accumulation_mode": layer[10],
+        "scale_accumulation_mode": layer[11],
     }
 
 
@@ -256,25 +257,21 @@ def _pack_payload(payload):
     ]
 
 
-def _unpack_payload(payload, version=1, reason="animation", full_snapshot=False):
-    details = payload[0] if payload else []
-    curves = payload[1] if len(payload) > 1 else []
-    objects = payload[2] if len(payload) > 2 else []
-    removed_curves = payload[3] if len(payload) > 3 else []
-    layers = payload[4] if len(payload) > 4 else []
+def _unpack_payload(payload, reason="animation", full_snapshot=False):
+    details, curves, objects, removed_curves, layers = payload
     return {
         "meta": {
-            "version": version,
+            "version": SCHEMA_VERSION,
             "reason": reason,
             "full_snapshot": bool(full_snapshot),
-            "source_file": details[0] if len(details) > 0 else None,
-            "location": details[1] if len(details) > 1 else None,
-            "current_frame": details[2] if len(details) > 2 else None,
-            "playback_range": details[3] if len(details) > 3 else None,
-            "animation_range": details[4] if len(details) > 4 else None,
-            "selected_objects": details[5] if len(details) > 5 else None,
-            "source_mtime": details[6] if len(details) > 6 else None,
-            "parent_checkpoint": details[7] if len(details) > 7 else None,
+            "source_file": details[0],
+            "location": details[1],
+            "current_frame": details[2],
+            "playback_range": details[3],
+            "animation_range": details[4],
+            "selected_objects": details[5],
+            "source_mtime": details[6],
+            "parent_checkpoint": details[7],
         },
         "curves": [_unpack_curve(curve) for curve in curves],
         "objects": [
@@ -287,11 +284,11 @@ def _unpack_payload(payload, version=1, reason="animation", full_snapshot=False)
         ],
         "removed_curves": [
             {
-                "name": item[0] if item else None,
-                "uuid": item[1] if len(item) > 1 else None,
+                "name": item[0],
+                "uuid": item[1],
                 "output_connections": [
                     _unpack_endpoint(endpoint)
-                    for endpoint in (item[2] if len(item) > 2 else [])
+                    for endpoint in item[2]
                 ],
             }
             for item in removed_curves
@@ -335,37 +332,30 @@ def _write_recovery_atomic(path, payload):
 
 
 def _load_recovery(path):
-    if path.lower().endswith(".json"):
-        with io.open(path, "r", encoding="utf-8") as stream:
-            return json.load(stream)
     with io.open(path, "rb") as stream:
         compiled = stream.read()
     if len(compiled) < 3:
         raise ValueError("Invalid Animation Recovery file")
     version, reason_code = struct.unpack("BB", compiled[:2])
-    if version < 1 or version > SCHEMA_VERSION:
+    if version != SCHEMA_VERSION:
         raise ValueError("Unsupported Animation Recovery version: {}".format(version))
     serialized = zlib.decompress(compiled[2:]).decode("utf-8")
     return _unpack_payload(
         json.loads(serialized),
-        version=version,
         reason=REASONS_BY_CODE.get(reason_code & ~FULL_SNAPSHOT_FLAG, "animation"),
-        full_snapshot=(version < 4 or bool(reason_code & FULL_SNAPSHOT_FLAG)),
+        full_snapshot=bool(reason_code & FULL_SNAPSHOT_FLAG),
     )
 
 
 def _recovery_reason(path):
-    if path.lower().endswith(".json"):
-        try:
-            return (_load_recovery(path).get("meta") or {}).get("reason") or "animation"
-        except Exception:
-            return "animation"
     try:
         with io.open(path, "rb") as stream:
             header = stream.read(2)
         if len(header) < 2:
             return "animation"
-        _version, reason_code = struct.unpack("BB", header)
+        version, reason_code = struct.unpack("BB", header)
+        if version != SCHEMA_VERSION:
+            return "animation"
         return REASONS_BY_CODE.get(reason_code & ~FULL_SNAPSHOT_FLAG, "animation")
     except Exception:
         return "animation"
@@ -382,12 +372,12 @@ def _recovery_source_file(path):
     list_recoveries() can afford to call this once per row.
     """
     try:
-        if path.lower().endswith(".json"):
-            details = (_load_recovery(path).get("meta") or {})
-            return details.get("source_file")
         with io.open(path, "rb") as stream:
             compiled = stream.read()
         if len(compiled) < 3:
+            return None
+        version, _reason_code = struct.unpack("BB", compiled[:2])
+        if version != SCHEMA_VERSION:
             return None
         serialized = zlib.decompress(compiled[2:]).decode("utf-8")
         packed = json.loads(serialized)
@@ -399,24 +389,14 @@ def _recovery_source_file(path):
 
 def _recovery_header(path):
     """Return the lightweight format metadata needed to build a replay chain."""
-    if path.lower().endswith(".json"):
-        payload = _load_recovery(path)
-        meta = payload.get("meta") or {}
-        try:
-            version = int(meta.get("version") or 1)
-        except (TypeError, ValueError):
-            version = 1
-        return version, bool(version < 4 or meta.get("full_snapshot"))
     with io.open(path, "rb") as stream:
         header = stream.read(2)
-    if header[:1] == b"x":
-        return 1, True
     if len(header) < 2:
         raise ValueError("Invalid Animation Recovery file")
     version, reason_code = struct.unpack("BB", header)
-    if version < 1 or version > SCHEMA_VERSION:
+    if version != SCHEMA_VERSION:
         raise ValueError("Unsupported Animation Recovery version: {}".format(version))
-    return version, bool(version < 4 or reason_code & FULL_SNAPSHOT_FLAG)
+    return version, bool(reason_code & FULL_SNAPSHOT_FLAG)
 
 
 def _maya_file_io_active():
@@ -601,76 +581,92 @@ def _layer_query(layer, flag, default=None):
         return default
 
 
-def _layer_curves_for_plug(layer, plug):
-    """Return the animation curve(s) driving *plug* on *layer*, if any."""
+def _layer_value(layer, attribute, default=None):
     try:
-        curves = cmds.animLayer(layer, query=True, findCurveForPlug=plug)
+        value = cmds.getAttr("{}.{}".format(layer, attribute))
     except Exception:
-        return []
-    if not curves:
-        return []
-    if isinstance(curves, six.string_types):
-        return [curves]
-    return list(curves)
+        return default
+    return default if value is None else value
 
 
-def _capture_layer(layer, member_plugs=None):
+def _capture_layer(layer, member_plugs=None, metadata=None):
+    metadata = metadata or {}
     if member_plugs is None:
         member_plugs = _layer_query(layer, "attribute", default=[]) or []
-    parent = _layer_query(layer, "parent")
+    parent = metadata.get("parent")
     if parent == layer:
         parent = None
     return {
         "name": layer,
         "uuid": _node_uuid(layer),
         "parent": parent or None,
-        "weight": _layer_query(layer, "weight", default=1.0),
-        "mute": bool(_layer_query(layer, "mute", default=False)),
-        "solo": bool(_layer_query(layer, "solo", default=False)),
-        "override": bool(_layer_query(layer, "override", default=False)),
-        "passthrough": bool(_layer_query(layer, "passthrough", default=True)),
-        "lock": bool(_layer_query(layer, "lock", default=False)),
+        "weight": _layer_value(layer, "weight", default=1.0),
+        "mute": bool(metadata.get("muted", False)),
+        "solo": bool(_layer_value(layer, "solo", default=False)),
+        "override": bool(metadata.get("override", False)),
+        "passthrough": bool(metadata.get("passthrough", True)),
+        "lock": bool(metadata.get("locked", False)),
         "attributes": sorted(member_plugs),
+        "rotation_accumulation_mode": metadata.get(
+            "rotation_accumulation_mode"
+        ),
+        "scale_accumulation_mode": metadata.get("scale_accumulation_mode"),
     }
 
 
 def _animation_layers_snapshot():
-    """Capture every animation layer plus a curve-name -> layer-context map.
+    """Capture layer state and exact per-layer curve ownership.
 
-    This runs on every debounced capture, so the expensive part --
-    findCurveForPlug, called per member attribute -- is only paid for layers
-    that actually have keyed curves, and skipped entirely (one cheap
-    animCurves query instead) for layers that are just empty membership
-    scaffolding. The common case of one animated attribute per layer is
-    resolved without findCurveForPlug at all, since there is nothing to
-    disambiguate.
+    Curve ownership goes through ``core.animlayers`` so recovery, copy/paste,
+    sliders, and key tools all interpret Maya's blend graph identically. The
+    graph is resolved once and reused for every member plug in this snapshot.
     """
-    layers = cmds.ls(type="animLayer") or []
+    context = animlayers.capture_context()
+    scene_layers = animlayers.scene_layer_objects()
+    root_name = context.get("root_name")
+    layer_metadata = context.get("layers") or {}
     layers_data = []
     curve_layer_map = {}
-    for layer in layers:
+    member_plugs_by_layer = {}
+    for layer_id, metadata in layer_metadata.items():
+        layer = metadata.get("name") or (
+            root_name if layer_id == animlayers.BASE_LAYER_ID else layer_id
+        )
+        if not layer:
+            continue
         member_plugs = _layer_query(layer, "attribute", default=[]) or []
-        layer_curves = _layer_query(layer, "animCurves", default=[]) or []
-        if layer_curves:
-            layer_uuid = _node_uuid(layer)
-            if len(member_plugs) == 1 and len(layer_curves) == 1:
-                curve_name = layer_curves[0]
-                if curve_name not in curve_layer_map:
-                    curve_layer_map[curve_name] = {
-                        "name": layer,
-                        "uuid": layer_uuid,
-                        "plug": member_plugs[0],
-                    }
-            else:
-                for plug in member_plugs:
-                    for curve_name in _layer_curves_for_plug(layer, plug):
-                        if curve_name and curve_name not in curve_layer_map:
-                            curve_layer_map[curve_name] = {
-                                "name": layer,
-                                "uuid": layer_uuid,
-                                "plug": plug,
-                            }
-        layers_data.append(_capture_layer(layer, member_plugs=member_plugs))
+        member_plugs_by_layer[layer] = member_plugs
+        layers_data.append(
+            _capture_layer(
+                layer,
+                member_plugs=member_plugs,
+                metadata=metadata,
+            )
+        )
+
+    all_member_plugs = sorted({
+        plug
+        for member_plugs in member_plugs_by_layer.values()
+        for plug in member_plugs
+    })
+    for plug in all_member_plugs:
+        try:
+            entries = animlayers.get_anim_curves_by_layer_for_plug(
+                plug,
+                scene_layers=scene_layers,
+            )
+        except Exception:
+            entries = []
+        for entry in entries:
+            curve_name = entry.get("curve")
+            layer_name = root_name if entry.get("root") else entry.get("layer")
+            if not curve_name or not layer_name:
+                continue
+            curve_layer_map[curve_name] = {
+                "name": layer_name,
+                "uuid": _node_uuid(layer_name),
+                "plug": plug,
+            }
     return layers_data, curve_layer_map
 
 
@@ -883,11 +879,18 @@ def _recovery_paths(scene_id=None):
     folder = scene_recovery_folder(scene_id=scene_id, create=False)
     if not folder or not os.path.isdir(folder):
         return []
-    paths = [
+    candidates = [
         os.path.join(folder, filename)
         for filename in os.listdir(folder)
-        if filename.lower().endswith((RECOVERY_EXTENSION, ".json"))
+        if filename.lower().endswith(RECOVERY_EXTENSION)
     ]
+    paths = []
+    for path in candidates:
+        try:
+            _recovery_header(path)
+        except (IOError, OSError, ValueError, struct.error):
+            continue
+        paths.append(path)
     paths.sort(key=_parse_filename_timestamp)
     return paths
 
@@ -1077,9 +1080,8 @@ def _recovery_chain_paths(path):
 
     start_index = 0
     for index in range(target_index, -1, -1):
-        version, full_snapshot = _recovery_header(paths[index])
-        # Only schema 5+ baselines contain complete curve and object state.
-        if version >= 5 and full_snapshot:
+        _version, full_snapshot = _recovery_header(paths[index])
+        if full_snapshot:
             start_index = index
             break
     return paths[start_index:target_index + 1]
@@ -1099,12 +1101,8 @@ def _load_merged_recovery(path, operation=None, chain_paths=None):
             return None
         payload = _load_recovery(checkpoint_path)
         meta = payload.get("meta") or {}
-        try:
-            version = int(meta.get("version") or 1)
-        except (TypeError, ValueError):
-            version = 1
-        full_snapshot = bool(version < 4 or meta.get("full_snapshot"))
-        if version >= 5 and not full_snapshot:
+        full_snapshot = bool(meta.get("full_snapshot"))
+        if not full_snapshot:
             parent = meta.get("parent_checkpoint")
             if not parent or parent != previous_name:
                 raise ValueError(
@@ -1114,8 +1112,7 @@ def _load_merged_recovery(path, operation=None, chain_paths=None):
                 )
         if full_snapshot:
             curves = []
-            if version >= 5:
-                objects = []
+            objects = []
         for marker in payload.get("removed_curves") or []:
             _remove_curve(curves, marker)
         for curve in payload.get("curves") or []:
@@ -1159,10 +1156,10 @@ def _prune_recovery_history(scene_id):
     baseline_indices = []
     for index, checkpoint_path in enumerate(paths):
         try:
-            version, full_snapshot = _recovery_header(checkpoint_path)
+            _version, full_snapshot = _recovery_header(checkpoint_path)
         except Exception:
             continue
-        if version >= 5 and full_snapshot:
+        if full_snapshot:
             baseline_indices.append(index)
     if len(baseline_indices) <= MAX_BASELINE_GENERATIONS:
         return 0
@@ -1252,12 +1249,36 @@ def _sorted_layers_parent_first(layers_data):
     return ordered
 
 
+def _layers_for_curves(layers_data, curves_data):
+    """Limit selection recovery to layers used by its surviving curves."""
+    by_name = {
+        entry.get("name"): entry
+        for entry in layers_data
+        if entry.get("name")
+    }
+    required = {
+        (curve.get("layer") or {}).get("name")
+        for curve in curves_data
+        if (curve.get("layer") or {}).get("name")
+    }
+    pending = list(required)
+    while pending:
+        name = pending.pop()
+        parent = (by_name.get(name) or {}).get("parent")
+        if parent and parent not in required:
+            required.add(parent)
+            pending.append(parent)
+    return [
+        entry for entry in layers_data if entry.get("name") in required
+    ]
+
+
 def _restore_layers(layers_data, operation=None):
     """Recreate any captured animation layer missing from the scene.
 
-    Existing layers are matched by uuid first, then by name, and are left in
-    place untouched aside from applying the captured settings; only layers
-    that no longer exist get rebuilt. Returns a map of captured layer name to
+    Existing layers are matched by uuid first, then by name, unlocked, moved
+    back under their captured parent, and given the captured settings. Layers
+    that no longer exist are rebuilt. Returns a map of captured layer name to
     the actual node name now representing it in the scene.
 
     BaseAnimation is never created directly -- Maya creates it automatically
@@ -1266,15 +1287,23 @@ def _restore_layers(layers_data, operation=None):
     """
     if not layers_data:
         return {}
+    current_context = animlayers.capture_context()
+    current_metadata = current_context.get("layers") or {}
+    root_name = current_context.get("root_name")
+    existing_layers = animlayers.scene_layer_names(include_root=True)
     existing_by_uuid = {}
-    for layer in cmds.ls(type="animLayer") or []:
+    for layer in existing_layers:
         layer_uuid = _node_uuid(layer)
         if layer_uuid:
             existing_by_uuid[layer_uuid] = layer
-
     ordered = _sorted_layers_parent_first(layers_data)
     base_entry = next((entry for entry in ordered if entry.get("name") == "BaseAnimation"), None)
     ordered = [entry for entry in ordered if entry.get("name") != "BaseAnimation"]
+    if base_entry is not None and root_name:
+        try:
+            cmds.animLayer(root_name, edit=True, lock=False)
+        except Exception:
+            pass
 
     name_map = {}
 
@@ -1285,6 +1314,17 @@ def _restore_layers(layers_data, operation=None):
                 continue
             try:
                 cmds.animLayer(node, edit=True, **{flag: entry[flag]})
+            except Exception:
+                pass
+        for attribute, key in (
+            ("rotationAccumulationMode", "rotation_accumulation_mode"),
+            ("scaleAccumulationMode", "scale_accumulation_mode"),
+        ):
+            value = entry.get(key)
+            if value is None:
+                continue
+            try:
+                cmds.setAttr("{}.{}".format(node, attribute), value)
             except Exception:
                 pass
 
@@ -1324,8 +1364,19 @@ def _restore_layers(layers_data, operation=None):
                 operation.step()
             continue
         try:
-            if parent_node and cmds.animLayer(node, query=True, parent=True) != parent_node:
-                cmds.animLayer(node, edit=True, parent=parent_node)
+            cmds.animLayer(node, edit=True, lock=False)
+        except Exception:
+            pass
+        desired_parent = parent_node
+        if not desired_parent and node != root_name:
+            desired_parent = root_name
+        current_entry = current_metadata.get(
+            animlayers.layer_id_for_name(node)
+        ) or {}
+        current_parent = current_entry.get("parent")
+        try:
+            if desired_parent and current_parent != desired_parent:
+                cmds.animLayer(node, edit=True, parent=desired_parent)
         except Exception:
             pass
         _apply_settings(entry, node)
@@ -1341,21 +1392,131 @@ def _restore_layers(layers_data, operation=None):
             except Exception:
                 base_node = None
         if base_node:
+            try:
+                cmds.animLayer(base_node, edit=True, lock=False)
+            except Exception:
+                pass
             _apply_settings(base_entry, base_node)
         if operation:
             operation.step()
 
+    restored_context = animlayers.capture_context()
+    restored_metadata = restored_context.get("layers") or {}
+    restored_root = restored_context.get("root_name")
+    if base_entry is not None:
+        base_node = name_map.get(base_entry.get("name"))
+        if not base_node:
+            return None
+        try:
+            if bool(cmds.getAttr("{}.lock".format(base_node))):
+                return None
+        except Exception:
+            return None
+    for entry in ordered:
+        node = name_map.get(entry.get("name"))
+        if not node:
+            return None
+        desired_parent = entry.get("parent")
+        if desired_parent:
+            desired_parent = name_map.get(desired_parent, desired_parent)
+        else:
+            desired_parent = restored_root
+        actual = restored_metadata.get(
+            animlayers.layer_id_for_name(node)
+        ) or {}
+        if desired_parent and actual.get("parent") != desired_parent:
+            return None
+        try:
+            if bool(cmds.getAttr("{}.lock".format(node))):
+                return None
+        except Exception:
+            return None
     return name_map
 
 
+def _extra_layer_names(layers_data, name_map=None):
+    """Return current non-root layers absent from the captured snapshot."""
+    captured_names = {
+        entry.get("name") for entry in layers_data if entry.get("name")
+    }
+    captured_names.update((name_map or {}).values())
+    captured_uuids = {
+        entry.get("uuid") for entry in layers_data if entry.get("uuid")
+    }
+    context = animlayers.capture_context()
+    root_name = context.get("root_name")
+    extras = []
+    for layer_id, metadata in (context.get("layers") or {}).items():
+        layer = metadata.get("name") or (
+            root_name if layer_id == animlayers.BASE_LAYER_ID else layer_id
+        )
+        if layer == root_name or layer in captured_names:
+            continue
+        layer_uuid = _node_uuid(layer)
+        if layer_uuid and layer_uuid in captured_uuids:
+            continue
+        extras.append(layer)
+    return extras
+
+
+def _extra_layer_membership_count(layers_data):
+    """Count memberships a full recovery will remove for progress sizing."""
+    current_layers = animlayers.scene_layer_names(include_root=True)
+    current_by_uuid = {
+        layer_uuid: layer
+        for layer in current_layers
+        for layer_uuid in (_node_uuid(layer),)
+        if layer_uuid
+    }
+    count = 0
+    root_name = animlayers.root_layer_name()
+    for entry in layers_data:
+        node = current_by_uuid.get(entry.get("uuid"))
+        if not node and entry.get("name") in current_layers:
+            node = entry.get("name")
+        if not node or node == root_name:
+            continue
+        try:
+            current_members = set(
+                cmds.animLayer(node, query=True, attribute=True) or []
+            )
+        except Exception:
+            current_members = set()
+        count += len(current_members - set(entry.get("attributes") or []))
+    return count
+
+
+def _remove_extra_layers(layers_data, name_map, operation=None):
+    """Remove noncaptured layers during a full-scene recovery."""
+    # Children normally follow parents in the shared graph, so reverse order
+    # avoids deleting a parent while one of its extra children still exists.
+    for layer in reversed(_extra_layer_names(layers_data, name_map=name_map)):
+        if operation and operation.cancelled:
+            return False
+        try:
+            cmds.animLayer(layer, edit=True, lock=False)
+        except Exception:
+            pass
+        try:
+            cmds.delete(layer)
+        except Exception:
+            pass
+        if cmds.objExists(layer):
+            return False
+        if operation and operation.step():
+            return False
+    return True
+
+
 def _restore_layer_membership(layers_data, name_map, operation=None, allowed_plugs=None):
-    """Ensure every captured attribute is (re)declared a member of its layer.
+    """Restore captured membership for each layer.
 
     This is what rebuilds the blend-node network a deleted/recreated layer
     needs before a curve can be reconnected to it. When *allowed_plugs* is
     given (a selection-scoped restore), membership is limited to the plugs
     actually needed by the curves being restored, so an in-selection recover
-    does not reach into layers for objects outside the selection.
+    does not reach into layers for objects outside the selection. A full-scene
+    recovery also removes memberships absent from the captured snapshot.
     """
     for entry in layers_data:
         node = name_map.get(entry.get("name"))
@@ -1368,9 +1529,23 @@ def _restore_layer_membership(layers_data, name_map, operation=None, allowed_plu
         member_plugs = entry.get("attributes") or []
         if allowed_plugs is not None:
             member_plugs = [plug for plug in member_plugs if plug in allowed_plugs]
+        elif node != animlayers.root_layer_name():
+            # A full recovery owns the entire layer snapshot. Remove members
+            # that did not exist at the recovered point before adding missing
+            # ones. Selection-scoped recovery deliberately stays additive.
+            saved_members = set(member_plugs)
+            for plug in sorted(current_members - saved_members):
+                if operation and operation.cancelled:
+                    return False
+                try:
+                    cmds.animLayer(node, edit=True, removeAttribute=plug)
+                except Exception:
+                    pass
+                if operation and operation.step():
+                    return False
         for plug in member_plugs:
             if operation and operation.cancelled:
-                return
+                return False
             if plug in current_members or not cmds.objExists(plug):
                 if operation:
                     operation.step()
@@ -1380,21 +1555,43 @@ def _restore_layer_membership(layers_data, name_map, operation=None, allowed_plu
             except Exception:
                 pass
             if operation and operation.step():
-                return
+                return False
+        if node == animlayers.root_layer_name():
+            continue
+        try:
+            restored_members = set(
+                cmds.animLayer(node, query=True, attribute=True) or []
+            )
+        except Exception:
+            return False
+        expected_members = {
+            plug for plug in member_plugs if cmds.objExists(plug)
+        }
+        if allowed_plugs is None:
+            if restored_members != expected_members:
+                return False
+        elif not expected_members.issubset(restored_members):
+            return False
+    return True
 
 
 def _lock_restored_layers(layers_data, name_map):
     """Apply the captured lock state last, after membership/curves are set."""
     for entry in layers_data:
-        if not entry.get("lock"):
-            continue
         node = name_map.get(entry.get("name"))
         if not node:
             continue
         try:
-            cmds.animLayer(node, edit=True, lock=True)
+            cmds.animLayer(node, edit=True, lock=bool(entry.get("lock")))
         except Exception:
-            pass
+            return False
+        try:
+            restored_lock = bool(cmds.getAttr("{}.lock".format(node)))
+        except Exception:
+            return False
+        if restored_lock != bool(entry.get("lock")):
+            return False
+    return True
 
 
 def _connect_curve(curve, curve_data, uuid_lookup):
@@ -1504,6 +1701,8 @@ def _set_curve_keys(curve, curve_data, operation=None):
             cmds.cutKey(curve, clear=True, **cut_argument)
         except Exception:
             pass
+        if operation and operation.step():
+            return False
 
     try:
         cmds.keyTangent(
@@ -1551,6 +1750,24 @@ def _curve_maps(curves=None):
         if curve_uuid:
             by_uuid[curve_uuid] = curve
     return curves, by_name, by_uuid
+
+
+def _curve_key_removal_count(curve, curve_data):
+    """Count current keys absent from a recovery curve snapshot."""
+    if not curve or not cmds.objExists(curve):
+        return 0
+    unitless_input = bool(curve_data.get("unitless_input"))
+    current_positions = _query_values(
+        cmds.keyframe,
+        curve,
+        "floatChange" if unitless_input else "timeChange",
+    )
+    saved_positions = {
+        float(position) for position in (curve_data.get("positions") or [])
+    }
+    return sum(
+        1 for position in current_positions if float(position) not in saved_positions
+    )
 
 
 def _selected_transform_nodes():
@@ -1603,9 +1820,12 @@ def _filter_recovery_to_selection(curves_data, objects_data, selected_nodes):
     ]
     filtered_curves = []
     for curve_data in curves_data:
+        layer_plug = (curve_data.get("layer") or {}).get("plug")
+        layer_node, _layer_attribute = _split_plug(layer_plug)
         if (
             curve_data.get("name") in current_curves
             or curve_data.get("uuid") in current_curve_uuids
+            or _matches_node(layer_node, None)
             or any(
                 _matches_node(endpoint.get("node"), endpoint.get("node_uuid"))
                 for endpoint in curve_data.get("output_connections") or []
@@ -1695,6 +1915,7 @@ def restore_recovery(path):
             selected_nodes = _selected_transform_nodes()
             scoped_curves = None
             allowed_layer_plugs = None
+            restore_layers_data = layers_data
             if selection_scoped:
                 curves_data, objects_data, scoped_curves = _filter_recovery_to_selection(
                     curves_data,
@@ -1712,6 +1933,10 @@ def restore_recovery(path):
                     for curve_data in curves_data
                     if curve_data.get("layer") and curve_data["layer"].get("plug")
                 }
+                restore_layers_data = _layers_for_curves(
+                    layers_data,
+                    curves_data,
+                )
             current_curves = _curve_maps(scoped_curves)[0]
             _all_curves, by_name, by_uuid = _curve_maps()
             saved_uuids = set(item.get("uuid") for item in curves_data if item.get("uuid"))
@@ -1719,18 +1944,43 @@ def restore_recovery(path):
                 curve for curve in current_curves
                 if _node_uuid(curve) not in saved_uuids
             ]
-            key_total = sum(len(item.get("positions") or []) for item in curves_data)
+            key_total = sum(
+                min(
+                    len(item.get("positions") or []),
+                    len(item.get("values") or []),
+                )
+                for item in curves_data
+            )
+            key_removal_total = 0
+            for item in curves_data:
+                curve = by_uuid.get(item.get("uuid"))
+                if not curve and not item.get("uuid"):
+                    curve = by_name.get(item.get("name"))
+                key_removal_total += _curve_key_removal_count(curve, item)
             attribute_total = sum(len(item.get("attributes") or {}) for item in objects_data)
             if allowed_layer_plugs is not None:
                 layer_member_count = sum(
                     len([p for p in (entry.get("attributes") or []) if p in allowed_layer_plugs])
-                    for entry in layers_data
+                    for entry in restore_layers_data
                 )
             else:
-                layer_member_count = sum(len(entry.get("attributes") or []) for entry in layers_data)
-            layer_total = len(layers_data) + layer_member_count
+                layer_member_count = sum(
+                    len(entry.get("attributes") or [])
+                    for entry in restore_layers_data
+                )
+            layer_total = len(restore_layers_data) + layer_member_count
+            if not selection_scoped:
+                layer_total += len(_extra_layer_names(restore_layers_data))
+                layer_total += _extra_layer_membership_count(
+                    restore_layers_data
+                )
             operation.set_total(
-                len(chain_paths) + len(extra_curves) + key_total + attribute_total + layer_total,
+                len(chain_paths)
+                + len(extra_curves)
+                + key_total
+                + key_removal_total
+                + attribute_total
+                + layer_total,
                 reset=False,
             )
             operation.set_status("Applying recovery")
@@ -1744,13 +1994,24 @@ def restore_recovery(path):
                 operation.step()
 
             operation.set_status("Restoring animation layers")
-            layer_name_map = _restore_layers(layers_data, operation=operation)
-            if operation.cancelled:
-                return False
-            _restore_layer_membership(
-                layers_data, layer_name_map, operation=operation, allowed_plugs=allowed_layer_plugs
+            layer_name_map = _restore_layers(
+                restore_layers_data,
+                operation=operation,
             )
-            if operation.cancelled:
+            if operation.cancelled or layer_name_map is None:
+                return False
+            if not selection_scoped and not _remove_extra_layers(
+                restore_layers_data,
+                layer_name_map,
+                operation=operation,
+            ):
+                return False
+            if not _restore_layer_membership(
+                restore_layers_data,
+                layer_name_map,
+                operation=operation,
+                allowed_plugs=allowed_layer_plugs,
+            ):
                 return False
             operation.set_status("Applying recovery")
 
@@ -1764,7 +2025,11 @@ def restore_recovery(path):
                     curve = by_name.get(curve_data.get("name"))
                 if not curve or not cmds.objExists(curve):
                     if not _has_resolvable_curve_output(curve_data, uuid_lookup, layer_name_map):
-                        if operation.step(len(curve_data.get("positions") or [])):
+                        skipped_keys = min(
+                            len(curve_data.get("positions") or []),
+                            len(curve_data.get("values") or []),
+                        )
+                        if skipped_keys and operation.step(skipped_keys):
                             return False
                         continue
                     curve = cmds.createNode(curve_data.get("node_type") or "animCurveTU", name=curve_data.get("name"))
@@ -1777,7 +2042,11 @@ def restore_recovery(path):
 
             # Lock state is applied last so it never blocks membership/curve
             # reconnection above -- a locked layer cannot receive new members.
-            _lock_restored_layers(layers_data, layer_name_map)
+            if not _lock_restored_layers(
+                restore_layers_data,
+                layer_name_map,
+            ):
+                return False
 
             # tool_operation() paints the timeline tint itself once it sees
             # operation.success + operation.timerange -- same handoff paste
@@ -1849,6 +2118,7 @@ class AnimationRecoveryService(QtCore.QObject):
         self._pending_object_attributes = {}
         self._full_refresh_pending = False
         self._curve_cache = None
+        self._layer_cache = None
         self._object_cache = {}
         self._attribute_cache = {}
         self._last_snapshot_timestamp = 0.0
@@ -1919,8 +2189,8 @@ class AnimationRecoveryService(QtCore.QObject):
             return
         try:
             chain_paths = _recovery_chain_paths(valid_path)
-            version, full_snapshot = _recovery_header(chain_paths[0])
-            baseline_offset = 1 if version >= 5 and full_snapshot else 0
+            _version, full_snapshot = _recovery_header(chain_paths[0])
+            baseline_offset = 1 if full_snapshot else 0
             self._snapshots_since_baseline = max(0, len(chain_paths) - baseline_offset)
         except Exception:
             self._last_checkpoint_name = None
@@ -1948,6 +2218,7 @@ class AnimationRecoveryService(QtCore.QObject):
                 key=RUNTIME_LAYER_KEY,
                 callback=self._layer_structure_changed,
             )
+        self._watch_animation_layers()
         self.manager.connect_signal(
             self.manager.scene_opened,
             self._scene_opened,
@@ -1980,10 +2251,12 @@ class AnimationRecoveryService(QtCore.QObject):
             RUNTIME_SCENE_KEY + ":before_save",
             RUNTIME_TRANSFORM_KEY,
             RUNTIME_LAYER_KEY,
+            RUNTIME_LAYER_ATTRIBUTE_KEY,
         ):
             self.manager.disconnect_callbacks(key)
         self.scene_id = None
         self._curve_cache = None
+        self._layer_cache = None
         self.discard_pending()
         self._object_cache.clear()
         self._attribute_cache.clear()
@@ -1996,12 +2269,14 @@ class AnimationRecoveryService(QtCore.QObject):
         with self.suspended():
             self.discard_pending()
             self._curve_cache = None
+            self._layer_cache = None
             self._object_cache.clear()
             self._attribute_cache.clear()
             self.scene_id = ensure_scene_id()
             self._initialize_history_state()
             self._last_prompted_checkpoint = None
         self._rewatch_timer.start()
+        QtCore.QTimer.singleShot(0, self._watch_animation_layers)
 
     def _scene_opened(self, *_args):
         self._scene_changed()
@@ -2074,7 +2349,56 @@ class AnimationRecoveryService(QtCore.QObject):
         # (existence, hierarchy, membership) current for recovery.
         if _maya_file_io_active():
             return
-        self.schedule_snapshot("dag", full=True)
+        self.schedule_snapshot("layer", full=True)
+        QtCore.QTimer.singleShot(0, self._watch_animation_layers)
+
+    def _watch_animation_layers(self):
+        """Watch layer values and membership connections, not only curves."""
+        if self._suspend_count or not self.scene_id:
+            return
+        self.manager.disconnect_callbacks(RUNTIME_LAYER_ATTRIBUTE_KEY)
+        self.manager.add_node_attribute_changed_callbacks(
+            animlayers.scene_layer_names(include_root=True),
+            self._layer_attribute_changed,
+            key=RUNTIME_LAYER_ATTRIBUTE_KEY,
+        )
+
+    def _layer_attribute_changed(self, *args):
+        if self._suspend_count or om is None or not args or _maya_file_io_active():
+            return
+        message = args[0]
+        value_change = bool(message & om.MNodeMessage.kAttributeSet)
+        structure_change = bool(
+            message
+            & (
+                om.MNodeMessage.kConnectionMade
+                | om.MNodeMessage.kConnectionBroken
+                | om.MNodeMessage.kAttributeAdded
+                | om.MNodeMessage.kAttributeRemoved
+            )
+        )
+        if not value_change and not structure_change:
+            return
+        if value_change and not structure_change and len(args) > 1:
+            try:
+                attribute = args[1].partialName(useLongNames=True)
+            except Exception:
+                attribute = None
+            if attribute not in {
+                "weight",
+                "mute",
+                "solo",
+                "override",
+                "passthrough",
+                "lock",
+                "rotationAccumulationMode",
+                "scaleAccumulationMode",
+            }:
+                return
+        # Membership changes can move an unchanged curve between layers, so
+        # they require a full curve comparison. Pure state changes only need
+        # the complete layer snapshot that every checkpoint already carries.
+        self.schedule_snapshot("layer", full=structure_change)
 
     def _watch_scene_objects(self):
         if self._suspend_count or not self.scene_id:
@@ -2301,6 +2625,8 @@ class AnimationRecoveryService(QtCore.QObject):
         self._full_refresh_pending = False
         with self.suspended():
             layers_data, curve_layer_map = _animation_layers_snapshot()
+            layers_changed = self._layer_cache != layers_data
+            self._layer_cache = layers_data
             if full:
                 payload, created = self._full_payload(
                     reason, layers_data, curve_layer_map, force_baseline=force_baseline
@@ -2321,10 +2647,11 @@ class AnimationRecoveryService(QtCore.QObject):
                 complete_snapshot=complete_snapshot,
             )
             if (
-                reason in ("animation", "transform")
+                reason in ("animation", "transform", "layer")
                 and not payload.get("curves")
                 and not payload.get("objects")
                 and not payload.get("removed_curves")
+                and not layers_changed
             ):
                 return None
             folder = scene_recovery_folder(self.scene_id, create=True)
@@ -2365,6 +2692,7 @@ class AnimationRecoveryService(QtCore.QObject):
         # Any queued delta may depend on the failed point. Rebuild both caches
         # so the next real checkpoint is a self-contained baseline.
         self._curve_cache = None
+        self._layer_cache = None
         self._object_cache.clear()
         self._initialize_history_state()
         self._snapshots_since_baseline = BASELINE_INTERVAL

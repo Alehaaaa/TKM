@@ -186,6 +186,12 @@ class AttributeSwitcherController:
 
     def analyze(self, nodes, show_rotate_order=True):
         """Return switchable connected attributes grouped across nodes."""
+        nodes = list(nodes or [])
+        # Gimbal analysis walks every keyed rotation frame for all six orders.
+        # A grouped row cannot display per-control results, so doing that work
+        # while opening the switcher makes large selections unnecessarily slow.
+        # Multi-switch explicitly requests the analysis when its dialog opens.
+        analyze_gimbal = show_rotate_order and len(nodes) == 1
         catalog = {}
         for node in nodes:
             attributes = cmds.listAttr(node, ud=True) or []
@@ -203,11 +209,22 @@ class AttributeSwitcherController:
 
             for attribute in attributes:
                 self._analyze_attribute(
-                    catalog, node, attribute, show_rotate_order
+                    catalog,
+                    node,
+                    attribute,
+                    show_rotate_order,
+                    analyze_gimbal,
                 )
         return catalog
 
-    def _analyze_attribute(self, catalog, node, attribute, show_rotate_order):
+    def _analyze_attribute(
+        self,
+        catalog,
+        node,
+        attribute,
+        show_rotate_order,
+        analyze_gimbal=True,
+    ):
         try:
             attribute_type = cmds.attributeQuery(
                 attribute, node=node, attributeType=True
@@ -265,9 +282,46 @@ class AttributeSwitcherController:
             "min": float(minimum),
             "max": float(maximum),
         }
-        if catalog_key == "rotateOrder" and show_rotate_order:
+        if catalog_key == "rotateOrder" and show_rotate_order and analyze_gimbal:
             object_data["gimbal"] = self.analyzer.analyze(node)
         entry["objects"][node] = object_data
+
+    def analyze_group_gimbal(self, objects_data):
+        """Analyze a staged rotate-order group and return combined ranks.
+
+        The score for an order is the worst score among the controls, which
+        makes the displayed recommendation safe for the complete group being
+        switched. Individual results remain cached only to avoid repeat work.
+        """
+        objects_data = objects_data or {}
+        per_object = {}
+        for node, data in objects_data.items():
+            gimbal = data.get("gimbal")
+            if gimbal is None:
+                gimbal = self.analyzer.analyze(node)
+                data["gimbal"] = gimbal
+            per_object[node] = gimbal or {}
+
+        any_data = next(iter(objects_data.values()), {})
+        orders = list(any_data.get("enum") or ROTATE_ORDER_OPTIONS)
+        percentages = []
+        for order in orders:
+            scores = [
+                result[order]["percentage"]
+                for result in per_object.values()
+                if order in result and "percentage" in result[order]
+            ]
+            percentages.append(max(scores) if scores else 0)
+
+        labels = self.analyzer.classify_percentages(percentages)
+        combined = {
+            order: {
+                "percentage": percentages[index],
+                "label": labels[index],
+            }
+            for index, order in enumerate(orders)
+        }
+        return combined
 
     @staticmethod
     def _attribute_range(node, attribute, attribute_type):

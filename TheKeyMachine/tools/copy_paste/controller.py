@@ -127,31 +127,54 @@ def _animation_layer_items(channel_data):
     return items
 
 
-def _animation_data_key_count(animation_data, targets=None):
+def _key_pair_count(channel_data):
+    """Return the number of key attempts the paste loop will perform."""
+    channel_data = channel_data or {}
+    return min(
+        len(channel_data.get(ANIMATION_FRAME_KEY) or []),
+        len(channel_data.get(ANIMATION_VALUE_KEY) or []),
+    )
+
+
+def _animation_channels_key_count(channels, layer_metadata=None):
+    """Count channel and layer-weight keys for one destination control."""
     count = 0
-    controls = _animation_controls(animation_data)
-    target_names = set(targets or controls.keys())
-    for control, channels in controls.items():
-        if control not in target_names:
-            continue
-        for anim_data in (channels or {}).values():
-            count += len(anim_data.get(ANIMATION_FRAME_KEY) or [])
-            for _layer_name, layer_data, weight_data in _animation_layer_items(anim_data):
-                count += len(layer_data.get(ANIMATION_FRAME_KEY) or [])
-                count += len(weight_data.get(ANIMATION_FRAME_KEY) or [])
-    for metadata in (
-        ((animation_data or {}).get(ANIMATION_META_KEY) or {})
-        .get(ANIMATION_LAYER_META_KEY, {})
-        .values()
-    ):
-        count += len((metadata.get("weight") or {}).get(ANIMATION_FRAME_KEY) or [])
+    counted_weight_layers = set()
+    layer_metadata = layer_metadata or {}
+    for anim_data in (channels or {}).values():
+        count += _key_pair_count(anim_data)
+        for layer_id, layer_data, weight_data in _animation_layer_items(anim_data):
+            count += _key_pair_count(layer_data)
+            if layer_id in counted_weight_layers:
+                continue
+            weight_data = weight_data or (
+                (layer_metadata.get(layer_id) or {}).get("weight") or {}
+            )
+            count += _key_pair_count(weight_data)
+            counted_weight_layers.add(layer_id)
     return count
+
+
+def _animation_data_key_count(animation_data, targets=None):
+    controls = _animation_controls(animation_data)
+    target_names = set(controls.keys() if targets is None else targets)
+    layer_metadata = (
+        ((animation_data or {}).get(ANIMATION_META_KEY) or {}).get(
+            ANIMATION_LAYER_META_KEY
+        )
+        or {}
+    )
+    return sum(
+        _animation_channels_key_count(channels, layer_metadata=layer_metadata)
+        for control, channels in controls.items()
+        if control in target_names
+    )
 
 
 def _animation_data_apply_count(animation_data, targets=None):
     count = _animation_data_key_count(animation_data, targets=targets)
     controls = _animation_controls(animation_data)
-    target_names = set(targets or controls.keys())
+    target_names = set(controls.keys() if targets is None else targets)
     for control, channels in controls.items():
         if control not in target_names:
             continue
@@ -159,6 +182,16 @@ def _animation_data_apply_count(animation_data, targets=None):
             if ANIMATION_STATIC_VALUE_KEY in (anim_data or {}):
                 count += 1
     return count
+
+
+def _animation_channels_apply_count(channels, layer_metadata=None):
+    return _animation_channels_key_count(
+        channels, layer_metadata=layer_metadata
+    ) + sum(
+        1
+        for anim_data in (channels or {}).values()
+        if ANIMATION_STATIC_VALUE_KEY in (anim_data or {})
+    )
 
 
 def _time_context_tint_range(time_context):
@@ -1356,12 +1389,21 @@ def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
         return
 
     paste_range = _animation_data_timerange(animation_data)
-    key_count = _animation_data_apply_count(animation_data)
     controls = _animation_controls(animation_data)
     scene_nodes = cmds.ls() or []
     scene_nodes_by_leaf = {
         node.rsplit("|", 1)[-1]: node for node in scene_nodes
     }
+    matched_sources = [
+        control_name
+        for control_name in controls
+        if scene_nodes_by_leaf.get(
+            mirror_controller.opposite_control_name(control_name)
+        )
+    ]
+    key_count = _animation_data_apply_count(
+        animation_data, targets=matched_sources
+    )
     prompt_range = None
     with _copy_paste_operation("paste_opposite_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
         keys_set = 0
@@ -1432,8 +1474,17 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
         first_source_frame = source_range[0] if source_range else current_time
         paste_range = _shift_timerange(source_range, current_time - first_source_frame) if insert else source_range
         controls = _animation_controls(animation_data)
+        layer_metadata = (
+            (animation_data.get(ANIMATION_META_KEY) or {}).get(
+                ANIMATION_LAYER_META_KEY
+            )
+            or {}
+        )
         key_count = sum(
-            _animation_data_apply_count({ANIMATION_CONTROLS_KEY: {source_node: controls.get(source_node, {})}})
+            _animation_channels_apply_count(
+                controls.get(source_node, {}),
+                layer_metadata=layer_metadata,
+            )
             for source_node, _ in mappings
         )
         prompt_range = None
@@ -1452,12 +1503,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
                     insert_time=current_time if insert else None,
                     replace_range=(0, 1e6),
                     progress=processor,
-                    layer_metadata=(
-                        (animation_data.get(ANIMATION_META_KEY) or {}).get(
-                            ANIMATION_LAYER_META_KEY
-                        )
-                        or {}
-                    ),
+                    layer_metadata=layer_metadata,
                 )
                 total_keys_set += applied
                 if applied:
@@ -1504,10 +1550,23 @@ def paste_pose_to(*args, anchor_widget=None, **kwargs):
     controls = _pose_controls(pose_data)
 
     def _apply_mappings(mappings, insert=False):
-        with _copy_paste_operation("paste_pose_to", "Pose Pasted", undo=True, tint="current") as operation:
+        attribute_total = sum(
+            len(controls.get(source_node) or {})
+            for source_node, _target_node in mappings
+        )
+        with _copy_paste_operation(
+            "paste_pose_to",
+            "Pose Pasted",
+            undo=True,
+            tint="current",
+            progress=True,
+            progress_max=attribute_total,
+        ) as operation:
+            processor = operation["operation"].set_status("Pasting Pose")
             attrs_set, pasted_targets = _apply_pose_data(
                 pose_data,
                 [target_node for _source_node, target_node in mappings],
+                progress=processor,
                 mappings=mappings,
             )
 
