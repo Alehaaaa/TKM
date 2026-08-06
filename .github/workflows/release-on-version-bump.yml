@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Normalize version, stage, build, codename and README badge
         id: sync
@@ -39,7 +41,15 @@ jobs:
           fi
 
       - name: Render changelog entry as release notes
-        run: python3 scripts/release/render_release_notes.py "${{ steps.sync.outputs.version }}" > release_notes.md
+        env:
+          VERSION: ${{ steps.sync.outputs.version }}
+        run: |
+          previous_tag="$(git describe --tags --match 'TKM-*' --abbrev=0 HEAD^ 2>/dev/null || true)"
+          args=("$VERSION")
+          if [[ -n "$previous_tag" ]]; then
+            args+=(--previous-version "${previous_tag#TKM-}")
+          fi
+          python3 scripts/release/render_release_notes.py "${args[@]}" > release_notes.md
 
       - name: Build release zip
         run: |
