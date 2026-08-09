@@ -21,62 +21,92 @@ Supports Maya 2022+ on Windows, Linux, and macOS.
 
 ## Main Tool Areas
 
-### Key Editing
+<details>
+<summary><b>Key Editing</b></summary>
 
-- `Nudge Left / Nudge Right` to move selected keys in time, including insert/remove inbetween variants
-- `Share Keys` to unify keyed times across selected objects
-- `reBlock` to rebuild selected animation onto a shared stepped timing structure
-- `Bake on Ones / Twos / Threes / Fours / Custom` for fixed or custom sampling
-- `Clear Selection` to remove key selection quickly
-- `Select Scene Anim` to collect animation curves from the scene
-- `Anim Curve Tools` use selected objects and animation layers, prioritize highlighted Time Slider ranges, and include layer-weight animation
-- key copy, cut, and crop share a tangent-aware clipboard; paste supports Graph Editor anchors, channel remapping, and relative value offsets
-- `Set Smart Key` for animated curves, selected channels, Graph Editor keys, highlighted ranges, exact subframes, and unanimated objects in mixed selections
-- `Smart Euler Filter`, redundant-key removal, and static-curve cleanup that respect the active selection context
-- `Snap Keys` uses selected objects and animation layers (including layer-weight keys), prioritizes the highlighted Time Slider range, and merges multiple subframe keys into the closest whole-frame key
-- nudge, inbetween, bake, tangent, and background-runner actions use clearer toolbar icons
+| Tool | What it does |
+|---|---|
+| `Nudge Left / Nudge Right` | Move selected keys in time, including insert/remove inbetween variants |
+| `Share Keys` | Unify keyed times across selected objects |
+| `reBlock` | Rebuild selected animation onto a shared stepped timing structure |
+| `Bake on Ones / Twos / Threes / Fours / Custom` | Fixed or custom sampling |
+| `Clear Selection` | Remove key selection quickly |
+| `Select Scene Anim` | Collect animation curves from the scene |
+| `Anim Curve Tools` | Use selected objects and animation layers, prioritize highlighted Time Slider ranges, and include layer-weight animation |
+| Copy / Cut / Crop | Share a tangent-aware clipboard; paste supports Graph Editor anchors, channel remapping, and relative value offsets |
+| `Set Smart Key` | For animated curves, selected channels, Graph Editor keys, highlighted ranges, exact subframes, and unanimated objects in mixed selections |
+| `Smart Euler Filter` | Redundant-key removal and static-curve cleanup that respect the active selection context |
+| `Snap Keys` | Uses selected objects and animation layers (including layer-weight keys), prioritizes the highlighted Time Slider range, and merges multiple subframe keys into the closest whole-frame key |
 
-### Tangents
+Nudge, inbetween, bake, tangent, and background-runner actions use clearer toolbar icons.
 
-- tangent buttons support modifier-click variants for Maya default tangent and all-keys operations
-- stepped tangent menus focus on stepped-safe actions
-- slider mode menus stay connected to visible modes, including torn-off menus and live pin/default changes
+</details>
 
-### Selection And Scene Tools
+<details>
+<summary><b>Tangents</b></summary>
 
-- `Select Rig Controls`, including animated-controls-only variants
-- `Isolate` with bookmark support and down-one-level options
-- `Create Locator` tools for quick temporary setup work
-- `Align` for translation, rotation, scale, full transform, and matching only the reference object's real keys across a selected range
-- `Tracer` for animation tracing, refresh, visibility, and style switching
-- `Default Values` on the current frame, selected keys, or ranges
-- `Clear Animation` in the active time context
-- `Selector` for a live selection list window
-- `Select Opposite` and `Mirror` for side-based workflows
-- `Select Hierarchy` for deeper rig selection
+- Tangent buttons support modifier-click variants for Maya default tangent and all-keys operations
+- Stepped tangent menus focus on stepped-safe actions
+- Slider mode menus stay connected to visible modes, including torn-off menus and live pin/default changes
 
-### Copy / Paste
+</details>
 
-- `Copy Pose / Paste Pose` for current-frame value transfer
-- `Copy Animation / Paste Animation` between matching controls
-- `Paste Insert` to place copied animation at the current time
-- `Paste Opposite` for mirrored transfers
-- `Paste To` for chosen target sets
+<details>
+<summary><b>Selection And Scene Tools</b></summary>
 
-### Offset And Pivot
+| Tool | What it does |
+|---|---|
+| `Select Rig Controls` | Includes animated-controls-only variants |
+| `Isolate` | Bookmark support and down-one-level options |
+| `Create Locator` | Quick temporary setup work |
+| `Align` | Translation, rotation, scale, full transform, and matching only the reference object's real keys across a selected range |
+| `Tracer` | Animation tracing, refresh, visibility, and style switching |
+| `Default Values` | On the current frame, selected keys, or ranges |
+| `Clear Animation` | In the active time context |
+| `Selector` | A live selection list window |
+| `Select Opposite` / `Mirror` | Side-based workflows |
+| `Select Hierarchy` | Deeper rig selection |
 
-- `Animation Offset` to protect the current frame while offsetting the surrounding range
-- `Temp Pivot` to create or reuse a temporary manipulation pivot
-- `Micro Move` for live, object-oriented precision translation and rotation with cursor acceleration
-- `Depth Mover` to push selected controls toward or away from the camera with drag-adjusted sensitivity
+</details>
 
-### Linking And Space
+<details>
+<summary><b>Copy / Paste</b></summary>
 
-- `Link Objects` for relative links and optional auto-link behavior
-- `World Space` samples every frame in the selected or visible playback range, supports one-to-many pastes, and preserves animation outside the pasted range
-- `Attribute Switcher` for enum and attribute-driven switching, drag-release popup choices, and compact scrolling that expands only when the screen-limited content requires it
+| Tool | What it does |
+|---|---|
+| `Copy Pose / Paste Pose` | Current-frame value transfer |
+| `Copy Animation / Paste Animation` | Between matching controls |
+| `Paste Insert` | Place copied animation at the current time |
+| `Paste Opposite` | Mirrored transfers |
+| `Paste To` | Chosen target sets |
 
-### Animation Recovery
+</details>
+
+<details>
+<summary><b>Offset And Pivot</b></summary>
+
+| Tool | What it does |
+|---|---|
+| `Animation Offset` | Protect the current frame while offsetting the surrounding range |
+| `Temp Pivot` | Create or reuse a temporary manipulation pivot |
+| `Micro Move` | Live, object-oriented precision translation and rotation with cursor acceleration |
+| `Depth Mover` | Push selected controls toward or away from the camera with drag-adjusted sensitivity |
+
+</details>
+
+<details>
+<summary><b>Linking And Space</b></summary>
+
+| Tool | What it does |
+|---|---|
+| `Link Objects` | Relative links and optional auto-link behavior |
+| `World Space` | Samples every frame in the selected or visible playback range, supports one-to-many pastes, and preserves animation outside the pasted range |
+| `Attribute Switcher` | Enum and attribute-driven switching, drag-release popup choices, and compact scrolling that expands only when the screen-limited content requires it |
+
+</details>
+
+<details>
+<summary><b>Animation Recovery</b></summary>
 
 `Animation Recovery` is an optional background runner that keeps lightweight, scene-specific checkpoints when animation, transform channels, enum controls, or hierarchy changes are detected. It also creates a distinct checkpoint whenever the Maya scene is saved.
 
@@ -86,13 +116,18 @@ Most checkpoints store only their changed data. Periodic complete baselines boun
 
 When a scene is opened with the same recovery identity but an older saved-file time than its newest checkpoint, the recovery window opens automatically so the newer animation can be reviewed or restored.
 
-### Floating Windows
+</details>
+
+<details>
+<summary><b>Floating Windows</b></summary>
 
 - `Selection Sets`
 - `Orbit`
 - `Search`
 - `Graph Editor Toolbar`
 - `Isolate Bookmarks`
+
+</details>
 
 ## Timeline Feedback
 
@@ -115,20 +150,6 @@ Selection Sets support:
 - scene import/export and quick-file import/export
 - floating window and toolbar integration
 
-## Integrated Tool Modules
+---
 
-Dedicated tools live under `TheKeyMachine/tools/` for:
-
-- `animation_recovery`
-- `animation_offset`
-- `attribute_switcher`
-- `depth_mover`
-- `gimbal_fixer`
-- `graph_toolbar`
-- `isolate_bookmarks`
-- `micro_move`
-- `orbit`
-- `search`
-- `selection_sets`
-
-<img width="200px" src="./TheKeyMachine/data/icons/install_example.png" />
+**AI disclosure:** Portions of this codebase, including this README, have been written with the assistance of AI coding tools (Claude and Codex), with all changes reviewed by the maintainer.
