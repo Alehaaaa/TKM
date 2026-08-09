@@ -21,6 +21,12 @@ concurrency:
 
 jobs:
   release:
+    # sync_version_metadata.py can write TheKeyMachine/version itself now
+    # (e.g. when __init__.py's __version__ was bumped by hand and is newer),
+    # and the "Commit normalized metadata" step below pushes that -- which
+    # would match this workflow's own path filter and re-trigger it. Skip
+    # runs the bot's own commit would cause.
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
