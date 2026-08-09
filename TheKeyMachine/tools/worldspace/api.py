@@ -47,16 +47,28 @@ def _copy_worldspace_frames(selected_objects, frames, timerange, tool_id, label)
         undo=False,
         suspend_refresh=True,
     ) as operation:
-        for frame in frames:
-            if operation.cancelled:
-                break
-
+        def _collect_frame(frame):
             for source_obj in selected_objects:
                 worldspace_values = _world_matrix(source_obj, frame)
                 if worldspace_values is None:
                     continue
                 animation_data.setdefault(source_obj, {})[int(frame)] = worldspace_values
-            operation.step()
+
+        def _collect_all():
+            for frame in frames:
+                if operation.cancelled:
+                    break
+                operation.run_on_main(_collect_frame, frame)
+                operation.step()
+
+        # Off the main thread so a Cancel press actually gets a chance to
+        # register while this samples potentially many frames' worth of
+        # world matrices -- a tight loop of OpenMaya calls on the main
+        # thread never gives Qt a chance to notice one. See
+        # attribute_switcher's controller for the same pattern applied
+        # first, and tools/common.py's run_on_worker_thread/
+        # ToolOperation.run_on_main for the mechanics.
+        toolCommon.run_on_worker_thread(_collect_all)
 
         payload = {
             "meta": {
@@ -134,6 +146,7 @@ def paste_worldspace_single_frame(*args):
         label="Paste World Space Frame",
         progress=False,
         undo=True,
+        rollback_on_cancel=True,
     ) as operation:
         # Load from clipboard
         payload = clipboard.load(
@@ -210,30 +223,46 @@ def paste_worldspace_single_frame(*args):
             first_frame = next(iter(obj_data))
             return obj_data[first_frame]
 
+        def _paste_to_target(obj, values):
+            if cmds.objExists(obj):
+                _apply_worldspace_values(obj, values)
+
         # Single-source: paste to any selection size (same transform for all targets)
         if source_count == 1:
             values = _first_frame_values(ordered_sources[0])
             if not values:
                 return wutil.make_inViewMessage("No World Space data found")
-            for obj in target_objects:
-                if operation.cancelled:
-                    return
-                if cmds.objExists(obj):
-                    _apply_worldspace_values(obj, values)
-                operation.step()
+
+            def _paste_single():
+                for obj in target_objects:
+                    if operation.cancelled:
+                        return
+                    operation.run_on_main(_paste_to_target, obj, values)
+                    operation.step()
+
+            toolCommon.run_on_worker_thread(_paste_single)
             return
 
-        # Multi-source: paste in order (source[0]->target[0], ...)
-        for idx, target_obj in enumerate(target_objects):
-            if operation.cancelled:
-                return
-            source_obj = ordered_sources[idx]
-            values = _first_frame_values(source_obj)
-            if not values:
-                return wutil.make_inViewMessage("No World Space data found")
-            if cmds.objExists(target_obj):
-                _apply_worldspace_values(target_obj, values)
-            operation.step()
+        # Multi-source: paste in order (source[0]->target[0], ...). Returns
+        # a message string if a target ran out of source data mid-loop, so
+        # the caller (still on the main thread once the worker returns) can
+        # surface it -- wutil.make_inViewMessage is a Qt call and can't be
+        # made directly from the worker thread this now runs on.
+        def _paste_multi():
+            for idx, target_obj in enumerate(target_objects):
+                if operation.cancelled:
+                    return None
+                source_obj = ordered_sources[idx]
+                values = _first_frame_values(source_obj)
+                if not values:
+                    return "No World Space data found"
+                operation.run_on_main(_paste_to_target, target_obj, values)
+                operation.step()
+            return None
+
+        message = toolCommon.run_on_worker_thread(_paste_multi)
+        if message:
+            return wutil.make_inViewMessage(message)
 
 
 def _worldspace_frame_number(frame_key):
@@ -265,6 +294,7 @@ def worldspace_paste_animation(*args):
             progress_max=1,
             undo=True,
             suspend_refresh=True,
+            rollback_on_cancel=True,
         ) as operation:
             payload = clipboard.load(
                 WORLDSPACE_CLIPBOARD,
@@ -381,10 +411,7 @@ def worldspace_paste_animation(*args):
 
             operation.set_total(len(all_frames), reset=True)
 
-            for frame in all_frames:
-                if operation.cancelled:
-                    break
-
+            def _paste_frame(frame):
                 cmds.currentTime(frame)
                 for source_obj, target_obj in mapping:
                     if not cmds.objExists(target_obj):
@@ -401,7 +428,19 @@ def worldspace_paste_animation(*args):
                             time=frame,
                             context=layer_context,
                         )
-                operation.step()
+
+            def _paste_all_frames():
+                for frame in all_frames:
+                    if operation.cancelled:
+                        break
+                    operation.run_on_main(_paste_frame, frame)
+                    operation.step()
+
+            # Off the main thread so a Cancel press actually gets a chance
+            # to register while this scrubs through potentially many
+            # frames -- see _copy_worldspace_frames above and
+            # attribute_switcher's controller for the same pattern.
+            toolCommon.run_on_worker_thread(_paste_all_frames)
 
             if valid_targets:
                 curves = []

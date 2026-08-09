@@ -15,6 +15,10 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.36:
+  - bugfix: Attribute Switcher's Cancel and Esc reliably stop an in-progress switch in Normal and Super mode, and its popup selector no longer occasionally errors while dragging
+  - bugfix: Cancelling Animation Recovery, World Space, or Copy and Paste Pose and Animation mid-operation now reverts cleanly instead of leaving a partial result
+
 0.1.35:
   - polish: Tool progress is steadier, more responsive, and less intrusive
   - bugfix: Selection Sets and toolbar popups close reliably after losing focus

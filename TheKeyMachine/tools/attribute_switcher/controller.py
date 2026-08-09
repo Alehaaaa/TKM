@@ -456,6 +456,21 @@ class AttributeSwitcherController:
             value = value.split(" ")[0]
         return value, True
 
+    @staticmethod
+    def _on_main(operation, fn, *args):
+        """Call ``fn`` on the main thread if ``operation`` says we're not
+        already there; otherwise call it inline.
+
+        Every helper below that's reachable from the worker thread
+        apply_switch/apply_switches dispatch onto (see run_on_worker_thread
+        in tools/common.py) must route its cmds/OpenMaya touches through
+        this -- calling them directly off the main thread can crash Maya.
+        ``operation.run_on_main`` already collapses to a plain inline call
+        when it's invoked from the main thread, so this is free to call
+        even for the non-threaded/analysis code paths.
+        """
+        return operation.run_on_main(fn, *args) if operation else fn(*args)
+
     def apply_switch(
         self,
         value,
@@ -495,54 +510,37 @@ class AttributeSwitcherController:
                 progress=True,
                 undo=True,
                 anchor_widget=self.view,
+                rollback_on_cancel=True,
             )
             operation = operation_manager.__enter__()
             if _manage_session:
                 self.disconnect_runtime()
 
-            sorted_targets = targets
-            if attribute == "rotateOrder":
-                # Rotate order only ever reinterprets an object's own local
-                # rx/ry/rz -- unlike every other switchable attribute (space
-                # switches, IK/FK, ...) it has no dependency on world space,
-                # parenting, or constraints. In Super mode, eligible
-                # targets are converted with pure Euler math instead of the
-                # frame-by-frame, world-matrix-preserving path below. Only
-                # targets that aren't safe for that (driven keys, layers,
-                # expressions), or every target when Super mode is off
-                # (Normal mode), fall back to it.
-                remaining_targets = targets
-                if self.super_mode_enabled():
-                    remaining_targets = self._switch_rotate_order_super(
-                        targets, target_attributes, value, operation, not _manage_session
-                    )
-                if remaining_targets:
-                    self._apply_frame_scoped(
-                        remaining_targets,
-                        attribute,
-                        enum_index,
-                        target_attributes,
-                        True,
-                        operation,
-                        temporary_keys,
-                        not _manage_session,
-                        prepared_frames=_prepared_frames,
-                    )
-            else:
-                self._apply_frame_scoped(
-                    targets,
-                    attribute,
-                    enum_index,
-                    target_attributes,
-                    all_frames,
-                    operation,
-                    temporary_keys,
-                    not _manage_session,
-                    prepared_frames=_prepared_frames,
-                )
+            # The actual frame-by-frame Maya work runs on a worker thread
+            # so the main thread's Qt event loop stays free to dispatch a
+            # Cancel press (progress-bar click or Esc) while it's working
+            # -- a tight loop of cmds calls on the main thread never gives
+            # Qt a chance to notice one until the loop itself pauses to
+            # check. This call blocks until the worker finishes, without
+            # blocking the event loop the way running it inline here
+            # would. See tools/common.py's run_on_worker_thread /
+            # ToolOperation.run_on_main for the mechanics.
+            toolCommon.run_on_worker_thread(
+                self._apply_switch_worker,
+                operation,
+                value,
+                attribute,
+                targets,
+                target_attributes,
+                enum_index,
+                all_frames,
+                temporary_keys,
+                _prepared_frames,
+                not _manage_session,
+            )
 
             if self.view.euler_filter and _manage_session:
-                self.apply_euler_filter(sorted_targets)
+                self.apply_euler_filter(targets)
         finally:
             self._remove_temporary_keys(temporary_keys)
             if _manage_session:
@@ -555,6 +553,64 @@ class AttributeSwitcherController:
                     pass
         if _manage_session:
             cmds.showWindow("MayaWindow")
+
+    def _apply_switch_worker(
+        self,
+        operation,
+        value,
+        attribute,
+        targets,
+        target_attributes,
+        enum_index,
+        all_frames,
+        temporary_keys,
+        prepared_frames,
+        step_operation,
+    ):
+        """Runs off the main thread -- see apply_switch's run_on_worker_thread
+        call. Every Maya touch reachable from here (directly or through the
+        helpers this calls) must go through operation.run_on_main()/
+        self._on_main() rather than calling cmds/omui directly.
+        """
+        if attribute == "rotateOrder":
+            # Rotate order only ever reinterprets an object's own local
+            # rx/ry/rz -- unlike every other switchable attribute (space
+            # switches, IK/FK, ...) it has no dependency on world space,
+            # parenting, or constraints. In Super mode, eligible
+            # targets are converted with pure Euler math instead of the
+            # frame-by-frame, world-matrix-preserving path below. Only
+            # targets that aren't safe for that (driven keys, layers,
+            # expressions), or every target when Super mode is off
+            # (Normal mode), fall back to it.
+            remaining_targets = targets
+            if self.super_mode_enabled():
+                remaining_targets = self._switch_rotate_order_super(
+                    targets, target_attributes, value, operation, step_operation
+                )
+            if remaining_targets:
+                self._apply_frame_scoped(
+                    remaining_targets,
+                    attribute,
+                    enum_index,
+                    target_attributes,
+                    True,
+                    operation,
+                    temporary_keys,
+                    step_operation,
+                    prepared_frames=prepared_frames,
+                )
+        else:
+            self._apply_frame_scoped(
+                targets,
+                attribute,
+                enum_index,
+                target_attributes,
+                all_frames,
+                operation,
+                temporary_keys,
+                step_operation,
+                prepared_frames=prepared_frames,
+            )
 
     def _apply_frame_scoped(
         self,
@@ -610,13 +666,15 @@ class AttributeSwitcherController:
                 transforms=transforms,
             )
         elif isinstance(keyframes, list) and keyframes:
-            if not omui.set_current_time(keyframes[0]):
+            if not self._on_main(operation, omui.set_current_time, keyframes[0]):
                 return
             frame_transforms = transforms.get(keyframes[0], {})
             for target in targets:
                 if target not in frame_transforms:
                     continue
-                self._set_preserving_transform(
+                self._on_main(
+                    operation,
+                    self._set_preserving_transform,
                     target,
                     target_attributes[target],
                     enum_index,
@@ -631,13 +689,17 @@ class AttributeSwitcherController:
                 if target not in frame_transforms:
                     continue
                 target_attribute = target_attributes[target]
-                plug = "{}.{}".format(target, target_attribute)
-                if not (cmds.keyframe(plug, query=True, keyframeCount=True) or 0):
-                    temporary_keys.setdefault(target, {}).setdefault(
-                        target_attribute, []
-                    ).append(current_time)
-                    cmds.keyframe(plug)
-                self._set_preserving_transform(
+                self._on_main(
+                    operation,
+                    self._ensure_temporary_key,
+                    target,
+                    target_attribute,
+                    current_time,
+                    temporary_keys,
+                )
+                self._on_main(
+                    operation,
+                    self._set_preserving_transform,
                     target,
                     target_attribute,
                     enum_index,
@@ -645,6 +707,20 @@ class AttributeSwitcherController:
                 )
             if operation is not None and step_operation:
                 operation.step()
+
+    @staticmethod
+    def _ensure_temporary_key(target, target_attribute, current_time, temporary_keys):
+        """Give an unkeyed channel a temporary key at ``current_time`` so
+        the frame-scoped switch below has something to preserve; the key
+        is removed again in ``_remove_temporary_keys`` once the switch is
+        done.
+        """
+        plug = "{}.{}".format(target, target_attribute)
+        if not (cmds.keyframe(plug, query=True, keyframeCount=True) or 0):
+            temporary_keys.setdefault(target, {}).setdefault(
+                target_attribute, []
+            ).append(current_time)
+            cmds.keyframe(plug)
 
     def _prepare_frame_scoped(
         self,
@@ -654,35 +730,46 @@ class AttributeSwitcherController:
         matrix_cache=None,
         keyframes=None,
     ):
-        """Collect frame work and snapshot world matrices before any edits."""
-        if keyframes is None:
-            timeline_selection = cmds.timeControl("timeControl1", q=True, rv=True)
-            selected_range = cmds.timeControl("timeControl1", q=True, ra=True)
-            keyframes = self._collect_keyframes(
-                targets, all_frames, timeline_selection, selected_range
-            )
+        """Collect frame work and snapshot world matrices before any edits.
+
+        Safe to call from either the main thread or (via
+        apply_switch/apply_switches' worker-thread dispatch) a worker
+        thread: every cmds/OpenMaya touch below routes through
+        self._on_main(), which collapses to a plain inline call when
+        there's no thread to hop from.
+        """
         operation = toolCommon.current_tool_operation()
+        if keyframes is None:
+            def _collect():
+                timeline_selection = cmds.timeControl("timeControl1", q=True, rv=True)
+                selected_range = cmds.timeControl("timeControl1", q=True, ra=True)
+                return self._collect_keyframes(
+                    targets, all_frames, timeline_selection, selected_range
+                )
+            keyframes = self._on_main(operation, _collect)
         transforms = {}
         matrix_cache = matrix_cache if matrix_cache is not None else {}
         complete = True
         current_frame = (
             keyframes[0]
             if isinstance(keyframes, list) and keyframes
-            else self._current_time()
+            else self._on_main(operation, self._current_time)
         )
 
         def snapshot(frame, frame_targets):
-            result = {}
-            for target in frame_targets:
-                cache_key = (target, frame)
-                if cache_key not in matrix_cache:
-                    matrix_cache[cache_key] = omui.world_matrix_at_time(
-                        target, frame
-                    )
-                matrix = matrix_cache[cache_key]
-                if matrix is not None:
-                    result[target] = matrix
-            return result
+            def _snapshot():
+                result = {}
+                for target in frame_targets:
+                    cache_key = (target, frame)
+                    if cache_key not in matrix_cache:
+                        matrix_cache[cache_key] = omui.world_matrix_at_time(
+                            target, frame
+                        )
+                    matrix = matrix_cache[cache_key]
+                    if matrix is not None:
+                        result[target] = matrix
+                return result
+            return self._on_main(operation, _snapshot)
 
         if isinstance(keyframes, dict) and keyframes:
             if operation:
@@ -773,16 +860,22 @@ class AttributeSwitcherController:
 
         Returns the subset of ``targets`` that were not eligible and still
         need the slower fallback.
+
+        Each target's reorder is marshaled onto the main thread as one
+        unit (self._on_main), and ``operation.cancelled`` is checked
+        between targets -- this used to run every target with no
+        cancellation check at all, which is why a Cancel press during a
+        Super mode rotate-order switch never stopped it. Any target not
+        yet reached when cancellation is noticed is handed to the slower
+        fallback path too, which will itself see the cancellation and stop
+        immediately without doing any further work.
         """
-        slow_targets = []
-        for target in targets:
+        def _reorder_target(target, rotate_order_attr):
             try:
                 old_order = ROTATE_ORDER_OPTIONS[cmds.getAttr(target + ".rotateOrder")]
             except Exception:
-                slow_targets.append(target)
-                continue
+                return False
 
-            rotate_order_attr = target_attributes.get(target, "rotateOrder")
             if old_order == new_order:
                 # Nothing to reorder, but the attribute itself may still be
                 # a distinct plug alias (rare) -- keep it in sync.
@@ -793,11 +886,10 @@ class AttributeSwitcherController:
                     )
                 except Exception:
                     pass
-                continue
+                return True
 
             if not self._rotate_order_fast_eligible(target):
-                slow_targets.append(target)
-                continue
+                return False
 
             try:
                 self._reorder_rotation_keys(target, old_order, new_order)
@@ -806,10 +898,20 @@ class AttributeSwitcherController:
                     ROTATE_ORDER_OPTIONS.index(new_order),
                 )
             except Exception:
-                slow_targets.append(target)
-                continue
+                return False
+            return True
 
-            if operation is not None and step_operation:
+        targets = list(targets)
+        slow_targets = []
+        for index, target in enumerate(targets):
+            if operation is not None and operation.cancelled:
+                slow_targets.extend(targets[index:])
+                break
+            rotate_order_attr = target_attributes.get(target, "rotateOrder")
+            converted = self._on_main(operation, _reorder_target, target, rotate_order_attr)
+            if not converted:
+                slow_targets.append(target)
+            elif operation is not None and step_operation:
                 operation.step()
         return slow_targets
 
@@ -945,6 +1047,7 @@ class AttributeSwitcherController:
             timerange=timerange,
             tint_key="attribute_switcher_range",
             tint_color=toolbox.get_tool_tint_color("attribute_switcher"),
+            rollback_on_cancel=True,
         ) as operation:
             self.disconnect_runtime()
             try:
@@ -956,15 +1059,24 @@ class AttributeSwitcherController:
                 # from the previous application.
                 operation.set_status("Saving Positions")
                 matrix_cache = {}
-                for plan in plans:
-                    if operation.cancelled:
-                        break
-                    plan["frames"] = self._prepare_frame_scoped(
-                        plan["targets"],
-                        plan["all_frames"],
-                        matrix_cache=matrix_cache,
-                        keyframes=plan["keyframes"],
-                    )
+
+                def _save_all_positions():
+                    # Runs off the main thread (see run_on_worker_thread
+                    # below) so a Cancel press actually gets a chance to
+                    # register while this snapshots potentially many
+                    # frames -- _prepare_frame_scoped() itself routes every
+                    # Maya touch back through operation.run_on_main().
+                    for plan in plans:
+                        if operation.cancelled:
+                            break
+                        plan["frames"] = self._prepare_frame_scoped(
+                            plan["targets"],
+                            plan["all_frames"],
+                            matrix_cache=matrix_cache,
+                            keyframes=plan["keyframes"],
+                        )
+
+                toolCommon.run_on_worker_thread(_save_all_positions)
 
                 if not operation.cancelled:
                     operation.set_status("Applying Positions")
@@ -1146,16 +1258,23 @@ class AttributeSwitcherController:
             return None
         return omui.decompose_local_matrix(local_matrix, rotate_order)
 
-    def _apply_super_switch(self, targets, attribute, value, target_attributes, transforms):
+    def _apply_super_switch(self, targets, attribute, value, target_attributes, transforms, operation):
         """Apply the fast path to every target in ``targets`` across every
         frame in ``transforms``. Returns the subset actually completed --
         any target that fails even once is dropped entirely (not just for
         the failing frame) so the caller's normal per-frame fallback redoes
         *all* of its frames from the untouched baseline, rather than
         leaving a partial mix of fast- and slow-computed keys behind.
+
+        Every frame's worth of writes is marshaled onto the main thread as
+        one batch (self._on_main), and ``operation.cancelled`` is checked
+        between frames -- this used to run every frame with no cancellation
+        check at all, which is why a Cancel press during a Super mode
+        switch never stopped it.
         """
         failed = set()
-        for frame, frame_transforms in (transforms or {}).items():
+
+        def _apply_frame(frame, frame_transforms):
             for target in targets:
                 if target in failed:
                     continue
@@ -1172,6 +1291,11 @@ class AttributeSwitcherController:
                     failed.add(target)
                     continue
                 self._write_decomposed_transform(target, decomposed, frame)
+
+        for frame, frame_transforms in (transforms or {}).items():
+            if operation and operation.cancelled:
+                break
+            self._on_main(operation, _apply_frame, frame, frame_transforms)
         return targets - failed
 
     @staticmethod
@@ -1286,9 +1410,15 @@ class AttributeSwitcherController:
         target_attributes=None,
         transforms=None,
     ):
-        current_time = self._current_time()
+        """Safe to call from either the main thread or (via
+        apply_switch/apply_switches' worker-thread dispatch) a worker
+        thread -- every cmds/OpenMaya touch below routes through
+        self._on_main(), which collapses to a plain inline call when
+        there's no thread to hop from.
+        """
+        operation = toolCommon.current_tool_operation()
+        current_time = self._on_main(operation, self._current_time)
         try:
-            operation = toolCommon.current_tool_operation()
             frames = list(keyframes)
             if operation and frames:
                 # ensure_operation_tint() is a no-op if the operation
@@ -1299,35 +1429,43 @@ class AttributeSwitcherController:
                 # Maya's playbackOptions guard below matters, it's cheap
                 # enough to just repeat per call rather than track whether
                 # it's already been set once for this operation.
-                if maya_version.supports_playback_selection():
-                    cmds.playbackOptions(sv=False)
-                toolCommon.ensure_operation_tint(
-                    operation,
-                    tint="range",
-                    timerange=(frames[0], frames[-1]),
-                    tint_key="attribute_switcher_range",
-                    tint_color=toolbox.get_tool_tint_color("attribute_switcher"),
-                )
+                def _begin_range():
+                    if maya_version.supports_playback_selection():
+                        cmds.playbackOptions(sv=False)
+                    toolCommon.ensure_operation_tint(
+                        operation,
+                        tint="range",
+                        timerange=(frames[0], frames[-1]),
+                        tint_key="attribute_switcher_range",
+                        tint_color=toolbox.get_tool_tint_color("attribute_switcher"),
+                    )
+                self._on_main(operation, _begin_range)
             if operation:
                 operation.set_status("Applying Positions")
 
             fast_targets = set()
             if self._super_mode_active():
-                candidates = {
-                    target
-                    for frame_transforms in (transforms or {}).values()
-                    for target in frame_transforms
-                }
-                candidates = {
-                    target for target in candidates
-                    if self._switch_fast_eligible(target)
-                }
-                if candidates and self._verify_super_switch_sample(
+                def _collect_candidates():
+                    all_targets = {
+                        target
+                        for frame_transforms in (transforms or {}).values()
+                        for target in frame_transforms
+                    }
+                    return {
+                        target for target in all_targets
+                        if self._switch_fast_eligible(target)
+                    }
+                candidates = self._on_main(operation, _collect_candidates)
+                verified = bool(candidates) and self._on_main(
+                    operation,
+                    self._verify_super_switch_sample,
                     candidates, attribute, value, target_attributes, transforms,
                     current_time,
-                ):
+                )
+                if candidates and verified:
                     fast_targets = self._apply_super_switch(
-                        candidates, attribute, value, target_attributes, transforms
+                        candidates, attribute, value, target_attributes,
+                        transforms, operation,
                     )
 
             for frame, frame_transforms in (transforms or {}).items():
@@ -1339,21 +1477,24 @@ class AttributeSwitcherController:
                     if target not in fast_targets
                 }
                 if relevant:
-                    if not omui.set_current_time(frame):
-                        continue
-                    for target, transform in relevant.items():
-                        target_attribute = (
-                            target_attributes[target]
-                            if target_attributes
-                            else attribute
-                        )
-                        self._set_preserving_transform(
-                            target, target_attribute, value, transform
-                        )
+                    self._on_main(
+                        operation,
+                        self._apply_relevant_at_frame,
+                        frame, relevant, attribute, value, target_attributes,
+                    )
                 if operation:
                     operation.step()
         finally:
-            omui.set_current_time(current_time)
+            self._on_main(operation, omui.set_current_time, current_time)
+
+    def _apply_relevant_at_frame(self, frame, relevant, attribute, value, target_attributes):
+        if not omui.set_current_time(frame):
+            return
+        for target, transform in relevant.items():
+            target_attribute = (
+                target_attributes[target] if target_attributes else attribute
+            )
+            self._set_preserving_transform(target, target_attribute, value, transform)
 
     @staticmethod
     def _collect_keyframes(targets, all_frames, timeline_selection, selected_range):

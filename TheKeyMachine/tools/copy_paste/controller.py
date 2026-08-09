@@ -615,6 +615,7 @@ def _copy_paste_operation(
     timerange=None,
     progress=False,
     progress_max=0,
+    rollback_on_cancel=False,
 ):
     state = {"success": False, "timerange": None, "operation": None}
     tint_session = None
@@ -637,6 +638,7 @@ def _copy_paste_operation(
             timerange=operation_timerange,
             default_mode=default_mode,
             tint_key=tool_id,
+            rollback_on_cancel=rollback_on_cancel,
         ) as operation:
             state["operation"] = operation
             yield state
@@ -902,84 +904,107 @@ def _apply_animation_channels_to_targets(
             progress.step(amount=pending_progress)
         return applied
 
-    with toolCommon.suspend_maya_refresh():
+    def _apply_channel(target, channel, anim_data):
+        nonlocal keys_set
+        cache_key = (target, channel)
+        if cache_key not in attr_settable_cache:
+            attr_settable_cache[cache_key] = _attr_exists_and_settable(target, channel)
+        if not attr_settable_cache[cache_key]:
+            return
+
+        if ANIMATION_STATIC_VALUE_KEY in (anim_data or {}):
+            destination = animlayers.selected_destination_for_plug(
+                "{}.{}".format(target, channel),
+                context=destination_context,
+            )
+            if destination.get("blocked"):
+                blocked_layers.add(
+                    destination.get("layer")
+                    or destination_context.get("root_name")
+                    or "BaseAnimation"
+                )
+                return
+            try:
+                value = anim_data.get(ANIMATION_STATIC_VALUE_KEY)
+                if destination.get("layer"):
+                    static_time = (
+                        insert_time
+                        if insert_time is not None
+                        else cmds.currentTime(query=True)
+                    )
+                    cmds.setKeyframe(
+                        target,
+                        attribute=channel,
+                        time=(static_time,),
+                        value=value,
+                        animLayer=destination["layer"],
+                        shape=False,
+                    )
+                else:
+                    _set_attr_value(f"{target}.{channel}", value)
+                keys_set += 1
+            except Exception as e:
+                import TheKeyMachine.mods.reportMod as report
+
+                report.report_detected_exception(e, context="paste animation static attribute set")
+            if progress:
+                progress.step()
+
+        destinations = _destination_entries(target, channel, anim_data)
+        cut_destinations = set()
+        for layer_name, layer_data, weight_data in destinations:
+            if progress and progress.cancelled:
+                break
+            if replace and layer_name not in cut_destinations:
+                _cut_destination_keys(
+                    target, channel, layer_name, replace_range
+                )
+                cut_destinations.add(layer_name)
+            keys_set += _apply_channel_data(target, channel, layer_data, layer_name=layer_name)
+            weight_key = layer_name
+            if weight_data and weight_key not in applied_weights:
+                if replace:
+                    # Weight belongs to the layer, not this channel,
+                    # so it isn't covered by the per-channel cut
+                    # above -- without this, old weight keys would
+                    # linger alongside newly pasted ones.
+                    _cut_layer_weight_keys(layer_name, replace_range)
+                keys_set += _apply_anim_layer_weight_data(
+                    layer_name,
+                    weight_data,
+                    progress=progress,
+                    insert_time=insert_time,
+                    time_shift=time_shift,
+                )
+                applied_weights.add(weight_key)
+
+    def _apply_all():
         for target in targets or []:
             for channel, anim_data in (channels_data or {}).items():
                 if progress and progress.cancelled:
-                    break
-                cache_key = (target, channel)
-                if cache_key not in attr_settable_cache:
-                    attr_settable_cache[cache_key] = _attr_exists_and_settable(target, channel)
-                if not attr_settable_cache[cache_key]:
-                    continue
-
-                if ANIMATION_STATIC_VALUE_KEY in (anim_data or {}):
-                    destination = animlayers.selected_destination_for_plug(
-                        "{}.{}".format(target, channel),
-                        context=destination_context,
-                    )
-                    if destination.get("blocked"):
-                        blocked_layers.add(
-                            destination.get("layer")
-                            or destination_context.get("root_name")
-                            or "BaseAnimation"
-                        )
-                        continue
-                    try:
-                        value = anim_data.get(ANIMATION_STATIC_VALUE_KEY)
-                        if destination.get("layer"):
-                            static_time = (
-                                insert_time
-                                if insert_time is not None
-                                else cmds.currentTime(query=True)
-                            )
-                            cmds.setKeyframe(
-                                target,
-                                attribute=channel,
-                                time=(static_time,),
-                                value=value,
-                                animLayer=destination["layer"],
-                                shape=False,
-                            )
-                        else:
-                            _set_attr_value(f"{target}.{channel}", value)
-                        keys_set += 1
-                    except Exception as e:
-                        import TheKeyMachine.mods.reportMod as report
-
-                        report.report_detected_exception(e, context="paste animation static attribute set")
-                    if progress:
-                        progress.step()
-
-                destinations = _destination_entries(target, channel, anim_data)
-                cut_destinations = set()
-                for layer_name, layer_data, weight_data in destinations:
-                    if progress and progress.cancelled:
-                        break
-                    if replace and layer_name not in cut_destinations:
-                        _cut_destination_keys(
-                            target, channel, layer_name, replace_range
-                        )
-                        cut_destinations.add(layer_name)
-                    keys_set += _apply_channel_data(target, channel, layer_data, layer_name=layer_name)
-                    weight_key = layer_name
-                    if weight_data and weight_key not in applied_weights:
-                        if replace:
-                            # Weight belongs to the layer, not this channel,
-                            # so it isn't covered by the per-channel cut
-                            # above -- without this, old weight keys would
-                            # linger alongside newly pasted ones.
-                            _cut_layer_weight_keys(layer_name, replace_range)
-                        keys_set += _apply_anim_layer_weight_data(
-                            layer_name,
-                            weight_data,
-                            progress=progress,
-                            insert_time=insert_time,
-                            time_shift=time_shift,
-                        )
-                        applied_weights.add(weight_key)
+                    return
+                if progress:
+                    progress.run_on_main(_apply_channel, target, channel, anim_data)
+                else:
+                    _apply_channel(target, channel, anim_data)
             if progress and progress.cancelled:
-                break
+                return
+
+    with toolCommon.suspend_maya_refresh():
+        if progress:
+            # Off the main thread so a Cancel press actually gets a chance
+            # to register while this pastes potentially many channels'
+            # worth of keys -- see attribute_switcher's controller for the
+            # same pattern applied first. ``progress`` here is the
+            # ToolOperation the caller opened (paste_animation etc. pass
+            # operation["operation"].set_status(...), which returns the
+            # operation itself), so run_on_main() marshals every actual
+            # Maya touch inside _apply_channel back onto the main thread.
+            # Callers with no progress (e.g. mirror's key-copy path) keep
+            # running inline, unthreaded, exactly as before.
+            toolCommon.run_on_worker_thread(_apply_all)
+        else:
+            _apply_all()
 
     animlayers.restore_created_layer_states(created_layers)
     if blocked_layers:
@@ -1100,67 +1125,88 @@ def _apply_pose_data(
     pasted_targets = []
     blocked_destination = False
     current_time = cmds.currentTime(query=True)
-    try:
-        for source_control, target_control in mappings:
-            control_attrs_set = 0
-            attributes = _attributes_for_mapping(source_control, target_control)
-            groups, blocked = animlayers.group_attributes_by_destination(
-                target_control,
-                attributes.keys(),
-                context=layer_context,
-            )
-            blocked_destination = blocked_destination or bool(blocked)
-            destinations = {
-                attr: layer_name
-                for layer_name, grouped_attrs in groups.items()
-                for attr in grouped_attrs
-            }
-            for attr, value in attributes.items():
-                if progress and progress.cancelled:
-                    return attrs_set, pasted_targets
-                if (
-                    attr not in destinations
-                    or not _is_valid_pose_attribute_value(value)
-                    or not _attr_exists_and_settable(target_control, attr)
-                ):
-                    if progress:
-                        progress.step()
-                    continue
-                layer_name = destinations[attr]
-                try:
-                    if layer_context.get("has_layers") and isinstance(
-                        value, (float, int)
-                    ):
-                        paste_layer = layer_name or layer_context.get("root_name")
-                        result = cmds.setKeyframe(
-                            target_control,
-                            attribute=attr,
-                            time=(current_time,),
-                            value=value,
-                            animLayer=paste_layer,
-                            shape=False,
-                        )
-                        if not result:
-                            continue
-                    else:
-                        # Scenes without layers and non-animatable values
-                        # retain pose paste's traditional setAttr behavior.
-                        _set_attr_value(
-                            "{}.{}".format(target_control, attr), value
-                        )
-                    attrs_set += 1
-                    control_attrs_set += 1
-                except (RuntimeError, ValueError, TypeError) as e:
-                    import TheKeyMachine.mods.reportMod as report
 
-                    report.report_detected_exception(
-                        e, context="paste pose attribute set"
+    def _apply_mapping(source_control, target_control):
+        nonlocal attrs_set, blocked_destination
+        control_attrs_set = 0
+        attributes = _attributes_for_mapping(source_control, target_control)
+        groups, blocked = animlayers.group_attributes_by_destination(
+            target_control,
+            attributes.keys(),
+            context=layer_context,
+        )
+        blocked_destination = blocked_destination or bool(blocked)
+        destinations = {
+            attr: layer_name
+            for layer_name, grouped_attrs in groups.items()
+            for attr in grouped_attrs
+        }
+        for attr, value in attributes.items():
+            if progress and progress.cancelled:
+                return
+            if (
+                attr not in destinations
+                or not _is_valid_pose_attribute_value(value)
+                or not _attr_exists_and_settable(target_control, attr)
+            ):
+                if progress:
+                    progress.step()
+                continue
+            layer_name = destinations[attr]
+            try:
+                if layer_context.get("has_layers") and isinstance(
+                    value, (float, int)
+                ):
+                    paste_layer = layer_name or layer_context.get("root_name")
+                    result = cmds.setKeyframe(
+                        target_control,
+                        attribute=attr,
+                        time=(current_time,),
+                        value=value,
+                        animLayer=paste_layer,
+                        shape=False,
                     )
-                finally:
-                    if progress:
-                        progress.step()
-            if control_attrs_set:
-                pasted_targets.append(target_control)
+                    if not result:
+                        continue
+                else:
+                    # Scenes without layers and non-animatable values
+                    # retain pose paste's traditional setAttr behavior.
+                    _set_attr_value(
+                        "{}.{}".format(target_control, attr), value
+                    )
+                attrs_set += 1
+                control_attrs_set += 1
+            except (RuntimeError, ValueError, TypeError) as e:
+                import TheKeyMachine.mods.reportMod as report
+
+                report.report_detected_exception(
+                    e, context="paste pose attribute set"
+                )
+            finally:
+                if progress:
+                    progress.step()
+        if control_attrs_set:
+            pasted_targets.append(target_control)
+
+    def _apply_all():
+        for source_control, target_control in mappings:
+            if progress and progress.cancelled:
+                return
+            if progress:
+                progress.run_on_main(_apply_mapping, source_control, target_control)
+            else:
+                _apply_mapping(source_control, target_control)
+
+    try:
+        if progress:
+            # Off the main thread so a Cancel press actually gets a chance
+            # to register while this pastes potentially many controls'
+            # worth of attributes -- see _apply_animation_channels_to_targets
+            # above for the same pattern (``progress`` here is likewise the
+            # caller's ToolOperation).
+            toolCommon.run_on_worker_thread(_apply_all)
+        else:
+            _apply_all()
     finally:
         animlayers.restore_created_layer_states(created_layers)
 
@@ -1331,7 +1377,7 @@ def paste_animation(*args, anchor_widget=None, **kwargs):
     paste_range = _animation_data_timerange(animation_data)
     key_count = _animation_data_apply_count(animation_data, targets=targets)
     prompt_range = None
-    with _copy_paste_operation("paste_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
+    with _copy_paste_operation("paste_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count, rollback_on_cancel=True) as operation:
         processor = operation["operation"].set_status("Pasting Animation")
         keys_set, pasted_targets = _apply_animation_data(animation_data, selected_objects, replace=True, progress=processor)
         if keys_set:
@@ -1362,7 +1408,7 @@ def paste_insert_animation(*args, anchor_widget=None, **kwargs):
     paste_range = _shift_timerange(source_range, current_time - first_source_frame)
     key_count = _animation_data_apply_count(animation_data, targets=targets)
     prompt_range = None
-    with _copy_paste_operation("paste_insert_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
+    with _copy_paste_operation("paste_insert_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count, rollback_on_cancel=True) as operation:
         processor = operation["operation"].set_status("Pasting Animation")
         keys_set, pasted_targets = _apply_animation_data(animation_data, selected_objects, insert_time=current_time, progress=processor)
         if keys_set:
@@ -1405,7 +1451,7 @@ def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
         animation_data, targets=matched_sources
     )
     prompt_range = None
-    with _copy_paste_operation("paste_opposite_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
+    with _copy_paste_operation("paste_opposite_animation", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count, rollback_on_cancel=True) as operation:
         keys_set = 0
         pasted_targets = []
         processor = operation["operation"].set_status("Pasting Opposite Animation")
@@ -1488,7 +1534,7 @@ def paste_animation_to(source_control_name=None, replace=True, insert_at_current
             for source_node, _ in mappings
         )
         prompt_range = None
-        with _copy_paste_operation("paste_animation_to", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count) as operation:
+        with _copy_paste_operation("paste_animation_to", "Animation Pasted", undo=True, tint="range", timerange=paste_range, progress=True, progress_max=key_count, rollback_on_cancel=True) as operation:
             total_keys_set = 0
             pasted_targets = []
             processor = operation["operation"].set_status("Pasting Animation")
@@ -1561,6 +1607,7 @@ def paste_pose_to(*args, anchor_widget=None, **kwargs):
             tint="current",
             progress=True,
             progress_max=attribute_total,
+            rollback_on_cancel=True,
         ) as operation:
             processor = operation["operation"].set_status("Pasting Pose")
             attrs_set, pasted_targets = _apply_pose_data(
@@ -1714,6 +1761,7 @@ def paste_pose(*args, **kwargs):
         tint="current",
         progress=True,
         progress_max=attribute_total,
+        rollback_on_cancel=True,
     ) as operation:
         processor = operation["operation"].set_status("Pasting Pose")
         attrs_set, pasted_targets = _apply_pose_data(
@@ -1749,6 +1797,7 @@ def paste_mirror_pose(*args, **kwargs):
         tint="current",
         progress=True,
         progress_max=attribute_total,
+        rollback_on_cancel=True,
     ) as operation:
         processor = operation["operation"].set_status("Pasting Mirror Pose")
         scene_nodes = {

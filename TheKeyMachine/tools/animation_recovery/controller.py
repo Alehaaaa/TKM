@@ -1898,164 +1898,219 @@ def restore_recovery(path):
             tint="range",
             tint_color=toolbox.get_tool_tint_color("animation_recovery"),
             show_success_message=False,
+            rollback_on_cancel=True,
         ) as operation:
-            payload = _load_merged_recovery(path, operation=operation, chain_paths=chain_paths)
-            if payload is None:
-                return False
-            curves_data = payload.get("curves") or []
-            objects_data = payload.get("objects") or []
-            layers_data = payload.get("layers") or []
-            meta = payload.get("meta") or {}
-            if meta.get("type") not in (None, "animation_recovery"):
-                raise ValueError("Not an Animation Recovery file")
-            if meta.get("scene_id") and scene_id and meta.get("scene_id") != scene_id:
-                raise ValueError("This recovery belongs to another Maya scene")
-
-            selection_scoped = _has_active_selection()
-            selected_nodes = _selected_transform_nodes()
-            scoped_curves = None
-            allowed_layer_plugs = None
-            restore_layers_data = layers_data
-            if selection_scoped:
-                curves_data, objects_data, scoped_curves = _filter_recovery_to_selection(
-                    curves_data,
-                    objects_data,
-                    selected_nodes,
-                )
-                if not curves_data and not objects_data:
-                    wutil.make_inViewMessage("No recovery data for the selected objects")
-                    return False
-                # Layer membership stays in step with the selection scope too:
-                # only the plugs the surviving curves actually need get
-                # (re)declared as layer members.
-                allowed_layer_plugs = {
-                    curve_data["layer"]["plug"]
-                    for curve_data in curves_data
-                    if curve_data.get("layer") and curve_data["layer"].get("plug")
-                }
-                restore_layers_data = _layers_for_curves(
-                    layers_data,
-                    curves_data,
-                )
-            current_curves = _curve_maps(scoped_curves)[0]
-            _all_curves, by_name, by_uuid = _curve_maps()
-            saved_uuids = set(item.get("uuid") for item in curves_data if item.get("uuid"))
-            extra_curves = [
-                curve for curve in current_curves
-                if _node_uuid(curve) not in saved_uuids
-            ]
-            key_total = sum(
-                min(
-                    len(item.get("positions") or []),
-                    len(item.get("values") or []),
-                )
-                for item in curves_data
+            # The heavy work below (potentially every keyed curve/object in
+            # the whole scene) runs on a worker thread so the main thread's
+            # Qt event loop stays free to dispatch a Cancel press while it's
+            # working -- see tools/common.py's run_on_worker_thread /
+            # ToolOperation.run_on_main, and attribute_switcher's controller
+            # for the same pattern applied first.
+            result = toolCommon.run_on_worker_thread(
+                _restore_recovery_worker, operation, path, chain_paths, scene_id
             )
-            key_removal_total = 0
-            for item in curves_data:
-                curve = by_uuid.get(item.get("uuid"))
-                if not curve and not item.get("uuid"):
-                    curve = by_name.get(item.get("name"))
-                key_removal_total += _curve_key_removal_count(curve, item)
-            attribute_total = sum(len(item.get("attributes") or {}) for item in objects_data)
-            if allowed_layer_plugs is not None:
-                layer_member_count = sum(
-                    len([p for p in (entry.get("attributes") or []) if p in allowed_layer_plugs])
-                    for entry in restore_layers_data
-                )
-            else:
-                layer_member_count = sum(
-                    len(entry.get("attributes") or [])
-                    for entry in restore_layers_data
-                )
-            layer_total = len(restore_layers_data) + layer_member_count
-            if not selection_scoped:
-                layer_total += len(_extra_layer_names(restore_layers_data))
-                layer_total += _extra_layer_membership_count(
-                    restore_layers_data
-                )
-            operation.set_total(
+            if not result:
+                return False
+
+    wutil.make_inViewMessage("Animation recovered")
+    return True
+
+
+def _restore_recovery_worker(operation, path, chain_paths, scene_id):
+    """Runs off the main thread -- see restore_recovery's
+    run_on_worker_thread call. Every Maya touch reachable from here must go
+    through operation.run_on_main() rather than calling cmds directly.
+
+    The one-time setup below (loading/merging the recovery payload, scoping
+    it to the current selection, and sizing the progress total) is bounded
+    by curve/object/layer *count*, not by how many keys each curve carries
+    -- the actual worst case the migration in this function targets -- so
+    it's marshaled as a single batch rather than item-by-item. The curve
+    restore loop just below it, which can each carry many keys and is what
+    dominates the cost on a big recovery, gets a marshal hop *per curve*
+    instead, so Cancel has many chances to land during a large restore
+    instead of only before/after the whole thing.
+    """
+    def _setup():
+        payload = _load_merged_recovery(path, operation=operation, chain_paths=chain_paths)
+        if payload is None:
+            return None
+        curves_data = payload.get("curves") or []
+        objects_data = payload.get("objects") or []
+        layers_data = payload.get("layers") or []
+        meta = payload.get("meta") or {}
+        if meta.get("type") not in (None, "animation_recovery"):
+            raise ValueError("Not an Animation Recovery file")
+        if meta.get("scene_id") and scene_id and meta.get("scene_id") != scene_id:
+            raise ValueError("This recovery belongs to another Maya scene")
+
+        selection_scoped = _has_active_selection()
+        selected_nodes = _selected_transform_nodes()
+        scoped_curves = None
+        allowed_layer_plugs = None
+        restore_layers_data = layers_data
+        if selection_scoped:
+            curves_data, objects_data, scoped_curves = _filter_recovery_to_selection(
+                curves_data,
+                objects_data,
+                selected_nodes,
+            )
+            if not curves_data and not objects_data:
+                return {"empty": True}
+            # Layer membership stays in step with the selection scope too:
+            # only the plugs the surviving curves actually need get
+            # (re)declared as layer members.
+            allowed_layer_plugs = {
+                curve_data["layer"]["plug"]
+                for curve_data in curves_data
+                if curve_data.get("layer") and curve_data["layer"].get("plug")
+            }
+            restore_layers_data = _layers_for_curves(
+                layers_data,
+                curves_data,
+            )
+        current_curves = _curve_maps(scoped_curves)[0]
+        _all_curves, by_name, by_uuid = _curve_maps()
+        saved_uuids = set(item.get("uuid") for item in curves_data if item.get("uuid"))
+        extra_curves = [
+            curve for curve in current_curves
+            if _node_uuid(curve) not in saved_uuids
+        ]
+        key_total = sum(
+            min(
+                len(item.get("positions") or []),
+                len(item.get("values") or []),
+            )
+            for item in curves_data
+        )
+        key_removal_total = 0
+        for item in curves_data:
+            curve = by_uuid.get(item.get("uuid"))
+            if not curve and not item.get("uuid"):
+                curve = by_name.get(item.get("name"))
+            key_removal_total += _curve_key_removal_count(curve, item)
+        attribute_total = sum(len(item.get("attributes") or {}) for item in objects_data)
+        if allowed_layer_plugs is not None:
+            layer_member_count = sum(
+                len([p for p in (entry.get("attributes") or []) if p in allowed_layer_plugs])
+                for entry in restore_layers_data
+            )
+        else:
+            layer_member_count = sum(
+                len(entry.get("attributes") or [])
+                for entry in restore_layers_data
+            )
+        layer_total = len(restore_layers_data) + layer_member_count
+        if not selection_scoped:
+            layer_total += len(_extra_layer_names(restore_layers_data))
+            layer_total += _extra_layer_membership_count(
+                restore_layers_data
+            )
+        uuid_lookup = _uuid_lookup()
+        return {
+            "empty": False,
+            "curves_data": curves_data,
+            "objects_data": objects_data,
+            "selection_scoped": selection_scoped,
+            "allowed_layer_plugs": allowed_layer_plugs,
+            "restore_layers_data": restore_layers_data,
+            "by_name": by_name,
+            "by_uuid": by_uuid,
+            "extra_curves": extra_curves,
+            "uuid_lookup": uuid_lookup,
+            "total": (
                 len(chain_paths)
                 + len(extra_curves)
                 + key_total
                 + key_removal_total
                 + attribute_total
-                + layer_total,
-                reset=False,
-            )
-            operation.set_status("Applying recovery")
-            for curve in extra_curves:
-                if operation.cancelled:
-                    return False
-                try:
-                    cmds.delete(curve)
-                except Exception:
-                    pass
-                operation.step()
+                + layer_total
+            ),
+        }
 
-            operation.set_status("Restoring animation layers")
-            layer_name_map = _restore_layers(
-                restore_layers_data,
-                operation=operation,
-            )
-            if operation.cancelled or layer_name_map is None:
-                return False
-            if not selection_scoped and not _remove_extra_layers(
-                restore_layers_data,
-                layer_name_map,
-                operation=operation,
-            ):
-                return False
-            if not _restore_layer_membership(
-                restore_layers_data,
-                layer_name_map,
-                operation=operation,
-                allowed_plugs=allowed_layer_plugs,
-            ):
-                return False
-            operation.set_status("Applying recovery")
+    setup = operation.run_on_main(_setup)
+    if setup is None:
+        return False
+    if setup.get("empty"):
+        operation.run_on_main(wutil.make_inViewMessage, "No recovery data for the selected objects")
+        return False
 
-            uuid_lookup = _uuid_lookup()
-            for curve_data in curves_data:
-                if operation.cancelled:
-                    return False
-                curve_uuid = curve_data.get("uuid")
-                curve = by_uuid.get(curve_uuid)
-                if not curve and not curve_uuid:
-                    curve = by_name.get(curve_data.get("name"))
-                if not curve or not cmds.objExists(curve):
-                    if not _has_resolvable_curve_output(curve_data, uuid_lookup, layer_name_map):
-                        skipped_keys = min(
-                            len(curve_data.get("positions") or []),
-                            len(curve_data.get("values") or []),
-                        )
-                        if skipped_keys and operation.step(skipped_keys):
-                            return False
-                        continue
-                    curve = cmds.createNode(curve_data.get("node_type") or "animCurveTU", name=curve_data.get("name"))
-                _connect_curve(curve, curve_data, uuid_lookup)
-                _connect_curve_output(curve, curve_data, uuid_lookup, layer_name_map)
-                if not _set_curve_keys(curve, curve_data, operation=operation):
-                    return False
-            if not _restore_object_states(objects_data, uuid_lookup, operation=operation):
-                return False
+    curves_data = setup["curves_data"]
+    objects_data = setup["objects_data"]
+    selection_scoped = setup["selection_scoped"]
+    allowed_layer_plugs = setup["allowed_layer_plugs"]
+    restore_layers_data = setup["restore_layers_data"]
+    by_name = setup["by_name"]
+    by_uuid = setup["by_uuid"]
+    extra_curves = setup["extra_curves"]
+    uuid_lookup = setup["uuid_lookup"]
 
-            # Lock state is applied last so it never blocks membership/curve
-            # reconnection above -- a locked layer cannot receive new members.
-            if not _lock_restored_layers(
-                restore_layers_data,
-                layer_name_map,
-            ):
-                return False
+    operation.set_total(setup["total"], reset=False)
+    operation.set_status("Applying recovery")
+    for curve in extra_curves:
+        if operation.cancelled:
+            return False
+        def _delete_curve(curve=curve):
+            try:
+                cmds.delete(curve)
+            except Exception:
+                pass
+        operation.run_on_main(_delete_curve)
+        operation.step()
 
-            # tool_operation() paints the timeline tint itself once it sees
-            # operation.success + operation.timerange -- same handoff paste
-            # animation uses, just resolved after restore instead of before it,
-            # since the recovered range isn't known until curves_data loads.
-            operation.timerange = _curves_timerange(curves_data)
-            operation.success = True
+    operation.set_status("Restoring animation layers")
+    layer_name_map = operation.run_on_main(_restore_layers, restore_layers_data, operation)
+    if operation.cancelled or layer_name_map is None:
+        return False
+    if not selection_scoped and not operation.run_on_main(
+        _remove_extra_layers, restore_layers_data, layer_name_map, operation
+    ):
+        return False
+    if not operation.run_on_main(
+        _restore_layer_membership,
+        restore_layers_data, layer_name_map, operation, allowed_layer_plugs,
+    ):
+        return False
+    operation.set_status("Applying recovery")
 
-    wutil.make_inViewMessage("Animation recovered")
+    def _restore_one_curve(curve_data):
+        curve_uuid = curve_data.get("uuid")
+        curve = by_uuid.get(curve_uuid)
+        if not curve and not curve_uuid:
+            curve = by_name.get(curve_data.get("name"))
+        if not curve or not cmds.objExists(curve):
+            if not _has_resolvable_curve_output(curve_data, uuid_lookup, layer_name_map):
+                skipped_keys = min(
+                    len(curve_data.get("positions") or []),
+                    len(curve_data.get("values") or []),
+                )
+                if skipped_keys:
+                    operation.step(skipped_keys)
+                return True
+            curve = cmds.createNode(curve_data.get("node_type") or "animCurveTU", name=curve_data.get("name"))
+        _connect_curve(curve, curve_data, uuid_lookup)
+        _connect_curve_output(curve, curve_data, uuid_lookup, layer_name_map)
+        return _set_curve_keys(curve, curve_data, operation=operation)
+
+    for curve_data in curves_data:
+        if operation.cancelled:
+            return False
+        if not operation.run_on_main(_restore_one_curve, curve_data):
+            return False
+    if not operation.run_on_main(_restore_object_states, objects_data, uuid_lookup, operation):
+        return False
+
+    # Lock state is applied last so it never blocks membership/curve
+    # reconnection above -- a locked layer cannot receive new members.
+    if not operation.run_on_main(_lock_restored_layers, restore_layers_data, layer_name_map):
+        return False
+
+    # tool_operation() paints the timeline tint itself once it sees
+    # operation.success + operation.timerange -- same handoff paste
+    # animation uses, just resolved after restore instead of before it,
+    # since the recovered range isn't known until curves_data loads.
+    operation.timerange = _curves_timerange(curves_data)
+    operation.success = True
     return True
 
 

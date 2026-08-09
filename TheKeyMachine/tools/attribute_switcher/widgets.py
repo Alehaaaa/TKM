@@ -768,9 +768,18 @@ class AttributePopup(QtWidgets.QWidget):
         painter.drawPolygon(poly)
 
     def select_option(self, idx, all_frames=None):
-        self.on_select(idx, all_frames=all_frames)
-        # closing triggers closeEvent which clears parent handle and resumes timer
+        # Tear ourselves down before calling out to on_select(), not after:
+        # on_select() applies the switch, which refreshes the parent
+        # dialog's widget list -- and that refresh would otherwise tear
+        # this same popup down as a side effect (_close_active_popup(),
+        # since this *is* the active popup) while we're still in the
+        # middle of handling the click that opened it. closeEvent() below
+        # clears the parent's _active_popup handle immediately, so that
+        # later _close_active_popup() call just no-ops instead of racing
+        # us to close/delete the same widget from two places.
         self.close()
+        self.deleteLater()
+        self.on_select(idx, all_frames=all_frames)
 
     def enterEvent(self, event):
         # Notify parent for unified interaction state

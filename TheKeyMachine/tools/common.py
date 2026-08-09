@@ -871,6 +871,7 @@ def tool_operation(
     show_success_message=True,
     suspend_refresh=True,
     preserve_time_selection=False,
+    rollback_on_cancel=False,
 ):
     _t_start = time.perf_counter() if _DEBUG_TIMING else None
 
@@ -1002,10 +1003,16 @@ def tool_operation(
         operation.refresh_suspended = refresh_suspended
     _t_refresh = time.perf_counter() if _DEBUG_TIMING else None
 
+    undo_length_before = None
     try:
         if undo:
             existing_undo_operation = _current_undo_operation(exclude=operation)
             if existing_undo_operation is None:
+                if rollback_on_cancel:
+                    try:
+                        undo_length_before = cmds.undoInfo(query=True, length=True)
+                    except Exception:
+                        undo_length_before = None
                 chunk_opened = open_undo_chunk(
                     undo_name or make_undo_chunk_name(tool_id=tool_id, title=label)
                 )
@@ -1070,6 +1077,29 @@ def tool_operation(
                 pass
         _release_refresh_suspension(refresh_suspended)
         close_undo_chunk(chunk_opened)
+        if (
+            chunk_opened
+            and rollback_on_cancel
+            and operation.cancelled
+            and undo_length_before is not None
+        ):
+            # A Cancel press stops the loops early, but whatever they'd
+            # already applied is still sitting in the chunk we just closed
+            # -- rollback_on_cancel means the caller wants Cancel to mean
+            # "nothing happened," not "here's a partial result to manually
+            # Ctrl+Z." Only undo if this chunk actually recorded something:
+            # an untouched/empty chunk isn't pushed onto Maya's undo queue
+            # at all, so unconditionally calling cmds.undo() here could
+            # revert the user's *previous*, unrelated action instead.
+            try:
+                undo_length_after = cmds.undoInfo(query=True, length=True)
+            except Exception:
+                undo_length_after = undo_length_before
+            if undo_length_after > undo_length_before:
+                try:
+                    cmds.undo()
+                except Exception:
+                    pass
         if operation.preserved_time_selection:
             try:
                 from TheKeyMachine.core import animation_context
