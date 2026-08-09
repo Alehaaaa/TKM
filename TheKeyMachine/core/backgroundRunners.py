@@ -40,6 +40,7 @@ CAMERA_ORBIT_SELECTION_ID = "camera_orbit_selection"
 HIDE_STATIC_CURVES_ID = "hide_static_animation_curves"
 ANIMATION_RECOVERY_ID = "animation_recovery"
 ANIM_LAYER_WEIGHTS_ID = "anim_layer_weights"
+SELECTOR_TOOLBAR_PIN_ID = "selector_toolbar_pin"
 CHANNELBOX_TINT_KEY = "background_runner:channelbox_selection_highlight"
 ANIM_LAYER_WEIGHTS_TINT_KEY = "background_runner:anim_layer_weights"
 
@@ -55,6 +56,7 @@ RUNNER_COMMAND_IDS = {
     HIDE_STATIC_CURVES_ID: "hide_static_animation_curves",
     ANIMATION_RECOVERY_ID: "background_runner_animation_recovery",
     ANIM_LAYER_WEIGHTS_ID: "background_runner_anim_layer_weights",
+    SELECTOR_TOOLBAR_PIN_ID: "background_runner_selector_toolbar_pin",
 }
 
 _CONTROLLER: Optional["BackgroundRunnerController"] = None
@@ -120,6 +122,10 @@ def toggle_animation_recovery():
 
 def toggle_anim_layer_weights():
     return toggle_runner_enabled(ANIM_LAYER_WEIGHTS_ID)
+
+
+def toggle_selector_toolbar_pin():
+    return toggle_runner_enabled(SELECTOR_TOOLBAR_PIN_ID)
 
 
 def _emit_runner_triggered(manager, runner_id):
@@ -1302,6 +1308,7 @@ def shutdown_controller():
 def get_runner_specs() -> Dict[str, Dict[str, object]]:
     import TheKeyMachine.core.runtimeManager as runtime
     from TheKeyMachine.tools.animation_recovery import controller as animationRecovery
+    from TheKeyMachine.tools.selection import controller as selectionController
 
     manager = runtime.get_runtime_manager(start=False)
 
@@ -1411,6 +1418,16 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
                 namespace=RUNNER_SETTINGS_NAMESPACE,
             ),
             "changed_signal": _background_runner_signal(ANIM_LAYER_WEIGHTS_ID),
+        },
+        SELECTOR_TOOLBAR_PIN_ID: {
+            "id": SELECTOR_TOOLBAR_PIN_ID,
+            "label": "Selected Object Display",
+            "icon": icons.selector,
+            "description": "Keep the Selected Object Display toolbutton pinned and visible on the toolbar.",
+            "default": True,
+            "get_enabled": selectionController.is_selector_pinned,
+            "set_enabled": selectionController.set_selector_pinned,
+            "changed_signal": _background_runner_signal(SELECTOR_TOOLBAR_PIN_ID),
         },
     }
     for runner_id, spec in specs.items():

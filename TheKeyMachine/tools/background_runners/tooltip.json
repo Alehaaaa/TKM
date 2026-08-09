@@ -5,5 +5,6 @@
   "camera_orbit_selection": ["Toggle automatic camera orbit targeting from the current selection."],
   "hide_static_animation_curves": ["Toggle automatic hiding of static curves in the Graph Editor."],
   "animation_recovery": ["Toggle automatic scene-scoped animation recovery snapshots."],
-  "anim_layer_weights": ["Toggle a timeline overlay plotting animation-layer weight curves; muted layers show dimmed and dashed."]
+  "anim_layer_weights": ["Toggle a timeline overlay plotting animation-layer weight curves; muted layers show dimmed and dashed."],
+  "selector_toolbar_pin": ["Toggle whether the Selected Object Display toolbutton stays pinned and visible on the toolbar."]
 }

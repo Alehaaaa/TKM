@@ -27,6 +27,10 @@ def toggle_anim_layer_weights(*_args):
     return backgroundRunners.toggle_anim_layer_weights()
 
 
+def toggle_selector_toolbar_pin(*_args):
+    return backgroundRunners.toggle_selector_toolbar_pin()
+
+
 def turn_all_off(*_args):
     return backgroundRunners.turn_all_runners_off()
 

@@ -1,0 +1,310 @@
+{
+    "snapshot_rig": {
+        "en": {
+            "label": "Snapshot Rig",
+            "tooltip": [
+                "Capture opposite-control, default-pose and mirror data for the selected rig's controls.",
+                "Only the selected controls are captured; existing entries for the rest of the rig are left untouched."
+            ]
+        },
+        "es": {
+            "label": "Captura del Rig",
+            "tooltip": [
+                "Captura los datos de control opuesto, pose por defecto y espejo de los controles del rig seleccionados.",
+                "Solo se capturan los controles seleccionados; las entradas existentes del resto del rig no se modifican."
+            ]
+        },
+        "fr": {
+            "label": "Capture du Rig",
+            "tooltip": [
+                "Capture les données de contrôleur opposé, de pose par défaut et de miroir pour les contrôleurs du rig sélectionnés.",
+                "Seuls les contrôleurs sélectionnés sont capturés ; les entrées existantes pour le reste du rig restent inchangées."
+            ]
+        },
+        "ca": {
+            "label": "Captura del Rig",
+            "tooltip": [
+                "Captura les dades de control oposat, pose per defecte i mirall dels controls del rig seleccionats",
+                "Només es capturen els controls seleccionats; les entrades existents de la resta del rig no es modifiquen"
+            ]
+        },
+        "zh": {
+            "label": "绑定快照",
+            "tooltip": [
+                "为所选绑定的控制器捕获对侧控制器、默认姿势和镜像数据",
+                "仅捕获所选控制器；绑定中其余部分的现有条目保持不变"
+            ]
+        },
+        "ja": {
+            "label": "リグのスナップショット",
+            "tooltip": [
+                "選択したリグのコントローラの反対側コントローラ、デフォルトポーズ、ミラーデータをキャプチャします",
+                "選択したコントローラのみがキャプチャされ、リグの他の部分の既存エントリは変更されません"
+            ]
+        },
+        "ko": {
+            "label": "리그 스냅샷",
+            "tooltip": [
+                "선택한 리그 컨트롤의 반대쪽 컨트롤, 기본 포즈, 미러 데이터를 캡처합니다",
+                "선택한 컨트롤만 캡처되며 리그의 나머지 기존 항목은 변경되지 않습니다"
+            ]
+        },
+        "ar": {
+            "label": "لقطة الريغ",
+            "tooltip": [
+                "التقاط بيانات المتحكم المقابل والوضعية الافتراضية والمرآة لمتحكمات الريغ المحددة",
+                "يتم التقاط المتحكمات المحددة فقط؛ تبقى الإدخالات الحالية لبقية الريغ دون تغيير"
+            ]
+        }
+    },
+    "snapshot_default": {
+        "en": {
+            "label": "Snapshot Default",
+            "tooltip": [
+                "Capture the current pose of the selected controls as their saved default.",
+                "Only attributes that differ from Maya's own attribute default are stored."
+            ]
+        },
+        "es": {
+            "label": "Captura de Pose por Defecto",
+            "tooltip": [
+                "Captura la pose actual de los controles seleccionados como su valor por defecto guardado.",
+                "Solo se guardan los atributos que difieren del valor por defecto propio de Maya."
+            ]
+        },
+        "fr": {
+            "label": "Capture de Pose par Défaut",
+            "tooltip": [
+                "Capture la pose actuelle des contrôleurs sélectionnés comme leur valeur par défaut enregistrée.",
+                "Seuls les attributs différant de la valeur par défaut propre à Maya sont enregistrés."
+            ]
+        },
+        "ca": {
+            "label": "Captura de Pose per Defecte",
+            "tooltip": [
+                "Captura la pose actual dels controls seleccionats com el seu valor per defecte desat",
+                "Només es desen els atributs que difereixen del valor per defecte propi de Maya"
+            ]
+        },
+        "zh": {
+            "label": "默认姿势快照",
+            "tooltip": [
+                "将所选控制器的当前姿势捕获为其已保存的默认值",
+                "仅存储与 Maya 自身属性默认值不同的属性"
+            ]
+        },
+        "ja": {
+            "label": "デフォルトポーズのスナップショット",
+            "tooltip": [
+                "選択したコントローラの現在のポーズを保存済みのデフォルトとしてキャプチャします",
+                "Maya 自体のアトリビュートデフォルトと異なるアトリビュートのみが保存されます"
+            ]
+        },
+        "ko": {
+            "label": "기본 포즈 스냅샷",
+            "tooltip": [
+                "선택한 컨트롤의 현재 포즈를 저장된 기본값으로 캡처합니다",
+                "Maya 자체의 속성 기본값과 다른 속성만 저장됩니다"
+            ]
+        },
+        "ar": {
+            "label": "لقطة الوضعية الافتراضية",
+            "tooltip": [
+                "التقاط الوضعية الحالية للمتحكمات المحددة كقيمتها الافتراضية المحفوظة",
+                "يتم تخزين الخصائص التي تختلف عن القيمة الافتراضية الخاصة بمايا فقط"
+            ]
+        }
+    },
+    "snapshot_opposite": {
+        "en": {
+            "label": "Snapshot Opposite",
+            "tooltip": [
+                "Capture and save the opposite-control relationship for the selected controls.",
+                "Controls with no matching opposite are recorded as center controls."
+            ]
+        },
+        "es": {
+            "label": "Captura de Opuesto",
+            "tooltip": [
+                "Captura y guarda la relación de control opuesto de los controles seleccionados.",
+                "Los controles sin opuesto coincidente se registran como controles centrales."
+            ]
+        },
+        "fr": {
+            "label": "Capture de l'Opposé",
+            "tooltip": [
+                "Capture et enregistre la relation de contrôleur opposé pour les contrôleurs sélectionnés.",
+                "Les contrôleurs sans opposé correspondant sont enregistrés comme contrôleurs centraux."
+            ]
+        },
+        "ca": {
+            "label": "Captura d'Oposat",
+            "tooltip": [
+                "Captura i desa la relació de control oposat dels controls seleccionats",
+                "Els controls sense oposat coincident es registren com a controls centrals"
+            ]
+        },
+        "zh": {
+            "label": "对侧关系快照",
+            "tooltip": [
+                "为所选控制器捕获并保存对侧控制器关系",
+                "没有匹配对侧的控制器将被记录为中心控制器"
+            ]
+        },
+        "ja": {
+            "label": "反対側のスナップショット",
+            "tooltip": [
+                "選択したコントローラの反対側コントローラの関係をキャプチャして保存します",
+                "一致する反対側がないコントローラはセンターコントローラとして記録されます"
+            ]
+        },
+        "ko": {
+            "label": "반대쪽 스냅샷",
+            "tooltip": [
+                "선택한 컨트롤의 반대쪽 컨트롤 관계를 캡처하여 저장합니다",
+                "일치하는 반대쪽이 없는 컨트롤은 중앙 컨트롤로 기록됩니다"
+            ]
+        },
+        "ar": {
+            "label": "لقطة الجانب المقابل",
+            "tooltip": [
+                "التقاط وحفظ علاقة المتحكم المقابل للمتحكمات المحددة",
+                "تُسجَّل المتحكمات التي لا يوجد لها مقابل مطابق كمتحكمات مركزية"
+            ]
+        }
+    },
+    "snapshot_mirror": {
+        "en": {
+            "label": "Snapshot Mirror",
+            "tooltip": [
+                "Confirm the selected controls are part of a saved rig.",
+                "Mirror exceptions are saved automatically via Add Exception Invert/Keep; there is nothing else to capture here."
+            ]
+        },
+        "es": {
+            "label": "Captura de Espejo",
+            "tooltip": [
+                "Confirma que los controles seleccionados forman parte de un rig guardado.",
+                "Las excepciones de espejo se guardan automáticamente mediante Añadir Excepción Invertir/Mantener; no hay nada más que capturar aquí."
+            ]
+        },
+        "fr": {
+            "label": "Capture du Miroir",
+            "tooltip": [
+                "Confirme que les contrôleurs sélectionnés font partie d'un rig enregistré.",
+                "Les exceptions de miroir sont enregistrées automatiquement via Ajouter une Exception d'Inversion/Conserver ; il n'y a rien d'autre à capturer ici."
+            ]
+        },
+        "ca": {
+            "label": "Captura de Mirall",
+            "tooltip": [
+                "Confirma que els controls seleccionats formen part d'un rig desat",
+                "Les excepcions de mirall es desen automàticament mitjançant Afegir Excepció Invertir/Mantenir; no hi ha res més a capturar aquí"
+            ]
+        },
+        "zh": {
+            "label": "镜像快照",
+            "tooltip": [
+                "确认所选控制器属于已保存的绑定",
+                "镜像例外会通过“添加反转/保持例外”自动保存；此处无需额外捕获任何内容"
+            ]
+        },
+        "ja": {
+            "label": "ミラーのスナップショット",
+            "tooltip": [
+                "選択したコントローラが保存済みのリグの一部であることを確認します",
+                "ミラー例外は反転/維持例外の追加により自動的に保存されるため、ここでキャプチャするものは他にありません"
+            ]
+        },
+        "ko": {
+            "label": "미러 스냅샷",
+            "tooltip": [
+                "선택한 컨트롤이 저장된 리그의 일부인지 확인합니다",
+                "미러 예외는 반전/유지 예외 추가를 통해 자동으로 저장되므로 여기서 캡처할 항목이 없습니다"
+            ]
+        },
+        "ar": {
+            "label": "لقطة المرآة",
+            "tooltip": [
+                "التأكد من أن المتحكمات المحددة جزء من ريغ محفوظ",
+                "تُحفظ استثناءات المرآة تلقائيًا عبر إضافة استثناء عكس/إبقاء؛ لا يوجد شيء آخر لالتقاطه هنا"
+            ]
+        }
+    },
+    "snapshot_help": {
+        "en": {
+            "label": "Help",
+            "tooltip": [
+                "Open the Snapshot Rig documentation."
+            ]
+        },
+        "es": {
+            "label": "Ayuda",
+            "tooltip": [
+                "Abre la documentación de Captura del Rig."
+            ]
+        },
+        "fr": {
+            "label": "Aide",
+            "tooltip": [
+                "Ouvre la documentation de Capture du Rig."
+            ]
+        },
+        "ca": {
+            "label": "Ajuda",
+            "tooltip": [
+                "Obre la documentació de Captura del Rig"
+            ]
+        },
+        "zh": {
+            "label": "帮助",
+            "tooltip": [
+                "打开绑定快照文档"
+            ]
+        },
+        "ja": {
+            "label": "ヘルプ",
+            "tooltip": [
+                "リグのスナップショットのドキュメントを開きます"
+            ]
+        },
+        "ko": {
+            "label": "도움말",
+            "tooltip": [
+                "리그 스냅샷 문서를 엽니다"
+            ]
+        },
+        "ar": {
+            "label": "مساعدة",
+            "tooltip": [
+                "فتح توثيق لقطة الريغ"
+            ]
+        }
+    },
+    "snapshot_rig_tools": {
+        "en": {
+            "label": "Snapshot"
+        },
+        "es": {
+            "label": "Captura"
+        },
+        "fr": {
+            "label": "Capture"
+        },
+        "ca": {
+            "label": "Captura"
+        },
+        "zh": {
+            "label": "快照"
+        },
+        "ja": {
+            "label": "スナップショット"
+        },
+        "ko": {
+            "label": "스냅샷"
+        },
+        "ar": {
+            "label": "لقطة"
+        }
+    }
+}

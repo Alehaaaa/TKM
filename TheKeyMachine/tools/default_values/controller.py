@@ -1,11 +1,8 @@
-import json
-import os
-
 from maya import cmds
 
 from TheKeyMachine.core import animation_context
+from TheKeyMachine.core import rig_snapshot
 from TheKeyMachine.mods import selectionMod
-from TheKeyMachine.tools import clipboard
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import util as wutil
 
@@ -15,39 +12,8 @@ ROTATION_ATTRS = {"rotate", "rotateX", "rotateY", "rotateZ"}
 SCALE_ATTRS = {"scale", "scaleX", "scaleY", "scaleZ"}
 
 
-def _data_path():
-    return clipboard.path("set_default")
-
-
-def _load_data():
-    path = _data_path()
-    if not os.path.isfile(path):
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as stream:
-            data = json.load(stream)
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError, TypeError):
-        return {}
-
-
-def _save_data(data):
-    path = _data_path()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as stream:
-        json.dump(data, stream, indent=4, sort_keys=True)
-
-
-def _object_identity(node):
-    basename = node.rsplit("|", 1)[-1]
-    if ":" not in basename:
-        return "default", basename
-    return basename.rsplit(":", 1)
-
-
-def _stored_default(node, attr, data):
-    namespace, short_name = _object_identity(node)
-    stored = data.get(namespace, {}).get("{}.{}".format(short_name, attr))
+def _stored_default(node, attr):
+    stored = rig_snapshot.resolve_control_snapshot(node, "default", compute_fn=lambda n: {}).get(attr)
     if stored is not None:
         return stored
     fallback = cmds.attributeQuery(attr, node=node, listDefault=True)
@@ -58,21 +24,22 @@ def save_selected():
     selected = selectionMod.get_selected_objects(long=True)
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
-    data = _load_data()
+    groups = rig_snapshot.group_controls_by_rig(selected)
+    if not groups:
+        return wutil.make_inViewMessage("Selected controls are not part of a recognizable rig")
+
     operation = toolCommon.current_tool_operation()
     if operation:
         operation.set_total(len(selected))
-    for node in selected:
-        if operation and operation.cancelled:
-            return
-        namespace, short_name = _object_identity(node)
-        values = data.setdefault(namespace, {})
-        for attr in cmds.listAttr(node, keyable=True, unlocked=True, visible=True) or []:
-            if attr != "tag":
-                values["{}.{}".format(short_name, attr)] = cmds.getAttr("{}.{}".format(node, attr))
-        if operation:
-            operation.step()
-    _save_data(data)
+    for rig_id, group in groups.items():
+        entries = {}
+        for node in group["controls"]:
+            if operation and operation.cancelled:
+                return
+            entries[rig_snapshot.control_key(node)] = rig_snapshot.capture_default_values(node)
+            if operation:
+                operation.step()
+        rig_snapshot.merge_control_entries(rig_id, "default", entries)
     wutil.make_inViewMessage("Default values saved")
 
 
@@ -80,29 +47,31 @@ def remove_selected():
     selected = selectionMod.get_selected_objects(long=True)
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
-    data = _load_data()
+    groups = rig_snapshot.group_controls_by_rig(selected)
+    if not groups:
+        return wutil.make_inViewMessage("Selected controls are not part of a recognizable rig")
+
     operation = toolCommon.current_tool_operation()
     if operation:
         operation.set_total(len(selected))
-    for node in selected:
-        if operation and operation.cancelled:
-            return
-        namespace, short_name = _object_identity(node)
-        values = data.get(namespace, {})
-        prefix = short_name + "."
-        data[namespace] = {key: value for key, value in values.items() if not key.startswith(prefix)}
-        if not data[namespace]:
-            data.pop(namespace, None)
-        if operation:
-            operation.step()
-    _save_data(data)
+    for rig_id, group in groups.items():
+        entries = {}
+        for node in group["controls"]:
+            if operation and operation.cancelled:
+                return
+            entries[rig_snapshot.control_key(node)] = {}
+            if operation:
+                operation.step()
+        rig_snapshot.merge_control_entries(rig_id, "default", entries)
     wutil.make_inViewMessage("Saved defaults removed for the selection")
 
 
 def clear_all():
-    if not os.path.isfile(_data_path()):
+    rig_ids = rig_snapshot.list_rig_ids()
+    if not rig_ids:
         return wutil.make_inViewMessage("No saved default values found")
-    _save_data({})
+    for rig_id in rig_ids:
+        rig_snapshot.clear_section(rig_id, "default")
     wutil.make_inViewMessage("All saved default values cleared")
 
 
@@ -119,7 +88,6 @@ def apply_defaults(translations=False, rotations=False, scales=False):
         "default_translations" if translations else "default_rotations" if rotations else
         "default_scales" if scales else "default_object_values"
     )
-    data = _load_data()
     target_info = animation_context.resolve_tool_context(
         default_mode="current_frame",
         include_channels=True,
@@ -152,7 +120,7 @@ def apply_defaults(translations=False, rotations=False, scales=False):
                 if not _matches(attr, translations, rotations, scales):
                     operation.step()
                     continue
-                value = _stored_default(node, attr, data)
+                value = _stored_default(node, attr)
                 if value is not None:
                     try:
                         cmds.keyframe(curve, edit=True, valueChange=value, time=(frame, frame))
@@ -172,7 +140,7 @@ def apply_defaults(translations=False, rotations=False, scales=False):
             if not _matches(attr, translations, rotations, scales) or not cmds.getAttr(plug, settable=True):
                 operation.step()
                 continue
-            value = _stored_default(node, attr, data)
+            value = _stored_default(node, attr)
             if value is None:
                 operation.step()
                 continue

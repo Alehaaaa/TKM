@@ -1,13 +1,9 @@
 """Mirror and opposite-control behavior."""
 
-import json
-import os
-
 from maya import cmds
 
-import TheKeyMachine.mods.reportMod as report
+from TheKeyMachine.core import rig_snapshot
 import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.tools import clipboard
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.copy_paste.controller import (
     ANIMATION_CONTROLS_KEY,
@@ -25,61 +21,20 @@ import TheKeyMachine.widgets.timeline as timelineWidgets
 import TheKeyMachine.widgets.util as wutil
 
 
-# _____________________________ Patrones Mirror ______________________________________
-
-
-MIRROR_PATTERNS = [
-    ("R_", "L_"),
-    ("L_", "R_"),
-    ("_R", "_L"),
-    ("_L", "_R"),
-    ("_R_", "_L_"),
-    ("_L_", "_R_"),
-    ("r_", "l_"),
-    ("l_", "r_"),
-    ("_r_", "_l_"),
-    ("_l_", "_r_"),
-    ("_rt_", "_lf_"),
-    ("_lf_", "_rt_"),
-    ("_rg_", "_lf_"),
-    ("_lf_", "_rg_"),
-    ("_lf", "_rg"),
-    ("_rg", "_lf"),
-    ("RF_", "LF_"),
-    ("LF_", "RF_"),
-    ("left_", "right_"),
-    ("right_", "left_"),
-    ("_left", "_right_"),
-    ("_right", "_left"),
-    ("_left_", "_right_"),
-    ("_right_", "_left_"),
-]
-
-
-# __________ Funcion para buscar control opuesto ___________________________________
+# _____________________________ Opposite-name resolution ______________________________
 
 
 def opposite_control_name(name):
-    """Return the configured opposite control name without querying the scene."""
-    namespace, _, control_name = name.rpartition(":")
-    for pattern, opposite_pattern in MIRROR_PATTERNS:
-        if pattern in control_name:
-            new_control_name = control_name.replace(pattern, opposite_pattern, 1)
-            return f"{namespace}:{new_control_name}" if namespace else new_control_name
-    return None
+    return rig_snapshot.opposite_control_name(name)
 
 
 def find_opposite_name(name):
-    """Return the configured opposite control when it exists in the scene."""
-    opposite_name = opposite_control_name(name)
-    return opposite_name if opposite_name and cmds.objExists(opposite_name) else None
+    return rig_snapshot.find_opposite_name(name)
 
 
 # ___________________________ SELECT OPPOSITE _____________________________________
 
 def select_opposite(*args):
-    global MIRROR_PATTERNS
-
     selected_objects = selectionMod.get_selected_objects()
     opposite_controls = []
 
@@ -93,8 +48,6 @@ def select_opposite(*args):
 
 
 def add_select_opposite(*args):
-    global MIRROR_PATTERNS
-
     selected_objects = selectionMod.get_selected_objects()
     opposite_controls = []
 
@@ -125,10 +78,9 @@ def copy_opposite(*args):
         operation_context = operation_manager.__enter__()
         operation_context.start()
         ATTRIBUTES_TO_IGNORE = {"tag"}
-        exceptions = load_exceptions()
 
         def replace_pattern_in_attribute(attr):
-            for from_pattern, to_pattern in MIRROR_PATTERNS:
+            for from_pattern, to_pattern in rig_snapshot.MIRROR_PATTERNS:
                 if from_pattern in attr:
                     return attr.replace(from_pattern, to_pattern)
             return attr
@@ -151,7 +103,7 @@ def copy_opposite(*args):
                     if not cmds.getAttr(f"{opposite_obj}.{opposite_attr}", lock=True):
                         try:
                             current_value = cmds.getAttr(f"{obj}.{attr}")
-                            current_value = apply_exception(exceptions, obj, attr, current_value)
+                            current_value = apply_exception(obj, attr, current_value)
                             cmds.setAttr(f"{opposite_obj}.{opposite_attr}", current_value)
                         except Exception as e:
                             import TheKeyMachine.mods.reportMod as report
@@ -172,12 +124,20 @@ def copy_opposite(*args):
 
 
 def mirror(*args):
+    selected_controls = selectionMod.get_selected_objects()
+    if not selected_controls:
+        return wutil.make_inViewMessage("Select at least one object")
+
+    time_context = timelineWidgets.resolve_time_context(default_mode="current_frame")
+    if time_context.mode != "current_frame":
+        # A time-slider range or Graph Editor key selection is active -- mirror
+        # just those keys instead of swapping the current frame's live value.
+        return _mirror_keys(selected_controls, time_context, tool_id="mirror", label="Mirror")
+
     operation_manager = None
     operation_context = None
     try:
-        selected_controls = selectionMod.get_selected_objects()
-        if not selected_controls:
-            return wutil.make_inViewMessage("Select at least one object")
+        selected_channels = set(selectionMod.get_selected_channels() or [])
 
         operation_manager = toolCommon.tool_operation(
             tool_id="mirror",
@@ -191,13 +151,12 @@ def mirror(*args):
         )
         operation_context = operation_manager.__enter__()
         operation_context.start()
-        exceptions = load_exceptions()
 
         def swap_control_values(control1, control2):
             if not cmds.objExists(control1):
                 return
 
-            attrs_to_swap = _mirror_keyable_attrs(control1)
+            attrs_to_swap = _target_attrs(control1, selected_channels)
             if not attrs_to_swap:
                 return
 
@@ -207,24 +166,20 @@ def mirror(*args):
 
                 try:
                     value1 = cmds.getAttr(f"{control1}.{attr}")
-
-                    # Aplicar excepciones si es necesario
-                    value1 = apply_exception(exceptions, control1, attr, value1)
+                    value1 = apply_exception(control1, attr, value1)
 
                     if control2 and cmds.objExists(control2) and _attr_settable(control2, attr):
                         value2 = cmds.getAttr(f"{control2}.{attr}")
-                        value2 = apply_exception(exceptions, control2, attr, value2)
+                        value2 = apply_exception(control2, attr, value2)
 
                         cmds.setAttr(f"{control2}.{attr}", value1)
                         cmds.setAttr(f"{control1}.{attr}", value2)
                     else:  # Solo un control (central o único)
-                        # Verificar si hay excepción para este control y atributo
-                        control_name = control1.rsplit(":", 1)[-1]
-                        if control_name in exceptions and attr in exceptions[control_name]:
-                            exception_type = exceptions[control_name][attr]
+                        exceptions = rig_snapshot.resolve_control_snapshot(control1, "mirror", compute_fn=lambda n: {})
+                        if attr in (exceptions or {}):
+                            exception_type = exceptions[attr]
                             if exception_type == "invert":
                                 cmds.setAttr(f"{control1}.{attr}", value1 * 1)
-
                         else:
                             # Invertir solo los atributos específicos si no hay excepciones
                             if attr in ["translateX", "rotateZ", "rotateY"]:
@@ -255,7 +210,7 @@ def mirror(*args):
                     # Tratar como control central o único si no se encuentra un opuesto
                     swap_control_values(control, None)
                     processed_controls.add(control)
-                
+
                 if operation_context:
                     operation_context.step()
 
@@ -284,31 +239,23 @@ def _mirror_token_side(token):
 
 def _mirror_control_side(control):
     _namespace, _sep, control_name = control.rpartition(":")
-    for pattern, _opposite_pattern in MIRROR_PATTERNS:
+    for pattern, _opposite_pattern in rig_snapshot.MIRROR_PATTERNS:
         if pattern in control_name:
             return _mirror_token_side(pattern)
     return None
 
 
-def load_exceptions():
-    mirror_exceptions_file_path = clipboard.path("mirror")
-    if os.path.exists(mirror_exceptions_file_path):
-        try:
-            with open(mirror_exceptions_file_path, "r") as file:
-                return json.load(file)
-        except Exception:
-            return {}
-    return {}
+def apply_exception(control, attr, value):
+    exceptions = rig_snapshot.resolve_control_snapshot(control, "mirror", compute_fn=lambda n: {})
+    return _apply_exception_type((exceptions or {}).get(attr), value)
 
 
-def apply_exception(exceptions, control, attr, value):
-    control_name = control.rsplit(":", 1)[-1]
-    exception_type = (exceptions.get(control_name) or {}).get(attr)
+def _apply_exception_type(exception_type, value):
     if exception_type == "invert":
         if isinstance(value, list):
-            return [apply_exception(exceptions, control, attr, item) for item in value]
+            return [_apply_exception_type(exception_type, item) for item in value]
         if isinstance(value, tuple):
-            return tuple(apply_exception(exceptions, control, attr, item) for item in value)
+            return tuple(_apply_exception_type(exception_type, item) for item in value)
         if isinstance(value, (int, float)):
             return -value
     return value
@@ -318,6 +265,14 @@ def _mirror_keyable_attrs(control):
     return [attr for attr in (cmds.listAttr(control, keyable=True) or []) if attr != "tag"]
 
 
+def _target_attrs(control, selected_channels):
+    """Restrict the mirrorable attrs of ``control`` to ``selected_channels`` when set."""
+    attrs = _mirror_keyable_attrs(control)
+    if not selected_channels:
+        return attrs
+    return [attr for attr in attrs if attr in selected_channels]
+
+
 def _attr_settable(control, attr):
     try:
         return bool(cmds.getAttr(f"{control}.{attr}", settable=True))
@@ -325,12 +280,74 @@ def _attr_settable(control, attr):
         return False
 
 
+def _mirror_keys(selected_controls, time_context, tool_id, label):
+    selected_channels = set(selectionMod.get_selected_channels() or [])
+    mirrored_data = {
+        ANIMATION_META_KEY: {
+            "type": "animation",
+            "version": ANIMATION_SCHEMA_VERSION,
+            "range": None,
+        },
+        ANIMATION_CONTROLS_KEY: {},
+    }
+    key_count = 0
+    processed_controls = set()
+
+    with _copy_paste_operation(
+        tool_id,
+        label,
+        undo=True,
+        tint="range",
+        progress=True,
+        progress_max=len(selected_controls),
+    ) as state:
+        operation = state["operation"]
+        operation.start()
+        for source in selected_controls:
+            if operation.cancelled:
+                break
+            if source in processed_controls:
+                operation.step()
+                continue
+            target = find_opposite_name(source)
+            if not target or not cmds.objExists(target):
+                operation.step()
+                continue
+            processed_controls.add(source)
+            processed_controls.add(target)
+
+            target_channels = {}
+            for attr in _target_attrs(source, selected_channels):
+                if not _attr_settable(source, attr) or not _attr_settable(target, attr):
+                    continue
+                plug = f"{source}.{attr}"
+                channel_data = _query_layered_anim_channel_data(plug, time_context)
+                if not channel_data.get(ANIMATION_FRAME_KEY) and not channel_data.get(ANIMATION_LAYERS_KEY):
+                    continue
+                target_channels[attr] = _transform_channel_values(
+                    channel_data,
+                    lambda value, node=source, channel=attr: apply_exception(node, channel, value),
+                )
+
+            if target_channels:
+                key_count += _apply_animation_channels_to_targets([target], target_channels, replace=True)
+                mirrored_data[ANIMATION_CONTROLS_KEY][target] = target_channels
+
+            operation.step()
+
+        if key_count:
+            state["timerange"] = _animation_data_timerange(mirrored_data)
+            state["success"] = True
+        else:
+            cmds.warning("No mirrorable animation keys found")
+
+
 def _mirror_current_values(target_side=None, operation=None):
     selected_controls = selectionMod.get_selected_objects()
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 
-    exceptions = load_exceptions()
+    selected_channels = set(selectionMod.get_selected_channels() or [])
     copied = 0
 
     for source in selected_controls:
@@ -351,16 +368,16 @@ def _mirror_current_values(target_side=None, operation=None):
                 operation.step()
             continue
 
-        for attr in _mirror_keyable_attrs(source):
+        for attr in _target_attrs(source, selected_channels):
             if not _attr_settable(source, attr) or not _attr_settable(target, attr):
                 continue
             try:
                 value = cmds.getAttr(f"{source}.{attr}")
-                cmds.setAttr(f"{target}.{attr}", apply_exception(exceptions, source, attr, value))
+                cmds.setAttr(f"{target}.{attr}", apply_exception(source, attr, value))
                 copied += 1
             except Exception as e:
                 cmds.warning(f"Could not mirror {source}.{attr} to {target}: {str(e)}")
-        
+
         if operation:
             operation.step()
 
@@ -406,66 +423,8 @@ def mirror_all_keys(*args):
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 
-    exceptions = load_exceptions()
     time_context = timelineWidgets.resolve_time_context(default_mode="all_animation")
-    mirrored_data = {
-        ANIMATION_META_KEY: {
-            "type": "animation",
-            "version": ANIMATION_SCHEMA_VERSION,
-            "range": None,
-        },
-        ANIMATION_CONTROLS_KEY: {},
-    }
-    key_count = 0
-    processed_controls = set()
-
-    with _copy_paste_operation(
-        "mirror_all_keys",
-        "Animation Mirrored",
-        undo=True,
-        tint="range",
-        progress=True,
-        progress_max=len(selected_controls),
-    ) as state:
-        operation = state["operation"]
-        operation.start()
-        for source in selected_controls:
-            if operation.cancelled:
-                break
-            if source in processed_controls:
-                operation.step()
-                continue
-            target = find_opposite_name(source)
-            if not target or not cmds.objExists(target):
-                operation.step()
-                continue
-            processed_controls.add(source)
-            processed_controls.add(target)
-
-            target_channels = {}
-            for attr in _mirror_keyable_attrs(source):
-                if not _attr_settable(source, attr) or not _attr_settable(target, attr):
-                    continue
-                plug = f"{source}.{attr}"
-                channel_data = _query_layered_anim_channel_data(plug, time_context)
-                if not channel_data.get(ANIMATION_FRAME_KEY) and not channel_data.get(ANIMATION_LAYERS_KEY):
-                    continue
-                target_channels[attr] = _transform_channel_values(
-                    channel_data,
-                    lambda value, node=source, channel=attr: apply_exception(exceptions, node, channel, value),
-                )
-
-            if target_channels:
-                key_count += _apply_animation_channels_to_targets([target], target_channels, replace=True)
-                mirrored_data[ANIMATION_CONTROLS_KEY][target] = target_channels
-
-            operation.step()
-
-        if key_count:
-            state["timerange"] = _animation_data_timerange(mirrored_data)
-            state["success"] = True
-        else:
-            cmds.warning("No mirrorable animation keys found")
+    return _mirror_keys(selected_controls, time_context, tool_id="mirror_all_keys", label="Animation Mirrored")
 
 
 def _update_mirror_exceptions(exception_type):
@@ -475,23 +434,20 @@ def _update_mirror_exceptions(exception_type):
         action = "create an exception" if exception_type else "remove exceptions"
         return wutil.make_inViewMessage(f"Select controls and channels to {action}")
 
-    exceptions = load_exceptions()
-    for control in selected_controls:
-        control_name = control.rsplit(":", 1)[-1]
-        control_exceptions = exceptions.setdefault(control_name, {})
-        for channel in selected_channels:
-            long_name = cmds.attributeQuery(channel, node=control, longName=True)
-            if exception_type:
-                control_exceptions[long_name] = exception_type
-            else:
-                control_exceptions.pop(long_name, None)
-        if not control_exceptions:
-            exceptions.pop(control_name, None)
+    groups = rig_snapshot.group_controls_by_rig(selected_controls)
+    if not groups:
+        return wutil.make_inViewMessage("Selected controls are not part of a recognizable rig")
 
-    json_path = clipboard.path("mirror")
-    os.makedirs(os.path.dirname(json_path), exist_ok=True)
-    with open(json_path, "w") as file:
-        json.dump(exceptions, file, indent=4)
+    for rig_id, group in groups.items():
+        entries = {}
+        for control in group["controls"]:
+            control_entries = {}
+            for channel in selected_channels:
+                long_name = cmds.attributeQuery(channel, node=control, longName=True)
+                control_entries[long_name] = exception_type
+            entries[rig_snapshot.control_key(control)] = control_entries
+        rig_snapshot.merge_control_entries(rig_id, "mirror", entries)
+
     cmds.warning("Exception created" if exception_type else "Exception removed")
 
 

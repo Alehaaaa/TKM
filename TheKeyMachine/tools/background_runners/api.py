@@ -39,6 +39,10 @@ def toggle_anim_layer_weights(*args):
     return controller.toggle_anim_layer_weights(*args)
 
 
+def toggle_selector_toolbar_pin(*args):
+    return controller.toggle_selector_toolbar_pin(*args)
+
+
 def turn_all_off(*args):
     return controller.turn_all_off(*args)
 

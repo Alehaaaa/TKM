@@ -349,6 +349,56 @@
             ]
         }
     },
+    "background_runner_selector_toolbar_pin": {
+        "en": {
+            "label": "Selected Object Display",
+            "tooltip": [
+                "Toggle whether the Selected Object Display toolbutton stays pinned and visible on the toolbar."
+            ]
+        },
+        "es": {
+            "label": "Visualización de Objetos Seleccionados",
+            "tooltip": [
+                "Activa o desactiva que el botón de Visualización de Objetos Seleccionados permanezca anclado y visible en la barra de herramientas."
+            ]
+        },
+        "fr": {
+            "label": "Affichage des Objets Sélectionnés",
+            "tooltip": [
+                "Active ou désactive le maintien du bouton d'Affichage des Objets Sélectionnés épinglé et visible sur la barre d'outils."
+            ]
+        },
+        "ca": {
+            "label": "Visualització d'Objectes Seleccionats",
+            "tooltip": [
+                "Activa o desactiva que el botó de Visualització d'Objectes Seleccionats romangui fixat i visible a la barra d'eines"
+            ]
+        },
+        "zh": {
+            "label": "已选对象显示",
+            "tooltip": [
+                "切换\"已选对象显示\"按钮是否固定并显示在工具栏上"
+            ]
+        },
+        "ja": {
+            "label": "選択オブジェクト表示",
+            "tooltip": [
+                "「選択オブジェクト表示」ボタンをツールバーに固定して表示し続けるかを切り替えます"
+            ]
+        },
+        "ko": {
+            "label": "선택된 오브젝트 표시",
+            "tooltip": [
+                "'선택된 오브젝트 표시' 버튼을 툴바에 고정하여 표시할지 전환합니다"
+            ]
+        },
+        "ar": {
+            "label": "عرض الكائنات المحددة",
+            "tooltip": [
+                "تبديل إبقاء زر «عرض الكائنات المحددة» مثبتًا ومرئيًا على شريط الأدوات"
+            ]
+        }
+    },
     "background_runner_tools": {
         "en": {
             "label": "Background Runners"

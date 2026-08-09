@@ -1,0 +1,21 @@
+{
+  "rig": [
+    "Capture opposite-control, default-pose and mirror data for the selected rig's controls.",
+    "Only the selected controls are captured; existing entries for the rest of the rig are left untouched."
+  ],
+  "default": [
+    "Capture the current pose of the selected controls as their saved default.",
+    "Only attributes that differ from Maya's own attribute default are stored."
+  ],
+  "opposite": [
+    "Capture and save the opposite-control relationship for the selected controls.",
+    "Controls with no matching opposite are recorded as center controls."
+  ],
+  "mirror": [
+    "Confirm the selected controls are part of a saved rig.",
+    "Mirror exceptions are saved automatically via Add Exception Invert/Keep; there is nothing else to capture here."
+  ],
+  "help": [
+    "Open the Snapshot Rig documentation."
+  ]
+}

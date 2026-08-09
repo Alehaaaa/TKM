@@ -8,6 +8,39 @@ from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import util as wutil
 
 
+SELECTOR_TOOL_ID = "selector"
+SELECTOR_SECTION_ID = "selection_tools"
+SELECTOR_TOOLBAR_ID = "main"
+
+
+def is_selector_pinned():
+    """Whether the Selector toolbutton is currently pinned/visible on the main toolbar.
+
+    Reads through the same ``get_section_tools`` the Workspaces editor uses,
+    so this always agrees with what a user sees there and on the toolbar's
+    own right-click pinning menu. Only the main toolbar is tracked here --
+    checking the graph toolbar too (and OR-ing the two) is what used to make
+    this getter stick at True forever: the graph toolbar is usually closed,
+    so it always fell back to its "pinned by default" workspace setting no
+    matter what the main toolbar's actual state was.
+    """
+    from TheKeyMachine.tools.workspaces import controller as workspacesController
+
+    for entry in workspacesController.get_section_tools(SELECTOR_TOOLBAR_ID, SELECTOR_SECTION_ID):
+        if entry["id"] == SELECTOR_TOOL_ID:
+            return bool(entry["checked"])
+    return False
+
+
+def set_selector_pinned(enabled):
+    """Pin or unpin the Selector toolbutton on the main toolbar."""
+    from TheKeyMachine.tools.workspaces import controller as workspacesController
+
+    return workspacesController.set_tool_pinned(
+        SELECTOR_TOOLBAR_ID, SELECTOR_SECTION_ID, SELECTOR_TOOL_ID, bool(enabled)
+    )
+
+
 def _selected_roots():
     roots = []
     for node in selectionMod.get_selected_objects(long=True):

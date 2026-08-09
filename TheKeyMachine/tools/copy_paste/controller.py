@@ -1428,8 +1428,6 @@ def paste_insert_animation(*args, anchor_widget=None, **kwargs):
 def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
     from TheKeyMachine.tools.mirror import controller as mirror_controller
 
-    exceptions = mirror_controller.load_exceptions()
-
     animation_data = _load_clipboard_data("animation", "animation")
     if not animation_data:
         return
@@ -1470,7 +1468,7 @@ def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
                     mirrored_channels[channel] = _transform_channel_values(
                         channel_data,
                         lambda value, attr=channel: mirror_controller.apply_exception(
-                            exceptions, control_name, attr, value
+                            control_name, attr, value
                         ),
                     )
                 applied = _apply_animation_channels_to_targets(
@@ -1782,8 +1780,6 @@ def paste_mirror_pose(*args, **kwargs):
     """Paste copied pose values onto opposite controls using mirror exceptions."""
     from TheKeyMachine.tools.mirror import controller as mirror_controller
 
-    exceptions = mirror_controller.load_exceptions()
-
     pose_data = _load_clipboard_data("pose", "pose")
     if not pose_data:
         return
@@ -1823,7 +1819,7 @@ def paste_mirror_pose(*args, **kwargs):
                     return
                 mirrored_controls[control_name][attr] = (
                     mirror_controller.apply_exception(
-                        exceptions, control_name, attr, value
+                        control_name, attr, value
                     )
                 )
 

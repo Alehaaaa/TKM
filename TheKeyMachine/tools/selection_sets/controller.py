@@ -13,8 +13,19 @@ from TheKeyMachine.widgets import util as wutil
 
 SELECTION_SETS_ROOT = "TheKeyMachine_SelectionSet"
 SET_GROUP_SUFFIX = "_setgroup"
+
+# --- animBot selection set import ------------------------------------------
+#
+# animBot keeps its own selection sets in a scene hierarchy rooted at
+# ANIMBOT_SELECTION_SETS_ROOT, grouped under per-color transforms that carry
+# an int `colorIndex` attribute (animBot's 0-29 swatch palette). The table
+# below maps each animBot swatch to the closest TKM selection color index
+# (see TheKeyMachine.data.colors.COLORS.selection). Swatches that aren't
+# listed here, or whose colorIndex can't be read, fall back to
+# ANIMBOT_FALLBACK_SUFFIX -- an unrecognized color should never cause a set
+# to be skipped during import.
 ANIMBOT_SELECTION_SETS_ROOT = "animBot_Select_Sets"
-ANIMBOT_COLOR_INDEX_TO_TKM_INDEX = {
+_ANIMBOT_COLOR_INDEX_TO_TKM_INDEX = {
     0: 1,
     1: 8,
     2: 14,
@@ -45,6 +56,22 @@ ANIMBOT_COLOR_INDEX_TO_TKM_INDEX = {
     28: 26,
     29: 27,
 }
+_TKM_SELECTION_COLOR_BY_INDEX = {
+    color.index: color for color in selectionSetsApi.SELECTION_COLORS.all
+}
+ANIMBOT_FALLBACK_SUFFIX = selectionSetsApi.SELECTION_COLORS.default.suffix
+
+
+def _build_animbot_color_suffix_map():
+    suffix_by_animbot_index = {}
+    for animbot_index, tkm_index in _ANIMBOT_COLOR_INDEX_TO_TKM_INDEX.items():
+        color = _TKM_SELECTION_COLOR_BY_INDEX.get(tkm_index)
+        if color:
+            suffix_by_animbot_index[animbot_index] = color.suffix
+    return suffix_by_animbot_index
+
+
+ANIMBOT_COLOR_INDEX_TO_SUFFIX = _build_animbot_color_suffix_map()
 
 
 def normalize_scene_items(items):
@@ -53,14 +80,6 @@ def normalize_scene_items(items):
         return set()
     normalized = cmds.ls(items, long=True) or []
     return set(normalized or items)
-TKM_SELECTION_COLOR_BY_INDEX = {
-    color.index: color for color in selectionSetsApi.SELECTION_COLORS.all
-}
-
-
-def _selection_color_suffix_from_tkm_index(tkm_index):
-    color = TKM_SELECTION_COLOR_BY_INDEX.get(tkm_index)
-    return color.suffix if color else selectionSetsApi.SELECTION_COLORS.default.suffix
 
 
 class SelectionSetsController:
@@ -68,6 +87,8 @@ class SelectionSetsController:
 
     def __init__(self, owner=None):
         self.owner = owner
+
+    # --- export / import -----------------------------------------------
 
     def export_sets(self, file_path=None, *args, **kwargs):
         operation = toolCommon.current_tool_operation()
@@ -198,6 +219,186 @@ class SelectionSetsController:
             operation.step()
         QtCore.QTimer.singleShot(500, selectionSetsApi.refresh_selection_sets_window)
 
+    def _serialize_selection_set(self, set_name):
+        base_name, _, color_suffix = set_name.rpartition("_")
+        return {
+            "name": base_name or set_name,
+            "color_suffix": color_suffix,
+            "objects": cmds.sets(set_name, q=True) or [],
+        }
+
+    def _import_selection_set(self, set_info, parent_set):
+        set_name = set_info.get("name")
+        color_suffix = str(set_info.get("color_suffix", "")).strip("_")
+        if not set_name or not color_suffix:
+            return None
+
+        set_name_with_suffix = f"{set_name}_{color_suffix}"
+        if not cmds.objExists(set_name_with_suffix):
+            new_set = cmds.sets(name=set_name_with_suffix, empty=True)
+            cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
+            cmds.sets(new_set, add=parent_set)
+        else:
+            new_set = set_name_with_suffix
+            if not cmds.attributeQuery("hidden", node=new_set, exists=True):
+                cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
+            try:
+                cmds.sets(new_set, add=parent_set)
+            except Exception:
+                pass
+
+        for obj in set_info.get("objects", []):
+            if cmds.objExists(obj):
+                cmds.sets(obj, add=new_set)
+        return new_set
+
+    # --- queries ---------------------------------------------------------
+
+    def get_set_groups(self):
+        if cmds.objExists(SELECTION_SETS_ROOT):
+            all_sets = cmds.sets(SELECTION_SETS_ROOT, q=True) or []
+            return [s for s in all_sets if s.endswith(SET_GROUP_SUFFIX)]
+        return []
+
+    def _get_direct_selection_sets(self):
+        if not cmds.objExists(SELECTION_SETS_ROOT):
+            return []
+        all_sets = cmds.sets(SELECTION_SETS_ROOT, q=True) or []
+        return [s for s in all_sets if cmds.objExists(s) and not str(s).endswith(SET_GROUP_SUFFIX)]
+
+    def get_selection_sets(self):
+        if not cmds.objExists(SELECTION_SETS_ROOT):
+            return []
+        selection_sets = []
+        seen = set()
+
+        def _append(node):
+            if not cmds.objExists(node):
+                return
+            if str(node).endswith(SET_GROUP_SUFFIX):
+                return
+            if node in seen:
+                return
+            seen.add(node)
+            selection_sets.append(node)
+
+        for node in cmds.sets(SELECTION_SETS_ROOT, q=True) or []:
+            if str(node).endswith(SET_GROUP_SUFFIX):
+                for subset in cmds.sets(node, q=True) or []:
+                    _append(subset)
+                continue
+            _append(node)
+        return selection_sets
+
+    def _find_matching_selection_set(self, selection):
+        target_members = normalize_scene_items(selection)
+        if not target_members:
+            return None
+
+        for subset in self.get_selection_sets():
+            if not cmds.objExists(subset):
+                continue
+            subset_members = normalize_scene_items(cmds.sets(subset, q=True) or [])
+            if subset_members == target_members:
+                return subset
+        return None
+
+    def find_matching_selection_set(self, selection=None):
+        if selection is None:
+            selection = selectionMod.get_selected_objects()
+        return self._find_matching_selection_set(selection)
+
+    def get_selection_set_display_name(self, set_name):
+        if not set_name:
+            return ""
+        split_name = str(set_name).split("_")
+        if len(split_name) >= 2:
+            return "_".join(split_name[:-1])
+        return str(set_name)
+
+    def show_matching_selection_set_message(self, set_name):
+        if set_name:
+            display_name = self.get_selection_set_display_name(set_name)
+            wutil.make_inViewMessage(f"Selection already matches set: {display_name or set_name}")
+
+    # --- creation ----------------------------------------------------------
+
+    def _sanitize_set_name(self, name):
+        parts = [part for part in re.split(r"[^A-Za-z0-9]+", str(name or "")) if part]
+        sanitized = "_".join(parts)
+        sanitized = re.sub(r"^[^A-Za-z_]+", "", sanitized)
+        return sanitized or "Selection_Set"
+
+    def _ensure_selection_sets_root(self):
+        sel_set_name = SELECTION_SETS_ROOT
+        if not cmds.objExists(sel_set_name):
+            cmds.sets(name=sel_set_name, empty=True)
+        return sel_set_name
+
+    def create_selection_set_from_data(self, name, color_suffix, objects, refresh=True):
+        valid_objects = cmds.ls(objects or [], long=True) or []
+        if not valid_objects:
+            return None
+
+        existing_match = self._find_matching_selection_set(valid_objects)
+        if existing_match:
+            return existing_match
+
+        base_name = self._sanitize_set_name(name)
+        color_suffix = color_suffix if str(color_suffix).startswith("_") else f"_{color_suffix}"
+        sel_set_name = self._ensure_selection_sets_root()
+
+        candidate = f"{base_name}{color_suffix}"
+        index = 1
+        while cmds.objExists(candidate):
+            candidate = f"{base_name}_{index}{color_suffix}"
+            index += 1
+
+        new_set = cmds.sets(name=candidate, empty=True)
+        cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
+        cmds.sets(valid_objects, add=new_set)
+        cmds.sets(new_set, add=sel_set_name)
+
+        if refresh:
+            selectionSetsApi.refresh_selection_sets_window()
+        return new_set
+
+    def create_new_set_and_update_buttons(self, color_suffix, set_name_field, *args):
+        selection = selectionMod.get_selected_objects()
+        if not selection:
+            wutil.make_inViewMessage("Select something first")
+            return False
+
+        matching_set = self._find_matching_selection_set(selection)
+        if matching_set:
+            self.show_matching_selection_set_message(matching_set)
+            return False
+
+        new_set_name = set_name_field.text().replace(" ", "_")
+        sel_set_name = self._ensure_selection_sets_root()
+
+        if not re.match("^[a-zA-Z_][a-zA-Z0-9_]*$", new_set_name):
+            cmds.warning("Invalid set name. Name can't start with a number or contain invalid characters")
+            return False
+
+        new_set_name += f"{color_suffix}"
+        if cmds.objExists(new_set_name):
+            cmds.warning(f"{new_set_name} already exists")
+            return False
+
+        new_set = cmds.sets(name=new_set_name, empty=True)
+        cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
+
+        if selectionMod.get_selected_objects():
+            cmds.sets(selectionMod.get_selected_objects(), add=new_set)
+
+        cmds.sets(new_set, add=sel_set_name)
+        selectionSetsApi.refresh_selection_sets_window()
+        set_name_field.clear()
+        return True
+
+    # --- renaming & color ----------------------------------------------------
+
     def rename_setgroup(self, old_setgroup_name, new_setgroup_name, *args):
         new_setgroup_name = new_setgroup_name.strip()
 
@@ -251,145 +452,7 @@ class SelectionSetsController:
         for set_group in self.get_set_groups():
             combo_widget.addItem(set_group.replace(SET_GROUP_SUFFIX, ""), set_group)
 
-    def get_set_groups(self):
-        if cmds.objExists(SELECTION_SETS_ROOT):
-            all_sets = cmds.sets(SELECTION_SETS_ROOT, q=True) or []
-            return [s for s in all_sets if s.endswith(SET_GROUP_SUFFIX)]
-        return []   
-
-    def _get_direct_selection_sets(self):
-        if not cmds.objExists(SELECTION_SETS_ROOT):
-            return []
-        all_sets = cmds.sets(SELECTION_SETS_ROOT, q=True) or []
-        return [s for s in all_sets if cmds.objExists(s) and not str(s).endswith(SET_GROUP_SUFFIX)]
-
-    def get_selection_sets(self):
-        if not cmds.objExists(SELECTION_SETS_ROOT):
-            return []
-        selection_sets = []
-        seen = set()
-
-        def _append(node):
-            if not cmds.objExists(node):
-                return
-            if str(node).endswith(SET_GROUP_SUFFIX):
-                return
-            if node in seen:
-                return
-            seen.add(node)
-            selection_sets.append(node)
-
-        for node in cmds.sets(SELECTION_SETS_ROOT, q=True) or []:
-            if str(node).endswith(SET_GROUP_SUFFIX):
-                for subset in cmds.sets(node, q=True) or []:
-                    _append(subset)
-                continue
-            _append(node)
-        return selection_sets
-
-    def _find_matching_selection_set(self, selection):
-        target_members = normalize_scene_items(selection)
-        if not target_members:
-            return None
-
-        for subset in self.get_selection_sets():
-            if not cmds.objExists(subset):
-                continue
-            subset_members = normalize_scene_items(cmds.sets(subset, q=True) or [])
-            if subset_members == target_members:
-                return subset
-        return None
-
-    def get_selection_set_display_name(self, set_name):
-        if not set_name:
-            return ""
-        split_name = str(set_name).split("_")
-        if len(split_name) >= 2:
-            return "_".join(split_name[:-1])
-        return str(set_name)
-
-    def find_matching_selection_set(self, selection=None):
-        if selection is None:
-            selection = selectionMod.get_selected_objects()
-        return self._find_matching_selection_set(selection)
-
-    def show_matching_selection_set_message(self, set_name):
-        if set_name:
-            display_name = self.get_selection_set_display_name(set_name)
-            wutil.make_inViewMessage(f"Selection already matches set: {display_name or set_name}")
-
-    def _sanitize_set_name(self, name):
-        parts = [part for part in re.split(r"[^A-Za-z0-9]+", str(name or "")) if part]
-        sanitized = "_".join(parts)
-        sanitized = re.sub(r"^[^A-Za-z_]+", "", sanitized)
-        return sanitized or "Selection_Set"
-
-    def _ensure_selection_sets_root(self):
-        sel_set_name = SELECTION_SETS_ROOT
-        if not cmds.objExists(sel_set_name):
-            cmds.sets(name=sel_set_name, empty=True)
-        return sel_set_name
-
-    def _serialize_selection_set(self, set_name):
-        base_name, _, color_suffix = set_name.rpartition("_")
-        return {
-            "name": base_name or set_name,
-            "color_suffix": color_suffix,
-            "objects": cmds.sets(set_name, q=True) or [],
-        }
-
-    def _import_selection_set(self, set_info, parent_set):
-        set_name = set_info.get("name")
-        color_suffix = str(set_info.get("color_suffix", "")).strip("_")
-        if not set_name or not color_suffix:
-            return None
-
-        set_name_with_suffix = f"{set_name}_{color_suffix}"
-        if not cmds.objExists(set_name_with_suffix):
-            new_set = cmds.sets(name=set_name_with_suffix, empty=True)
-            cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
-            cmds.sets(new_set, add=parent_set)
-        else:
-            new_set = set_name_with_suffix
-            if not cmds.attributeQuery("hidden", node=new_set, exists=True):
-                cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
-            try:
-                cmds.sets(new_set, add=parent_set)
-            except Exception:
-                pass
-
-        for obj in set_info.get("objects", []):
-            if cmds.objExists(obj):
-                cmds.sets(obj, add=new_set)
-        return new_set
-
-    def create_selection_set_from_data(self, name, color_suffix, objects, refresh=True):
-        valid_objects = cmds.ls(objects or [], long=True) or []
-        if not valid_objects:
-            return None
-
-        existing_match = self._find_matching_selection_set(valid_objects)
-        if existing_match:
-            return existing_match
-
-        base_name = self._sanitize_set_name(name)
-        color_suffix = color_suffix if str(color_suffix).startswith("_") else f"_{color_suffix}"
-        sel_set_name = self._ensure_selection_sets_root()
-
-        candidate = f"{base_name}{color_suffix}"
-        index = 1
-        while cmds.objExists(candidate):
-            candidate = f"{base_name}_{index}{color_suffix}"
-            index += 1
-
-        new_set = cmds.sets(name=candidate, empty=True)
-        cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
-        cmds.sets(valid_objects, add=new_set)
-        cmds.sets(new_set, add=sel_set_name)
-
-        if refresh:
-            selectionSetsApi.refresh_selection_sets_window()
-        return new_set
+    # --- animBot import ------------------------------------------------------
 
     def _animbot_root(self):
         matches = cmds.ls(ANIMBOT_SELECTION_SETS_ROOT, long=True) or []
@@ -401,14 +464,33 @@ class SelectionSetsController:
         return matches[0] if matches else None
 
     def _animbot_color_suffix(self, color_group):
+        """Resolve the TKM color suffix for an animBot color group.
+
+        Always returns a usable suffix: an unread or unmapped animBot
+        colorIndex falls back to ANIMBOT_FALLBACK_SUFFIX rather than
+        dropping the group's sets from the import.
+        """
         if not cmds.attributeQuery("colorIndex", node=color_group, exists=True):
-            return None
+            return ANIMBOT_FALLBACK_SUFFIX
         try:
             animbot_index = int(cmds.getAttr(f"{color_group}.colorIndex"))
         except Exception:
+            return ANIMBOT_FALLBACK_SUFFIX
+        return ANIMBOT_COLOR_INDEX_TO_SUFFIX.get(animbot_index, ANIMBOT_FALLBACK_SUFFIX)
+
+    def _animbot_entry_from_set_node(self, set_node, color_suffix):
+        if not cmds.attributeQuery("contents", node=set_node, exists=True):
             return None
-        tkm_index = ANIMBOT_COLOR_INDEX_TO_TKM_INDEX.get(animbot_index)
-        return _selection_color_suffix_from_tkm_index(tkm_index) if tkm_index else None
+        contents = cmds.getAttr(f"{set_node}.contents") or ""
+        objects = [item for item in str(contents).split(" ") if item]
+        valid_objects = cmds.ls(objects, long=True) or []
+        if not valid_objects:
+            return None
+        return {
+            "name": str(set_node).rsplit("|", 1)[-1],
+            "color_suffix": color_suffix,
+            "objects": valid_objects,
+        }
 
     def _animbot_selection_sets(self):
         root = self._animbot_root()
@@ -419,24 +501,11 @@ class SelectionSetsController:
         color_groups = cmds.listRelatives(root, children=True, type="transform", fullPath=True) or []
         for color_group in color_groups:
             color_suffix = self._animbot_color_suffix(color_group)
-            if not color_suffix:
-                continue
             set_nodes = cmds.listRelatives(color_group, children=True, type="transform", fullPath=True) or []
             for set_node in set_nodes:
-                if not cmds.attributeQuery("contents", node=set_node, exists=True):
-                    continue
-                contents = cmds.getAttr(f"{set_node}.contents") or ""
-                objects = [item for item in str(contents).split(" ") if item]
-                valid_objects = cmds.ls(objects, long=True) or []
-                if not valid_objects:
-                    continue
-                entries.append(
-                    {
-                        "name": str(set_node).rsplit("|", 1)[-1],
-                        "color_suffix": color_suffix,
-                        "objects": valid_objects,
-                    }
-                )
+                entry = self._animbot_entry_from_set_node(set_node, color_suffix)
+                if entry:
+                    entries.append(entry)
         return entries
 
     def pending_animbot_selection_sets(self):
@@ -463,54 +532,7 @@ class SelectionSetsController:
             selectionSetsApi.refresh_selection_sets_window()
         return created
 
-    def _delete_empty_set_groups(self):
-        for set_group in list(self.get_set_groups()):
-            if not cmds.objExists(set_group):
-                continue
-            try:
-                members = cmds.sets(set_group, q=True) or []
-            except Exception:
-                members = []
-            if members:
-                continue
-            try:
-                cmds.delete(set_group)
-            except Exception:
-                pass
-
-    def create_new_set_and_update_buttons(self, color_suffix, set_name_field, *args):
-        selection = selectionMod.get_selected_objects()
-        if not selection:
-            wutil.make_inViewMessage("Select something first")
-            return False
-
-        matching_set = self._find_matching_selection_set(selection)
-        if matching_set:
-            self.show_matching_selection_set_message(matching_set)
-            return False
-
-        new_set_name = set_name_field.text().replace(" ", "_")
-        sel_set_name = self._ensure_selection_sets_root()
-
-        if not re.match("^[a-zA-Z_][a-zA-Z0-9_]*$", new_set_name):
-            cmds.warning("Invalid set name. Name can't start with a number or contain invalid characters")
-            return False
-
-        new_set_name += f"{color_suffix}"
-        if cmds.objExists(new_set_name):
-            cmds.warning(f"{new_set_name} already exists")
-            return False
-
-        new_set = cmds.sets(name=new_set_name, empty=True)
-        cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
-
-        if selectionMod.get_selected_objects():
-            cmds.sets(selectionMod.get_selected_objects(), add=new_set)
-
-        cmds.sets(new_set, add=sel_set_name)
-        selectionSetsApi.refresh_selection_sets_window()
-        set_name_field.clear()
-        return True
+    # --- selection <-> set membership ----------------------------------------
 
     def handle_set_selection(self, set_name, shift_pressed, ctrl_pressed):
         mods = runtime.get_modifier_mask()
@@ -552,6 +574,23 @@ class SelectionSetsController:
         if current_members:
             cmds.sets(current_members, remove=set_name)
         cmds.sets(selection, add=set_name)
+
+    # --- deletion ------------------------------------------------------------
+
+    def _delete_empty_set_groups(self):
+        for set_group in list(self.get_set_groups()):
+            if not cmds.objExists(set_group):
+                continue
+            try:
+                members = cmds.sets(set_group, q=True) or []
+            except Exception:
+                members = []
+            if members:
+                continue
+            try:
+                cmds.delete(set_group)
+            except Exception:
+                pass
 
     def delete_sets_by_color_suffix(self, color_suffix, *args):
         target_suffix = color_suffix if str(color_suffix).startswith("_") else f"_{color_suffix}"

@@ -43,6 +43,11 @@ class BackgroundRunnersToolObject(ToolObject):
             "callback": api.toggle_anim_layer_weights,
             "tooltip": TOOLTIPS["anim_layer_weights"],
         },
+        "background_runner_selector_toolbar_pin": {
+            "type": "tool", "label": "Selected Object Display",
+            "callback": api.toggle_selector_toolbar_pin,
+            "tooltip": TOOLTIPS["selector_toolbar_pin"],
+        },
     }
     SECTION = {
         "id": "background_runner_tools",
