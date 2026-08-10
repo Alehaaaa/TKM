@@ -2,7 +2,7 @@
 
 from maya import cmds
 
-from TheKeyMachine.core import rig_snapshot
+from TheKeyMachine.tools.snapshot_rig import rig_snapshot
 import TheKeyMachine.mods.selectionMod as selectionMod
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.copy_paste.controller import (
@@ -175,14 +175,15 @@ def mirror(*args):
                         cmds.setAttr(f"{control2}.{attr}", value1)
                         cmds.setAttr(f"{control1}.{attr}", value2)
                     else:  # Solo un control (central o único)
-                        exceptions = rig_snapshot.resolve_control_snapshot(control1, "mirror", compute_fn=lambda n: {})
-                        if attr in (exceptions or {}):
-                            exception_type = exceptions[attr]
-                            if exception_type == "invert":
-                                cmds.setAttr(f"{control1}.{attr}", value1 * 1)
+                        directions = rig_snapshot.resolve_control_snapshot(control1, "mirror", compute_fn=lambda n: {})
+                        direction = rig_snapshot.get_attr_value(control1, directions, attr)
+                        if direction is not None:
+                            # ``apply_exception`` already applied the saved
+                            # absolute direction to ``value1`` above.
+                            cmds.setAttr(f"{control1}.{attr}", value1)
                         else:
                             # Invertir solo los atributos específicos si no hay excepciones
-                            if attr in ["translateX", "rotateZ", "rotateY"]:
+                            if attr in rig_snapshot.CENTER_INVERT_ATTRS:
                                 cmds.setAttr(f"{control1}.{attr}", value1 * -1)
 
                 except Exception as e:
@@ -246,16 +247,17 @@ def _mirror_control_side(control):
 
 
 def apply_exception(control, attr, value):
-    exceptions = rig_snapshot.resolve_control_snapshot(control, "mirror", compute_fn=lambda n: {})
-    return _apply_exception_type((exceptions or {}).get(attr), value)
+    directions = rig_snapshot.resolve_control_snapshot(control, "mirror", compute_fn=lambda n: {})
+    direction = rig_snapshot.get_attr_value(control, directions, attr)
+    return _apply_direction(direction, value)
 
 
-def _apply_exception_type(exception_type, value):
-    if exception_type == "invert":
+def _apply_direction(direction, value):
+    if direction == -1:
         if isinstance(value, list):
-            return [_apply_exception_type(exception_type, item) for item in value]
+            return [_apply_direction(direction, item) for item in value]
         if isinstance(value, tuple):
-            return tuple(_apply_exception_type(exception_type, item) for item in value)
+            return tuple(_apply_direction(direction, item) for item in value)
         if isinstance(value, (int, float)):
             return -value
     return value
@@ -427,11 +429,11 @@ def mirror_all_keys(*args):
     return _mirror_keys(selected_controls, time_context, tool_id="mirror_all_keys", label="Animation Mirrored")
 
 
-def _update_mirror_exceptions(exception_type):
+def _update_mirror_directions(direction):
     selected_controls = selectionMod.get_selected_objects()
     selected_channels = selectionMod.get_selected_channels()
     if not selected_controls or not selected_channels:
-        action = "create an exception" if exception_type else "remove exceptions"
+        action = "create an exception" if direction is not None else "remove exceptions"
         return wutil.make_inViewMessage(f"Select controls and channels to {action}")
 
     groups = rig_snapshot.group_controls_by_rig(selected_controls)
@@ -443,21 +445,21 @@ def _update_mirror_exceptions(exception_type):
         for control in group["controls"]:
             control_entries = {}
             for channel in selected_channels:
-                long_name = cmds.attributeQuery(channel, node=control, longName=True)
-                control_entries[long_name] = exception_type
+                short_name = cmds.attributeQuery(channel, node=control, shortName=True)
+                control_entries[short_name] = direction
             entries[rig_snapshot.control_key(control)] = control_entries
         rig_snapshot.merge_control_entries(rig_id, "mirror", entries)
 
-    cmds.warning("Exception created" if exception_type else "Exception removed")
+    cmds.warning("Exception created" if direction is not None else "Exception removed")
 
 
 def add_invert_exception(*args):
-    return _update_mirror_exceptions("invert")
+    return _update_mirror_directions(-1)
 
 
 def add_keep_exception(*args):
-    return _update_mirror_exceptions("keep")
+    return _update_mirror_directions(1)
 
 
 def remove_exception(*args):
-    return _update_mirror_exceptions(None)
+    return _update_mirror_directions(None)

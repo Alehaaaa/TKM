@@ -92,36 +92,27 @@ def format_eta(seconds):
         return ""
     if seconds < 60:
         unit = "second" if seconds == 1 else "seconds"
-        return "{} {} left".format(seconds, unit)
+        return "{} {}".format(seconds, unit)
     minutes, seconds = divmod(seconds, 60)
     if minutes < 60:
         minute_unit = "minute" if minutes == 1 else "minutes"
+        if not seconds:
+            return "{} {}".format(minutes, minute_unit)
         second_unit = "second" if seconds == 1 else "seconds"
-        return "{} {} {} {} left".format(
+        return "{} {} {} {}".format(
             minutes, minute_unit, seconds, second_unit
         )
     hours, minutes = divmod(minutes, 60)
     hour_unit = "hour" if hours == 1 else "hours"
+    if not minutes:
+        return "{} {}".format(hours, hour_unit)
     minute_unit = "minute" if minutes == 1 else "minutes"
-    return "{} {} {} {} left".format(hours, hour_unit, minutes, minute_unit)
+    return "{} {} {} {}".format(hours, hour_unit, minutes, minute_unit)
 
 
 def _quantize_eta_seconds(seconds):
-    """Round a raw remaining-time estimate to a "round" display value.
-
-    A countdown that ticks 47s, 46s, 44s, 39s, 41s... reads as broken even
-    when the underlying estimate is reasonable -- people expect a steady,
-    coarse number, not an exact one. Coarser buckets the longer the
-    remaining time is, since precision that far out is noise anyway.
-    """
-    seconds = max(0.0, float(seconds))
-    if seconds < 10:
-        step = 1
-    elif seconds < 60:
-        step = 5
-    else:
-        step = 15
-    return step * round(seconds / step)
+    """Round an ETA to an individual second for a smooth countdown."""
+    return int(round(max(0.0, float(seconds))))
 
 
 class _EtaEstimator(object):
@@ -147,12 +138,14 @@ class _EtaEstimator(object):
     def __init__(self):
         self._rate_per_unit = None
         self._last_sampled_value = None
+        self._last_sample_elapsed_ms = None
         self._displayed_seconds = None
         self._last_refresh_ms = -1
 
     def reset(self):
         self._rate_per_unit = None
         self._last_sampled_value = None
+        self._last_sample_elapsed_ms = None
         self._displayed_seconds = None
         self._last_refresh_ms = -1
 
@@ -178,10 +171,16 @@ class _EtaEstimator(object):
                     instantaneous_rate - self._rate_per_unit
                 )
             self._last_sampled_value = value
+            self._last_sample_elapsed_ms = elapsed_ms
 
         if self._rate_per_unit is None:
             return None
         remaining = self._rate_per_unit * max(0, max_value - value)
+        if self._last_sample_elapsed_ms is not None:
+            remaining = max(
+                0.0,
+                remaining - max(0, elapsed_ms - self._last_sample_elapsed_ms) / 1000.0,
+            )
 
         displayed = self._displayed_seconds
         stale = (
@@ -340,16 +339,14 @@ class AdaptiveProgress(object):
 
         title = format_tool_label(self.label)
         if self.max_value:
-            # Total is already known (most TKM tools compute it upfront), so
-            # there's nothing to "estimate" -- show real N/Total progress
-            # from the first frame instead of a placeholder that implies an
-            # open-ended wait most operations never actually have.
+            # Known totals drive the ETA estimator internally; the user-facing
+            # status stays time-based and never exposes completed/total counts.
             if self.value > 0:
                 remaining = self._eta.estimate(self._timer.elapsed(), self.value, self.max_value)
                 eta = format_eta(remaining) if remaining is not None else ""
                 if eta:
-                    return "{}... about {}".format(title, eta)
-            return "{}... {}/{}".format(title, self.value, self.max_value)
+                    return "{}... about {} left".format(title, eta)
+            return "{}... estimating time".format(title)
 
         # Total is genuinely unknown here. Most operations still finish in
         # well under a second, so lead with the plain label instead of
@@ -362,7 +359,7 @@ class AdaptiveProgress(object):
             # just quantize it so it doesn't tick by exact seconds either.
             eta = format_eta(_quantize_eta_seconds(self.estimated_seconds - elapsed_seconds))
             if eta:
-                return "{}... about {}".format(title, eta)
+                return "{}... about {} left".format(title, eta)
         if elapsed_seconds >= 1.0:
             elapsed = int(round(elapsed_seconds))
             return "{}... estimating time ({} seconds elapsed)".format(

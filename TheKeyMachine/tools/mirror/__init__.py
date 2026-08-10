@@ -87,6 +87,8 @@ class MirrorToolObject(ToolObject):
                 {"id": "select_opposite"},
                 {"id": "opposite_add"},
                 {"id": "opposite_copy"},
+                "separator",
+                {"id": "snapshot_opposite", "pinnable": False},
             ],
         },
         {
@@ -109,6 +111,8 @@ class MirrorToolObject(ToolObject):
                 {"id": "mirror_add_invert"},
                 {"id": "mirror_add_keep"},
                 {"id": "mirror_remove_exc"},
+                "separator",
+                {"id": "snapshot_mirror", "pinnable": False},
                 "separator",
                 {"id": "mirror_help"},
             ],

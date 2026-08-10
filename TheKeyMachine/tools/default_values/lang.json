@@ -249,56 +249,6 @@
             ]
         }
     },
-    "default_set_defaults": {
-        "en": {
-            "label": "Save Defaults for Selected",
-            "tooltip": [
-                "Store the current keyable attribute values as custom defaults for the selected objects."
-            ]
-        },
-        "es": {
-            "label": "Guardar Predeterminados de la Selección",
-            "tooltip": [
-                "Guarda los valores actuales de los atributos clave como predeterminados personalizados para los objetos seleccionados."
-            ]
-        },
-        "fr": {
-            "label": "Enregistrer les Valeurs par Défaut de la Sélection",
-            "tooltip": [
-                "Enregistre les valeurs actuelles des attributs clés comme valeurs par défaut personnalisées pour les objets sélectionnés."
-            ]
-        },
-        "ca": {
-            "label": "Desar Predeterminats de la Selecció",
-            "tooltip": [
-                "Desa els valors actuals dels atributs clau com a predeterminats personalitzats per als objectes seleccionats"
-            ]
-        },
-        "zh": {
-            "label": "为所选保存默认值",
-            "tooltip": [
-                "将当前可设关键帧属性值存储为所选对象的自定义默认值"
-            ]
-        },
-        "ja": {
-            "label": "選択にデフォルトを保存",
-            "tooltip": [
-                "現在のキー設定可能なアトリビュート値を、選択オブジェクトのカスタムデフォルトとして保存します"
-            ]
-        },
-        "ko": {
-            "label": "선택 항목의 기본값 저장",
-            "tooltip": [
-                "현재 키 설정 가능한 속성 값을 선택한 오브젝트의 사용자 지정 기본값으로 저장합니다"
-            ]
-        },
-        "ar": {
-            "label": "حفظ الافتراضيات للتحديد",
-            "tooltip": [
-                "تخزين قيم الخصائص القابلة للتحريك الحالية كقيم افتراضية مخصصة للكائنات المحددة"
-            ]
-        }
-    },
     "default_restore_defaults": {
         "en": {
             "label": "Remove Saved Defaults for Selected",

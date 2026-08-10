@@ -93,7 +93,7 @@ def _download_status(downloaded, total_size, elapsed_ms):
     if bytes_per_second <= 0:
         return label
     eta = toolCommon.format_eta(remaining / bytes_per_second)
-    return "{}, about {}".format(label, eta) if eta else label
+    return "{}, about {} left".format(label, eta) if eta else label
 
 
 def _reopen_after_install():

@@ -4,7 +4,6 @@
   "rotations": ["Reset only rotation attributes to their default values."],
   "scales": ["Reset only scale attributes to their default values."],
   "trs": ["Reset translation, rotation, and scale attributes together."],
-  "save": ["Store the current keyable attribute values as custom defaults for the selected objects."],
   "remove": ["Remove custom defaults for the selected objects without affecting other saved controls."],
   "clear": ["Clear every custom default saved by TheKeyMachine."],
   "help": ["Open the Default Values documentation."]

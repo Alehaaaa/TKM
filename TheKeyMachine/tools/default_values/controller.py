@@ -1,7 +1,7 @@
 from maya import cmds
 
 from TheKeyMachine.core import animation_context
-from TheKeyMachine.core import rig_snapshot
+from TheKeyMachine.tools.snapshot_rig import rig_snapshot
 from TheKeyMachine.mods import selectionMod
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.widgets import util as wutil
@@ -13,34 +13,12 @@ SCALE_ATTRS = {"scale", "scaleX", "scaleY", "scaleZ"}
 
 
 def _stored_default(node, attr):
-    stored = rig_snapshot.resolve_control_snapshot(node, "default", compute_fn=lambda n: {}).get(attr)
+    values = rig_snapshot.resolve_control_snapshot(node, "default", compute_fn=lambda n: {})
+    stored = rig_snapshot.get_attr_value(node, values, attr)
     if stored is not None:
         return stored
     fallback = cmds.attributeQuery(attr, node=node, listDefault=True)
     return fallback[0] if fallback else None
-
-
-def save_selected():
-    selected = selectionMod.get_selected_objects(long=True)
-    if not selected:
-        return wutil.make_inViewMessage("Select at least one object")
-    groups = rig_snapshot.group_controls_by_rig(selected)
-    if not groups:
-        return wutil.make_inViewMessage("Selected controls are not part of a recognizable rig")
-
-    operation = toolCommon.current_tool_operation()
-    if operation:
-        operation.set_total(len(selected))
-    for rig_id, group in groups.items():
-        entries = {}
-        for node in group["controls"]:
-            if operation and operation.cancelled:
-                return
-            entries[rig_snapshot.control_key(node)] = rig_snapshot.capture_default_values(node)
-            if operation:
-                operation.step()
-        rig_snapshot.merge_control_entries(rig_id, "default", entries)
-    wutil.make_inViewMessage("Default values saved")
 
 
 def remove_selected():

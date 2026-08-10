@@ -177,57 +177,57 @@
         "en": {
             "label": "Snapshot Mirror",
             "tooltip": [
-                "Confirm the selected controls are part of a saved rig.",
-                "Mirror exceptions are saved automatically via Add Exception Invert/Keep; there is nothing else to capture here."
+                "Test the selected controls' mirror directions and world-space orientations.",
+                "Only direction overrides required for correct mirroring are saved."
             ]
         },
         "es": {
             "label": "Captura de Espejo",
             "tooltip": [
-                "Confirma que los controles seleccionados forman parte de un rig guardado.",
-                "Las excepciones de espejo se guardan automáticamente mediante Añadir Excepción Invertir/Mantener; no hay nada más que capturar aquí."
+                "Prueba las direcciones de espejo y las orientaciones en espacio mundial de los controles seleccionados.",
+                "Solo se guardan las correcciones de dirección necesarias para un reflejo correcto."
             ]
         },
         "fr": {
             "label": "Capture du Miroir",
             "tooltip": [
-                "Confirme que les contrôleurs sélectionnés font partie d'un rig enregistré.",
-                "Les exceptions de miroir sont enregistrées automatiquement via Ajouter une Exception d'Inversion/Conserver ; il n'y a rien d'autre à capturer ici."
+                "Teste les directions de miroir et les orientations en espace global des contrôleurs sélectionnés.",
+                "Seules les corrections de direction nécessaires à un miroir correct sont enregistrées."
             ]
         },
         "ca": {
             "label": "Captura de Mirall",
             "tooltip": [
-                "Confirma que els controls seleccionats formen part d'un rig desat",
-                "Les excepcions de mirall es desen automàticament mitjançant Afegir Excepció Invertir/Mantenir; no hi ha res més a capturar aquí"
+                "Prova les direccions de mirall i les orientacions en espai global dels controls seleccionats",
+                "Només es desen les correccions de direcció necessàries per a un mirall correcte"
             ]
         },
         "zh": {
             "label": "镜像快照",
             "tooltip": [
-                "确认所选控制器属于已保存的绑定",
-                "镜像例外会通过“添加反转/保持例外”自动保存；此处无需额外捕获任何内容"
+                "测试所选控制器的镜像方向和世界空间朝向",
+                "仅保存正确镜像所需的方向覆盖"
             ]
         },
         "ja": {
             "label": "ミラーのスナップショット",
             "tooltip": [
-                "選択したコントローラが保存済みのリグの一部であることを確認します",
-                "ミラー例外は反転/維持例外の追加により自動的に保存されるため、ここでキャプチャするものは他にありません"
+                "選択したコントローラのミラー方向とワールド空間の向きをテストします",
+                "正しいミラーリングに必要な方向オーバーライドのみを保存します"
             ]
         },
         "ko": {
             "label": "미러 스냅샷",
             "tooltip": [
-                "선택한 컨트롤이 저장된 리그의 일부인지 확인합니다",
-                "미러 예외는 반전/유지 예외 추가를 통해 자동으로 저장되므로 여기서 캡처할 항목이 없습니다"
+                "선택한 컨트롤의 미러 방향과 월드 공간 방향을 테스트합니다",
+                "올바른 미러링에 필요한 방향 재정의만 저장합니다"
             ]
         },
         "ar": {
             "label": "لقطة المرآة",
             "tooltip": [
-                "التأكد من أن المتحكمات المحددة جزء من ريغ محفوظ",
-                "تُحفظ استثناءات المرآة تلقائيًا عبر إضافة استثناء عكس/إبقاء؛ لا يوجد شيء آخر لالتقاطه هنا"
+                "اختبار اتجاهات المرآة واتجاهات الفضاء العالمي للمتحكمات المحددة",
+                "يتم حفظ تجاوزات الاتجاه المطلوبة فقط للحصول على انعكاس صحيح"
             ]
         }
     },

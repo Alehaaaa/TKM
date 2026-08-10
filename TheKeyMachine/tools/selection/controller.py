@@ -69,28 +69,29 @@ def _is_curve_control(node):
     return any(cmds.nodeType(shape) == "nurbsCurve" for shape in shapes)
 
 
-def _control_nodes(nodes):
-    nodes = list(dict.fromkeys(nodes or ()))
-    if not nodes:
+def _nurbs_curve_controls(roots):
+    """Return control transforms below *roots* that own NURBS curve shapes."""
+    roots = list(dict.fromkeys(roots or ()))
+    if not roots:
         return []
-    shapes = cmds.listRelatives(
-        nodes,
-        shapes=True,
+
+    # Ask Maya for curve shapes directly instead of walking every transform
+    # and then inspecting all of their shapes.  Besides being cheaper on large
+    # rigs, the typed query prevents joints, meshes, locators, and intermediate
+    # construction shapes from entering either rig-control selection path.
+    curve_shapes = cmds.ls(
+        roots,
+        dagObjects=True,
+        type="nurbsCurve",
         noIntermediate=True,
-        fullPath=True,
+        long=True,
     ) or []
-    curve_shapes = cmds.ls(shapes, type="nurbsCurve", long=True) or []
-    curve_parents = set(
-        cmds.listRelatives(curve_shapes, parent=True, fullPath=True) or []
-    )
-    return [node for node in nodes if node in curve_parents]
+    controls = cmds.listRelatives(curve_shapes, parent=True, fullPath=True) or []
+    return list(dict.fromkeys(controls))
 
 
 def _rig_controls(animated_only=False):
-    descendants = []
-    for root in _selected_roots():
-        descendants.extend(_descendant_transforms(root))
-    controls = _control_nodes(descendants)
+    controls = _nurbs_curve_controls(_selected_roots())
     if not animated_only:
         return controls
     operation = toolCommon.current_tool_operation()

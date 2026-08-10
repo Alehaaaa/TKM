@@ -12,8 +12,8 @@
     "Controls with no matching opposite are recorded as center controls."
   ],
   "mirror": [
-    "Confirm the selected controls are part of a saved rig.",
-    "Mirror exceptions are saved automatically via Add Exception Invert/Keep; there is nothing else to capture here."
+    "Test the selected controls' mirror directions and world-space orientations.",
+    "Only direction overrides required for correct mirroring are saved."
   ],
   "help": [
     "Open the Snapshot Rig documentation."

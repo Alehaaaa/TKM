@@ -103,49 +103,49 @@
         "en": {
             "label": "Select Rig Controls",
             "tooltip": [
-                "Select all curve and joint controls in the selected rig hierarchy."
+                "Select all NURBS curve controls in the selected rig hierarchy."
             ]
         },
         "es": {
             "label": "Seleccionar Controles del Rig",
             "tooltip": [
-                "Selecciona todos los controles de curva y joint en la jerarquía del rig seleccionado."
+                "Selecciona todos los controles de curva NURBS en la jerarquía del rig seleccionado."
             ]
         },
         "fr": {
             "label": "Sélectionner les Contrôleurs du Rig",
             "tooltip": [
-                "Sélectionne tous les contrôleurs de courbe et joints dans la hiérarchie du rig sélectionné."
+                "Sélectionne tous les contrôleurs de courbe NURBS dans la hiérarchie du rig sélectionné."
             ]
         },
         "ca": {
             "label": "Seleccionar Controls del Rig",
             "tooltip": [
-                "Selecciona tots els controls de corba i joint a la jerarquia del rig seleccionat"
+                "Selecciona tots els controls de corba NURBS a la jerarquia del rig seleccionat"
             ]
         },
         "zh": {
             "label": "选择绑定控制器",
             "tooltip": [
-                "选择所选绑定层级中的所有曲线和关节控制器"
+                "选择所选绑定层级中的所有 NURBS 曲线控制器"
             ]
         },
         "ja": {
             "label": "リグコントローラを選択",
             "tooltip": [
-                "選択したリグ階層内のすべてのカーブおよびジョイントコントローラを選択します"
+                "選択したリグ階層内のすべての NURBS カーブコントローラを選択します"
             ]
         },
         "ko": {
             "label": "리그 컨트롤 선택",
             "tooltip": [
-                "선택한 리그 계층의 모든 커브 및 조인트 컨트롤을 선택합니다"
+                "선택한 리그 계층의 모든 NURBS 커브 컨트롤을 선택합니다"
             ]
         },
         "ar": {
             "label": "تحديد متحكمات الريغ",
             "tooltip": [
-                "تحديد كل متحكمات المنحنى والمفصل في التسلسل الهرمي المحدد للريغ"
+                "تحديد كل متحكمات منحنى NURBS في التسلسل الهرمي المحدد للريغ"
             ]
         }
     },
@@ -153,49 +153,49 @@
         "en": {
             "label": "Select Animated Rig Controls",
             "tooltip": [
-                "Select only animated curve and joint controls in the selected rig hierarchy."
+                "Select only animated NURBS curve controls in the selected rig hierarchy."
             ]
         },
         "es": {
             "label": "Seleccionar Controles Animados del Rig",
             "tooltip": [
-                "Selecciona solo los controles de curva y joint animados en la jerarquía del rig seleccionado."
+                "Selecciona solo los controles de curva NURBS animados en la jerarquía del rig seleccionado."
             ]
         },
         "fr": {
             "label": "Sélectionner les Contrôleurs Animés du Rig",
             "tooltip": [
-                "Sélectionne uniquement les contrôleurs de courbe et joints animés dans la hiérarchie du rig sélectionné."
+                "Sélectionne uniquement les contrôleurs de courbe NURBS animés dans la hiérarchie du rig sélectionné."
             ]
         },
         "ca": {
             "label": "Seleccionar Controls Animats del Rig",
             "tooltip": [
-                "Selecciona només els controls de corba i joint animats a la jerarquia del rig seleccionat"
+                "Selecciona només els controls de corba NURBS animats a la jerarquia del rig seleccionat"
             ]
         },
         "zh": {
             "label": "选择已设置动画的绑定控制器",
             "tooltip": [
-                "仅选择所选绑定层级中已设置动画的曲线和关节控制器"
+                "仅选择所选绑定层级中已设置动画的 NURBS 曲线控制器"
             ]
         },
         "ja": {
             "label": "アニメーション済みリグコントローラを選択",
             "tooltip": [
-                "選択したリグ階層内のアニメーション済みカーブ・ジョイントコントローラのみを選択します"
+                "選択したリグ階層内のアニメーション済み NURBS カーブコントローラのみを選択します"
             ]
         },
         "ko": {
             "label": "애니메이션된 리그 컨트롤 선택",
             "tooltip": [
-                "선택한 리그 계층에서 애니메이션된 커브 및 조인트 컨트롤만 선택합니다"
+                "선택한 리그 계층에서 애니메이션된 NURBS 커브 컨트롤만 선택합니다"
             ]
         },
         "ar": {
             "label": "تحديد متحكمات الريغ المتحركة",
             "tooltip": [
-                "تحديد متحكمات المنحنى والمفصل المتحركة فقط في التسلسل الهرمي المحدد للريغ"
+                "تحديد متحكمات منحنى NURBS المتحركة فقط في التسلسل الهرمي المحدد للريغ"
             ]
         }
     },

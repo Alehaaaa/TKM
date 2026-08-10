@@ -178,8 +178,28 @@ def get_ordered_section_ids(toolbar_id):
             movable.append(section_id)
 
     movable_set = set(movable)
-    ordered_movable = [section_id for section_id in custom_order if section_id in movable_set]
-    ordered_movable.extend(section_id for section_id in movable if section_id not in ordered_movable)
+    ordered_movable = []
+    seen_movable = set()
+    for section_id in custom_order:
+        if section_id in movable_set and section_id not in seen_movable:
+            ordered_movable.append(section_id)
+            seen_movable.add(section_id)
+
+    # A saved order may predate newly added sections. Insert those sections next
+    # to their nearest canonical successor instead of appending them all at the
+    # end. For example, Snapshot Rig was introduced immediately before
+    # Background Runners and should appear there for existing workspaces too.
+    for index, section_id in enumerate(movable):
+        if section_id in ordered_movable:
+            continue
+        following = next(
+            (candidate for candidate in movable[index + 1:] if candidate in ordered_movable),
+            None,
+        )
+        if following is None:
+            ordered_movable.append(section_id)
+        else:
+            ordered_movable.insert(ordered_movable.index(following), section_id)
 
     result = []
     movable_iter = iter(ordered_movable)

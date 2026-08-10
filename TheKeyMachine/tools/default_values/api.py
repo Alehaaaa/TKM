@@ -21,10 +21,6 @@ def apply_trs(*_args):
     return controller.apply_defaults(translations=True, rotations=True, scales=True)
 
 
-def save_selected(*_args):
-    return controller.save_selected()
-
-
 def remove_selected(*_args):
     return controller.remove_selected()
 

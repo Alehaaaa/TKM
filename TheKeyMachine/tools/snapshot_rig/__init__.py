@@ -14,18 +14,22 @@ class SnapshotRigToolObject(ToolObject):
         "snapshot_rig": {
             "type": "tool", "label": "Snapshot Rig", "icon": "mirror",
             "callback": api.snapshot_rig, "tooltip": TOOLTIPS["rig"],
+            "operation": {"undo": False, "suspend_refresh": True},
         },
         "snapshot_default": {
             "type": "tool", "label": "Snapshot Default", "icon": "default",
             "callback": api.snapshot_default, "tooltip": TOOLTIPS["default"],
+            "operation": {"undo": False, "suspend_refresh": True},
         },
         "snapshot_opposite": {
             "type": "tool", "label": "Snapshot Opposite", "icon": "opposite_select",
             "callback": api.snapshot_opposite, "tooltip": TOOLTIPS["opposite"],
+            "operation": {"undo": False, "suspend_refresh": True},
         },
         "snapshot_mirror": {
             "type": "tool", "label": "Snapshot Mirror", "icon": "mirror",
             "callback": api.snapshot_mirror, "tooltip": TOOLTIPS["mirror"],
+            "operation": {"undo": False, "suspend_refresh": True},
         },
         "snapshot_help": {
             "type": "tool", "label": "Help", "icon": "help", "pinnable": False,
