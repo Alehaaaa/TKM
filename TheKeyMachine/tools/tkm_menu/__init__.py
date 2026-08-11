@@ -20,16 +20,25 @@ class TkmMenuToolObject(ToolObject):
                         "toolbar_add_shelf_button", {"type": "check", "command": "start_with_maya"},
                         {"type": "check", "command": "show_tooltips"}, "separator",
                         {"type": "section", "label": "Alignment", "i18n_key": "alignment_section"},
-                        {"type": "choice", "get_value": api.get_alignment, "set_value": api.set_alignment, "items": api.alignment_choices},
+                        {
+                            "type": "choice", "id": "toolbar_icon_alignment",
+                            "get_value": api.get_alignment, "set_value": api.set_alignment, "items": api.alignment_choices,
+                        },
                     ]},
                     "hotkeys_window",
                     "workspaces_window",
                     {"type": "menu", "command": "main_dock_menu", "label": "Dock", "icon": "dock", "description": TOOLTIPS["dock"][0], "items": [
                         {"type": "section", "label": "Position", "i18n_key": "position_section"},
-                        {"type": "choice", "get_value": api.get_dock_orientation, "set_value": api.set_dock_orientation, "items": api.dock_orientation_choices},
+                        {
+                            "type": "choice", "id": "dock_orientation", "setting_label": "Dock Position",
+                            "get_value": api.get_dock_orientation, "set_value": api.set_dock_orientation, "items": api.dock_orientation_choices,
+                        },
                         "separator",
                         {"type": "section", "label": "Dock Area", "i18n_key": "dock_area_section"},
-                        {"type": "choice", "get_value": api.get_dock_layout, "set_value": api.set_dock_layout, "items": api.dock_layout_choices},
+                        {
+                            "type": "choice", "id": "dock_layout", "setting_label": "Dock Area",
+                            "get_value": api.get_dock_layout, "set_value": api.set_dock_layout, "items": api.dock_layout_choices,
+                        },
                     ]},
                     {"type": "menu", "command": "main_system_menu", "label": "System", "icon": "system", "description": TOOLTIPS["system"][0], "items": [
                         "toolbar_reload", "toolbar_unload", "toolbar_uninstall",
@@ -80,7 +89,7 @@ class TkmMenuToolObject(ToolObject):
     }
     SECTION = {
             "id": "system",
-            "label": "TKM Menu", "hiddeable": False,
+            "label": "TKM Menu", "icon": "tkm_main", "hiddeable": False,
             "items": [
                 *({"id": tool_id} for tool_id in (
                     "main_preferences_menu", "main_dock_menu", "main_system_menu", "help_menu",

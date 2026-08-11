@@ -38,6 +38,7 @@ class AnimationToolsToolObject(ToolObject):
             "menu": {"label": "Remove Redundant Keys", "icon": "remove_redundant_keys", "items": [
                 {
                     "type": "choice",
+                    "id": "remove_redundant_keys_mode",
                     "get_value": api.get_remove_redundant_mode,
                     "set_value": api.set_remove_redundant_mode,
                     "items": api.remove_redundant_mode_choices,

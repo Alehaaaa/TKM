@@ -25,6 +25,7 @@ from contextlib import contextmanager
 from maya import cmds
 
 import TheKeyMachine.mods.generalMod as general
+from TheKeyMachine.tools.mirror import math as mirror_math
 
 
 MIRROR_PATTERNS = [
@@ -46,18 +47,41 @@ MIRROR_PATTERNS = [
     ("_rg", "_lf"),
     ("RF_", "LF_"),
     ("LF_", "RF_"),
+    ("Left", "Right"),
+    ("Right", "Left"),
     ("left_", "right_"),
     ("right_", "left_"),
-    ("_left", "_right_"),
+    ("_left", "_right"),
     ("_right", "_left"),
     ("_left_", "_right_"),
     ("_right_", "_left_"),
 ]
+MIRROR_NAME_ALIASES = [
+    ("Mover", "Translate"),
+    ("Translate", "Mover"),
+]
 
 CENTER_INVERT_ATTRS = {"translateX", "rotateY", "rotateZ", "tx", "ry", "rz"}
+MIRROR_ATTRS_TO_IGNORE = {
+    "tag",
+    "rotateOrder", "ro",
+    "rotateAxis", "rotateAxisX", "rotateAxisY", "rotateAxisZ", "rax", "ray", "raz",
+    "jointOrient", "jointOrientX", "jointOrientY", "jointOrientZ", "jox", "joy", "joz",
+    "rotatePivot", "rotatePivotX", "rotatePivotY", "rotatePivotZ", "rpx", "rpy", "rpz",
+    "rotatePivotTranslate", "rotatePivotTranslateX", "rotatePivotTranslateY",
+    "rotatePivotTranslateZ", "rpt", "rptx", "rpty", "rptz",
+    "scalePivot", "scalePivotX", "scalePivotY", "scalePivotZ", "spx", "spy", "spz",
+    "scalePivotTranslate", "scalePivotTranslateX", "scalePivotTranslateY",
+    "scalePivotTranslateZ", "spt", "sptx", "spty", "sptz",
+    "segmentScaleCompensate", "ssc", "inheritsTransform", "it",
+}
+MIRROR_FIXED_KEEP_ATTRS = {
+    "scale", "scaleX", "scaleY", "scaleZ", "sx", "sy", "sz",
+}
 _MIRROR_PROBE_DELTA = 0.1
 _MIRROR_EFFECT_EPSILON = 1e-10
 MIRROR_PROGRESS_WEIGHT = 4
+_OPPOSITE_UNSET = object()
 
 
 # ____________________________ Opposite-name pattern matching ________________________
@@ -65,19 +89,42 @@ MIRROR_PROGRESS_WEIGHT = 4
 
 def opposite_control_name(name):
     """Return the configured opposite control name without querying the scene."""
-    namespace, _, control_name = name.rpartition(":")
-    for pattern, opposite_pattern in MIRROR_PATTERNS:
-        if pattern in control_name:
-            new_control_name = control_name.replace(pattern, opposite_pattern, 1)
-            return f"{namespace}:{new_control_name}" if namespace else new_control_name
-    return None
+    candidates = opposite_control_candidates(name)
+    return candidates[0] if candidates else None
 
 
-def find_opposite_name(name):
-    """Return the configured opposite control when it exists in the scene."""
-    opposite_name = opposite_control_name(name)
-    if opposite_name and cmds.objExists(opposite_name):
-        return opposite_name
+def opposite_control_candidates(name):
+    """Return all supported opposite names, including secondary aliases."""
+    return mirror_math.opposite_name_candidates(
+        name, MIRROR_PATTERNS, MIRROR_NAME_ALIASES,
+    )
+
+
+def find_selected_opposite(node, selected_nodes):
+    """Resolve an opposite unambiguously within one already-grouped rig selection."""
+    candidate_keys = {
+        control_key(candidate) for candidate in opposite_control_candidates(control_key(node))
+    }
+    matches = [
+        candidate for candidate in selected_nodes
+        if candidate != node and control_key(candidate) in candidate_keys
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _find_pattern_opposite(name):
+    """Return the name-pattern opposite without consulting saved snapshots."""
+    direct_candidates = opposite_control_candidates(name)
+    direct_matches = [candidate for candidate in direct_candidates if cmds.objExists(candidate)]
+    if len(direct_matches) == 1:
+        return direct_matches[0]
+    if len(direct_matches) > 1:
+        source_root = get_rig_root(name)
+        same_rig = [
+            candidate for candidate in direct_matches
+            if get_rig_root(candidate) == source_root
+        ]
+        return same_rig[0] if len(same_rig) == 1 else None
 
     # Long DAG paths keep the source control's parent path when the leaf name
     # is swapped. Left/right controls commonly live below different parent
@@ -87,10 +134,14 @@ def find_opposite_name(name):
     leaf_name = name.rsplit("|", 1)[-1]
     if leaf_name == name:
         return None
-    opposite_leaf = opposite_control_name(leaf_name)
-    if not opposite_leaf:
+    opposite_leaves = opposite_control_candidates(leaf_name)
+    if not opposite_leaves:
         return None
-    matches = cmds.ls(opposite_leaf, long=True) or []
+    matches = []
+    for opposite_leaf in opposite_leaves:
+        for match in cmds.ls(opposite_leaf, long=True) or []:
+            if match not in matches:
+                matches.append(match)
     if len(matches) == 1:
         return matches[0]
     if not matches:
@@ -99,6 +150,38 @@ def find_opposite_name(name):
     source_root = get_rig_root(name)
     same_rig_matches = [match for match in matches if get_rig_root(match) == source_root]
     return same_rig_matches[0] if len(same_rig_matches) == 1 else None
+
+
+def _resolve_control_key(node, shortname):
+    """Resolve a snapshot short name to a control in ``node``'s rig."""
+    leaf_name = node.rsplit("|", 1)[-1]
+    namespace, separator, _control_name = leaf_name.rpartition(":")
+    candidate = f"{namespace}:{shortname}" if separator else shortname
+    matches = cmds.ls(candidate, long=True) or []
+    if not matches and cmds.objExists(candidate):
+        return candidate
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        return None
+    source_root = get_rig_root(node)
+    same_rig_matches = [match for match in matches if get_rig_root(match) == source_root]
+    return same_rig_matches[0] if len(same_rig_matches) == 1 else None
+
+
+def find_opposite_name(name, use_snapshot=True):
+    """Return the saved opposite, falling back to name-pattern analysis."""
+    if use_snapshot:
+        rig_id = get_rig_id(name)
+        if rig_id:
+            cached = get_cached_entry(rig_id, control_key(name), "opposite")
+            if cached == "":
+                return None
+            if cached:
+                resolved = _resolve_control_key(name, cached)
+                if resolved:
+                    return resolved
+    return _find_pattern_opposite(name)
 
 
 def control_key(node):
@@ -421,7 +504,7 @@ def get_attr_value(node, values, attr, default=None):
 
 def capture_opposite(node):
     """Resolve node's opposite control, namespace-stripped, or None if it's a center."""
-    opposite = find_opposite_name(node)
+    opposite = find_opposite_name(node, use_snapshot=False)
     return control_key(opposite) if opposite else None
 
 
@@ -436,37 +519,6 @@ def _world_matrix(node):
     if not values or len(values) != 16:
         raise ValueError(f"Unable to read a world matrix for {node}")
     return tuple(float(value) for value in values)
-
-
-def _matrix_delta(matrix, baseline):
-    return tuple(value - base for value, base in zip(matrix, baseline))
-
-
-def _reflect_matrix_delta(delta):
-    """Reflect a row-major Maya matrix delta across the world YZ plane."""
-    signs = (-1.0, 1.0, 1.0, 1.0)
-    return tuple(
-        delta[row * 4 + column] * signs[row] * signs[column]
-        for row in range(4)
-        for column in range(4)
-    )
-
-
-def _matrix_delta_score(first, second):
-    return sum((a - b) ** 2 for a, b in zip(first, second))
-
-
-def _direction_from_deltas(source_delta, target_keep_delta, target_invert_delta):
-    """Return 1/-1 for a clear keep/invert match, otherwise None."""
-    desired = _reflect_matrix_delta(source_delta)
-    if _matrix_delta_score(desired, (0.0,) * 16) <= _MIRROR_EFFECT_EPSILON:
-        return None
-    keep_score = _matrix_delta_score(desired, target_keep_delta)
-    invert_score = _matrix_delta_score(desired, target_invert_delta)
-    difference = abs(keep_score - invert_score)
-    if difference <= max(_MIRROR_EFFECT_EPSILON, min(keep_score, invert_score) * 0.05):
-        return None
-    return -1 if invert_score < keep_score else 1
 
 
 def _probe_matrix(node, plug, value):
@@ -514,6 +566,16 @@ def mirror_probe_session():
                 pass
 
 
+def _central_response(node, plug, value, probe_delta):
+    """Measure a channel's local world-matrix response without pose bias."""
+    try:
+        plus = _probe_matrix(node, plug, value + probe_delta)
+        minus = _probe_matrix(node, plug, value - probe_delta)
+    finally:
+        cmds.setAttr(plug, value)
+    return mirror_math.matrix_delta(plus, minus)
+
+
 def _capture_attr_direction(source, target, attr):
     source_plug = f"{source}.{attr}"
     target_plug = f"{target}.{attr}"
@@ -535,25 +597,16 @@ def _capture_attr_direction(source, target, attr):
             else _MIRROR_PROBE_DELTA
         )
 
-        source_base = _world_matrix(source)
-        target_base = source_base if source == target else _world_matrix(target)
-        try:
-            source_plus = _probe_matrix(source, source_plug, source_value + probe_delta)
-        finally:
-            cmds.setAttr(source_plug, source_value)
-        source_delta = _matrix_delta(source_plus, source_base)
-
-        try:
-            target_plus = _probe_matrix(target, target_plug, target_value + probe_delta)
-            cmds.setAttr(target_plug, target_value)
-            target_minus = _probe_matrix(target, target_plug, target_value - probe_delta)
-        finally:
-            cmds.setAttr(target_plug, target_value)
-
-        return _direction_from_deltas(
-            source_delta,
-            _matrix_delta(target_plus, target_base),
-            _matrix_delta(target_minus, target_base),
+        source_response = _central_response(
+            source, source_plug, source_value, probe_delta,
+        )
+        target_response = (
+            source_response
+            if source == target
+            else _central_response(target, target_plug, target_value, probe_delta)
+        )
+        return mirror_math.response_direction(
+            source_response, target_response, epsilon=_MIRROR_EFFECT_EPSILON,
         )
     except (RuntimeError, TypeError, ValueError):
         if source_value is not None:
@@ -565,12 +618,18 @@ def _capture_attr_direction(source, target, attr):
 
 def snapshot_attrs(node):
     """Return the attributes considered by default and mirror snapshots."""
-    return cmds.listAttr(node, keyable=True, unlocked=True, visible=True) or []
+    try:
+        return cmds.listAttr(node, keyable=True, unlocked=True, visible=True) or []
+    except (RuntimeError, TypeError, ValueError):
+        return []
 
 
-def capture_mirror_directions(node, attrs=None, processor=None):
+def capture_mirror_directions(
+    node, attrs=None, processor=None, opposite=_OPPOSITE_UNSET,
+):
     """Probe mirror direction/orientation and return only required overrides."""
-    opposite = find_opposite_name(node)
+    if opposite is _OPPOSITE_UNSET:
+        opposite = find_opposite_name(node, use_snapshot=False)
     target = opposite or node
     is_center = opposite is None
     overrides = {}
@@ -578,7 +637,9 @@ def capture_mirror_directions(node, attrs=None, processor=None):
         if processor and processor.cancelled:
             break
         try:
-            if attr == "tag" or not cmds.attributeQuery(attr, node=target, exists=True):
+            if (attr in MIRROR_ATTRS_TO_IGNORE
+                    or attr in MIRROR_FIXED_KEEP_ATTRS
+                    or not cmds.attributeQuery(attr, node=target, exists=True)):
                 continue
             short_attr = cmds.attributeQuery(attr, node=node, shortName=True) or attr
             direction = _capture_attr_direction(node, target, attr)

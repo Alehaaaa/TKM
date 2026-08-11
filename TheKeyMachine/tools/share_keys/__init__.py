@@ -19,6 +19,7 @@ class ShareKeysToolObject(ToolObject):
                 "items": [
                     {
                         "type": "choice",
+                        "id": "share_keys_mode",
                         "get_value": api.get_share_keys_mode,
                         "set_value": api.set_share_keys_mode,
                         "items": api.share_keys_mode_choices,
@@ -40,6 +41,7 @@ class ShareKeysToolObject(ToolObject):
                 "items": [
                     {
                         "type": "choice",
+                        "id": "bake_tangent_mode",
                         "get_value": api.get_bake_tangent_mode,
                         "set_value": api.set_bake_tangent_mode,
                         "items": api.bake_tangent_mode_choices,

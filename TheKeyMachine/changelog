@@ -15,6 +15,14 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.38:
+  - polish: Search and Hotkeys open faster and keep menu options clear and in sync
+  - bugfix: Attribute Switcher stays responsive on large multi-control changes
+  - bugfix: Mirror and opposite pasting work reliably across full rigs, animation ranges, and parented controls
+  - bugfix: Snapshot Rig detects paired controls and mirror behavior more reliably
+  - bugfix: Sliders now create keys on frames without existing keys
+  - changed: Cycle Matcher can match tangents only or include key values
+
 0.1.37:
   - polish: Tool progress shows smooth second-by-second time remaining without item counters
   - bugfix: Rig analysis resolves opposite controls across separate branches and safely skips malformed attributes

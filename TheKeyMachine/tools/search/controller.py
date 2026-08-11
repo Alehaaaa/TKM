@@ -1,6 +1,7 @@
 """Search catalog, matching, session state, and background loading."""
 
-from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
+from TheKeyMachine.widgets.util import BackgroundCallThread
 
 
 SEARCH_WINDOW_KEY = "tkm_search_window"
@@ -87,12 +88,6 @@ def clear_position():
         app.setProperty(_POSITION_PROPERTY, None)
 
 
-class SearchCatalogThread(QtCore.QThread):
-    loaded = QtCore.Signal(object)
-    failed = QtCore.Signal(str)
-
-    def run(self):
-        try:
-            self.loaded.emit(build_command_rows())
-        except Exception as exc:
-            self.failed.emit(str(exc))
+class SearchCatalogThread(BackgroundCallThread):
+    def __init__(self, parent=None):
+        super().__init__(build_command_rows, parent=parent)

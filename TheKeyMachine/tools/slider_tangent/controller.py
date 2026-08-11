@@ -9,11 +9,52 @@ from TheKeyMachine.core import curveFitting
 from TheKeyMachine.mods.sliders import utils
 
 
+def _ensure_target_keys(session, curve, keys):
+    """Create a key at each ``time`` in ``keys`` that doesn't already have one.
+
+    Tangent edits need an actual keyframe to act on. When an attribute is
+    keyed elsewhere on the curve but has no key exactly at the current
+    interaction time, seed one there with the curve's own evaluated value
+    (matching what value-based sliders already do) so tangent blending has
+    something to work on instead of silently doing nothing.
+
+    Gated on the session cache so this only runs once per drag: later
+    preview steps and the final commit reuse the key created on first touch.
+    """
+    cache_key = (curve, "tangent_keys_ensured")
+    if session.cache.auxiliary.get(cache_key):
+        return
+    session.cache.auxiliary[cache_key] = True
+
+    try:
+        existing = {
+            float(t) for t in (cmds.keyframe(curve, query=True, timeChange=True) or [])
+        }
+    except Exception:
+        existing = set()
+
+    for time in keys:
+        time = float(time)
+        if time in existing:
+            continue
+        try:
+            values = cmds.keyframe(curve, query=True, eval=True, time=(time, time))
+            value = values[0] if values else None
+        except Exception:
+            value = None
+        if value is None:
+            continue
+        try:
+            cmds.setKeyframe(curve, time=(time,), value=value)
+        except Exception:
+            pass
+
+
 def _ensure_tangent_cache(session, curve, keys):
     """Caches original tangent states using batched commands for performance."""
     if (curve, "tangents") in session.cache.auxiliary:
         return
-        
+
     cache = {}
     keys = sorted(float(time) for time in keys)
     try:
@@ -27,7 +68,7 @@ def _ensure_tangent_cache(session, curve, keys):
         out_types = cmds.keyTangent(curve, query=True, time=(keys[0], keys[-1]), outTangentType=True) or []
         locks = cmds.keyTangent(curve, query=True, time=(keys[0], keys[-1]), lock=True) or []
         all_times = cmds.keyframe(curve, query=True, time=(keys[0], keys[-1]), timeChange=True) or []
-        
+
         result_count = min(
             len(all_times), len(in_angles), len(out_angles), len(in_weights),
             len(out_weights), len(in_types), len(out_types),
@@ -44,15 +85,15 @@ def _ensure_tangent_cache(session, curve, keys):
                 "outType": out_types[i],
                 "locked": bool(locks[i]) if i < len(locks) else False,
             }
-            
+
         # Only cache the ones we actually care about
         for time in keys:
             if time in full_curve_data:
                 cache[time] = full_curve_data[time]
-                
+
     except Exception:
         pass
-        
+
     session.cache.auxiliary[(curve, "tangents")] = cache
 
 
@@ -136,15 +177,16 @@ def _maya_type_targets(curve, keys, tangent_type):
 def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1.0):
     """Blend toward a contextual target, or its vertical mirror on the left."""
     resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
-    
+
     for curve in resolved_curves:
         keys = affected_map.get(curve, [])
         if not keys:
             continue
 
+        _ensure_target_keys(session, curve, keys)
         _ensure_tangent_cache(session, curve, keys)
         orig_tangents = session.cache.auxiliary.get((curve, "tangents"), {})
-        
+
         target_cache_key = (curve, f"target_{tangent_type}")
         if target_cache_key not in session.cache.auxiliary:
             if tangent_type == "bounce":
@@ -155,11 +197,11 @@ def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1
 
         target_tangents = session.cache.auxiliary[target_cache_key]
         is_weighted = _curve_has_weighted_tangents(curve)
-        
+
         for time in keys:
             if time not in orig_tangents or time not in target_tangents:
                 continue
-                
+
             orig = orig_tangents[time]
             target = target_tangents[time]
 
@@ -177,7 +219,7 @@ def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1
                     lock=orig["locked"],
                 )
                 continue
-            
+
             # +100 reaches the contextual target rotation. -100 reaches its
             # vertical mirror (angle sign flipped), rather than extrapolating
             # a full rotation through and beyond the drag-start tangent.
@@ -258,4 +300,3 @@ def execute(mode, value, session=None):
     finally:
         if standalone:
             session.finish()
-

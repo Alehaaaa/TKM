@@ -583,7 +583,7 @@ class AttributeSwitcherController:
             # expressions), or every target when Super mode is off
             # (Normal mode), fall back to it.
             remaining_targets = targets
-            if self.super_mode_enabled():
+            if self._super_mode_active():
                 remaining_targets = self._switch_rotate_order_super(
                     targets, target_attributes, value, operation, step_operation
                 )
@@ -831,7 +831,7 @@ class AttributeSwitcherController:
         needs a tint) or will be handled entirely by the pure-math Super
         mode path.
         """
-        if not self.super_mode_enabled():
+        if not self._super_mode_active():
             return True
         for target in targets:
             try:
@@ -984,30 +984,42 @@ class AttributeSwitcherController:
                 targets = self._sort_targets_by_influence(
                     options[normalized_value]["objects"]
                 )
+                option_data = options[normalized_value]
             except (KeyError, TypeError):
                 continue
-            keyframes = self._collect_keyframes(
-                targets, frame_all, timeline_selection, selected_range
-            )
-            frame_count = len(keyframes) if isinstance(keyframes, dict) else 0
-            apply_cost = (
-                max(frame_count, len(targets))
-                if attribute == "rotateOrder"
-                else frame_count
-            )
-            total_cost += frame_count + max(1, apply_cost)
             needs_scope = (
                 self._rotate_order_needs_frame_scope(targets, normalized_value)
                 if attribute == "rotateOrder"
                 else True
             )
+            # A fully fast-path rotate-order conversion edits its curves
+            # directly. It never needs a timeline frame map or world-matrix
+            # snapshots, so collecting them would waste most of the time this
+            # path is intended to save on large selections.
+            keyframes = (
+                self._collect_keyframes(
+                    targets, frame_all, timeline_selection, selected_range
+                )
+                if needs_scope
+                else {}
+            )
+            frame_count = len(keyframes) if isinstance(keyframes, dict) else 0
+            save_cost = frame_count if needs_scope else 0
+            apply_cost = frame_count
+            if attribute == "rotateOrder" and self._super_mode_active():
+                apply_cost += len(targets)
+            total_cost += save_cost + max(1, apply_cost)
             plans.append(
                 {
-                    "request": (value, attribute, options, all_frames),
-                    "targets": targets,
+                    "value": normalized_value,
+                    "attribute": attribute,
                     "all_frames": frame_all,
+                    "targets": targets,
+                    "target_attributes": option_data["attrs"],
+                    "enum_index": option_data.get("index", normalized_value),
                     "keyframes": keyframes,
                     "needs_scope": needs_scope,
+                    "frames": None,
                 }
             )
 
@@ -1051,51 +1063,84 @@ class AttributeSwitcherController:
         ) as operation:
             self.disconnect_runtime()
             try:
-                # Snapshot every request before the first scene edit.
+                # Snapshot every frame-scoped request before the first scene
+                # edit. Fully fast rotate-order plans need no matrices.
                 # Besides avoiding repeated "Saving Positions" passes,
                 # this is essential when two staged switches affect the
                 # same target: each application restores the world
                 # matrix from the common pre-switch state rather than
                 # from the previous application.
-                operation.set_status("Saving Positions")
-                matrix_cache = {}
+                scoped_plans = [plan for plan in plans if plan["needs_scope"]]
+                if scoped_plans:
+                    operation.set_status("Saving Positions")
+                    matrix_cache = {}
 
-                def _save_all_positions():
-                    # Runs off the main thread (see run_on_worker_thread
-                    # below) so a Cancel press actually gets a chance to
-                    # register while this snapshots potentially many
-                    # frames -- _prepare_frame_scoped() itself routes every
-                    # Maya touch back through operation.run_on_main().
-                    for plan in plans:
-                        if operation.cancelled:
-                            break
-                        plan["frames"] = self._prepare_frame_scoped(
-                            plan["targets"],
-                            plan["all_frames"],
-                            matrix_cache=matrix_cache,
-                            keyframes=plan["keyframes"],
-                        )
+                    def _save_all_positions():
+                        # Runs off the main thread (see run_on_worker_thread
+                        # below) so a Cancel press actually gets a chance to
+                        # register while this snapshots potentially many
+                        # frames -- _prepare_frame_scoped() itself routes every
+                        # Maya touch back through operation.run_on_main().
+                        for plan in scoped_plans:
+                            if operation.cancelled:
+                                break
+                            plan["frames"] = self._prepare_frame_scoped(
+                                plan["targets"],
+                                plan["all_frames"],
+                                matrix_cache=matrix_cache,
+                                keyframes=plan["keyframes"],
+                            )
 
-                toolCommon.run_on_worker_thread(_save_all_positions)
+                    toolCommon.run_on_worker_thread(_save_all_positions)
 
                 if not operation.cancelled:
                     operation.set_status("Applying Positions")
-                applied_targets = []
-                for plan in plans:
-                    if operation.cancelled:
-                        break
-                    value, attribute, options, all_frames = plan["request"]
-                    self.apply_switch(
-                        value,
-                        attribute,
-                        options,
-                        all_frames_override=all_frames,
-                        _manage_session=False,
-                        _prepared_frames=plan["frames"],
-                    )
-                    applied_targets.extend(plan["targets"])
 
-                if self.view.euler_filter and applied_targets:
+                applied_targets = []
+
+                def _apply_all_plans():
+                    # Keep the whole apply phase on one worker. Calling
+                    # apply_switch() here used to create a fresh worker and
+                    # nested Qt event loop for every staged entry while the
+                    # shared operation was already active; with large target
+                    # sets Maya could stall indefinitely at "Applying
+                    # Positions". The worker implementation already accepts
+                    # prepared snapshots, so invoke it directly instead.
+                    for plan in plans:
+                        if operation.cancelled:
+                            break
+                        temporary_keys = {}
+                        try:
+                            self._apply_switch_worker(
+                                operation,
+                                plan["value"],
+                                plan["attribute"],
+                                plan["targets"],
+                                plan["target_attributes"],
+                                plan["enum_index"],
+                                plan["all_frames"],
+                                temporary_keys,
+                                plan["frames"],
+                                True,
+                            )
+                        finally:
+                            self._on_main(
+                                operation,
+                                self._remove_temporary_keys,
+                                temporary_keys,
+                            )
+                        if not operation.cancelled:
+                            applied_targets.extend(plan["targets"])
+
+                if not operation.cancelled:
+                    toolCommon.run_on_worker_thread(_apply_all_plans)
+
+                if (
+                    not operation.cancelled
+                    and self.view.euler_filter
+                    and applied_targets
+                ):
+                    operation.set_status("Euler Filtering")
                     self.apply_euler_filter(list(dict.fromkeys(applied_targets)))
             finally:
                 self.connect_runtime()

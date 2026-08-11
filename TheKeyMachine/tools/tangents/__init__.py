@@ -92,6 +92,14 @@ class TangentsToolObject(ToolObject):
             "icon": "match_curve_cycle", "callback": api.match_cycle,
             "tooltip": TOOLTIPS["cycle"],
             "menu": {"label": "Cycle Matcher", "icon": "match_curve_cycle", "items": [
+                {
+                    "type": "choice",
+                    "id": "cycle_match_mode",
+                    "get_value": api.get_cycle_match_mode,
+                    "set_value": api.set_cycle_match_mode,
+                    "items": api.cycle_match_mode_choices,
+                },
+                "separator",
                 _scope_action("Match First Key", partial(api.match_cycle, target_key="first"), "cycle_first", icon="match_curve_cycle"),
                 _scope_action("Match Last Key", partial(api.match_cycle, target_key="last"), "cycle_last", icon="match_curve_cycle"),
             ]},

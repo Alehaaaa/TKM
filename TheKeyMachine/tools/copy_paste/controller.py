@@ -1441,9 +1441,8 @@ def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
     matched_sources = [
         control_name
         for control_name in controls
-        if scene_nodes_by_leaf.get(
-            mirror_controller.opposite_control_name(control_name)
-        )
+        if scene_nodes_by_leaf.get(control_name)
+        and mirror_controller.find_opposite_name(scene_nodes_by_leaf[control_name])
     ]
     key_count = _animation_data_apply_count(
         animation_data, targets=matched_sources
@@ -1456,19 +1455,21 @@ def paste_opposite_animation(*args, anchor_widget=None, **kwargs):
         for control_name, anim_data in controls.items():
             if processor.cancelled:
                 break
-            mirror_control_name = mirror_controller.opposite_control_name(control_name)
+            source_control = scene_nodes_by_leaf.get(control_name)
+            full_mirror_control_name = (
+                mirror_controller.find_opposite_name(source_control)
+                if source_control else None
+            )
 
-            if mirror_control_name:
-                full_mirror_control_name = scene_nodes_by_leaf.get(mirror_control_name)
-                if not full_mirror_control_name:
-                    continue
+            if full_mirror_control_name:
 
                 mirrored_channels = {}
                 for channel, channel_data in anim_data.items():
                     mirrored_channels[channel] = _transform_channel_values(
                         channel_data,
                         lambda value, attr=channel: mirror_controller.apply_exception(
-                            control_name, attr, value
+                            source_control, attr, value, target=full_mirror_control_name,
+                            use_defaults=False,
                         ),
                     )
                 applied = _apply_animation_channels_to_targets(
@@ -1802,12 +1803,11 @@ def paste_mirror_pose(*args, **kwargs):
         mirrored_controls = {}
         mappings = []
         for control_name, attributes in controls.items():
-            mirror_name = mirror_controller.opposite_control_name(control_name)
-            if not mirror_name:
-                if attributes:
-                    processor.step(amount=len(attributes))
-                continue
-            mirror_control = scene_nodes.get(mirror_name)
+            source_control = scene_nodes.get(control_name)
+            mirror_control = (
+                mirror_controller.find_opposite_name(source_control)
+                if source_control else None
+            )
             if not mirror_control:
                 if attributes:
                     processor.step(amount=len(attributes))
@@ -1819,7 +1819,7 @@ def paste_mirror_pose(*args, **kwargs):
                     return
                 mirrored_controls[control_name][attr] = (
                     mirror_controller.apply_exception(
-                        control_name, attr, value
+                        source_control, attr, value, target=mirror_control
                     )
                 )
 

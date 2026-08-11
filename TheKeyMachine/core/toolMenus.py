@@ -43,18 +43,32 @@ def _resolve_action_fields(command_id=None, tool_lookup=None, **overrides):
     if command_id:
         if not callable(tool_lookup):
             raise TypeError("tool_lookup must be callable for command-backed actions")
-        tool = tool_lookup(command_id)
-        tooltip = tool.get("tooltip")
-        fields.update(
-            {
-                "label": tool.get("menu_label") or tool.get("label") or command_id,
-                "callback": None if tool.get("type") == "setting" else tool.get("callback"),
-                "icon": tool.get("icon"),
-                "description": tooltip if isinstance(tooltip, str) else "",
-                "tooltip": tooltip,
-                "command_icon": tool.get("icon"),
-            }
-        )
+        # command_id isn't always a toolbox tool id -- a "choice" setting's
+        # per-value command (see core.toolbox.choice_setting_command_name)
+        # is only ever registered with core.trigger, the same way custom
+        # connect-entry tools are, so tool_lookup can legitimately have
+        # nothing for it. MenuWidget.addAction already guards its own,
+        # separate toolbox.get_tool(command_id) lookup the same way; this
+        # mirrors that instead of leaving this one path able to crash the
+        # menu build over a command_id it wasn't meant to resolve extra
+        # label/icon/tooltip fields from. The caller's own explicit
+        # overrides below still apply either way.
+        try:
+            tool = tool_lookup(command_id)
+        except Exception:
+            tool = None
+        if tool:
+            tooltip = tool.get("tooltip")
+            fields.update(
+                {
+                    "label": tool.get("menu_label") or tool.get("label") or command_id,
+                    "callback": None if tool.get("type") == "setting" else tool.get("callback"),
+                    "icon": tool.get("icon"),
+                    "description": tooltip if isinstance(tooltip, str) else "",
+                    "tooltip": tooltip,
+                    "command_icon": tool.get("icon"),
+                }
+            )
     fields.update(overrides)
     fields.setdefault("label", command_id or "")
     fields.setdefault("callback", None)
@@ -141,12 +155,6 @@ def _add_action_specs(menu, specs):
             continue
         actions.append(_add_action(menu, **spec))
     return actions
-
-
-def _apply_checked_value(setter, value, checked):
-    if checked:
-        return setter(value)
-    return None
 
 
 def _add_toolbox_action(menu, tool_id):
@@ -295,18 +303,38 @@ def build_declared_menu(definition, parent_widget=None, owner_command_id=None):
             choices = item.get("items", ())
             if callable(choices):
                 choices = choices()
+            choice_id = item.get("id")
+            # menu.icon() mirrors the MenuWidget.setIcon(icon) call already
+            # made when this menu itself was opened via addMenu(icon, ...);
+            # guarded since not every QMenu subclass reaching this code path
+            # is guaranteed to expose the getter.
+            menu_icon = menu.icon() if hasattr(menu, "icon") else None
             for choice in choices:
                 value = choice.get("value")
                 _add_checkable_action(
                     menu,
                     choice.get("label", str(value)),
                     toolCommon.mark_non_tool_action(
-                        partial(_apply_checked_value, setter, value)
+                        partial(toolbox.apply_choice_value, setter, value, state_key=choice_id)
                     ),
                     checked=value == current_value,
                     group=group,
                     description=choice.get("description", ""),
                     open_menu=True,
+                    # Ties this action to the same command trigger already
+                    # registered for it (core.toolbox.register_choice_setting_commands,
+                    # reachable by name via choice_setting_command_name) so
+                    # its tooltip gets the same "Edit hotkey"/"Add to shelf"
+                    # affordances and live hotkey display every regular
+                    # command-backed menu action already gets -- see
+                    # tooltipsMod's use of command_id. The icon comes from
+                    # the menu this choice is declared directly under (the
+                    # same nearest-enclosing-menu rule
+                    # core.toolbox._iter_menu_choice_settings uses to decide
+                    # a choice's owner), so it matches whatever icon that
+                    # menu was opened with, e.g. Bake's or Preferences'.
+                    command_id=toolbox.choice_setting_command_name(choice_id, value) if choice_id else None,
+                    icon=menu_icon,
                 )
             continue
         if item_type == "section":
@@ -939,7 +967,7 @@ def populate_languages_menu(menu):
     ``dynamic_menu`` slot -- one implementation, so the two surfaces can't
     drift apart.
     """
-    from TheKeyMachine.core import i18n
+    from TheKeyMachine.core import i18n, toolbox
 
     menu.clear()
     menu._tkm_language_fingerprint = (i18n.get_language(), i18n.get_translate_tool_names())
@@ -967,7 +995,7 @@ def populate_languages_menu(menu):
             menu,
             info.get("native") or info.get("name") or code,
             toolCommon.mark_non_tool_action(
-                partial(_apply_checked_value, i18n.set_language, code)
+                partial(toolbox.apply_choice_value, i18n.set_language, code)
             ),
             checked=code == current_language,
             group=group,
@@ -1233,7 +1261,7 @@ def build_graph_settings_submenu(apply_alignment_fn):
 
 
 def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, move_dock_fn):
-    from TheKeyMachine.core import i18n
+    from TheKeyMachine.core import i18n, toolbox
 
     dock_menu = cw.MenuWidget(
         QtGui.QIcon(icons.dock),
@@ -1249,7 +1277,7 @@ def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, mov
             dock_menu,
             i18n.tr("graph_dock_{}".format(position), label),
             toolCommon.mark_non_tool_action(
-                partial(_apply_checked_value, move_dock_fn, position)
+                partial(toolbox.apply_choice_value, move_dock_fn, position)
             ),
             group=dock_group,
             description=i18n.tr("graph_dock_{}_desc".format(position), description),

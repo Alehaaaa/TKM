@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+from functools import partial
 
 from maya import cmds
 
@@ -827,6 +828,75 @@ def _append_section_tool_rows(section, seen, title_lookup, icon_lookup, trigger_
             _variant_command_row(tool_data, variant, shortcut_label=shortcut_label),
         )
 
+    for choice_row in _tool_choice_setting_rows(tool_id, tool_data):
+        _append_section_row(section, seen, title_lookup, icon_lookup, trigger_commands, choice_row)
+
+
+def _choice_is_active(getter, value):
+    return getter() == value
+
+
+def _tool_choice_setting_rows(tool_id, tool_data):
+    """Expand a tool's inline declared-menu "choice" settings into their own rows.
+
+    A "choice" item (Share Keys' Keep Tangent Type/Keep Anim Curve Shape
+    picker, Bake's tangent mode, Remove Redundant Keys' mode, the
+    Preferences alignment picker, the Dock position/area pickers -- every
+    ``"type": "choice"`` declared under ``tools/*/__init__.py``) is a
+    setting owned by a tool button's own dropdown menu, not a standalone
+    toolbox tool, so it never reached ``trigger``, Search, or the Hotkeys
+    editor before. This turns each of a choice's values into its own row
+    through ``core.toolbox.tool_choice_settings``, the same declared-menu
+    walk ``core.toolMenus.build_declared_menu`` uses to build the dropdown
+    itself, so Search and the Hotkeys editor can never drift out of sync
+    with what a tool's menu actually offers. The commands themselves are
+    already registered by ``core.toolbox.register_choice_setting_commands()``
+    (called eagerly from ``trigger._discover_commands()``, mirroring
+    ``trigger._register_connect_entries()``) -- this only has to reference
+    the same names via ``toolbox.choice_setting_command_name``.
+
+    Every row for one choice shares a ``"choice_group"`` (the choice's own
+    id) so the list widgets that render these rows (here, and
+    ``tools.search.widgets.SearchResultItemWidget``) can put their
+    checkboxes in one exclusive ``QButtonGroup`` -- the same mutual-exclusion
+    ``core.toolMenus.build_declared_menu`` gets from a ``QActionGroup`` for
+    the live dropdown, just expressed with Qt's button-group equivalent
+    since these rows are plain checkable rows, not menu actions.
+
+    Each row also carries the raw ``"choice_value"`` it represents, so a
+    list widget can subscribe it to that value's live updates via
+    ``widgets.util.bind_choice_row_state`` -- see that function for why a
+    row's own ``get_checked`` snapshot at construction isn't enough on its
+    own.
+    """
+    rows = []
+    owner_label = tool_data.get("menu_label") or tool_data.get("label") or _humanize(tool_id)
+    owner_icon = tool_data.get("icon")
+    for choice_item in toolbox.tool_choice_settings(tool_id):
+        choice_id = choice_item.get("id")
+        getter = choice_item.get("get_value")
+        setter = choice_item.get("set_value")
+        if not choice_id or not callable(getter) or not callable(setter):
+            continue
+        setting_label = choice_item.get("setting_label") or owner_label
+        choices = choice_item.get("items", ())
+        if callable(choices):
+            choices = choices()
+        for choice in choices:
+            value = choice.get("value")
+            rows.append({
+                "command": toolbox.choice_setting_command_name(choice_id, value),
+                "title": "{}: {}".format(setting_label, choice.get("label", str(value))),
+                "icon": owner_icon,
+                "description": choice.get("description") or "",
+                "checkable": True,
+                "choice_group": choice_id,
+                "choice_value": value,
+                "get_checked": partial(_choice_is_active, getter, value),
+                "set_checked": partial(toolbox.apply_choice_value, setter, value),
+            })
+    return rows
+
 
 def _append_toolbox_item_rows(section, seen, title_lookup, icon_lookup, trigger_commands, item):
     if item == "separator":
@@ -1372,18 +1442,17 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
 
         self.check_box = None
         if command_data.get("checkable"):
-            self.check_box = QtWidgets.QCheckBox(self)
-            self.check_box.setObjectName("HotkeyCommandCheckBox")
-            self.check_box.setProperty("tkm_window_anchor", False)
-            self.check_box.setFixedSize(wutil.DPI(15), wutil.DPI(22))
-            self.check_box.setFocusPolicy(QtCore.Qt.NoFocus)
-            self.check_box.setStyleSheet(
-                "#HotkeyCommandCheckBox{background:transparent;spacing:0px;}"
-                "#HotkeyCommandCheckBox::indicator{width:%spx;height:%spx;border:1px solid #626262;border-radius:%spx;background:#262626;}"
-                "#HotkeyCommandCheckBox::indicator:hover{border-color:#7d7d7d;background:#303030;}"
-                "#HotkeyCommandCheckBox::indicator:checked{image:url(%s);border-color:#7d7d7d;background:#363636;}"
-                % (wutil.DPI(11), wutil.DPI(11), wutil.DPI(3), icons.apply)
+            is_choice_row = bool(command_data.get("choice_group"))
+            self.check_box = wutil.make_row_check_control(
+                self, "HotkeyCommandCheckBox", radio=is_choice_row
             )
+            self.check_box.setProperty("tkm_window_anchor", False)
+            # A radio row's size is already fixed to its indicator by
+            # make_row_check_control -- see its docstring for why a looser
+            # box here would throw the checked-state gradient off-center.
+            if not is_choice_row:
+                self.check_box.setFixedSize(wutil.DPI(15), wutil.DPI(22))
+            self.check_box.setFocusPolicy(QtCore.Qt.NoFocus)
             # Dispatch by name (like every other trigger entry point) instead
             # of caching a direct callable here: every row reaching this
             # widget is already guaranteed a registered command (see
@@ -1402,6 +1471,9 @@ class HotkeyCommandItemWidget(HotkeySelectableItemWidget):
                 changed_signal=self.command_data.get("changed_signal"),
                 bind_fn=self.command_data.get("bind_checked_fn"),
                 state_key=self.command_data.get("state_key"),
+            )
+            wutil.bind_choice_row_state(
+                self.check_box, command_data.get("choice_group"), command_data.get("choice_value")
             )
             layout.addWidget(self.check_box, 0)
             layout.setSpacing(wutil.DPI(5))
@@ -1573,12 +1645,20 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         content_layout = self._build_content(main)
         main_layout.addLayout(content_layout, 1)
         self.root_layout.insertWidget(0, main, 1)
-        self._populate_sections()
+        self._content_widget = main
         self._build_bottom_bar()
+        self._begin_catalog_load()
 
     def _initialize_state(self):
-        self._sections, self._title_lookup, self._icon_lookup = _build_command_catalog()
-        self._section_lookup = {section["id"]: section for section in self._sections}
+        self._sections = []
+        self._title_lookup = {}
+        self._icon_lookup = {}
+        self._section_lookup = {}
+        self._catalog_ready = False
+        self._catalog_thread = None
+        # Live Maya hotkey state has to be queried on the main thread --
+        # only the pure-Python catalog build below (_begin_catalog_load) is
+        # heavy enough to move off it, and this stays synchronous.
         self._stored_mapping = _load_hotkeys_from_maya()
         self._draft_mapping = _copy_hotkey_mapping(self._stored_mapping)
         self._section_views = {}
@@ -1593,6 +1673,43 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         self._build_timer = QtCore.QTimer(self)
         self._build_timer.setSingleShot(True)
         self._build_timer.timeout.connect(self._populate_next_batch)
+
+    def _begin_catalog_load(self):
+        """Build the command catalog off the main thread, like Search does.
+
+        ``_build_command_catalog()`` is pure Python (no Maya API calls) but
+        walks every declared tool, shortcut, and choice setting in the whole
+        toolbox -- building it synchronously here, like the dialog used to,
+        is perceptible and blocks Maya's UI for as long as it takes. The
+        section list and command panel stay visible but disabled until the
+        background build reports back.
+        """
+        self._set_content_enabled(False)
+        self._catalog_thread = wutil.BackgroundCallThread(_build_command_catalog, self)
+        self._catalog_thread.loaded.connect(self._on_catalog_loaded)
+        self._catalog_thread.failed.connect(self._on_catalog_failed)
+        self._catalog_thread.start()
+
+    def _on_catalog_loaded(self, result):
+        self._sections, self._title_lookup, self._icon_lookup = result
+        self._section_lookup = {section["id"]: section for section in self._sections}
+        self._catalog_ready = True
+        self._populate_sections()
+        self._set_content_enabled(True)
+
+    def _on_catalog_failed(self, error):
+        self._catalog_ready = True
+        self._set_content_enabled(True)
+        if error:
+            print("[TheKeyMachine] Hotkeys catalog failed to load: {}".format(error))
+
+    def _set_content_enabled(self, enabled):
+        content_widget = getattr(self, "_content_widget", None)
+        if content_widget is not None:
+            content_widget.setEnabled(enabled)
+        bottom_bar = getattr(self, "bottomBar", None)
+        if bottom_bar is not None:
+            bottom_bar.setEnabled(enabled)
 
     def _build_content(self, parent):
         from TheKeyMachine.core import i18n
@@ -1728,6 +1845,7 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
             "rows": [],
             "items": [],
             "built": False,
+            "choice_groups": {},
         }
         self._section_views[section_id] = view
         return view
@@ -1754,6 +1872,7 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         view["rows"] = []
         view["items"] = []
         view["built"] = False
+        view["choice_groups"] = {}
 
     def _begin_section_build(self, section_id, commands, batched=False):
         view = self._ensure_section_view(section_id)
@@ -1790,6 +1909,9 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
             row.invokeRequested.connect(self._invoke_command)
             command_list.setItemWidget(item, row)
             self._set_row_combo_from_draft(row)
+            wutil.sync_choice_group_button(
+                self._pending_view["choice_groups"], command.get("choice_group"), row.check_box, parent=command_list
+            )
             self._pending_view["rows"].append(row)
             self._pending_view["items"].append(item)
         command_list.blockSignals(False)
@@ -1864,6 +1986,10 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         return None
 
     def focus_command(self, command_name):
+        if not self._catalog_ready:
+            QtCore.QTimer.singleShot(40, lambda: self.focus_command(command_name))
+            return True
+
         section_id = self._section_id_for_command(command_name)
         if not section_id:
             return False

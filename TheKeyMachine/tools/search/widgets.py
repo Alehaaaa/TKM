@@ -138,18 +138,17 @@ class SearchResultItemWidget(QtWidgets.QWidget):
 
         self.check_box = None
         if row.get("checkable"):
-            self.check_box = QtWidgets.QCheckBox(self)
-            self.check_box.setObjectName("SearchResultCheckBox")
-            self.check_box.setProperty("tkm_window_anchor", False)
-            self.check_box.setFixedSize(wutil.DPI(15), wutil.DPI(18))
-            self.check_box.setFocusPolicy(QtCore.Qt.NoFocus)
-            self.check_box.setStyleSheet(
-                "#SearchResultCheckBox{background:transparent;spacing:0px;}"
-                "#SearchResultCheckBox::indicator{width:%spx;height:%spx;border:1px solid #626262;border-radius:%spx;background:#262626;}"
-                "#SearchResultCheckBox::indicator:hover{border-color:#7d7d7d;background:#303030;}"
-                "#SearchResultCheckBox::indicator:checked{image:url(%s);border-color:#7d7d7d;background:#363636;}"
-                % (wutil.DPI(11), wutil.DPI(11), wutil.DPI(3), icons.apply)
+            is_choice_row = bool(row.get("choice_group"))
+            self.check_box = wutil.make_row_check_control(
+                self, "SearchResultCheckBox", radio=is_choice_row
             )
+            self.check_box.setProperty("tkm_window_anchor", False)
+            # A radio row's size is already fixed to its indicator by
+            # make_row_check_control -- see its docstring for why a looser
+            # box here would throw the checked-state gradient off-center.
+            if not is_choice_row:
+                self.check_box.setFixedSize(wutil.DPI(15), wutil.DPI(18))
+            self.check_box.setFocusPolicy(QtCore.Qt.NoFocus)
             # Dispatch by name instead of caching a direct callable -- see the
             # same fix in mods/hotkeysMod.py's HotkeyCommandItemWidget for why.
             command_name = row.get("command")
@@ -164,6 +163,7 @@ class SearchResultItemWidget(QtWidgets.QWidget):
                 bind_fn=row.get("bind_checked_fn"),
                 state_key=row.get("state_key"),
             )
+            wutil.bind_choice_row_state(self.check_box, row.get("choice_group"), row.get("choice_value"))
             layout.addWidget(self.check_box)
 
         self.title_label = QtWidgets.QLabel(str(row.get("title") or row.get("command") or ""), self)
@@ -247,6 +247,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         self._catalog_ready = False
         self._pending_result_rows = []
         self._pending_result_index = 0
+        self._choice_groups = {}
         self._restoring_position = False
         self._position_save_timer = QtCore.QTimer(self)
         self._position_save_timer.setSingleShot(True)
@@ -361,6 +362,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         self._result_build_timer.stop()
         self._pending_result_rows = []
         self._pending_result_index = 0
+        self._choice_groups = {}
         settings.set_setting(
             SEARCH_TEXT_KEY, str(text), namespace=SEARCH_SETTINGS_NAMESPACE
         )
@@ -401,6 +403,9 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
             widget.clicked.connect(lambda target=item: self._select_result_item(target))
             widget.invoked.connect(lambda target=item: self._invoke_result_item(target))
             self.results.setItemWidget(item, widget)
+            wutil.sync_choice_group_button(
+                self._choice_groups, row.get("choice_group"), widget.check_box, parent=self.results
+            )
 
         first_batch = self._pending_result_index == 0
         self._pending_result_index = batch_end

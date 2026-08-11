@@ -107,6 +107,7 @@ from TheKeyMachine.data.colors import COLORS
 
 _PACKAGE_TOOL_DEFINITIONS = None
 _PACKAGE_SECTION_DEFINITIONS = None
+_CHOICE_SETTINGS_BY_OWNER = None
 
 
 
@@ -256,21 +257,188 @@ def _iter_section_items(items):
                     yield shortcut
 
 
-def _iter_menu_command_ids(items):
+def _iter_menu_leaf_items(items):
+    """Flatten a declared menu tree into its leaf items, recursing into
+    nested "type": "menu" submenus.
+
+    A leaf is anything that isn't itself a submenu container: a bare string
+    id, a plain command dict, a "choice"/"check"/"section" item, and so on.
+    Used by ``_iter_menu_command_ids`` for validation, which only needs the
+    leaves themselves. ``_iter_menu_choice_settings`` below does its own,
+    separate recursion instead of building on this one, because it also has
+    to track *which* enclosing submenu each choice sits in.
+    """
     for item in items or ():
+        if isinstance(item, dict) and item.get("type") == "menu":
+            for leaf in _iter_menu_leaf_items(item.get("items")):
+                yield leaf
+            continue
+        yield item
+
+
+def _iter_menu_command_ids(items):
+    for item in _iter_menu_leaf_items(items):
         if isinstance(item, str):
             if item != "separator":
                 yield item
             continue
         if not isinstance(item, dict):
             continue
-        if item.get("type") == "menu":
-            for command_id in _iter_menu_command_ids(item.get("items")):
-                yield command_id
+        if item.get("type") == "choice":
+            # A choice item's "id" names its own setting group (see
+            # tool_choice_settings()/_validate_definition_graph's separate
+            # choice-id check below), not a reference to another tool --
+            # unlike every other declared-menu item, where "id" is always a
+            # tool reference.
             continue
         command_id = item.get("command") or item.get("id")
         if command_id:
             yield command_id
+
+
+def _iter_menu_choice_settings(owner_id, items):
+    """Yield ``(owner_id, choice_item)`` for every "type": "choice" leaf under *items*.
+
+    A choice's owner is the nearest enclosing menu's "command"/"id" -- the
+    same nearest-declared-identity rule ``core.toolMenus._declared_item_text``
+    already uses for a submenu's own label/description -- falling back to
+    the caller's *owner_id* when a choice sits directly in a menu with no
+    nested submenu in between. That single rule is what lets a choice
+    declared deep inside one tool's menu (the alignment picker nested in
+    the "TKM" logo's own Preferences submenu) surface under the
+    *standalone* tool that actually represents it on the section graph
+    (the "Preferences" toolbar button, ``main_preferences_menu``) with no
+    caller ever special-casing that nesting: this one walk is reused by
+    both package validation and ``tool_choice_settings()`` below, so there
+    is exactly one place that knows how ownership is resolved.
+    """
+    for item in items or ():
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") == "menu":
+            nested_owner = item.get("command") or item.get("id") or owner_id
+            for owner, choice_item in _iter_menu_choice_settings(nested_owner, item.get("items")):
+                yield owner, choice_item
+            continue
+        if item.get("type") == "choice":
+            yield owner_id, item
+
+
+def _all_choice_settings_by_owner():
+    by_owner = {}
+    for tool_id, tool in _tool_definitions().items():
+        menu = tool.get("menu")
+        if not isinstance(menu, dict):
+            continue
+        for owner_id, choice_item in _iter_menu_choice_settings(tool_id, menu.get("items")):
+            by_owner.setdefault(owner_id, []).append(choice_item)
+    return by_owner
+
+
+def tool_choice_settings(tool_id):
+    """Return every "type": "choice" item owned by *tool_id*.
+
+    ``get_tool()`` replaces a tool's declared "menu" dict with a callable
+    that builds the actual Qt menu (see the ``tool["menu"] = lambda ...``
+    assignment below), so introspecting the *declared* choice items -- each
+    one a setting owned by a tool's dropdown, like Bake's tangent mode,
+    Share Keys' Keep Anim Curve Shape picker, or the Preferences alignment
+    picker -- has to read the raw package definitions instead, via
+    ``_iter_menu_choice_settings``'s ownership walk. ``mods.hotkeysMod``
+    calls this once per tool it already visits to expose each choice value
+    as its own row for Search and the Hotkeys editor, instead of
+    re-implementing declared-menu traversal or special-casing any one
+    tool's nesting.
+    """
+    global _CHOICE_SETTINGS_BY_OWNER
+    if _CHOICE_SETTINGS_BY_OWNER is None:
+        _CHOICE_SETTINGS_BY_OWNER = _all_choice_settings_by_owner()
+    return _CHOICE_SETTINGS_BY_OWNER.get(tool_id, [])
+
+
+def apply_choice_value(setter, value, checked, state_key=None):
+    """Apply *value* through *setter* when a choice row's checkbox turns on.
+
+    Shared by every surface that reaches a declared "choice" menu item's
+    boolean-in/value-out setter through a checkable control: the menu radio
+    group ``core.toolMenus.build_declared_menu`` builds, and the individual
+    per-value rows ``mods.hotkeysMod`` derives from the same declared choice
+    for Search and the Hotkeys editor. A choice group is mutually exclusive
+    -- unchecking a row has nothing of its own to apply, only checking one
+    does.
+
+    When *state_key* is given (every caller that has a stable choice id
+    passes its own), a successful apply also publishes *value* under that
+    key via ``runtimeManager.set_control_state`` -- the app's existing
+    generic shared-control-state channel. ``widgets.util.bind_choice_row_state``
+    subscribes each Search/Hotkeys row for the same choice to that channel,
+    so picking a value through the live dropdown menu, a hotkey, or any one
+    row updates every other row for that setting immediately, from this one
+    place, instead of each surface needing its own refresh logic.
+    """
+    if not checked:
+        return None
+    result = setter(value)
+    if state_key:
+        from TheKeyMachine.core import runtimeManager as runtime
+
+        runtime.get_runtime_manager().set_control_state(state_key, value)
+    return result
+
+
+def choice_setting_command_name(choice_id, value):
+    """Return the trigger command name for one value of a "choice" setting.
+
+    Mirrors ``slider_command_name`` -- a stable, collision-free name
+    composed from the setting's own id and one of its values. Shared by
+    ``register_choice_setting_commands()`` below (which registers the
+    command) and ``mods.hotkeysMod`` (which references the same name to
+    build a Search/Hotkeys row for that value), so there is exactly one
+    formula for the name.
+    """
+    return "{}__{}".format(choice_id, value)
+
+
+def _choice_setting_callback(choice_id, setter, value):
+    def _apply_choice_setting(*_args, **_kwargs):
+        return apply_choice_value(setter, value, True, state_key=choice_id)
+
+    return _apply_choice_setting
+
+
+def register_choice_setting_commands():
+    """Eagerly register every declared "choice" setting value as a command.
+
+    Mirrors ``trigger._register_connect_entries()``'s reasoning, applied to
+    choice settings instead of custom tools: without this, a choice
+    setting's command only entered trigger's registry -- and was therefore
+    only assignable/firable as a hotkey -- once Search or the Hotkeys
+    editor had built its catalog at least once this session
+    (``mods.hotkeysMod._tool_choice_setting_rows`` builds rows that
+    reference these same command names but does not register them; it
+    relies on this function having already run). Called once from
+    ``trigger._discover_commands()``, right after ``_register_connect_entries()``.
+    """
+    global _CHOICE_SETTINGS_BY_OWNER
+    if _CHOICE_SETTINGS_BY_OWNER is None:
+        _CHOICE_SETTINGS_BY_OWNER = _all_choice_settings_by_owner()
+
+    for choice_items in _CHOICE_SETTINGS_BY_OWNER.values():
+        for choice_item in choice_items:
+            choice_id = choice_item.get("id")
+            setter = choice_item.get("set_value")
+            if not choice_id or not callable(setter):
+                continue
+            choices = choice_item.get("items", ())
+            if callable(choices):
+                choices = choices()
+            for choice in choices:
+                value = choice.get("value")
+                trigger.register_command(
+                    choice_setting_command_name(choice_id, value),
+                    _choice_setting_callback(choice_id, setter, value),
+                    policy=trigger.OperationPolicy(progress=False, undo=False),
+                )
 
 
 def _validate_definition_graph(tools, sections):
@@ -302,6 +470,12 @@ def _validate_definition_graph(tools, sections):
                 if tool_id not in pinnable_ids:
                     errors.append("workspace pins unknown tool {!r} in toolbar {!r}".format(tool_id, toolbar_id))
 
+    # Uses the raw *tools* argument, not _tool_definitions() -- this runs
+    # while _PACKAGE_TOOL_DEFINITIONS is still being assembled, before that
+    # cache exists. tool_choice_settings() reuses the exact same
+    # _iter_menu_choice_settings ownership walk once the cache is up, so
+    # this check and that lookup can never disagree about who owns what.
+    choice_setting_owners = {}
     for tool_id, tool in tools.items():
         menu = tool.get("menu")
         if not isinstance(menu, dict):
@@ -309,6 +483,25 @@ def _validate_definition_graph(tools, sections):
         for command_id in _iter_menu_command_ids(menu.get("items")):
             if command_id not in tools:
                 errors.append("tool {!r} menu references unknown command {!r}".format(tool_id, command_id))
+        for owner_id, choice_item in _iter_menu_choice_settings(tool_id, menu.get("items")):
+            choice_id = choice_item.get("id")
+            if not choice_id:
+                errors.append(
+                    "tool {!r} declares a \"choice\" menu setting (owner {!r}) with no stable \"id\" -- "
+                    "Search and the Hotkeys editor need one to expose each value as its own row".format(
+                        tool_id, owner_id
+                    )
+                )
+                continue
+            previous_owner = choice_setting_owners.get(choice_id)
+            if previous_owner:
+                errors.append(
+                    "choice setting id {!r} is declared twice, under owners {!r} and {!r}".format(
+                        choice_id, previous_owner, owner_id
+                    )
+                )
+            else:
+                choice_setting_owners[choice_id] = owner_id
     if errors:
         raise RuntimeError("Invalid tool package graph:\n- " + "\n- ".join(errors))
 
@@ -357,9 +550,10 @@ def _collect_package_definitions():
 
 def reset_package_cache():
     """Force package metadata to be rediscovered after an in-process reload."""
-    global _PACKAGE_TOOL_DEFINITIONS, _PACKAGE_SECTION_DEFINITIONS
+    global _PACKAGE_TOOL_DEFINITIONS, _PACKAGE_SECTION_DEFINITIONS, _CHOICE_SETTINGS_BY_OWNER
     _PACKAGE_TOOL_DEFINITIONS = None
     _PACKAGE_SECTION_DEFINITIONS = None
+    _CHOICE_SETTINGS_BY_OWNER = None
 
 
 def _package_definitions():

@@ -143,6 +143,7 @@ def _discover_commands() -> None:
                 _register_slider_section(section_id, section)
 
         _register_connect_entries()
+        toolbox.register_choice_setting_commands()
         _DISCOVERY_COMPLETE = True
     finally:
         _DISCOVERY_IN_PROGRESS = False
