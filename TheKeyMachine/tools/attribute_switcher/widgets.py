@@ -1406,6 +1406,10 @@ class AttributeItem(QtWidgets.QWidget):
                         "objects": list(self.objects_map.keys()),
                         "index": idx,
                         "attrs": {o: d["attr"] for o, d in self.objects_map.items()},
+                        "switch_nodes": {
+                            o: d.get("switch_node", o)
+                            for o, d in self.objects_map.items()
+                        },
                     }
                 }
             else:
@@ -2292,9 +2296,42 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         selection = self.controller.selected_nodes(long=False)
 
         def on_close(objects):
+            target_nodes = sorted(objects)
+            fresh_options = self.controller.build_options_map(data["objects"])
+
+            # The row's options map is created once in _create_switch_item and
+            # is what every apply path (popup, footer, and multi-switch) uses.
+            # SetupTargetsDialog mutates data["objects"] in place, so keep the
+            # already-published options map in sync as well. Updating it in
+            # place also preserves references held by an open/staged UI.
+            old_key = None
+            options_map = None
+            for key, (item, item_options) in self._active_switch_widgets.items():
+                if item is sender:
+                    old_key = key
+                    options_map = item_options
+                    break
+            if options_map is not None:
+                options_map.clear()
+                options_map.update(fresh_options)
+                if old_key is not None:
+                    self._active_switch_widgets.pop(old_key, None)
+                    self._active_switch_widgets[
+                        (sender.enum_attr, tuple(target_nodes))
+                    ] = (sender, options_map)
+
+            sender.unique_controls = target_nodes
+            sender.object_label = self._format_object_name(target_nodes)
+            sender.label_text = "{} {}".format(
+                sender.object_label, sender.attribute_label
+            )
+            display_label = sender.label_text
+            if sender.has_mixed_key_values:
+                display_label += " *"
+            sender.name_label.setText(display_label)
             self.controller.select(selection)
             self._connect_runtime_manager()
-            sender.setToolTip(self.formatXformTooltipObjects(objects))
+            sender.setToolTip(self.formatXformTooltipObjects(target_nodes))
 
         objects_dict = data["objects"]
         self._disconnect_runtime_manager()

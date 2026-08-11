@@ -19,7 +19,7 @@
   - polish: Search and Hotkeys open faster and keep menu options clear and in sync
   - bugfix: Attribute Switcher stays responsive on large multi-control changes
   - bugfix: Mirror and opposite pasting work reliably across full rigs, animation ranges, and parented controls
-  - bugfix: Snapshot Rig detects paired controls and mirror behavior more reliably
+  - bugfix: Snapshot Rig safely handles posed rigs and detects mirror behavior more reliably
   - bugfix: Sliders now create keys on frames without existing keys
   - changed: Cycle Matcher can match tangents only or include key values
 

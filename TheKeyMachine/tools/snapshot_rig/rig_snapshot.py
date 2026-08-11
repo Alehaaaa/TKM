@@ -18,6 +18,7 @@ unless the user explicitly snapshots.
 
 import copy
 import json
+import math
 import os
 import tempfile
 from contextlib import contextmanager
@@ -248,6 +249,11 @@ def _section_path(rig_id, kind):
     if kind not in SNAPSHOT_KINDS:
         raise ValueError(f"Unknown snapshot kind: {kind}")
     return os.path.join(_snapshot_folder(rig_id), f"{kind}.json")
+
+
+def has_snapshot_section(rig_id, kind):
+    """Return whether this rig already has a persisted snapshot section."""
+    return bool(rig_id and os.path.isfile(_section_path(rig_id, kind)))
 
 
 def _empty_snapshot():
@@ -622,6 +628,130 @@ def snapshot_attrs(node):
         return cmds.listAttr(node, keyable=True, unlocked=True, visible=True) or []
     except (RuntimeError, TypeError, ValueError):
         return []
+
+
+def _pose_reference_value(node, attr, saved_defaults):
+    stored = get_attr_value(node, saved_defaults, attr)
+    if stored is not None:
+        return stored
+    try:
+        fallback = cmds.attributeQuery(attr, node=node, listDefault=True)
+    except (RuntimeError, TypeError, ValueError):
+        fallback = None
+    return fallback[0] if fallback else None
+
+
+def _pose_values_differ(current, reference):
+    if isinstance(current, bool) or isinstance(reference, bool):
+        return current != reference
+    if isinstance(current, (int, float)) and isinstance(reference, (int, float)):
+        tolerance = max(1e-4, abs(float(reference)) * 1e-6)
+        return abs(float(current) - float(reference)) > tolerance
+    return False
+
+
+def pose_likely_not_default(groups, attrs_by_control):
+    """Detect a clearly posed selection without guessing from rig rest offsets.
+
+    A saved default is strong evidence and needs only one control with several
+    changed channels. Without one, require several changed *animated* channels
+    across multiple controls; custom rigs with non-zero unkeyed rest values are
+    therefore not treated as posed merely because Maya's plug defaults are zero.
+    """
+    for rig_id, group in (groups or {}).items():
+        has_saved_default = has_snapshot_section(rig_id, "default")
+        changed_attrs = 0
+        changed_controls = 0
+        saved_changed_attrs = 0
+        saved_changed_controls = 0
+        animated_changed_attrs = 0
+        animated_changed_controls = 0
+        raw_transform_attrs = 0
+        raw_transform_controls = 0
+        extreme_rotation_controls = 0
+        for control in group.get("controls", ()):
+            saved_entry = (
+                get_cached_entry(rig_id, control_key(control), "default")
+                if has_saved_default else None
+            )
+            saved_defaults = saved_entry or {}
+            control_changed = 0
+            control_animated = 0
+            control_raw_transforms = 0
+            control_extreme_rotation = False
+            for attr in attrs_by_control.get(control, ()):
+                if attr == "tag" or attr in MIRROR_ATTRS_TO_IGNORE:
+                    continue
+                plug = f"{control}.{attr}"
+                try:
+                    current = cmds.getAttr(plug)
+                    reference = _pose_reference_value(control, attr, saved_defaults)
+                    maya_default = _pose_reference_value(control, attr, {})
+                    short_attr = cmds.attributeQuery(
+                        attr, node=control, shortName=True,
+                    ) or attr
+                except (RuntimeError, TypeError, ValueError):
+                    continue
+                is_transform = short_attr in {"tx", "ty", "tz", "rx", "ry", "rz"}
+                if is_transform and _pose_values_differ(current, maya_default):
+                    control_raw_transforms += 1
+                    if (
+                        short_attr in {"rx", "ry", "rz"}
+                        and isinstance(current, (int, float))
+                        and isinstance(maya_default, (int, float))
+                        and abs(float(current) - float(maya_default)) > 180.0
+                    ):
+                        control_extreme_rotation = True
+                if not _pose_values_differ(current, reference):
+                    continue
+                control_changed += 1
+                try:
+                    keyed = bool(cmds.keyframe(plug, query=True, keyframeCount=True))
+                except (RuntimeError, TypeError, ValueError):
+                    keyed = False
+                if keyed:
+                    control_animated += 1
+            if control_changed:
+                changed_controls += 1
+                changed_attrs += control_changed
+                if saved_entry is not None:
+                    saved_changed_controls += 1
+                    saved_changed_attrs += control_changed
+            if control_animated:
+                animated_changed_controls += 1
+                animated_changed_attrs += control_animated
+            if control_raw_transforms:
+                raw_transform_controls += 1
+                raw_transform_attrs += control_raw_transforms
+            if control_extreme_rotation:
+                extreme_rotation_controls += 1
+
+        if saved_changed_controls >= 1 and saved_changed_attrs >= 2:
+            return True
+        if animated_changed_controls >= 2 and animated_changed_attrs >= 3:
+            return True
+        # On a first snapshot there is no trustworthy rig-specific reference.
+        # Several meaningful TR offsets are enough to ask (not assume): the
+        # user can confirm a custom non-zero rest pose in the anchored prompt.
+        if (
+            not has_saved_default
+            and raw_transform_controls >= 2
+            and raw_transform_attrs >= 3
+        ):
+            return True
+        # Also recover from a previously captured bad default that matches the
+        # current pose. Very large Euler branches or a quarter of the selected
+        # rig carrying multiple raw TR offsets are implausible enough to ask.
+        control_count = len(group.get("controls", ()))
+        widespread_minimum = max(5, int(math.ceil(control_count * 0.25)))
+        if extreme_rotation_controls >= 2:
+            return True
+        if (
+            raw_transform_controls >= widespread_minimum
+            and raw_transform_attrs >= raw_transform_controls * 2
+        ):
+            return True
+    return False
 
 
 def capture_mirror_directions(

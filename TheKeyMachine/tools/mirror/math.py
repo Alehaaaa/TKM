@@ -4,6 +4,23 @@
 MATRIX_SIZE = 16
 
 
+def normalize_angle_degrees(value):
+    """Return an equivalent angle on Maya's compact -180..180 branch."""
+    value = float(value)
+    normalized = (value + 180.0) % 360.0 - 180.0
+    # Keep positive half-turns positive and remove tiny modulo noise around 0.
+    if abs(normalized + 180.0) <= 1e-10 and value > 0.0:
+        return 180.0
+    if abs(normalized) <= 1e-10:
+        return 0.0
+    return normalized
+
+
+def normalize_euler_degrees(values):
+    """Normalize an Euler channel triple without changing its orientation."""
+    return tuple(normalize_angle_degrees(value) for value in values)
+
+
 def opposite_name_candidates(name, patterns, aliases=()):
     """Return every ordered, de-duplicated opposite-name candidate."""
     namespace, separator, leaf = str(name).rpartition(":")

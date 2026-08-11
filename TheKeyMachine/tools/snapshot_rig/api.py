@@ -1,8 +1,8 @@
 from TheKeyMachine.tools.snapshot_rig import controller
 
 
-def snapshot_rig(*args):
-    return controller.snapshot_rig(*args)
+def snapshot_rig(*args, **kwargs):
+    return controller.snapshot_rig(*args, **kwargs)
 
 
 def snapshot_default(*args):

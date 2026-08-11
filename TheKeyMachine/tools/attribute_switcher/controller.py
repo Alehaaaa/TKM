@@ -256,7 +256,12 @@ class AttributeSwitcherController:
                 "long": cmds.attributeQuery(attribute, node=node, niceName=True),
             },
         )
-        existing = entry["objects"].get(node)
+        xform_target = (
+            node
+            if attribute == "rotateOrder"
+            else self.detect_xform_target(node, attribute)
+        )
+        existing = entry["objects"].get(xform_target)
         if existing:
             if attribute == "rotateOrder":
                 existing["attr"] = attribute
@@ -278,13 +283,14 @@ class AttributeSwitcherController:
             "keyed_values": keyed_values,
             "current": current_value,
             "attr": attribute,
+            "switch_node": node,
             "type": attribute_type,
             "min": float(minimum),
             "max": float(maximum),
         }
         if catalog_key == "rotateOrder" and show_rotate_order and analyze_gimbal:
             object_data["gimbal"] = self.analyzer.analyze(node)
-        entry["objects"][node] = object_data
+        entry["objects"][xform_target] = object_data
 
     def analyze_group_gimbal(self, objects_data):
         """Analyze a staged rotate-order group and return combined ranks.
@@ -364,15 +370,119 @@ class AttributeSwitcherController:
             return False
 
     @staticmethod
+    def _downstream_nodes(source):
+        """Return direct DG destinations for a node or plug."""
+        try:
+            return cmds.listConnections(
+                source,
+                source=False,
+                destination=True,
+                skipConversionNodes=True,
+            ) or []
+        except (TypeError, RuntimeError, ValueError):
+            try:
+                return cmds.listConnections(
+                    source, source=False, destination=True
+                ) or []
+            except Exception:
+                return []
+
+    @staticmethod
+    def _is_transform(node):
+        try:
+            return cmds.nodeType(node) in ("transform", "joint")
+        except Exception:
+            return False
+
+    @classmethod
+    def _controller_descendants(cls, root, max_depth=8):
+        """Find the nearest curve controller below a driven transform."""
+        queue = [(root, 0)]
+        visited = set()
+        matches = []
+        nearest_depth = None
+        while queue:
+            node, depth = queue.pop(0)
+            if node in visited or depth > max_depth:
+                continue
+            visited.add(node)
+            try:
+                shapes = cmds.listRelatives(
+                    node,
+                    shapes=True,
+                    noIntermediate=True,
+                    fullPath=True,
+                ) or []
+            except Exception:
+                shapes = []
+            if any(
+                cmds.nodeType(shape) == "nurbsCurve"
+                for shape in shapes
+            ):
+                if nearest_depth is None:
+                    nearest_depth = depth
+                if depth == nearest_depth:
+                    matches.append(node)
+                continue
+            if nearest_depth is not None or depth == max_depth:
+                continue
+            try:
+                children = cmds.listRelatives(
+                    node, children=True, type="transform", fullPath=True
+                ) or []
+            except Exception:
+                children = []
+            queue.extend((child, depth + 1) for child in children)
+        return matches
+
+    @classmethod
+    def detect_xform_target(cls, switch_node, attribute, max_nodes=256):
+        """Infer the control whose world pose a switch should preserve.
+
+        Space-switch attributes often live on a settings/spacer control while
+        their DG output drives an offset group above the animated control. Walk
+        only downstream from the switch plug, stop at driven transforms, and
+        use a unique nearest curve-controller descendant. Ambiguous networks
+        deliberately fall back to the attribute owner.
+        """
+        plug = "{}.{}".format(switch_node, attribute)
+        queue = list(cls._downstream_nodes(plug))
+        visited = set()
+        driven = []
+        while queue and len(visited) < max_nodes:
+            node = queue.pop(0)
+            if node in visited:
+                continue
+            visited.add(node)
+            if cls._is_transform(node):
+                driven.append(node)
+                continue
+            queue.extend(cls._downstream_nodes(node))
+
+        candidates = []
+        for transform in driven:
+            controls = cls._controller_descendants(transform)
+            candidates.extend(controls or [transform])
+        candidates = list(dict.fromkeys(candidates))
+        return candidates[0] if len(candidates) == 1 else switch_node
+
+    @staticmethod
     def build_options_map(objects_data):
         options = {}
         for node, data in objects_data.items():
             for index, label in enumerate(data["enum"]):
                 entry = options.setdefault(
-                    label, {"objects": [], "index": index, "attrs": {}}
+                    label,
+                    {
+                        "objects": [],
+                        "index": index,
+                        "attrs": {},
+                        "switch_nodes": {},
+                    },
                 )
                 entry["objects"].append(node)
                 entry["attrs"][node] = data.get("attr")
+                entry["switch_nodes"][node] = data.get("switch_node", node)
         return options
 
     # Scene edits ----------------------------------------------------------
@@ -491,6 +601,7 @@ class AttributeSwitcherController:
             options[value]["objects"]
         )
         target_attributes = options[value]["attrs"]
+        target_switch_nodes = options[value].get("switch_nodes", {})
         enum_index = options[value].get("index", value)
         operation_manager = None
         operation = None
@@ -532,6 +643,7 @@ class AttributeSwitcherController:
                 attribute,
                 targets,
                 target_attributes,
+                target_switch_nodes,
                 enum_index,
                 all_frames,
                 temporary_keys,
@@ -561,6 +673,7 @@ class AttributeSwitcherController:
         attribute,
         targets,
         target_attributes,
+        target_switch_nodes,
         enum_index,
         all_frames,
         temporary_keys,
@@ -593,6 +706,7 @@ class AttributeSwitcherController:
                     attribute,
                     enum_index,
                     target_attributes,
+                    target_switch_nodes,
                     True,
                     operation,
                     temporary_keys,
@@ -605,6 +719,7 @@ class AttributeSwitcherController:
                 attribute,
                 enum_index,
                 target_attributes,
+                target_switch_nodes,
                 all_frames,
                 operation,
                 temporary_keys,
@@ -618,6 +733,7 @@ class AttributeSwitcherController:
         attribute,
         enum_index,
         target_attributes,
+        target_switch_nodes,
         all_frames,
         operation,
         temporary_keys,
@@ -663,6 +779,7 @@ class AttributeSwitcherController:
                 enum_index,
                 {frame: keyframes[frame] for frame in transforms},
                 target_attributes,
+                target_switch_nodes,
                 transforms=transforms,
             )
         elif isinstance(keyframes, list) and keyframes:
@@ -676,6 +793,7 @@ class AttributeSwitcherController:
                     operation,
                     self._set_preserving_transform,
                     target,
+                    target_switch_nodes.get(target, target),
                     target_attributes[target],
                     enum_index,
                     frame_transforms.get(target),
@@ -689,10 +807,11 @@ class AttributeSwitcherController:
                 if target not in frame_transforms:
                     continue
                 target_attribute = target_attributes[target]
+                switch_node = target_switch_nodes.get(target, target)
                 self._on_main(
                     operation,
                     self._ensure_temporary_key,
-                    target,
+                    switch_node,
                     target_attribute,
                     current_time,
                     temporary_keys,
@@ -701,6 +820,7 @@ class AttributeSwitcherController:
                     operation,
                     self._set_preserving_transform,
                     target,
+                    switch_node,
                     target_attribute,
                     enum_index,
                     frame_transforms.get(target),
@@ -709,15 +829,15 @@ class AttributeSwitcherController:
                 operation.step()
 
     @staticmethod
-    def _ensure_temporary_key(target, target_attribute, current_time, temporary_keys):
+    def _ensure_temporary_key(switch_node, target_attribute, current_time, temporary_keys):
         """Give an unkeyed channel a temporary key at ``current_time`` so
         the frame-scoped switch below has something to preserve; the key
         is removed again in ``_remove_temporary_keys`` once the switch is
         done.
         """
-        plug = "{}.{}".format(target, target_attribute)
+        plug = "{}.{}".format(switch_node, target_attribute)
         if not (cmds.keyframe(plug, query=True, keyframeCount=True) or 0):
-            temporary_keys.setdefault(target, {}).setdefault(
+            temporary_keys.setdefault(switch_node, {}).setdefault(
                 target_attribute, []
             ).append(current_time)
             cmds.keyframe(plug)
@@ -1016,6 +1136,7 @@ class AttributeSwitcherController:
                     "all_frames": frame_all,
                     "targets": targets,
                     "target_attributes": option_data["attrs"],
+                    "target_switch_nodes": option_data.get("switch_nodes", {}),
                     "enum_index": option_data.get("index", normalized_value),
                     "keyframes": keyframes,
                     "needs_scope": needs_scope,
@@ -1117,6 +1238,7 @@ class AttributeSwitcherController:
                                 plan["attribute"],
                                 plan["targets"],
                                 plan["target_attributes"],
+                                plan["target_switch_nodes"],
                                 plan["enum_index"],
                                 plan["all_frames"],
                                 temporary_keys,
@@ -1148,8 +1270,10 @@ class AttributeSwitcherController:
         cmds.showWindow("MayaWindow")
 
     @staticmethod
-    def _set_preserving_transform(target, attribute, value, transform):
-        cmds.setAttr("{}.{}".format(target, attribute), value)
+    def _set_preserving_transform(
+        target, switch_node, attribute, value, transform
+    ):
+        cmds.setAttr("{}.{}".format(switch_node, attribute), value)
         cmds.xform(target, ws=True, matrix=transform)
 
     # General switches -- super-mode (fast) path -----------------------------
@@ -1426,7 +1550,9 @@ class AttributeSwitcherController:
 
             if not omui.set_current_time(frame):
                 return False
-            self._set_preserving_transform(target, target_attribute, value, baseline)
+            self._set_preserving_transform(
+                target, target, target_attribute, value, baseline
+            )
             slow = {
                 axis: cmds.getAttr("{}.{}".format(target, axis)) for axis in axes
             }
@@ -1453,6 +1579,7 @@ class AttributeSwitcherController:
         value,
         keyframes,
         target_attributes=None,
+        target_switch_nodes=None,
         transforms=None,
     ):
         """Safe to call from either the main thread or (via
@@ -1499,6 +1626,7 @@ class AttributeSwitcherController:
                     return {
                         target for target in all_targets
                         if self._switch_fast_eligible(target)
+                        and (target_switch_nodes or {}).get(target, target) == target
                     }
                 candidates = self._on_main(operation, _collect_candidates)
                 verified = bool(candidates) and self._on_main(
@@ -1526,20 +1654,32 @@ class AttributeSwitcherController:
                         operation,
                         self._apply_relevant_at_frame,
                         frame, relevant, attribute, value, target_attributes,
+                        target_switch_nodes,
                     )
                 if operation:
                     operation.step()
         finally:
             self._on_main(operation, omui.set_current_time, current_time)
 
-    def _apply_relevant_at_frame(self, frame, relevant, attribute, value, target_attributes):
+    def _apply_relevant_at_frame(
+        self,
+        frame,
+        relevant,
+        attribute,
+        value,
+        target_attributes,
+        target_switch_nodes,
+    ):
         if not omui.set_current_time(frame):
             return
         for target, transform in relevant.items():
             target_attribute = (
                 target_attributes[target] if target_attributes else attribute
             )
-            self._set_preserving_transform(target, target_attribute, value, transform)
+            switch_node = (target_switch_nodes or {}).get(target, target)
+            self._set_preserving_transform(
+                target, switch_node, target_attribute, value, transform
+            )
 
     @staticmethod
     def _collect_keyframes(targets, all_frames, timeline_selection, selected_range):

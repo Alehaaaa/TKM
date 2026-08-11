@@ -180,10 +180,10 @@ def _matrix_channel_solver(node):
                     euler = euler.closestSolution(current_euler)
                 except (RuntimeError, TypeError, ValueError):
                     pass
-                rotation = tuple(
+                rotation = mirror_math.normalize_euler_degrees(tuple(
                     om.MAngle(value, om.MAngle.kRadians).asDegrees()
                     for value in (euler.x, euler.y, euler.z)
-                )
+                ))
                 scale = tuple(combined_transform.scale(om.MSpace.kTransform))
 
                 cmds.setAttr(f"{solver}.translate", 0.0, 0.0, 0.0)

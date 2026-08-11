@@ -8,7 +8,27 @@ from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.widgets.util as wutil
 
 
-def _snapshot_controls(kinds, tool_id, label):
+def _confirmed_snapshot_kinds(kinds, groups, attrs_by_control, anchor_widget=None):
+    """Resolve the Full Snapshot default-pose prompt without starting capture."""
+    kinds = tuple(kinds)
+    if (
+        "default" not in kinds
+        or not rig_snapshot.pose_likely_not_default(groups, attrs_by_control)
+    ):
+        return kinds
+    from TheKeyMachine.tools.snapshot_rig import widgets
+
+    save_default = widgets.confirm_current_default_pose(anchor_widget)
+    if save_default is None:
+        return None
+    if not save_default:
+        return tuple(kind for kind in kinds if kind != "default")
+    return kinds
+
+
+def _snapshot_controls(
+    kinds, tool_id, label, anchor_widget=None, confirm_default_pose=False,
+):
     selected_controls = selectionMod.get_selected_objects(long=True)
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
@@ -23,6 +43,13 @@ def _snapshot_controls(kinds, tool_id, label):
         control: rig_snapshot.snapshot_attrs(control) if attr_kinds else []
         for control in controls
     }
+    kinds = tuple(kinds)
+    if confirm_default_pose:
+        kinds = _confirmed_snapshot_kinds(
+            kinds, groups, attrs_by_control, anchor_widget=anchor_widget,
+        )
+        if kinds is None:
+            return wutil.make_inViewMessage(f"{label} cancelled")
     needs_opposites = "opposite" in kinds or "mirror" in kinds
     opposites_by_control = {}
     for group in groups.values():
@@ -149,9 +176,13 @@ def _snapshot_controls(kinds, tool_id, label):
     wutil.make_inViewMessage(message)
 
 
-def snapshot_rig(*args):
+def snapshot_rig(*args, anchor_widget=None, tool_operation=None, **_kwargs):
     return _snapshot_controls(
-        ("opposite", "default", "mirror"), tool_id="snapshot_rig", label="Snapshot Rig"
+        ("opposite", "default", "mirror"),
+        tool_id="snapshot_rig",
+        label="Snapshot Rig",
+        anchor_widget=anchor_widget,
+        confirm_default_pose=True,
     )
 
 
