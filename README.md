@@ -6,7 +6,7 @@
 
 **The Open Source Animation toolbar for Autodesk Maya.**
 
-![Version](https://img.shields.io/badge/version-0.1.40-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.41-blue.svg)
 
 TheKeyMachine (TKM) is a Maya toolbar for Animation. Change timing, posing, curve editing, selection, mirroring, pivots, and space switches.
 
@@ -99,7 +99,7 @@ Colored sets, inline rename, duplicate checks, clear all, and quick or regular i
 <summary><b>Viewport & Tracing</b>: Orbit, Tracer</summary>
 
 - **Orbit:** Quick orbit mode and a floating Orbit window.
-- **Tracer:** Create, refresh, show/hide, recolor, offset, auto-update, or remove a motion tracer.
+- **Tracer:** Toggle or layer tracers, refresh them asynchronously, and control style, size, color, range, space, falloff, x-ray display, offset, and update performance.
 
 </details>
 

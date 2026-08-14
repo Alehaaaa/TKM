@@ -103,7 +103,7 @@
         "en": {
             "label": "Select Rig Controls",
             "tooltip": [
-                "Select all NURBS curve controls in the selected rig hierarchy."
+                "Select all curve and joint controls in the selected rig hierarchy."
             ]
         },
         "es": {
@@ -153,7 +153,7 @@
         "en": {
             "label": "Select Animated Rig Controls",
             "tooltip": [
-                "Select only animated NURBS curve controls in the selected rig hierarchy."
+                "Select only animated curve and joint controls in the selected rig hierarchy."
             ]
         },
         "es": {

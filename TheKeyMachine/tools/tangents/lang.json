@@ -3,7 +3,7 @@
         "en": {
             "label": "Cycle Matcher",
             "tooltip": [
-                "Match the first and last keys of selected Graph Editor curves to create a seamless cycle."
+                "Match the current end of each curve to its opposite end, for a seamless cycle. If one end key is selected in the Graph Editor, that end is matched to the opposite one; otherwise matches the last key to the first. Matches tangent orientation, or tangent and value in Tangents and Value mode."
             ]
         },
         "es": {

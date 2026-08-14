@@ -1,16 +1,26 @@
 {
   "create": [
-    "Create a viewport trail from the selected object's animated path.",
+    "Click to create a viewport tracer for the selected object; click again to remove all tracers.",
     {"movie": "tracer"},
     {"separator": true},
-    "Use Refresh after animation changes when Auto Update is disabled."
+    "Shift-click creates another tracer. Right-click opens tracer settings."
   ],
-  "refresh": ["Rebuild the active trail from the object's current animation."],
-  "toggle": ["Show or hide the active trail without deleting it."],
-  "offset": ["Select the trail offset node so the displayed path can be repositioned."],
-  "grey": ["Use the neutral grey display style for the active trail."],
-  "red": ["Use the red display style for the active trail."],
-  "blue": ["Use the blue display style for the active trail."],
-  "remove": ["Delete the active tracer setup from the scene."],
-  "connected": ["Update the trail automatically while the source animation changes."]
+  "create_another": ["Create another tracer without replacing existing TKM tracers."],
+  "set_range": ["Set every tracer's start and end to the current playback range."],
+  "refresh": ["Force every tracer to rebuild from its object's current animation."],
+  "toggle": ["Show or hide the active tracer without deleting it."],
+  "offset": ["Select the active tracer's offset. Translate or rotate it to resample the path; its values are remembered by object name for this Maya session."],
+  "world_space": ["Rebuild the tracer in world space."],
+  "camera_space": ["Rebuild the tracer relative to the focused viewport's camera."],
+  "relative_space": ["Rebuild the tracer relative to one selected anchor object."],
+  "grey": ["Use the neutral grey color for every tracer."],
+  "red": ["Use the red color for every tracer."],
+  "blue": ["Use the blue color for every tracer."],
+  "remove": ["Delete every TKM tracer setup from the scene."],
+  "connected": ["Update tracers automatically after animation, source transform, or offset changes. The Performance setting controls update timing and sampling quality."],
+  "cycle_style": ["Cycle the global drawing style used by every tracer."],
+  "cycle_range": ["Cycle the global number of visible frames before and after the current frame."],
+  "cycle_performance": ["Cycle auto-update responsiveness and sampling quality."],
+  "falloff": ["Fade every tracer around the current frame."],
+  "xray": ["Draw every tracer through scene geometry."]
 }
