@@ -15,6 +15,9 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.40:
+  - bugfix: Toolbar alignment, pinning, and reloads stay responsive without clipped rows or menu errors
+
 0.1.39:
   - bugfix: Copy and Paste Animation reliably recognizes the same control across full and short scene paths
   - bugfix: Smart Key and other layer-aware tools read animation layers without errors

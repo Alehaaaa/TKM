@@ -6,7 +6,7 @@
 
 **The Open Source Animation toolbar for Autodesk Maya.**
 
-![Version](https://img.shields.io/badge/version-0.1.39-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.40-blue.svg)
 
 TheKeyMachine (TKM) is a Maya toolbar for Animation. Change timing, posing, curve editing, selection, mirroring, pivots, and space switches.
 

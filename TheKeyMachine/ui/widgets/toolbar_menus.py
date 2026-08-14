@@ -741,30 +741,49 @@ def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alig
         toolbar_widget.update()
 
 
-def _add_alignment_actions(menu, current_alignment, apply_alignment_fn, sections, names=TOOLBAR_ALIGNMENT_NAMES):
+def _add_alignment_actions(
+    menu,
+    current_alignment,
+    apply_alignment_fn,
+    sections=None,
+    names=TOOLBAR_ALIGNMENT_NAMES,
+):
     from TheKeyMachine.core import workspaces
     group = QtGui.QActionGroup(menu)
     group.setExclusive(True)
+    # Retain the direct Python slots for as long as their QActionGroup lives.
+    group._tkm_alignment_handlers = []
     actions = {}
 
-    def apply_align(checked, a):
-        if checked:
-            apply_alignment_fn(a)
-            is_deviating = workspaces.is_current_workspace_deviating(sections, get_alignment_fn=lambda: a)
+    def apply_alignment(alignment):
+        apply_alignment_fn(alignment)
+        if sections is not None:
+            is_deviating = workspaces.is_current_workspace_deviating(
+                sections,
+                get_alignment_fn=lambda: alignment,
+            )
             workspaces.mark_workspace_modified(is_deviating)
 
     translated = {value: (label, description) for value, label, description in toolbar_modes.translated_options()}
     for label in names:
         action_label, action_description = translated[label]
-        actions[label] = _add_checkable_action(
+        action = _add_checkable_action(
             menu,
             action_label,
-            toolCommon.mark_non_tool_action(partial(apply_align, a=label)),
             checked=label == current_alignment,
             group=group,
             description=action_description,
-            open_menu=True,
+            open_menu=False,
         )
+
+        # Connect directly instead of using MenuWidget's deferred checkable
+        # callback. Maya can destroy the menu actions while applying a mode.
+        def handler(_checked=False, alignment=label):
+            apply_alignment(alignment)
+
+        action.triggered.connect(handler)
+        group._tkm_alignment_handlers.append(handler)
+        actions[label] = action
     return group, actions
 
 

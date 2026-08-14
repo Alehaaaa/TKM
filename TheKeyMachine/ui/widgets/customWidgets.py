@@ -1978,7 +1978,6 @@ class QFlatToolbar(QtWidgets.QScrollArea):
         self._pan_start_offset = 0
         self._pan_dragging = False
         self._pan_cursor_active = False
-        self._single_line_refresh_pending = False
         self._height_syncing = False
         self._pending_scroll_restore = None
         self._restoring_scroll_position = False
@@ -2025,7 +2024,6 @@ class QFlatToolbar(QtWidgets.QScrollArea):
         )
         self._tkm_sections.append(sec)
         self.layout().addWidget(sec)
-        sec.pinsChanged.connect(self._schedule_single_line_layout_refresh)
         return sec
 
     def set_single_line(self, enabled):
@@ -2105,18 +2103,6 @@ class QFlatToolbar(QtWidgets.QScrollArea):
         for widget in [self] + self.findChildren(QtWidgets.QWidget):
             widget.installEventFilter(self)
 
-    def _schedule_single_line_layout_refresh(self):
-        if not self.is_single_line() or self._single_line_refresh_pending:
-            return
-        self._single_line_refresh_pending = True
-
-        def _refresh():
-            self._single_line_refresh_pending = False
-            if self.is_single_line() and QtCompat.isValid(self):
-                self._update_height()
-
-        QtCore.QTimer.singleShot(0, _refresh)
-
     def _save_single_line_scroll_position(self):
         if (
             not self.is_single_line()
@@ -2177,6 +2163,16 @@ class QFlatToolbar(QtWidgets.QScrollArea):
             QtWidgets.QApplication.restoreOverrideCursor()
             self._pan_cursor_active = False
 
+    def _valid_horizontal_scroll_bar(self):
+        """Return the live scroll bar, or None while Qt tears the toolbar down."""
+        if not QtCompat.isValid(self):
+            return None
+        try:
+            scroll_bar = self.horizontalScrollBar()
+        except RuntimeError:
+            return None
+        return scroll_bar if QtCompat.isValid(scroll_bar) else None
+
     @staticmethod
     def _event_global_x(event):
         global_pos = event.globalPos() if hasattr(event, "globalPos") else event.globalPosition().toPoint()
@@ -2192,9 +2188,15 @@ class QFlatToolbar(QtWidgets.QScrollArea):
             current = current.parentWidget()
 
     def eventFilter(self, watched, event):
+        if not QtCompat.isValid(self):
+            self._reset_pan_state()
+            return False
         if not self.is_single_line():
             return super().eventFilter(watched, event)
-        scroll_bar = self.horizontalScrollBar()
+        scroll_bar = self._valid_horizontal_scroll_bar()
+        if scroll_bar is None:
+            self._reset_pan_state()
+            return False
         if scroll_bar.maximum() <= scroll_bar.minimum():
             self._reset_pan_state()
             return super().eventFilter(watched, event)
@@ -2217,7 +2219,18 @@ class QFlatToolbar(QtWidgets.QScrollArea):
                     QFlatTooltipManager.hide()
                     QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.ClosedHandCursor)
                     self._pan_cursor_active = True
-                scroll_bar.setValue(self._pan_start_offset - delta)
+                # setDown()/tooltip cleanup can process a pending toolbar
+                # deletion. Reacquire instead of using the wrapper captured
+                # before those callbacks.
+                scroll_bar = self._valid_horizontal_scroll_bar()
+                if scroll_bar is None:
+                    self._reset_pan_state()
+                    return False
+                try:
+                    scroll_bar.setValue(self._pan_start_offset - delta)
+                except RuntimeError:
+                    self._reset_pan_state()
+                    return False
                 return True
         elif event_type == QtCore.QEvent.MouseButtonRelease and event.button() == QtCore.Qt.LeftButton:
             was_dragging = self._pan_dragging
@@ -3351,15 +3364,20 @@ class QFlatSectionWidget(QtWidgets.QWidget):
                 return
             section._layout_refresh_pending = False
             section.updateGeometry()
+            height_owner = None
             parent = section.parent()
             while parent:
                 layout = parent.layout() if hasattr(parent, "layout") else None
                 if layout is not None:
                     layout.invalidate()
                 if hasattr(parent, "_update_height"):
-                    parent._update_height()
+                    height_owner = parent
+                if isinstance(parent, QFlatToolbar):
                     break
                 parent = parent.parent()
+
+            if height_owner is not None:
+                height_owner._update_height()
 
         QtCore.QTimer.singleShot(0, _apply_refresh)
 
