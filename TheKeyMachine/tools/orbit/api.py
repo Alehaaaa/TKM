@@ -18,11 +18,11 @@ from TheKeyMachine.core.Qt import QtGui, QtWidgets  # type: ignore
 
 from TheKeyMachine.data import icons
 from TheKeyMachine.core import trigger
-import TheKeyMachine.core.runtimeManager as runtime
-import TheKeyMachine.mods.settingsMod as settings
+from TheKeyMachine.core import runtime
+from TheKeyMachine.core import settings
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import customWidgets as cw, util as wutil
+from TheKeyMachine.ui.widgets import customWidgets as cw, util as wutil
 
 ORBIT_SETTINGS_NAMESPACE = "orbit_window"
 ORBIT_AUTO_TRANSPARENCY_KEY = "orbit_auto_transparency"
@@ -64,10 +64,6 @@ ORBIT_ACTIONS = (
     "ws_paste_frame",
 )
 ORBIT_ACTION_SET = set(ORBIT_ACTIONS)
-ORBIT_ACTION_MIGRATIONS = {
-    "copy_opposite": "opposite_copy",
-}
-
 DEFAULT_ORBIT_CONFIGURATION = {
     "button{}".format(index): action_identifier for index, action_identifier in enumerate(DEFAULT_ORBIT_ACTIONS, start=1)
 }
@@ -84,7 +80,6 @@ def sanitize_orbit_configuration(config):
         if not str(button_id).startswith("button"):
             continue
         action_identifier = config.get(button_id, "")
-        action_identifier = ORBIT_ACTION_MIGRATIONS.get(action_identifier, action_identifier)
         if action_identifier not in ORBIT_ACTION_SET or action_identifier in seen_actions:
             continue
         sanitized[button_id] = action_identifier

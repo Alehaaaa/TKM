@@ -1,4 +1,4 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.animation_recovery import api
 
 
@@ -18,8 +18,7 @@ class AnimationRecoveryToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "animation_recovery_tools",
+        "id": "animation_recovery_tools", "i18n_key": "animation_recovery",
         "label": "Animation Recovery",
         "items": [{"id": "animation_recovery"}],
     }
-

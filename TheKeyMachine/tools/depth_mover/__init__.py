@@ -1,4 +1,4 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.depth_mover import api
 
 

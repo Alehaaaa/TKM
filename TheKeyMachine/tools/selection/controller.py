@@ -3,9 +3,9 @@
 from maya import cmds
 
 from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
-from TheKeyMachine.mods import selectionMod
+from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 SELECTOR_TOOL_ID = "selector"
@@ -43,7 +43,7 @@ def set_selector_pinned(enabled):
 
 def _selected_roots():
     roots = []
-    for node in selectionMod.get_selected_objects(long=True):
+    for node in selection.get_selected_objects(long=True):
         if node.startswith("|"):
             current = "|" + node.lstrip("|").split("|", 1)[0]
         else:
@@ -101,7 +101,7 @@ def _rig_controls(animated_only=False):
     for node in controls:
         if operation and operation.cancelled:
             break
-        if selectionMod.is_node_animated(node):
+        if selection.is_node_animated(node):
             animated.append(node)
         if operation:
             operation.step()
@@ -109,7 +109,7 @@ def _rig_controls(animated_only=False):
 
 
 def open_selector(*args, **kwargs):
-    if not selectionMod.get_selected_objects():
+    if not selection.get_selected_objects():
         return
 
     from TheKeyMachine.tools.selection.widgets import SelectorDialog
@@ -126,7 +126,7 @@ def open_selector(*args, **kwargs):
 
 
 def select_hierarchy(*args):
-    selected = selectionMod.get_selected_objects(long=True)
+    selected = selection.get_selected_objects(long=True)
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
 

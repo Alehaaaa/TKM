@@ -398,31 +398,5 @@
                 "تبديل إبقاء زر «عرض الكائنات المحددة» مثبتًا ومرئيًا على شريط الأدوات"
             ]
         }
-    },
-    "background_runner_tools": {
-        "en": {
-            "label": "Background Runners"
-        },
-        "es": {
-            "label": "Ejecutores en Segundo Plano"
-        },
-        "fr": {
-            "label": "Exécuteurs en Arrière-Plan"
-        },
-        "ca": {
-            "label": "Executors en Segon Pla"
-        },
-        "zh": {
-            "label": "后台运行器"
-        },
-        "ja": {
-            "label": "バックグラウンドランナー"
-        },
-        "ko": {
-            "label": "백그라운드 러너"
-        },
-        "ar": {
-            "label": "المشغلات الخلفية"
-        }
     }
 }

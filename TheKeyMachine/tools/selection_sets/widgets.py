@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore, QtGui
 
-from TheKeyMachine.widgets import customWidgets as cw, util as wutil
+from TheKeyMachine.ui.widgets import customWidgets as cw, util as wutil
 
 
 class SelectionSetButton(cw.InlineRenameButton):
@@ -54,7 +54,7 @@ class SelectionSetButton(cw.InlineRenameButton):
 
 import re
 
-import maya.cmds as cmds
+from maya import cmds
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
@@ -62,9 +62,9 @@ from TheKeyMachine.data import icons
 from TheKeyMachine.data.colors import COLORS
 import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
 from TheKeyMachine.tools.selection_sets import controller as selectionSetsController
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.maya import selection as maya_selection
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
+from TheKeyMachine.ui.widgets import customDialogs, customWidgets as cw, util as wutil
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
 
 
@@ -227,7 +227,7 @@ class SelectionSetCreationDialog(
         return sanitized
 
     def _build_default_name_from_selection(self):
-        selection = selectionMod.get_selected_objects()
+        selection = maya_selection.get_selected_objects()
         if not selection:
             return ""
 
@@ -663,7 +663,7 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         if runtime_manager:
             toolCommon.clear_tracked_connection(self, "_selection_changed_relay")
         try:
-            import TheKeyMachine.core.runtimeManager as runtime
+            from TheKeyMachine.core import runtime
 
             self._runtime_manager = runtime.get_runtime_manager()
             toolCommon.replace_tracked_connection(
@@ -693,7 +693,9 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
         super().showEvent(event)
 
     def _update_button_match_states(self):
-        current_selection = selectionSetsController.normalize_scene_items(selectionMod.get_selected_objects(long=True))
+        current_selection = selectionSetsController.normalize_scene_items(
+            maya_selection.get_selected_objects(long=True)
+        )
         primary_is_full = False
         for subset, button in list(self._set_buttons.items()):
             if not wutil.is_valid_widget(button):

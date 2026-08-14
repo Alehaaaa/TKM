@@ -1,27 +1,25 @@
 from maya import cmds
 
-from TheKeyMachine.core import animation_context
-from TheKeyMachine.core import animlayers
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.maya import animation
+from TheKeyMachine.maya import selection as maya_selection
 from TheKeyMachine.tools import common as toolCommon
-import TheKeyMachine.widgets.util as wutil
+import TheKeyMachine.ui.widgets.util as wutil
 
 
 def _collect_keyframes(objects, attributes=None, layer_context=None):
+    layer_context = layer_context or animation.layer_cache.capture()
     frames = set()
     for obj in objects or []:
         plugs = [
             "{}.{}".format(obj, attribute)
             for attribute in (attributes or ())
         ]
-        if plugs and animlayers.has_anim_layers():
+        if plugs and animation.has_anim_layers():
             for plug in plugs:
-                destination = animlayers.selected_destination_for_plug(
-                    plug, context=layer_context
-                )
+                destination = layer_context.destination_for_plug(plug)
                 if destination.get("blocked"):
                     continue
-                curve = animlayers.get_anim_curve_for_plug(
+                curve = animation.layer_graph.curve_for_plug(
                     plug,
                     layer_name=destination.get("layer"),
                 )
@@ -73,6 +71,7 @@ def _apply_auto_euler_filter(objects, layer_context=None):
     if not attributeSwitcherApi.is_euler_filter_enabled():
         return
 
+    layer_context = layer_context or animation.layer_cache.capture()
     plugs = [
         "{}.{}".format(obj, attr)
         for obj in objects
@@ -81,19 +80,20 @@ def _apply_auto_euler_filter(objects, layer_context=None):
     ]
     curves = []
     for plug in plugs:
-        destination = animlayers.selected_destination_for_plug(
-            plug, context=layer_context
-        )
+        destination = layer_context.destination_for_plug(plug)
         if destination.get("blocked"):
             continue
-        curve = animlayers.get_anim_curve_for_plug(
+        curve = animation.layer_graph.curve_for_plug(
             plug,
             layer_name=destination.get("layer"),
         )
         if curve:
             curves.append(curve)
-    if not animlayers.has_anim_layers():
-        curves = selectionMod.get_anim_curves_from_plugs(plugs)
+    if not animation.has_anim_layers():
+        curves = animation.layer_graph.curves_for_plugs(
+            plugs,
+            include_all_layers=True,
+        )
     if curves:
         cmds.filterCurve(*list(dict.fromkeys(curves)))
 
@@ -103,7 +103,7 @@ def align_selected_objects(*_args, **kwargs):
     rot = kwargs.get("rot", True)
     scl = kwargs.get("scl", False)
     key_scope = kwargs.get("key_scope", "selection")
-    selection = selectionMod.get_selected_objects(ordered=True)
+    selection = maya_selection.get_selected_objects(ordered=True)
     if len(selection) < 2:
         return wutil.make_inViewMessage("Select at least two objects")
 
@@ -111,7 +111,7 @@ def align_selected_objects(*_args, **kwargs):
     target_object = selection[-1]
     start_frame = cmds.currentTime(query=True)
     modified_objects = []
-    layer_context = animlayers.capture_context()
+    layer_context = animation.layer_cache.capture()
     key_attributes = _keyable_transform_attributes(pos, rot, scl)
     with toolCommon.suspend_maya_refresh():
         try:
@@ -125,7 +125,7 @@ def align_selected_objects(*_args, **kwargs):
                 )
                 set_keys = True
             else:
-                time_context = animation_context.resolve_tool_context(
+                time_context = animation.resolve_context(
                     default_mode="current_frame", include_channels=True
                 )["time_context"]
                 if time_context.mode in ("graph_editor_keys", "time_slider_range"):
@@ -162,10 +162,8 @@ def align_selected_objects(*_args, **kwargs):
                         break
                     cmds.currentTime(frame)
                     for source_object in source_objects:
-                        groups, blocked = animlayers.group_attributes_by_destination(
-                            source_object,
-                            key_attributes,
-                            context=layer_context,
+                        groups, blocked = layer_context.group_by_destination(
+                            source_object, key_attributes
                         )
                         locked_destination = locked_destination or bool(blocked)
                         if not groups:
@@ -173,11 +171,10 @@ def align_selected_objects(*_args, **kwargs):
                         cmds.matchTransform(
                             source_object, target_object, pos=pos, rot=rot, scl=scl
                         )
-                        _keyed, blocked = animlayers.set_keyframe_in_destination(
+                        _keyed, blocked = layer_context.set_keyframe(
                             source_object,
                             key_attributes,
                             time=frame,
-                            context=layer_context,
                         )
                         locked_destination = locked_destination or bool(blocked)
                         if source_object not in modified_objects:

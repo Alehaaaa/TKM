@@ -1,1 +1,1 @@
-"""Temp Pivot uses the standard toolbox widgets."""
+"""Temp Pivot uses the standard registry widgets."""

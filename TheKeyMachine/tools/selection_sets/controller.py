@@ -4,11 +4,11 @@ from maya import cmds
 
 from TheKeyMachine.core.Qt import QtCore
 
-import TheKeyMachine.core.runtimeManager as runtime
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.core import runtime
+from TheKeyMachine.maya import selection as maya_selection
 from TheKeyMachine.tools import clipboard, common as toolCommon
 from TheKeyMachine.tools.selection_sets import api as selectionSetsApi
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 SELECTION_SETS_ROOT = "TheKeyMachine_SelectionSet"
@@ -290,8 +290,8 @@ class SelectionSetsController:
             _append(node)
         return selection_sets
 
-    def _find_matching_selection_set(self, selection):
-        target_members = normalize_scene_items(selection)
+    def _find_matching_selection_set(self, selected_objects):
+        target_members = normalize_scene_items(selected_objects)
         if not target_members:
             return None
 
@@ -303,10 +303,10 @@ class SelectionSetsController:
                 return subset
         return None
 
-    def find_matching_selection_set(self, selection=None):
-        if selection is None:
-            selection = selectionMod.get_selected_objects()
-        return self._find_matching_selection_set(selection)
+    def find_matching_selection_set(self, selected_objects=None):
+        if selected_objects is None:
+            selected_objects = maya_selection.get_selected_objects()
+        return self._find_matching_selection_set(selected_objects)
 
     def get_selection_set_display_name(self, set_name):
         if not set_name:
@@ -364,12 +364,12 @@ class SelectionSetsController:
         return new_set
 
     def create_new_set_and_update_buttons(self, color_suffix, set_name_field, *args):
-        selection = selectionMod.get_selected_objects()
-        if not selection:
+        selected_objects = maya_selection.get_selected_objects()
+        if not selected_objects:
             wutil.make_inViewMessage("Select something first")
             return False
 
-        matching_set = self._find_matching_selection_set(selection)
+        matching_set = self._find_matching_selection_set(selected_objects)
         if matching_set:
             self.show_matching_selection_set_message(matching_set)
             return False
@@ -389,8 +389,7 @@ class SelectionSetsController:
         new_set = cmds.sets(name=new_set_name, empty=True)
         cmds.addAttr(new_set, longName="hidden", attributeType="bool", defaultValue=False)
 
-        if selectionMod.get_selected_objects():
-            cmds.sets(selectionMod.get_selected_objects(), add=new_set)
+        cmds.sets(selected_objects, add=new_set)
 
         cmds.sets(new_set, add=sel_set_name)
         selectionSetsApi.refresh_selection_sets_window()
@@ -548,24 +547,24 @@ class SelectionSetsController:
                 cmds.select(set_name)
 
     def add_selection_to_set(self, set_name, *args):
-        selection = selectionMod.get_selected_objects()
-        if not selection:
+        selected_objects = maya_selection.get_selected_objects()
+        if not selected_objects:
             return wutil.make_inViewMessage("No selection to add")
         if not cmds.objExists(set_name):
             return cmds.warning(f"Set {set_name} does not exist")
-        cmds.sets(selection, add=set_name)
+        cmds.sets(selected_objects, add=set_name)
 
     def remove_selection_from_set(self, set_name, *args):
-        selection = selectionMod.get_selected_objects()
-        if not selection:
+        selected_objects = maya_selection.get_selected_objects()
+        if not selected_objects:
             return wutil.make_inViewMessage("No selection to remove")
         if not cmds.objExists(set_name):
             return cmds.warning(f"Set {set_name} does not exist")
-        cmds.sets(selection, remove=set_name)
+        cmds.sets(selected_objects, remove=set_name)
 
     def update_selection_to_set(self, set_name, *args):
-        selection = selectionMod.get_selected_objects()
-        if not selection:
+        selected_objects = maya_selection.get_selected_objects()
+        if not selected_objects:
             return wutil.make_inViewMessage("No selection to update")
         if not cmds.objExists(set_name):
             return cmds.warning(f"Set {set_name} does not exist")
@@ -573,7 +572,7 @@ class SelectionSetsController:
         current_members = cmds.sets(set_name, q=True) or []
         if current_members:
             cmds.sets(current_members, remove=set_name)
-        cmds.sets(selection, add=set_name)
+        cmds.sets(selected_objects, add=set_name)
 
     # --- deletion ------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.search import api
 
 
@@ -21,7 +21,7 @@ class SearchToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "search_tools",
+        "id": "search_tools", "i18n_key": "search_window",
         "label": "Search",
         "hiddeable": True,
         "items": [{"id": "search_window"}],

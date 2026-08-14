@@ -464,31 +464,5 @@
                 "فتح توثيق محاذاة الكائنات"
             ]
         }
-    },
-    "align_tools": {
-        "en": {
-            "label": "Align Objects"
-        },
-        "es": {
-            "label": "Alinear Objetos"
-        },
-        "fr": {
-            "label": "Aligner les Objets"
-        },
-        "ca": {
-            "label": "Alinear Objectes"
-        },
-        "zh": {
-            "label": "对齐对象"
-        },
-        "ja": {
-            "label": "オブジェクトを整列"
-        },
-        "ko": {
-            "label": "오브젝트 정렬"
-        },
-        "ar": {
-            "label": "محاذاة الكائنات"
-        }
     }
 }

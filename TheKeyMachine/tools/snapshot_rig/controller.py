@@ -3,9 +3,9 @@
 from contextlib import nullcontext
 
 from TheKeyMachine.tools.snapshot_rig import rig_snapshot
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import common as toolCommon
-import TheKeyMachine.widgets.util as wutil
+import TheKeyMachine.ui.widgets.util as wutil
 
 
 def _confirmed_snapshot_kinds(kinds, groups, attrs_by_control, anchor_widget=None):
@@ -29,7 +29,7 @@ def _confirmed_snapshot_kinds(kinds, groups, attrs_by_control, anchor_widget=Non
 def _snapshot_controls(
     kinds, tool_id, label, anchor_widget=None, confirm_default_pose=False,
 ):
-    selected_controls = selectionMod.get_selected_objects(long=True)
+    selected_controls = selection.get_selected_objects(long=True)
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 

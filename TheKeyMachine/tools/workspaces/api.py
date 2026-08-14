@@ -18,7 +18,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 from TheKeyMachine.core.Qt import QtCore
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets.util import is_valid_widget
+from TheKeyMachine.ui.widgets.util import is_valid_widget
 
 _workspaces_window = None
 

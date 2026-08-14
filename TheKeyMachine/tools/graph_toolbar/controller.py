@@ -1,8 +1,8 @@
 from TheKeyMachine.core.Qt import QtCore
 
-import TheKeyMachine.mods.settingsMod as settings
-import TheKeyMachine.widgets.util as wutil
-import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.core import settings
+import TheKeyMachine.ui.widgets.util as wutil
+from TheKeyMachine.core import runtime
 from TheKeyMachine.tools import common as toolCommon
 
 

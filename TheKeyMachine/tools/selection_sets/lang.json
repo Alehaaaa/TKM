@@ -306,31 +306,5 @@
                 "يطلب هذا الإجراء تأكيدًا"
             ]
         }
-    },
-    "selection_set_tools": {
-        "en": {
-            "label": "Selection Sets"
-        },
-        "es": {
-            "label": "Conjuntos de Selección"
-        },
-        "fr": {
-            "label": "Ensembles de Sélection"
-        },
-        "ca": {
-            "label": "Conjunts de Selecció"
-        },
-        "zh": {
-            "label": "选择集"
-        },
-        "ja": {
-            "label": "セレクションセット"
-        },
-        "ko": {
-            "label": "선택 세트"
-        },
-        "ar": {
-            "label": "مجموعات التحديد"
-        }
     }
 }

@@ -4,36 +4,49 @@ from __future__ import annotations
 
 import importlib
 import inspect
-import keyword
 from dataclasses import dataclass
 from functools import wraps
 from typing import Callable, Dict, Optional
 
 
-SLIDER_BUTTON_VALUES = (-150, -125, -105, -100, -50, -15, -5, 0, 5, 15, 50, 100, 105, 125, 150)
-
-_COMMANDS: Dict[str, Callable] = {}
-_COMMAND_POLICIES: Dict[str, "OperationPolicy"] = {}
-_SLIDER_EXECUTORS: Dict[str, Callable] = {}
-_DISCOVERY_COMPLETE = False
-_DISCOVERY_IN_PROGRESS = False
+SLIDER_BUTTON_VALUES = (
+    -150, -125, -105, -100, -50, -15, -5,
+    0,
+    5, 15, 50, 100, 105, 125, 150,
+)
 
 
 @dataclass(frozen=True)
 class OperationPolicy:
+    """Execution behavior applied around one registered command."""
+
     progress: bool = True
     undo: bool = True
     suspend_refresh: bool = False
     preserve_time_selection: bool = False
-    # Opt-in only: running a callback's normal (untouched) body on a worker
-    # thread would call cmds/OpenMaya off the main thread and can crash
-    # Maya. Only set this True for a callback that's been migrated to route
-    # every Maya API call through the tool_operation it receives (see
-    # tools/common.py's ToolOperation.run_on_main / run_on_worker_thread).
+    # Opt in only when every Maya API call is routed back to the main thread.
     threaded: bool = False
 
 
-def _policy_from_definition(command_name: str, definition, callback: Optional[Callable] = None) -> OperationPolicy:
+@dataclass(frozen=True)
+class _RegisteredCommand:
+    callback: Callable
+    policy: OperationPolicy
+    dispatch: Callable
+
+
+_COMMANDS: Dict[str, _RegisteredCommand] = {}
+_SLIDER_EXECUTORS: Dict[str, Callable] = {}
+_DISCOVERY_COMPLETE = False
+_DISCOVERY_IN_PROGRESS = False
+_SLIDER_POLICY = OperationPolicy(progress=False, undo=False)
+
+
+def _policy_from_definition(
+    command_name: str,
+    definition,
+    callback: Optional[Callable] = None,
+) -> OperationPolicy:
     explicit = (definition or {}).get("operation") or {}
     if explicit:
         return OperationPolicy(
@@ -55,70 +68,109 @@ def _policy_from_definition(command_name: str, definition, callback: Optional[Ca
     return OperationPolicy(progress=is_tool_operation, undo=is_tool_operation)
 
 
-def register_command(name: str, callback: Callable, policy: Optional[OperationPolicy] = None) -> Callable:
+def register_command(
+    name: str,
+    callback: Callable,
+    policy: Optional[OperationPolicy] = None,
+) -> Callable:
     """Register a callable behind the shared tool-operation boundary."""
     if not name or not callable(callback):
         raise ValueError("Commands require a name and callable callback")
-    if policy is not None:
-        _COMMAND_POLICIES[name] = policy
-    elif name not in _COMMAND_POLICIES:
-        _COMMAND_POLICIES[name] = _policy_from_definition(name, {}, callback)
 
-    if getattr(callback, "_tkm_tool_dispatch", False) and getattr(callback, "_tkm_command_name", None) == name:
-        dispatched = callback
+    existing = _COMMANDS.get(name)
+    if policy is not None:
+        resolved_policy = policy
+    elif existing is not None:
+        resolved_policy = existing.policy
     else:
-        dispatched = _make_dispatched_command(name, callback)
-    _COMMANDS[name] = dispatched
-    return dispatched
+        resolved_policy = _policy_from_definition(name, {}, callback)
+
+    original = getattr(callback, "_tkm_registered_callback", callback)
+
+    try:
+        parameters = tuple(inspect.signature(original).parameters.values())
+    except (TypeError, ValueError):
+        accepted_keywords = None
+    else:
+        accepts_any_keyword = any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters
+        )
+        accepted_keywords = None if accepts_any_keyword else {
+            parameter.name
+            for parameter in parameters
+            if parameter.kind
+            in (
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            )
+        }
+
+    @wraps(original)
+    def dispatch(*args, **kwargs):
+        from TheKeyMachine.tools import common as toolCommon
+
+        label = kwargs.pop("_tkm_tool_label", None)
+        anchor = kwargs.pop("_tkm_anchor_widget", None)
+        kwargs.pop("tool_operation", None)
+
+        with toolCommon.tool_operation(
+            tool_id=name,
+            label=label,
+            anchor_widget=anchor,
+            progress=resolved_policy.progress,
+            undo=resolved_policy.undo,
+            suspend_refresh=resolved_policy.suspend_refresh,
+            preserve_time_selection=resolved_policy.preserve_time_selection,
+        ) as operation:
+            call_kwargs = dict(kwargs)
+            call_kwargs.setdefault("anchor_widget", anchor)
+            call_kwargs.setdefault("tool_operation", operation)
+            if accepted_keywords is not None:
+                call_kwargs = {
+                    key: value
+                    for key, value in call_kwargs.items()
+                    if key in accepted_keywords
+                }
+
+            if resolved_policy.threaded:
+                return toolCommon.run_on_worker_thread(
+                    original,
+                    *args,
+                    **call_kwargs
+                )
+            return original(*args, **call_kwargs)
+
+    dispatch.__name__ = name
+    dispatch._tkm_command_name = name
+    dispatch._tkm_registered_callback = original
+    _COMMANDS[name] = _RegisteredCommand(original, resolved_policy, dispatch)
+    return dispatch
 
 
 def reset_registry() -> None:
     """Discard discovered commands and package-backed executors for reload."""
     global _DISCOVERY_COMPLETE, _DISCOVERY_IN_PROGRESS
     _COMMANDS.clear()
-    _COMMAND_POLICIES.clear()
     _SLIDER_EXECUTORS.clear()
     _DISCOVERY_COMPLETE = False
     _DISCOVERY_IN_PROGRESS = False
 
+def _register_slider_commands(prefix: str, mode: str, execute: Callable) -> None:
+    for value in SLIDER_BUTTON_VALUES:
+        def execute_mode(
+            session=None,
+            _execute=execute,
+            _mode=mode,
+            _value=value,
+        ):
+            return _execute(_mode, _value, session=session)
 
-def _make_dispatched_command(name: str, callback: Callable) -> Callable:
-    @wraps(callback)
-    def _dispatch(*args, **kwargs):
-        from TheKeyMachine.tools import common as toolCommon
-
-        label = kwargs.pop("_tkm_tool_label", None)
-        anchor_widget = kwargs.pop("_tkm_anchor_widget", None)
-        kwargs.pop("tool_operation", None)
-        policy = _COMMAND_POLICIES.get(name) or _policy_from_definition(name, {}, callback)
-        with toolCommon.tool_operation(
-            tool_id=name,
-            label=label,
-            anchor_widget=anchor_widget,
-            progress=policy.progress,
-            undo=policy.undo,
-            suspend_refresh=policy.suspend_refresh,
-            preserve_time_selection=policy.preserve_time_selection,
-        ) as operation:
-            call_kwargs = dict(kwargs)
-            call_kwargs.setdefault("anchor_widget", anchor_widget)
-            call_kwargs.setdefault("tool_operation", operation)
-            call_kwargs = _supported_callback_kwargs(callback, call_kwargs)
-            if policy.threaded:
-                # Runs callback on a worker thread so the main thread's Qt
-                # event loop stays free to dispatch the progress bar's
-                # Cancel click while callback is working -- see
-                # tools/common.py's run_on_worker_thread for the mechanics
-                # and the thread-safety contract this callback must honor.
-                return toolCommon.run_on_worker_thread(callback, *args, **call_kwargs)
-            return callback(*args, **call_kwargs)
-
-    _dispatch.__name__ = name
-    _dispatch._tkm_tool_dispatch = True
-    _dispatch._tkm_command_name = name
-    _dispatch._tkm_registered_callback = callback
-    return _dispatch
-
+        register_command(
+            slider_command_name(prefix, mode, value),
+            execute_mode,
+            policy=_SLIDER_POLICY,
+        )
 
 def _discover_commands() -> None:
     global _DISCOVERY_COMPLETE, _DISCOVERY_IN_PROGRESS
@@ -127,9 +179,10 @@ def _discover_commands() -> None:
 
     _DISCOVERY_IN_PROGRESS = True
     try:
-        from TheKeyMachine.core import toolbox
+        from TheKeyMachine.tools.custom_tools import service as connect_entries
+        from TheKeyMachine.tools import registry
 
-        for tool_id, definition in toolbox.get_tool_definitions().items():
+        for tool_id, definition in registry.get_tool_definitions().items():
             callback = definition.get("callback")
             if callable(callback):
                 register_command(
@@ -138,89 +191,48 @@ def _discover_commands() -> None:
                     policy=_policy_from_definition(tool_id, definition, callback),
                 )
 
-        for section_id, section in toolbox.get_section_definitions().items():
-            if section.get("type") == "slider":
-                _register_slider_section(section_id, section)
+        for section_id, section in registry.get_section_definitions().items():
+            if section.get("type") != "slider":
+                continue
 
-        _register_connect_entries()
-        toolbox.register_choice_setting_commands()
+            prefix = section.get("slider_type")
+            package_name = section.get("_package")
+            if not prefix or not package_name:
+                raise RuntimeError(
+                    "Slider section {!r} is missing its type or owning package".format(
+                        section_id
+                    )
+                )
+
+            api = importlib.import_module(package_name + ".api")
+            execute = getattr(api, "execute", None)
+            if not callable(execute):
+                raise RuntimeError("{} must expose api.execute()".format(package_name))
+
+            previous = _SLIDER_EXECUTORS.get(prefix)
+            if previous is not None and previous is not execute:
+                raise RuntimeError("Duplicate slider type {!r}".format(prefix))
+            _SLIDER_EXECUTORS[prefix] = execute
+
+            for mode in section.get("modes") or ():
+                mode_key = getattr(mode, "key", None)
+                if mode_key:
+                    _register_slider_commands(prefix, mode_key, execute)
+
+        for kind in connect_entries.SOURCES:
+            for entry in connect_entries.load_entries(kind):
+                callback = entry.get("callback")
+                if entry.get("type") == "entry" and callable(callback):
+                    register_command(entry["id"], callback)
+
+        registry.register_choice_setting_commands()
         _DISCOVERY_COMPLETE = True
     finally:
         _DISCOVERY_IN_PROGRESS = False
 
-
-def _register_connect_entries() -> None:
-    """Eagerly register every custom-tools manifest entry as a real command.
-
-    Without this, a custom tool only entered _COMMANDS -- and therefore only
-    ran inside tool_operation() -- once the Hotkeys editor had been opened at
-    least once in the session (mods/hotkeysMod.py's
-    _append_connect_entry_rows registers them too, so it still picks up
-    manifest edits made while Maya is running). Before that first open, a
-    hotkey or shelf button for a custom tool fell through execute_command()'s
-    fallback straight to connectEntries.execute_entry_command(), which has no
-    progress/undo/tint wrapping at all -- a different (and lesser) execution
-    path than every other command gets.
-    """
-    from TheKeyMachine.core import connectEntries
-
-    for kind in connectEntries.SOURCES:
-        for entry in connectEntries.load_entries(kind):
-            if entry.get("type") != "entry" or not callable(entry.get("callback")):
-                continue
-            register_command(entry["id"], entry["callback"])
-
-
-def _register_slider_section(section_id: str, section) -> None:
-    prefix = section.get("slider_type")
-    package_name = section.get("_package")
-    if not prefix or not package_name:
-        raise RuntimeError("Slider section {!r} is missing its type or owning package".format(section_id))
-
-    api = importlib.import_module(package_name + ".api")
-    execute = getattr(api, "execute", None)
-    if not callable(execute):
-        raise RuntimeError("{} must expose api.execute()".format(package_name))
-    previous = _SLIDER_EXECUTORS.get(prefix)
-    if previous is not None and previous is not execute:
-        raise RuntimeError("Duplicate slider type {!r}".format(prefix))
-    _SLIDER_EXECUTORS[prefix] = execute
-
-    for mode in section.get("modes") or ():
-        mode_key = getattr(mode, "key", None)
-        if not mode_key:
-            continue
-        for value in SLIDER_BUTTON_VALUES:
-            command_name = slider_command_name(prefix, mode_key, value)
-            register_command(
-                command_name,
-                _slider_callback(execute, mode_key, value),
-                policy=OperationPolicy(progress=False, undo=False),
-            )
-
-
-def _slider_callback(execute: Callable, mode: str, value: int) -> Callable:
-    def _execute_slider_mode(session=None):
-        return execute(mode, value, session=session)
-
-    return _execute_slider_mode
-
-
-def get_command(name: str) -> Optional[Callable]:
+def has_command(name: str) -> bool:
     _discover_commands()
-    return _COMMANDS.get(name)
-
-
-def execute_command(name: str, *args, **kwargs):
-    """Execute a discovered command through its standardized operation."""
-    callback = get_command(name)
-    if callback is None:
-        from TheKeyMachine.core import connectEntries
-
-        if connectEntries.is_entry_command(name):
-            return connectEntries.execute_entry_command(name)
-        raise AttributeError("Unknown TheKeyMachine trigger command: {}".format(name))
-    return callback(*args, **kwargs)
+    return name in _COMMANDS
 
 
 def list_commands() -> list[str]:
@@ -228,15 +240,25 @@ def list_commands() -> list[str]:
     return sorted(_COMMANDS)
 
 
-def has_command(name: str) -> bool:
-    _discover_commands()
-    return name in _COMMANDS
-
-
 def operation_policy(name: str) -> OperationPolicy:
     """Return the standardized execution policy for a registered command."""
     _discover_commands()
-    return _COMMAND_POLICIES.get(name) or OperationPolicy()
+    command = _COMMANDS.get(name)
+    return command.policy if command else OperationPolicy()
+
+
+def execute_command(name: str, *args, **kwargs):
+    """Execute a discovered command through its standardized operation."""
+    _discover_commands()
+    command = _COMMANDS.get(name)
+    if command:
+        return command.dispatch(*args, **kwargs)
+
+    from TheKeyMachine.tools.custom_tools import service as connect_entries
+
+    if connect_entries.is_entry_command(name):
+        return connect_entries.execute_entry_command(name)
+    raise AttributeError("Unknown TheKeyMachine trigger command: {}".format(name))
 
 
 def command_name_for_callback(callback: Callable) -> Optional[str]:
@@ -247,9 +269,8 @@ def command_name_for_callback(callback: Callable) -> Optional[str]:
         return getattr(callback, "__name__", None)
 
     _discover_commands()
-    for command_name, dispatched in _COMMANDS.items():
-        registered = getattr(dispatched, "_tkm_registered_callback", None)
-        if callback is dispatched or callback is registered:
+    for command_name, command in _COMMANDS.items():
+        if callback is command.dispatch or callback is command.callback:
             return command_name
     return None
 
@@ -269,33 +290,17 @@ def make_command_callback(name: str, callback: Optional[Callable] = None) -> Cal
 
 def command_string(name: str, *args) -> str:
     """Return a Maya-friendly Python command string."""
-    if not name.isidentifier() or keyword.iskeyword(name):
-        raise ValueError("Trigger command is not a valid Python attribute: {}".format(name))
+    if not isinstance(name, str) or not name:
+        raise ValueError("Trigger commands require a non-empty string name")
     serialized_args = ", ".join(repr(arg) for arg in args)
-    return "import TheKeyMachine.core as TKM_CORE; TKM_CORE.trigger.{}({})".format(name, serialized_args)
-
-
-def execute_slider(prefix: str, mode: str, value: int = 0, session=None):
-    """Execute a slider through the API owned by its discovered tool package."""
-    _discover_commands()
-    execute = _SLIDER_EXECUTORS.get(prefix)
-    if execute is None:
-        raise ValueError("Unknown slider type: {}".format(prefix))
-    return execute(mode, value, session=session)
-
-
-def register_slider_mode(prefix: str, mode: str) -> None:
-    """Register command variants for an already-discovered slider type."""
-    _discover_commands()
-    execute = _SLIDER_EXECUTORS.get(prefix)
-    if execute is None:
-        raise ValueError("Unknown slider type: {}".format(prefix))
-    for value in SLIDER_BUTTON_VALUES:
-        register_command(
-            slider_command_name(prefix, mode, value),
-            _slider_callback(execute, mode, value),
-            policy=OperationPolicy(progress=False, undo=False),
+    return (
+        "from TheKeyMachine.core import trigger; "
+        "trigger.execute_command({!r}{}{})".format(
+            name,
+            ", " if serialized_args else "",
+            serialized_args,
         )
+    )
 
 
 def slider_command_name(prefix: str, mode: str, value: int = 0) -> str:
@@ -303,36 +308,5 @@ def slider_command_name(prefix: str, mode: str, value: int = 0) -> str:
     value = int(value)
     if value == 0:
         return base_command_name
-    return "{}_{}".format(base_command_name, _slider_value_suffix(value))
-
-
-def _supported_callback_kwargs(callback: Callable, kwargs):
-    if not kwargs:
-        return kwargs
-    try:
-        parameters = inspect.signature(callback).parameters.values()
-    except Exception:
-        return kwargs
-    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters):
-        return kwargs
-    supported = {
-        parameter.name
-        for parameter in parameters
-        if parameter.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-    }
-    return {key: value for key, value in kwargs.items() if key in supported}
-
-
-def _slider_value_suffix(value: int) -> str:
-    value = int(value)
-    return "neg{}".format(abs(value)) if value < 0 else str(value)
-
-
-def __getattr__(name: str):
-    if has_command(name):
-        return make_command_callback(name)
-    from TheKeyMachine.core import connectEntries
-
-    if connectEntries.is_entry_command(name):
-        return make_command_callback(name)
-    raise AttributeError(name)
+    suffix = "neg{}".format(abs(value)) if value < 0 else str(value)
+    return "{}_{}".format(base_command_name, suffix)

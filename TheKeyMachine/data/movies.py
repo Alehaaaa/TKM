@@ -1,4 +1,4 @@
-"""Tooltip-media compatibility lookup during package migration."""
+"""Tooltip media paths owned by individual tool packages."""
 
 from __future__ import annotations
 
@@ -38,7 +38,3 @@ def get_path(name: str, default=None):
 def get(name: str, default=None):
     resolved = get_path(name)
     return TooltipMedia(resolved) if resolved else default
-
-
-def __getattr__(name):
-    return get(name)

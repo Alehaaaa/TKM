@@ -1,4 +1,4 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.custom_tools import api
 
 
@@ -18,7 +18,7 @@ class CustomToolsToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "custom_tools_section",
+        "id": "custom_tools_section", "i18n_key": "custom_tools",
         "label": "Custom Tools",
         "type": "connect_entries",
         "connect_kind": "tools",

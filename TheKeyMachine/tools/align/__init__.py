@@ -2,9 +2,9 @@ from functools import partial
 
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
-import TheKeyMachine.mods.generalMod as general
+import TheKeyMachine.core.application as general
 from TheKeyMachine.tools.align import api
 
 
@@ -108,7 +108,7 @@ class AlignToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "align_tools",
+            "id": "align_tools", "i18n_key": "align_objects",
         "label": "Align Objects",
         "color": COLORS.toolbar.green.hex,
         "items": [

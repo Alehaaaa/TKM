@@ -1,7 +1,7 @@
 from maya import cmds
 from maya import OpenMaya as om
 
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.maya import selection as maya_selection
 from TheKeyMachine.tools import common as toolCommon
 WINDOW_NAME = "gimbal_fixer"
 ROTATE_ORDERS = ["xyz", "yzx", "zxy", "xzy", "yxz", "zyx"]
@@ -28,7 +28,7 @@ def gimbal_tolerance(obj):
 
 
 def selected_control():
-    selection = selectionMod.get_selected_objects()
+    selection = maya_selection.get_selected_objects()
     return selection[0] if selection else None
 
 
@@ -37,7 +37,7 @@ def convert_rotation_order(rot_order="zxy"):
         om.MGlobal.displayWarning("Wrong rotation order " + str(rot_order))
         return
 
-    selection = selectionMod.get_selected_objects()
+    selection = maya_selection.get_selected_objects()
     if not selection:
         om.MGlobal.displayWarning("Please select a control.")
         return
@@ -120,7 +120,7 @@ import math
 from maya import cmds
 from maya.api import OpenMaya as om
 
-import TheKeyMachine.core.openMayaUtils as omutils
+from TheKeyMachine.maya import maya_api
 
 
 class GimbalAnalyzer:
@@ -142,11 +142,11 @@ class GimbalAnalyzer:
         return int(abs(((mid + 90) % 180) - 90) / 90 * 100)
 
     def convert_order_string(self, order):
-        enum = omutils.rotate_order_enum(order)
+        enum = maya_api.rotate_order_enum(order)
         return enum if enum is not None else om.MEulerRotation.kZYX
 
     def get_rotation(self, obj):
-        node = omutils.mobject_from_node(obj)
+        node = maya_api.mobject_from_node(obj)
         if node is None:
             return om.MEulerRotation()
         tfm = om.MFnTransform(node)

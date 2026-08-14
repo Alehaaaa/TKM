@@ -56,31 +56,5 @@
                 "قم بتكوين إدخالات Python وMEL والإدخالات القابلة للاستدعاء دون الاعتماد على أرفف Maya"
             ]
         }
-    },
-    "custom_tools_section": {
-        "en": {
-            "label": "Custom Tools"
-        },
-        "es": {
-            "label": "Herramientas Personalizadas"
-        },
-        "fr": {
-            "label": "Outils Personnalisés"
-        },
-        "ca": {
-            "label": "Eines Personalitzades"
-        },
-        "zh": {
-            "label": "自定义工具"
-        },
-        "ja": {
-            "label": "カスタムツール"
-        },
-        "ko": {
-            "label": "사용자 지정 도구"
-        },
-        "ar": {
-            "label": "أدوات مخصصة"
-        }
     }
 }

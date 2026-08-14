@@ -2,7 +2,7 @@ from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 
 import TheKeyMachine.tools.orbit.api as orbitApi
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
-from TheKeyMachine.widgets import customWidgets as cw, util as wutil
+from TheKeyMachine.ui.widgets import customWidgets as cw, util as wutil
 
 
 ORBIT_BUTTON_SIZE = wutil.DPI(28)
@@ -167,27 +167,27 @@ class OrbitToolSection(cw.QFlatSectionWidget):
 
 class OrbitWindowMixin(FloatingToolWindowMixin):
     def _get_menu_items(self):
-        import TheKeyMachine.core.toolbox as toolbox
+        from TheKeyMachine.tools import registry
 
         return [
-            toolbox.get_tool("isolate_master"),
-            toolbox.get_tool("align_objects"),
-            toolbox.get_tool("create_tracer"),
-            toolbox.get_tool("default_object_values"),
-            toolbox.get_tool("delete_all_animation"),
-            toolbox.get_tool("select_opposite"),
-            toolbox.get_tool("opposite_copy"),
-            toolbox.get_tool("mirror"),
-            toolbox.get_tool("copy_animation"),
-            toolbox.get_tool("paste_animation"),
-            toolbox.get_tool("paste_insert_animation"),
-            toolbox.get_tool("copy_pose"),
-            toolbox.get_tool("paste_pose"),
-            toolbox.get_tool("select_hierarchy"),
-            toolbox.get_tool("link_copy"),
-            toolbox.get_tool("temp_pivot"),
-            toolbox.get_tool("ws_copy_frame", label="Copy World Space Animation"),
-            toolbox.get_tool("ws_paste_frame", label="Paste World Space Current Frame"),
+            registry.get_tool("isolate_master"),
+            registry.get_tool("align_objects"),
+            registry.get_tool("create_tracer"),
+            registry.get_tool("default_object_values"),
+            registry.get_tool("delete_all_animation"),
+            registry.get_tool("select_opposite"),
+            registry.get_tool("opposite_copy"),
+            registry.get_tool("mirror"),
+            registry.get_tool("copy_animation"),
+            registry.get_tool("paste_animation"),
+            registry.get_tool("paste_insert_animation"),
+            registry.get_tool("copy_pose"),
+            registry.get_tool("paste_pose"),
+            registry.get_tool("select_hierarchy"),
+            registry.get_tool("link_copy"),
+            registry.get_tool("temp_pivot"),
+            registry.get_tool("ws_copy_frame", label="Copy World Space Animation"),
+            registry.get_tool("ws_paste_frame", label="Paste World Space Current Frame"),
         ]
 
     def _setup_orbit_ui(self):
@@ -349,7 +349,7 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
 from TheKeyMachine.core.Qt import QtCore, QtGui  # type: ignore
 
 import TheKeyMachine.tools.orbit.api as orbitApi
-from TheKeyMachine.widgets import customDialogs
+from TheKeyMachine.ui.widgets import customDialogs
 
 class OrbitWindow(OrbitWindowMixin, customDialogs.QFlatCloseableFloatingWidget):
     initial_layout_ready = QtCore.Signal()

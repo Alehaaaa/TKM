@@ -1,7 +1,9 @@
 """Search catalog, matching, session state, and background loading."""
 
+import re
+
 from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
-from TheKeyMachine.widgets.util import BackgroundCallThread
+from TheKeyMachine.ui.widgets.util import BackgroundCallThread
 
 
 SEARCH_WINDOW_KEY = "tkm_search_window"
@@ -12,9 +14,9 @@ _POSITION_PROPERTY = "tkm_search_session_position"
 
 
 def build_command_rows():
-    from TheKeyMachine.mods import hotkeysMod
+    from TheKeyMachine.tools.hotkeys import controller as hotkeys
 
-    sections, _titles, _icons = hotkeysMod._build_command_catalog()
+    sections, _titles, _icons = hotkeys._build_command_catalog()
     rows = []
     seen = set()
     for section in sections:
@@ -31,6 +33,26 @@ def normalize_query(text):
     return " ".join(str(text).lower().split())
 
 
+def _searchable_tooltip_text(row):
+    """Return the user-facing help text attached to a command row."""
+    values = [row.get("description")]
+    tooltip = row.get("tooltip")
+    if tooltip:
+        values.extend(
+            (
+                getattr(tooltip, "title", ""),
+                getattr(tooltip, "first_line", ""),
+                tooltip,
+            )
+        )
+
+    # Most registered tooltips are Tooltip string subclasses, while custom
+    # tools can still provide small HTML/XML fragments. Removing tags makes
+    # both forms searchable by the words a user actually sees.
+    combined = " ".join(str(value) for value in values if value)
+    return normalize_query(re.sub(r"<[^>]+>", " ", combined))
+
+
 def match_rank(row, query):
     title = str(row.get("title") or "")
     command = str(row.get("command") or "")
@@ -44,6 +66,8 @@ def match_rank(row, query):
         return 2
     if query in command_lower:
         return 3
+    if query in _searchable_tooltip_text(row):
+        return 4
     return None
 
 

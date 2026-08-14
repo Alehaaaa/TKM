@@ -15,6 +15,11 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.39:
+  - bugfix: Copy and Paste Animation reliably recognizes the same control across full and short scene paths
+  - bugfix: Smart Key and other layer-aware tools read animation layers without errors
+  - changed: The codebase was restructured for clearer tool ownership and easier future development
+
 0.1.38:
   - polish: Search and Hotkeys open faster and keep menu options clear and in sync
   - bugfix: Attribute Switcher stays responsive on large multi-control changes

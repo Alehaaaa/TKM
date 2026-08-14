@@ -2,9 +2,9 @@ from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.isolate import api
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets import customWidgets as cw
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets import customWidgets as cw
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 class IsolateBookmarkRow(QtWidgets.QWidget):

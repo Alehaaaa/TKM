@@ -1,12 +1,12 @@
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.data import icons
-import TheKeyMachine.mods.settingsMod as settings
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.core import settings
+from TheKeyMachine.maya import selection
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
-from TheKeyMachine.widgets import customDialogs, customWidgets as cw, util as wutil
+from TheKeyMachine.ui.widgets import customDialogs, customWidgets as cw, util as wutil
 
 SELECTION_SETS_SETTINGS_NAMESPACE = "selection_sets_window"
 SELECTION_SETS_AUTO_TRANSPARENCY_KEY = "selection_sets_auto_transparency"
@@ -46,7 +46,7 @@ def _emit_selection_sets_window_state(is_open):
     except Exception:
         pass
     try:
-        import TheKeyMachine.core.runtimeManager as runtime
+        from TheKeyMachine.core import runtime
         runtime.get_runtime_manager().set_tool_state("selection_sets", state)
     except Exception:
         pass
@@ -156,7 +156,7 @@ def _has_any_selection_sets(controller=None):
 
 
 def _can_open_selection_set_creation(show_message=True):
-    if selectionMod.get_selected_objects():
+    if selection.get_selected_objects():
         return True
     if show_message:
         wutil.make_inViewMessage("Select something first")

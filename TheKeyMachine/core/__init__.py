@@ -1,1 +1,1 @@
-import TheKeyMachine.core.trigger as trigger
+"""Shared runtime, UI infrastructure, and Maya helpers."""

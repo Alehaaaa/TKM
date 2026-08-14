@@ -1,1 +1,1 @@
-"""Graph Tools uses standard toolbox widgets."""
+"""Graph Tools uses standard registry widgets."""

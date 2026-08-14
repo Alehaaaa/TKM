@@ -456,31 +456,5 @@
                 "تحديث الأثر تلقائيًا أثناء تغيّر الحركة المصدر"
             ]
         }
-    },
-    "tracer_tools": {
-        "en": {
-            "label": "Tracer"
-        },
-        "es": {
-            "label": "Trazador"
-        },
-        "fr": {
-            "label": "Traceur"
-        },
-        "ca": {
-            "label": "Traçador"
-        },
-        "zh": {
-            "label": "轨迹描绘器"
-        },
-        "ja": {
-            "label": "軌跡ツール"
-        },
-        "ko": {
-            "label": "궤적 도구"
-        },
-        "ar": {
-            "label": "راسم المسار"
-        }
     }
 }

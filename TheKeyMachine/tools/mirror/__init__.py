@@ -1,7 +1,7 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
-from TheKeyMachine.mods import generalMod as general
+from TheKeyMachine.core import application as general
 from TheKeyMachine.tools.mirror import api
 
 
@@ -92,7 +92,7 @@ class MirrorToolObject(ToolObject):
             ],
         },
         {
-            "id": "mirror_tools",
+            "id": "mirror_tools", "i18n_key": "mirror",
             "label": "Mirror",
             "color": COLORS.toolbar.green.hex,
             "items": [

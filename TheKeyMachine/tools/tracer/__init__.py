@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.tracer import api
 
@@ -34,7 +34,7 @@ class TracerToolObject(ToolObject):
         },
     }
     SECTION = {
-            "id": "tracer_tools",
+            "id": "tracer_tools", "i18n_key": "create_tracer",
             "label": "Tracer", "color": COLORS.toolbar.red.hex,
             "items": [
                 {"id": "create_tracer", "shortcuts": [
@@ -47,4 +47,3 @@ class TracerToolObject(ToolObject):
                 {"id": "tracer_grey"}, {"id": "tracer_red"}, {"id": "tracer_blue"}, "separator", {"id": "tracer_remove"},
             ],
         }
-

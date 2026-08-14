@@ -1,34 +1,23 @@
 def updates_available():
-    from TheKeyMachine.mods import generalMod
+    from TheKeyMachine.core import application
 
-    return bool(generalMod.config.get("INTERNET_CONNECTION", True))
+    return bool(application.config.get("INTERNET_CONNECTION", True))
 
 
 def bug_reports_available():
-    from TheKeyMachine.mods import generalMod
+    from TheKeyMachine.core import application
 
-    return bool(generalMod.config.get("BUG_REPORT", True))
+    return bool(application.config.get("BUG_REPORT", True))
 
 
 _DEBUG_MODULE_NAME = "TheKeyMachine.core.debug"
 
 
 def _load_debug_module(reload_module=False):
-    """Load the canonical debug module, replacing stale pre-move aliases."""
     import importlib
-    import sys
 
-    debug_module = sys.modules.get(_DEBUG_MODULE_NAME)
-    if debug_module is not None and (
-        getattr(debug_module, "__name__", None) != _DEBUG_MODULE_NAME
-        or getattr(debug_module, "__spec__", None) is None
-    ):
-        sys.modules.pop(_DEBUG_MODULE_NAME, None)
-        debug_module = None
-
-    if debug_module is None:
-        debug_module = importlib.import_module(_DEBUG_MODULE_NAME)
-    elif reload_module:
+    debug_module = importlib.import_module(_DEBUG_MODULE_NAME)
+    if reload_module:
         debug_module = importlib.reload(debug_module)
     return debug_module
 
@@ -58,8 +47,8 @@ def rebuild_debug_menu(menu):
 
 
 def show_menu(tool_id="TKM", *_args):
-    from TheKeyMachine.mods import shelfMod
-    return shelfMod.show_tool_menu_at_cursor(tool_id)
+    from TheKeyMachine.maya import shelf
+    return shelf.show_tool_menu_at_cursor(tool_id)
 
 
 show_menu._tkm_non_tool_action = True
@@ -72,13 +61,13 @@ def create_logo_action(parent, clickable=True):
 
 
 def toggle_toolbar(*_args):
-    from TheKeyMachine.core import toolbar
+    from TheKeyMachine.ui.widgets import toolbar
     return toolbar.toggle()
 
 
 def add_shelf_button(*_args):
-    from TheKeyMachine.mods import shelfMod
-    return shelfMod.create_main_shelf_button()
+    from TheKeyMachine.maya import shelf
+    return shelf.create_main_shelf_button()
 
 
 def reload_toolbar(*_args, anchor_widget=None):
@@ -95,56 +84,58 @@ reload_toolbar._tkm_non_tool_action = True
 
 
 def unload_toolbar(*_args):
-    from TheKeyMachine.core import toolbar
-    return toolbar.unload_current()
+    from TheKeyMachine.ui.widgets import toolbar
+
+    toolbar_instance = toolbar.get_toolbar()
+    return toolbar_instance.unload() if toolbar_instance else None
 
 
 def uninstall(*_args):
-    from TheKeyMachine.mods import generalMod as general
+    from TheKeyMachine.core import application as general
     return general.uninstall()
 
 
 def check_for_updates(*_args):
-    from TheKeyMachine.mods import updater
-    return updater.check_for_updates(force=True)
+    from TheKeyMachine.tools.update import controller as updates
+    return updates.check_for_updates(force=True)
 
 
 def set_start_with_maya(enabled, *_args):
-    from TheKeyMachine.mods import generalMod as general
+    from TheKeyMachine.core import application as general
     return general.install_userSetup(enabled)
 
 
 def starts_with_maya():
-    from TheKeyMachine.mods import generalMod as general
+    from TheKeyMachine.core import application as general
     return bool(general.check_userSetup())
 
 
 def set_tooltips_enabled(enabled, *_args):
-    from TheKeyMachine.mods import settingsMod
-    from TheKeyMachine.mods.tooltipsMod import QFlatTooltipManager
+    from TheKeyMachine.core import settings
+    from TheKeyMachine.ui.tooltips import QFlatTooltipManager
 
     enabled = bool(enabled)
-    settingsMod.set_setting("show_tooltips", enabled)
+    settings.set_setting("show_tooltips", enabled)
     QFlatTooltipManager.enabled = enabled
     if not enabled:
         QFlatTooltipManager.hide()
 
 
 def tooltips_enabled():
-    from TheKeyMachine.mods import settingsMod
-    return bool(settingsMod.get_setting("show_tooltips", True))
+    from TheKeyMachine.core import settings
+    return bool(settings.get_setting("show_tooltips", True))
 
 
 def dock_toolbar(*_args, **target):
-    from TheKeyMachine.core import toolbar
+    from TheKeyMachine.ui.widgets import toolbar
     instance = toolbar.get_toolbar()
     if instance:
         return instance.dock_to_ui(**target)
 
 
 def _docking_position():
-    from TheKeyMachine.core import toolbar
-    from TheKeyMachine.mods import settingsMod as settings
+    from TheKeyMachine.ui.widgets import toolbar
+    from TheKeyMachine.core import settings
 
     instance = toolbar.get_toolbar()
     position = (
@@ -181,7 +172,8 @@ def set_dock_layout(layout, *_args):
 
 
 def dock_orientation_choices():
-    from TheKeyMachine.core import i18n, toolbar
+    from TheKeyMachine.core import i18n
+    from TheKeyMachine.ui.widgets import toolbar
 
     return [
         {
@@ -197,7 +189,8 @@ def dock_orientation_choices():
 
 
 def dock_layout_choices():
-    from TheKeyMachine.core import i18n, toolbar
+    from TheKeyMachine.core import i18n
+    from TheKeyMachine.ui.widgets import toolbar
 
     return [
         {
@@ -213,45 +206,51 @@ def dock_layout_choices():
 
 
 def set_alignment(alignment_name, *_args):
-    from TheKeyMachine.mods import settingsMod as settings
-    settings.set_setting("toolbar_icon_alignment", alignment_name)
+    from TheKeyMachine.core import settings
+    from TheKeyMachine.ui import toolbar_modes
+    alignment_name = toolbar_modes.normalize(alignment_name)
+    settings.set_setting(toolbar_modes.MAIN_ALIGNMENT_SETTING, alignment_name)
 
-    from TheKeyMachine.core import toolWidgets, toolbar
+    from TheKeyMachine.ui.widgets import toolbar
+    from TheKeyMachine.ui.widgets import toolbar_widgets
     instance = toolbar.get_toolbar()
     if instance:
-        return toolWidgets.set_main_toolbar_icon_alignment(instance, alignment_name)
+        return toolbar_widgets.set_main_toolbar_icon_alignment(instance, alignment_name)
 
 
 def get_alignment(*_args):
-    from TheKeyMachine.mods import settingsMod as settings
-    return settings.get_setting("toolbar_icon_alignment", "Center")
+    from TheKeyMachine.core import settings
+    from TheKeyMachine.ui import toolbar_modes
+    return toolbar_modes.normalize(
+        settings.get_setting(
+            toolbar_modes.MAIN_ALIGNMENT_SETTING,
+            toolbar_modes.DEFAULT_ALIGNMENT,
+        )
+    )
 
 
 def alignment_choices():
-    from TheKeyMachine.core import i18n
+    from TheKeyMachine.ui import toolbar_modes
 
     return [
         {
-            "label": i18n.tr("align_{}_label".format(value.lower()), "Align {}".format(value)),
+            "label": label,
             "value": value,
-            "description": i18n.tr(
-                "align_{}_desc".format(value.lower()),
-                "Align toolbar icons to the {}.".format(value.lower()),
-            ),
+            "description": description,
         }
-        for value in ("Left", "Center", "Right")
+        for value, label, description in toolbar_modes.translated_options()
     ]
 
 
 
 def open_url(url, *_args):
-    from TheKeyMachine.mods import generalMod
-    return generalMod.open_url(url)
+    from TheKeyMachine.core import application
+    return application.open_url(url)
 
 
 def show_hotkeys(*_args):
-    from TheKeyMachine.mods import hotkeysMod
-    return hotkeysMod.show_hotkeys_window()
+    from TheKeyMachine.tools.hotkeys import controller as hotkeys
+    return hotkeys.show_hotkeys_window()
 
 
 def show_workspaces(*_args):
@@ -275,17 +274,17 @@ def show_donate(*_args):
 
 
 def show_bug_report(*_args):
-    from TheKeyMachine.mods import reportMod
-    return reportMod.bug_report_window()
+    from TheKeyMachine.tools.bug_report import controller as bug_reporting
+    return bug_reporting.bug_report_window()
 
 
 def populate_languages_menu(menu, *_args):
     """Populate (or repopulate) the Languages submenu in place.
 
     Used as the ``dynamic_menu`` builder for the nested "System" submenu in
-    the TKM logo's mega-menu; ``toolMenus.build_main_system_menu`` reuses the
-    same ``toolMenus.populate_languages_menu`` implementation for the
+    the TKM logo's mega-menu; ``toolbar_menus.build_main_system_menu`` reuses the
+    same ``toolbar_menus.populate_languages_menu`` implementation for the
     standalone System button, so the two surfaces can never drift apart.
     """
-    from TheKeyMachine.core import toolMenus
-    return toolMenus.populate_languages_menu(menu)
+    from TheKeyMachine.ui.widgets import toolbar_menus
+    return toolbar_menus.populate_languages_menu(menu)

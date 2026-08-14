@@ -1,13 +1,13 @@
 from maya import cmds
 
-import TheKeyMachine.mods.selectionMod as selectionMod
-import TheKeyMachine.widgets.util as wutil
-from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.maya import selection
+import TheKeyMachine.ui.widgets.util as wutil
+from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.data import icons
 
 
 def create_tracer(*_args):
-    selected_objects = selectionMod.get_selected_objects()
+    selected_objects = selection.get_selected_objects()
     if len(selected_objects) != 1:
         return wutil.make_inViewMessage("Select only one object")
     if cmds.objExists("Tracer"):

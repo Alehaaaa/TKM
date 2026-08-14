@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-from TheKeyMachine.mods import generalMod as general
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
+from TheKeyMachine.core import application as general
 from TheKeyMachine.tools.isolate import api
 
 
@@ -39,7 +39,7 @@ class IsolateToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "isolate_tools",
+        "id": "isolate_tools", "i18n_key": "isolate_master",
         "label": "Isolate",
         "items": [
             {
@@ -53,4 +53,3 @@ class IsolateToolObject(ToolObject):
             {"id": "isolate_help"},
         ],
     }
-

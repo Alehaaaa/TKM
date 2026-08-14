@@ -6,7 +6,7 @@ environment) to show the menu. The committed fallback is always off.
 
 import os
 import shutil
-import xml.etree.ElementTree as ElementTree
+from xml.etree import ElementTree
 
 from TheKeyMachine.data.colors import COLORS
 
@@ -72,7 +72,7 @@ def print_debug_summary(*_args):
     """Print a small runtime summary to Maya's Script Editor."""
     from maya import cmds
 
-    from TheKeyMachine.core import toolbar
+    from TheKeyMachine.ui.widgets import toolbar
 
     instance = toolbar.get_toolbar()
     summary = {
@@ -265,7 +265,7 @@ def _write_slider_worldspace_icon(color, output_path, size=int(_SLIDER_BUTTON_CA
     QSvgGenerator pipeline used for the slider text icons.
     """
     from TheKeyMachine.core.Qt import QtCore, QtGui, QtSvg
-    from TheKeyMachine.widgets import util as wutil
+    from TheKeyMachine.ui.widgets import util as wutil
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     generator = QtSvg.QSvgGenerator()
@@ -342,7 +342,7 @@ def _clear_slider_button_icons(icons_dir, variants):
 def _refresh_live_slider_icons():
     """Clear Qt image caches and refresh every live slider presentation."""
     from TheKeyMachine.core.Qt import QtGui, QtWidgets
-    from TheKeyMachine.widgets.sliderWidget import QFlatSliderWidget
+    from TheKeyMachine.ui.widgets.sliderWidget import QFlatSliderWidget
 
     QtGui.QPixmapCache.clear()
     application = QtWidgets.QApplication.instance()
@@ -460,12 +460,12 @@ def export_slider_text_icons(*_args):
     """Replace each text-slider namespace with fresh SVG exports."""
     from maya import cmds
 
-    from TheKeyMachine.core import toolbox
+    from TheKeyMachine.tools import registry
     from TheKeyMachine.data import icons
 
     exported = []
     failed = []
-    for section in toolbox.get_section_definitions().values():
+    for section in registry.get_section_definitions().values():
         if section.get("type") != "slider":
             continue
 
@@ -514,13 +514,13 @@ def export_slider_button_icons(*_args):
     """Export one shared square-button asset set per slider type."""
     from maya import cmds
 
-    from TheKeyMachine.core import toolbox
+    from TheKeyMachine.tools import registry
     from TheKeyMachine.data import icons
-    from TheKeyMachine.widgets.sliderWidget import SLIDER_FRAME_BUTTON_COLOR
+    from TheKeyMachine.ui.widgets.sliderWidget import SLIDER_FRAME_BUTTON_COLOR
 
     exported = []
     failed = []
-    for section in toolbox.get_section_definitions().values():
+    for section in registry.get_section_definitions().values():
         if section.get("type") != "slider":
             continue
 

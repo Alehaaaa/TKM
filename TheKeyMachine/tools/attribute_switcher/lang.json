@@ -65,32 +65,6 @@
             ]
         }
     },
-    "attribute_tools": {
-        "en": {
-            "label": "Attribute Switcher"
-        },
-        "es": {
-            "label": "Selector de Atributos"
-        },
-        "fr": {
-            "label": "Sélecteur d'Attributs"
-        },
-        "ca": {
-            "label": "Selector d'Atributs"
-        },
-        "zh": {
-            "label": "属性切换器"
-        },
-        "ja": {
-            "label": "アトリビュートスイッチャー"
-        },
-        "ko": {
-            "label": "속성 전환기"
-        },
-        "ar": {
-            "label": "محول الخصائص"
-        }
-    },
     "rotate_order_section": {
         "en": {
             "label": "Switch Speed"

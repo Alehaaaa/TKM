@@ -1,6 +1,6 @@
 from functools import partial
 
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.tkm_menu import api
 
 

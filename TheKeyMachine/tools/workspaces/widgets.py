@@ -26,14 +26,14 @@ is no separate "Apply" step, matching the toolbar's own right-click pinning
 menu.
 
 The Color Group column reorders whole color runs (see
-``toolbox.group_sections_by_color`` / ``controller.get_color_groups``) as one
+``registry.group_sections_by_color`` / ``controller.get_color_groups``) as one
 atomic unit rather than individual sections, matching how the toolbar itself
 now visually clusters sections by color. A group spanning more than one
 section shows every member's tools in the Tools column, one small header per
 section.
 
 Workspace/Toolbar/Position/Alignment/Color Group rows are styled like the
-Hotkeys window's section list (mods/hotkeysMod.py): alternating row shading
+Hotkeys window's section list (tools/hotkeys/controller.py): alternating row shading
 with a flat highlight fill on selection, rather than the list's native
 selection palette. Tools is the one exception: rows there are checkable
 buttons that fill with the section's color when pinned.
@@ -45,9 +45,9 @@ from maya import cmds
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 from TheKeyMachine.data import icons
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets import customWidgets as cw
-from TheKeyMachine.widgets.util import DPI, is_valid_widget
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets import customWidgets as cw
+from TheKeyMachine.ui.widgets.util import DPI, is_valid_widget
 
 from TheKeyMachine.tools.workspaces import controller
 
@@ -80,7 +80,7 @@ def _swatch_icon(hex_color, size=13):
 
 def _text_badge_qicon(text, size=16):
     """Short-text icon for tools with no real icon, exactly like Hotkeys'
-    ``_text_badge_qicon`` (mods/hotkeysMod.py) -- the same ``text`` field
+    ``_text_badge_qicon`` (tools/hotkeys/controller.py) -- the same ``text`` field
     tool/slider-mode definitions already carry for this purpose.
     """
     dim = max(1, int(DPI(size)))
@@ -230,7 +230,7 @@ class _Column(QtWidgets.QWidget):
 
 
 class HotkeySelectableItemWidget(QtWidgets.QWidget):
-    """Mirrors ``mods.hotkeysMod.HotkeySelectableItemWidget``: alternating
+    """Mirrors ``tools.hotkeys.controller.HotkeySelectableItemWidget``: alternating
     row shading with a flat highlight fill (plus a focus rect) on selection,
     painted by the widget itself instead of the list's native selection.
     """
@@ -459,12 +459,13 @@ class ToolPinButton(QtWidgets.QToolButton):
 
 class WorkspacesWindow(customDialogs.QFlatDialog):
     def __init__(self, parent=None):
-        from TheKeyMachine.core import i18n, toolbox
+        from TheKeyMachine.core import i18n
+        from TheKeyMachine.tools import registry
 
         super().__init__(parent=parent)
         # Reuses the workspaces_window tool's own lang.json label -- same
         # word already translated for its menu entry.
-        workspaces_label = toolbox.get_tool("workspaces_window").get("label") or "Workspaces"
+        workspaces_label = registry.get_tool("workspaces_window").get("label") or "Workspaces"
         self.setWindowTitle(workspaces_label)
         self.resize(DPI(1080), DPI(620))
         self.setMinimumSize(DPI(1000), DPI(540))
@@ -624,10 +625,11 @@ class WorkspacesWindow(customDialogs.QFlatDialog):
             cmds.warning("Could not export workspaces: {}".format(exc))
 
     def _restore_defaults(self, *_args):
-        from TheKeyMachine.core import i18n, toolWorkspaces
+        from TheKeyMachine.core import i18n
+        from TheKeyMachine.core import workspaces
 
         ws_id = controller.get_active_workspace()
-        ws_name = toolWorkspaces.get_active_workspace_name()
+        ws_name = workspaces.get_active_workspace_name()
         clicked = customDialogs.QFlatConfirmDialog.question(
             self,
             i18n.tr("restore_defaults", "Restore Defaults"),

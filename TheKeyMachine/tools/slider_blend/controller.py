@@ -4,24 +4,30 @@ TheKeyMachine - Curve-level Slider Operations
 Operations that work directly on animation curves and their keys.
 """
 
-import maya.cmds as cmds
 import random
+
+from maya import cmds
 
 try:
     from maya.api import OpenMaya as om
 except ImportError:
     om = None
 
-import TheKeyMachine.core.openMayaUtils as omutils
-from TheKeyMachine.core import curveFitting
-from TheKeyMachine.mods.sliders import mode_values, utils
+from TheKeyMachine.data.colors import COLORS
+from TheKeyMachine.maya import animation, maya_api
+from TheKeyMachine.tools.sliders import (
+    curve_writer,
+    math as slider_math,
+    session as slider_session,
+    targeting,
+)
 
 
 def _ensure_curve_value_cache(session, curve, keys):
     """Caches original values for ALL keyframes on a curve for stable dragging."""
     if curve not in session.cache.original_keyframes:
         cached = None
-        curve_fn = omutils.anim_curve_fn(curve)
+        curve_fn = maya_api.anim_curve_fn(curve)
         if curve_fn is not None:
             try:
                 num_keys = curve_fn.numKeys() if callable(curve_fn.numKeys) else curve_fn.numKeys
@@ -40,7 +46,7 @@ def _ensure_curve_value_cache(session, curve, keys):
     # evaluated drag-start value so every value slider treats that virtual key
     # exactly like an existing selected key, then creates it through _apply_value.
     original_data = session.cache.original_keyframes[curve]
-    curve_fn = omutils.anim_curve_fn(curve)
+    curve_fn = maya_api.anim_curve_fn(curve)
     for time in keys or []:
         time = float(time)
         if time in original_data:
@@ -48,7 +54,7 @@ def _ensure_curve_value_cache(session, curve, keys):
         value = None
         if curve_fn is not None and om is not None:
             try:
-                value = curve_fn.evaluate(om.MTime(time, omutils.time_unit()))
+                value = curve_fn.evaluate(om.MTime(time, maya_api.time_unit()))
             except Exception:
                 pass
         if value is None:
@@ -70,10 +76,10 @@ def _cached_value_at_time(session, curve, time):
     original_data = _cached_curve_values(session, curve, [time])
     if time in original_data:
         return original_data[time]
-    curve_fn = omutils.anim_curve_fn(curve)
+    curve_fn = maya_api.anim_curve_fn(curve)
     if curve_fn is not None and om is not None:
         try:
-            value = curve_fn.evaluate(om.MTime(float(time), omutils.time_unit()))
+            value = curve_fn.evaluate(om.MTime(float(time), maya_api.time_unit()))
             original_data[time] = value
             return value
         except Exception:
@@ -98,7 +104,7 @@ def _cached_value_at_time(session, curve, time):
 
 
 def _neighbor_values(curve, time, target_times_set, all_keys, original_data):
-    p_time, n_time = utils.get_block_neighbors(time, target_times_set, all_keys)
+    p_time, n_time = slider_math.block_neighbors(time, target_times_set, all_keys)
     orig_val = original_data.get(time, original_data.get(p_time, 0.0))
     p_val = original_data.get(p_time, orig_val)
     n_val = original_data.get(n_time, orig_val)
@@ -107,9 +113,9 @@ def _neighbor_values(curve, time, target_times_set, all_keys, original_data):
 
 def _apply_value(session, curve, time, value):
     if getattr(session, "preview", False):
-        mode_values.apply_curve_value(session, curve, time, value, create=True, allow_cmds_fallback=False)
+        curve_writer.write_curve_value(session, curve, time, value, create=True, allow_command_fallback=False)
         return
-    mode_values.apply_curve_value(session, curve, time, value, create=True, allow_cmds_fallback=True)
+    curve_writer.write_curve_value(session, curve, time, value, create=True, allow_command_fallback=True)
 
 
 def _curve_default_value(curve):
@@ -134,7 +140,7 @@ def _curve_default_value(curve):
 
 def apply_smooth(session, curves=None, factor=1.0):
     """Smooths the curve values toward the average of their block-aware neighbors."""
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
         if not keys:
@@ -163,7 +169,7 @@ def apply_smooth(session, curves=None, factor=1.0):
 def apply_rough(session, curves=None, factor=1.0):
     """Push keys away from the neighbor trend only when that trend has motion."""
     factor = 1.0 + max(0.0, factor)
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
         if not keys:
@@ -191,7 +197,7 @@ def apply_rough(session, curves=None, factor=1.0):
 
 def apply_noise(session, curves=None, factor=1.0):
     """Add stable random noise scaled to each curve's value range."""
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
         if not keys:
@@ -215,7 +221,7 @@ def apply_noise(session, curves=None, factor=1.0):
 
 def apply_wave(session, curves=None, factor=1.0):
     """Offset consecutive keys with an alternating positive/negative wave."""
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     for curve in resolved_curves:
         keys = sorted(set(target_times_per_curve.get(curve, [])))
         if not keys:
@@ -228,7 +234,7 @@ def apply_wave(session, curves=None, factor=1.0):
 
         value_range = max(target_values) - min(target_values)
         if abs(value_range) <= 0.000001:
-            max_amplitude = omutils.anim_curve_attr_value_to_curve_value(curve, 1.0)
+            max_amplitude = maya_api.anim_curve_attr_value_to_curve_value(curve, 1.0)
         else:
             max_amplitude = value_range * 3.0
         amplitude = max_amplitude * max(0.0, min(1.0, factor))
@@ -249,7 +255,7 @@ def apply_ease(session, curve_list=None, factor=0.5):
     def ease_out(t, p=3):
         return 1 - pow(1 - t, p)
 
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
         if not keys or len(keys) < 2:
@@ -277,15 +283,15 @@ def apply_ease(session, curve_list=None, factor=0.5):
                     f = (factor - 0.5) * 2
                     e_pos = ease_out(t_pos, p=f * 3 + 1)
 
-                target = utils.lerp(first_v, last_v, e_pos)
+                target = slider_math.lerp(first_v, last_v, e_pos)
                 orig_v = original_data[t]
-                new_v = utils.lerp(orig_v, target, f)
+                new_v = slider_math.lerp(orig_v, target, f)
                 _apply_value(session, curve, t, new_v)
 
 
 def apply_scale(session, curves=None, factor=1.0):
     """Scales keyframe values relative to their average."""
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
         if not keys:
@@ -305,7 +311,7 @@ def apply_scale(session, curves=None, factor=1.0):
 
 
 def apply_scale_from_pivot(session, curves=None, pivot_getter=None, factor=1.0):
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
         if not keys:
@@ -329,7 +335,7 @@ def apply_scale_from_pivot(session, curves=None, pivot_getter=None, factor=1.0):
 def apply_pull_push(session, curves=None, amount=0.0):
     """Pulls keys toward the interpolated neighbor line or pushes them away."""
     factor = 1.0 + amount
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     for curve in resolved_curves:
         keys = target_times_per_curve.get(curve, [])
         if not keys:
@@ -374,7 +380,7 @@ def _implicit_connect_block(direction, current_time, all_keys):
 
 def apply_connect_neighbors(session, curves, amount):
     """Shift the affected block vertically so its edge connects to a neighbor."""
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     direction = -1 if amount < 0 else 1
     factor = min(1.0, max(0.0, abs(amount)))
     current_time = float(cmds.currentTime(query=True))
@@ -395,10 +401,10 @@ def apply_connect_neighbors(session, curves, amount):
             target_times_set = set(keys)
             if direction < 0:
                 anchor_time = min(keys)
-                neighbor_time, _right_time = utils.get_block_neighbors(anchor_time, target_times_set, all_keys)
+                neighbor_time, _right_time = slider_math.block_neighbors(anchor_time, target_times_set, all_keys)
             else:
                 anchor_time = max(keys)
-                _left_time, neighbor_time = utils.get_block_neighbors(anchor_time, target_times_set, all_keys)
+                _left_time, neighbor_time = slider_math.block_neighbors(anchor_time, target_times_set, all_keys)
         else:
             keys, neighbor_time = _implicit_connect_block(direction, current_time, all_keys)
             anchor_time = current_time
@@ -428,7 +434,7 @@ def apply_connect_neighbors(session, curves, amount):
 
 def apply_gap_stitcher(session, curves, amount):
     """Close a boundary gap and feather its offset across the selected block."""
-    resolved_curves, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, target_times_per_curve = targeting.curves_for_session(session)
     direction = -1 if amount < 0.0 else 1
     blend = min(1.0, max(0.0, abs(float(amount))))
     affected_times = []
@@ -440,7 +446,7 @@ def apply_gap_stitcher(session, curves, amount):
         all_keys = sorted(original_data)
         selected_set = set(keys)
         anchor = keys[0] if direction < 0 else keys[-1]
-        previous_time, next_time = utils.get_block_neighbors(anchor, selected_set, all_keys)
+        previous_time, next_time = slider_math.block_neighbors(anchor, selected_set, all_keys)
         neighbor = previous_time if direction < 0 else next_time
         if neighbor is None or neighbor == anchor:
             continue
@@ -468,7 +474,7 @@ def apply_gap_stitcher(session, curves, amount):
 
 def apply_simplify(session, curves, amount):
     """Progressively remove keys and refit each surviving cubic span."""
-    resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, affected_map = targeting.curves_for_session(session)
     amount = min(1.0, max(0.0, float(amount)))
     for curve in resolved_curves:
         keys = sorted(set(float(time) for time in affected_map.get(curve, [])))
@@ -478,7 +484,7 @@ def apply_simplify(session, curves, amount):
         priority_cache_key = (curve, "simplify_detail_priority", tuple(keys))
         priority_data = session.cache.auxiliary.get(priority_cache_key)
         if priority_data is None:
-            priority_data = curveFitting.detail_priority_with_scores(curve, keys)
+            priority_data = animation.detail_priority_with_scores(curve, keys)
             session.cache.auxiliary[priority_cache_key] = priority_data
         priority, detail_scores = priority_data
 
@@ -501,13 +507,13 @@ def apply_simplify(session, curves, amount):
         kept_set.update(priority[: max(0, keep_count - 2)])
         kept = sorted(kept_set)
         removed = [time for time in keys if time not in kept_set]
-        shape = curveFitting.capture([curve], kept)
+        shape = animation.capture_curve_shape([curve], kept)
         if session.preview and session.anim_change is not None:
-            curve_fn = omutils.anim_curve_fn(curve)
+            curve_fn = maya_api.anim_curve_fn(curve)
             # Remove backwards so API key indices remain stable.
             for time in reversed(removed):
-                omutils.remove_anim_curve_key(curve_fn, time, change=session.anim_change)
-            curveFitting.apply(
+                maya_api.remove_anim_curve_key(curve_fn, time, change=session.anim_change)
+            animation.apply_curve_shape(
                 shape,
                 set_values=False,
                 change=session.anim_change,
@@ -516,12 +522,12 @@ def apply_simplify(session, curves, amount):
         else:
             for time in removed:
                 cmds.cutKey(curve, time=(time, time), clear=True)
-            curveFitting.apply(shape, set_values=False, preserve_tangent_types=True)
+            animation.apply_curve_shape(shape, set_values=False, preserve_tangent_types=True)
 
 
 def apply_bake(session, curves, amount):
     """Progressively insert keys sampled from the untouched curve tendency."""
-    resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, affected_map = targeting.curves_for_session(session)
     amount = min(1.0, max(0.0, float(amount)))
     if amount <= 0.0:
         return
@@ -529,7 +535,7 @@ def apply_bake(session, curves, amount):
         keys = sorted(set(float(time) for time in affected_map.get(curve, [])))
         if len(keys) < 2:
             continue
-        full_frame_targets = curveFitting.sample_times(keys[0], keys[-1], 1)
+        full_frame_targets = animation.sample_times(keys[0], keys[-1], 1)
         cache_key = (curve, "bake_tendency", tuple(full_frame_targets))
         bake_data = session.cache.auxiliary.get(cache_key)
         if bake_data is None:
@@ -544,7 +550,7 @@ def apply_bake(session, curves, amount):
                 )
             )
             missing = [frame for frame in full_frame_targets if float(frame) not in existing]
-            captured = curveFitting.capture([curve], full_frame_targets).get(curve, {})
+            captured = animation.capture_curve_shape([curve], full_frame_targets).get(curve, {})
             bake_data = (missing, captured)
             session.cache.auxiliary[cache_key] = bake_data
         missing, captured = bake_data
@@ -564,7 +570,7 @@ def apply_bake(session, curves, amount):
         target_shape = {
             curve: {frame: captured[frame] for frame in targets if frame in captured}
         }
-        curveFitting.apply(
+        animation.apply_curve_shape(
             target_shape,
             change=session.anim_change if session.preview else None,
         )
@@ -600,7 +606,7 @@ def apply_scale_frame(session, curves, factor):
 
 
 def apply_scale_neighbor_left(session, curves, factor):
-    _, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    _, target_times_per_curve = targeting.curves_for_session(session)
 
     def _pivot(curve, keys, selected):
         original_data = session.cache.original_keyframes.get(curve, {})
@@ -614,7 +620,7 @@ def apply_scale_neighbor_left(session, curves, factor):
 
 
 def apply_scale_neighbor_right(session, curves, factor):
-    _, target_times_per_curve = utils.resolve_curve_targets_for_session(session)
+    _, target_times_per_curve = targeting.curves_for_session(session)
 
     def _pivot(curve, keys, selected):
         original_data = session.cache.original_keyframes.get(curve, {})
@@ -632,11 +638,6 @@ TheKeyMachine - Time Operations
 Slider modes that modify keyframe timing (offsetting and staggering).
 """
 
-import maya.cmds as cmds
-from TheKeyMachine.core import curveFitting
-from TheKeyMachine.mods.sliders import mode_values, utils
-
-
 def _curve_owner(curve):
     try:
         plugs = cmds.listConnections(
@@ -651,13 +652,13 @@ def _curve_owner(curve):
 
 def apply_time_offset(session, curves=None, amount=0.0):
     """Shift animation shape in time while preserving every destination key time."""
-    resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, affected_map = targeting.curves_for_session(session)
     for curve in resolved_curves:
         keys = affected_map.get(curve, [])
         if not keys:
             continue
         source_times = [float(destination_time) - float(amount) for destination_time in keys]
-        source_shape = curveFitting.capture([curve], source_times).get(curve, {})
+        source_shape = animation.capture_curve_shape([curve], source_times).get(curve, {})
         for destination_time, source_time in zip(keys, source_times):
             # Positive drag moves the visible shape later, so each fixed key
             # samples an earlier point from the untouched source curve.
@@ -665,9 +666,9 @@ def apply_time_offset(session, curves=None, amount=0.0):
             source_value = source_sample.get("value")
             if source_value is None:
                 continue
-            mode_values.apply_curve_value(
+            curve_writer.write_curve_value(
                 session, curve, destination_time, source_value,
-                create=False, allow_cmds_fallback=True,
+                create=False, allow_command_fallback=True,
             )
             if session.preview or len(keys) < 2:
                 continue
@@ -694,7 +695,7 @@ def apply_time_offset(session, curves=None, amount=0.0):
 
 def apply_time_stagger(session, curves=None, amount=0.0):
     """Stagger whole-object key timing while keeping each object's channels together."""
-    resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, affected_map = targeting.curves_for_session(session)
     if not resolved_curves:
         return
         
@@ -726,10 +727,6 @@ def apply_time_stagger(session, curves=None, amount=0.0):
         for j, new_t in updated.items():
             keys[j] = new_t
 
-from TheKeyMachine.data.colors import COLORS
-from TheKeyMachine.mods.sliders import utils
-
-
 CURVE_OPERATIONS = {
     "connect_neighbors": (apply_connect_neighbors, "percent"),
     "ease_in_out": (apply_ease, "ease"),
@@ -759,7 +756,7 @@ def create_session(mode_key):
     mode = _find_mode(mode_key)
     if mode is None:
         raise ValueError("Unknown Blend slider mode: {}".format(mode_key))
-    return utils.SliderSession(
+    return slider_session.SliderSession(
         mode_key, title=mode.label,
         description=mode.description,
         tooltip=mode.tooltip,

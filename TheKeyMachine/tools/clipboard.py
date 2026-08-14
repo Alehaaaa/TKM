@@ -27,7 +27,7 @@ from typing import Any, Optional
 # ---------------------------------------------------------------------------
 # Registry of known clipboard slots
 # Each entry maps a logical key -> (relative sub-folder, filename)
-# The root folder is provided by generalMod at call-time to avoid circular imports.
+# The root folder is provided by application at call-time to avoid circular imports.
 # ---------------------------------------------------------------------------
 
 _SLOTS: dict = {
@@ -50,7 +50,7 @@ _MEMORY: dict = {}
 
 def _root() -> str:
     """Return the user data root folder (lazy import to avoid circular deps)."""
-    from TheKeyMachine.mods import generalMod as general
+    from TheKeyMachine.core import application as general
     return general.USER_FOLDER_PATH
 
 
@@ -104,7 +104,7 @@ def load(slot: str, missing_warning: Optional[str] = None) -> Optional[Any]:
     if not os.path.exists(file_path):
         if missing_warning:
             try:
-                import maya.cmds as cmds
+                from maya import cmds
                 cmds.warning(missing_warning)
             except ImportError:
                 pass
@@ -120,7 +120,7 @@ def load_raw(file_path: str, missing_warning: Optional[str] = None) -> Optional[
     if not os.path.exists(file_path):
         if missing_warning:
             try:
-                import maya.cmds as cmds
+                from maya import cmds
                 cmds.warning(missing_warning)
             except ImportError:
                 pass
@@ -169,8 +169,8 @@ def export_dialog(slot: str, caption: str, operation=None) -> Optional[str]:
 
     Returns the exported path, or None if the user cancelled / no data exists.
     """
-    import maya.cmds as cmds
-    from TheKeyMachine.widgets import util as wutil
+    from maya import cmds
+    from TheKeyMachine.ui.widgets import util as wutil
 
     file_path = _resolve(slot)
     if not os.path.exists(file_path):
@@ -194,8 +194,8 @@ def import_dialog(slot: str, caption: str, operation=None) -> Optional[Any]:
 
     Returns the loaded data, or None if the user cancelled / the file was invalid.
     """
-    import maya.cmds as cmds
-    from TheKeyMachine.widgets import util as wutil
+    from maya import cmds
+    from TheKeyMachine.ui.widgets import util as wutil
 
     result = cmds.fileDialog2(fileMode=1, caption=caption, fileFilter="JSON Files (*.json)")
     if not result:

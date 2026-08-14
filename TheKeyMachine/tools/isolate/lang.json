@@ -206,31 +206,5 @@
                 "فتح توثيق أداة العزل"
             ]
         }
-    },
-    "isolate_tools": {
-        "en": {
-            "label": "Isolate"
-        },
-        "es": {
-            "label": "Aislar"
-        },
-        "fr": {
-            "label": "Isoler"
-        },
-        "ca": {
-            "label": "Aïllar"
-        },
-        "zh": {
-            "label": "隔离"
-        },
-        "ja": {
-            "label": "アイソレート"
-        },
-        "ko": {
-            "label": "격리"
-        },
-        "ar": {
-            "label": "عزل"
-        }
     }
 }

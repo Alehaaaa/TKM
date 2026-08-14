@@ -5,8 +5,8 @@ from functools import partial
 from TheKeyMachine.core.Qt import QtCore
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools.animation_recovery import controller
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 def _enable_prompt(anchor_widget):
@@ -85,4 +85,3 @@ def cleanup():
     except Exception:
         pass
     controller.shutdown()
-

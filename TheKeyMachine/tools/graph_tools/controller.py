@@ -1,9 +1,9 @@
 from maya import cmds, mel
 
-from TheKeyMachine.core import animation_context
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.maya import animation
+from TheKeyMachine.maya import selection as maya_selection
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 def _operation(tool_id, label):
@@ -11,13 +11,13 @@ def _operation(tool_id, label):
 
 
 def match_keys(*_args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if len(curves) < 2:
         return wutil.make_inViewMessage("Select at least two animation curves")
-    source_values = animation_context.key_data(curves[-1], target_info)
+    source_values = target_info.key_data(curves[-1])
     if not source_values:
         return wutil.make_inViewMessage("No source keys found")
     source_times = {time for time, _value in source_values}
@@ -26,7 +26,7 @@ def match_keys(*_args):
         for curve in curves[:-1]:
             if operation.cancelled:
                 return
-            extra_frames = set(animation_context.key_times(curve, target_info)) - source_times
+            extra_frames = set(target_info.key_times(curve)) - source_times
             if extra_frames:
                 cmds.cutKey(
                     curve,
@@ -39,43 +39,43 @@ def match_keys(*_args):
 
 
 def flip_curves(*_args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not curves:
         return wutil.make_inViewMessage("Select at least one animation curve")
     flipped = False
     with _operation("graph_flip", "Flip Curves"):
         for curve in curves:
-            key_data = animation_context.key_data(curve, target_info)
+            key_data = target_info.key_data(curve)
             if not key_data:
                 continue
             values = [value for _time, value in key_data]
             pivot = (min(values) + max(values)) / 2.0
-            time_context = target_info.get("time_context")
+            time_context = target_info.time
             if time_context and time_context.mode == "graph_editor_keys":
                 for key_time, value in key_data:
                     cmds.keyframe(curve, edit=True, time=(key_time, key_time), valueChange=pivot * 2.0 - value)
             else:
-                kwargs = animation_context.selection_time_kwargs(time_context)
+                kwargs = animation.selection_time_kwargs(time_context)
                 cmds.scaleKey(curve, valueScale=-1, valuePivot=pivot, **kwargs)
             flipped = True
     if not flipped:
-        return animation_context.notify_empty("keys")
+        return animation.notify_empty("keys")
 
 
 def overlap_curves(direction, *_args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not curves:
         return wutil.make_inViewMessage("Select animation curves, channels, or animated objects")
     direction = 1 if direction >= 0 else -1
     tool_id = "graph_overlap_forward" if direction > 0 else "graph_overlap_backward"
     label = "Overlap Forward" if direction > 0 else "Overlap Backward"
-    kwargs = animation_context.selection_time_kwargs(target_info.get("time_context"))
+    kwargs = animation.selection_time_kwargs(target_info.time)
     with _operation(tool_id, label):
         for index, curve in enumerate(curves):
             cmds.keyframe(curve, edit=True, includeUpperBound=True, relative=True,
@@ -83,15 +83,15 @@ def overlap_curves(direction, *_args):
 
 
 def isolate_curves(*_args):
-    if not selectionMod.get_graph_editor_outliner_items():
+    if not maya_selection.get_graph_editor_outliner_items():
         return wutil.make_inViewMessage("Select curves in the Graph Editor")
     mel.eval("isolateAnimCurve true {} {};".format(
-        selectionMod.GRAPH_EDITOR_OUTLINER, selectionMod.GRAPH_EDITOR
+        maya_selection.GRAPH_EDITOR_OUTLINER, maya_selection.GRAPH_EDITOR
     ))
 
 
 def toggle_mute(*_args):
-    curves = selectionMod.get_graph_editor_outliner_items()
+    curves = maya_selection.get_graph_editor_outliner_items()
     if not curves:
         return wutil.make_inViewMessage("Select curves in the Graph Editor")
     with _operation("graph_toggle_mute", "Mute Curves"):
@@ -103,12 +103,18 @@ def toggle_mute(*_args):
 
 
 def toggle_lock(*_args):
-    items = selectionMod.get_graph_editor_outliner_items()
+    items = maya_selection.get_graph_editor_outliner_items()
     if not items:
         return wutil.make_inViewMessage("Select curves in the Graph Editor")
     with _operation("graph_toggle_lock", "Lock Curves"):
         for item in items:
-            curves = [item] if selectionMod.is_anim_curve(item) else selectionMod.get_anim_curves_for_nodes([item], include_shapes=True)
+            curves = (
+                [item]
+                if maya_selection.is_anim_curve(item)
+                else maya_selection.get_anim_curves_for_nodes(
+                    [item], include_shapes=True
+                )
+            )
             for curve in curves or ():
                 plug = curve + ".ktv"
                 cmds.setAttr(plug, lock=not cmds.getAttr(plug, lock=True))
@@ -118,7 +124,7 @@ def select_objects_from_selected_curves(*_args):
     curves = cmds.keyframe(query=True, name=True, selected=True) or []
     if not curves:
         return wutil.make_inViewMessage("Select keys in the Graph Editor")
-    selection = selectionMod.get_selected_objects()
+    selection = maya_selection.get_selected_objects()
     namespace = selection[0].split(":", 1)[0] if selection and ":" in selection[0] else None
     objects = set()
     for curve in curves:

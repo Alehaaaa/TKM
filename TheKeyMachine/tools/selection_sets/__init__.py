@@ -1,6 +1,6 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.selection_sets import api
 
 
@@ -44,7 +44,7 @@ class SelectionSetsToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "selection_set_tools",
+        "id": "selection_set_tools", "i18n_key": "selection_sets",
         "label": "Selection Sets",
         "items": [
             {"id": "selection_sets", "shortcuts": [

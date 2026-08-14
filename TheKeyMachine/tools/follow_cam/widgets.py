@@ -1,1 +1,1 @@
-"""Follow Cam uses the standard toolbox widgets."""
+"""Follow Cam uses the standard registry widgets."""

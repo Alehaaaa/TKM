@@ -1,20 +1,20 @@
 """Custom-tool manifest access."""
 
-from TheKeyMachine.core import connectEntries
-from TheKeyMachine.mods import generalMod
+from TheKeyMachine.tools.custom_tools import service as connect_entries
+from TheKeyMachine.core import application
 
 
 KIND = "tools"
 
 
 def entries(notify=True):
-    return connectEntries.load_entries(KIND, notify=notify)
+    return connect_entries.load_entries(KIND, notify=notify)
 
 
 def source_spec():
-    return connectEntries.source_spec(KIND)
+    return connect_entries.source_spec(KIND)
 
 
 def open_config():
     spec = source_spec()
-    return generalMod.open_file(spec["folder"], spec["file"])
+    return application.open_file(spec["folder"], spec["file"])

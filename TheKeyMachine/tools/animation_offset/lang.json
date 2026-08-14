@@ -56,31 +56,5 @@
                 "حدد المتحكمات المتحركة، فعّل الأداة، ثم حوّلها باستخدام أدوات التحكم في Maya"
             ]
         }
-    },
-    "animation_offset_tools": {
-        "en": {
-            "label": "Animation Offset"
-        },
-        "es": {
-            "label": "Desfase de Animación"
-        },
-        "fr": {
-            "label": "Décalage d'Animation"
-        },
-        "ca": {
-            "label": "Desfase d'Animació"
-        },
-        "zh": {
-            "label": "动画偏移"
-        },
-        "ja": {
-            "label": "アニメーションオフセット"
-        },
-        "ko": {
-            "label": "애니메이션 오프셋"
-        },
-        "ar": {
-            "label": "إزاحة الحركة"
-        }
     }
 }

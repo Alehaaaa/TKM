@@ -17,7 +17,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-import maya.cmds as cmds # type: ignore
+from maya import cmds # type: ignore
 
 from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 
@@ -26,12 +26,13 @@ from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 #                                             Loading necessary modules from TheKeyMachine                                    #
 # -----------------------------------------------------------------------------------------------------------------------------
 
-import TheKeyMachine.core.toolMenus as toolMenus
-import TheKeyMachine.core.toolWidgets as toolWidgets
+from TheKeyMachine.ui.widgets import toolbar_menus
+from TheKeyMachine.ui.widgets import toolbar_widgets
+from TheKeyMachine.ui import toolbar_modes
 
-from TheKeyMachine.widgets import customWidgets as cw  # type: ignore
-from TheKeyMachine.widgets import util as wutil  # type: ignore
-import TheKeyMachine.mods.settingsMod as settings  # type: ignore
+from TheKeyMachine.ui.widgets import customWidgets as cw  # type: ignore
+from TheKeyMachine.ui.widgets import util as wutil  # type: ignore
+from TheKeyMachine.core import settings  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.controller as graphToolbarController  # type: ignore
 
 
@@ -42,8 +43,11 @@ _GRAPH_TOOLBAR_WIDGET = None
 
 
 def _graph_toolbar_alignment():
-    align_str = settings.get_setting("graph_toolbar_alignment", "Center")
-    return toolMenus.toolbar_alignment_value(align_str)
+    align_str = settings.get_setting(
+        toolbar_modes.GRAPH_ALIGNMENT_SETTING,
+        toolbar_modes.DEFAULT_ALIGNMENT,
+    )
+    return toolbar_modes.alignment_value(align_str)
 
 
 def _graph_editor_control_widget():
@@ -180,7 +184,10 @@ def _place_graph_toolbar_widget(toolbar_widget, dock_position=None):
 
 def applyCustomGraphAlignment(alignment_label=None):
     if alignment_label:
-        settings.set_setting("graph_toolbar_alignment", alignment_label)
+        settings.set_setting(
+            toolbar_modes.GRAPH_ALIGNMENT_SETTING,
+            toolbar_modes.normalize(alignment_label),
+        )
 
     toolbar_widget = getCustomGraphWidget()
     if not toolbar_widget:
@@ -191,14 +198,11 @@ def applyCustomGraphAlignment(alignment_label=None):
         return False
 
     try:
-        if hasattr(layout, "setSingleLine"):
-            current_alignment = settings.get_setting("graph_toolbar_alignment", "Center")
-            layout.setSingleLine(current_alignment == "Single Line")
-        layout.setAlignment(_graph_toolbar_alignment())
-        layout.invalidate()
-        toolbar_widget.updateGeometry()
-        toolbar_widget.update()
-        toolbar_widget._update_height()
+        current_alignment = settings.get_setting(
+            toolbar_modes.GRAPH_ALIGNMENT_SETTING,
+            toolbar_modes.DEFAULT_ALIGNMENT,
+        )
+        toolbar_modes.apply_to(toolbar_widget, current_alignment)
         return True
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return False
@@ -291,7 +295,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         )
 
     def _build_graph_settings_menu(_menu, source_widget=None):
-        return toolMenus.build_graph_settings_menu(
+        return toolbar_menus.build_graph_settings_menu(
             source_widget or flow_qw,
             dock_options=graphToolbarController.DOCK_OPTIONS,
             dock_setting=graphToolbarController.GRAPH_TOOLBAR_DOCK_SETTING,
@@ -300,8 +304,8 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
             apply_alignment_fn=applyCustomGraphAlignment,
         )
 
-    toolWidgets.populate_graph_toolbar_from_layout(new_section, _build_graph_settings_menu, toolbar_widget=flow_qw)
-    toolWidgets.bind_toolbar_pinning_context(flow_qw)
+    toolbar_widgets.populate_graph_toolbar_from_layout(new_section, _build_graph_settings_menu, toolbar_widget=flow_qw)
+    toolbar_widgets.bind_toolbar_pinning_context(flow_qw)
 
     _place_graph_toolbar_widget(flow_qw)
     QtCore.QTimer.singleShot(50, flow_qw._update_height)

@@ -2,8 +2,8 @@
 
 from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 
-import TheKeyMachine.core.runtimeManager as runtime
-from TheKeyMachine.mods import settingsMod as settings
+from TheKeyMachine.core import runtime
+from TheKeyMachine.core import settings
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools.search.controller import (
@@ -12,7 +12,7 @@ from TheKeyMachine.tools.search.controller import (
     SEARCH_WINDOW_KEY,
 )
 from TheKeyMachine.tools.search import controller
-from TheKeyMachine.widgets import customWidgets as cw, util as wutil
+from TheKeyMachine.ui.widgets import customWidgets as cw, util as wutil
 
 
 __all__ = [

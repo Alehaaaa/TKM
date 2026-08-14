@@ -1,1 +1,1 @@
-"""Align uses the standard toolbox widgets."""
+"""Align uses the standard registry widgets."""

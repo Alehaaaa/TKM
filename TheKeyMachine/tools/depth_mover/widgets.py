@@ -1,1 +1,1 @@
-"""Depth Mover uses the standard toolbox widgets."""
+"""Depth Mover uses the standard registry widgets."""

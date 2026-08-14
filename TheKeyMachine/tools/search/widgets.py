@@ -4,7 +4,7 @@ from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 from TheKeyMachine.core import trigger
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 class SearchLineEdit(QtWidgets.QLineEdit):
@@ -108,6 +108,7 @@ class SearchResultItemWidget(QtWidgets.QWidget):
 
     def __init__(self, row, row_index=0, parent=None):
         super().__init__(parent)
+        self.row = row
         self._selected = False
         self.setObjectName("SearchResultItemWidget")
         self.setProperty("rowSelected", False)
@@ -150,7 +151,7 @@ class SearchResultItemWidget(QtWidgets.QWidget):
                 self.check_box.setFixedSize(wutil.DPI(15), wutil.DPI(18))
             self.check_box.setFocusPolicy(QtCore.Qt.NoFocus)
             # Dispatch by name instead of caching a direct callable -- see the
-            # same fix in mods/hotkeysMod.py's HotkeyCommandItemWidget for why.
+            # same fix in tools/hotkeys/controller.py's HotkeyCommandItemWidget for why.
             command_name = row.get("command")
             can_run = bool(command_name) and trigger.has_command(command_name)
             toolCommon.connect_tool_control(
@@ -204,20 +205,35 @@ class SearchResultItemWidget(QtWidgets.QWidget):
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
-import TheKeyMachine.core.trigger as trigger
+from TheKeyMachine.core import trigger
 from TheKeyMachine.data import icons
-from TheKeyMachine.mods import settingsMod as settings
+from TheKeyMachine.core import settings
 from TheKeyMachine.tools.search import controller
 from TheKeyMachine.tools.search.controller import (
     SEARCH_SETTINGS_NAMESPACE,
     SEARCH_TEXT_KEY,
     SearchCatalogThread,
 )
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets import util as wutil
+from TheKeyMachine.ui.tooltips import QFlatTooltip
+
+
+class SearchTooltipPreview(QFlatTooltip):
+    """The standard tooltip card, sized for Search's wider side panel."""
+
+    MIN_WIDTH = 300
+    # Leave room beside the card for the scroll area's vertical bar. Media is
+    # contained to this width by QFlatTooltip before a GIF starts playing.
+    MAX_WIDTH = 300
+    MEDIA_MAX_WIDTH = None
+    MEDIA_FIT_WIDTH = True
 
 
 class SearchDialog(customDialogs.QFlatFloatingWidget):
+    DEFAULT_WIDTH = 720
+    EXPANDED_HEIGHT = 450
+
     def __init__(self, parent=None):
         super().__init__(popup=True, closeButton=False, parent=parent or wutil.get_maya_qt())
         # A real Qt popup owns focus while open and consumes the first click
@@ -230,12 +246,12 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         self.setProperty("tkm_floating_widget", True)
         self.setObjectName("search_window")
         self.setWindowTitle("Search")
-        self._default_width = wutil.DPI(620)
+        self._default_width = wutil.DPI(self.DEFAULT_WIDTH)
         self._collapsed_height = wutil.DPI(68)
-        self._expanded_height = int(round(self._default_width / 1.5))
+        self._expanded_height = wutil.DPI(self.EXPANDED_HEIGHT)
         self._results_expanded = False
         self.resize(self._default_width, self._collapsed_height)
-        self.setMinimumWidth(wutil.DPI(440))
+        self.setMinimumWidth(wutil.DPI(560))
         self.setMinimumHeight(self._collapsed_height)
         self.setMaximumHeight(self._collapsed_height)
         # Search uses the same frameless draggable shell as Attribute Switcher.
@@ -255,6 +271,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         self._result_build_timer = QtCore.QTimer(self)
         self._result_build_timer.setSingleShot(True)
         self._result_build_timer.timeout.connect(self._populate_next_result_batch)
+        self._tooltip_preview = None
 
         layout = self.mainLayout
         layout.setContentsMargins(wutil.DPI(8), wutil.DPI(8), wutil.DPI(8), wutil.DPI(8))
@@ -296,7 +313,12 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         results_panel_layout.setContentsMargins(0, 0, 0, 0)
         results_panel_layout.setSpacing(wutil.DPI(6))
 
-        self.results = QtWidgets.QListWidget(self.results_panel)
+        results_row = QtWidgets.QWidget(self.results_panel)
+        results_row_layout = QtWidgets.QHBoxLayout(results_row)
+        results_row_layout.setContentsMargins(0, 0, 0, 0)
+        results_row_layout.setSpacing(wutil.DPI(6))
+
+        self.results = QtWidgets.QListWidget()
         self.results.setObjectName("SearchToolResults")
         self.results.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.results.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
@@ -307,7 +329,25 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
             "#SearchToolResults::item{margin:0px;padding:0px;border:none;}"
             "#SearchToolResults::item:selected{margin:0px;padding:0px;border:none;background:transparent;}"
         )
-        results_panel_layout.addWidget(self.results, 1)
+        results_row_layout.addWidget(self.results, 1)
+
+        self.tooltip_scroll = QtWidgets.QScrollArea()
+        self.tooltip_scroll.setObjectName("SearchTooltipPreview")
+        self.tooltip_scroll.setWidgetResizable(False)
+        self.tooltip_scroll.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
+        self.tooltip_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.tooltip_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.tooltip_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        scrollbar_width = self.style().pixelMetric(QtWidgets.QStyle.PM_ScrollBarExtent)
+        self.tooltip_scroll.setFixedWidth(
+            wutil.DPI(SearchTooltipPreview.MAX_WIDTH) + max(0, scrollbar_width)
+        )
+        self.tooltip_scroll.setStyleSheet(
+            "#SearchTooltipPreview{background:transparent;border:none;}"
+            "#SearchTooltipPreview>QWidget>QWidget{background:transparent;}"
+        )
+        results_row_layout.addWidget(self.tooltip_scroll)
+        results_panel_layout.addWidget(results_row, 1)
 
         self.hint_widget = QtWidgets.QWidget(self.results_panel)
         hint_layout = QtWidgets.QHBoxLayout(self.hint_widget)
@@ -368,6 +408,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         )
         if not str(text).strip():
             self.results.clear()
+            self._clear_tooltip_preview()
             self.search_input.set_completion("")
             self.search_input.set_result_icon()
             self._set_results_visible(False)
@@ -375,6 +416,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
 
         if not self._catalog_ready:
             self.results.clear()
+            self._clear_tooltip_preview()
             self.search_input.set_completion("")
             self.search_input.set_result_icon()
             self._set_results_visible(False)
@@ -383,6 +425,7 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         matches = controller.ranked_command_rows(self._rows, text)
 
         self.results.clear()
+        self._clear_tooltip_preview()
         self._pending_result_rows = matches
         self._set_results_visible(True)
         self._populate_next_result_batch()
@@ -448,10 +491,12 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
         if current is None:
             self.search_input.set_completion("")
             self.search_input.set_result_icon()
+            self._clear_tooltip_preview()
             return
         current_widget = self.results.itemWidget(current)
         if current_widget:
             current_widget.set_selected(True)
+            self._show_tooltip_preview(current_widget.row)
         title = current.data(QtCore.Qt.UserRole + 1) or ""
         completion = controller.completion_suffix(self.search_input.text(), title)
         if completion:
@@ -464,6 +509,43 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
             current.data(QtCore.Qt.UserRole + 2),
             current.data(QtCore.Qt.UserRole + 3) or title,
         )
+
+    def _clear_tooltip_preview(self):
+        preview = self.tooltip_scroll.takeWidget()
+        self._tooltip_preview = None
+        if preview is not None:
+            preview.deleteLater()
+
+    def _show_tooltip_preview(self, row):
+        if not row:
+            self._clear_tooltip_preview()
+            return
+
+        preview = SearchTooltipPreview(
+            text=str(row.get("title") or row.get("command") or ""),
+            icon=row.get("icon"),
+            shortcuts=row.get("shortcuts") or [],
+            description=row.get("description"),
+            tooltip=row.get("tooltip"),
+            command_id=row.get("command"),
+            command_label=row.get("command_label") or row.get("title"),
+            command_icon=row.get("command_icon") or row.get("icon"),
+            parent=self.tooltip_scroll,
+            embedded=True,
+        )
+        preview.bg_frame.setFixedWidth(wutil.DPI(preview.MAX_WIDTH))
+
+        self.tooltip_scroll.setUpdatesEnabled(False)
+        try:
+            previous = self.tooltip_scroll.takeWidget()
+            self.tooltip_scroll.setWidget(preview)
+            self._tooltip_preview = preview
+            if previous is not None:
+                previous.deleteLater()
+        finally:
+            self.tooltip_scroll.setUpdatesEnabled(True)
+        self.tooltip_scroll.update()
+        self.tooltip_scroll.verticalScrollBar().setValue(0)
 
     def _select_result_item(self, item):
         self.results.setCurrentItem(item)
@@ -527,15 +609,24 @@ class SearchDialog(customDialogs.QFlatFloatingWidget):
     def _move_to_default_position(self):
         parent = self.parentWidget() or wutil.get_maya_qt()
         geometry = parent.frameGeometry() if parent else QtGui.QGuiApplication.primaryScreen().availableGeometry()
+        reference_height = self._expanded_height
+        target_center_y = geometry.y() + (geometry.height() * 0.45)
+        target_y = target_center_y - (reference_height / 2.0)
         self.move(
             int(geometry.x() + (geometry.width() - self.width()) / 2),
-            int(geometry.y() + (geometry.height() / 3.0)),
+            int(target_y),
         )
         self._clamp_to_screen()
 
     def restore_default_position(self):
         self._restoring_position = True
         try:
+            target_height = (
+                self._expanded_height
+                if self._results_expanded
+                else self._collapsed_height
+            )
+            self.resize(self._default_width, target_height)
             self._move_to_default_position()
         finally:
             self._restoring_position = False

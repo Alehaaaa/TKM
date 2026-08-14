@@ -1,7 +1,7 @@
 """State adapters for settings that affect TKM globally."""
 
-import TheKeyMachine.core.runtimeManager as runtime
-import TheKeyMachine.mods.settingsMod as settings
+from TheKeyMachine.core import runtime
+from TheKeyMachine.core import settings
 
 
 def _attribute_switcher_api():
@@ -10,10 +10,10 @@ def _attribute_switcher_api():
     return api
 
 
-def _graph_toolbar_api():
-    from TheKeyMachine.tools.graph_toolbar import api
+def _graph_toolbar_controller():
+    from TheKeyMachine.tools.graph_toolbar import controller
 
-    return api
+    return controller
 
 
 def is_euler_filter_enabled():
@@ -48,11 +48,11 @@ def toggle_overshoot_sliders():
 
 
 def is_graph_toolbar_enabled():
-    return _graph_toolbar_api().get_graph_toolbar_checkbox_state()
+    return _graph_toolbar_controller().get_graph_toolbar_checkbox_state()
 
 
 def set_graph_toolbar_enabled(enabled):
-    return _graph_toolbar_api().set_graph_toolbar_enabled(bool(enabled), apply=True)
+    return _graph_toolbar_controller().set_graph_toolbar_enabled(bool(enabled), apply=True)
 
 
 def toggle_graph_toolbar():
@@ -74,10 +74,10 @@ def get_setting_spec(setting_id):
             "changed_signal": manager.overshootChanged,
         }
     if setting_id == "custom_graph":
-        graph_api = _graph_toolbar_api()
+        graph_controller = _graph_toolbar_controller()
         return {
             "get_checked": is_graph_toolbar_enabled,
             "set_checked": set_graph_toolbar_enabled,
-            "changed_signal": graph_api.custom_graph_bus.graph_toolbar_enabled_changed,
+            "changed_signal": graph_controller.custom_graph_bus.graph_toolbar_enabled_changed,
         }
     raise KeyError("Unknown global setting: {}".format(setting_id))

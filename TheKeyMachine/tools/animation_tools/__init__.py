@@ -1,4 +1,4 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.animation_tools import api
 
@@ -29,8 +29,8 @@ class AnimationToolsToolObject(ToolObject):
         "apply_smart_euler_filter": {"type": "tool", "label": "Apply Smart Euler Filter", "icon": "euler_filter", "callback": api.apply_smart_euler_filter, "tooltip": TOOLTIPS["euler_filter"]},
         "snap": {"type": "tool", "label": "Snap Keys", "text": "SpK", "icon": "snap", "callback": api.snap_keyframes, "tooltip": TOOLTIPS["snap"]},
         "clear_animation": {"type": "tool", "label": "Clear Animation", "icon": "delete_animation", "callback": api.clear_animation_keys, "tooltip": TOOLTIPS["clear_animation"]},
-        "delete_all_animation": {"type": "tool", "label": "Clear Animation", "icon": "delete_animation", "callback": api.clear_animation_keys, "tooltip": TOOLTIPS["clear_animation"]},
-        "delete_static_animation": {"type": "tool", "label": "Remove Static Anim Curves", "icon": "delete_animation", "callback": api.remove_static_anim_curves, "tooltip": TOOLTIPS["remove_static"]},
+        "delete_all_animation": {"type": "tool", "label": "Clear Animation", "icon": "delete_animation", "callback": api.clear_animation_keys, "tooltip": TOOLTIPS["clear_animation"], "i18n_key": "clear_animation"},
+        "delete_static_animation": {"type": "tool", "label": "Remove Static Anim Curves", "icon": "delete_animation", "callback": api.remove_static_anim_curves, "tooltip": TOOLTIPS["remove_static"], "i18n_key": "remove_static_anim_curves"},
         "crop_animation": {"type": "tool", "label": "Crop Animation", "icon": "isolate", "callback": api.crop_animation, "tooltip": TOOLTIPS["crop"]},
         "remove_redundant_keys": {
             "type": "tool", "label": "Remove Redundant Keys", "icon": "remove_redundant_keys",

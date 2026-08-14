@@ -8,13 +8,13 @@ try:
 except ImportError:
     om = None
 
-import TheKeyMachine.core.runtimeManager as runtime
-import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.core import runtime
+from TheKeyMachine.maya import selection as maya_selection
+from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import clipboard
 from TheKeyMachine.tools import common as toolCommon
-import TheKeyMachine.widgets.util as wutil
+import TheKeyMachine.ui.widgets.util as wutil
 
 
 TEMP_PIVOT_NODE = "Temp_Pivot"
@@ -177,7 +177,7 @@ def _emit_temp_pivot_state_changed():
 
 def _playback_slider():
     try:
-        return selectionMod.get_playback_slider()
+        return maya_selection.get_playback_slider()
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         return None
 
@@ -464,7 +464,7 @@ def _on_selection_changed(*args):
     if _session["suppress"] or not _session["active"]:
         return
 
-    current_selection = selectionMod.get_selected_objects(long=False, ordered=True)
+    current_selection = maya_selection.get_selected_objects(long=False, ordered=True)
     if current_selection == [TEMP_PIVOT_NODE]:
         return
 
@@ -565,7 +565,7 @@ def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False
     if is_temp_pivot_active():
         _end_session(restore_selection=True)
 
-    selection = selectionMod.get_selected_objects(long=True, ordered=True)
+    selection = maya_selection.get_selected_objects(long=True, ordered=True)
     selection = [node for node in selection if cmds.objExists(node) and node != TEMP_PIVOT_NODE]
     if not selection:
         return wutil.make_inViewMessage("Select at least one object")
@@ -642,7 +642,7 @@ def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False
             pass
         _clear_time_slider_connection()
         _reset_session_state(selection if "selection" in locals() else None)
-        import TheKeyMachine.mods.reportMod as report
+        import TheKeyMachine.tools.bug_report.controller as report
 
         report.report_detected_exception(exc, context="temp pivot")
     finally:

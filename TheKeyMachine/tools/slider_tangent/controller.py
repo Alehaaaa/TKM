@@ -4,9 +4,14 @@ TheKeyMachine - Tangent Operations
 Proper tangent blending and manipulation logic.
 """
 
-import maya.cmds as cmds
-from TheKeyMachine.core import curveFitting
-from TheKeyMachine.mods.sliders import utils
+from maya import cmds
+from TheKeyMachine.data.colors import COLORS
+from TheKeyMachine.maya import animation
+from TheKeyMachine.tools.sliders import (
+    math as slider_math,
+    session as slider_session,
+    targeting,
+)
 
 
 def _ensure_target_keys(session, curve, keys):
@@ -123,7 +128,7 @@ def _bounce_targets(curve, keys, original_tangents, angle_factor=1.3):
         if not any(abs(key_time - float(time)) < 0.0001 for key_time in key_times):
             continue
         original = original_tangents.get(time, {})
-        in_angle, out_angle = curveFitting.bouncy_tangent_angles(curve, time, angle_adjustment_factor=angle_factor)
+        in_angle, out_angle = animation.bouncy_tangent_angles(curve, time, angle_adjustment_factor=angle_factor)
         targets[float(time)] = {
             "inAngle": in_angle,
             "outAngle": out_angle,
@@ -176,7 +181,7 @@ def _maya_type_targets(curve, keys, tangent_type):
 
 def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1.0):
     """Blend toward a contextual target, or its vertical mirror on the left."""
-    resolved_curves, affected_map = utils.resolve_curve_targets_for_session(session)
+    resolved_curves, affected_map = targeting.curves_for_session(session)
 
     for curve in resolved_curves:
         keys = affected_map.get(curve, [])
@@ -227,14 +232,14 @@ def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1
             direction = 1.0 if factor >= 0.0 else -1.0
             target_in_angle = float(target["inAngle"]) * direction
             target_out_angle = float(target["outAngle"]) * direction
-            new_in_a = utils.lerp(orig["inAngle"], target_in_angle, blend)
-            new_out_a = utils.lerp(orig["outAngle"], target_out_angle, blend)
+            new_in_a = slider_math.lerp(orig["inAngle"], target_in_angle, blend)
+            new_out_a = slider_math.lerp(orig["outAngle"], target_out_angle, blend)
             tangent_kwargs = {"inAngle": new_in_a, "outAngle": new_out_a}
 
             # Blend weights if curve is weighted
             if is_weighted:
-                tangent_kwargs["inWeight"] = utils.lerp(orig["inWeight"], target["inWeight"], blend)
-                tangent_kwargs["outWeight"] = utils.lerp(orig["outWeight"], target["outWeight"], blend)
+                tangent_kwargs["inWeight"] = slider_math.lerp(orig["inWeight"], target["inWeight"], blend)
+                tangent_kwargs["outWeight"] = slider_math.lerp(orig["outWeight"], target["outWeight"], blend)
             cmds.keyTangent(curve, edit=True, time=(time, time), absolute=True, lock=False, **tangent_kwargs)
             # Fixed/manual tangents can retain both their type and blended
             # rotation. Maya necessarily promotes automatic tangents to fixed
@@ -245,10 +250,6 @@ def apply_tangent_type_blend(session, curves=None, tangent_type="auto", factor=1
                     inTangentType=orig["inType"], outTangentType=orig["outType"],
                 )
             cmds.keyTangent(curve, edit=True, time=(time, time), lock=orig["locked"])
-
-from TheKeyMachine.data.colors import COLORS
-from TheKeyMachine.mods.sliders import utils
-
 
 TANGENT_TYPES = {
     "blend_best_guess": "auto",
@@ -273,7 +274,7 @@ def create_session(mode_key):
     mode = _find_mode(mode_key)
     if mode is None:
         raise ValueError("Unknown Tangent slider mode: {}".format(mode_key))
-    return utils.SliderSession(
+    return slider_session.SliderSession(
         mode_key, title=mode.label,
         description=mode.description,
         tooltip=mode.tooltip,

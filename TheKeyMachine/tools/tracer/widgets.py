@@ -1,1 +1,1 @@
-"""Tracer uses the standard toolbox widgets."""
+"""Tracer uses the standard registry widgets."""

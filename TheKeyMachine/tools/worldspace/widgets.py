@@ -1,1 +1,1 @@
-"""Worldspace uses the standard toolbox widgets."""
+"""Worldspace uses the standard registry widgets."""

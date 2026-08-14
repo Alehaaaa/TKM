@@ -1,11 +1,11 @@
 from maya import cmds
 
-from TheKeyMachine.core import animation_context
-from TheKeyMachine.core import openMayaUtils as omutils
-from TheKeyMachine.mods import settingsMod as settings
+from TheKeyMachine.maya import animation
+from TheKeyMachine.maya import maya_api
+from TheKeyMachine.core import settings
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import timeline as timelineWidgets
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import timeline as timelineWidgets
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 def nudge_value(default=1):
@@ -29,13 +29,13 @@ def _scene_curves():
 
 
 def _target_curves():
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         default_mode="all_animation",
         include_channels=True,
         include_shapes=True,
         resolve_curves=True,
     )
-    return _unique(target_info["selected_curves"])
+    return _unique(target_info.curves)
 
 
 def _move_current_time(offset):
@@ -62,7 +62,7 @@ def _edit_keyframe_batches(operation, items, batch_size=100, **kwargs):
 def nudge_all_keys(direction):
     curves = _target_curves()
     if not curves:
-        return animation_context.notify_empty("animation", "nudge")
+        return animation.notify_empty("animation", "nudge")
     offset = nudge_value() * int(direction)
     if not offset:
         return
@@ -87,7 +87,7 @@ def nudge_all_keys(direction):
 def nudge_scene(direction):
     curves = _scene_curves()
     if not curves:
-        return animation_context.notify_empty("animation in the scene")
+        return animation.notify_empty("animation in the scene")
     offset = nudge_value() * int(direction)
     if not offset:
         return
@@ -115,7 +115,7 @@ def shift_inbetween(direction, scene=False):
         return
     curves = _scene_curves() if scene else None
     if scene and not curves:
-        return animation_context.notify_empty("animation in the scene")
+        return animation.notify_empty("animation in the scene")
     current = cmds.currentTime(query=True)
     with toolCommon.tool_operation(
         tool_id="nudge_inbetween",
@@ -152,22 +152,22 @@ def nudge_range(direction):
     if not offset:
         return
     current_time = cmds.currentTime(query=True)
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         default_mode="all_animation",
         include_channels=True,
         include_shapes=True,
         resolve_curves=True,
     )
-    target_curves = target_info["selected_curves"]
-    time_context = target_info["time_context"]
+    target_curves = target_info.curves
+    time_context = target_info.time
     start_frame, end_frame = time_context.timerange
 
     with toolCommon.tool_operation(
         tool_id="nudge_range", label="Nudge Keys", undo=True
     ) as operation:
-        if target_info["has_graph_keys"]:
+        if target_info.has_graph_keys:
             curve_times = {}
-            for curve, key_time in target_info.get("selected_keyframes") or []:
+            for curve, key_time in target_info.selected_keys or []:
                 curve_times.setdefault(curve, []).append(float(key_time))
             operation.set_total(len(curve_times))
             for curve, key_times in curve_times.items():
@@ -191,7 +191,7 @@ def nudge_range(direction):
                 return
             operation.set_total(len(curves))
             with timelineWidgets.suspend_time_slider_updates():
-                edited = omutils.move_anim_curve_keys(
+                edited = maya_api.move_anim_curve_keys(
                     curves,
                     start_frame,
                     end_frame,

@@ -20,16 +20,18 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 Nothing here keeps its own copy of pin state: tool pins are always read from
 and written to the same ``QFlatSectionWidget`` objects the real toolbar uses
-(see ``core.toolWidgets``/``core.toolbar``), so the editor and the toolbar's
+(see ``widgets.toolbar_widgets``/``widgets.toolbar``), so the editor and the toolbar's
 own right-click pinning menu can never drift apart.
 """
 
 from TheKeyMachine.data.colors import COLORS
-import TheKeyMachine.core.toolbox as toolbox
-import TheKeyMachine.core.toolWidgets as toolWidgets
-import TheKeyMachine.core.toolWorkspaces as toolWorkspaces
-import TheKeyMachine.mods.settingsMod as settings
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.tools import registry
+from TheKeyMachine.ui.widgets import toolbar_widgets
+from TheKeyMachine.ui import toolbar_modes
+from TheKeyMachine.core import workspaces
+from TheKeyMachine.tools.graph_toolbar import controller as graph_toolbar
+from TheKeyMachine.core import settings
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 TOOLBARS = (
@@ -37,14 +39,7 @@ TOOLBARS = (
     {"id": "graph", "label": "Graph Editor Toolbar"},
 )
 
-ALIGNMENT_OPTIONS = (
-    ("Left", "Align Left", "Align toolbar icons to the left."),
-    ("Center", "Align Center", "Align toolbar icons to the center."),
-    ("Right", "Align Right", "Align toolbar icons to the right."),
-    ("Single Line", "Single Line", "Keep every section on a single row without wrapping."),
-)
-
-WORKSPACES_NAMESPACE = toolWorkspaces.WORKSPACES_NAMESPACE
+WORKSPACES_NAMESPACE = workspaces.WORKSPACES_NAMESPACE
 
 
 def get_toolbars():
@@ -63,42 +58,14 @@ def get_toolbars():
 
 
 def get_alignment_options():
-    """Live-translated ``ALIGNMENT_OPTIONS`` for the Alignment column.
-
-    Left/Center/Right reuse the exact ids already translated for the
-    toolbar's own Alignment choice menu (``tkm_menu.api.alignment_choices``);
-    "Single Line" is unique to the Workspaces editor and gets its own id.
-    """
-    from TheKeyMachine.core import i18n
-
-    options = [
-        (
-            value,
-            i18n.tr("align_{}_label".format(value.lower()), "Align {}".format(value)),
-            i18n.tr(
-                "align_{}_desc".format(value.lower()),
-                "Align toolbar icons to the {}.".format(value.lower()),
-            ),
-        )
-        for value in ("Left", "Center", "Right")
-    ]
-    options.append(
-        (
-            "Single Line",
-            i18n.tr("workspaces_align_single_line", "Single Line"),
-            i18n.tr(
-                "workspaces_align_single_line_desc",
-                "Keep every section on a single row without wrapping.",
-            ),
-        )
-    )
-    return options
+    """Return the same live-translated modes used by every toolbar menu."""
+    return toolbar_modes.translated_options()
 
 
 # --------------------------------------------------------------------------- live widgets
 
 def get_toolbar_instance():
-    from TheKeyMachine.core import toolbar as toolbar_module
+    from TheKeyMachine.ui.widgets import toolbar as toolbar_module
 
     return toolbar_module.get_toolbar()
 
@@ -106,9 +73,7 @@ def get_toolbar_instance():
 def get_toolbar_widget(toolbar_id):
     """Return the live ``QFlatToolbar`` for *toolbar_id*, or ``None`` if not open."""
     if toolbar_id == "graph":
-        from TheKeyMachine.tools.graph_toolbar import api as graph_api
-
-        widget = graph_api.get_widget()
+        widget = graph_toolbar.get_widget()
     else:
         inst = get_toolbar_instance()
         widget = getattr(inst, "main_toolbar_widget", None)
@@ -122,11 +87,9 @@ def get_position_options(toolbar_id):
     from TheKeyMachine.core import i18n
 
     if toolbar_id == "graph":
-        from TheKeyMachine.tools.graph_toolbar import api as graph_api
-
-        # graph_api.DOCK_OPTIONS is the raw (id, English label, English
+        # graph_toolbar.DOCK_OPTIONS is the raw (id, English label, English
         # description) data the graph toolbar's own dock menu also reads --
-        # see core.toolMenus.build_graph_dock_menu, which translates the same
+        # see widgets.toolbar_menus.build_graph_dock_menu, which translates the same
         # tuple at its point of use via the same "graph_dock_{id}" ids rather
         # than baking translation into the tuple itself (language can change
         # at runtime; a module-level constant can't).
@@ -136,10 +99,10 @@ def get_position_options(toolbar_id):
                 i18n.tr("graph_dock_{}".format(position), label),
                 i18n.tr("graph_dock_{}_desc".format(position), description),
             )
-            for position, label, description in graph_api.DOCK_OPTIONS
+            for position, label, description in graph_toolbar.DOCK_OPTIONS
         ]
 
-    from TheKeyMachine.core import toolbar as toolbar_module
+    from TheKeyMachine.ui.widgets import toolbar as toolbar_module
 
     options = []
     for orient, orient_label in toolbar_module.DOCKING_ORIENTATIONS.items():
@@ -165,9 +128,7 @@ def get_position_options(toolbar_id):
 
 def get_current_position(toolbar_id):
     if toolbar_id == "graph":
-        from TheKeyMachine.tools.graph_toolbar import api as graph_api
-
-        return settings.get_setting(graph_api.GRAPH_TOOLBAR_DOCK_SETTING, graph_api.DOCK_BOTTOM_GRAPH)
+        return settings.get_setting(graph_toolbar.GRAPH_TOOLBAR_DOCK_SETTING, graph_toolbar.DOCK_BOTTOM_GRAPH)
 
     inst = get_toolbar_instance()
     if inst is not None:
@@ -181,9 +142,7 @@ def set_position(toolbar_id, position_id):
     if not position_id:
         return
     if toolbar_id == "graph":
-        from TheKeyMachine.tools.graph_toolbar import api as graph_api
-
-        graph_api.move_dock(position_id)
+        graph_toolbar.move_dock(position_id)
         return
 
     area, _, orient = position_id.partition("::")
@@ -198,22 +157,27 @@ def set_position(toolbar_id, position_id):
 
 def get_current_alignment(toolbar_id):
     if toolbar_id == "graph":
-        return settings.get_setting("graph_toolbar_alignment", "Center")
-    return settings.get_setting("toolbar_icon_alignment", "Center")
+        setting_key = toolbar_modes.GRAPH_ALIGNMENT_SETTING
+    else:
+        setting_key = toolbar_modes.MAIN_ALIGNMENT_SETTING
+    return toolbar_modes.normalize(
+        settings.get_setting(setting_key, toolbar_modes.DEFAULT_ALIGNMENT)
+    )
 
 
 def set_alignment(toolbar_id, alignment_name):
     if toolbar_id == "graph":
-        from TheKeyMachine.tools.graph_toolbar import api as graph_api
-
-        graph_api.apply_alignment(alignment_name)
+        graph_toolbar.apply_alignment(alignment_name)
         return
 
     inst = get_toolbar_instance()
     if inst is not None:
-        toolWidgets.set_main_toolbar_icon_alignment(inst, alignment_name)
+        toolbar_widgets.set_main_toolbar_icon_alignment(inst, alignment_name)
     else:
-        settings.set_setting("toolbar_icon_alignment", alignment_name)
+        settings.set_setting(
+            toolbar_modes.MAIN_ALIGNMENT_SETTING,
+            toolbar_modes.normalize(alignment_name),
+        )
 
 
 # --------------------------------------------------------------------------- sections
@@ -223,10 +187,10 @@ def _toolbar_section_defs(toolbar_id):
 
     This order matches ``widget._tkm_sections`` positionally: every entry here
     gets exactly one ``QFlatSectionWidget`` when the toolbar is populated (see
-    ``core.toolWidgets.populate_main_toolbar_from_layout`` /
+    ``widgets.toolbar_widgets.populate_main_toolbar_from_layout`` /
     ``populate_graph_toolbar_from_layout``).
     """
-    return toolbox.get_toolbar_sections(toolbar_id, resolve_items=False)
+    return registry.get_toolbar_sections(toolbar_id, resolve_items=False)
 
 
 def get_sections(toolbar_id):
@@ -261,7 +225,7 @@ def reorder_sections(toolbar_id, new_order_ids):
     )
 
     # Re-read after persisting: this reflects the full order (fixed sections
-    # kept in place, editable ones permuted) that toolbox.get_toolbar_sections
+    # kept in place, editable ones permuted) that registry.get_toolbar_sections
     # will now build from.
     full_new_order = [section_def["id"] for section_def in _toolbar_section_defs(toolbar_id)]
 
@@ -277,7 +241,7 @@ def get_color_groups(toolbar_id):
     """Ordered color-group rows for the Workspaces editor.
 
     Each row is one contiguous run of same-colored sections (see
-    ``toolbox.group_sections_by_color``), presented -- and reordered -- as one
+    ``registry.group_sections_by_color``), presented -- and reordered -- as one
     atomic unit instead of individual sections. A group has no identity of
     its own beyond "these section ids share a color run right now": it is
     recomputed fresh from the current section order every time this is
@@ -286,7 +250,7 @@ def get_color_groups(toolbar_id):
     """
     sections = get_sections(toolbar_id)
     groups = []
-    for member_sections in toolbox.group_sections_by_color(sections):
+    for member_sections in registry.group_sections_by_color(sections):
         section_ids = tuple(section["id"] for section in member_sections)
         groups.append(
             {
@@ -379,7 +343,7 @@ def _iter_leaf_tools(items):
 
     Most sections list their tools flat. ``link_tools`` (labeled
     "Relationships & Worldspace" on the toolbar) instead nests two whole
-    sub-sections via ``{"section": ...}`` refs, which ``toolbox.get_tool_section``
+    sub-sections via ``{"section": ...}`` refs, which ``registry.get_tool_section``
     resolves into ``{"type": "group", "items": [...]}`` wrappers -- the real
     tool dicts are one level deeper, under that wrapper's own ``"items"``.
     Recursing here (groups can in principle nest further) is the one place
@@ -403,12 +367,12 @@ def get_section_tools(toolbar_id, section_id):
     source of truth -- no probing/fallback between them:
 
     * Ordinary sections list their tools under ``"items"``, resolved through
-      ``toolbox.get_tool_section`` (every item there comes from the tool's
-      own registry entry via ``toolbox.get_tool``).
+      ``registry.get_tool_section`` (every item there comes from the tool's
+      own registry entry via ``registry.get_tool``).
     * Slider sections (``section_def["type"] == "slider"``) have no
       ``"items"`` at all -- one pinnable slot per ``SliderMode`` in
       ``section_def["modes"]`` instead, keyed exactly like
-      ``core.toolWidgets.build_slider_section`` keys them
+      ``widgets.toolbar_widgets.build_slider_section`` keys them
       (``"{slider_type}_{mode.key}"``).
 
     Either way, whether a row is currently pinned comes from the live
@@ -421,7 +385,7 @@ def get_section_tools(toolbar_id, section_id):
     # instead) -- "type"/"slider_type"/"modes" pass through untouched either
     # way, so there's no need for a separate resolve_items=False call just to
     # branch on section type first.
-    section_def = toolbox.get_tool_section(section_id, resolve_items=True, toolbar_id=toolbar_id)
+    section_def = registry.get_tool_section(section_id, resolve_items=True, toolbar_id=toolbar_id)
     if not section_def:
         return []
 
@@ -459,7 +423,7 @@ def get_section_tools(toolbar_id, section_id):
         entry["checked"] = (
             live_section._is_pin_key_checked(entry["id"])
             if live_section is not None
-            else toolbox.is_pinned_by_default(toolbar_id, entry["id"])
+            else registry.is_pinned_by_default(toolbar_id, entry["id"])
         )
     return entries
 
@@ -496,30 +460,30 @@ def unwatch_section_pins(section, callback):
 # --------------------------------------------------------------------------- workspaces
 
 def list_workspaces():
-    return toolWorkspaces.list_workspaces()
+    return workspaces.list_workspaces()
 
 
 def get_active_workspace():
-    return toolWorkspaces.get_active_workspace()
+    return workspaces.get_active_workspace()
 
 
 def rename_workspace(ws_id, new_name):
-    return toolWorkspaces.rename_workspace(ws_id, new_name)
+    return workspaces.rename_workspace(ws_id, new_name)
 
 
 def is_custom_workspace(ws_id):
-    return toolWorkspaces.is_custom_workspace(ws_id)
+    return workspaces.is_custom_workspace(ws_id)
 
 
 def delete_workspace(ws_id):
-    return toolWorkspaces.delete_workspace(ws_id)
+    return workspaces.delete_workspace(ws_id)
 
 
 def export_workspaces_data():
     """Everything the Workspaces editor owns that isn't derived from the toolbars themselves."""
     return {
-        "custom_workspaces": toolWorkspaces.get_custom_workspaces(),
-        "name_overrides": toolWorkspaces.get_name_overrides(),
+        "custom_workspaces": workspaces.get_custom_workspaces(),
+        "name_overrides": workspaces.get_name_overrides(),
     }
 
 
@@ -530,17 +494,17 @@ def import_workspaces_data(data):
 
     incoming_workspaces = data.get("custom_workspaces")
     if isinstance(incoming_workspaces, list):
-        merged = {entry.get("id"): entry for entry in toolWorkspaces.get_custom_workspaces() if entry.get("id")}
+        merged = {entry.get("id"): entry for entry in workspaces.get_custom_workspaces() if entry.get("id")}
         for entry in incoming_workspaces:
             if isinstance(entry, dict) and entry.get("id"):
                 merged[entry["id"]] = entry
-        toolWorkspaces.set_custom_workspaces(list(merged.values()))
+        workspaces.set_custom_workspaces(list(merged.values()))
 
     incoming_overrides = data.get("name_overrides")
     if isinstance(incoming_overrides, dict):
-        merged_overrides = toolWorkspaces.get_name_overrides()
+        merged_overrides = workspaces.get_name_overrides()
         merged_overrides.update(incoming_overrides)
-        toolWorkspaces.set_name_overrides(merged_overrides)
+        workspaces.set_name_overrides(merged_overrides)
 
     return True
 
@@ -567,8 +531,8 @@ def snapshot_current_configuration():
 
 def create_workspace_from_current(name):
     snapshot = snapshot_current_configuration()
-    ws_id = toolWorkspaces.create_workspace(name, snapshot)
-    toolWorkspaces.set_active_workspace(ws_id)
+    ws_id = workspaces.create_workspace(name, snapshot)
+    workspaces.set_active_workspace(ws_id)
     return ws_id
 
 
@@ -604,9 +568,9 @@ def _apply_snapshot_toolbar(toolbar_id, toolbar_snapshot):
 
 def apply_workspace(ws_id):
     """Make *ws_id* the active workspace and apply it to both live toolbars."""
-    if toolWorkspaces.is_custom_workspace(ws_id):
-        snapshot = toolWorkspaces.get_custom_workspace_snapshot(ws_id) or {}
-        toolWorkspaces.set_active_workspace(ws_id)
+    if workspaces.is_custom_workspace(ws_id):
+        snapshot = workspaces.get_custom_workspace_snapshot(ws_id) or {}
+        workspaces.set_active_workspace(ws_id)
         _apply_snapshot_toolbar("main", snapshot.get("main"))
         _apply_snapshot_toolbar("graph", snapshot.get("graph"))
         return
@@ -617,20 +581,18 @@ def apply_workspace(ws_id):
     if main_widget is not None:
         inst = get_toolbar_instance()
         main_alignment_fn = (
-            (lambda name, inst=inst: toolWidgets.set_main_toolbar_icon_alignment(inst, name))
+            (lambda name, inst=inst: toolbar_widgets.set_main_toolbar_icon_alignment(inst, name))
             if inst is not None
             else None
         )
-        toolWorkspaces.apply_workspace(ws_id, list(getattr(main_widget, "_tkm_sections", ())), main_alignment_fn)
+        workspaces.apply_workspace(ws_id, list(getattr(main_widget, "_tkm_sections", ())), main_alignment_fn)
 
     graph_widget = get_toolbar_widget("graph")
     if graph_widget is not None:
-        from TheKeyMachine.tools.graph_toolbar import api as graph_api
-
-        toolWorkspaces.apply_workspace(
-            ws_id, list(getattr(graph_widget, "_tkm_sections", ())), graph_api.apply_alignment
+        workspaces.apply_workspace(
+            ws_id, list(getattr(graph_widget, "_tkm_sections", ())), graph_toolbar.apply_alignment
         )
 
     if main_widget is None and graph_widget is None:
         # Neither toolbar is open -- at least persist the active id.
-        toolWorkspaces.set_active_workspace(ws_id)
+        workspaces.set_active_workspace(ws_id)

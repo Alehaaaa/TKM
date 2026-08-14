@@ -8,8 +8,8 @@ from maya import cmds
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools.animation_recovery import controller
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 _dialog = None

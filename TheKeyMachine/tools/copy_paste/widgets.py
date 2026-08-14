@@ -1,6 +1,6 @@
 """Copy/paste-specific widgets.
 
-The group uses standard toolbox buttons and declarative menus. ``PasteToDialog``
+The group uses standard registry buttons and declarative menus. ``PasteToDialog``
 and its namespace-resolution helpers own the paste-target UI: they are only
 consumed by ``tools.copy_paste.controller`` and resolve Maya namespaces
 directly, so they live with the feature instead of in the shared
@@ -9,8 +9,8 @@ directly, so they live with the feature instead of in the shared
 
 from TheKeyMachine.core.Qt import QtCore, QtWidgets
 from TheKeyMachine.data import icons
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets.util import DPI
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets.util import DPI
 
 
 def _paste_to_node_leaf(node):

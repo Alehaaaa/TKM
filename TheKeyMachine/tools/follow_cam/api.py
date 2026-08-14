@@ -1,8 +1,8 @@
 from maya import cmds
 
-import TheKeyMachine.mods.selectionMod as selectionMod
-import TheKeyMachine.widgets.util as wutil
-from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.maya import selection
+import TheKeyMachine.ui.widgets.util as wutil
+from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.data import icons
 
 
@@ -80,7 +80,7 @@ def _store_follow_camera(camera):
 def create_follow_cam(translation=True, rotation=True, *args):
     global followCam_original_camera
 
-    selected_objects = selectionMod.get_selected_objects()
+    selected_objects = selection.get_selected_objects()
 
     TkmSceneNode.root()
 

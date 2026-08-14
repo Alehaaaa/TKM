@@ -1,10 +1,10 @@
 from maya import cmds
 
-from TheKeyMachine.core import animation_context
+from TheKeyMachine.maya import animation
 from TheKeyMachine.tools.snapshot_rig import rig_snapshot
-from TheKeyMachine.mods import selectionMod
+from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 TRANSLATION_ATTRS = {"translate", "translateX", "translateY", "translateZ"}
@@ -22,7 +22,7 @@ def _stored_default(node, attr):
 
 
 def remove_selected():
-    selected = selectionMod.get_selected_objects(long=True)
+    selected = selection.get_selected_objects(long=True)
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
     groups = rig_snapshot.group_controls_by_rig(selected)
@@ -66,12 +66,12 @@ def apply_defaults(translations=False, rotations=False, scales=False):
         "default_translations" if translations else "default_rotations" if rotations else
         "default_scales" if scales else "default_object_values"
     )
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         default_mode="current_frame",
         include_channels=True,
     )
-    selected = target_info["target_objects"]
-    if not selected and not target_info["target_plugs"]:
+    selected = target_info.objects
+    if not selected and not target_info.plugs:
         return wutil.make_inViewMessage("Select objects, channels, or Graph Editor keys")
 
     with toolCommon.tool_operation(
@@ -80,9 +80,9 @@ def apply_defaults(translations=False, rotations=False, scales=False):
         tint="context",
         default_mode="current_frame",
     ) as operation:
-        if target_info["time_context"].mode == "graph_editor_keys":
-            operation.set_total(len(target_info["selected_keyframes"]))
-            for curve, frame in target_info["selected_keyframes"]:
+        if target_info.time.mode == "graph_editor_keys":
+            operation.set_total(len(target_info.selected_keys))
+            for curve, frame in target_info.selected_keys:
                 if operation.cancelled:
                     return
                 destinations = cmds.listConnections(
@@ -107,8 +107,8 @@ def apply_defaults(translations=False, rotations=False, scales=False):
                 operation.step()
             return
 
-        operation.set_total(len(target_info["target_plugs"]))
-        for plug in target_info["target_plugs"]:
+        operation.set_total(len(target_info.plugs))
+        for plug in target_info.plugs:
             if operation.cancelled:
                 return
             if "." not in plug:
@@ -122,7 +122,7 @@ def apply_defaults(translations=False, rotations=False, scales=False):
             if value is None:
                 operation.step()
                 continue
-            time_context = target_info["time_context"]
+            time_context = target_info.time
             try:
                 if time_context.mode == "current_frame":
                     cmds.setAttr(plug, value)

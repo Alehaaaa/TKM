@@ -1,1 +1,1 @@
-"""Copy Relationship uses standard toolbox widgets."""
+"""Copy Relationship uses standard registry widgets."""

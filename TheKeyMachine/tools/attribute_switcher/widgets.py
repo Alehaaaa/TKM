@@ -1,4 +1,3 @@
-from __future__ import division
 # -*- coding: utf-8 -*-
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
@@ -11,9 +10,9 @@ from TheKeyMachine.tools.attribute_switcher.controller import (
     ATTRIBUTE_SWITCHER_GEOMETRY_KEY,
     ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE,
 )
-from TheKeyMachine.widgets import customDialogs as cd
-from TheKeyMachine.widgets import customWidgets as cw
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import customDialogs as cd
+from TheKeyMachine.ui.widgets import customWidgets as cw
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 UI_COLOR = COLORS.ui

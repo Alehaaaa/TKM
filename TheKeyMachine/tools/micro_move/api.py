@@ -2,13 +2,14 @@ import os
 
 from maya.api import OpenMaya as om
 from maya import cmds, utils
+import maya.OpenMayaUI as omui
 
 from TheKeyMachine.core.Qt import QtCompat, QtCore, QtGui, QtWidgets
 from TheKeyMachine.data import icons
 
-import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.core import runtime
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.core import native_plugins as plugins
+from TheKeyMachine.maya import runtime as maya_runtime
 
 
 MICRO_MOVE_CONTEXT = "microMoveCtx"
@@ -22,7 +23,7 @@ BUILD_COMMAND = "tkmMicroMoveBuild"
 CONFIGURE_COMMAND = "tkmMicroMoveConfigure"
 REFRESH_COMMAND = "tkmMicroMoveRefresh"
 
-PLUGIN_SPEC = plugins.NativePluginSpec(
+PLUGIN_SPEC = maya_runtime.NativePluginSpec(
     label="Micro Move",
     plugin_directory=os.path.dirname(__file__),
     output_name="tkmMicroMove",
@@ -61,7 +62,12 @@ def _plugin_cursor_paths():
 
 
 class _ColorCursorFilter(QtCore.QObject):
-    """Keep the Micro Move cursor in full-color Qt image form."""
+    """Keep the Micro Move cursor on Maya's active viewport widget.
+
+    Maya's native contexts, including Blue Pencil, scope cursor changes to the
+    context/view instead of installing an application-wide override.  Qt is
+    still used here so the cursor can retain the source image's full color.
+    """
 
     _CURSOR_SIZE = 32
 
@@ -80,38 +86,62 @@ class _ColorCursorFilter(QtCore.QObject):
             False: load_cursor(open_path),
             True: load_cursor(pinched_path),
         }
-        self._override_active = False
+        self._viewport = None
+        self._viewport_pointer = None
+        self._cursor_applied = False
         self._pinched = False
         self._poll_timer = QtCore.QTimer(self)
         self._poll_timer.setInterval(16)
         self._poll_timer.timeout.connect(self._poll_mouse_buttons)
 
+    @staticmethod
+    def _active_viewport():
+        try:
+            pointer = omui.M3dView.active3dView().widget()
+            if not pointer:
+                return None, None
+            return (
+                QtCompat.wrapInstance(int(pointer), QtWidgets.QWidget),
+                int(pointer),
+            )
+        except Exception:
+            return None, None
+
+    def _viewport_widget(self):
+        viewport, pointer = self._active_viewport()
+        if viewport is None:
+            return None
+        if pointer == self._viewport_pointer and QtCompat.isValid(self._viewport):
+            return self._viewport
+
+        self._clear_cursor()
+        self._viewport = viewport
+        self._viewport_pointer = pointer
+        return viewport
+
     def _set_cursor(self, pinched=False):
-        application = QtWidgets.QApplication.instance()
-        if application is None:
+        viewport = self._viewport_widget()
+        if viewport is None:
             return
         pinched = bool(pinched)
         desired = self._cursors[pinched]
-        current = application.overrideCursor()
+        current = viewport.cursor()
         if (
-                self._override_active
+                self._cursor_applied
                 and pinched == self._pinched
-                and current is not None
                 and current.pixmap().cacheKey() == desired.pixmap().cacheKey()
         ):
             return
         self._pinched = pinched
-        if not self._override_active:
-            application.setOverrideCursor(desired)
-            self._override_active = True
-        else:
-            application.changeOverrideCursor(desired)
+        viewport.setCursor(desired)
+        self._cursor_applied = True
 
     def _clear_cursor(self):
-        application = QtWidgets.QApplication.instance()
-        if application is not None and self._override_active:
-            application.restoreOverrideCursor()
-        self._override_active = False
+        if self._cursor_applied and QtCompat.isValid(self._viewport):
+            self._viewport.unsetCursor()
+        self._viewport = None
+        self._viewport_pointer = None
+        self._cursor_applied = False
 
     def _poll_mouse_buttons(self):
         application = QtWidgets.QApplication.instance()
@@ -146,7 +176,7 @@ class _ColorCursorFilter(QtCore.QObject):
 
 def _ensure_micro_contexts():
     """Load the native plug-in and recreate its MPx contexts."""
-    plugins.ensure_contexts(
+    maya_runtime.ensure_contexts(
         PLUGIN_SPEC,
         (
             (MOVE_CONTEXT_COMMAND, MICRO_MOVE_CONTEXT),
@@ -225,7 +255,7 @@ class MicroMoveController(QtCore.QObject):
                 return
             if cmds.currentCtx() not in (MICRO_MOVE_CONTEXT, MICRO_ROTATE_CONTEXT):
                 return
-            if plugins.command_exists(REFRESH_COMMAND):
+            if maya_runtime.command_exists(REFRESH_COMMAND):
                 getattr(cmds, REFRESH_COMMAND)()
 
         utils.executeDeferred(_refresh)
@@ -271,7 +301,7 @@ class MicroMoveController(QtCore.QObject):
 
     def _cleanup_native_resources(self, restore_standard_context):
         try:
-            plugins.unload(
+            maya_runtime.unload(
                 PLUGIN_SPEC,
                 restore_context=bool(restore_standard_context),
             )
@@ -417,4 +447,4 @@ def cleanup():
         controller.shutdown()
         controller.deleteLater()
         return
-    plugins.unload(PLUGIN_SPEC, restore_context=True)
+    maya_runtime.unload(PLUGIN_SPEC, restore_context=True)

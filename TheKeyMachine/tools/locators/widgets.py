@@ -1,1 +1,1 @@
-"""Locators uses the standard toolbox widgets."""
+"""Locators uses the standard registry widgets."""

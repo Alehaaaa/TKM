@@ -2397,11 +2397,6 @@ def _install():
     # Enable direct import of QtCompat
     sys.modules[__name__ + ".QtCompat"] = Qt.QtCompat
 
-    # Backwards compatibility
-    if hasattr(Qt.QtCompat, "loadUi"):
-        Qt.QtCompat.load_ui = Qt.QtCompat.loadUi
-
-
 _install()
 
 # Setup Binding Enum states
@@ -2409,10 +2404,6 @@ Qt.IsPySide6 = Qt.__binding__ == "PySide6"
 Qt.IsPyQt6 = Qt.__binding__ == "PyQt6"
 Qt.IsPySide2 = Qt.__binding__ == "PySide2"
 Qt.IsPyQt5 = Qt.__binding__ == "PyQt5"
-# Qt4 is deprecated, These are left for compatibility
-Qt.IsPySide = False
-Qt.IsPyQt4 = False
-
 """Augment QtCompat
 
 QtCompat contains wrappers and added functionality

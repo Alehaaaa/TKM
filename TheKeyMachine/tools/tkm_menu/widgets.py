@@ -2,11 +2,11 @@ from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.Qt import QtGui, QtWidgets  # type: ignore
 
 from TheKeyMachine.data import icons
-from TheKeyMachine.mods import generalMod
-from TheKeyMachine.mods import changelogMod
+from TheKeyMachine.core import application
+from TheKeyMachine.tools.update import changelog
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets.util import DPI, is_valid_widget
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets.util import DPI, is_valid_widget
 
 
 class LogoAction(QtWidgets.QWidgetAction):
@@ -48,7 +48,7 @@ class LogoAction(QtWidgets.QWidgetAction):
         return self.clickable
 
     def _on_clicked(self, _event):
-        generalMod.open_url("https://github.com/Alehaaaa/TKM")
+        application.open_url("https://github.com/Alehaaaa/TKM")
         parent = self.parent()
         if parent and hasattr(parent, "hide"):
             parent.hide()
@@ -119,12 +119,13 @@ def show_donate(parent=None):
     if _donate_dialog and is_valid_widget(_donate_dialog):
         return _present_window(_donate_dialog)
 
-    from TheKeyMachine.core import i18n, toolbox
+    from TheKeyMachine.core import i18n
+    from TheKeyMachine.tools import registry
 
     # "Donate" itself reuses the donate_window tool's own lang.json label --
     # the same word already translated for its toolbar/menu entry -- instead
     # of duplicating it as a separate chrome string.
-    donate_label = toolbox.get_tool("donate_window").get("label") or "Donate"
+    donate_label = registry.get_tool("donate_window").get("label") or "Donate"
 
     link = "https://github.com/Alehaaaa/TKM"
     message = (
@@ -180,10 +181,10 @@ class TKMAboutDialog(customDialogs.QFlatDialog):
         logo_label.setPixmap(logo_pixmap)
         content_layout.addWidget(logo_label)
 
-        stage_version = generalMod.get_thekeymachine_stage_version()
-        version = generalMod.get_thekeymachine_version()
-        build_version = generalMod.get_thekeymachine_build_version()
-        codename = generalMod.get_thekeymachine_codename()
+        stage_version = application.get_thekeymachine_stage_version()
+        version = application.get_thekeymachine_version()
+        build_version = application.get_thekeymachine_build_version()
+        codename = application.get_thekeymachine_codename()
 
         tool_name = QtWidgets.QLabel(
             i18n.tr("about_tagline", "Animation toolset for Maya Animators")
@@ -315,7 +316,8 @@ def show_version_history_dialog(parent=None):
 
 class TKMVersionHistoryDialog(customDialogs.QFlatDialog):
     def __init__(self, parent=None):
-        from TheKeyMachine.core import i18n, toolbox
+        from TheKeyMachine.core import i18n
+        from TheKeyMachine.tools import registry
 
         customDialogs.QFlatDialog.__init__(self, parent)
         self.setWindowTitle(i18n.tr("version_history_dialog_title", "TheKeyMachine Version History"))
@@ -338,13 +340,13 @@ class TKMVersionHistoryDialog(customDialogs.QFlatDialog):
 
         # Reuses the version_history_window tool's own lang.json label --
         # same word already translated for its menu entry.
-        section_title = toolbox.get_tool("version_history_window").get("label") or "Version History"
+        section_title = registry.get_tool("version_history_window").get("label") or "Version History"
         title_label = QtWidgets.QLabel(section_title)
         title_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         title_label.setStyleSheet("font-size: %spx; font-weight: bold; color: #cfcfcf;" % DPI(15))
         content_layout.addWidget(title_label)
 
-        sections = changelogMod.get_local_changelog_sections()
+        sections = changelog.get_local_changelog_sections()
         range_text = self._version_range_text(sections)
         range_label = QtWidgets.QLabel(range_text)
         range_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
@@ -421,7 +423,7 @@ class TKMVersionHistoryDialog(customDialogs.QFlatDialog):
         version_label.setStyleSheet("font-size: %spx; font-weight: bold; color: #f0f0f0;" % DPI(15))
         layout.addWidget(version_label)
 
-        for group in changelogMod.group_changelog_entries(section.get("entries", [])):
+        for group in changelog.group_changelog_entries(section.get("entries", [])):
             layout.addLayout(self._build_entry_group(group))
 
         return frame
@@ -437,14 +439,14 @@ class TKMVersionHistoryDialog(customDialogs.QFlatDialog):
 
         icon_label = QtWidgets.QLabel()
         kind = group.get("kind", "")
-        pixmap = QtGui.QPixmap(changelogMod.change_kind_icon(kind))
+        pixmap = QtGui.QPixmap(changelog.change_kind_icon(kind))
         icon_size = DPI(17)
         if not pixmap.isNull():
             icon_label.setPixmap(pixmap.scaled(icon_size, icon_size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
         icon_label.setFixedSize(icon_size, icon_size)
         header_layout.addWidget(icon_label, 0, QtCore.Qt.AlignVCenter)
 
-        title = QtWidgets.QLabel("<b>%s</b>" % changelogMod.escape_text(changelogMod.change_kind_label(kind)))
+        title = QtWidgets.QLabel("<b>%s</b>" % changelog.escape_text(changelog.change_kind_label(kind)))
         title.setTextFormat(QtCore.Qt.RichText)
         title.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         title.setStyleSheet("font-size: %spx; color: #d3d3d3;" % DPI(11))
@@ -453,7 +455,7 @@ class TKMVersionHistoryDialog(customDialogs.QFlatDialog):
         group_layout.addLayout(header_layout)
 
         for entry in group.get("entries", []):
-            label = QtWidgets.QLabel(changelogMod.escape_text(entry.get("description", "")))
+            label = QtWidgets.QLabel(changelog.escape_text(entry.get("description", "")))
             label.setWordWrap(True)
             label.setTextFormat(QtCore.Qt.RichText)
             label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)

@@ -1,5 +1,5 @@
 from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 class GimbalOrderButton(QtWidgets.QFrame):
@@ -84,9 +84,9 @@ class GimbalOrderButton(QtWidgets.QFrame):
 from maya import cmds
 
 from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
-import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.core import runtime
 from TheKeyMachine.data import icons
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.gimbal_fixer.controller import (
     GimbalAnalyzer,
@@ -97,8 +97,8 @@ from TheKeyMachine.tools.gimbal_fixer.controller import (
     rotate_gimbal_state,
     selected_control,
 )
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 _gimbal_fixer_window = None
@@ -112,7 +112,7 @@ def _emit_gimbal_fixer_window_state(is_open):
     except Exception:
         pass
     try:
-        import TheKeyMachine.core.runtimeManager as runtime
+        from TheKeyMachine.core import runtime
         runtime.get_runtime_manager().set_tool_state("gimbal", state)
     except Exception:
         pass
@@ -306,7 +306,7 @@ def show_gimbal_fixer_window(anchor_button=None, popup=True):
         window.present_floating_window()
     _emit_gimbal_fixer_window_state(True)
 
-    if not selectionMod.get_selected_objects():
+    if not selection.get_selected_objects():
         wutil.make_inViewMessage("Select a control and reload")
 
     return window

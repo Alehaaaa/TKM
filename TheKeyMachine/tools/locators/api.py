@@ -1,13 +1,13 @@
 from maya import cmds
 
-import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.maya import selection as maya_selection
+from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import common as toolCommon
 
 
 def create_locator(*_args):
-    selection = selectionMod.get_selected_objects()
+    selection = maya_selection.get_selected_objects()
     if not selection:
         return
     TkmSceneNode.root().child("Temp_Locators", icon=icons.cube)

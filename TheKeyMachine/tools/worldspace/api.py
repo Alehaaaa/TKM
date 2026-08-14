@@ -1,32 +1,26 @@
 from maya import cmds
 
-from TheKeyMachine.core import animation_context
-from TheKeyMachine.core import animlayers
-from TheKeyMachine.core import openMayaUtils as open_maya
-import TheKeyMachine.core.toolbox as toolbox
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.maya import animation
+from TheKeyMachine.maya import maya_api
+from TheKeyMachine.tools import registry
+from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import clipboard
 from TheKeyMachine.tools import common as toolCommon
-import TheKeyMachine.widgets.timeline as timelineWidgets
-import TheKeyMachine.widgets.util as wutil
+import TheKeyMachine.ui.widgets.timeline as timelineWidgets
+import TheKeyMachine.ui.widgets.util as wutil
 
 
 WORLDSPACE_CLIPBOARD = "worldspace"
 
 
 def _world_matrix(node, frame=None):
-    return open_maya.world_matrix_at_time(node, frame)
+    return maya_api.world_matrix_at_time(node, frame)
 
 
 def _apply_worldspace_values(node, values):
-    if not values:
+    if not values or len(values) != 16:
         return False
-    if len(values) == 16:
-        cmds.xform(node, matrix=values, worldSpace=True)
-    else:
-        # Backwards compatibility with six-value worldspace clipboards.
-        cmds.xform(node, translation=values[:3], worldSpace=True)
-        cmds.xform(node, rotation=values[3:6], worldSpace=True)
+    cmds.xform(node, matrix=values, worldSpace=True)
     return True
 
 
@@ -43,7 +37,7 @@ def _copy_worldspace_frames(selected_objects, frames, timerange, tool_id, label)
         progress_max=len(frames),
         tint="range",
         timerange=timerange,
-        tint_color=toolbox.get_tool_tint_color(tool_id),
+        tint_color=registry.get_tool_tint_color(tool_id),
         undo=False,
         suspend_refresh=True,
     ) as operation:
@@ -73,7 +67,7 @@ def _copy_worldspace_frames(selected_objects, frames, timerange, tool_id, label)
         payload = {
             "meta": {
                 "ordered_objects": selected_objects,
-                "layer_context": animlayers.capture_context(),
+                "layer_context": animation.layer_cache.capture(),
             },
             "data": animation_data,
         }
@@ -82,15 +76,15 @@ def _copy_worldspace_frames(selected_objects, frames, timerange, tool_id, label)
 
 
 def _worldspace_copy(default_mode, tool_id, label):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         default_mode=default_mode,
         include_channels=True,
     )
-    selected_objects = list(dict.fromkeys(target_info.get("target_objects") or []))
+    selected_objects = list(dict.fromkeys(target_info.objects or []))
     if not selected_objects:
         return
 
-    time_context = target_info["time_context"]
+    time_context = target_info.time
     selected_range = (
         time_context.timerange
         if time_context.mode == "time_slider_range"
@@ -191,12 +185,12 @@ def paste_worldspace_single_frame(*args):
                 tint="range",
                 timerange=frame_range,
                 tint_key="ws_paste_frame",
-                tint_color=toolbox.get_tool_tint_color("ws_paste_frame"),
+                tint_color=registry.get_tool_tint_color("ws_paste_frame"),
             )
 
         target_objects = list(
             dict.fromkeys(
-                selectionMod.get_selected_objects(orderedSelection=True)
+                selection.get_selected_objects(ordered=True)
             )
         )
 
@@ -322,7 +316,7 @@ def worldspace_paste_animation(*args):
 
             target_objects = list(
                 dict.fromkeys(
-                    selectionMod.get_selected_objects(orderedSelection=True)
+                    selection.get_selected_objects(ordered=True)
                 )
             )
 
@@ -379,24 +373,20 @@ def worldspace_paste_animation(*args):
                 for target in valid_targets
                 for attribute in key_attributes
             ]
-            layer_context, created_layers = animlayers.prepare_paste_context(
-                copied_layer_context,
-                target_plugs,
-            )
+            layer_context, created_layers = animation.LayerContext(
+                copied_layer_context or {}
+            ).prepare_paste(target_plugs)
             destination_groups = {}
             locked_destination = False
             if valid_targets:
                 for target in valid_targets:
-                    groups, blocked = animlayers.group_attributes_by_destination(
-                        target, key_attributes, context=layer_context
+                    groups, blocked = layer_context.group_by_destination(
+                        target, key_attributes
                     )
                     destination_groups[target] = groups
                     locked_destination = locked_destination or bool(blocked)
-                    blocked = animlayers.cut_keys_in_destination(
-                        target,
-                        key_attributes,
-                        paste_range,
-                        context=layer_context,
+                    blocked = layer_context.cut_keys(
+                        target, key_attributes, paste_range
                     )
                     locked_destination = locked_destination or bool(blocked)
             if locked_destination:
@@ -405,7 +395,7 @@ def worldspace_paste_animation(*args):
             operation.timerange = paste_range
             operation.tint_session = timelineWidgets.begin_timeline_tint(
                 timerange=paste_range,
-                color=toolbox.get_tool_tint_color("ws_paste"),
+                color=registry.get_tool_tint_color("ws_paste"),
                 key="ws_paste",
             )
 
@@ -422,11 +412,10 @@ def worldspace_paste_animation(*args):
                     if values is None:
                         continue
                     if _apply_worldspace_values(target_obj, values):
-                        animlayers.set_keyframe_in_destination(
+                        layer_context.set_keyframe(
                             target_obj,
                             key_attributes,
                             time=frame,
-                            context=layer_context,
                         )
 
             def _paste_all_frames():
@@ -447,7 +436,7 @@ def worldspace_paste_animation(*args):
                 for target, groups in destination_groups.items():
                     for layer_name, attributes in groups.items():
                         for attribute in attributes:
-                            curve = animlayers.get_anim_curve_for_plug(
+                            curve = animation.layer_graph.curve_for_plug(
                                 "{}.{}".format(target, attribute),
                                 layer_name=layer_name,
                             )
@@ -459,5 +448,5 @@ def worldspace_paste_animation(*args):
             operation.success = True
 
     finally:
-        animlayers.restore_created_layer_states(created_layers)
+        animation.restore_created_layer_states(created_layers)
         cmds.currentTime(original_time)

@@ -206,31 +206,5 @@
                 "إزالة إعداد كاميرا المتابعة النشط واستعادة الكاميرا السابقة"
             ]
         }
-    },
-    "follow_cam_tools": {
-        "en": {
-            "label": "Follow Cam"
-        },
-        "es": {
-            "label": "Cámara de Seguimiento"
-        },
-        "fr": {
-            "label": "Caméra de Suivi"
-        },
-        "ca": {
-            "label": "Càmera de Seguiment"
-        },
-        "zh": {
-            "label": "跟随摄像机"
-        },
-        "ja": {
-            "label": "追従カメラ"
-        },
-        "ko": {
-            "label": "추적 카메라"
-        },
-        "ar": {
-            "label": "كاميرا المتابعة"
-        }
     }
 }

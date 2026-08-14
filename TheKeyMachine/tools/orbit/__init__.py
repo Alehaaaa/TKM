@@ -1,4 +1,4 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.orbit import api
 
 
@@ -29,7 +29,7 @@ class OrbitToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "orbit_tools",
+        "id": "orbit_tools", "i18n_key": "orbit",
         "label": "Orbit",
         "items": [{"id": "orbit"}],
     }

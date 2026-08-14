@@ -356,31 +356,5 @@
                 "فتح توثيق المحور المؤقت"
             ]
         }
-    },
-    "temp_pivot_tools": {
-        "en": {
-            "label": "Temp Pivot"
-        },
-        "es": {
-            "label": "Pivote Temporal"
-        },
-        "fr": {
-            "label": "Pivot Temporaire"
-        },
-        "ca": {
-            "label": "Pivot Temporal"
-        },
-        "zh": {
-            "label": "临时轴心点"
-        },
-        "ja": {
-            "label": "テンポラリピボット"
-        },
-        "ko": {
-            "label": "임시 피벗"
-        },
-        "ar": {
-            "label": "محور مؤقت"
-        }
     }
 }

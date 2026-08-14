@@ -5,10 +5,10 @@ from contextlib import contextmanager
 from maya import cmds
 from maya.api import OpenMaya as om
 
-from TheKeyMachine.core import openMayaUtils as omui
+from TheKeyMachine.maya import maya_api
 from TheKeyMachine.tools.mirror import math as mirror_math
 from TheKeyMachine.tools.snapshot_rig import rig_snapshot
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.copy_paste.controller import (
     ANIMATION_CONTROLS_KEY,
@@ -23,8 +23,8 @@ from TheKeyMachine.tools.copy_paste.controller import (
     _query_layered_anim_channel_data,
     _transform_channel_values,
 )
-import TheKeyMachine.widgets.timeline as timelineWidgets
-import TheKeyMachine.widgets.util as wutil
+import TheKeyMachine.ui.widgets.timeline as timelineWidgets
+import TheKeyMachine.ui.widgets.util as wutil
 
 
 _MATRIX_TRANSFORM_ATTRS = (
@@ -102,8 +102,8 @@ def _center_reflection_matrix(node):
 
 def _mirrored_channel_matrix(node, frame=None, reflection=None):
     """Return a reflected channel matrix with animated parent motion removed."""
-    world = omui.world_matrix_at_time(node, frame)
-    parent_inverse = omui.parent_inverse_matrix_at_time(node, frame)
+    world = maya_api.world_matrix_at_time(node, frame)
+    parent_inverse = maya_api.parent_inverse_matrix_at_time(node, frame)
     if not world or not parent_inverse:
         return None
     try:
@@ -219,7 +219,7 @@ def _matrix_channel_solver(node):
 # ___________________________ SELECT OPPOSITE _____________________________________
 
 def select_opposite(*args):
-    selected_objects = selectionMod.get_selected_objects()
+    selected_objects = selection.get_selected_objects()
     opposite_controls = []
 
     for obj in selected_objects:
@@ -232,7 +232,7 @@ def select_opposite(*args):
 
 
 def add_select_opposite(*args):
-    selected_objects = selectionMod.get_selected_objects()
+    selected_objects = selection.get_selected_objects()
     opposite_controls = []
 
     for obj in selected_objects:
@@ -251,7 +251,7 @@ def copy_opposite(*args):
     operation_manager = None
     operation_context = None
     try:
-        selected_objects = selectionMod.get_selected_objects()
+        selected_objects = selection.get_selected_objects()
         operation_manager = toolCommon.tool_operation(
             tool_id="copy_opposite",
             label="Copy Opposite",
@@ -294,7 +294,7 @@ def copy_opposite(*args):
                             )
                             cmds.setAttr(f"{opposite_obj}.{opposite_attr}", current_value)
                         except Exception as e:
-                            import TheKeyMachine.mods.reportMod as report
+                            import TheKeyMachine.tools.bug_report.controller as report
 
                             report.report_detected_exception(e, context="copy opposite attribute compile")
             operation_context.step()
@@ -312,7 +312,7 @@ def copy_opposite(*args):
 
 
 def mirror(*args):
-    selected_controls = selectionMod.get_selected_objects()
+    selected_controls = selection.get_selected_objects()
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 
@@ -325,7 +325,7 @@ def mirror(*args):
     operation_manager = None
     operation_context = None
     try:
-        selected_channels = set(selectionMod.get_selected_channels() or [])
+        selected_channels = set(selection.get_selected_channels() or [])
 
         operation_manager = toolCommon.tool_operation(
             tool_id="mirror",
@@ -742,7 +742,7 @@ def _capture_pair_key_channels(source, target, attrs, time_context):
 
 
 def _mirror_keys(selected_controls, time_context, tool_id, label, target_side=None):
-    selected_channels = set(selectionMod.get_selected_channels() or [])
+    selected_channels = set(selection.get_selected_channels() or [])
     mirrored_data = {
         ANIMATION_META_KEY: {
             "type": "animation",
@@ -855,11 +855,11 @@ def _mirror_keys(selected_controls, time_context, tool_id, label, target_side=No
 
 
 def _mirror_current_values(target_side=None, operation=None):
-    selected_controls = selectionMod.get_selected_objects()
+    selected_controls = selection.get_selected_objects()
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 
-    selected_channels = set(selectionMod.get_selected_channels() or [])
+    selected_channels = set(selection.get_selected_channels() or [])
     copied = 0
     source_side = (
         "left" if target_side == "right"
@@ -935,7 +935,7 @@ def _mirror_current_values(target_side=None, operation=None):
 
 
 def mirror_to_right(*args):
-    selected_controls = selectionMod.get_selected_objects()
+    selected_controls = selection.get_selected_objects()
     time_context = timelineWidgets.resolve_time_context(default_mode="current_frame")
     if time_context.mode != "current_frame":
         return _mirror_keys(
@@ -960,7 +960,7 @@ def mirror_to_right(*args):
 
 
 def mirror_to_left(*args):
-    selected_controls = selectionMod.get_selected_objects()
+    selected_controls = selection.get_selected_objects()
     time_context = timelineWidgets.resolve_time_context(default_mode="current_frame")
     if time_context.mode != "current_frame":
         return _mirror_keys(
@@ -985,7 +985,7 @@ def mirror_to_left(*args):
 
 
 def mirror_all_keys(*args):
-    selected_controls = selectionMod.get_selected_objects()
+    selected_controls = selection.get_selected_objects()
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 
@@ -994,8 +994,8 @@ def mirror_all_keys(*args):
 
 
 def _update_mirror_directions(direction):
-    selected_controls = selectionMod.get_selected_objects()
-    selected_channels = selectionMod.get_selected_channels()
+    selected_controls = selection.get_selected_objects()
+    selected_channels = selection.get_selected_channels()
     if not selected_controls or not selected_channels:
         action = "create an exception" if direction is not None else "remove exceptions"
         return wutil.make_inViewMessage(f"Select controls and channels to {action}")

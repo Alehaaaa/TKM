@@ -1,1 +1,1 @@
-"""Tangents uses the standard toolbox widgets."""
+"""Tangents uses the standard registry widgets."""

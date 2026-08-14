@@ -8,6 +8,6 @@ def build_menu(menu, source_widget=None):
 
 
 def show_menu(*_args):
-    from TheKeyMachine.mods import shelfMod
+    from TheKeyMachine.maya import shelf
 
-    return shelfMod.show_tool_menu_at_cursor("custom_tools")
+    return shelf.show_tool_menu_at_cursor("custom_tools")

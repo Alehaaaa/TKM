@@ -6,14 +6,15 @@ import time
 import traceback
 import warnings
 
-import maya.cmds as cmds  # type: ignore
-import maya.mel as mel  # type: ignore
+from maya import cmds  # type: ignore
+from maya import mel  # type: ignore
 
 from TheKeyMachine.core.Qt import QtCore, QtGui  # type: ignore
 
 from TheKeyMachine.data import icons
-from TheKeyMachine.widgets import util as wutil
-from TheKeyMachine.mods import settingsMod as settings
+from TheKeyMachine.maya import animation
+from TheKeyMachine.ui.widgets import util as wutil
+from TheKeyMachine.core import settings
 
 
 # Set TKM_DEBUG_TIMING=true in TheKeyMachine/.env (or the process
@@ -527,7 +528,7 @@ def suspend_maya_refresh(enabled=True):
 # scene edit has to hop back onto the main thread via
 # ToolOperation.run_on_main(). This is opt-in per tool (see
 # core/trigger.py's OperationPolicy.threaded): a callback that hasn't been
-# migrated to route its Maya calls through run_on_main() must not be marked
+# routed through run_on_main() must not be marked
 # threaded, or it will call cmds off the main thread and can crash Maya.
 
 _MAIN_THREAD_MARSHAL = None
@@ -805,7 +806,7 @@ def _begin_operation_tint(tint=None, timerange=None, default_mode="current_frame
     if not tint or tint == "none":
         return None
     try:
-        from TheKeyMachine.widgets import timeline as timeline_widgets
+        from TheKeyMachine.ui.widgets import timeline as timeline_widgets
     except Exception:
         return None
     try:
@@ -900,9 +901,9 @@ def tool_operation(
 
     if tint_color is None and tool_id:
         try:
-            from TheKeyMachine.core import toolbox
+            from TheKeyMachine.tools import registry
 
-            tint_color = toolbox.get_tool_tint_color(tool_id)
+            tint_color = registry.get_tool_tint_color(tool_id)
         except Exception:
             tint_color = None
 
@@ -911,10 +912,8 @@ def tool_operation(
     preserved_time_selection = None
     if preserve_time_selection:
         try:
-            from TheKeyMachine.core import animation_context
-
             preserved_time_selection = (
-                animation_context.capture_time_slider_selection()
+                animation.capture_time_slider_selection()
             )
         except Exception:
             preserved_time_selection = None
@@ -1036,7 +1035,7 @@ def tool_operation(
             
         if operation.success:
             if tint == "range" and operation.timerange and not operation.tint_session:
-                from TheKeyMachine.widgets import timeline as timeline_widgets
+                from TheKeyMachine.ui.widgets import timeline as timeline_widgets
                 try:
                     operation.tint_session = timeline_widgets.begin_timeline_tint(
                         timerange=operation.timerange,
@@ -1099,9 +1098,7 @@ def tool_operation(
                     pass
         if operation.preserved_time_selection:
             try:
-                from TheKeyMachine.core import animation_context
-
-                animation_context.restore_time_slider_selection(
+                animation.restore_time_slider_selection(
                     operation.preserved_time_selection
                 )
             except Exception:
@@ -1230,16 +1227,16 @@ def _humanize_compound_word(raw):
 
 
 def _tooltip_parts(raw):
-    """Extract (title, first_line) from a Tooltip (mods.tooltipsMod).
+    """Extract (title, first_line) from a Tooltip (ui.tooltips).
 
     Uses attribute access rather than isinstance to avoid a circular import
-    (tooltipsMod already imports this module). Expects a Tooltip;
+    (ui.tooltips already imports this module). Expects a Tooltip;
     falls back gracefully to a plain string.
     """
     if not raw:
         return "", ""
 
-    # Tooltip (from mods.tooltipsMod) exposes .title and .first_line
+    # Tooltip (from ui.tooltips) exposes .title and .first_line
     if hasattr(raw, "title") and hasattr(raw, "first_line"):
         return clean_tool_text(raw.title), clean_tool_text(raw.first_line)
 
@@ -1321,15 +1318,15 @@ def _get_tool_definition(tool_id):
     if not tool_id:
         return None
     try:
-        import TheKeyMachine.core.toolbox as toolbox
+        from TheKeyMachine.tools import registry
 
-        return toolbox.get_tool(tool_id)
+        return registry.get_tool(tool_id)
     except Exception:
         return None
 
 
 try:
-    # toolbox.get_tool()'s label/tooltip can now depend on the active
+    # registry.get_tool()'s label/tooltip can now depend on the active
     # language (see core/i18n.py), which this lru_cache -- keyed only by
     # tool_id -- predates and knows nothing about. Without this, switching
     # languages would leave undo chunk names and operation status text
@@ -1575,7 +1572,7 @@ def publish_control_state(state_key, value):
     if not state_key:
         return value
     try:
-        import TheKeyMachine.core.runtimeManager as runtime
+        from TheKeyMachine.core import runtime
         return runtime.get_runtime_manager().set_control_state(str(state_key), value)
     except Exception:
         return value
@@ -1603,7 +1600,7 @@ def bind_control_state(control, state_key, apply_fn, attr_name="_tkm_control_sta
     if control is None or not state_key or not callable(apply_fn):
         return None
     try:
-        import TheKeyMachine.core.runtimeManager as runtime
+        from TheKeyMachine.core import runtime
         manager = runtime.get_runtime_manager()
     except Exception:
         return None
@@ -1847,7 +1844,7 @@ def invalidate_cached_window_on_language_change(dialog, clear_ref):
     window is closed (but not deleted -- these all set
     ``WA_DeleteOnClose=False``) never gets picked up on reopen. Hooking the
     same ``i18n.bus.languageChanged`` signal every already-open toolbar
-    button listens to (see ``core.toolWidgets._bind_toolbar_translation_refresh``)
+    button listens to (see ``widgets.toolbar_widgets._bind_toolbar_translation_refresh``)
     and tearing the cached instance down here means the next open call finds
     no valid cached widget and builds a fresh one, picking up the current
     language for free -- no per-dialog ``refresh_translations()`` method to
@@ -2090,7 +2087,7 @@ class ToolbarWindowToggle(QtCore.QObject):
         centralizing here just means it (and the dispatch wrap) happens once
         instead of being copy-pasted at every call site below.
         """
-        import TheKeyMachine.mods.reportMod as report
+        import TheKeyMachine.tools.bug_report.controller as report
 
         with tool_operation(
             tool_id=self._tool_id,

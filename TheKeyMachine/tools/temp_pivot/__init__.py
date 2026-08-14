@@ -1,8 +1,8 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
-import TheKeyMachine.mods.generalMod as general
+import TheKeyMachine.core.application as general
 from TheKeyMachine.tools.temp_pivot import api
 
 
@@ -50,7 +50,7 @@ class TempPivotToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "temp_pivot_tools", "label": "Temp Pivot",
+        "id": "temp_pivot_tools", "i18n_key": "temp_pivot", "label": "Temp Pivot",
         "color": COLORS.toolbar.purple.hex,
         "items": [
             {"id": "temp_pivot", "shortcuts": [
@@ -65,4 +65,3 @@ class TempPivotToolObject(ToolObject):
             {"id": "temp_pivot_reset"}, "separator", {"id": "temp_pivot_help"},
         ],
     }
-

@@ -16,49 +16,39 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.38"
+__version__ = "0.1.39"
 __stage__ = "beta"
-__build__ = "338"
+__build__ = "339"
 __codename__ = "Cortado"
 
 
 def reload():
+    import importlib
     import sys
 
     try:
-        from importlib import reload
-    except ImportError:
-        from imp import reload
-    except ImportError:
-        pass
-
-    try:
-        import TheKeyMachine.core.runtimeManager as runtime
+        from TheKeyMachine.core import runtime
 
         runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
     except Exception:
         pass
 
-    modules_to_delete = [
-        m for m in list(sys.modules.keys()) if m.startswith("TheKeyMachine")
-    ]
+    for module_name in tuple(sys.modules):
+        if module_name.startswith("TheKeyMachine."):
+            sys.modules.pop(module_name, None)
 
-    for mod_name in modules_to_delete:
-        del sys.modules[mod_name]
+    importlib.invalidate_caches()
+    toolbar = importlib.import_module("TheKeyMachine.ui.widgets.toolbar")
 
-    import TheKeyMachine.core.toolbar as t
-
-    reload(t)
-
-    if tb := t.get_toolbar():
-        tb.reload()
+    if instance := toolbar.get_toolbar():
+        instance.reload()
     else:
-        t.show()
+        toolbar.show()
 
 
 def toggle():
-    import TheKeyMachine.core.toolbar as t
-    from TheKeyMachine.tools.graph_toolbar import api as graph_toolbar
+    from TheKeyMachine.ui.widgets import toolbar as t
+    from TheKeyMachine.tools.graph_toolbar import controller as graph_toolbar
 
     visible = t.toggle()
     graph_toolbar.set_graph_toolbar_enabled(visible, apply=True)
@@ -66,6 +56,6 @@ def toggle():
 
 
 def welcome():
-    import TheKeyMachine.core.toolbar as t
+    from TheKeyMachine.ui.widgets import toolbar as t
 
     t.welcome()

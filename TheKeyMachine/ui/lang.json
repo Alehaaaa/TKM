@@ -1,0 +1,1524 @@
+{
+    "about_build_label": {
+        "ar": "الإصدار: {} | {}",
+        "ca": "Compilació: {} | {}",
+        "es": "Compilación: {} | {}",
+        "fr": "Build : {} | {}",
+        "ja": "ビルド: {} | {}",
+        "ko": "빌드: {} | {}",
+        "zh": "构建版本：{} | {}"
+    },
+    "about_developed_by": {
+        "ar": "طوره {name}",
+        "ca": "Desenvolupat per {name}",
+        "es": "Desarrollado por {name}",
+        "fr": "Développé par {name}",
+        "ja": "開発者: {name}",
+        "ko": "개발자: {name}",
+        "zh": "开发者：{name}"
+    },
+    "about_dialog_title": {
+        "ar": "حول TheKeyMachine",
+        "ca": "Quant a TheKeyMachine",
+        "es": "Acerca de TheKeyMachine",
+        "fr": "À propos de TheKeyMachine",
+        "ja": "TheKeyMachineについて",
+        "ko": "TheKeyMachine 정보",
+        "zh": "关于 TheKeyMachine"
+    },
+    "about_license_sentence": {
+        "ar": "هذه الأداة مرخصة بموجب {gpl_link}.",
+        "ca": "Aquesta eina està llicenciada sota la {gpl_link}.",
+        "es": "Esta herramienta está licenciada bajo la {gpl_link}.",
+        "fr": "Cet outil est distribué sous la licence {gpl_link}.",
+        "ja": "このツールは{gpl_link}の下でライセンスされています。",
+        "ko": "이 도구는 {gpl_link}에 따라 라이선스가 부여됩니다.",
+        "zh": "本工具依据 {gpl_link} 授权。"
+    },
+    "about_modified_by": {
+        "ar": "عدّله {name}",
+        "ca": "Modificat per {name}",
+        "es": "Modificado por {name}",
+        "fr": "Modifié par {name}",
+        "ja": "改変者: {name}",
+        "ko": "수정자: {name}",
+        "zh": "修改者：{name}"
+    },
+    "about_tagline": {
+        "ar": "مجموعة أدوات الرسوم المتحركة لمتحركي Maya",
+        "ca": "Conjunt d'eines d'animació per a animadors de Maya",
+        "es": "Conjunto de herramientas de animación para animadores de Maya",
+        "fr": "Ensemble d'outils d'animation pour les animateurs Maya",
+        "ja": "Mayaアニメーターのためのアニメーションツールセット",
+        "ko": "Maya 애니메이터를 위한 애니메이션 도구 모음",
+        "zh": "面向 Maya 动画师的动画工具集"
+    },
+    "align_center_desc": {
+        "ar": "محاذاة أيقونات شريط الأدوات إلى المنتصف.",
+        "ca": "Alinea les icones de la barra al centre.",
+        "en": "Align toolbar icons to the center.",
+        "es": "Alinea los iconos de la barra al centro.",
+        "fr": "Aligne les icônes de la barre au centre.",
+        "ja": "ツールバーのアイコンを中央揃えにします。",
+        "ko": "툴바 아이콘을 가운데로 정렬합니다.",
+        "zh": "将工具栏图标居中对齐。"
+    },
+    "align_center_label": {
+        "ar": "محاذاة إلى المنتصف",
+        "ca": "Alinear al Centre",
+        "en": "Align Center",
+        "es": "Alinear al Centro",
+        "fr": "Aligner au Centre",
+        "ja": "中央揃え",
+        "ko": "가운데 정렬",
+        "zh": "居中对齐"
+    },
+    "align_left_desc": {
+        "ar": "محاذاة أيقونات شريط الأدوات إلى اليسار.",
+        "ca": "Alinea les icones de la barra a l'esquerra.",
+        "en": "Align toolbar icons to the left.",
+        "es": "Alinea los iconos de la barra a la izquierda.",
+        "fr": "Aligne les icônes de la barre à gauche.",
+        "ja": "ツールバーのアイコンを左揃えにします。",
+        "ko": "툴바 아이콘을 왼쪽으로 정렬합니다.",
+        "zh": "将工具栏图标左对齐。"
+    },
+    "align_left_label": {
+        "ar": "محاذاة إلى اليسار",
+        "ca": "Alinear a l'Esquerra",
+        "en": "Align Left",
+        "es": "Alinear a la Izquierda",
+        "fr": "Aligner à Gauche",
+        "ja": "左揃え",
+        "ko": "왼쪽 정렬",
+        "zh": "左对齐"
+    },
+    "align_right_desc": {
+        "ar": "محاذاة أيقونات شريط الأدوات إلى اليمين.",
+        "ca": "Alinea les icones de la barra a la dreta.",
+        "en": "Align toolbar icons to the right.",
+        "es": "Alinea los iconos de la barra a la derecha.",
+        "fr": "Aligne les icônes de la barre à droite.",
+        "ja": "ツールバーのアイコンを右揃えにします。",
+        "ko": "툴바 아이콘을 오른쪽으로 정렬합니다.",
+        "zh": "将工具栏图标右对齐。"
+    },
+    "align_right_label": {
+        "ar": "محاذاة إلى اليمين",
+        "ca": "Alinear a la Dreta",
+        "en": "Align Right",
+        "es": "Alinear a la Derecha",
+        "fr": "Aligner à Droite",
+        "ja": "右揃え",
+        "ko": "오른쪽 정렬",
+        "zh": "右对齐"
+    },
+    "align_single_line_desc": {
+        "ar": "إبقاء جميع أقسام شريط الأدوات في سطر واحد قابل للتمرير أفقيًا.",
+        "ca": "Manté totes les seccions de la barra en una línia amb desplaçament horitzontal.",
+        "en": "Keep every toolbar section on one horizontally scrollable line.",
+        "es": "Mantiene todas las secciones de la barra en una línea con desplazamiento horizontal.",
+        "fr": "Garde toutes les sections de la barre sur une ligne à défilement horizontal.",
+        "ja": "すべてのツールバーセクションを横スクロール可能な1行に保ちます。",
+        "ko": "모든 툴바 섹션을 가로로 스크롤할 수 있는 한 줄에 유지합니다.",
+        "zh": "将所有工具栏分区保持在可水平滚动的单行内。"
+    },
+    "align_single_line_label": {
+        "ar": "سطر واحد",
+        "ca": "Una Sola Línia",
+        "en": "Single Line",
+        "es": "Una Sola Línea",
+        "fr": "Ligne Unique",
+        "ja": "1行表示",
+        "ko": "한 줄로 표시",
+        "zh": "单行显示"
+    },
+    "alignment_section": {
+        "ar": "المحاذاة",
+        "ca": "Alineació",
+        "es": "Alineación",
+        "fr": "Alignement",
+        "ja": "配置",
+        "ko": "정렬",
+        "zh": "对齐"
+    },
+    "all_saved_default_values_cleared": {
+        "ar": "تم مسح جميع القيم الافتراضية المحفوظة",
+        "ca": "S'han eliminat tots els valors predeterminats desats",
+        "en": "All saved default values cleared",
+        "es": "Todos los valores predeterminados guardados fueron eliminados",
+        "fr": "Toutes les valeurs par défaut enregistrées ont été effacées",
+        "ja": "保存済みのデフォルト値をすべて消去しました",
+        "ko": "저장된 모든 기본값이 삭제되었습니다",
+        "zh": "已清除所有已保存的默认值"
+    },
+    "bake_tangent_mode_keep_shape": {
+        "ar": "الحفاظ على أشكال منحنى الرسوم المتحركة",
+        "ca": "Mantenir Formes de Corba d'Animació",
+        "es": "Mantener Formas de Curva de Animación",
+        "fr": "Conserver les Formes de Courbe d'Animation",
+        "ja": "アニメーションカーブの形状を維持",
+        "ko": "애니메이션 커브 형태 유지",
+        "zh": "保持动画曲线形状"
+    },
+    "bake_tangent_mode_keep_shape_desc": {
+        "ar": "عمل Bake مع الحفاظ على أشكال منحنى الرسوم المتحركة حيثما أمكن ذلك في Maya.",
+        "ca": "Fa bake conservant les formes de les corbes d'animació quan Maya ho pot fer.",
+        "es": "Hace bake conservando las formas de las curvas de animación cuando Maya puede hacerlo.",
+        "fr": "Effectue le bake en préservant les formes des courbes d'animation lorsque Maya le permet.",
+        "ja": "Mayaが可能な場合、アニメーションカーブの形状を保持しながらベイクします。",
+        "ko": "Maya에서 가능한 경우 애니메이션 커브 형태를 유지하면서 베이크합니다.",
+        "zh": "在 Maya 允许的情况下，烘焙时保持动画曲线的形状。"
+    },
+    "bake_tangent_mode_keep_type_desc": {
+        "ar": "عمل Bake للمفاتيح دون فرض مماسات متدرجة على المفاتيح الناتجة.",
+        "ca": "Fa bake de les claus sense forçar tangents esglaonades a les claus resultants.",
+        "es": "Hace bake de las claves sin forzar tangentes escalonadas en las claves resultantes.",
+        "fr": "Effectue le bake des clés sans forcer des tangentes en escalier sur les clés obtenues.",
+        "ja": "ベイクされたキーにステップタンジェントを強制せずにキーをベイクします。",
+        "ko": "베이크된 키에 계단형 탄젠트를 강제하지 않고 키를 베이크합니다.",
+        "zh": "烘焙关键帧，且不强制将烘焙后的关键帧设为阶梯切线。"
+    },
+    "bake_tangent_mode_step": {
+        "ar": "التحويل إلى مماس متدرج",
+        "ca": "Convertir a Tangent Esglaonada",
+        "es": "Convertir a Tangente Escalonada",
+        "fr": "Convertir en Tangente en Escalier",
+        "ja": "ステップタンジェントに変換",
+        "ko": "계단형 탄젠트로 변환",
+        "zh": "烘焙为阶梯切线"
+    },
+    "bake_tangent_mode_step_desc": {
+        "ar": "عمل Bake للمفاتيح، ثم تحويل المماسات الناتجة إلى شكل متدرج.",
+        "ca": "Fa bake de les claus i converteix les tangents resultants a esglaonades.",
+        "es": "Hace bake de las claves y convierte las tangentes resultantes a escalonadas.",
+        "fr": "Effectue le bake des clés, puis convertit les tangentes obtenues en escalier.",
+        "ja": "キーをベイクし、ベイクされたタンジェントをステップ状に変換します。",
+        "ko": "키를 베이크한 다음 베이크된 탄젠트를 계단형으로 변환합니다.",
+        "zh": "烘焙关键帧，然后将烘焙后的切线转换为阶梯状。"
+    },
+    "bug_report_explanation_placeholder": {
+        "ar": "* صف ما حدث، وما كنت تتوقعه، وخطوات إعادة إنتاج المشكلة.",
+        "ca": "* Descriu el que ha passat, el que esperaves i els passos per reproduir-ho.",
+        "es": "* Describe lo ocurrido, lo que esperabas y los pasos para reproducirlo.",
+        "fr": "* Décrivez ce qui s'est passé, ce que vous attendiez et les étapes pour reproduire le problème.",
+        "ja": "* 何が起こったか、何を期待していたか、再現手順を記入してください。",
+        "ko": "* 발생한 상황, 예상했던 결과, 재현 단계를 설명해 주세요.",
+        "zh": "* 请描述发生的情况、您期望的结果以及重现该问题的步骤。"
+    },
+    "bug_report_name_placeholder": {
+        "ar": "* اسمك",
+        "ca": "* El teu nom",
+        "es": "* Tu nombre",
+        "fr": "* Votre nom",
+        "ja": "* お名前",
+        "ko": "* 이름",
+        "zh": "* 您的姓名"
+    },
+    "bug_report_script_error_placeholder": {
+        "ar": "الصق آخر أسطر محرر البرمجة النصية هنا. أضف تتبع الخطأ (traceback) أو الخطأ الدقيق إن وُجد.",
+        "ca": "Enganxa aquí les últimes línies de l'Editor d'Scripts. Inclou el traceback o l'error exacte si el tens.",
+        "es": "Pega aquí las últimas líneas del Editor de Scripts. Incluye el traceback o el error exacto si lo tienes.",
+        "fr": "Collez ici les dernières lignes de l'éditeur de scripts. Incluez la trace ou l'erreur exacte si vous l'avez.",
+        "ja": "スクリプトエディタの最後の行をここに貼り付けてください。トレースバックや正確なエラーがあれば含めてください。",
+        "ko": "스크립트 에디터의 마지막 줄을 여기에 붙여넣으세요. 트레이스백이나 정확한 오류가 있다면 포함해 주세요.",
+        "zh": "在此粘贴脚本编辑器的最后几行。如有回溯信息或确切错误，请一并附上。"
+    },
+    "bug_report_send_button": {
+        "ar": "إرسال الخطأ",
+        "ca": "Enviar error",
+        "es": "Enviar error",
+        "fr": "Envoyer le bug",
+        "ja": "バグを送信",
+        "ko": "버그 전송",
+        "zh": "发送报告"
+    },
+    "bug_report_status_failed": {
+        "ar": "فشل إرسال التقرير. حاول مرة أخرى لاحقًا.",
+        "ca": "No s'ha pogut enviar l'informe. Torna-ho a provar més tard.",
+        "es": "No se pudo enviar el informe. Inténtalo de nuevo más tarde.",
+        "fr": "Échec de l'envoi du rapport. Réessayez plus tard.",
+        "ja": "レポートの送信に失敗しました。後でもう一度お試しください。",
+        "ko": "보고서 전송에 실패했습니다. 나중에 다시 시도해 주세요.",
+        "zh": "报告发送失败，请稍后再试。"
+    },
+    "bug_report_status_missing_fields": {
+        "ar": "يرجى ملء الحقول المطلوبة.",
+        "ca": "Si us plau, completa els camps obligatoris.",
+        "es": "Por favor, completa los campos obligatorios.",
+        "fr": "Veuillez remplir les champs obligatoires.",
+        "ja": "必須項目を入力してください。",
+        "ko": "필수 항목을 입력해 주세요.",
+        "zh": "请填写必填字段。"
+    },
+    "bug_report_status_prepare_failed": {
+        "ar": "فشل تحضير التقرير.",
+        "ca": "No s'ha pogut preparar l'informe.",
+        "es": "No se pudo preparar el informe.",
+        "fr": "Échec de la préparation du rapport.",
+        "ja": "レポートの準備に失敗しました。",
+        "ko": "보고서 준비에 실패했습니다.",
+        "zh": "报告准备失败。"
+    },
+    "bug_report_status_sending": {
+        "ar": "جارٍ إرسال تقرير الخطأ...",
+        "ca": "Enviant l'informe d'error...",
+        "es": "Enviando informe de error...",
+        "fr": "Envoi du rapport de bug...",
+        "ja": "バグレポートを送信中...",
+        "ko": "버그 보고서 전송 중...",
+        "zh": "正在发送错误报告……"
+    },
+    "bug_report_status_sending_wait": {
+        "ar": "جارٍ إرسال تقرير الخطأ. يرجى الانتظار...",
+        "ca": "Enviant l'informe d'error. Si us plau, espera...",
+        "es": "Enviando informe de error. Por favor, espera...",
+        "fr": "Envoi du rapport de bug en cours. Veuillez patienter...",
+        "ja": "バグレポートを送信中です。お待ちください...",
+        "ko": "버그 보고서를 전송 중입니다. 잠시만 기다려 주세요...",
+        "zh": "正在发送错误报告，请稍候……"
+    },
+    "bug_report_status_success": {
+        "ar": "تم إرسال التقرير بنجاح. شكرًا لك!",
+        "ca": "Informe enviat correctament. Gràcies!",
+        "es": "¡Informe enviado correctamente. Gracias!",
+        "fr": "Rapport envoyé avec succès. Merci !",
+        "ja": "レポートが正常に送信されました。ありがとうございます！",
+        "ko": "보고서가 성공적으로 전송되었습니다. 감사합니다!",
+        "zh": "报告发送成功，谢谢！"
+    },
+    "bug_report_status_unavailable": {
+        "ar": "الإبلاغ عن الأخطاء غير متاح في الوقت الحالي.",
+        "ca": "L'enviament d'errors no està disponible en aquest moment.",
+        "es": "El envío de errores no está disponible en este momento.",
+        "fr": "Le signalement de bugs n'est pas disponible pour le moment.",
+        "ja": "現在、バグ報告はご利用いただけません。",
+        "ko": "현재 버그 신고 기능을 사용할 수 없습니다.",
+        "zh": "错误报告功能目前不可用。"
+    },
+    "bug_report_subtitle": {
+        "ar": "هل وجدت خطأً؟ يرجى ملء التقرير وسأبذل قصارى جهدي لإصلاحه في التحديث القادم.",
+        "ca": "Has trobat un error? Omple l'informe i faré tot el possible per solucionar-lo en la propera actualització.",
+        "es": "¿Has encontrado un error? Rellena el informe y haré todo lo posible por solucionarlo en la próxima actualización.",
+        "fr": "Vous avez trouvé un bug ? Remplissez le rapport et je ferai de mon mieux pour le corriger dans la prochaine mise à jour.",
+        "ja": "バグを見つけましたか？レポートにご記入いただければ、次回のアップデートで修正するよう最善を尽くします。",
+        "ko": "버그를 발견하셨나요? 보고서를 작성해 주시면 다음 업데이트에서 수정하도록 최선을 다하겠습니다.",
+        "zh": "发现了错误吗？请填写报告，我会尽力在下一次更新中修复它。"
+    },
+    "bug_report_title": {
+        "ar": "الإبلاغ عن خطأ",
+        "ca": "Informar d'un Error",
+        "es": "Informar de un Error",
+        "fr": "Signaler un Bug",
+        "ja": "バグを報告",
+        "ko": "버그 신고",
+        "zh": "报告错误"
+    },
+    "bug_report_title_detected": {
+        "ar": "عذرًا، لقد وجدت خطأً!",
+        "ca": "Vaja, has trobat un error!",
+        "es": "¡Vaya, encontraste un error!",
+        "fr": "Oups, vous avez trouvé un bug !",
+        "ja": "バグが見つかりました！",
+        "ko": "이런, 버그를 발견하셨네요!",
+        "zh": "抱歉，您发现了一个错误！"
+    },
+    "close": {
+        "ar": "إغلاق",
+        "ca": "Tancar",
+        "es": "Cerrar",
+        "fr": "Fermer",
+        "ja": "閉じる",
+        "ko": "닫기",
+        "zh": "关闭"
+    },
+    "close_graph_toolbar_desc": {
+        "ar": "إخفاء شريط أدوات TKM في Graph Editor وإبقاؤه معطلاً.",
+        "ca": "Amaga la barra de TKM del Graph Editor i la manté desactivada.",
+        "es": "Oculta la barra de TKM del Graph Editor y la mantiene desactivada.",
+        "fr": "Masque la barre TKM du Graph Editor et la garde désactivée.",
+        "ja": "Graph EditorのTKMツールバーを非表示にし、無効のままにします。",
+        "ko": "Graph Editor의 TKM 툴바를 숨기고 비활성 상태로 유지합니다.",
+        "zh": "隐藏 Graph Editor 中的 TKM 工具栏并使其保持禁用状态。"
+    },
+    "default_values_saved": {
+        "ar": "تم حفظ القيم الافتراضية",
+        "ca": "Valors predeterminats desats",
+        "en": "Default values saved",
+        "es": "Valores predeterminados guardados",
+        "fr": "Valeurs par défaut enregistrées",
+        "ja": "デフォルト値を保存しました",
+        "ko": "기본값이 저장되었습니다",
+        "zh": "默认值已保存"
+    },
+    "dialog_button_apply": {
+        "ar": "تطبيق",
+        "ca": "Aplicar",
+        "es": "Aplicar",
+        "fr": "Appliquer",
+        "ja": "適用",
+        "ko": "적용",
+        "zh": "应用"
+    },
+    "dialog_button_cancel": {
+        "ar": "إلغاء",
+        "ca": "Cancel·lar",
+        "es": "Cancelar",
+        "fr": "Annuler",
+        "ja": "キャンセル",
+        "ko": "취소",
+        "zh": "取消"
+    },
+    "dialog_button_no": {
+        "ar": "لا",
+        "ca": "No",
+        "es": "No",
+        "fr": "Non",
+        "ja": "いいえ",
+        "ko": "아니오",
+        "zh": "否"
+    },
+    "dialog_button_ok": {
+        "ar": "موافق",
+        "ca": "Acceptar",
+        "es": "Aceptar",
+        "fr": "OK",
+        "ja": "OK",
+        "ko": "확인",
+        "zh": "确定"
+    },
+    "dialog_button_save": {
+        "ar": "حفظ",
+        "ca": "Desar",
+        "es": "Guardar",
+        "fr": "Enregistrer",
+        "ja": "保存",
+        "ko": "저장",
+        "zh": "保存"
+    },
+    "dialog_button_yes": {
+        "ar": "نعم",
+        "ca": "Sí",
+        "es": "Sí",
+        "fr": "Oui",
+        "ja": "はい",
+        "ko": "예",
+        "zh": "是"
+    },
+    "discord": {
+        "ar": "Discord",
+        "ca": "Discord",
+        "es": "Discord",
+        "fr": "Discord",
+        "ja": "Discord",
+        "ko": "Discord",
+        "zh": "Discord"
+    },
+    "discord_desc": {
+        "ar": "افتح مجتمع Discord الخاص بـ TheKeyMachine.",
+        "ca": "Obre la comunitat de Discord de TheKeyMachine.",
+        "es": "Abrir la comunidad de Discord de TheKeyMachine.",
+        "fr": "Ouvrir la communauté Discord de TheKeyMachine.",
+        "ja": "TheKeyMachineのDiscordコミュニティを開きます。",
+        "ko": "TheKeyMachine의 Discord 커뮤니티를 엽니다.",
+        "zh": "打开 TheKeyMachine 的 Discord 社区。"
+    },
+    "display_section": {
+        "ar": "العرض",
+        "ca": "Visualització",
+        "es": "Visualización",
+        "fr": "Affichage",
+        "ja": "表示",
+        "ko": "표시",
+        "zh": "显示"
+    },
+    "dock_area_AttributeEditor": {
+        "ar": "محرر الخصائص",
+        "ca": "Editor d'Atributs",
+        "es": "Editor de Atributos",
+        "fr": "Éditeur d'Attributs",
+        "ja": "アトリビュートエディタ",
+        "ko": "속성 편집기",
+        "zh": "属性编辑器"
+    },
+    "dock_area_AttributeEditor_desc": {
+        "ar": "أرسِ شريط الأدوات في محرر الخصائص.",
+        "ca": "Acobla la barra a l'Editor d'Atributs.",
+        "es": "Acopla la barra en el Editor de Atributos.",
+        "fr": "Ancre la barre dans l'Éditeur d'Attributs.",
+        "ja": "ツールバーをアトリビュートエディタにドッキングします。",
+        "ko": "툴바를 속성 편집기에 도킹합니다.",
+        "zh": "将工具栏停靠在属性编辑器中。"
+    },
+    "dock_area_ChannelBoxLayerEditor": {
+        "ar": "صندوق القنوات",
+        "ca": "Caixa de Canals",
+        "es": "Caja de Canales",
+        "fr": "Boîte de Canaux",
+        "ja": "チャンネルボックス",
+        "ko": "채널 박스",
+        "zh": "通道盒"
+    },
+    "dock_area_ChannelBoxLayerEditor_desc": {
+        "ar": "أرسِ شريط الأدوات في صندوق القنوات.",
+        "ca": "Acobla la barra a la Caixa de Canals.",
+        "es": "Acopla la barra en la Caja de Canales.",
+        "fr": "Ancre la barre dans la Boîte de Canaux.",
+        "ja": "ツールバーをチャンネルボックスにドッキングします。",
+        "ko": "툴바를 채널 박스에 도킹합니다.",
+        "zh": "将工具栏停靠在通道盒中。"
+    },
+    "dock_area_MainPane": {
+        "ar": "العرض الرئيسي",
+        "ca": "Vista Principal",
+        "es": "Vista Principal",
+        "fr": "Vue Principale",
+        "ja": "メインビュー",
+        "ko": "메인 뷰",
+        "zh": "主视图"
+    },
+    "dock_area_MainPane_desc": {
+        "ar": "أرسِ شريط الأدوات في العرض الرئيسي.",
+        "ca": "Acobla la barra a la Vista Principal.",
+        "es": "Acopla la barra en la Vista Principal.",
+        "fr": "Ancre la barre dans la Vue Principale.",
+        "ja": "ツールバーをメインビューにドッキングします。",
+        "ko": "툴바를 메인 뷰에 도킹합니다.",
+        "zh": "将工具栏停靠在主视图中。"
+    },
+    "dock_area_Outliner": {
+        "ar": "المخطط التفصيلي",
+        "ca": "Esquema",
+        "es": "Esquema",
+        "fr": "Contours",
+        "ja": "アウトライナ",
+        "ko": "아웃라이너",
+        "zh": "大纲视图"
+    },
+    "dock_area_Outliner_desc": {
+        "ar": "أرسِ شريط الأدوات في المخطط التفصيلي.",
+        "ca": "Acobla la barra a l'Esquema.",
+        "es": "Acopla la barra en el Esquema.",
+        "fr": "Ancre la barre dans les Contours.",
+        "ja": "ツールバーをアウトライナにドッキングします。",
+        "ko": "툴바를 아웃라이너에 도킹합니다.",
+        "zh": "将工具栏停靠在大纲视图中。"
+    },
+    "dock_area_RangeSlider": {
+        "ar": "شريط النطاق",
+        "ca": "Control de Rang",
+        "es": "Control de Rango",
+        "fr": "Curseur de Plage",
+        "ja": "レンジスライダー",
+        "ko": "범위 슬라이더",
+        "zh": "范围滑块"
+    },
+    "dock_area_RangeSlider_desc": {
+        "ar": "أرسِ شريط الأدوات في شريط النطاق.",
+        "ca": "Acobla la barra al Control de Rang.",
+        "es": "Acopla la barra en el Control de Rango.",
+        "fr": "Ancre la barre dans le Curseur de Plage.",
+        "ja": "ツールバーをレンジスライダーにドッキングします。",
+        "ko": "툴바를 범위 슬라이더에 도킹합니다.",
+        "zh": "将工具栏停靠在范围滑块中。"
+    },
+    "dock_area_Shelf_desc": {
+        "ar": "أرسِ شريط الأدوات في Shelf.",
+        "ca": "Acobla la barra al Shelf.",
+        "es": "Acopla la barra en el Shelf.",
+        "fr": "Ancre la barre dans le Shelf.",
+        "ja": "ツールバーをShelfにドッキングします。",
+        "ko": "툴바를 Shelf에 도킹합니다.",
+        "zh": "将工具栏停靠在 Shelf 中。"
+    },
+    "dock_area_TimeSlider": {
+        "ar": "شريط الزمن",
+        "ca": "Línia de Temps",
+        "es": "Línea de Tiempo",
+        "fr": "Barre Temporelle",
+        "ja": "タイムスライダー",
+        "ko": "타임 슬라이더",
+        "zh": "时间滑块"
+    },
+    "dock_area_TimeSlider_desc": {
+        "ar": "أرسِ شريط الأدوات في شريط الزمن.",
+        "ca": "Acobla la barra a la Línia de Temps.",
+        "es": "Acopla la barra en la Línea de Tiempo.",
+        "fr": "Ancre la barre dans la Barre Temporelle.",
+        "ja": "ツールバーをタイムスライダーにドッキングします。",
+        "ko": "툴바를 타임 슬라이더에 도킹합니다.",
+        "zh": "将工具栏停靠在时间滑块中。"
+    },
+    "dock_area_section": {
+        "ar": "منطقة الإرساء",
+        "ca": "Àrea d'acoblament",
+        "es": "Área de acoplamiento",
+        "fr": "Zone d'ancrage",
+        "ja": "ドッキング領域",
+        "ko": "도킹 영역",
+        "zh": "停靠区域"
+    },
+    "dock_menu": {
+        "ar": "الإرساء",
+        "ca": "Acoblar",
+        "es": "Acoplar",
+        "fr": "Ancrage",
+        "ja": "ドッキング",
+        "ko": "도킹",
+        "zh": "停靠"
+    },
+    "dock_menu_desc": {
+        "ar": "نقل شريط الأدوات إلى منطقة أخرى في Maya.",
+        "ca": "Mou la barra d'eines a una altra àrea de Maya.",
+        "es": "Mueve la barra de herramientas a otra área de Maya.",
+        "fr": "Déplace la barre d'outils vers une autre zone de Maya.",
+        "ja": "ツールバーを別のMayaエリアに移動します。",
+        "ko": "툴바를 다른 Maya 영역으로 이동합니다.",
+        "zh": "将工具栏移动到 Maya 的其他区域。"
+    },
+    "dock_orient_bottom": {
+        "ar": "أسفل",
+        "ca": "Avall",
+        "es": "Abajo",
+        "fr": "Vers le Bas",
+        "ja": "下部",
+        "ko": "아래쪽",
+        "zh": "底部"
+    },
+    "dock_orient_bottom_desc": {
+        "ar": "ضع شريط الأدوات في الأسفل.",
+        "ca": "Col·loca la barra a la part inferior.",
+        "es": "Coloca la barra en la parte inferior.",
+        "fr": "Place la barre en bas.",
+        "ja": "ツールバーを下部に配置します。",
+        "ko": "툴바를 하단에 배치합니다.",
+        "zh": "将工具栏放置在底部。"
+    },
+    "dock_orient_top": {
+        "ar": "أعلى",
+        "ca": "Amunt",
+        "es": "Arriba",
+        "fr": "Vers le Haut",
+        "ja": "上部",
+        "ko": "위쪽",
+        "zh": "顶部"
+    },
+    "dock_orient_top_desc": {
+        "ar": "ضع شريط الأدوات في الأعلى.",
+        "ca": "Col·loca la barra a la part superior.",
+        "es": "Coloca la barra en la parte superior.",
+        "fr": "Place la barre en haut.",
+        "ja": "ツールバーを上部に配置します。",
+        "ko": "툴바를 상단에 배치합니다.",
+        "zh": "将工具栏放置在顶部。"
+    },
+    "documentation": {
+        "ar": "التوثيق",
+        "ca": "Documentació",
+        "es": "Documentación",
+        "fr": "Documentation",
+        "ja": "ドキュメント",
+        "ko": "문서",
+        "zh": "文档"
+    },
+    "documentation_desc": {
+        "ar": "افتح توثيق TheKeyMachine.",
+        "ca": "Obre la documentació de TheKeyMachine.",
+        "es": "Abrir la documentación de TheKeyMachine.",
+        "fr": "Ouvrir la documentation de TheKeyMachine.",
+        "ja": "TheKeyMachineのドキュメントを開きます。",
+        "ko": "TheKeyMachine 문서를 엽니다.",
+        "zh": "打开 TheKeyMachine 文档。"
+    },
+    "donate_link_label": {
+        "ar": "ادعم TheKeyMachine",
+        "ca": "Dona Suport a TheKeyMachine",
+        "es": "Apoya a TheKeyMachine",
+        "fr": "Soutenez TheKeyMachine",
+        "ja": "TheKeyMachineを支援する",
+        "ko": "TheKeyMachine 후원하기",
+        "zh": "支持 TheKeyMachine"
+    },
+    "donate_message_1": {
+        "ar": "يتطلب تطوير TheKeyMachine قدرًا كبيرًا من الوقت والجهد.",
+        "ca": "El desenvolupament de TheKeyMachine requereix una gran quantitat de temps i energia.",
+        "es": "El desarrollo de TheKeyMachine requiere una gran cantidad de tiempo y energía.",
+        "fr": "Le développement de TheKeyMachine demande beaucoup de temps et d'énergie.",
+        "ja": "TheKeyMachineの開発には多くの時間と労力がかかっています。",
+        "ko": "TheKeyMachine 개발에는 상당한 시간과 노력이 소요됩니다.",
+        "zh": "TheKeyMachine 的开发需要大量的时间和精力。"
+    },
+    "donate_message_2": {
+        "ar": "إذا كنت تستخدمه بشكل احترافي أو منتظم، ففكر في دعم تطويره المستمر.",
+        "ca": "Si l'uses de manera professional o habitual, considera donar suport al seu desenvolupament continuat.",
+        "es": "Si lo usas de forma profesional o habitual, considera apoyar su desarrollo continuo.",
+        "fr": "Si vous l'utilisez professionnellement ou régulièrement, envisagez de soutenir son développement continu.",
+        "ja": "業務で、または頻繁にご利用の場合は、継続的な開発へのご支援をご検討ください。",
+        "ko": "전문적으로 또는 정기적으로 사용하신다면 지속적인 개발을 지원해 주시기 바랍니다.",
+        "zh": "如果您专业或经常使用它，请考虑支持其持续开发。"
+    },
+    "donate_title": {
+        "ar": "تبرع لـ TheKeyMachine",
+        "ca": "Fes una Donació a TheKeyMachine",
+        "es": "Dona a TheKeyMachine",
+        "fr": "Faire un don à TheKeyMachine",
+        "ja": "TheKeyMachineに寄付する",
+        "ko": "TheKeyMachine에 기부하기",
+        "zh": "捐助 TheKeyMachine"
+    },
+    "follow_cam_focus_viewport_required": {
+        "ar": "ركّز على منفذ عرض قبل إنشاء كاميرا المتابعة",
+        "ca": "Enfoca una vista de model abans de crear la Càmera de Seguiment",
+        "en": "Focus a model viewport before creating Follow Cam",
+        "es": "Enfoca una vista de modelo antes de crear la Cámara de Seguimiento",
+        "fr": "Sélectionnez une vue 3D avant de créer la Caméra de Suivi",
+        "ja": "追従カメラを作成する前にビューポートを選択してください",
+        "ko": "추적 카메라를 만들기 전에 뷰포트를 선택하세요",
+        "zh": "创建跟随摄像机前请先激活一个视图"
+    },
+    "follow_cam_no_valid_camera": {
+        "ar": "منفذ العرض النشط لا يحتوي على كاميرا صالحة",
+        "ca": "La vista activa no té una càmera vàlida",
+        "en": "The active viewport has no valid camera",
+        "es": "La vista activa no tiene una cámara válida",
+        "fr": "La vue active n'a pas de caméra valide",
+        "ja": "アクティブなビューポートに有効なカメラがありません",
+        "ko": "활성 뷰포트에 유효한 카메라가 없습니다",
+        "zh": "当前视图没有有效的摄像机"
+    },
+    "follow_cam_not_in_scene": {
+        "ar": "لا توجد كاميرا متابعة في المشهد",
+        "ca": "No hi ha cap Càmera de Seguiment a l'escena",
+        "en": "No followCam in the scene",
+        "es": "No hay ninguna Cámara de Seguimiento en la escena",
+        "fr": "Aucune Caméra de Suivi dans la scène",
+        "ja": "シーンに追従カメラがありません",
+        "ko": "씬에 추적 카메라가 없습니다",
+        "zh": "场景中没有跟随摄像机"
+    },
+    "general_section": {
+        "ar": "عام",
+        "ca": "General",
+        "es": "General",
+        "fr": "Général",
+        "ja": "一般",
+        "ko": "일반",
+        "zh": "常规"
+    },
+    "graph_dock_bottom_graph_editor": {
+        "ar": "أسفل Graph Editor",
+        "ca": "Part Inferior del Graph Editor",
+        "es": "Parte Inferior del Graph Editor",
+        "fr": "Bas du Graph Editor",
+        "ja": "Graph Editorの下部",
+        "ko": "Graph Editor 하단",
+        "zh": "Graph Editor 底部"
+    },
+    "graph_dock_bottom_graph_editor_desc": {
+        "ar": "وضع شريط الأدوات في أسفل Graph Editor.",
+        "ca": "Col·loca la barra d'eines a la part inferior del Graph Editor.",
+        "es": "Coloca la barra de herramientas en la parte inferior del Graph Editor.",
+        "fr": "Place la barre d'outils en bas du Graph Editor.",
+        "ja": "Graph Editorの下部にツールバーを配置します。",
+        "ko": "Graph Editor 하단에 툴바를 배치합니다.",
+        "zh": "将工具栏放置在 Graph Editor 的底部。"
+    },
+    "graph_dock_bottom_menu": {
+        "ar": "أسفل القائمة",
+        "ca": "Sota el Menú",
+        "es": "Bajo el Menú",
+        "fr": "Sous le Menu",
+        "ja": "メニューの下",
+        "ko": "메뉴 아래",
+        "zh": "菜单下方"
+    },
+    "graph_dock_bottom_menu_desc": {
+        "ar": "وضع شريط الأدوات مباشرة أسفل قائمة Graph Editor.",
+        "ca": "Col·loca la barra d'eines just sota el menú del Graph Editor.",
+        "es": "Coloca la barra de herramientas justo debajo del menú del Graph Editor.",
+        "fr": "Place la barre d'outils juste en dessous du menu du Graph Editor.",
+        "ja": "Graph Editorメニューのすぐ下にツールバーを配置します。",
+        "ko": "Graph Editor 메뉴 바로 아래에 툴바를 배치합니다.",
+        "zh": "将工具栏放置在 Graph Editor 菜单正下方。"
+    },
+    "graph_dock_menu_desc": {
+        "ar": "نقل شريط أدوات Graph Editor.",
+        "ca": "Mou la barra d'eines del Graph Editor.",
+        "es": "Mueve la barra de herramientas del Graph Editor.",
+        "fr": "Déplace la barre d'outils du Graph Editor.",
+        "ja": "Graph Editorツールバーを移動します。",
+        "ko": "Graph Editor 툴바를 이동합니다.",
+        "zh": "移动 Graph Editor 工具栏。"
+    },
+    "graph_dock_top_graph_editor": {
+        "ar": "أعلى Graph Editor",
+        "ca": "Part Superior del Graph Editor",
+        "es": "Parte Superior del Graph Editor",
+        "fr": "Haut du Graph Editor",
+        "ja": "Graph Editorの上部",
+        "ko": "Graph Editor 상단",
+        "zh": "Graph Editor 顶部"
+    },
+    "graph_dock_top_graph_editor_desc": {
+        "ar": "وضع شريط الأدوات في أعلى Graph Editor.",
+        "ca": "Col·loca la barra d'eines a la part superior del Graph Editor.",
+        "es": "Coloca la barra de herramientas en la parte superior del Graph Editor.",
+        "fr": "Place la barre d'outils en haut du Graph Editor.",
+        "ja": "Graph Editorの上部にツールバーを配置します。",
+        "ko": "Graph Editor 상단에 툴바를 배치합니다.",
+        "zh": "将工具栏放置在 Graph Editor 的顶部。"
+    },
+    "graph_editor_toolbar": {
+        "ar": "شريط أدوات Graph Editor",
+        "ca": "Barra del Graph Editor",
+        "es": "Barra del Graph Editor",
+        "fr": "Barre du Graph Editor",
+        "ja": "Graph Editor ツールバー",
+        "ko": "Graph Editor 툴바",
+        "zh": "Graph Editor 工具栏"
+    },
+    "graph_editor_toolbar_desc": {
+        "ar": "إظهار أو إخفاء شريط أدوات TKM داخل Graph Editor.",
+        "ca": "Mostra o amaga la barra de TKM dins del Graph Editor.",
+        "es": "Muestra u oculta la barra de TKM dentro del Graph Editor.",
+        "fr": "Afficher ou masquer la barre TKM dans le Graph Editor.",
+        "ja": "Graph Editor内のTKMツールバーを表示または非表示にします。",
+        "ko": "Graph Editor 내의 TKM 툴바를 표시하거나 숨깁니다.",
+        "zh": "显示或隐藏 Graph Editor 中的 TKM 工具栏。"
+    },
+    "graph_toolbar_section": {
+        "ar": "شريط أدوات Graph Editor",
+        "ca": "Barra d'eines del Graph Editor",
+        "es": "Barra de herramientas del Graph Editor",
+        "fr": "Barre d'outils du Graph Editor",
+        "ja": "Graph Editor ツールバー",
+        "ko": "Graph Editor 툴바",
+        "zh": "Graph Editor 工具栏"
+    },
+    "help_menu": {
+        "ar": "المساعدة",
+        "ca": "Ajuda",
+        "es": "Ayuda",
+        "fr": "Aide",
+        "ja": "ヘルプ",
+        "ko": "도움말",
+        "zh": "帮助"
+    },
+    "hotkeys_capture_placeholder": {
+        "ar": "اكتب اختصارًا",
+        "ca": "Escriu una drecera",
+        "es": "Escribe un atajo",
+        "fr": "Saisissez un raccourci",
+        "ja": "ホットキーを入力",
+        "ko": "단축키 입력",
+        "zh": "输入快捷键"
+    },
+    "hotkeys_clear_button": {
+        "ar": "مسح اختصارات TKM",
+        "ca": "Esborrar Dreceres de TKM",
+        "es": "Borrar Hotkeys de TKM",
+        "fr": "Effacer les Raccourcis TKM",
+        "ja": "TKMホットキーをクリア",
+        "ko": "TKM 단축키 지우기",
+        "zh": "清除 TKM 快捷键"
+    },
+    "hotkeys_clear_dialog_heading": {
+        "ar": "هل تريد مسح الاختصارات الحالية؟",
+        "ca": "Vols esborrar les dreceres actuals?",
+        "es": "¿Borrar los hotkeys actuales?",
+        "fr": "Effacer les raccourcis actuels ?",
+        "ja": "現在のホットキーをクリアしますか？",
+        "ko": "현재 단축키를 지우시겠습니까?",
+        "zh": "确定要清除当前的快捷键吗？"
+    },
+    "hotkeys_clear_dialog_message": {
+        "ar": "سيؤدي هذا إلى مسح الاختصارات المعروضة حاليًا في المحرر. لا يزال بإمكانك الإلغاء قبل التطبيق.",
+        "ca": "Això esborrarà les dreceres mostrades actualment a l'editor. Encara pots cancel·lar abans d'aplicar.",
+        "es": "Esto borrará los hotkeys mostrados actualmente en el editor. Aún puedes cancelar antes de aplicar.",
+        "fr": "Cela effacera les raccourcis actuellement affichés dans l'éditeur. Vous pouvez encore annuler avant d'appliquer.",
+        "ja": "エディタに現在表示されているホットキーがクリアされます。適用前であればキャンセルできます。",
+        "ko": "편집기에 현재 표시된 단축키가 지워집니다. 적용하기 전에는 취소할 수 있습니다.",
+        "zh": "这将清除编辑器中当前显示的快捷键。在应用之前您仍可以取消。"
+    },
+    "hotkeys_clear_dialog_title": {
+        "ar": "مسح الاختصارات",
+        "ca": "Esborrar dreceres",
+        "es": "Borrar hotkeys",
+        "fr": "Effacer les raccourcis",
+        "ja": "ホットキーをクリア",
+        "ko": "단축키 지우기",
+        "zh": "清除快捷键"
+    },
+    "hotkeys_dialog_title": {
+        "ar": "اختصارات TheKeyMachine",
+        "ca": "Dreceres de TheKeyMachine",
+        "es": "Hotkeys de TheKeyMachine",
+        "fr": "Raccourcis de TheKeyMachine",
+        "ja": "TheKeyMachine ホットキー",
+        "ko": "TheKeyMachine 단축키",
+        "zh": "TheKeyMachine 快捷键"
+    },
+    "hotkeys_discard_button": {
+        "ar": "تجاهل",
+        "ca": "Descartar",
+        "es": "Descartar",
+        "fr": "Ignorer",
+        "ja": "破棄",
+        "ko": "취소하고 버리기",
+        "zh": "放弃"
+    },
+    "hotkeys_export_button": {
+        "ar": "تصدير الاختصارات",
+        "ca": "Exportar Dreceres",
+        "es": "Exportar Hotkeys",
+        "fr": "Exporter les Raccourcis",
+        "ja": "ホットキーをエクスポート",
+        "ko": "단축키 내보내기",
+        "zh": "导出快捷键"
+    },
+    "hotkeys_import_button": {
+        "ar": "استيراد الاختصارات",
+        "ca": "Importar Dreceres",
+        "es": "Importar Hotkeys",
+        "fr": "Importer les Raccourcis",
+        "ja": "ホットキーをインポート",
+        "ko": "단축키 가져오기",
+        "zh": "导入快捷键"
+    },
+    "hotkeys_panel_tools": {
+        "ar": "الأدوات",
+        "ca": "Eines",
+        "es": "Herramientas",
+        "fr": "Outils",
+        "ja": "ツール",
+        "ko": "도구",
+        "zh": "工具"
+    },
+    "hotkeys_unsaved_dialog_heading": {
+        "ar": "هل تريد حفظ تغييرات الاختصارات؟",
+        "ca": "Vols desar els canvis de dreceres?",
+        "es": "¿Guardar los cambios de hotkeys?",
+        "fr": "Enregistrer les modifications des raccourcis ?",
+        "ja": "ホットキーの変更を保存しますか？",
+        "ko": "단축키 변경 사항을 저장하시겠습니까?",
+        "zh": "是否保存快捷键的更改？"
+    },
+    "hotkeys_unsaved_dialog_message": {
+        "ar": "لديك تغييرات غير محفوظة في الاختصارات. احفظها أو تجاهلها أو ألغِ الأمر وواصل التحرير.",
+        "ca": "Tens canvis de dreceres sense desar. Desa'ls, descarta'ls o cancel·la i continua editant.",
+        "es": "Tienes cambios de hotkeys sin guardar. Guárdalos, descártalos o cancela y sigue editando.",
+        "fr": "Vous avez des modifications de raccourcis non enregistrées. Enregistrez-les, ignorez-les, ou annulez et continuez à modifier.",
+        "ja": "未保存のホットキーの変更があります。保存するか、破棄するか、キャンセルして編集を続けてください。",
+        "ko": "저장되지 않은 단축키 변경 사항이 있습니다. 저장하거나, 취소하거나, 편집을 계속하세요.",
+        "zh": "您有未保存的快捷键更改。请保存、放弃，或取消并继续编辑。"
+    },
+    "hotkeys_unsaved_dialog_title": {
+        "ar": "اختصارات غير محفوظة",
+        "ca": "Dreceres sense desar",
+        "es": "Hotkeys sin guardar",
+        "fr": "Raccourcis non enregistrés",
+        "ja": "未保存のホットキー",
+        "ko": "저장되지 않은 단축키",
+        "zh": "未保存的快捷键"
+    },
+    "no_animation_curves_found": {
+        "ar": "لم يتم العثور على منحنيات حركة",
+        "ca": "No s'han trobat corbes d'animació",
+        "en": "No animation curves found",
+        "es": "No se encontraron curvas de animación",
+        "fr": "Aucune courbe d'animation trouvée",
+        "ja": "アニメーションカーブが見つかりません",
+        "ko": "애니메이션 커브를 찾을 수 없습니다",
+        "zh": "未找到动画曲线"
+    },
+    "no_animation_curves_found_in_scene": {
+        "ar": "لم يتم العثور على منحنيات حركة في المشهد",
+        "ca": "No s'han trobat corbes d'animació a l'escena",
+        "en": "No animation curves found in the scene",
+        "es": "No se encontraron curvas de animación en la escena",
+        "fr": "Aucune courbe d'animation trouvée dans la scène",
+        "ja": "シーン内にアニメーションカーブが見つかりません",
+        "ko": "씬에서 애니메이션 커브를 찾을 수 없습니다",
+        "zh": "场景中未找到动画曲线"
+    },
+    "no_saved_default_values_found": {
+        "ar": "لم يتم العثور على قيم افتراضية محفوظة",
+        "ca": "No s'han trobat valors predeterminats desats",
+        "en": "No saved default values found",
+        "es": "No se encontraron valores predeterminados guardados",
+        "fr": "Aucune valeur par défaut enregistrée trouvée",
+        "ja": "保存済みのデフォルト値が見つかりません",
+        "ko": "저장된 기본값을 찾을 수 없습니다",
+        "zh": "未找到已保存的默认值"
+    },
+    "open_config_file": {
+        "ar": "فتح ملف الإعداد",
+        "ca": "Obrir fitxer de configuració",
+        "es": "Abrir archivo de configuración",
+        "fr": "Ouvrir le fichier de configuration",
+        "ja": "設定ファイルを開く",
+        "ko": "구성 파일 열기",
+        "zh": "打开配置文件"
+    },
+    "open_config_file_desc": {
+        "ar": "فتح ملف إعداد الأدوات المخصصة.",
+        "ca": "Obre el fitxer de configuració de les Eines Personalitzades.",
+        "es": "Abre el archivo de configuración de Herramientas Personalizadas.",
+        "fr": "Ouvre le fichier de configuration des Outils Personnalisés.",
+        "ja": "カスタムツールの設定ファイルを開きます。",
+        "ko": "사용자 지정 도구 구성 파일을 엽니다.",
+        "zh": "打开自定义工具配置文件。"
+    },
+    "pin_all": {
+        "ar": "تثبيت الكل",
+        "ca": "Fixar-ho Tot",
+        "es": "Anclar Todo",
+        "fr": "Tout Épingler",
+        "ja": "すべてピン留め",
+        "ko": "모두 고정",
+        "zh": "固定全部"
+    },
+    "pin_defaults": {
+        "ar": "تثبيت الافتراضيات",
+        "ca": "Fixar Predeterminats",
+        "es": "Anclar Predeterminados",
+        "fr": "Épingler les Valeurs par Défaut",
+        "ja": "デフォルトをピン留め",
+        "ko": "기본값 고정",
+        "zh": "固定默认项"
+    },
+    "pin_tools_in": {
+        "ar": "تثبيت الأدوات في {}.",
+        "ca": "Fixa eines a {}.",
+        "es": "Anclar herramientas en {}.",
+        "fr": "Épingler les outils dans {}.",
+        "ja": "{} にツールを固定します。",
+        "ko": "{}에 도구 고정.",
+        "zh": "在 {} 中固定工具。"
+    },
+    "position_orient_bottom": {
+        "ar": "أسفل",
+        "ca": "Avall",
+        "es": "Abajo",
+        "fr": "Bas",
+        "ja": "下",
+        "ko": "아래",
+        "zh": "底部"
+    },
+    "position_orient_top": {
+        "ar": "أعلى",
+        "ca": "Amunt",
+        "es": "Arriba",
+        "fr": "Haut",
+        "ja": "上",
+        "ko": "위",
+        "zh": "顶部"
+    },
+    "position_section": {
+        "ar": "الموضع",
+        "ca": "Posició",
+        "es": "Posición",
+        "fr": "Position",
+        "ja": "位置",
+        "ko": "위치",
+        "zh": "位置"
+    },
+    "preferences_menu": {
+        "ar": "التفضيلات",
+        "ca": "Preferències",
+        "es": "Preferencias",
+        "fr": "Préférences",
+        "ja": "環境設定",
+        "ko": "환경설정",
+        "zh": "首选项"
+    },
+    "reload_prompt_message_1": {
+        "ar": "تؤدي إعادة التحميل إلى استبدال وحدات Python وردود الأفعال (callbacks) وواجهة Maya الخاصة بـ TheKeyMachine أثناء تشغيل Maya.",
+        "ca": "Recarregar substitueix els mòduls de Python, callbacks i interfície de Maya de TheKeyMachine mentre Maya s'està executant.",
+        "es": "Recargar reemplaza los módulos de Python, callbacks e interfaz de Maya de TheKeyMachine mientras Maya está en ejecución.",
+        "fr": "Le rechargement remplace les modules Python, les callbacks et l'interface Maya de TheKeyMachine pendant que Maya est en cours d'exécution.",
+        "ja": "再読み込みは、Mayaの実行中にTheKeyMachineのPythonモジュール、コールバック、Maya UIを置き換えます。",
+        "ko": "다시 로드하면 Maya가 실행 중인 상태에서 TheKeyMachine의 Python 모듈, 콜백, Maya UI가 교체됩니다.",
+        "zh": "重新加载会在 Maya 运行期间替换 TheKeyMachine 的 Python 模块、回调和 Maya 界面。"
+    },
+    "reload_prompt_message_2": {
+        "ar": "قد يؤدي هذا أحيانًا إلى عدم استقرار Maya أو تعطله. احفظ المشهد قبل المتابعة.",
+        "ca": "Això pot fer que Maya esdevingui inestable o es bloquegi ocasionalment. Desa l'escena abans de continuar.",
+        "es": "Esto puede ocasionalmente hacer que Maya se vuelva inestable o se bloquee. Guarda la escena antes de continuar.",
+        "fr": "Cela peut occasionnellement rendre Maya instable ou provoquer un plantage. Enregistrez la scène avant de continuer.",
+        "ja": "これにより、Mayaが不安定になったりクラッシュしたりすることが稀にあります。続行する前にシーンを保存してください。",
+        "ko": "이로 인해 Maya가 간혹 불안정해지거나 충돌할 수 있습니다. 계속하기 전에 씬을 저장하세요.",
+        "zh": "这可能偶尔会导致 Maya 不稳定或崩溃。请在继续之前保存场景。"
+    },
+    "reload_prompt_save_as": {
+        "ar": "حفظ باسم",
+        "ca": "Desar Com",
+        "es": "Guardar Como",
+        "fr": "Enregistrer Sous",
+        "ja": "名前を付けて保存",
+        "ko": "다른 이름으로 저장",
+        "zh": "另存为"
+    },
+    "reload_prompt_skip": {
+        "ar": "تخطي",
+        "ca": "Ometre",
+        "es": "Omitir",
+        "fr": "Ignorer",
+        "ja": "スキップ",
+        "ko": "건너뛰기",
+        "zh": "跳过"
+    },
+    "reload_prompt_title": {
+        "ar": "هل تريد حفظ المشهد قبل إعادة التحميل؟",
+        "ca": "Vols desar l'escena abans de recarregar?",
+        "es": "¿Guardar la escena antes de recargar?",
+        "fr": "Enregistrer la scène avant de recharger ?",
+        "ja": "再読み込みする前にシーンを保存しますか？",
+        "ko": "다시 로드하기 전에 씬을 저장하시겠습니까?",
+        "zh": "重新加载前是否保存场景？"
+    },
+    "reload_prompt_window_title": {
+        "ar": "إعادة تحميل TheKeyMachine",
+        "ca": "Recarregar TheKeyMachine",
+        "es": "Recargar TheKeyMachine",
+        "fr": "Recharger TheKeyMachine",
+        "ja": "TheKeyMachineを再読み込み",
+        "ko": "TheKeyMachine 다시 로드",
+        "zh": "重新加载 TheKeyMachine"
+    },
+    "remove_redundant_mode_all": {
+        "ar": "جميع المفاتيح الزائدة",
+        "ca": "Totes les Redundants",
+        "es": "Todas las Redundantes",
+        "fr": "Toutes les Redondantes",
+        "ja": "すべての冗長キー",
+        "ko": "모든 중복 키",
+        "zh": "所有冗余关键帧"
+    },
+    "remove_redundant_mode_all_desc": {
+        "ar": "تبسيط جميع المفاتيح الزائدة على المنحنيات النشطة مع الحفاظ على تحديد المفاتيح الحالي.",
+        "ca": "Simplifica totes les claus redundants a les corbes actives conservant la selecció de claus actual.",
+        "es": "Simplifica todas las claves redundantes en las curvas activas conservando la selección de claves actual.",
+        "fr": "Simplifie toutes les clés redondantes sur les courbes actives en conservant la sélection de clés actuelle.",
+        "ja": "現在のキー選択を維持しながら、アクティブなカーブ上のすべての冗長キーを簡略化します。",
+        "ko": "현재 키 선택을 유지하면서 활성 커브의 모든 중복 키를 단순화합니다.",
+        "zh": "简化活动曲线上所有冗余的关键帧，同时保留当前的关键帧选择。"
+    },
+    "remove_redundant_mode_flat": {
+        "ar": "التأثير على المفاتيح المسطحة فقط",
+        "ca": "Afectar Només Claus Planes",
+        "es": "Afectar Solo Claves Planas",
+        "fr": "Affecter Uniquement les Clés Plates",
+        "ja": "フラットキーのみに適用",
+        "ko": "평평한 키에만 적용",
+        "zh": "仅影响平坦关键帧"
+    },
+    "remove_redundant_mode_flat_desc": {
+        "ar": "إزالة المفاتيح الداخلية فقط من المقاطع ذات القيمة الثابتة. تُترك مفاتيح الحركة غير المسطحة دون تغيير.",
+        "ca": "Elimina només les claus interiors de trams de valor pla. Les claus de moviment no planes es deixen intactes.",
+        "es": "Elimina solo las claves interiores de tramos de valor plano. Las claves de movimiento no planas se dejan intactas.",
+        "fr": "Supprime uniquement les clés intérieures des segments de valeur plate. Les clés de mouvement non plates restent intactes.",
+        "ja": "フラットな値の区間内の内部キーのみを削除します。フラットでない動きのキーはそのままにします。",
+        "ko": "평평한 값 구간의 내부 키만 제거합니다. 평평하지 않은 모션 키는 그대로 유지됩니다.",
+        "zh": "仅移除平坦数值区间内的内部关键帧，非平坦运动关键帧保持不变。"
+    },
+    "restore_defaults": {
+        "ar": "استعادة الإعدادات الافتراضية",
+        "ca": "Restaurar Valors Predeterminats",
+        "es": "Restaurar Valores Predeterminados",
+        "fr": "Restaurer les Valeurs par Défaut",
+        "ja": "デフォルトに戻す",
+        "ko": "기본값 복원",
+        "zh": "恢复默认设置"
+    },
+    "restore_defaults_desc": {
+        "ar": "استعادة التثبيتات والمحاذاة الافتراضية لشريط الأدوات.",
+        "ca": "Restaura els ancoratges i l'alineació predeterminats de la barra.",
+        "es": "Restaura los anclajes y la alineación predeterminados de la barra.",
+        "fr": "Restaure les épingles et l'alignement par défaut de la barre.",
+        "ja": "ツールバーのデフォルトのピン留めと配置を復元します。",
+        "ko": "툴바의 기본 고정 항목과 정렬을 복원합니다.",
+        "zh": "恢复工具栏的默认固定项和对齐方式。"
+    },
+    "restore_runner_defaults_desc": {
+        "ar": "استعادة الحالات الافتراضية للمشغلات الخلفية.",
+        "ca": "Restaura els estats predeterminats dels executors en segon pla.",
+        "es": "Restaura los estados predeterminados de los ejecutores en segundo plano.",
+        "fr": "Restaure les états par défaut des exécuteurs en arrière-plan.",
+        "ja": "バックグラウンドランナーのデフォルト状態を復元します。",
+        "ko": "백그라운드 러너의 기본 상태를 복원합니다.",
+        "zh": "恢复后台运行器的默认状态。"
+    },
+    "saved_defaults_removed_for_selection": {
+        "ar": "تمت إزالة القيم الافتراضية المحفوظة للتحديد",
+        "ca": "S'han eliminat els valors predeterminats desats per a la selecció",
+        "en": "Saved defaults removed for the selection",
+        "es": "Valores predeterminados guardados eliminados para la selección",
+        "fr": "Valeurs par défaut enregistrées supprimées pour la sélection",
+        "ja": "選択オブジェクトの保存済みデフォルト値を削除しました",
+        "ko": "선택 항목에 대해 저장된 기본값이 제거되었습니다",
+        "zh": "已移除所选对象保存的默认值"
+    },
+    "select_at_least_one_object": {
+        "ar": "حدد كائنًا واحدًا على الأقل",
+        "ca": "Selecciona almenys un objecte",
+        "en": "Select at least one object",
+        "es": "Selecciona al menos un objeto",
+        "fr": "Sélectionnez au moins un objet",
+        "ja": "少なくとも1つのオブジェクトを選択してください",
+        "ko": "하나 이상의 오브젝트를 선택하세요",
+        "zh": "请至少选择一个对象"
+    },
+    "select_objects_channels_or_graph_editor_keys": {
+        "ar": "حدد كائنات أو قنوات أو مفاتيح من Graph Editor",
+        "ca": "Selecciona objectes, canals o claus del Graph Editor",
+        "en": "Select objects, channels, or Graph Editor keys",
+        "es": "Selecciona objetos, canales o claves del Graph Editor",
+        "fr": "Sélectionnez des objets, des canaux ou des clés du Graph Editor",
+        "ja": "オブジェクト、チャンネル、またはGraph Editorのキーを選択してください",
+        "ko": "오브젝트, 채널 또는 Graph Editor 키를 선택하세요",
+        "zh": "请选择对象、通道或 Graph Editor 中的关键帧"
+    },
+    "settings_menu": {
+        "ar": "الإعدادات",
+        "ca": "Ajustos",
+        "es": "Ajustes",
+        "fr": "Paramètres",
+        "ja": "設定",
+        "ko": "설정",
+        "zh": "设置"
+    },
+    "settings_menu_desc": {
+        "ar": "إعدادات الأداة وتفضيلاتها.",
+        "ca": "Configuració i preferències de l'eina.",
+        "es": "Configuración y preferencias de la herramienta.",
+        "fr": "Configuration et préférences de l'outil.",
+        "ja": "ツールの設定と環境設定。",
+        "ko": "도구 설정 및 환경설정.",
+        "zh": "工具配置和偏好设置。"
+    },
+    "share_keys_mode_preserve_shape": {
+        "ar": "الحفاظ على شكل منحنى الرسوم المتحركة",
+        "ca": "Mantenir Forma de Corba d'Animació",
+        "es": "Mantener Forma de Curva de Animación",
+        "fr": "Conserver la Forme de la Courbe d'Animation",
+        "ja": "アニメーションカーブの形状を維持",
+        "ko": "애니메이션 커브 형태 유지",
+        "zh": "保持动画曲线形状"
+    },
+    "share_keys_mode_preserve_shape_desc": {
+        "ar": "إدراج المفاتيح المفقودة مع الحفاظ على شكل منحنى الرسوم المتحركة.",
+        "ca": "Insereix les claus que falten conservant la forma de la corba d'animació.",
+        "es": "Inserta las claves que faltan conservando la forma de la curva de animación.",
+        "fr": "Insère les clés manquantes en préservant la forme de la courbe d'animation.",
+        "ja": "アニメーションカーブの形状を保持しながら、不足しているキーを挿入します。",
+        "ko": "애니메이션 커브 형태를 유지하면서 누락된 키를 삽입합니다.",
+        "zh": "插入缺失的关键帧，同时保持动画曲线的形状。"
+    },
+    "share_keys_mode_preserve_tangent": {
+        "ar": "الحفاظ على نوع المماس",
+        "ca": "Mantenir Tipus de Tangent",
+        "es": "Mantener Tipo de Tangente",
+        "fr": "Conserver le Type de Tangente",
+        "ja": "タンジェントタイプを維持",
+        "ko": "탄젠트 유형 유지",
+        "zh": "保持切线类型"
+    },
+    "share_keys_mode_preserve_tangent_desc": {
+        "ar": "إضافة المفاتيح المفقودة دون تغيير نوع المماس.",
+        "ca": "Afegeix les claus que falten sense canviar el tipus de tangent.",
+        "es": "Añade las claves que faltan sin cambiar el tipo de tangente.",
+        "fr": "Ajoute les clés manquantes sans changer le type de tangente.",
+        "ja": "タンジェントタイプを変更せずに不足しているキーを追加します。",
+        "ko": "탄젠트 유형을 변경하지 않고 누락된 키를 추가합니다.",
+        "zh": "添加缺失的关键帧，且不改变切线类型。"
+    },
+    "slider_mode_section": {
+        "ar": "وضع شريط التمرير",
+        "ca": "Mode de Control Lliscant",
+        "es": "Modo de Slider",
+        "fr": "Mode de Curseur",
+        "ja": "スライダーモード",
+        "ko": "슬라이더 모드",
+        "zh": "滑块模式"
+    },
+    "startup_section": {
+        "ar": "بدء التشغيل",
+        "ca": "Inici",
+        "es": "Inicio",
+        "fr": "Démarrage",
+        "ja": "起動",
+        "ko": "시작",
+        "zh": "启动"
+    },
+    "system_menu": {
+        "ar": "النظام",
+        "ca": "Sistema",
+        "es": "Sistema",
+        "fr": "Système",
+        "ja": "システム",
+        "ko": "시스템",
+        "zh": "系统"
+    },
+    "toolbar_icons_alignment_section": {
+        "ar": "محاذاة أيقونات شريط الأدوات",
+        "ca": "Alineació de les icones de la barra",
+        "es": "Alineación de los iconos de la barra",
+        "fr": "Alignement des icônes de la barre",
+        "ja": "ツールバーアイコンの配置",
+        "ko": "툴바 아이콘 정렬",
+        "zh": "工具栏图标对齐方式"
+    },
+    "translate_tool_names_desc": {
+        "ar": "يترجم أيضًا أسماء الأدوات، وليس فقط الأوصاف والرسائل.",
+        "ca": "També tradueix els noms de les eines, no només les descripcions i missatges.",
+        "es": "También traduce los nombres de las herramientas, no solo las descripciones y mensajes.",
+        "fr": "Traduit aussi les noms des outils, pas seulement les descriptions et les messages.",
+        "ja": "説明やメッセージだけでなく、ツール名も翻訳します。",
+        "ko": "설명 및 메시지뿐만 아니라 도구 이름도 번역합니다.",
+        "zh": "同时翻译工具名称，不仅仅是描述和消息。"
+    },
+    "translate_tool_names_label": {
+        "ar": "ترجمة أسماء الأدوات",
+        "ca": "Traduir Noms d'Eines",
+        "es": "Traducir Nombres de Herramientas",
+        "fr": "Traduire les Noms d'Outils",
+        "ja": "ツール名も翻訳",
+        "ko": "도구 이름 번역",
+        "zh": "翻译工具名称"
+    },
+    "turn_all_off": {
+        "ar": "إيقاف تشغيل الكل",
+        "ca": "Desactivar-ho Tot",
+        "es": "Desactivar Todo",
+        "fr": "Tout Désactiver",
+        "ja": "すべてオフにする",
+        "ko": "모두 끄기",
+        "zh": "全部关闭"
+    },
+    "turn_all_off_desc": {
+        "ar": "تعطيل جميع المشغلات الخلفية.",
+        "ca": "Desactiva tots els executors en segon pla.",
+        "es": "Desactiva todos los ejecutores en segundo plano.",
+        "fr": "Désactive tous les exécuteurs en arrière-plan.",
+        "ja": "すべてのバックグラウンドランナーを無効にします。",
+        "ko": "모든 백그라운드 러너를 비활성화합니다.",
+        "zh": "禁用所有后台运行器。"
+    },
+    "version_history_dialog_title": {
+        "ar": "سجل إصدارات TheKeyMachine",
+        "ca": "Historial de Versions de TheKeyMachine",
+        "es": "Historial de Versiones de TheKeyMachine",
+        "fr": "Historique des Versions de TheKeyMachine",
+        "ja": "TheKeyMachine バージョン履歴",
+        "ko": "TheKeyMachine 버전 기록",
+        "zh": "TheKeyMachine 版本历史"
+    },
+    "version_history_empty": {
+        "ar": "لا يوجد سجل تغييرات متاح.",
+        "ca": "No hi ha historial de canvis disponible.",
+        "es": "No hay historial de cambios disponible.",
+        "fr": "Aucun historique des modifications disponible.",
+        "ja": "変更履歴はありません。",
+        "ko": "변경 기록이 없습니다.",
+        "zh": "暂无更新日志。"
+    },
+    "version_history_no_entries": {
+        "ar": "(لم يتم العثور على إدخالات في سجل التغييرات)",
+        "ca": "(No s'ha trobat cap entrada a l'historial de canvis)",
+        "es": "(No se encontraron entradas en el historial de cambios)",
+        "fr": "(Aucune entrée d'historique des modifications trouvée)",
+        "ja": "（変更履歴のエントリが見つかりません）",
+        "ko": "(변경 기록 항목을 찾을 수 없습니다)",
+        "zh": "（未找到更新日志条目）"
+    },
+    "version_history_range": {
+        "ar": "(من {} إلى {})",
+        "ca": "(Des de {} fins a {})",
+        "es": "(Desde {} hasta {})",
+        "fr": "(De {} à {})",
+        "ja": "（{} から {} まで）",
+        "ko": "({}부터 {}까지)",
+        "zh": "（从 {} 到 {}）"
+    },
+    "version_history_version_label": {
+        "ar": "الإصدار {}",
+        "ca": "Versió {}",
+        "es": "Versión {}",
+        "fr": "Version {}",
+        "ja": "バージョン {}",
+        "ko": "버전 {}",
+        "zh": "版本 {}"
+    },
+    "workspace_position_desc": {
+        "ar": "إرساء شريط الأدوات: {position}.",
+        "ca": "Ancora la barra d'eines: {position}.",
+        "es": "Ancla la barra de herramientas: {position}.",
+        "fr": "Ancre la barre d'outils : {position}.",
+        "ja": "ツールバーをドッキング: {position}",
+        "ko": "툴바를 도킹합니다: {position}",
+        "zh": "将工具栏停靠在：{position}。"
+    },
+    "workspace_position_label": {
+        "ar": "{orient} {area}",
+        "ca": "{orient} de {area}",
+        "es": "{orient} de {area}",
+        "fr": "{orient} de {area}",
+        "ja": "{area}の{orient}",
+        "ko": "{area} {orient}",
+        "zh": "{area}{orient}"
+    },
+    "workspaces_column_alignment": {
+        "ar": "المحاذاة",
+        "ca": "Alineació",
+        "es": "Alineación",
+        "fr": "Alignement",
+        "ja": "配置",
+        "ko": "정렬",
+        "zh": "对齐方式"
+    },
+    "workspaces_column_color_group": {
+        "ar": "مجموعة الألوان",
+        "ca": "Grup de Color",
+        "es": "Grupo de Color",
+        "fr": "Groupe de Couleur",
+        "ja": "カラーグループ",
+        "ko": "색상 그룹",
+        "zh": "颜色组"
+    },
+    "workspaces_column_toolbar": {
+        "ar": "شريط الأدوات",
+        "ca": "Barra d'Eines",
+        "es": "Barra de Herramientas",
+        "fr": "Barre d'Outils",
+        "ja": "ツールバー",
+        "ko": "툴바",
+        "zh": "工具栏"
+    },
+    "workspaces_column_workspace": {
+        "ar": "مساحة العمل",
+        "ca": "Espai de Treball",
+        "es": "Espacio de Trabajo",
+        "fr": "Espace de Travail",
+        "ja": "ワークスペース",
+        "ko": "워크스페이스",
+        "zh": "工作区"
+    },
+    "workspaces_delete_button": {
+        "ar": "حذف مساحة العمل",
+        "ca": "Eliminar Espai de Treball",
+        "es": "Eliminar Espacio de Trabajo",
+        "fr": "Supprimer l'Espace de Travail",
+        "ja": "ワークスペースを削除",
+        "ko": "워크스페이스 삭제",
+        "zh": "删除工作区"
+    },
+    "workspaces_delete_heading": {
+        "ar": "هل تريد حذف مساحة العمل؟",
+        "ca": "Vols eliminar l'espai de treball?",
+        "es": "¿Eliminar espacio de trabajo?",
+        "fr": "Supprimer l'espace de travail ?",
+        "ja": "ワークスペースを削除しますか？",
+        "ko": "워크스페이스를 삭제하시겠습니까?",
+        "zh": "是否删除工作区？"
+    },
+    "workspaces_delete_message": {
+        "ar": "هل تريد حذف مساحة العمل '{}'؟ لا يمكن التراجع عن هذا الإجراء.",
+        "ca": "Vols eliminar l'espai de treball '{}'? Això no es pot desfer.",
+        "es": "¿Eliminar el espacio de trabajo '{}'? Esto no se puede deshacer.",
+        "fr": "Supprimer l'espace de travail « {} » ? Cette action est irréversible.",
+        "ja": "ワークスペース「{}」を削除しますか？この操作は元に戻せません。",
+        "ko": "'{}' 워크스페이스를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+        "zh": "确定要删除工作区“{}”吗？此操作无法撤销。"
+    },
+    "workspaces_export_button": {
+        "ar": "تصدير",
+        "ca": "Exportar",
+        "es": "Exportar",
+        "fr": "Exporter",
+        "ja": "エクスポート",
+        "ko": "내보내기",
+        "zh": "导出"
+    },
+    "workspaces_export_caption": {
+        "ar": "تصدير مساحات العمل",
+        "ca": "Exportar Espais de Treball",
+        "es": "Exportar Espacios de Trabajo",
+        "fr": "Exporter les Espaces de Travail",
+        "ja": "ワークスペースをエクスポート",
+        "ko": "워크스페이스 내보내기",
+        "zh": "导出工作区"
+    },
+    "workspaces_import_button": {
+        "ar": "استيراد",
+        "ca": "Importar",
+        "es": "Importar",
+        "fr": "Importer",
+        "ja": "インポート",
+        "ko": "가져오기",
+        "zh": "导入"
+    },
+    "workspaces_import_caption": {
+        "ar": "استيراد مساحات العمل",
+        "ca": "Importar Espais de Treball",
+        "es": "Importar Espacios de Trabajo",
+        "fr": "Importer les Espaces de Travail",
+        "ja": "ワークスペースをインポート",
+        "ko": "워크스페이스 가져오기",
+        "zh": "导入工作区"
+    },
+    "workspaces_new_button": {
+        "ar": "مساحة عمل جديدة",
+        "ca": "Nou Espai de Treball",
+        "es": "Nuevo Espacio de Trabajo",
+        "fr": "Nouvel Espace de Travail",
+        "ja": "新規ワークスペース",
+        "ko": "새 워크스페이스",
+        "zh": "新建工作区"
+    },
+    "workspaces_restore_heading": {
+        "ar": "هل تريد استعادة الإعدادات الافتراضية لشريط الأدوات؟",
+        "ca": "Vols restaurar els valors predeterminats de la barra?",
+        "es": "¿Restaurar los valores predeterminados de la barra?",
+        "fr": "Restaurer les paramètres par défaut de la barre d'outils ?",
+        "ja": "ツールバーのデフォルト設定を復元しますか？",
+        "ko": "툴바의 기본값을 복원하시겠습니까?",
+        "zh": "是否恢复工具栏的默认设置？"
+    },
+    "workspaces_restore_message": {
+        "ar": "هل تريد استعادة الإعدادات الافتراضية لمساحة العمل '{}'؟",
+        "ca": "Vols restaurar els valors predeterminats de l'espai de treball '{}'?",
+        "es": "¿Restaurar los valores predeterminados del espacio de trabajo '{}'?",
+        "fr": "Restaurer les paramètres par défaut de l'espace de travail « {} » ?",
+        "ja": "ワークスペース「{}」のデフォルト設定を復元しますか？",
+        "ko": "'{}' 워크스페이스의 기본값을 복원하시겠습니까?",
+        "zh": "是否恢复工作区“{}”的默认设置？"
+    },
+    "workspaces_toolbar_main": {
+        "ar": "الشريط الرئيسي",
+        "ca": "Barra Principal",
+        "es": "Barra Principal",
+        "fr": "Barre Principale",
+        "ja": "メインツールバー",
+        "ko": "메인 툴바",
+        "zh": "主工具栏"
+    },
+    "youtube": {
+        "ar": "YouTube",
+        "ca": "YouTube",
+        "es": "YouTube",
+        "fr": "YouTube",
+        "ja": "YouTube",
+        "ko": "YouTube",
+        "zh": "YouTube"
+    },
+    "youtube_desc": {
+        "ar": "افتح دروس TheKeyMachine على YouTube.",
+        "ca": "Obre els tutorials de TheKeyMachine a YouTube.",
+        "es": "Abrir los tutoriales de TheKeyMachine en YouTube.",
+        "fr": "Ouvrir les tutoriels TheKeyMachine sur YouTube.",
+        "ja": "YouTubeのTheKeyMachineチュートリアルを開きます。",
+        "ko": "YouTube에서 TheKeyMachine 튜토리얼을 엽니다.",
+        "zh": "打开 YouTube 上的 TheKeyMachine 教程。"
+    }
+}

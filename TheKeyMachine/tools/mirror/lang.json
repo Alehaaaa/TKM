@@ -630,31 +630,5 @@
         "ar": {
             "label": "الجانب المقابل"
         }
-    },
-    "mirror_tools": {
-        "en": {
-            "label": "Mirror"
-        },
-        "es": {
-            "label": "Espejo"
-        },
-        "fr": {
-            "label": "Miroir"
-        },
-        "ca": {
-            "label": "Mirall"
-        },
-        "zh": {
-            "label": "镜像"
-        },
-        "ja": {
-            "label": "ミラー"
-        },
-        "ko": {
-            "label": "미러"
-        },
-        "ar": {
-            "label": "المرآة"
-        }
     }
 }

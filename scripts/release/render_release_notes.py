@@ -5,7 +5,7 @@ for use as GitHub release notes.
 
 Usage: render_release_notes.py <version> [--previous-version <version>]
 
-Loads TheKeyMachine/mods/changelogMod.py directly (it has no Maya dependency)
+Loads TheKeyMachine/tools/update/changelog.py directly (it has no Maya dependency)
 so the parsing/labeling rules stay in exactly one place instead of being
 reimplemented here.
 """
@@ -15,25 +15,29 @@ import importlib.util
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CHANGELOG_MOD_PATH = REPO_ROOT / "TheKeyMachine" / "mods" / "changelogMod.py"
+CHANGELOG_MODULE_PATH = (
+    REPO_ROOT / "TheKeyMachine" / "tools" / "update" / "changelog.py"
+)
 CHANGELOG_FILE = REPO_ROOT / "TheKeyMachine" / "changelog"
 COMPARE_URL = "https://github.com/Alehaaaa/TKM/compare/TKM-{previous}...TKM-{current}"
 
 
-def load_changelog_mod():
-    spec = importlib.util.spec_from_file_location("changelogMod", CHANGELOG_MOD_PATH)
+def load_changelog_module():
+    spec = importlib.util.spec_from_file_location(
+        "thekeymachine_changelog", CHANGELOG_MODULE_PATH
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-def render_markdown(entries, changelog_mod, version, previous_version=None):
+def render_markdown(entries, changelog_module, version, previous_version=None):
     if not entries:
         notes = "No changelog entries recorded for this version."
     else:
         lines = []
         for entry in entries:
-            label = changelog_mod.change_kind_label(entry.get("kind", ""))
+            label = changelog_module.change_kind_label(entry.get("kind", ""))
             lines.append("- **{}:** {}".format(label, entry.get("description", "")))
         notes = "\n".join(lines)
 
@@ -53,10 +57,10 @@ def main():
     )
     args = parser.parse_args()
 
-    changelog_mod = load_changelog_mod()
+    changelog_module = load_changelog_module()
     raw = CHANGELOG_FILE.read_text(encoding="utf-8") if CHANGELOG_FILE.is_file() else ""
-    entries = changelog_mod.parse_changelog_entries(raw, args.version)
-    print(render_markdown(entries, changelog_mod, args.version, args.previous_version))
+    entries = changelog_module.parse_changelog_entries(raw, args.version)
+    print(render_markdown(entries, changelog_module, args.version, args.previous_version))
 
 
 if __name__ == "__main__":

@@ -1,26 +1,17 @@
 """Central translation service for the TKM toolbar.
 
-Design mirrors ``toolbox.load_tooltips``: every tool package that wants
-translated labels/tooltips owns one small ``lang.json`` file next to its
-``tooltip.json`` (added only where translations exist -- packages without one
-simply fall back to their English source strings, so nothing else has to
-change). Chrome strings that aren't tied to a single tool id split across two
-shared files by kind: ``data/lang/ui.json`` for menu section headers,
-alignment labels, and similar always-visible chrome text (looked up via
-``tr()``), and ``data/lang/messages.json`` for transient in-view/status
-messages (looked up via ``tr_text()``). Keeping them apart mirrors how they're
-actually consulted -- ``tr()`` always has a literal English default from its
-caller and never needs an ``"en"`` entry, while ``tr_text()`` reverse-indexes
-every entry's own ``"en"`` field -- so mixing the two shapes in one file was
-just an artifact of history, not a real relationship between them.
-
+Every package that owns translated text uses the same ``lang.json`` schema.
+Tool packages keep their catalog beside ``tooltip.json``; cross-cutting UI
+text lives in ``ui/lang.json``. Simple strings use the
+flat ``id -> language -> string`` shape. Tool entries only use nested fields
+when one id genuinely owns multiple values, such as a label and tooltip.
 This module is the *only* place language state, the available-language
-registry, and string lookup are implemented -- ``toolbox.get_tool`` and the
-handful of hardcoded chrome labels in ``toolMenus.py`` call into it, but none
+registry, and string lookup are implemented -- ``registry.get_tool`` and the
+handful of hardcoded chrome labels in ``toolbar_menus.py`` call into it, but none
 of them duplicate its logic.
 
-Loading is cheap and lazy: the language registry and the two shared string
-files are tiny JSON files read once and cached; a package's ``lang.json`` is
+Loading is cheap and lazy: the language registry and shared catalog are read
+once and cached; a package's ``lang.json`` is
 only ever read the first time one of its tools is resolved, exactly like
 ``load_tooltips`` already does for tooltips. Nothing is parsed for a language
 the user never selects beyond the couple of KB already loaded for the
@@ -39,12 +30,14 @@ TRANSLATE_TOOL_NAMES_SETTING = "translate_tool_names"
 
 _DATA_LANG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lang")
 _LANGUAGES_FILE = os.path.join(_DATA_LANG_DIR, "languages.json")
-_UI_STRINGS_FILE = os.path.join(_DATA_LANG_DIR, "ui.json")
-_MESSAGES_STRINGS_FILE = os.path.join(_DATA_LANG_DIR, "messages.json")
+_SHARED_LANG_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)),
+    "ui",
+    "lang.json",
+)
 
 _languages_cache = None
-_ui_strings_cache = None
-_messages_strings_cache = None
+_shared_lang_cache = None
 _package_lang_cache = {}
 
 
@@ -52,7 +45,7 @@ class _LanguageBus(QtCore.QObject):
     """Signals so live UI can react when the active language/settings change.
 
     Most menus in this toolbar are already rebuilt fresh every time they're
-    opened (see ``toolMenus._add_registered_menu`` / shelfMod's rebuild
+    opened (see ``toolbar_menus._add_registered_menu`` / shelf's rebuild
     pattern), so they simply pick up the new language on their next open.
     The few menus cached across opens (the toolbar's right-click pinning
     menu, the dock menu) listen on this bus to invalidate themselves.
@@ -83,20 +76,15 @@ def available_languages():
     return _languages_cache
 
 
-def language_display_name(code):
-    entry = available_languages().get(code) or {}
-    return entry.get("native") or entry.get("name") or code
-
-
 def get_language():
-    from TheKeyMachine.mods import settingsMod as settings
+    from TheKeyMachine.core import settings
 
     lang = settings.get_setting(LANGUAGE_SETTING, SOURCE_LANGUAGE)
     return lang if lang in available_languages() else SOURCE_LANGUAGE
 
 
 def set_language(code):
-    from TheKeyMachine.mods import settingsMod as settings
+    from TheKeyMachine.core import settings
 
     if code not in available_languages():
         code = SOURCE_LANGUAGE
@@ -107,7 +95,7 @@ def set_language(code):
 
 
 def get_translate_tool_names():
-    from TheKeyMachine.mods import settingsMod as settings
+    from TheKeyMachine.core import settings
 
     # Defaults on: picking a language is expected to translate everything
     # visible -- tool/section names included -- not just tooltip bodies.
@@ -119,7 +107,7 @@ def get_translate_tool_names():
 
 
 def set_translate_tool_names(enabled):
-    from TheKeyMachine.mods import settingsMod as settings
+    from TheKeyMachine.core import settings
 
     enabled = bool(enabled)
     if enabled == get_translate_tool_names():
@@ -128,34 +116,17 @@ def set_translate_tool_names(enabled):
     bus.languageChanged.emit()
 
 
-def _ui_strings():
-    global _ui_strings_cache
-    if _ui_strings_cache is None:
-        _ui_strings_cache = _load_json(_UI_STRINGS_FILE, default={})
-    return _ui_strings_cache
-
-
-def _messages_strings():
-    global _messages_strings_cache
-    if _messages_strings_cache is None:
-        _messages_strings_cache = _load_json(_MESSAGES_STRINGS_FILE, default={})
-    return _messages_strings_cache
+def _shared_lang():
+    global _shared_lang_cache
+    if _shared_lang_cache is None:
+        _shared_lang_cache = _load_json(_SHARED_LANG_FILE, default={})
+    return _shared_lang_cache
 
 
 def tr(key, default=""):
-    """Translate a chrome string that isn't owned by a single tool id.
-
-    Menu section headers, alignment labels, and similar cross-cutting UI
-    text look themselves up here by a short id, backed by
-    ``data/lang/ui.json``. Falls back to ``default`` (the English source)
-    whenever the active language is English or the key/language has no
-    translation yet -- switching to a not-yet-translated string never raises.
-    """
-    lang = get_language()
-    if lang == SOURCE_LANGUAGE:
-        return default
-    translated = _ui_strings().get(key, {}).get(lang)
-    return translated or default
+    """Translate shared UI text from the standard ``ui/lang.json`` catalog."""
+    translated = (_shared_lang().get(key) or {}).get(get_language())
+    return translated if isinstance(translated, str) and translated else default
 
 
 _message_id_index_cache = None
@@ -164,11 +135,7 @@ _message_id_index_cache = None
 def _message_id_index():
     """Map each message's English source text back to its invented id.
 
-    ``data/lang/messages.json`` is keyed by invented ids (e.g.
-    ``"select_at_least_one_object"``), each carrying its own ``"en"`` source
-    text alongside ``es``/``fr`` -- the same id-keyed shape every other
-    translation table in this codebase uses, rather than the raw English
-    sentence itself as the key. Call sites like
+    ``ui/lang.json`` message entries use the same flat string shape. Call sites like
     ``wutil.make_inViewMessage("Select at least one object")`` still just
     pass plain English text though, so this index is what lets ``tr_text()``
     map that text back to its id without every one of its ~30 call sites
@@ -177,8 +144,8 @@ def _message_id_index():
     global _message_id_index_cache
     if _message_id_index_cache is None:
         index = {}
-        for message_id, entry in _messages_strings().items():
-            en_text = entry.get("en")
+        for message_id, entry in _shared_lang().items():
+            en_text = entry.get(SOURCE_LANGUAGE)
             if en_text:
                 index[en_text] = message_id
         _message_id_index_cache = index
@@ -201,7 +168,7 @@ def tr_text(message):
     message_id = _message_id_index().get(message)
     if not message_id:
         return message
-    translated = _messages_strings().get(message_id, {}).get(lang)
+    translated = (_shared_lang().get(message_id) or {}).get(lang)
     return translated or message
 
 
@@ -222,11 +189,17 @@ def load_package_lang(package_file):
     return data
 
 
+def localize_string(key, package_file, default=""):
+    """Translate one flat ``id -> language -> string`` package entry."""
+    translated = (load_package_lang(package_file).get(key) or {}).get(get_language())
+    return translated if isinstance(translated, str) and translated else default
+
+
 def _translate_tooltip(original, translated_strings):
     """Rebuild a tooltip list, swapping only its plain-string entries.
 
     Tooltip lists can mix plain text with platform variants, movies, and
-    separators (see ``toolbox.load_tooltips``); none of that media is
+    separators (see ``registry.load_tooltips``); none of that media is
     language-specific, so a translation only ever supplies replacement text
     for the string entries, in the same order they appear in the source.
     """
@@ -265,7 +238,7 @@ def _lookup_translation(key, package_file):
 def localize_tool(tool_id, tool):
     """Apply the active language to one package tool definition, in place.
 
-    Called from ``toolbox.get_tool`` *before* any caller-supplied overrides
+    Called from ``registry.get_tool`` *before* any caller-supplied overrides
     are applied, so an explicit override always wins over translation --
     this only ever touches the package's own declared ``label``/``tooltip``.
     Tooltips (the "helper" text) translate whenever a non-English language
@@ -296,9 +269,9 @@ def localize_tool(tool_id, tool):
 def localize_label_tooltip(key, package_file, label, tooltip):
     """Translate a bare label/tooltip pair keyed the same way as ``localize_tool``.
 
-    Some presentation objects (slider modes -- see ``mods/sliders.py`` and
-    ``toolWidgets.build_slider_section``) carry their own label/tooltip
-    instead of living in the ``toolbox.get_tool`` registry, but still want a
+    Some presentation objects (slider modes -- see ``ui/sliders`` and
+    ``toolbar_widgets.build_slider_section``) carry their own label/tooltip
+    instead of living in the ``registry.get_tool`` registry, but still want a
     per-package ``lang.json`` entry under the same key. Returns
     ``(label, tooltip)``, translated if available, otherwise the inputs
     unchanged.
@@ -377,7 +350,7 @@ def localize_slider_modes(modes, package_file):
 
 
 def localize_section_label(section_id, package_file, label):
-    """Translate a toolbox SECTION's display label (used by the toolbar's
+    """Translate a registry SECTION's display label (used by the toolbar's
     right-click pinning menu and section headers), the same way tool labels
     are translated -- gated by "Translate Tool Names" since a section name
     like "Nudge" is as much an identity as any one tool's name.

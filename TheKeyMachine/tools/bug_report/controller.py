@@ -1,0 +1,529 @@
+"""
+
+TheKeyMachine - Animation Toolset for Maya Animators
+
+
+This file is part of TheKeyMachine, an open source software for Autodesk Maya licensed under the GNU General Public License v3.0 (GPL-3.0).
+You are free to use, modify, and distribute this code under the terms of the GPL-3.0 license.
+By using this code, you agree to keep it open source and share any modifications.
+This code is provided "as is," without any warranty. For the full license text, visit https://www.gnu.org/licenses/gpl-3.0.html
+
+thekeymachine.xyz / x@thekeymachine.xyz
+
+Developed by: Rodrigo Torres / rodritorres.com
+Modified by: Alehaaaa / alehaaaa.github.io
+
+
+
+"""
+
+import os
+import platform
+import sys
+import threading
+import time
+import traceback
+from datetime import datetime
+# import urllib.parse
+# import urllib.request
+
+from maya import cmds
+
+import TheKeyMachine.core.application as general
+
+from TheKeyMachine.core.Qt import QtCore, QtWidgets
+
+from TheKeyMachine.tools import common as toolCommon
+from TheKeyMachine.ui.widgets import customDialogs
+
+
+_BUG_EXCEPTION_HANDLER_INSTALLED = False
+_BUG_EXCEPTION_DIALOG_PENDING = False
+_BUG_EXCEPTION_LAST_SIGNATURE = None
+_BUG_EXCEPTION_LAST_TIME = 0.0
+_BUG_REPORT_DIALOG = None
+_REPORTED_EXCEPTION_IDS = {}
+_PREVIOUS_EXCEPTHOOK = None
+_PREVIOUS_THREADING_EXCEPTHOOK = None
+_TKM_EXCEPTHOOK_MARKER = "_tkm_bug_exception_hook"
+_TKM_PREVIOUS_HOOK_ATTR = "_tkm_previous_hook"
+
+
+def _is_valid_dialog(dialog):
+    if dialog is None:
+        return False
+    try:
+        dialog.objectName()
+        return True
+    except RuntimeError:
+        return False
+    except Exception:
+        return False
+
+
+def _set_bug_report_dialog(dialog):
+    global _BUG_REPORT_DIALOG
+    _BUG_REPORT_DIALOG = dialog
+
+
+def _clear_bug_report_dialog(*_):
+    global _BUG_REPORT_DIALOG
+    _BUG_REPORT_DIALOG = None
+
+
+def _get_bug_report_dialog(include_hidden=False):
+    global _BUG_REPORT_DIALOG
+
+    if _is_valid_dialog(_BUG_REPORT_DIALOG):
+        try:
+            if include_hidden or _BUG_REPORT_DIALOG.isVisible():
+                return _BUG_REPORT_DIALOG
+        except Exception:
+            pass
+        if not include_hidden:
+            return None
+        _clear_bug_report_dialog()
+
+    for widget in QtWidgets.QApplication.topLevelWidgets():
+        if (
+            isinstance(widget, customDialogs.QFlatBugReportDialog)
+            and _is_valid_dialog(widget)
+            and (include_hidden or widget.isVisible())
+        ):
+            _set_bug_report_dialog(widget)
+            return widget
+    return None
+
+
+def _safe_about(**kwargs):
+    try:
+        return cmds.about(**kwargs)
+    except Exception:
+        return None
+
+
+def _safe_call(callback):
+    try:
+        return callback()
+    except Exception:
+        return None
+
+
+def _sanitize_payload_value(value):
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value)
+    return str(value)
+
+
+def _collect_debug_context():
+    info = {
+        "tkm_version": general.get_thekeymachine_version(),
+        "python_version": sys.version,
+        "python_implementation": _safe_call(platform.python_implementation),
+        "python_compiler": _safe_call(platform.python_compiler),
+        "python_build": _safe_call(platform.python_build),
+        "qt_version": _safe_call(QtCore.qVersion),
+        "maya_version": _safe_about(version=True),
+        "maya_api_version": _safe_about(apiVersion=True),
+        "maya_product": _safe_about(product=True),
+        "maya_installed_version": _safe_about(installedVersion=True),
+        "maya_operating_system": _safe_about(operatingSystem=True),
+        "maya_operating_system_version": _safe_about(operatingSystemVersion=True),
+        "maya_ui_language": _safe_about(uiLanguage=True),
+        "maya_batch_mode": _safe_about(batch=True),
+        "maya_64bit": _safe_about(is64=True),
+        "maya_cut_identifier": _safe_about(cutIdentifier=True),
+        "maya_current_unit_time": _safe_call(lambda: cmds.currentUnit(query=True, time=True)),
+        "maya_current_unit_linear": _safe_call(lambda: cmds.currentUnit(query=True, linear=True)),
+        "maya_current_unit_angle": _safe_call(lambda: cmds.currentUnit(query=True, angle=True)),
+        "platform_system": _safe_call(platform.system),
+        "platform_release": _safe_call(platform.release),
+        "platform_version": _safe_call(platform.version),
+        "platform_platform": _safe_call(lambda: platform.platform(aliased=True, terse=False)),
+        "platform_machine": _safe_call(platform.machine),
+        "platform_architecture": _safe_call(lambda: platform.architecture()[0]),
+    }
+    return {key: _sanitize_payload_value(value) for key, value in info.items()}
+
+
+class BugReportSubmitWorker(QtCore.QThread):
+    result_ready = QtCore.Signal(bool, object)
+
+    def __init__(self, submit_callback, payload, parent=None):
+        QtCore.QThread.__init__(self, parent)
+        self._submit_callback = submit_callback
+        self._payload = dict(payload or {})
+
+    def run(self):
+        try:
+            success = bool(self._submit_callback(**self._payload))
+            self.result_ready.emit(success, None)
+        except Exception as exc:
+            self.result_ready.emit(False, exc)
+
+
+def prepare_bug_report_payload(name, explanation, script_error):
+    payload = {
+        "name": name,
+        "explanation": explanation,
+        "script_error": script_error,
+    }
+    payload.update(_collect_debug_context())
+    return payload
+
+
+def write_bug_report_payload(**payload):
+    try:
+        time.sleep(1.2)
+
+        desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+        if not os.path.isdir(desktop_dir):
+            return False
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        report_path = os.path.join(desktop_dir, "TKM_Bug Report_{}.txt".format(timestamp))
+
+        lines = [
+            "TheKeyMachine Bug Report",
+            "Generated: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "",
+            "[User]",
+            "Name: {}".format(payload.get("name", "")),
+            "",
+            "[Explanation]",
+            payload.get("explanation", "") or "",
+            "",
+            "[Script Error]",
+            payload.get("script_error", "") or "",
+            "",
+            "[System Details]",
+        ]
+        for key in sorted(payload.keys()):
+            if key in ("name", "explanation", "script_error"):
+                continue
+            lines.append("{}: {}".format(key, payload[key]))
+
+        with open(report_path, "w") as report_file:
+            report_file.write("\n".join(lines))
+    except Exception:
+        return False
+
+    return True
+
+
+def send_bug_report(name, explanation, script_error):
+    return write_bug_report_payload(**prepare_bug_report_payload(name, explanation, script_error))
+
+
+def _extract_exception_source_file(exc=None, tb=None):
+    extracted = []
+    if tb is not None:
+        extracted = traceback.extract_tb(tb)
+    elif exc is not None and getattr(exc, "__traceback__", None) is not None:
+        extracted = traceback.extract_tb(exc.__traceback__)
+
+    if not extracted:
+        return "unknown.py"
+
+    for frame in reversed(extracted):
+        filename = frame.filename or ""
+        if "TheKeyMachine" in filename:
+            return _format_exception_source_file(filename)
+    return _format_exception_source_file(extracted[-1].filename or "unknown.py")
+
+
+def _format_exception_source_file(filename):
+    normalized = os.path.normpath(filename or "")
+    marker = "{}{}".format("TheKeyMachine", os.sep)
+    if marker in normalized:
+        return normalized.split(marker, 1)[1]
+    return os.path.basename(normalized) or "unknown.py"
+
+
+def _is_thekeymachine_frame(filename):
+    normalized = os.path.normpath(filename or "")
+    parts = [part for part in normalized.split(os.sep) if part]
+    return "TheKeyMachine" in parts
+
+
+def _traceback_has_thekeymachine_frame(tb):
+    if tb is None:
+        return False
+    try:
+        for frame in traceback.extract_tb(tb):
+            if _is_thekeymachine_frame(frame.filename):
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _format_detected_bug_name(source_file):
+    return "Error Detection on file {}".format(source_file or "unknown.py")
+
+
+def _default_detected_bug_explanation(context=None):
+    if context:
+        return "Auto-detected exception in {}.\n\nPlease describe what you were doing when this happened.".format(context)
+    return "Auto-detected exception.\n\nPlease describe what you were doing when this happened."
+
+
+def _detected_exception_signature(exc=None, source_file=None):
+    exc_type = type(exc).__name__ if exc is not None else "UnknownError"
+    exc_message = str(exc) if exc is not None else ""
+    return "{}|{}|{}".format(source_file or "unknown.py", exc_type, exc_message)
+
+
+def _prune_reported_exception_ids(now=None):
+    global _REPORTED_EXCEPTION_IDS
+    if now is None:
+        now = time.time()
+    expiry_seconds = 10.0
+    _REPORTED_EXCEPTION_IDS = {key: timestamp for key, timestamp in _REPORTED_EXCEPTION_IDS.items() if (now - timestamp) < expiry_seconds}
+
+
+def _is_exception_already_reported(exc=None):
+    if exc is None:
+        return False
+    try:
+        if getattr(exc, "_tkm_reported", False):
+            return True
+    except Exception:
+        pass
+
+    exc_id = id(exc)
+    now = time.time()
+    _prune_reported_exception_ids(now=now)
+    return exc_id in _REPORTED_EXCEPTION_IDS
+
+
+def _mark_exception_reported(exc=None):
+    if exc is None:
+        return
+    try:
+        setattr(exc, "_tkm_reported", True)
+    except Exception:
+        pass
+    now = time.time()
+    _prune_reported_exception_ids(now=now)
+    _REPORTED_EXCEPTION_IDS[id(exc)] = now
+
+
+def report_detected_exception(exc=None, context=None, source_file=None, traceback_text=None):
+    global _BUG_EXCEPTION_DIALOG_PENDING, _BUG_EXCEPTION_LAST_SIGNATURE, _BUG_EXCEPTION_LAST_TIME
+
+    if not general.config.get("BUG_REPORT", True):
+        return
+
+    if _is_exception_already_reported(exc):
+        return
+
+    if _get_bug_report_dialog():
+        _mark_exception_reported(exc)
+        return
+
+    try:
+        source_name = source_file or _extract_exception_source_file(exc=exc)
+        report_name = _format_detected_bug_name(source_name)
+        report_traceback = traceback_text
+        if not report_traceback:
+            if exc is not None:
+                report_traceback = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            else:
+                report_traceback = "".join(traceback.format_stack())
+        report_explanation = _default_detected_bug_explanation(context=context)
+    except Exception:
+        return
+
+    signature = _detected_exception_signature(exc=exc, source_file=source_name)
+    now = time.time()
+    if signature == _BUG_EXCEPTION_LAST_SIGNATURE and (now - _BUG_EXCEPTION_LAST_TIME) < 2.0:
+        _mark_exception_reported(exc)
+        return
+    _BUG_EXCEPTION_LAST_SIGNATURE = signature
+    _BUG_EXCEPTION_LAST_TIME = now
+
+    if _BUG_EXCEPTION_DIALOG_PENDING:
+        _mark_exception_reported(exc)
+        return
+    _mark_exception_reported(exc)
+    _BUG_EXCEPTION_DIALOG_PENDING = True
+
+    def _show_dialog():
+        global _BUG_EXCEPTION_DIALOG_PENDING
+        from TheKeyMachine.core import i18n
+
+        try:
+            bug_report_window(
+                dialog_title=i18n.tr("bug_report_title_detected", "Sorry, you found a bug!"),
+                prefill_name=report_name,
+                prefill_explanation=report_explanation,
+                prefill_script_error=report_traceback,
+            )
+        finally:
+            _BUG_EXCEPTION_DIALOG_PENDING = False
+
+    try:
+        QtCore.QTimer.singleShot(0, _show_dialog)
+    except Exception:
+        _BUG_EXCEPTION_DIALOG_PENDING = False
+
+
+def _emit_exception_to_script_editor(traceback_text):
+    if not traceback_text:
+        return
+    try:
+        sys.stderr.write(traceback_text)
+        if not traceback_text.endswith("\n"):
+            sys.stderr.write("\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+
+def safe_execute(callback, *args, context=None, source_file=None, default=None, **kwargs):
+    try:
+        return callback(*args, **kwargs)
+    except Exception as exc:
+        traceback_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        _emit_exception_to_script_editor(traceback_text)
+        report_detected_exception(exc=exc, context=context, source_file=source_file, traceback_text=traceback_text)
+        return default
+
+
+def wrap_callback(callback, context=None, source_file=None, default=None):
+    def _wrapped(*args, **kwargs):
+        return safe_execute(callback, *args, context=context, source_file=source_file, default=default, **kwargs)
+
+    return _wrapped
+
+
+def _restore_previous_hook(owner, hook_name):
+    restored = False
+    while True:
+        current_hook = getattr(owner, hook_name, None)
+        if current_hook is None or not getattr(current_hook, _TKM_EXCEPTHOOK_MARKER, False):
+            return restored
+
+        previous_hook = getattr(current_hook, _TKM_PREVIOUS_HOOK_ATTR, None)
+        if previous_hook is None:
+            return restored
+        try:
+            setattr(owner, hook_name, previous_hook)
+            restored = True
+        except Exception:
+            return restored
+
+
+def uninstall_bug_exception_handler():
+    global _BUG_EXCEPTION_HANDLER_INSTALLED, _PREVIOUS_EXCEPTHOOK, _PREVIOUS_THREADING_EXCEPTHOOK
+
+    _restore_previous_hook(sys, "excepthook")
+    if hasattr(threading, "excepthook"):
+        _restore_previous_hook(threading, "excepthook")
+
+    _PREVIOUS_EXCEPTHOOK = None
+    _PREVIOUS_THREADING_EXCEPTHOOK = None
+    _BUG_EXCEPTION_HANDLER_INSTALLED = False
+
+
+def install_bug_exception_handler():
+    global _BUG_EXCEPTION_HANDLER_INSTALLED, _PREVIOUS_EXCEPTHOOK, _PREVIOUS_THREADING_EXCEPTHOOK
+
+    uninstall_bug_exception_handler()
+    if not general.config.get("BUG_REPORT", True):
+        return False
+    previous_excepthook = sys.excepthook
+    _PREVIOUS_EXCEPTHOOK = previous_excepthook
+
+    def _tkm_excepthook(exc_type, exc_value, exc_tb):
+        if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
+            if previous_excepthook:
+                previous_excepthook(exc_type, exc_value, exc_tb)
+            return
+        if _traceback_has_thekeymachine_frame(exc_tb):
+            try:
+                report_detected_exception(
+                    exc=exc_value,
+                    source_file=_extract_exception_source_file(tb=exc_tb),
+                    traceback_text="".join(traceback.format_exception(exc_type, exc_value, exc_tb)),
+                )
+            except Exception:
+                pass
+        if previous_excepthook:
+            previous_excepthook(exc_type, exc_value, exc_tb)
+
+    setattr(_tkm_excepthook, _TKM_EXCEPTHOOK_MARKER, True)
+    setattr(_tkm_excepthook, _TKM_PREVIOUS_HOOK_ATTR, previous_excepthook)
+    sys.excepthook = _tkm_excepthook
+
+    if hasattr(threading, "excepthook"):
+        previous_threading_hook = threading.excepthook
+        _PREVIOUS_THREADING_EXCEPTHOOK = previous_threading_hook
+
+        def _tkm_threading_excepthook(args):
+            if issubclass(args.exc_type, (KeyboardInterrupt, SystemExit)):
+                if previous_threading_hook:
+                    previous_threading_hook(args)
+                return
+            if _traceback_has_thekeymachine_frame(args.exc_traceback):
+                try:
+                    report_detected_exception(
+                        exc=args.exc_value,
+                        source_file=_extract_exception_source_file(tb=args.exc_traceback),
+                        traceback_text="".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)),
+                    )
+                except Exception:
+                    pass
+            if previous_threading_hook:
+                previous_threading_hook(args)
+
+        setattr(_tkm_threading_excepthook, _TKM_EXCEPTHOOK_MARKER, True)
+        setattr(_tkm_threading_excepthook, _TKM_PREVIOUS_HOOK_ATTR, previous_threading_hook)
+        threading.excepthook = _tkm_threading_excepthook
+
+    _BUG_EXCEPTION_HANDLER_INSTALLED = True
+    return True
+
+
+def bug_report_window(*args, dialog_title=None, prefill_name="", prefill_explanation="", prefill_script_error=""):
+    if not general.config.get("BUG_REPORT", True):
+        return None
+    if dialog_title is None:
+        from TheKeyMachine.core import i18n
+
+        dialog_title = i18n.tr("bug_report_title", "Report a Bug")
+    existing_dialog = _get_bug_report_dialog(include_hidden=True)
+    if existing_dialog:
+        if hasattr(existing_dialog, "apply_prefill"):
+            existing_dialog.apply_prefill(
+                dialog_title=dialog_title,
+                name=prefill_name,
+                explanation=prefill_explanation,
+                script_error=prefill_script_error,
+            )
+        try:
+            existing_dialog.show()
+            existing_dialog.raise_()
+            existing_dialog.activateWindow()
+        except Exception:
+            pass
+        return existing_dialog
+
+    dlg = customDialogs.QFlatBugReportDialog(
+        submit_callback=write_bug_report_payload,
+        prepare_callback=prepare_bug_report_payload,
+        worker_class=BugReportSubmitWorker,
+        dialog_title=dialog_title,
+        prefill_name=prefill_name,
+        prefill_explanation=prefill_explanation,
+        prefill_script_error=prefill_script_error,
+    )
+    dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
+    _set_bug_report_dialog(dlg)
+    dlg.destroyed.connect(_clear_bug_report_dialog)
+    toolCommon.invalidate_cached_window_on_language_change(dlg, _clear_bug_report_dialog)
+    dlg.show_centered()
+    return dlg

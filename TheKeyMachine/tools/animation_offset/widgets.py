@@ -2,10 +2,10 @@ import math
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
-import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.core import runtime
 from TheKeyMachine.data import icons
-from TheKeyMachine.widgets import util as wutil
-from TheKeyMachine.widgets import timeline
+from TheKeyMachine.ui.widgets import util as wutil
+from TheKeyMachine.ui.widgets import timeline
 
 
 class AnimationOffsetTimelineTint(timeline.TimelineTint):

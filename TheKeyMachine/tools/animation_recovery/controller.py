@@ -1,7 +1,5 @@
 """Persistent, scene-scoped animation recovery snapshots."""
 
-from __future__ import absolute_import
-
 from contextlib import contextmanager
 from datetime import datetime
 import io
@@ -19,16 +17,15 @@ try:
 except ImportError:
     om = None
 
-from TheKeyMachine.core import six
-from TheKeyMachine.core import animlayers
-from TheKeyMachine.core import toolbox
+from TheKeyMachine.maya import animation
+from TheKeyMachine.tools import registry
 from TheKeyMachine.core.Qt import QtCore
-from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.data import icons
-from TheKeyMachine.mods import generalMod as general
-from TheKeyMachine.mods import settingsMod as settings
+from TheKeyMachine.core import application as general
+from TheKeyMachine.core import settings
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 SETTINGS_NAMESPACE = "animation_recovery"
@@ -43,7 +40,7 @@ RUNTIME_LAYER_ATTRIBUTE_KEY = "animation_recovery:layer_attributes"
 SCENE_NODE = "Animation_Recovery"
 # Animation recovery owns this child node under the TKM root; tools must never
 # stamp their own attributes onto the root itself (TheKeyMachine only ever
-# parents other tools' nodes -- see TheKeyMachine.core.scene_nodes).
+# parents other tools' nodes -- see TheKeyMachine.maya.runtime).
 SCENE_ID_ATTRIBUTE = "tkmAnimationRecoverySceneId"
 # fileInfo, not a node attribute: it is scene-global (survives even if the
 # TheKeyMachine node were ever removed), is documented as NOT undoable, and
@@ -617,12 +614,12 @@ def _capture_layer(layer, member_plugs=None, metadata=None):
 def _animation_layers_snapshot():
     """Capture layer state and exact per-layer curve ownership.
 
-    Curve ownership goes through ``core.animlayers`` so recovery, copy/paste,
+    Curve ownership goes through ``animation.layer_graph`` so recovery, copy/paste,
     sliders, and key tools all interpret Maya's blend graph identically. The
     graph is resolved once and reused for every member plug in this snapshot.
     """
-    context = animlayers.capture_context()
-    scene_layers = animlayers.scene_layer_objects()
+    context = animation.layer_cache.capture()
+    scene_layers = animation.scene_layer_objects()
     root_name = context.get("root_name")
     layer_metadata = context.get("layers") or {}
     layers_data = []
@@ -630,7 +627,7 @@ def _animation_layers_snapshot():
     member_plugs_by_layer = {}
     for layer_id, metadata in layer_metadata.items():
         layer = metadata.get("name") or (
-            root_name if layer_id == animlayers.BASE_LAYER_ID else layer_id
+            root_name if layer_id == animation.BASE_LAYER_ID else layer_id
         )
         if not layer:
             continue
@@ -651,7 +648,7 @@ def _animation_layers_snapshot():
     })
     for plug in all_member_plugs:
         try:
-            entries = animlayers.get_anim_curves_by_layer_for_plug(
+            entries = animation.layer_graph.curves_by_layer(
                 plug,
                 scene_layers=scene_layers,
             )
@@ -797,7 +794,7 @@ def ensure_scene_id():
             cmds.setAttr(plug, lock=False)
         except Exception:
             pass
-        scene_id = six.text_type(uuid.uuid4())
+        scene_id = str(uuid.uuid4())
         cmds.setAttr(plug, scene_id, type="string")
     try:
         cmds.setAttr(plug, lock=True, keyable=False, channelBox=False)
@@ -1287,10 +1284,10 @@ def _restore_layers(layers_data, operation=None):
     """
     if not layers_data:
         return {}
-    current_context = animlayers.capture_context()
+    current_context = animation.layer_cache.capture()
     current_metadata = current_context.get("layers") or {}
     root_name = current_context.get("root_name")
-    existing_layers = animlayers.scene_layer_names(include_root=True)
+    existing_layers = animation.scene_layer_names(include_root=True)
     existing_by_uuid = {}
     for layer in existing_layers:
         layer_uuid = _node_uuid(layer)
@@ -1371,7 +1368,7 @@ def _restore_layers(layers_data, operation=None):
         if not desired_parent and node != root_name:
             desired_parent = root_name
         current_entry = current_metadata.get(
-            animlayers.layer_id_for_name(node)
+            animation.layer_id_for_name(node)
         ) or {}
         current_parent = current_entry.get("parent")
         try:
@@ -1400,7 +1397,7 @@ def _restore_layers(layers_data, operation=None):
         if operation:
             operation.step()
 
-    restored_context = animlayers.capture_context()
+    restored_context = animation.layer_cache.capture()
     restored_metadata = restored_context.get("layers") or {}
     restored_root = restored_context.get("root_name")
     if base_entry is not None:
@@ -1422,7 +1419,7 @@ def _restore_layers(layers_data, operation=None):
         else:
             desired_parent = restored_root
         actual = restored_metadata.get(
-            animlayers.layer_id_for_name(node)
+            animation.layer_id_for_name(node)
         ) or {}
         if desired_parent and actual.get("parent") != desired_parent:
             return None
@@ -1443,12 +1440,12 @@ def _extra_layer_names(layers_data, name_map=None):
     captured_uuids = {
         entry.get("uuid") for entry in layers_data if entry.get("uuid")
     }
-    context = animlayers.capture_context()
+    context = animation.layer_cache.capture()
     root_name = context.get("root_name")
     extras = []
     for layer_id, metadata in (context.get("layers") or {}).items():
         layer = metadata.get("name") or (
-            root_name if layer_id == animlayers.BASE_LAYER_ID else layer_id
+            root_name if layer_id == animation.BASE_LAYER_ID else layer_id
         )
         if layer == root_name or layer in captured_names:
             continue
@@ -1461,7 +1458,7 @@ def _extra_layer_names(layers_data, name_map=None):
 
 def _extra_layer_membership_count(layers_data):
     """Count memberships a full recovery will remove for progress sizing."""
-    current_layers = animlayers.scene_layer_names(include_root=True)
+    current_layers = animation.scene_layer_names(include_root=True)
     current_by_uuid = {
         layer_uuid: layer
         for layer in current_layers
@@ -1469,7 +1466,7 @@ def _extra_layer_membership_count(layers_data):
         if layer_uuid
     }
     count = 0
-    root_name = animlayers.root_layer_name()
+    root_name = animation.root_layer_name()
     for entry in layers_data:
         node = current_by_uuid.get(entry.get("uuid"))
         if not node and entry.get("name") in current_layers:
@@ -1529,7 +1526,7 @@ def _restore_layer_membership(layers_data, name_map, operation=None, allowed_plu
         member_plugs = entry.get("attributes") or []
         if allowed_plugs is not None:
             member_plugs = [plug for plug in member_plugs if plug in allowed_plugs]
-        elif node != animlayers.root_layer_name():
+        elif node != animation.root_layer_name():
             # A full recovery owns the entire layer snapshot. Remove members
             # that did not exist at the recovered point before adding missing
             # ones. Selection-scoped recovery deliberately stays additive.
@@ -1556,7 +1553,7 @@ def _restore_layer_membership(layers_data, name_map, operation=None, allowed_plu
                 pass
             if operation and operation.step():
                 return False
-        if node == animlayers.root_layer_name():
+        if node == animation.root_layer_name():
             continue
         try:
             restored_members = set(
@@ -1896,7 +1893,7 @@ def restore_recovery(path):
             undo_name=toolCommon.make_undo_chunk_name(tool_id="animation_recovery_restore"),
             suspend_refresh=True,
             tint="range",
-            tint_color=toolbox.get_tool_tint_color("animation_recovery"),
+            tint_color=registry.get_tool_tint_color("animation_recovery"),
             show_success_message=False,
             rollback_on_cancel=True,
         ) as operation:
@@ -1924,7 +1921,7 @@ def _restore_recovery_worker(operation, path, chain_paths, scene_id):
     The one-time setup below (loading/merging the recovery payload, scoping
     it to the current selection, and sizing the progress total) is bounded
     by curve/object/layer *count*, not by how many keys each curve carries
-    -- the actual worst case the migration in this function targets -- so
+    -- the actual worst case this implementation targets -- so
     it's marshaled as a single batch rather than item-by-item. The curve
     restore loop just below it, which can each carry many keys and is what
     dominates the cost on a big recovery, gets a marshal hop *per curve*
@@ -2154,7 +2151,7 @@ class _SnapshotWriteTask(QtCore.QRunnable):
                     # must remain successful if old files cannot be removed.
                     pass
         except Exception as exc:
-            self.signals.failed.emit(six.text_type(exc))
+            self.signals.failed.emit(str(exc))
             return
         self.signals.saved.emit(self.path)
 
@@ -2413,7 +2410,7 @@ class AnimationRecoveryService(QtCore.QObject):
             return
         self.manager.disconnect_callbacks(RUNTIME_LAYER_ATTRIBUTE_KEY)
         self.manager.add_node_attribute_changed_callbacks(
-            animlayers.scene_layer_names(include_root=True),
+            animation.scene_layer_names(include_root=True),
             self._layer_attribute_changed,
             key=RUNTIME_LAYER_ATTRIBUTE_KEY,
         )
@@ -2768,7 +2765,7 @@ def start(manager=None):
             _SERVICE.start()
         return _SERVICE
     if manager is None:
-        from TheKeyMachine.core import runtimeManager as runtime
+        from TheKeyMachine.core import runtime
 
         manager = runtime.get_runtime_manager()
     _SERVICE = AnimationRecoveryService(manager)
@@ -2777,15 +2774,15 @@ def start(manager=None):
 
 
 def set_enabled(enabled, manager=None):
-    from TheKeyMachine.core import backgroundRunners
+    from TheKeyMachine.tools.background_runners import service as background_runners
 
     runner_controller = (
-        backgroundRunners.get_controller(manager)
+        background_runners.get_controller(manager)
         if manager is not None
-        else backgroundRunners.get_controller()
+        else background_runners.get_controller()
     )
     runner_controller.set_enabled(
-        backgroundRunners.ANIMATION_RECOVERY_ID,
+        background_runners.ANIMATION_RECOVERY_ID,
         bool(enabled),
     )
     return bool(enabled)

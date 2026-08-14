@@ -56,31 +56,5 @@
                 "اكتب للتصفية، واستخدم لأعلى أو لأسفل لاختيار نتيجة، ثم اضغط Enter لتشغيلها"
             ]
         }
-    },
-    "search_tools": {
-        "en": {
-            "label": "Search"
-        },
-        "es": {
-            "label": "Buscar"
-        },
-        "fr": {
-            "label": "Rechercher"
-        },
-        "ca": {
-            "label": "Cercar"
-        },
-        "zh": {
-            "label": "搜索"
-        },
-        "ja": {
-            "label": "検索"
-        },
-        "ko": {
-            "label": "검색"
-        },
-        "ar": {
-            "label": "بحث"
-        }
     }
 }

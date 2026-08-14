@@ -1,1 +1,1 @@
-"""Micro Move uses the standard toolbox widgets."""
+"""Micro Move uses the standard registry widgets."""

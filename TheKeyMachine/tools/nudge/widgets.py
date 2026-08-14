@@ -1,8 +1,8 @@
-from TheKeyMachine.core import runtimeManager as runtime
-from TheKeyMachine.mods import settingsMod as settings
+from TheKeyMachine.core import runtime
+from TheKeyMachine.core import settings
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import customWidgets as cw
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import customWidgets as cw
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 def create_nudge_value_widget(section, item_data, owner=None):

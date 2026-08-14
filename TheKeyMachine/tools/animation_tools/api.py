@@ -70,7 +70,7 @@ def set_remove_redundant_mode(mode):
 def remove_redundant_mode_choices():
     """Live-translated choice list for the Remove Redundant Keys menu's mode picker.
 
-    Built fresh on every menu open (see ``core.toolMenus.build_declared_menu``'s
+    Built fresh on every menu open (see ``widgets.toolbar_menus.build_declared_menu``'s
     ``"choice"`` handling, which calls this instead of a static list), the
     same pattern already used by ``tkm_menu.api``'s alignment/dock choices.
     """

@@ -56,31 +56,5 @@
                 "استرجع دون تحديد أي شيء لاستعادة كل شيء، أو حدد كائنات لاستعادة تلك الكائنات فقط"
             ]
         }
-    },
-    "animation_recovery_tools": {
-        "en": {
-            "label": "Animation Recovery"
-        },
-        "es": {
-            "label": "Recuperación de Animación"
-        },
-        "fr": {
-            "label": "Récupération d'Animation"
-        },
-        "ca": {
-            "label": "Recuperació d'Animació"
-        },
-        "zh": {
-            "label": "动画恢复"
-        },
-        "ja": {
-            "label": "アニメーションリカバリー"
-        },
-        "ko": {
-            "label": "애니메이션 복구"
-        },
-        "ar": {
-            "label": "استرجاع الحركة"
-        }
     }
 }

@@ -2,12 +2,12 @@
 
 from maya import cmds
 
-import TheKeyMachine.core.runtimeManager as runtime
-from TheKeyMachine.core import maya_version
-from TheKeyMachine.core import openMayaUtils as omui
-from TheKeyMachine.core import toolbox
-import TheKeyMachine.mods.selectionMod as selectionMod
-import TheKeyMachine.mods.settingsMod as settings
+from TheKeyMachine.core import runtime
+from TheKeyMachine.maya import runtime as maya_runtime
+from TheKeyMachine.maya import maya_api
+from TheKeyMachine.tools import registry
+from TheKeyMachine.maya import selection
+from TheKeyMachine.core import settings
 from TheKeyMachine.tools.gimbal_fixer.controller import GimbalAnalyzer
 from TheKeyMachine.tools import common as toolCommon
 
@@ -168,7 +168,7 @@ class AttributeSwitcherController:
 
     @staticmethod
     def selected_nodes(long=False):
-        return selectionMod.get_selected_objects(long=long)
+        return selection.get_selected_objects(long=long)
 
     @staticmethod
     def select(nodes):
@@ -683,7 +683,7 @@ class AttributeSwitcherController:
         """Runs off the main thread -- see apply_switch's run_on_worker_thread
         call. Every Maya touch reachable from here (directly or through the
         helpers this calls) must go through operation.run_on_main()/
-        self._on_main() rather than calling cmds/omui directly.
+        self._on_main() rather than calling cmds/maya_api directly.
         """
         if attribute == "rotateOrder":
             # Rotate order only ever reinterprets an object's own local
@@ -783,7 +783,7 @@ class AttributeSwitcherController:
                 transforms=transforms,
             )
         elif isinstance(keyframes, list) and keyframes:
-            if not self._on_main(operation, omui.set_current_time, keyframes[0]):
+            if not self._on_main(operation, maya_api.set_current_time, keyframes[0]):
                 return
             frame_transforms = transforms.get(keyframes[0], {})
             for target in targets:
@@ -882,7 +882,7 @@ class AttributeSwitcherController:
                 for target in frame_targets:
                     cache_key = (target, frame)
                     if cache_key not in matrix_cache:
-                        matrix_cache[cache_key] = omui.world_matrix_at_time(
+                        matrix_cache[cache_key] = maya_api.world_matrix_at_time(
                             target, frame
                         )
                     matrix = matrix_cache[cache_key]
@@ -915,7 +915,7 @@ class AttributeSwitcherController:
 
     @staticmethod
     def _current_time():
-        current = omui.current_time()
+        current = maya_api.current_time()
         return current if current is not None else cmds.currentTime(query=True)
 
     # Rotate order -- super-mode (fast) path ----------------------------------
@@ -1050,7 +1050,7 @@ class AttributeSwitcherController:
                 cmds.getAttr("{}.{}".format(target, axis))
                 for axis in self.ROTATE_AXES
             ]
-            new_values = omui.reorder_euler_rotation(
+            new_values = maya_api.reorder_euler_rotation(
                 values[0], values[1], values[2], old_order, new_order
             )
             for axis, value in zip(self.ROTATE_AXES, new_values):
@@ -1074,7 +1074,7 @@ class AttributeSwitcherController:
                 cmds.getAttr("{}.{}".format(target, axis), time=frame)
                 for axis in self.ROTATE_AXES
             ]
-            new_values = omui.reorder_euler_rotation(
+            new_values = maya_api.reorder_euler_rotation(
                 values[0], values[1], values[2], old_order, new_order
             )
             for axis, value in zip(self.ROTATE_AXES, new_values):
@@ -1166,7 +1166,7 @@ class AttributeSwitcherController:
             for frame in plan["keyframes"]
         ]
         timerange = (min(tint_frames), max(tint_frames)) if tint_frames else None
-        if timerange and maya_version.supports_playback_selection():
+        if timerange and maya_runtime.supports_playback_selection():
             cmds.playbackOptions(sv=False)
 
         with toolCommon.tool_operation(
@@ -1179,7 +1179,7 @@ class AttributeSwitcherController:
             tint="range" if timerange else None,
             timerange=timerange,
             tint_key="attribute_switcher_range",
-            tint_color=toolbox.get_tool_tint_color("attribute_switcher"),
+            tint_color=registry.get_tool_tint_color("attribute_switcher"),
             rollback_on_cancel=True,
         ) as operation:
             self.disconnect_runtime()
@@ -1419,13 +1419,13 @@ class AttributeSwitcherController:
         if not self._write_switch_attribute(target, target_attribute, value, frame):
             return None
         rotate_order = self._node_rotate_order(target)
-        new_parent_inverse = omui.parent_inverse_matrix_at_time(target, frame)
+        new_parent_inverse = maya_api.parent_inverse_matrix_at_time(target, frame)
         if new_parent_inverse is None:
             return None
-        local_matrix = omui.multiply_matrices(baseline, new_parent_inverse)
+        local_matrix = maya_api.multiply_matrices(baseline, new_parent_inverse)
         if local_matrix is None:
             return None
-        return omui.decompose_local_matrix(local_matrix, rotate_order)
+        return maya_api.decompose_local_matrix(local_matrix, rotate_order)
 
     def _apply_super_switch(self, targets, attribute, value, target_attributes, transforms, operation):
         """Apply the fast path to every target in ``targets`` across every
@@ -1548,7 +1548,7 @@ class AttributeSwitcherController:
             if fast_result is None:
                 return False
 
-            if not omui.set_current_time(frame):
+            if not maya_api.set_current_time(frame):
                 return False
             self._set_preserving_transform(
                 target, target, target_attribute, value, baseline
@@ -1567,7 +1567,7 @@ class AttributeSwitcherController:
             for snapshot in snapshots:
                 self._restore_channel(snapshot, frame)
             self._restore_channel(switch_snapshot, frame)
-            omui.set_current_time(restore_time)
+            maya_api.set_current_time(restore_time)
 
         if not ok:
             self._suspend_super_mode()
@@ -1602,14 +1602,14 @@ class AttributeSwitcherController:
                 # enough to just repeat per call rather than track whether
                 # it's already been set once for this operation.
                 def _begin_range():
-                    if maya_version.supports_playback_selection():
+                    if maya_runtime.supports_playback_selection():
                         cmds.playbackOptions(sv=False)
                     toolCommon.ensure_operation_tint(
                         operation,
                         tint="range",
                         timerange=(frames[0], frames[-1]),
                         tint_key="attribute_switcher_range",
-                        tint_color=toolbox.get_tool_tint_color("attribute_switcher"),
+                        tint_color=registry.get_tool_tint_color("attribute_switcher"),
                     )
                 self._on_main(operation, _begin_range)
             if operation:
@@ -1659,7 +1659,7 @@ class AttributeSwitcherController:
                 if operation:
                     operation.step()
         finally:
-            self._on_main(operation, omui.set_current_time, current_time)
+            self._on_main(operation, maya_api.set_current_time, current_time)
 
     def _apply_relevant_at_frame(
         self,
@@ -1670,7 +1670,7 @@ class AttributeSwitcherController:
         target_attributes,
         target_switch_nodes,
     ):
-        if not omui.set_current_time(frame):
+        if not maya_api.set_current_time(frame):
             return
         for target, transform in relevant.items():
             target_attribute = (
@@ -1684,7 +1684,7 @@ class AttributeSwitcherController:
     @staticmethod
     def _collect_keyframes(targets, all_frames, timeline_selection, selected_range):
         if not timeline_selection and not all_frames:
-            current = omui.current_time()
+            current = maya_api.current_time()
             return [
                 current if current is not None else cmds.currentTime(query=True)
             ]
@@ -1725,7 +1725,12 @@ class AttributeSwitcherController:
                 for attribute in ("rx", "ry", "rz")
                 if cmds.objExists("{}.{}".format(target, attribute))
             ]
-            curves.extend(selectionMod.get_anim_curves_from_plugs(plugs))
+            curves.extend(
+                animation.layer_graph.curves_for_plugs(
+                    plugs,
+                    include_all_layers=True,
+                )
+            )
         curves = list(set(curves))
         if curves:
             cmds.filterCurve(*curves)

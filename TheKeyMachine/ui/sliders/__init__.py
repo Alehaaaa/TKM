@@ -1,0 +1,1 @@
+"""Shared slider presentation components."""

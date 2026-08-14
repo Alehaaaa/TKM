@@ -1,7 +1,7 @@
 from maya import cmds
 
-import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.maya import selection
+from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.data import icons
 
 
@@ -55,7 +55,7 @@ def isolate_master(*_args):
     if not panel:
         return False
 
-    selected = selectionMod.get_selected_objects()
+    selected = selection.get_selected_objects()
     isolated = bool(cmds.isolateSelect(panel, query=True, state=True))
     if not selected:
         if isolated:

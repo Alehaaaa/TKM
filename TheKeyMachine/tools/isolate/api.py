@@ -2,12 +2,12 @@ import re
 
 from maya import cmds
 
-import TheKeyMachine.mods.selectionMod as selectionMod
-from TheKeyMachine.core.scene_nodes import TkmSceneNode
+from TheKeyMachine.maya import selection
+from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.tools.isolate import controller
 from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
 from TheKeyMachine.data import icons
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 WINDOW_NAME = "isolate_bookmarksWindow"
@@ -84,7 +84,7 @@ def create_bookmark(bookmark_name=None):
     bookmark's name, or None if the selection was empty, the prompt was
     cancelled, or the name was invalid.
     """
-    current_selection = selectionMod.get_selected_objects()
+    current_selection = selection.get_selected_objects()
     if not current_selection:
         wutil.make_inViewMessage("Select something to bookmark")
         return None
@@ -165,7 +165,7 @@ def remove_bookmark(bookmark_name):
 
 
 def isolate_bookmark(bookmark_name=None, *_args):
-    current_selection = selectionMod.get_selected_objects(long=True)
+    current_selection = selection.get_selected_objects(long=True)
 
     if not bookmark_name:
         cmds.warning("No bookmark selected")
@@ -254,7 +254,7 @@ def _existing_isolate_bookmarks_window():
 def create_isolate_bookmarks_window(*_args, anchor_widget=None):
     from TheKeyMachine.tools.isolate.widgets import IsolateBookmarksWindow
 
-    original_selection = selectionMod.get_selected_objects()
+    original_selection = selection.get_selected_objects()
 
     def _present(win):
         if anchor_widget is not None:

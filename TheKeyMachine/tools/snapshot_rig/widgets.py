@@ -1,8 +1,8 @@
 """Snapshot Rig-specific prompts."""
 
 from TheKeyMachine.data import icons
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 def confirm_current_default_pose(anchor_widget=None):

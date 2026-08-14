@@ -1,8 +1,8 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
-import TheKeyMachine.mods.generalMod as general
+import TheKeyMachine.core.application as general
 from TheKeyMachine.tools.link_objects import api
 
 

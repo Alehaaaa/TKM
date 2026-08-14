@@ -2,12 +2,12 @@ from maya import cmds
 
 from TheKeyMachine.core.Qt import QtCompat, QtCore, QtWidgets
 
-import TheKeyMachine.core.runtimeManager as runtime
-import TheKeyMachine.mods.selectionMod as selectionMod
+from TheKeyMachine.core import runtime
+from TheKeyMachine.maya import selection
 from TheKeyMachine.data import icons
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
-import TheKeyMachine.widgets.timeline as timelineWidgets
+import TheKeyMachine.ui.widgets.timeline as timelineWidgets
 
 
 def _offset_widgets():
@@ -89,7 +89,7 @@ class AnimationOffsetController(QtCore.QObject):
         return self._enabled
 
     def _selection(self):
-        return selectionMod.get_selected_objects(long=True)
+        return selection.get_selected_objects(long=True)
 
     def _selection_signature_value(self, selection=None):
         if selection is None:
@@ -523,7 +523,7 @@ class AnimationOffsetController(QtCore.QObject):
         locked_range = self._resolve_locked_time_range()
         if locked_range:
             self._time_range = locked_range
-        cmds.select(selectionMod.get_selected_objects())
+        cmds.select(selection.get_selected_objects())
         self._connect_runtime_manager()
         self._resnapshot(update_range=self._time_range is None)
         _offset_widgets().show_animation_offset_tint(

@@ -1,7 +1,7 @@
 """Background Runners menu construction."""
 
 from TheKeyMachine.core.Qt import QtGui
-from TheKeyMachine.core import backgroundRunners
+from TheKeyMachine.tools.background_runners import service as background_runners
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.background_runners import controller
@@ -9,22 +9,23 @@ from TheKeyMachine.tools.background_runners import controller
 
 def build_menu(menu, source_widget=None):
     _ = source_widget
-    from TheKeyMachine.core import toolbox, trigger
+    from TheKeyMachine.core import trigger
+    from TheKeyMachine.tools import registry
 
     from TheKeyMachine.core import i18n
 
-    for runner_id, spec in backgroundRunners.get_runner_specs().items():
+    for runner_id, spec in background_runners.get_runner_specs().items():
         command_id = spec.get("command_id", runner_id)
         # Route the click through the same registered command every hotkey,
         # shelf button, and Hotkeys-editor row for this runner already goes
-        # through (see backgroundRunners.RUNNER_COMMAND_IDS), instead of
+        # through (see background_runners.RUNNER_COMMAND_IDS), instead of
         # toggling the runner's state directly -- one dispatch path, one
         # place that decides what "run this" means. That same registered
         # tool is also this menu's only source for label/description text,
         # so a runner entry translates exactly like its Hotkeys-editor row
         # and shelf button do, via the package's own lang.json -- no
-        # separate copy of the string lives in backgroundRunners.py's specs.
-        tool = toolbox.get_tool(command_id) if trigger.has_command(command_id) else {}
+        # separate copy of the string lives in background_runners.py's specs.
+        tool = registry.get_tool(command_id) if trigger.has_command(command_id) else {}
         callback = tool.get("callback") if tool else None
         tooltip = tool.get("tooltip")
         label = tool.get("menu_label") or tool.get("label") or spec.get("label", runner_id)
@@ -53,7 +54,7 @@ def build_menu(menu, source_widget=None):
     )
     menu.addAction(
         QtGui.QIcon(icons.reload),
-        i18n.tr("restore_runner_defaults", "Restore Defaults"),
+        i18n.tr("restore_defaults", "Restore Defaults"),
         callback=toolCommon.mark_non_tool_action(controller.restore_defaults),
         description=i18n.tr("restore_runner_defaults_desc", "Restore the default background-runner states."),
     )

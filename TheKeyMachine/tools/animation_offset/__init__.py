@@ -1,4 +1,4 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.animation_offset import api
 
@@ -22,7 +22,7 @@ class AnimationOffsetToolObject(ToolObject):
         }
     }
     SECTION = {
-        "id": "animation_offset_tools",
+        "id": "animation_offset_tools", "i18n_key": "animation_offset",
         "label": "Animation Offset",
         "color": COLORS.toolbar.purple.hex,
         "items": [{"id": "animation_offset"}],

@@ -7,9 +7,9 @@ from maya import cmds, utils
 
 from TheKeyMachine.core.Qt import QtCompat, QtCore
 from TheKeyMachine.data import icons
-import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.core import runtime
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.core import native_plugins as plugins
+from TheKeyMachine.maya import runtime as maya_runtime
 
 
 DEPTH_CONTEXT = "tkmDepthMoverCtx"
@@ -18,7 +18,7 @@ BUILD_COMMAND = "tkmDepthMoverNativeBuild"
 CONFIGURE_COMMAND = "tkmDepthMoverNativeConfigure"
 SELECT_CONTEXT = "selectSuperContext"
 
-PLUGIN_SPEC = plugins.NativePluginSpec(
+PLUGIN_SPEC = maya_runtime.NativePluginSpec(
     label="Depth Mover",
     plugin_directory=os.path.dirname(__file__),
     output_name="tkmDepthMoverNative",
@@ -40,7 +40,7 @@ def _warn_selection_required():
 
 
 def _ensure_context():
-    plugins.ensure_contexts(
+    maya_runtime.ensure_contexts(
         PLUGIN_SPEC,
         ((DEPTH_CONTEXT_COMMAND, DEPTH_CONTEXT),),
         configure_command=CONFIGURE_COMMAND,
@@ -56,7 +56,7 @@ def cleanup():
         controller.shutdown()
         controller.deleteLater()
         return
-    plugins.unload(PLUGIN_SPEC, restore_context=True)
+    maya_runtime.unload(PLUGIN_SPEC, restore_context=True)
 
 
 class DepthMoverController(QtCore.QObject):
@@ -77,7 +77,7 @@ class DepthMoverController(QtCore.QObject):
     def is_enabled(self):
         return bool(
             self._enabled
-            and plugins.loaded_plugin(PLUGIN_SPEC)
+            and maya_runtime.loaded_plugin(PLUGIN_SPEC)
             and cmds.currentCtx() == DEPTH_CONTEXT
         )
 
@@ -124,7 +124,7 @@ class DepthMoverController(QtCore.QObject):
                     fallback = self._fallback_context
                     if (
                         fallback == DEPTH_CONTEXT
-                        or not plugins.context_exists(fallback)
+                        or not maya_runtime.context_exists(fallback)
                     ):
                         fallback = SELECT_CONTEXT
                     self._set_context(fallback)
@@ -168,7 +168,7 @@ class DepthMoverController(QtCore.QObject):
         self.deactivate(restore_select=True)
         self._remove_callback()
         try:
-            plugins.unload(PLUGIN_SPEC, restore_context=True)
+            maya_runtime.unload(PLUGIN_SPEC, restore_context=True)
         except Exception as error:
             om.MGlobal.displayWarning(
                 "Depth Mover cleanup was incomplete: {}".format(error)

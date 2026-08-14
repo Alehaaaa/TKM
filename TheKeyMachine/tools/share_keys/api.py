@@ -19,7 +19,7 @@ def set_bake_tangent_mode(mode): return controller.set_bake_tangent_mode(mode)
 def share_keys_mode_choices():
     """Live-translated choice list for the Share Keys menu's mode picker.
 
-    Built fresh on every menu open (see ``core.toolMenus.build_declared_menu``'s
+    Built fresh on every menu open (see ``widgets.toolbar_menus.build_declared_menu``'s
     ``"choice"`` handling, which calls this instead of a static list), the
     same pattern already used by ``tkm_menu.api``'s alignment/dock choices.
     """
@@ -60,7 +60,7 @@ def bake_tangent_mode_choices():
         },
         {
             "value": BAKE_TANGENT_MODE_KEEP_TYPE,
-            "label": i18n.tr("bake_tangent_mode_keep_type", "Keep Tangent Type"),
+            "label": i18n.tr("share_keys_mode_preserve_tangent", "Keep Tangent Type"),
             "description": i18n.tr(
                 "bake_tangent_mode_keep_type_desc",
                 "Bake keys without forcing the baked keys to stepped tangents.",

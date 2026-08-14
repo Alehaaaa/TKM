@@ -1,7 +1,7 @@
 from functools import partial
 
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.tangents import api
 

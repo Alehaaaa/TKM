@@ -1,7 +1,7 @@
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 
 from TheKeyMachine.data.colors import COLORS
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.follow_cam import api
 
 
@@ -42,7 +42,7 @@ class FollowCamToolObject(ToolObject):
     }
 
     SECTION = {
-            "id": "follow_cam_tools",
+            "id": "follow_cam_tools", "i18n_key": "follow_cam",
             "label": "Follow Cam",
             "color": COLORS.toolbar.purple.hex,
             "items": [
@@ -60,4 +60,3 @@ class FollowCamToolObject(ToolObject):
                 {"id": "follow_cam_remove"},
             ],
         }
-

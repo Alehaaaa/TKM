@@ -9,7 +9,7 @@ changes and any existing snapshot data becomes orphaned under the old id --
 this is an inherent limitation of node-identity, not something this module
 solves.
 
-Only the explicit "Snapshot ..." toolbox actions persist analysis to disk
+Only the explicit "Snapshot ..." registry actions persist analysis to disk
 (via ``merge_control_entries``). Ordinary default/opposite/mirror operations
 read a cached snapshot when one exists and otherwise analyze on the fly
 in-memory only, through ``resolve_control_snapshot`` -- nothing is written
@@ -25,7 +25,7 @@ from contextlib import contextmanager
 
 from maya import cmds
 
-import TheKeyMachine.mods.generalMod as general
+import TheKeyMachine.core.application as general
 from TheKeyMachine.tools.mirror import math as mirror_math
 
 

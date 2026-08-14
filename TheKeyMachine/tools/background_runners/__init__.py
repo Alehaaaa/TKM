@@ -1,4 +1,4 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.background_runners import api
 
 
@@ -50,7 +50,7 @@ class BackgroundRunnersToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "background_runner_tools",
+        "id": "background_runner_tools", "i18n_key": "background_runners",
         "label": "Background Runners",
         "items": [{"id": "background_runners"}],
     }

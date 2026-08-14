@@ -3,8 +3,8 @@ from functools import partial
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.data import icons
-import TheKeyMachine.mods.settingsMod as settings
-import TheKeyMachine.core.runtimeManager as runtime
+from TheKeyMachine.core import settings
+from TheKeyMachine.core import runtime
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools.attribute_switcher.controller import (
@@ -13,7 +13,7 @@ from TheKeyMachine.tools.attribute_switcher.controller import (
     SUPER_MODE_KEY,
 )
 import TheKeyMachine.tools.gimbal_fixer.api as gimbalFixerApi
-from TheKeyMachine.widgets import customWidgets as widgets, util as wutil
+from TheKeyMachine.ui.widgets import customWidgets as widgets, util as wutil
 
 # Public API surface
 __all__ = [

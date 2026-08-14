@@ -5,15 +5,14 @@ import math
 
 from maya import cmds
 
-from TheKeyMachine.core import animation_context, curveFitting
-from TheKeyMachine.core import animlayers
-from TheKeyMachine.core import openMayaUtils as open_maya
-from TheKeyMachine.mods import selectionMod
-from TheKeyMachine.mods import settingsMod as settings
+from TheKeyMachine.maya import animation
+from TheKeyMachine.maya import maya_api
+from TheKeyMachine.maya import selection
+from TheKeyMachine.core import settings
 from TheKeyMachine.tools import clipboard as toolClipboard
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.widgets import timeline
-from TheKeyMachine.widgets import util as wutil
+from TheKeyMachine.ui.widgets import timeline
+from TheKeyMachine.ui.widgets import util as wutil
 
 
 _CURVE_CLIPBOARD_SLOT = "curve_keys"
@@ -113,7 +112,7 @@ def _nav_accumulate_pending_key_step(amount):
 
 def _nav_schedule_flush():
     global _nav_idle_callback_id
-    _nav_idle_callback_id = open_maya.add_event_callback("idle", _nav_flush_from_idle)
+    _nav_idle_callback_id = maya_api.add_event_callback("idle", _nav_flush_from_idle)
     if _nav_idle_callback_id is None:
         _nav_flush_pending()
 
@@ -122,7 +121,7 @@ def _nav_flush_from_idle(*_args):
     global _nav_idle_callback_id
     callback_id = _nav_idle_callback_id
     _nav_idle_callback_id = None
-    open_maya.remove_callback(callback_id)
+    maya_api.remove_callback(callback_id)
     return _nav_flush_pending()
 
 
@@ -136,7 +135,7 @@ def _nav_flush_pending(*_args):
     if not actions:
         return False
 
-    current = open_maya.current_time()
+    current = maya_api.current_time()
     if current is None:
         return False
     for kind, context, amount in actions:
@@ -145,7 +144,7 @@ def _nav_flush_pending(*_args):
         elif kind == "curve_key":
             curves, time_range = context
             if curves:
-                destination = open_maya.step_anim_curve_key_time(
+                destination = maya_api.step_anim_curve_key_time(
                     curves,
                     current,
                     amount,
@@ -157,13 +156,13 @@ def _nav_flush_pending(*_args):
             current = destination if destination is not None else current + amount
             if time_range:
                 current = max(time_range[0], min(time_range[1], current))
-    return open_maya.set_current_time(current)
+    return maya_api.set_current_time(current)
 
 
 def cancel_pending_navigation():
     """Discard queued work when the TKM runtime is shutting down."""
     global _nav_flush_scheduled, _nav_idle_callback_id
-    open_maya.remove_callback(_nav_idle_callback_id)
+    maya_api.remove_callback(_nav_idle_callback_id)
     _nav_idle_callback_id = None
     _nav_pending_actions[:] = []
     _nav_flush_scheduled = False
@@ -192,7 +191,7 @@ def _closest_turn_offset(value, reference, full_turn):
         or full_turn <= 0.0
     ):
         return 0.0
-    closest_value = open_maya.closest_euler_angle_cut(value, reference)
+    closest_value = maya_api.closest_euler_angle_cut(value, reference)
     if closest_value is not None:
         return float(closest_value) - float(value)
     turns = math.floor(((float(reference) - float(value)) / float(full_turn)) + 0.5)
@@ -215,7 +214,7 @@ def _euler_turn_groups(curve, target_info, full_turn):
         return []
 
     target_times = set(
-        float(value) for value in animation_context.key_times(curve, target_info)
+        float(value) for value in target_info.key_times(curve)
     )
     if not target_times:
         return []
@@ -257,7 +256,7 @@ def _euler_turn_groups(curve, target_info, full_turn):
 def _apply_euler_filter(curves, target_info, operation=None):
     changed_groups = 0
     full_turn = _euler_full_turn()
-    with animation_context.preserve_key_selection():
+    with animation.preserve_key_selection():
         for curve in curves or []:
             if operation is not None and operation.cancelled:
                 break
@@ -278,10 +277,10 @@ def _apply_euler_filter(curves, target_info, operation=None):
 
 
 def delete_keyframes_before_current_time():
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not _validate_curve_tool_targets(target_info, curves, "delete"):
         return None
     current_time = cmds.currentTime(query=True)
@@ -300,14 +299,14 @@ def delete_keyframes_before_current_time():
         if operation is not None:
             operation.step()
     if not deleted:
-        return animation_context.notify_empty("keys", "delete")
+        return animation.notify_empty("keys", "delete")
 
 
 def delete_keyframes_after_current_time():
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not _validate_curve_tool_targets(target_info, curves, "delete"):
         return None
     current_time = cmds.currentTime(query=True)
@@ -326,7 +325,7 @@ def delete_keyframes_after_current_time():
         if operation is not None:
             operation.step()
     if not deleted:
-        return animation_context.notify_empty("keys", "delete")
+        return animation.notify_empty("keys", "delete")
 
 
 def select_all_animation_curves(*args):
@@ -347,7 +346,7 @@ def select_all_animation_curves(*args):
         cmds.select(curvas_seleccionadas)
         cmds.selectKey(add=True)
     else:
-        animation_context.notify_empty()
+        animation.notify_empty()
 
 
 def clear_selected_keys(*args):
@@ -408,7 +407,7 @@ def _animation_command_context(
 
 @contextmanager
 def _cleanup_command_context(label, tool_id):
-    """Cleanup-command alias: tint-less, caller-managed progress."""
+    """Create a tint-less operation with caller-managed progress."""
     with _animation_command_context(
         label,
         tool_id,
@@ -431,13 +430,13 @@ def _run_key_command(
     if target_context:
         target_info, curves = target_context
     else:
-        target_info = animation_context.resolve_tool_context(
+        target_info = animation.resolve_context(
             default_mode=default_mode,
             include_channels=True,
             include_shapes=True,
             resolve_curves=True,
         )
-        curves = target_info["selected_curves"]
+        curves = target_info.curves
     action = {
         "clear_animation": "clear",
         "copy_keys": "copy",
@@ -451,7 +450,7 @@ def _run_key_command(
         require_keys=True,
     ):
         return None
-    time_context = target_info.get("time_context")
+    time_context = target_info.time
 
     with toolCommon.tool_operation(
         tool_id=command_name,
@@ -464,7 +463,7 @@ def _run_key_command(
         preserve_time_selection=preserve_time_selection,
     ):
         kwargs = dict(base_kwargs)
-        selected_keyframes = target_info.get("selected_keyframes") or []
+        selected_keyframes = target_info.selected_keys or []
         if selected_keyframes:
             curve_times = {}
             for curve, key_time in selected_keyframes:
@@ -477,7 +476,7 @@ def _run_key_command(
                     result = command(curve, **command_kwargs)
             return result
 
-        kwargs.update(animation_context.selection_time_kwargs(time_context))
+        kwargs.update(animation.selection_time_kwargs(time_context))
         if default_mode == "current_frame" and not _has_key_time_filter(kwargs):
             frame = cmds.currentTime(query=True)
             kwargs["time"] = (frame, frame)
@@ -503,17 +502,17 @@ def _is_explicit_channel_source(source):
 def _capture_curve_clipboard(target_info, curves):
     entries = []
     all_times = []
-    layer_context = target_info.get("layer_context") or {}
+    layer_context = target_info.layer_scope or {}
     curve_layers = layer_context.get("curve_layers") or {}
     for curve in curves or []:
-        key_data = animation_context.key_data(curve, target_info)
+        key_data = target_info.key_data(curve)
         if not key_data:
             continue
-        output_plugs = selectionMod.get_anim_curve_output_plugs([curve])
+        output_plugs = selection.get_anim_curve_output_plugs([curve])
         plug = output_plugs[0] if output_plugs else None
         attribute = plug.rsplit(".", 1)[-1] if plug and "." in plug else None
         key_times = [float(time) for time, _value in key_data]
-        tangent_snapshots = animation_context.key_tangent_snapshots(
+        tangent_snapshots = animation.key_tangent_snapshots(
             curve,
             key_times,
         )
@@ -544,7 +543,7 @@ def _capture_curve_clipboard(target_info, curves):
     source_start = min(all_times)
     for entry in entries:
         curve = entry.get("curve")
-        curve_fn = open_maya.anim_curve_fn(curve)
+        curve_fn = maya_api.anim_curve_fn(curve)
         entry["source_anchor_value"] = _curve_value_at_time(
             curve,
             curve_fn,
@@ -575,7 +574,7 @@ def _load_curve_clipboard():
 def _spec_attribute(spec):
     plug = spec.get("plug")
     if not plug and spec.get("curve"):
-        output_plugs = selectionMod.get_anim_curve_output_plugs([spec["curve"]])
+        output_plugs = selection.get_anim_curve_output_plugs([spec["curve"]])
         plug = output_plugs[0] if output_plugs else None
     return plug.rsplit(".", 1)[-1] if plug and "." in plug else None
 
@@ -649,10 +648,10 @@ def _paste_target_mappings(target_info, clipboard_data):
     entries = list((clipboard_data or {}).get("entries") or [])
     if not entries:
         return []
-    layer_context = target_info.get("layer_context") or {}
+    layer_context = target_info.layer_scope or {}
     layer_mapping = _paste_layer_mapping(entries, layer_context)
 
-    time_context = target_info.get("time_context")
+    time_context = target_info.time
     current_time = float(cmds.currentTime(query=True))
     anchor_time = (
         float(time_context.start_frame)
@@ -660,8 +659,8 @@ def _paste_target_mappings(target_info, clipboard_data):
         else current_time
     )
     selected_keyframes = (
-        target_info.get("selected_keyframes") or []
-        if target_info.get("source") == "graph_editor"
+        target_info.selected_keys or []
+        if target_info.source == "graph_editor"
         else []
     )
     if selected_keyframes:
@@ -674,9 +673,9 @@ def _paste_target_mappings(target_info, clipboard_data):
         ]
         return _pair_explicit_paste_targets(specs, entries)
 
-    selected_objects = target_info.get("target_objects") or []
-    channel_plugs = target_info.get("target_plugs") or []
-    if target_info.get("source") == "channel_box" and channel_plugs:
+    selected_objects = target_info.objects or []
+    channel_plugs = target_info.plugs or []
+    if target_info.source == "channel_box" and channel_plugs:
         specs = [
             {"curve": None, "plug": plug, "anchor": anchor_time}
             for plug in _unique(channel_plugs)
@@ -745,7 +744,7 @@ def _paste_target_mappings(target_info, clipboard_data):
             if entry.get("layer") in layer_mapping
         ]
     for layer_name, entry in weight_pairs:
-        weight_curves = animlayers.weight_curves(layer_name)
+        weight_curves = animation.weight_curves(layer_name)
         mappings.append((
             {
                 "curve": weight_curves[0] if weight_curves else None,
@@ -772,7 +771,7 @@ def _paste_curves_for_plug(plug, layer_context, layer_name=None):
     scope_layers = layer_context.get("scope_layer_names") or []
     requested_layers = [layer_name] if layer_name in scope_layers else scope_layers
     if layer_context.get("has_layers"):
-        return list(animlayers.get_anim_curve_layer_map_for_plugs(
+        return list(animation.layer_graph.ownership(
             [plug],
             requested_layers,
             scene_layers=layer_context.get("scene_layers"),
@@ -814,7 +813,7 @@ def _create_paste_curve(
     except _COMMAND_ERRORS:
         return None
     if layer_weight:
-        curves = animlayers.weight_curves(node)
+        curves = animation.weight_curves(node)
         return curves[-1] if curves else None
     curves = _paste_curves_for_plug(
         plug,
@@ -835,7 +834,7 @@ def _curve_anchor_data(curve, time):
     except _COMMAND_ERRORS:
         values = []
     if values:
-        snapshots = animation_context.key_tangent_snapshots(curve, [time])
+        snapshots = animation.key_tangent_snapshots(curve, [time])
         return float(values[0]), snapshots[0] if snapshots else {}, True
     try:
         values = cmds.keyframe(
@@ -899,7 +898,7 @@ def _paste_entry_to_curve(
         value = float(key["value"]) + value_offset
         cmds.setKeyframe(curve, time=(destination_time,), value=value)
         tangent = key.get("tangent") or {}
-        animation_context.apply_key_tangent_snapshot(
+        animation.apply_key_tangent_snapshot(
             curve,
             destination_time,
             tangent,
@@ -915,7 +914,7 @@ def _paste_entry_to_curve(
             time=(anchor, anchor),
             valueChange=anchor_value,
         )
-        animation_context.apply_key_tangent_snapshot(
+        animation.apply_key_tangent_snapshot(
             curve,
             anchor,
             anchor_tangent,
@@ -926,19 +925,19 @@ def _paste_entry_to_curve(
 def _paste_clipboard(relative=False):
     clipboard_data = _load_curve_clipboard()
     if not clipboard_data:
-        return animation_context.notify_empty("keys", "paste")
+        return animation.notify_empty("keys", "paste")
 
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         default_mode="current_frame",
         include_channels=True,
         resolve_curves=True,
     )
-    layer_context = target_info.get("layer_context") or {}
+    layer_context = target_info.layer_scope or {}
     mappings = _paste_target_mappings(target_info, clipboard_data)
     if not mappings:
-        if not target_info.get("target_objects"):
+        if not target_info.objects:
             return wutil.make_inViewMessage("Select an object")
-        return animation_context.notify_empty("channels", "paste")
+        return animation.notify_empty("channels", "paste")
     uses_layer_destination = any(not spec.get("curve") for spec, _entry in mappings)
     if (
         uses_layer_destination
@@ -1024,16 +1023,16 @@ def _paste_clipboard(relative=False):
                 ) or changed
 
     if not changed:
-        return animation_context.notify_empty("keys", "paste")
+        return animation.notify_empty("keys", "paste")
     return True
 
 
 def _navigation_key_context():
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
-    time_context = target_info.get("time_context")
+    curves = target_info.curves
+    time_context = target_info.time
     selected_range = (
         time_context.timerange
         if time_context is not None
@@ -1070,15 +1069,15 @@ def go_to_previous_frame(*args):
 
 
 def apply_smart_euler_filter(*args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    target_curves = target_info["selected_curves"]
+    target_curves = target_info.curves
     if not _validate_curve_tool_targets(target_info, target_curves, "filter"):
         return None
     curves = []
     for curve in target_curves:
-        if selectionMod.is_rotation_anim_curve(curve):
+        if selection.is_rotation_anim_curve(curve):
             curves.append(curve)
 
     if not curves:
@@ -1097,17 +1096,17 @@ def clear_animation_keys(*args):
 
 
 def copy_keys(*args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not _validate_curve_tool_targets(
         target_info, curves, "copy", require_keys=True
     ):
         return None
     clipboard_data = _capture_curve_clipboard(target_info, curves)
     if not _save_curve_clipboard(clipboard_data):
-        return animation_context.notify_empty("keys", "copy")
+        return animation.notify_empty("keys", "copy")
     tint_range = (clipboard_data["start"], clipboard_data["end"])
     with toolCommon.tool_operation(
         tool_id="copy_keys",
@@ -1122,17 +1121,17 @@ def copy_keys(*args):
 
 
 def cut_keys(*args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not _validate_curve_tool_targets(
         target_info, curves, "cut", require_keys=True
     ):
         return None
     clipboard_data = _capture_curve_clipboard(target_info, curves)
     if not _save_curve_clipboard(clipboard_data):
-        return animation_context.notify_empty("keys", "cut")
+        return animation.notify_empty("keys", "cut")
     return _run_key_command(
         cmds.cutKey,
         "cut_keys",
@@ -1145,14 +1144,14 @@ def cut_keys(*args):
 
 
 def delete_keys(*args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         default_mode="current_frame",
         include_channels=True,
         include_shapes=True,
         resolve_curves=True,
     )
-    curves = target_info["selected_curves"]
-    time_context = target_info.get("time_context")
+    curves = target_info.curves
+    time_context = target_info.time
     selected_range = (
         time_context.timerange
         if time_context and time_context.mode == "time_slider_range"
@@ -1178,24 +1177,24 @@ def paste_keys_relative(*args):
 
 
 def crop_animation(*args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not _validate_curve_tool_targets(target_info, curves, "crop"):
         return None
 
-    time_context = target_info["time_context"]
+    time_context = target_info.time
     crop_range = (time_context.start_frame, time_context.end_frame)
     clipboard_target_info = dict(target_info)
-    clipboard_target_info["time_context"] = timeline.TimeContext(
+    clipboard_target_info.time = timeline.TimeContext(
         mode="time_slider_range",
         start_frame=crop_range[0],
         end_frame=crop_range[1],
     )
     clipboard_data = _capture_curve_clipboard(clipboard_target_info, curves)
     if not _save_curve_clipboard(clipboard_data):
-        return animation_context.notify_empty("keys", "crop")
+        return animation.notify_empty("keys", "crop")
 
     with _animation_command_context(
         "Crop Animation", "crop_animation", timerange=crop_range
@@ -1235,7 +1234,7 @@ def _flat_redundant_key_times(curve, target_info, tolerance=1e-8):
         return []
 
     target_times = {
-        float(value) for value in animation_context.key_times(curve, target_info)
+        float(value) for value in target_info.key_times(curve)
     }
     redundant = []
     for index in range(1, len(all_times) - 1):
@@ -1258,7 +1257,7 @@ def _flat_redundant_key_times(curve, target_info, tolerance=1e-8):
 
 def _remove_flat_redundant_keys(curves, target_info, operation=None):
     removed = 0
-    with animation_context.preserve_key_selection():
+    with animation.preserve_key_selection():
         for curve in curves:
             if operation is not None and operation.cancelled:
                 break
@@ -1276,14 +1275,14 @@ def _remove_tendency_redundant_keys(
 ):
     """Remove low-detail keys while retaining the fitted motion tendency."""
     removed_count = 0
-    with animation_context.preserve_key_selection():
+    with animation.preserve_key_selection():
         for curve in curves:
             if operation is not None and operation.cancelled:
                 break
             keys = sorted(
                 set(
                     float(value)
-                    for value in animation_context.key_times(curve, target_info)
+                    for value in target_info.key_times(curve)
                 )
             )
             if len(keys) <= 2:
@@ -1291,7 +1290,7 @@ def _remove_tendency_redundant_keys(
                     operation.step()
                 continue
 
-            priority, scores = curveFitting.detail_priority_with_scores(curve, keys)
+            priority, scores = animation.detail_priority_with_scores(curve, keys)
             redundant = [
                 frame
                 for frame in reversed(priority)
@@ -1300,11 +1299,11 @@ def _remove_tendency_redundant_keys(
             if redundant:
                 redundant_set = set(redundant)
                 kept = [frame for frame in keys if frame not in redundant_set]
-                shape = curveFitting.capture([curve], kept)
+                shape = animation.capture_curve_shape([curve], kept)
                 for frame in sorted(redundant, reverse=True):
                     cmds.cutKey(curve, time=(frame, frame), clear=True)
                     removed_count += 1
-                curveFitting.apply(
+                animation.apply_curve_shape(
                     shape,
                     set_values=False,
                     preserve_tangent_types=True,
@@ -1315,14 +1314,14 @@ def _remove_tendency_redundant_keys(
 
 
 def _redundant_key_targets():
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not _validate_curve_tool_targets(target_info, curves, "clean"):
         return None, None, None
 
-    time_context = target_info["time_context"]
+    time_context = target_info.time
     timerange = (time_context.start_frame, time_context.end_frame)
     return target_info, curves, timerange
 
@@ -1364,7 +1363,7 @@ def remove_redundant_keys(*args):
             operation.set_total(len(curves))
             removed = _remove_flat_redundant_keys(curves, target_info, operation)
     if removed == 0:
-        animation_context.notify_empty("keys", "remove")
+        animation.notify_empty("keys", "remove")
     return removed
 
 
@@ -1374,10 +1373,10 @@ def remove_static_anim_curves(*args):
         "remove_static_anim_curves",
     ) as operation:
         operation.start()
-        target_info = animation_context.resolve_tool_context(
+        target_info = animation.resolve_context(
             include_channels=True, include_shapes=True, resolve_curves=True
         )
-        curves = target_info["selected_curves"]
+        curves = target_info.curves
         if not _validate_curve_tool_targets(target_info, curves, "clean"):
             return None
 
@@ -1386,7 +1385,7 @@ def remove_static_anim_curves(*args):
         for curve in curves:
             if operation.cancelled:
                 return None
-            key_data = animation_context.key_data(curve, target_info)
+            key_data = target_info.key_data(curve)
             if not key_data:
                 operation.step()
                 continue
@@ -1399,7 +1398,7 @@ def remove_static_anim_curves(*args):
         if not static_targets:
             return wutil.make_inViewMessage("No static animation")
 
-        time_context = target_info["time_context"]
+        time_context = target_info.time
         operation.timerange = (time_context.start_frame, time_context.end_frame)
         operation.set_total(len(curves) + len(static_targets))
         removed = False
@@ -1446,10 +1445,10 @@ def remove_static_anim_curves(*args):
 
 
 def reverse_animation(*args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not _validate_curve_tool_targets(
         target_info,
         curves,
@@ -1458,16 +1457,16 @@ def reverse_animation(*args):
     ):
         return None
 
-    time_context = target_info["time_context"]
+    time_context = target_info.time
     reverse_range = (time_context.start_frame, time_context.end_frame)
     if time_context.mode == "all_animation":
         key_times = [
             frame
             for curve in curves
-            for frame in animation_context.key_times(curve, target_info)
+            for frame in target_info.key_times(curve)
         ]
         if not key_times:
-            return animation_context.notify_empty("keys", "reverse")
+            return animation.notify_empty("keys", "reverse")
         reverse_range = (min(key_times), max(key_times))
     with _animation_command_context(
         "Reverse Animation",
@@ -1508,7 +1507,7 @@ def _nearest_whole_frame(key_time):
 
 
 def _curve_output_plug(curve):
-    destinations = selectionMod.get_anim_curve_output_plugs([curve])
+    destinations = selection.get_anim_curve_output_plugs([curve])
     return destinations[0] if destinations else None
 
 
@@ -1556,7 +1555,7 @@ def _curve_tangent_at_frame(curve, frame):
         source_time = _nearest_curve_key_time(curve, frame)
     if source_time is None:
         return {}
-    snapshots = animation_context.key_tangent_snapshots(curve, [source_time])
+    snapshots = animation.key_tangent_snapshots(curve, [source_time])
     return snapshots[0] if snapshots else {}
 
 
@@ -1567,7 +1566,7 @@ def _set_key_on_curve_preserving_tangent(curve, frame):
 
     tangent = _curve_tangent_at_frame(curve, frame)
     cmds.setKeyframe(curve, time=(frame,), value=value)
-    animation_context.apply_key_tangent_snapshot(curve, frame, tangent)
+    animation.apply_key_tangent_snapshot(curve, frame, tangent)
     return True
 
 
@@ -1617,7 +1616,7 @@ def _key_attributes_layer_aware(
     scene_layers=None,
 ):
     """Key ``attributes`` on ``obj`` at ``frame`` through the one shared
-    animation-layer destination route (see ``core.animlayers``).
+    animation-layer destination route (see ``animation.layer_graph``).
 
     An attribute that already has a curve on the resolved destination layer
     keeps its existing tangent shape; one that doesn't gets a fresh key,
@@ -1629,9 +1628,8 @@ def _key_attributes_layer_aware(
     """
     if not attributes:
         return [], []
-    groups, blocked = animlayers.group_attributes_by_destination(
-        obj, attributes, context=layer_context
-    )
+    layer_context = layer_context or animation.layer_cache.capture()
+    groups, blocked = layer_context.group_by_destination(obj, attributes)
     keyed_attrs = []
     if operation is not None and blocked:
         operation.step(len(blocked))
@@ -1641,7 +1639,7 @@ def _key_attributes_layer_aware(
                 return keyed_attrs, blocked
             plug = "{}.{}".format(obj, attr)
             try:
-                curve = animlayers.get_anim_curve_for_plug(
+                curve = animation.layer_graph.curve_for_plug(
                     plug,
                     layer_name=layer_name,
                     scene_layers=scene_layers,
@@ -1668,22 +1666,22 @@ def _key_attributes_layer_aware(
 
 
 def set_smart_key(*args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         default_mode="current_frame",
         include_channels=True,
     )
-    target_plugs = target_info["target_plugs"]
-    selected_objects = target_info["target_objects"]
-    selected_channels = target_info["selected_channels"]
+    target_plugs = target_info.plugs
+    selected_objects = target_info.objects
+    selected_channels = target_info.channels
 
     selected_objects = _unique(selected_objects)
     target_plugs = _unique(target_plugs)
 
-    frames = _frames_for_smart_key(target_info["time_context"])
-    source = target_info.get("source")
-    has_graph_keys = bool(target_info.get("has_graph_keys"))
+    frames = _frames_for_smart_key(target_info.time)
+    source = target_info.source
+    has_graph_keys = bool(target_info.has_graph_keys)
 
-    layer_scope = target_info.get("layer_context") or animlayers.curve_tool_context()
+    layer_scope = target_info.layer_scope or animation.layer_cache.tool_context()
     layer_context = layer_scope["context"]
     scene_layers = layer_scope["scene_layers"]
 
@@ -1695,7 +1693,7 @@ def set_smart_key(*args):
     ) as operation:
         keyed = (
             _set_selected_graph_editor_curves_current_time(
-                target_info.get("selected_curves"),
+                target_info.curves,
                 operation,
             )
             if has_graph_keys
@@ -1729,12 +1727,12 @@ def set_smart_key(*args):
                         )
                         keyed = keyed or bool(keyed_attrs)
             else:
-                curves = target_info["selected_curves"]
+                curves = target_info.curves
                 curve_frames = frames
                 if source in (
                     "graph_editor",
                     "graph_editor_outliner",
-                ) and not target_info.get("selected_keyframes"):
+                ) and not target_info.selected_keys:
                     curve_frames = (cmds.currentTime(query=True),)
                 operation.set_total(
                     len(curves) * len(curve_frames), reset=has_graph_keys
@@ -1755,7 +1753,7 @@ def set_smart_key(*args):
 
             object_work = []
             for obj in selected_objects:
-                attrs = selectionMod.get_keyable_scalar_attributes(obj)
+                attrs = selection.get_keyable_scalar_attributes(obj)
                 if not attrs:
                     continue
 
@@ -1769,7 +1767,7 @@ def set_smart_key(*args):
                 # can start being animated.
                 animated_attrs = [
                     attr for attr in valid_attrs
-                    if animlayers.get_anim_curves_by_layer_for_plug(
+                    if animation.layer_graph.curves_by_layer(
                         "{}.{}".format(obj, attr),
                         scene_layers=scene_layers,
                     )
@@ -1799,23 +1797,23 @@ def set_smart_key(*args):
                     break
 
         if not keyed:
-            return animation_context.notify_empty("channels", "key")
+            return animation.notify_empty("channels", "key")
 
 
 def set_smart_key_all_channels(*args):
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         default_mode="current_frame",
         include_channels=True,
         include_graph=True,
     )
-    selected_objects = target_info["target_objects"]
-    target_plugs = target_info["target_plugs"]
-    source = target_info.get("source")
+    selected_objects = target_info.objects
+    target_plugs = target_info.plugs
+    source = target_info.source
 
     selected_objects = _unique(selected_objects)
 
-    frames = _frames_for_smart_key(target_info["time_context"])
-    layer_scope = target_info.get("layer_context") or animlayers.curve_tool_context()
+    frames = _frames_for_smart_key(target_info.time)
+    layer_scope = target_info.layer_scope or animation.layer_cache.tool_context()
     layer_context = layer_scope["context"]
     scene_layers = layer_scope["scene_layers"]
 
@@ -1846,7 +1844,7 @@ def set_smart_key_all_channels(*args):
             attrs = (
                 _unique(explicit_attrs.get(obj) or [])
                 if source == "channel_box"
-                else selectionMod.get_keyable_scalar_attributes(obj)
+                else selection.get_keyable_scalar_attributes(obj)
             )
             if not attrs:
                 continue
@@ -1877,7 +1875,7 @@ def set_smart_key_all_channels(*args):
                 break
 
         if not keyed:
-            return animation_context.notify_empty("channels", "key")
+            return animation.notify_empty("channels", "key")
 
 
 def _snap_curve_keys(
@@ -1931,9 +1929,9 @@ def _snap_curve_keys(
 
 
 def _curve_value_at_time(curve, curve_fn, time):
-    value = open_maya.evaluate_anim_curve(curve_fn, time)
+    value = maya_api.evaluate_anim_curve(curve_fn, time)
     if value is not None:
-        return open_maya.anim_curve_value_to_attr_value(curve, value)
+        return maya_api.anim_curve_value_to_attr_value(curve, value)
     try:
         values = (
             cmds.keyframe(
@@ -1951,7 +1949,7 @@ def _curve_value_at_time(curve, curve_fn, time):
 
 def _curve_tool_has_keys(curves, target_info):
     return any(
-        animation_context.key_times(curve, target_info)
+        target_info.key_times(curve)
         for curve in curves or []
     )
 
@@ -1963,12 +1961,12 @@ def _validate_curve_tool_targets(
     require_keys=False,
 ):
     if (
-        not target_info.get("target_objects")
-        and target_info.get("source") != "graph_editor"
+        not target_info.objects
+        and target_info.source != "graph_editor"
     ):
         wutil.make_inViewMessage("Select an object")
         return False
-    layer_context = target_info.get("layer_context") or {}
+    layer_context = target_info.layer_scope or {}
     if (
         layer_context.get("selection_explicit")
         and not layer_context.get("selected_unlocked")
@@ -1976,25 +1974,25 @@ def _validate_curve_tool_targets(
         wutil.make_inViewMessage("Selected layer is locked")
         return False
     if not curves:
-        animation_context.notify_empty("animation", action)
+        animation.notify_empty("animation", action)
         return False
     if require_keys and not _curve_tool_has_keys(curves, target_info):
-        animation_context.notify_empty("keys", action)
+        animation.notify_empty("keys", action)
         return False
     return True
 
 
 def snap_keyframes():
-    target_info = animation_context.resolve_tool_context(
+    target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
-    curves = target_info["selected_curves"]
+    curves = target_info.curves
     if not _validate_curve_tool_targets(target_info, curves, "snap"):
         return None
 
     curve_key_times = []
     for curve in curves:
-        target_times = animation_context.key_times(curve, target_info)
+        target_times = target_info.key_times(curve)
         try:
             curve_times = cmds.keyframe(
                 curve,
@@ -2018,7 +2016,7 @@ def snap_keyframes():
         if not buckets:
             continue
 
-        curve_fn = open_maya.anim_curve_fn(curve)
+        curve_fn = maya_api.anim_curve_fn(curve)
         snap_data = []
         for rounded_time, key_times in sorted(buckets.items()):
             target_value = _curve_value_at_time(
@@ -2035,7 +2033,7 @@ def snap_keyframes():
     )
 
     if not work_items:
-        return animation_context.notify_empty("keys", "snap")
+        return animation.notify_empty("keys", "snap")
 
     snapped = False
     with toolCommon.tool_operation(
@@ -2063,4 +2061,4 @@ def snap_keyframes():
                 operation.step()
 
     if not snapped:
-        return animation_context.notify_empty("keys", "snap")
+        return animation.notify_empty("keys", "snap")

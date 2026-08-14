@@ -2,8 +2,8 @@
 
 from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 from TheKeyMachine.data import icons
-from TheKeyMachine.mods import selectionMod
-from TheKeyMachine.widgets.customDialogs import QFlatToolBarPopupDialog
+from TheKeyMachine.maya import selection
+from TheKeyMachine.ui.widgets.customDialogs import QFlatToolBarPopupDialog
 
 
 class SelectorDialog(QFlatToolBarPopupDialog):
@@ -26,12 +26,12 @@ class SelectorDialog(QFlatToolBarPopupDialog):
         self.list_widget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.list_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.list_widget.setUniformItemSizes(True)
-        self.list_widget.selectionModel().selectionChanged.connect(self._on_list_selection_changed)
+        self.list_widget.selectionel().selectionChanged.connect(self._on_list_selection_changed)
         self.mainLayout.addWidget(self.list_widget, 1)
 
         try:
-            from TheKeyMachine.core import runtimeManager
-            runtimeManager.get_runtime_manager().selection_changed.connect(self._schedule_reload)
+            from TheKeyMachine.core import runtime
+            runtime.get_runtime_manager().selection_changed.connect(self._schedule_reload)
         except Exception:
             pass
         self.reload_objects()
@@ -45,12 +45,12 @@ class SelectorDialog(QFlatToolBarPopupDialog):
 
     def reload_objects(self):
         self._refreshing = True
-        selected = selectionMod.get_valid_selected_objects(long=True)
+        selected = selection.get_valid_selected_objects(long=True)
         self._objects = sorted(selected, key=lambda node: (node.rsplit("|", 1)[-1].lower(), node.lower()))
         self.title_label.setText(str(len(self._objects)))
         self._list_model.setStringList([node.rsplit("|", 1)[-1] for node in self._objects])
 
-        model = self.list_widget.selectionModel()
+        model = self.list_widget.selectionel()
         if model and self._objects:
             model.select(
                 QtCore.QItemSelection(self._list_model.index(0, 0), self._list_model.index(len(self._objects) - 1, 0)),
@@ -63,7 +63,7 @@ class SelectorDialog(QFlatToolBarPopupDialog):
             return
         from maya import cmds
 
-        names = [self._objects[index.row()] for index in self.list_widget.selectionModel().selectedIndexes()]
+        names = [self._objects[index.row()] for index in self.list_widget.selectionel().selectedIndexes()]
         names = [name for name in names if cmds.objExists(name)]
         self._suppress_next_refresh = True
         if names:

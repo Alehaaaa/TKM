@@ -1,5 +1,5 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
-import TheKeyMachine.mods.generalMod as general
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
+import TheKeyMachine.core.application as general
 from TheKeyMachine.tools.snapshot_rig import api
 
 

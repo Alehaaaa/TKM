@@ -1,4 +1,4 @@
-from TheKeyMachine.core.toolbox import ToolObject, load_tooltips
+from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.tools.graph_toolbar import api
 
 
@@ -17,4 +17,3 @@ class GraphToolbarToolObject(ToolObject):
             "callback": api.show_dock_menu, "tooltip": TOOLTIPS["dock_menu"],
         },
     }
-

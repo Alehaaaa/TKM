@@ -4,9 +4,9 @@ from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.share_keys import controller
-from TheKeyMachine.widgets import customDialogs
-from TheKeyMachine.widgets import customWidgets as cw
-from TheKeyMachine.widgets.util import DPI
+from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets import customWidgets as cw
+from TheKeyMachine.ui.widgets.util import DPI
 
 
 WINDOW_NAME = "bake_custom_interval_window"
