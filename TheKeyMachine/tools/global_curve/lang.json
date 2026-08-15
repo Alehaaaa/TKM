@@ -1,0 +1,8 @@
+{
+  "global_curve": {"en": {"label": "Global Curve"}},
+  "global_curve_create": {"en": {"label": "Create"}},
+  "global_curve_remove": {"en": {"label": "Remove"}},
+  "global_curve_edit": {"en": {"label": "Edit"}},
+  "global_curve_affect_time": {"en": {"label": "Affect Time"}},
+  "global_curve_snap_keys": {"en": {"label": "Snap Keys"}}
+}

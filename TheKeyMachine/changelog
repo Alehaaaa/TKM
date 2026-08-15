@@ -15,6 +15,9 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.42:
+  - new: Global Curve reshapes selected or visible Graph Editor curves together with live time and tangent controls
+
 0.1.41:
   - bugfix: Tooltips stay accurate and correctly localized across animation, selection, attribute, tangent, and tracer tools
   - new: Create and manage multiple tracers

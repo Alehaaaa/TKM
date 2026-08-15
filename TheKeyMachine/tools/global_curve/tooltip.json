@@ -1,0 +1,8 @@
+{
+  "global_curve": ["Create or remove a live Global Curve for selected or visible Graph Editor curves.", "Edit it to reshape every captured curve together."],
+  "create": ["Capture the selected Graph Editor curves, or all shown curves, in another Global Curve."],
+  "remove": ["Remove every Global Curve and all of their live callbacks."],
+  "edit": ["Replace the active Global Curve with a fresh capture of the current Graph Editor curves."],
+  "affect_time": ["Move captured keys in time when Global Curve keys move horizontally."],
+  "snap_keys": ["Round time changes made through the Global Curve to whole frames."]
+}

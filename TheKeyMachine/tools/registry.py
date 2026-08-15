@@ -138,7 +138,7 @@ TOOLBAR_SECTION_IDS = {
         "temp_pivot_tools", "follow_cam_tools",
         "link_tools",
         "attribute_tools", "selection_set_tools", "orbit_tools", "tracer_tools",
-        "graph_tools", "animation_tools", "custom_tools_section", "snapshot_rig_tools",
+        "global_curve_tools", "graph_tools", "animation_tools", "custom_tools_section", "snapshot_rig_tools",
     ),
 }
 

@@ -6,7 +6,7 @@
 
 **The Open Source Animation toolbar for Autodesk Maya.**
 
-![Version](https://img.shields.io/badge/version-0.1.41-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.42-blue.svg)
 
 TheKeyMachine (TKM) is a Maya toolbar for Animation. Change timing, posing, curve editing, selection, mirroring, pivots, and space switches.
 
@@ -107,6 +107,7 @@ Colored sets, inline rename, duplicate checks, clear all, and quick or regular i
 <summary><b>Graph & Curve Tools</b></summary>
 
 - **Global Tools:** Auto Euler Filter, Overshoot Sliders, and the Graph Editor Toolbar.
+- **Global Curve:** Capture selected or visible curves, then reshape their values, timing, and tangents together from one simplified curve.
 - **Graph Tools:** Select Object from Curve, Isolate, Flip, Overlap, Mute, Lock, Match Curves, and Graph Filter controls.
 - **Anim Curve Tools:** Smart Key, Smart Key All Channels, Smart Euler Filter, Snap, Reverse, Clear, Crop, redundant/static cleanup, Copy/Cut/Delete/Paste/Paste Relative, key/frame navigation, scene animation selection, and delete-before/after-current-frame.
 

@@ -27,7 +27,7 @@ except Exception:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
 
-__version__ = "0.1.41"
+__version__ = "0.1.42"
 __stage__ = "beta"
 __build__ = "341"
 __codename__ = "Cortado"

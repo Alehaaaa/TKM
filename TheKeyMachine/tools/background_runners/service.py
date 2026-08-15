@@ -1102,10 +1102,15 @@ class AnimLayerWeightsRunner(QtCore.QObject):
         super().__init__(parent or manager)
         self._manager = manager
         self._last_curves_key = None
+        self._weight_curve_names = set()
         self._structure_refresh_timer = QtCore.QTimer(self)
         self._structure_refresh_timer.setSingleShot(True)
         self._structure_refresh_timer.setInterval(0)
         self._structure_refresh_timer.timeout.connect(self._apply_layer_structure_change)
+        self._curve_refresh_timer = QtCore.QTimer(self)
+        self._curve_refresh_timer.setSingleShot(True)
+        self._curve_refresh_timer.setInterval(8)
+        self._curve_refresh_timer.timeout.connect(self._recompute)
 
     def start(self):
         for event_name in ("animLayerRebuild", "animLayerRefresh"):
@@ -1122,11 +1127,13 @@ class AnimLayerWeightsRunner(QtCore.QObject):
 
     def stop(self):
         self._structure_refresh_timer.stop()
+        self._curve_refresh_timer.stop()
         self._manager.disconnect_callbacks(self.STRUCTURE_KEY)
         self._manager.disconnect_callbacks(self.CURVE_EDIT_KEY)
         self._manager.disconnect_callbacks(self.NODE_WATCH_KEY)
         self._manager.clear_managed_widget(ANIM_LAYER_WEIGHTS_TINT_KEY)
         self._last_curves_key = None
+        self._weight_curve_names.clear()
 
     def _schedule_layer_structure_change(self, *_args):
         # Maya can emit both refresh and rebuild for one layer edit. Coalesce
@@ -1140,17 +1147,37 @@ class AnimLayerWeightsRunner(QtCore.QObject):
         self._watch_layer_nodes()
         self._recompute()
 
-    def _on_curve_edited(self, *_args):
-        self._recompute()
+    def _on_curve_edited(self, *args):
+        """Ignore unrelated curves and coalesce Maya's per-key edit bursts."""
+        edited = set()
+        try:
+            curves = args[0]
+            for index in range(len(curves)):
+                edited.add(om.MFnDependencyNode(curves[index]).name())
+        except Exception:
+            pass
+        if edited and not edited.intersection(self._weight_curve_names):
+            return
+        if not self._curve_refresh_timer.isActive():
+            self._curve_refresh_timer.start()
 
     def _watch_layer_nodes(self):
         self._manager.disconnect_callbacks(self.NODE_WATCH_KEY)
+        self._weight_curve_names.clear()
         for layer_name in animation.scene_layer_names(include_root=False):
             self._manager.add_node_attribute_changed_callback(
                 layer_name,
                 self._on_layer_attribute_changed,
                 key=self.NODE_WATCH_KEY,
             )
+            try:
+                self._weight_curve_names.update(
+                    cmds.keyframe(
+                        "{}.weight".format(layer_name), query=True, name=True
+                    ) or []
+                )
+            except Exception:
+                pass
 
     def _on_layer_attribute_changed(self, msg, plug, *_args):
         if not _is_authored_attribute_change(msg):
@@ -1160,6 +1187,9 @@ class AnimLayerWeightsRunner(QtCore.QObject):
         except Exception:
             return
         if attribute_name not in self.WATCHED_ATTRIBUTES:
+            return
+        if msg & (om.MNodeMessage.kConnectionMade | om.MNodeMessage.kConnectionBroken):
+            self._schedule_layer_structure_change()
             return
         self._recompute()
 

@@ -397,6 +397,9 @@ class RuntimeManager(QtCore.QObject):
         self._alt_pressed = False
         self._playback_active = False
         self._undo_notification_suppression = 0
+        self._anim_curve_coalesce_depth = 0
+        self._anim_curve_coalesced = {}
+        self._anim_curve_coalesce_preset = None
 
         self._event_filter_installed = False
         self._background_runner_controller = None
@@ -656,7 +659,12 @@ class RuntimeManager(QtCore.QObject):
         if not oma:
             return None
 
+        queue_key = object()
+
         def _wrapped(*args):
+            if self._anim_curve_coalesce_depth:
+                self._queue_anim_curve_callback(queue_key, handler, key, args)
+                return
             try:
                 handler(*args)
             finally:
@@ -668,6 +676,66 @@ class RuntimeManager(QtCore.QObject):
             return None
         self._track_om(key, int(cb_id))
         return int(cb_id)
+
+    def _queue_anim_curve_callback(self, queue_key, handler, key, args):
+        entry = self._anim_curve_coalesced.setdefault(
+            queue_key,
+            {"handler": handler, "key": key, "objects": {}},
+        )
+        if self._anim_curve_coalesce_preset is not None:
+            if not entry["objects"]:
+                entry["objects"].update(self._anim_curve_coalesce_preset)
+            return
+        try:
+            curves = args[0]
+            for index in range(len(curves)):
+                handle = om.MObjectHandle(curves[index])
+                entry["objects"][int(handle.hashCode())] = handle
+        except Exception:
+            pass
+
+    def _flush_anim_curve_callbacks(self):
+        queued = list(self._anim_curve_coalesced.values())
+        self._anim_curve_coalesced.clear()
+        for entry in queued:
+            curves = om.MObjectArray()
+            for handle in entry["objects"].values():
+                try:
+                    if handle.isValid() and handle.isAlive():
+                        curves.append(handle.object())
+                except Exception:
+                    continue
+            try:
+                entry["handler"](curves, None)
+            except Exception:
+                pass
+            finally:
+                self._emit(entry["key"])
+
+    @contextmanager
+    def coalesce_anim_curve_callbacks(self, curves=None):
+        """Deliver bulk secondary curve edits once per registered handler."""
+        if not self._anim_curve_coalesce_depth and curves is not None:
+            preset = {}
+            for curve in curves:
+                try:
+                    handle = om.MObjectHandle(curve)
+                    preset[int(handle.hashCode())] = handle
+                except Exception:
+                    continue
+            self._anim_curve_coalesce_preset = preset
+        self._anim_curve_coalesce_depth += 1
+        try:
+            yield
+        finally:
+            self._anim_curve_coalesce_depth = max(
+                0, self._anim_curve_coalesce_depth - 1
+            )
+            if not self._anim_curve_coalesce_depth:
+                try:
+                    self._flush_anim_curve_callbacks()
+                finally:
+                    self._anim_curve_coalesce_preset = None
 
     def connect_signal(self, signal: Any, handler: Callable[..., Any], *, key: str, unique: bool = True) -> bool:
         if signal is None or handler is None:
