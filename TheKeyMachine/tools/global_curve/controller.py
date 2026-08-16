@@ -129,30 +129,64 @@ def _query_array(curve, flag, count, default):
 
 
 def _curve_snapshot(curve):
-    try:
-        times = list(cmds.keyframe(curve, query=True, timeChange=True) or [])
-        values = list(cmds.keyframe(curve, query=True, valueChange=True) or [])
-    except (RuntimeError, TypeError, ValueError, AttributeError):
+    """Capture one curve's keys via the API in a single pass.
+
+    Tangent *type* still comes from cmds.keyTangent (a plain string query,
+    kept as-is) because that's the exact vocabulary _restore_tangents feeds
+    straight back into cmds.keyTangent later ("spline", "fixed", "step",
+    ...) -- the API's integer TangentType enum doesn't have a confidently
+    verifiable 1:1 string mapping worth risking here. Everything else below
+    is plain numeric data with no such ambiguity, so one MFnAnimCurve pass
+    replaces what used to be two cmds.keyframe calls plus four more
+    cmds.keyTangent calls (angles and weights, in and out) -- each a
+    command-layer round-trip through Maya's string-based command dispatch,
+    versus one native call per key here.
+    """
+    fn = maya_api.anim_curve_fn(curve)
+    if fn is None:
         return None
-    count = min(len(times), len(values))
+    try:
+        count = _api_key_count(fn)
+    except Exception:
+        return None
     if not count:
         return None
-    times, values = times[:count], values[:count]
+    times, values = [], []
+    in_angles, out_angles = [], []
+    in_weights, out_weights = [], []
     try:
-        weighted = bool(cmds.keyTangent(curve, query=True, weightedTangents=True))
-    except (RuntimeError, TypeError, ValueError, AttributeError):
-        weighted = False
+        weighted = bool(fn.isWeighted)
+        unit = om.MTime.uiUnit()
+        for index in range(count):
+            times.append(float(fn.input(index).asUnits(unit)))
+            values.append(float(fn.value(index)))
+            in_angle, in_weight = fn.getTangentAngleWeight(index, True)
+            out_angle, out_weight = fn.getTangentAngleWeight(index, False)
+            in_angles.append(float(in_angle.asDegrees()))
+            out_angles.append(float(out_angle.asDegrees()))
+            in_weights.append(float(in_weight))
+            out_weights.append(float(out_weight))
+    except Exception:
+        return None
+    try:
+        api_type = _api_curve_type(fn)
+    except Exception:
+        api_type = None
     return {
         "curve": curve,
         "times": times,
         "values": values,
         "in_types": _query_array(curve, "inTangentType", count, "auto"),
         "out_types": _query_array(curve, "outTangentType", count, "auto"),
-        "in_angles": _query_array(curve, "inAngle", count, 0.0),
-        "out_angles": _query_array(curve, "outAngle", count, 0.0),
-        "in_weights": _query_array(curve, "inWeight", count, 1.0),
-        "out_weights": _query_array(curve, "outWeight", count, 1.0),
+        "in_angles": in_angles,
+        "out_angles": out_angles,
+        "in_weights": in_weights,
+        "out_weights": out_weights,
         "weighted": weighted,
+        # Reuse this resolved function set / curve type in _source_api
+        # instead of re-resolving the node from its name a second time.
+        "api_fn": fn,
+        "api_type": api_type,
     }
 
 
@@ -184,6 +218,7 @@ def _guide_state(fn):
             "times": [], "values": [],
             "in_angles": [], "out_angles": [],
             "in_weights": [], "out_weights": [],
+            "in_types": [], "out_types": [],
             "weighted": bool(fn.isWeighted),
         }
         unit = om.MTime.uiUnit()
@@ -196,6 +231,12 @@ def _guide_state(fn):
             state["out_angles"].append(float(out_angle.asDegrees()))
             state["in_weights"].append(float(in_weight))
             state["out_weights"].append(float(out_weight))
+            # Tangent *type* (e.g. spline -> step) doesn't change the stored
+            # angle/weight, so it has to be tracked explicitly. Without this,
+            # switching the guide to stepped tangents was invisible to the
+            # signature check below and never propagated to the other curves.
+            state["in_types"].append(int(fn.inTangentType(index)))
+            state["out_types"].append(int(fn.outTangentType(index)))
         return state if state["times"] else None
     except Exception:
         return None
@@ -208,7 +249,7 @@ def _guide_signature(state):
         state[key] if isinstance(state[key], bool) else tuple(state[key])
         for key in (
             "times", "values", "in_angles", "out_angles",
-            "in_weights", "out_weights", "weighted",
+            "in_weights", "out_weights", "in_types", "out_types", "weighted",
         )
     )
 
@@ -235,7 +276,29 @@ def _source_api(source):
 
 
 def _cache_bulk_source_state(source):
-    """Cache native key/tangent arrays used by Maya's one-call bulk replace."""
+    """Cache native key/tangent arrays used by Maya's one-call bulk replace.
+
+    Every eligible curve gets an inputs + tangent-*type* cache: that alone
+    is enough for _bulk_set_values to replace every key's value in one
+    addKeysWithTangents call. That matters even for non-weighted curves --
+    per Autodesk's own dev support, a per-key MFnAnimCurve.setValue() loop
+    fires Maya's anim-curve notification system once per key, which is
+    "a huge performance hit" for anything with more than a few keys
+    (https://forums.autodesk.com/t5/maya-programming-forum/fastest-way-to-
+    replace-all-keyframes-through-the-api/td-p/9071582).
+
+    Only *weighted* curves additionally get the tangent X/Y arrays.
+    addKeysWithTangents takes tangentInTypeArray/tangentOutTypeArray fully
+    independently of the X/Y arrays (they're separate, individually
+    optional parameters) -- so a non-weighted curve can go through the same
+    bulk call with type preserved and X/Y simply omitted. Omitting X/Y is
+    also what keeps it from being flipped weighted: supplying explicit X/Y
+    is what forces that conversion, and only a curve that's already
+    weighted needs X/Y supplied to reproduce its exact handle shape (a
+    non-weighted curve's smart tangent types -- auto/spline/clamped/...
+    already recompute their own angle from the new values with no X/Y
+    involved, exactly like a normal Graph Editor edit would).
+    """
     fn = _source_api(source)
     if fn is None or source.get("api_type") not in (
         oma.MFnAnimCurve.kAnimCurveTA,
@@ -243,25 +306,30 @@ def _cache_bulk_source_state(source):
         oma.MFnAnimCurve.kAnimCurveTU,
     ):
         return False
+    weighted = bool(source.get("weighted"))
     try:
         count = _api_key_count(fn)
         inputs = om.MTimeArray()
         in_types, out_types = om.MIntArray(), om.MIntArray()
-        in_x, in_y = om.MDoubleArray(), om.MDoubleArray()
-        out_x, out_y = om.MDoubleArray(), om.MDoubleArray()
-        tangent_locks, weight_locks = om.MIntArray(), om.MIntArray()
+        in_x = in_y = out_x = out_y = None
+        tangent_locks = weight_locks = None
+        if weighted:
+            in_x, in_y = om.MDoubleArray(), om.MDoubleArray()
+            out_x, out_y = om.MDoubleArray(), om.MDoubleArray()
+            tangent_locks, weight_locks = om.MIntArray(), om.MIntArray()
         for index in range(count):
             inputs.append(fn.input(index))
             in_types.append(fn.inTangentType(index))
             out_types.append(fn.outTangentType(index))
-            x, y = fn.getTangentXY(index, True)
-            in_x.append(x)
-            in_y.append(y)
-            x, y = fn.getTangentXY(index, False)
-            out_x.append(x)
-            out_y.append(y)
-            tangent_locks.append(fn.tangentsLocked(index))
-            weight_locks.append(fn.weightsLocked(index))
+            if weighted:
+                x, y = fn.getTangentXY(index, True)
+                in_x.append(x)
+                in_y.append(y)
+                x, y = fn.getTangentXY(index, False)
+                out_x.append(x)
+                out_y.append(y)
+                tangent_locks.append(fn.tangentsLocked(index))
+                weight_locks.append(fn.weightsLocked(index))
         source["bulk_state"] = {
             "inputs": inputs,
             "in_types": in_types,
@@ -272,6 +340,7 @@ def _cache_bulk_source_state(source):
             "out_y": out_y,
             "tangent_locks": tangent_locks,
             "weight_locks": weight_locks,
+            "weighted": weighted,
         }
         return True
     except Exception:
@@ -288,20 +357,22 @@ def _bulk_set_values(source, fn, values):
         output_values = om.MDoubleArray(
             [_api_output_value(source, value) for value in values]
         )
-        fn.addKeysWithTangents(
-            state["inputs"],
-            output_values,
-            tangentInTypeArray=state["in_types"],
-            tangentOutTypeArray=state["out_types"],
-            tangentInXArray=state["in_x"],
-            tangentInYArray=state["in_y"],
-            tangentOutXArray=state["out_x"],
-            tangentOutYArray=state["out_y"],
-            tangentsLockedArray=state["tangent_locks"],
-            weightsLockedArray=state["weight_locks"],
-            convertUnits=False,
-            keepExistingKeys=False,
-        )
+        kwargs = {
+            "tangentInTypeArray": state["in_types"],
+            "tangentOutTypeArray": state["out_types"],
+            "convertUnits": False,
+            "keepExistingKeys": False,
+        }
+        if state.get("weighted"):
+            kwargs.update(
+                tangentInXArray=state["in_x"],
+                tangentInYArray=state["in_y"],
+                tangentOutXArray=state["out_x"],
+                tangentOutYArray=state["out_y"],
+                tangentsLockedArray=state["tangent_locks"],
+                weightsLockedArray=state["weight_locks"],
+            )
+        fn.addKeysWithTangents(state["inputs"], output_values, **kwargs)
         return True
     except Exception:
         return False
@@ -746,11 +817,33 @@ def _nearest_guide_index(time, guide_times):
     return before if abs(guide_times[before] - time) <= abs(guide_times[index] - time) else index
 
 
+def _scaled_weight(weight, guide_weight, current_guide_weight, minimum=0.0001):
+    """Rescale a source tangent's weight by how much the guide's weight moved.
+
+    Weight is a handle *length*, so a proportional (ratio) change keeps a
+    curve's own tangent shape -- an additive delta doesn't: shrinking the
+    guide's weight by more than a source curve's own weight pushed the
+    result negative, clamped to a hair's width, and collapsed that handle
+    into a sharp point. Scaling by the guide's before/after ratio keeps
+    each source's handle proportionate instead of flattening it.
+    """
+    if guide_weight > minimum:
+        return max(minimum, weight * (current_guide_weight / guide_weight))
+    return max(minimum, weight + (current_guide_weight - guide_weight))
+
+
 def _restore_tangents(curve, source, guide, current_guide, times, tangent_mode):
     if tangent_mode == "none":
         return
+    # Only touch weightedTangents -- and only ever pass inWeight/outWeight
+    # below -- for curves that were already weighted. Maya implicitly turns
+    # a curve's tangents weighted the moment inWeight/outWeight is supplied
+    # to keyTangent, no matter what weightedTangents was just set to, so a
+    # non-weighted curve reaching that call is exactly what was converting
+    # every captured curve to weighted tangents.
+    weighted = bool(source["weighted"])
     try:
-        cmds.keyTangent(curve, edit=True, weightedTangents=source["weighted"])
+        cmds.keyTangent(curve, edit=True, weightedTangents=weighted)
     except (RuntimeError, TypeError, ValueError, AttributeError):
         pass
     for index, time in enumerate(times):
@@ -759,26 +852,32 @@ def _restore_tangents(curve, source, guide, current_guide, times, tangent_mode):
         in_weight, out_weight = source["in_weights"][index], source["out_weights"][index]
         apply_in = tangent_mode == "any" or (tangent_mode == "fixed" and in_type == "fixed")
         apply_out = tangent_mode == "any" or (tangent_mode == "fixed" and out_type == "fixed")
-        if tangent_mode != "none" and guide["times"] and current_guide["times"]:
+        if guide["times"] and current_guide["times"]:
             guide_index = _nearest_guide_index(source["times"][index], guide["times"])
             current_index = _nearest_guide_index(times[index], current_guide["times"])
             if apply_in:
                 in_angle += current_guide["in_angles"][current_index] - guide["in_angles"][guide_index]
-                in_weight = max(0.0001, in_weight + current_guide["in_weights"][current_index] - guide["in_weights"][guide_index])
+                if weighted:
+                    in_weight = _scaled_weight(
+                        in_weight, guide["in_weights"][guide_index], current_guide["in_weights"][current_index]
+                    )
                 if tangent_mode == "any":
                     in_type = "fixed"
             if apply_out:
                 out_angle += current_guide["out_angles"][current_index] - guide["out_angles"][guide_index]
-                out_weight = max(0.0001, out_weight + current_guide["out_weights"][current_index] - guide["out_weights"][guide_index])
+                if weighted:
+                    out_weight = _scaled_weight(
+                        out_weight, guide["out_weights"][guide_index], current_guide["out_weights"][current_index]
+                    )
                 if tangent_mode == "any":
                     out_type = "fixed"
         try:
             cmds.keyTangent(curve, edit=True, index=(index, index), inTangentType=in_type, outTangentType=out_type)
-            cmds.keyTangent(
-                curve, edit=True, index=(index, index),
-                inAngle=in_angle, outAngle=out_angle,
-                inWeight=in_weight, outWeight=out_weight,
-            )
+            angle_kwargs = {"inAngle": in_angle, "outAngle": out_angle}
+            if weighted:
+                angle_kwargs["inWeight"] = in_weight
+                angle_kwargs["outWeight"] = out_weight
+            cmds.keyTangent(curve, edit=True, index=(index, index), **angle_kwargs)
         except (RuntimeError, TypeError, ValueError, AttributeError):
             pass
 
@@ -815,21 +914,23 @@ def _retime_curve(source, fn, times, values):
             )
             for index in reversed(range(count)):
                 fn.remove(index, change=change)
-            fn.addKeysWithTangents(
-                inputs,
-                output_values,
-                tangentInTypeArray=state["in_types"],
-                tangentOutTypeArray=state["out_types"],
-                tangentInXArray=state["in_x"],
-                tangentInYArray=state["in_y"],
-                tangentOutXArray=state["out_x"],
-                tangentOutYArray=state["out_y"],
-                tangentsLockedArray=state["tangent_locks"],
-                weightsLockedArray=state["weight_locks"],
-                convertUnits=False,
-                keepExistingKeys=False,
-                change=change,
-            )
+            kwargs = {
+                "tangentInTypeArray": state["in_types"],
+                "tangentOutTypeArray": state["out_types"],
+                "convertUnits": False,
+                "keepExistingKeys": False,
+                "change": change,
+            }
+            if state.get("weighted"):
+                kwargs.update(
+                    tangentInXArray=state["in_x"],
+                    tangentInYArray=state["in_y"],
+                    tangentOutXArray=state["out_x"],
+                    tangentOutYArray=state["out_y"],
+                    tangentsLockedArray=state["tangent_locks"],
+                    weightsLockedArray=state["weight_locks"],
+                )
+            fn.addKeysWithTangents(inputs, output_values, **kwargs)
             state["inputs"] = inputs
             return True
         except Exception:
@@ -839,10 +940,12 @@ def _retime_curve(source, fn, times, values):
                 pass
             return False
 
+    # Fallback for curve types the bulk_state cache above doesn't cover
+    # (only TA/TL/TU are eligible) -- collision-free temporary positions
+    # keep every key index stable during this per-key rewrite.
     temporary_start = max(current_times + list(times)) + 1000.0
     change = oma.MAnimCurveChange()
     try:
-        # Collision-free temporary positions keep every key index stable.
         for index in reversed(range(count)):
             fn.setInput(index, _api_input(source, temporary_start + index), change=change)
         for index, (time, value) in enumerate(zip(times, values)):
@@ -857,10 +960,16 @@ def _retime_curve(source, fn, times, values):
         return False
 
 
-def _apply_session(
-    session, current_guide, affect_time, snap, tangent_mode,
-    tangent_jobs,
-):
+def _plan_session(session, current_guide, affect_time, snap, write_jobs):
+    """Compute every source curve's new times/values -- no Maya writes here.
+
+    Compute and write used to be interleaved per curve (compute curve 1,
+    write curve 1, compute curve 2, write curve 2, ...), which is exactly
+    what let the Graph Editor catch curves mid-update, one at a time, during
+    a drag. Splitting planning out lets every curve in every changed session
+    be queued first, so the write pass (_write_planned) can push them all to
+    Maya back-to-back in one uninterrupted go.
+    """
     guide = session["guide"]
     guide_fn = session.get("guide_fn")
     value_cache = {}
@@ -884,6 +993,12 @@ def _apply_session(
             new_values.append(source["values"][index] + delta)
         if affect_time and snap:
             new_times = _strict_snapped_times(new_times)
+        write_jobs.append((source, fn, curve, guide, current_guide, new_times, new_values))
+
+
+def _write_planned(write_jobs, affect_time, tangent_mode, tangent_jobs):
+    """Push every already-planned curve edit to Maya, one right after another."""
+    for source, fn, curve, guide, current_guide, new_times, new_values in write_jobs:
         try:
             if affect_time:
                 if not _retime_curve(source, fn, new_times, new_values):
@@ -891,11 +1006,13 @@ def _apply_session(
             else:
                 if _api_key_count(fn) != len(new_values):
                     continue
-                if tangent_mode == "none" and _bulk_set_values(
-                    source, fn, new_values
-                ):
-                    pass
-                else:
+                # Bulk-write whenever a cache exists, regardless of tangent
+                # mode: when tangent_mode isn't "none", _restore_tangents
+                # overwrites whatever type/angle this call picks right
+                # after anyway, so there's no reason to pay for a per-key
+                # setValue loop (Maya notifies once per key on that path)
+                # just because a later step is going to touch tangents too.
+                if not _bulk_set_values(source, fn, new_values):
                     for index, value in enumerate(new_values):
                         fn.setValue(index, _api_output_value(source, value))
             if tangent_mode != "none":
@@ -944,8 +1061,9 @@ def _process_curve_edits(pending):
     tangent_mode = get_tangent_mode()
     _PROCESSING = True
     tangent_jobs = []
+    write_jobs = []
     affected_objects = []
-    for session, _signature, _current_guide in changed:
+    for session, _signature, current_guide in changed:
         for source in session["sources"]:
             fn = _source_api(source)
             if fn is not None:
@@ -953,15 +1071,35 @@ def _process_curve_edits(pending):
                     affected_objects.append(fn.object())
                 except Exception:
                     pass
+        # Plan every curve in every changed session before writing any of
+        # them, so the write pass right below touches Maya only to push
+        # already-computed results -- nothing is read back mid-batch.
+        _plan_session(session, current_guide, affect_time, snap, write_jobs)
+    try:
+        cmds.refresh(suspend=True)
+    except (RuntimeError, TypeError, ValueError, AttributeError):
+        pass
+    try:
+        # One undo chunk for every curve in this batch: Maya (and anything
+        # downstream watching chunk boundaries rather than raw per-curve
+        # edits, which includes parts of the Graph Editor's own redraw
+        # logic) treats everything between open/close as a single atomic
+        # operation instead of N separate ones -- which is what "all curves
+        # at once" actually requires, on top of the writes already being
+        # planned and pushed as one uninterrupted pass.
+        cmds.undoInfo(openChunk=True)
+    except (RuntimeError, TypeError, ValueError, AttributeError):
+        pass
     try:
         with runtime.get_runtime_manager().coalesce_anim_curve_callbacks(
             affected_objects
         ):
-            for session, signature, current_guide in changed:
-                _apply_session(
-                    session, current_guide, affect_time, snap, tangent_mode,
-                    tangent_jobs,
-                )
+            # All curves move together here: one tight loop over every
+            # planned write, with nothing else interleaved between them, so
+            # Maya never has a chance to draw a half-updated in-between
+            # state the way it did when each curve was computed and written
+            # in its own turn.
+            _write_planned(write_jobs, affect_time, tangent_mode, tangent_jobs)
             for job in tangent_jobs:
                 _restore_tangents(*job)
         for session, signature, _current_guide in changed:
@@ -969,6 +1107,17 @@ def _process_curve_edits(pending):
     except Exception:
         pass
     finally:
+        try:
+            cmds.undoInfo(closeChunk=True)
+        except (RuntimeError, TypeError, ValueError, AttributeError):
+            pass
+        try:
+            # suspend=False alone is enough: it lets Maya's own next redraw
+            # (already due on this same event-loop tick) pick up the change,
+            # now that the whole batch has landed as one closed chunk.
+            cmds.refresh(suspend=False)
+        except (RuntimeError, TypeError, ValueError, AttributeError):
+            pass
         _PROCESSING = False
 
 
