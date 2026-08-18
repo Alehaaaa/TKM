@@ -26,20 +26,26 @@ from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
 # Registry of known clipboard slots
-# Each entry maps a logical key -> (relative sub-folder, filename)
+# Each entry maps a logical key -> either:
+#   - a relative sub-folder name (str), with the filename defaulting to
+#     "<key>_data.json", or
+#   - an explicit (relative sub-folder, filename) tuple, to override the
+#     filename for a slot that needs something other than that default
+#     (e.g. two slots sharing one sub-folder with different filenames).
 # The root folder is provided by application at call-time to avoid circular imports.
 # ---------------------------------------------------------------------------
 
 _SLOTS: dict = {
-    "animation":        ("copy_animation",  "copy_animation_data.json"),
-    "curve_keys":       ("copy_animation",  "curve_keys_data.json"),
-    "pose":             ("copy_pose",        "copy_pose_data.json"),
-    "selection_sets":   ("selection_sets",   "selection_sets_data.json"),
-    "worldspace":       ("copy_worldspace", "copy_worldspace_data.json"),
-    "copy_link":        ("copy_link",        "copy_link_data.json"),
-    "temp_pivot":       ("temp_pivot",       "temp_pivot_data.json"),
-    "set_default":      ("default_default",  "default_default_data.json"),
-    "mirror":           ("mirror",           "mirror_data.json"),
+    "animation":        "copy_animation",
+    "curve_keys":       "copy_animation",
+    "pose":             "copy_pose",
+    "selection_sets":   "selection_sets",
+    "worldspace":       "copy_worldspace",
+    "copy_link":        "copy_link",
+    "temp_pivot":       "temp_pivot",
+    "set_default":      "default_default",
+    "mirror":           "mirror",
+    "animation_layers": "animation_layers",
 }
 
 # Same-session copy/paste should not pay JSON serialization and parsing costs.
@@ -60,7 +66,11 @@ def _resolve(slot: str) -> str:
         raise ValueError(
             "Unknown clipboard slot: {!r}. Valid slots: {}".format(slot, list(_SLOTS))
         )
-    sub, filename = _SLOTS[slot]
+    entry = _SLOTS[slot]
+    if isinstance(entry, tuple):
+        sub, filename = entry
+    else:
+        sub, filename = entry, "{}_data.json".format(slot)
     return os.path.join(_root(), "TheKeyMachine_user_data", "tools", sub, filename)
 
 

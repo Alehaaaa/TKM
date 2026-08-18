@@ -14,6 +14,7 @@ from TheKeyMachine.maya import shelf  # type: ignore
 from TheKeyMachine.data import icons
 from TheKeyMachine.maya import selection  # type: ignore
 from TheKeyMachine.core import runtime  # type: ignore
+import TheKeyMachine.tools.animation_layers.api as animationLayersApi  # type: ignore
 import TheKeyMachine.tools.animation_offset.api as animationOffsetApi  # type: ignore
 import TheKeyMachine.tools.attribute_switcher.api as attributeSwitcherApi  # type: ignore
 import TheKeyMachine.tools.depth_mover.api as depthMoverApi  # type: ignore
@@ -40,6 +41,7 @@ TOOLBAR_SPECIAL_TOOL_KEYS = {
     "orbit",
     "selection_sets",
     "attribute_switcher",
+    "animation_layers",
     "selector",
     "TKM",
 }
@@ -614,6 +616,8 @@ def add_main_tool_item(section, item_data, owner):
                 controller=getattr(owner, "selection_sets_controller", None),
             ),
         )
+    if key == "animation_layers":
+        return add_bound_tool_button(section, item_data, animationLayersApi.bind_animation_layers_toolbar_button)
     if key == "attribute_switcher":
         return add_bound_tool_button(section, item_data, attributeSwitcherApi.bind_attribute_switcher_toolbar_button)
     if key == "gimbal":

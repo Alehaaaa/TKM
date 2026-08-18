@@ -1,7 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <path d="M3 23 C8 23 7 8 13 8 S18 24 24 18 S26 9 29 9" fill="none" stroke="#d6d6d6" stroke-width="2.4" stroke-linecap="round"/>
-  <circle cx="3" cy="23" r="2.2" fill="#f5b642"/>
-  <circle cx="13" cy="8" r="2.2" fill="#f5b642"/>
-  <circle cx="24" cy="18" r="2.2" fill="#f5b642"/>
-  <circle cx="29" cy="9" r="2.2" fill="#f5b642"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+        stroke: #bdbdbd;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 3.2px;
+      }
+
+      .st1 {
+        fill: #bdbdbd;
+        stroke: #6e6e6e;
+        stroke-width: 1.4px;
+      }
+    </style>
+  </defs>
+  <path class="st0" d="M4.7 35.9 C12.5 35.9 10.9 12.5 20.3 12.5 S28.1 37.5 37.5 28.1 S40.6 14.1 45.3 14.1"/>
+  <circle class="st1" cx="4.7" cy="35.9" r="3.4"/>
+  <circle class="st1" cx="20.3" cy="12.5" r="3.4"/>
+  <circle class="st1" cx="37.5" cy="28.1" r="3.4"/>
+  <circle class="st1" cx="45.3" cy="14.1" r="3.4"/>
 </svg>

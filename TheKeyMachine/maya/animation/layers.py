@@ -494,16 +494,20 @@ def _layer_parent(layer_name):
     That flag turned out to have the same "Unable to parse the argument
     list" issue as the accumulation-mode ones -- it's the last remaining
     cmds.animLayer query flag in the normal refresh path. A parent layer
-    connects to a child through the child's ``message`` plug into the
-    parent's ``childrenLayers`` array (the same link ``scene_layer_objects()``
-    already walks via OpenMaya), so ``listConnections`` -- a different,
-    unaffected command -- can read it back directly.
+    connects to a child through *some* plug of the child into the parent's
+    ``childrenLayers`` array (the same link ``scene_layer_objects()`` already
+    walks via OpenMaya) -- but not specifically the child's ``message`` plug
+    (verified empty even for a layer with a real parent), so querying just
+    that one attribute always came back with nothing and every layer looked
+    like a top-level layer. Querying the whole node's connections (no
+    attribute suffix) and filtering the destination side for
+    ``childrenLayers`` finds it regardless of which plug actually carries it.
     """
     if not layer_name or cmds is None:
         return None
     try:
         destinations = cmds.listConnections(
-            "{}.message".format(layer_name),
+            layer_name,
             source=False,
             destination=True,
             type="animLayer",

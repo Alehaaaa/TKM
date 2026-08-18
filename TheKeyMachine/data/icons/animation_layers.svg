@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+        stroke: #bdbdbd;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 3.2px;
+      }
+    </style>
+  </defs>
+  <polygon class="st0" points="25 7.5 42.5 17 25 26.5 7.5 17 25 7.5"/>
+  <polyline class="st0" points="7.5 25 25 34.5 42.5 25"/>
+  <polyline class="st0" points="7.5 33 25 42.5 42.5 33"/>
+</svg>
