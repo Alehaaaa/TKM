@@ -483,6 +483,13 @@ class LayerRowWidget(QtWidgets.QWidget):
         self.weight_spin.setAlignment(QtCore.Qt.AlignCenter)
         self.weight_spin.setToolTip("Layer weight")
         self.weight_spin.setFocusPolicy(QtCore.Qt.StrongFocus)
+        # Without this, valueChanged fires once per keystroke while typing a
+        # value (e.g. "8", then "5" for "85") -- and each of those routes
+        # through the window's own tool_operation(undo=True) wrapper, so
+        # typing one weight flooded the undo stack with one entry per digit.
+        # Wheel/arrow-driven single-step changes are unaffected: those are
+        # already one deliberate change each.
+        self.weight_spin.setKeyboardTracking(False)
         self.weight_spin.valueChanged.connect(self._on_weight_changed)
         if self.is_root:
             # BaseAnimation has no meaningful override weight to blend.
@@ -596,7 +603,11 @@ class LayerRowWidget(QtWidgets.QWidget):
         self.type_button.setIconSize(QtCore.QSize(icon_dim, icon_dim))
 
     def _open_color_menu(self, *_args):
-        menu = QtWidgets.QMenu(self)
+        # Parented to the top-level window, not this row -- a scriptjob-
+        # driven refresh() can tear down and rebuild every row (including
+        # this one) while the menu is still open, and a QMenu whose parent
+        # got deleted out from under it is a use-after-free risk.
+        menu = QtWidgets.QMenu(self.window())
         swatch_size = wutil.DPI(12)
         default_hex = COLORS.selection.get(controller.DEFAULT_GROUP_COLOR_SUFFIX).hex
         default_action = menu.addAction(_color_swatch_icon(swatch_size, default_hex), "Default (Light Gray)")
@@ -680,8 +691,9 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         self._restore_saved_geometry()
         self.apply_stay_on_top_setting()
         self.update_transparency_state(False)
-        self._connect_runtime()
-        self._install_click_outside_filter()
+        self._runtime_connected = False
+        self._click_outside_filter_installed = False
+        self._refreshing = False
         self.refresh()
 
     # ------------------------------------------------------------ layout
@@ -760,48 +772,61 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
     def refresh(self, *_args):
         if not wutil.is_valid_widget(self):
             return
-        tree = controller.layer_tree()
-        selection_before = set(self._selected_names)
-        self.list_widget.clear()
-        self._rows = {}
-
-        # Show BaseAnimation by itself once it exists, even with zero real
-        # layers under it yet -- only truly nothing (no root at all) falls
-        # back to the empty-state message.
-        if tree is None:
-            self.empty_label.setVisible(True)
-            self.list_widget.setVisible(False)
-            self._selected_names = set()
+        # A scriptjob-driven refresh (Undo/Redo/animLayerRebuild, see
+        # _connect_runtime) can in principle fire again while one is already
+        # rebuilding the list -- e.g. a signal handler triggered mid-rebuild
+        # synchronously touching the scene. Rebuilding the list is not
+        # reentrant (it tears down and repopulates self._rows), so a nested
+        # call is simply dropped rather than risking it running against a
+        # half-cleared list.
+        if getattr(self, "_refreshing", False):
             return
+        self._refreshing = True
+        try:
+            tree = controller.layer_tree()
+            selection_before = set(self._selected_names)
+            self.list_widget.clear()
+            self._rows = {}
 
-        self.empty_label.setVisible(False)
-        self.list_widget.setVisible(True)
+            # Show BaseAnimation by itself once it exists, even with zero real
+            # layers under it yet -- only truly nothing (no root at all) falls
+            # back to the empty-state message.
+            if tree is None:
+                self.empty_label.setVisible(True)
+                self.list_widget.setVisible(False)
+                self._selected_names = set()
+                return
 
-        flat = self._filter_visible(controller.flatten_tree(tree))
-        for row_index, node in enumerate(flat):
-            item = QtWidgets.QListWidgetItem(self.list_widget)
-            item.setSizeHint(QtCore.QSize(0, ROW_HEIGHT))
-            row = LayerRowWidget(
-                node, node.get("_depth", 0), row_index,
-                collapsed=node["name"] in self._collapsed_groups,
-                parent=self.list_widget,
-            )
-            row.bind_to_item(self.list_widget, item)
-            row.clicked.connect(self._on_row_clicked)
-            row.lockToggled.connect(self._on_lock_toggled)
-            row.muteToggled.connect(self._on_mute_toggled)
-            row.overrideToggled.connect(self._on_override_toggled)
-            row.weightEdited.connect(self._on_weight_edited)
-            row.renamed.connect(self._on_renamed)
-            row.contextRequested.connect(self._on_row_context_menu)
-            row.collapseToggled.connect(self._on_group_collapse_toggled)
-            row.colorChosen.connect(self._on_group_color_chosen)
-            self.list_widget.addItem(item)
-            self.list_widget.setItemWidget(item, row)
-            self._rows[node["name"]] = row
-            row.set_selected(node["name"] in selection_before)
+            self.empty_label.setVisible(False)
+            self.list_widget.setVisible(True)
 
-        self._selected_names = {name for name in selection_before if name in self._rows}
+            flat = self._filter_visible(controller.flatten_tree(tree))
+            for row_index, node in enumerate(flat):
+                item = QtWidgets.QListWidgetItem(self.list_widget)
+                item.setSizeHint(QtCore.QSize(0, ROW_HEIGHT))
+                row = LayerRowWidget(
+                    node, node.get("_depth", 0), row_index,
+                    collapsed=node["name"] in self._collapsed_groups,
+                    parent=self.list_widget,
+                )
+                row.bind_to_item(self.list_widget, item)
+                row.clicked.connect(self._on_row_clicked)
+                row.lockToggled.connect(self._on_lock_toggled)
+                row.muteToggled.connect(self._on_mute_toggled)
+                row.overrideToggled.connect(self._on_override_toggled)
+                row.weightEdited.connect(self._on_weight_edited)
+                row.renamed.connect(self._on_renamed)
+                row.contextRequested.connect(self._on_row_context_menu)
+                row.collapseToggled.connect(self._on_group_collapse_toggled)
+                row.colorChosen.connect(self._on_group_color_chosen)
+                self.list_widget.addItem(item)
+                self.list_widget.setItemWidget(item, row)
+                self._rows[node["name"]] = row
+                row.set_selected(node["name"] in selection_before)
+
+            self._selected_names = {name for name in selection_before if name in self._rows}
+        finally:
+            self._refreshing = False
 
     def _filter_visible(self, flat):
         """Drop every node nested under a collapsed group.
@@ -857,7 +882,19 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             self._set_selection({layer_name})
             self._last_anchor = layer_name
 
-        controller.select_layer(layer_name, weight_attribute=True)
+        # A single selected layer keeps select_layer()'s extra Channel-Box
+        # convenience (selecting the layer node itself so Weight shows up
+        # there); a multi-selection needs the full set written to Maya's
+        # native animLayer selection, or toolbar quick actions reading that
+        # live selection (Smart Merge/Export/Import) would only ever see the
+        # one layer clicked last. Ctrl-click can leave exactly one *other*
+        # layer selected (toggling the clicked one off), so this reads back
+        # whichever name is actually left in self._selected_names rather
+        # than assuming it's still layer_name.
+        if len(self._selected_names) == 1:
+            controller.select_layer(next(iter(self._selected_names)), weight_attribute=True)
+        elif self._selected_names:
+            controller.set_selected_layers(self._selected_names)
 
     # ------------------------------------------------------------ per-row mutations
 
@@ -890,6 +927,9 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         if layer_name in self._selected_names:
             self._selected_names.discard(layer_name)
             self._selected_names.add(renamed)
+        if layer_name in self._collapsed_groups:
+            self._collapsed_groups.discard(layer_name)
+            self._collapsed_groups.add(renamed)
         self.refresh()
 
     def _on_layer_dropped(self, layer_name):
@@ -935,9 +975,15 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         self.refresh()
 
     def _create_group(self, *_args):
+        # self._selected_names is a set -- iterate self._rows (insertion-
+        # ordered, top-to-bottom the same as the visible list) instead of it
+        # directly, so the new group's children land in the same relative
+        # order the user actually saw them in rather than an arbitrary set
+        # iteration order.
+        ordered_selected = [name for name in self._rows.keys() if name in self._selected_names]
         try:
             with toolCommon.tool_operation(tool_id="animation_layers_new_group", label="Group Animation Layers", undo=True, progress=False):
-                controller.create_group(member_names=list(self._selected_names))
+                controller.create_group(member_names=ordered_selected)
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
             return
@@ -983,6 +1029,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             for name in selected:
                 controller.delete_layer(name, recursive=False)
         self._selected_names = set()
+        self._collapsed_groups -= set(selected)
         self.refresh()
 
     def _export_selected(self, *_args):
@@ -997,8 +1044,12 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
                 wutil.make_inViewMessage(str(exc))
 
     def _import_layers(self, *_args):
-        with toolCommon.tool_operation(tool_id="animation_layers_import", label="Import Animation Layers", undo=True) as operation:
-            controller.import_from_file(operation=operation)
+        try:
+            with toolCommon.tool_operation(tool_id="animation_layers_import", label="Import Animation Layers", undo=True) as operation:
+                controller.import_from_file(operation=operation)
+        except RuntimeError as exc:
+            wutil.make_inViewMessage(str(exc))
+            return
         self.refresh()
 
     # ------------------------------------------------------------ context menu
@@ -1111,6 +1162,22 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
     # ------------------------------------------------------------ live sync
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Wired up here (idempotently), not just __init__: this window is
+        # reused rather than recreated across close/reopen (see
+        # ``api.animation_layers_window``'s reuse_existing path), and
+        # closeEvent() below tears the scriptjob connections down -- without
+        # reconnecting on the next show, a reopened window would silently
+        # stop live-syncing to Undo/Redo/scene layer changes for the rest of
+        # the Maya session.
+        if not getattr(self, "_runtime_connected", False):
+            self._connect_runtime()
+            self._runtime_connected = True
+        if not getattr(self, "_click_outside_filter_installed", False):
+            self._install_click_outside_filter()
+            self._click_outside_filter_installed = True
+
     def _connect_runtime(self):
         manager = runtime.get_runtime_manager()
         # "Undo"/"Redo" so an undone/redone layer create/delete/reorder/etc.
@@ -1168,6 +1235,10 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
                 app.removeEventFilter(self)
         except Exception:
             pass
+        # Matches showEvent()'s guards -- a later reshow of this same reused
+        # instance needs to know it has to reconnect both.
+        self._runtime_connected = False
+        self._click_outside_filter_installed = False
         animationLayersApi._emit_animation_layers_window_state(False)
         super().closeEvent(event)
 

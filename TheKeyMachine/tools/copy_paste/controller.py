@@ -708,6 +708,8 @@ def _apply_animation_channels_to_targets(
     progress=None,
     layer_metadata=None,
 ):
+    from TheKeyMachine.tools.animation_layers import controller as animation_layers_controller
+
     keys_set = 0
     attr_settable_cache = {}
     progress_batch_size = 25
@@ -763,6 +765,15 @@ def _apply_animation_channels_to_targets(
             return False
         if destination.get("created"):
             created_layers[layer_name] = metadata
+            if metadata.get("is_group"):
+                # Mirrors tools.animation_layers.controller._import_layer's
+                # own pattern: create_layer() (called inside
+                # ensure_destination() above) has no notion of groups/color,
+                # so a copied group is marked and colored here, right after
+                # creation, the one place every paste entry point (Paste,
+                # Paste Insert, Paste Opposite, Paste To) funnels through.
+                animation_layers_controller.mark_as_group(layer_name)
+                animation_layers_controller.set_group_color(layer_name, metadata.get("color"))
             # A new layer changes the blend-node graph used for exact curve
             # resolution. Refresh it once here, then reuse it for every
             # remaining pasted channel.
@@ -1255,6 +1266,8 @@ def _apply_pose_data(
 
 
 def copy_animation(*args, **kwargs):
+    from TheKeyMachine.tools.animation_layers import controller as animation_layers_controller
+
     get_animation_channels = _settable_keyable_channels
 
     _t0 = time.perf_counter() if toolCommon.debug_timing_enabled() else None
@@ -1299,6 +1312,15 @@ def copy_animation(*args, **kwargs):
             time_context,
             selected_keyframes=target_info.selected_keys,
         )
+        # Animation Layers' group/color are private node attributes that
+        # this generic layer-metadata dict (AnimationLayer.as_dict()) never
+        # carried -- read them straight from the scene here, the same way
+        # `weight` just above is bolted on after the fact, so a copied
+        # group's grouping and color survive the round trip to paste()
+        # instead of coming back as an ordinary ungrouped layer.
+        is_group = animation_layers_controller.is_group(layer_name)
+        metadata["is_group"] = is_group
+        metadata["color"] = animation_layers_controller.get_group_color(layer_name) if is_group else None
 
     if toolCommon.debug_timing_enabled():
         _t_weights = time.perf_counter()

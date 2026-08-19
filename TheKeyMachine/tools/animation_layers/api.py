@@ -205,8 +205,12 @@ def export_selected_layers(*_args):
 
 
 def import_layers_file(*_args):
-    with toolCommon.tool_operation(tool_id="animation_layers_import", label="Import Animation Layers", undo=True) as operation:
-        controller.import_from_file(operation=operation)
+    try:
+        with toolCommon.tool_operation(tool_id="animation_layers_import", label="Import Animation Layers", undo=True) as operation:
+            controller.import_from_file(operation=operation)
+    except RuntimeError as exc:
+        wutil.make_inViewMessage(str(exc))
+        return
     _refresh_open_window()
 
 

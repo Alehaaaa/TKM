@@ -81,6 +81,14 @@ def is_group(layer_name):
         return False
 
 
+def mark_as_group(layer_name):
+    """Public entry point for other tools (e.g. ``copy_paste``, when a
+    copied layer being pasted turns out to be a group) that need to mark an
+    existing/freshly created layer as a group without reaching into the
+    private ``_mark_as_group`` helper below."""
+    _mark_as_group(layer_name)
+
+
 def _mark_as_group(layer_name):
     if not cmds.attributeQuery(GROUP_ATTRIBUTE, node=layer_name, exists=True):
         try:
@@ -577,11 +585,12 @@ def set_weight(layer_name, weight):
 
 def selected_layer_names():
     """Layers currently selected in Maya's own animLayer selection state --
-    the same state ``select_layer()`` writes to -- for toolbar quick actions
-    (Smart Merge/Export shortcuts, right-click menu) that act without the
-    Animation Layers window open, so they read from the live scene selection
-    the same way ``maya.animation.layer_cache`` already backs every other
-    layer-scope-aware tool (see ``copy_paste``/``animation_tools``)."""
+    the same state ``select_layer()``/``set_selected_layers()`` write to --
+    for toolbar quick actions (Smart Merge/Export shortcuts, right-click
+    menu) that act without the Animation Layers window open, so they read
+    from the live scene selection the same way ``maya.animation.layer_cache``
+    already backs every other layer-scope-aware tool (see
+    ``copy_paste``/``animation_tools``)."""
     try:
         context = animation.layer_cache.tool_context()
     except _COMMAND_ERRORS:
@@ -603,6 +612,34 @@ def get_parent(layer_name):
 # like a "prior object selection" and silently disables the behavior for
 # every click after the first.
 _last_auto_selected = {"name": None}
+
+
+def set_selected_layers(layer_names):
+    """Write a *multi*-layer selection into Maya's native animLayer selection
+    state, the same state ``select_layer()`` writes to for a single layer.
+
+    The window's own multi-select (ctrl/shift-click) used to always collapse
+    down to whichever layer was clicked last, because every click routed
+    through ``select_layer()`` -- which only ever leaves one layer selected,
+    matching Maya's single "preferred" edit-target semantics for keying. That
+    silently broke toolbar quick actions (Smart Merge/Export/Import) invoked
+    while several rows were selected in the window, since those read the
+    live scene selection via ``selected_layer_names()`` above. The last
+    layer in *layer_names* (if any) is also made preferred, matching plain
+    single-selection's own "last click wins" keying-target behavior.
+    """
+    names = [name for name in dict.fromkeys(layer_names or []) if name and cmds.objExists(name)]
+    try:
+        root_name = root_layer_name()
+        selected_set = set(names)
+        for name in animation.scene_layer_names(include_root=False):
+            cmds.animLayer(name, edit=True, selected=(name in selected_set))
+        if root_name:
+            cmds.animLayer(root_name, edit=True, selected=(root_name in selected_set))
+        if names:
+            cmds.animLayer(names[-1], edit=True, preferred=True)
+    except _COMMAND_ERRORS:
+        pass
 
 
 def select_layer(layer_name, weight_attribute=True):
@@ -686,9 +723,17 @@ def _active_ranges(layer_names, pad=1.0):
     anything. This is the core of "smart" merge: a layer that only does
     something for a handful of frames in a long shot gets baked over a
     handful of frames, not the whole timeline.
+
+    Uses the scene's full animation range (``animationStartTime``/
+    ``animationEndTime``), not the zoomed/visible playback range
+    (``playbackOptions -min/-max``) -- the two are independent in Maya, and
+    using the visible range meant a layer with keys outside whatever the
+    timeline happened to be zoomed to at merge time had that outside data
+    silently discarded: baked nowhere (out of range), then deleted along
+    with the source layer.
     """
-    scene_start = cmds.playbackOptions(query=True, min=True)
-    scene_end = cmds.playbackOptions(query=True, max=True)
+    scene_start = cmds.playbackOptions(query=True, animationStartTime=True)
+    scene_end = cmds.playbackOptions(query=True, animationEndTime=True)
 
     breakpoints = {scene_start, scene_end}
     static_active = []
@@ -739,18 +784,32 @@ def _active_ranges(layer_names, pad=1.0):
         else:
             merged.append([start, end])
 
-    return [
-        (max(scene_start, start - pad), min(scene_end, end + pad))
+    padded = [
+        [max(scene_start, start - pad), min(scene_end, end + pad)]
         for start, end in merged
     ]
+
+    # Two ranges that were left separate above (gap > pad, so not merged)
+    # can still end up overlapping once each is independently padded by
+    # `pad` on both sides (possible whenever pad < gap <= 2*pad) --
+    # collapse those now, or bakeResults below gets handed two overlapping
+    # time chunks to sample instead of one.
+    final = [padded[0]]
+    for start, end in padded[1:]:
+        if start <= final[-1][1]:
+            final[-1][1] = max(final[-1][1], end)
+        else:
+            final.append([start, end])
+
+    return [tuple(r) for r in final]
 
 
 def _key_group_weight_envelope(layer_name, ranges, transition=1.0):
     """Animate the merged layer's own weight so it only overrides its
     active window(s), instead of holding its last baked value forever via
     the default constant extrapolation outside its keyed range."""
-    scene_start = cmds.playbackOptions(query=True, min=True)
-    scene_end = cmds.playbackOptions(query=True, max=True)
+    scene_start = cmds.playbackOptions(query=True, animationStartTime=True)
+    scene_end = cmds.playbackOptions(query=True, animationEndTime=True)
     weight_plug = "{}.weight".format(layer_name)
 
     if len(ranges) == 1 and ranges[0][0] <= scene_start and ranges[0][1] >= scene_end:
@@ -788,20 +847,45 @@ def smart_merge_layers(layer_names, operation=None):
 
     Selecting literally every real layer merges down into BaseAnimation
     itself instead of creating a new "Merged" layer -- matching Maya's own
-    native Merge Layers behavior when the whole stack is selected -- unless
-    BaseAnimation is locked, in which case there's nothing to bake into and
-    this refuses outright rather than silently falling back to a new layer.
+    native Merge Layers behavior when the whole stack is selected.
+
+    Locking only ever protects the one layer whose position anchors the
+    result -- every *other* selected layer can be locked and still gets
+    merged away. For a partial batch (destination: a new "Merged" layer),
+    that's the bottom-most (closest to BaseAnimation) layer in the
+    selection; for a full-stack merge (destination: BaseAnimation itself),
+    that's BaseAnimation.
     """
-    layer_names = [name for name in dict.fromkeys(layer_names or []) if name and cmds.objExists(name)]
+    root_name = root_layer_name()
+    # BaseAnimation can't itself be "merged into" something else -- it's the
+    # foundation everything else stacks on. Including it alongside other
+    # layers in a partial selection used to silently drag its own animated
+    # attributes into the merge (and, since positions has no entry for it,
+    # could even skew which layer got picked as the bottom-most anchor), so
+    # it's dropped here rather than treated as just another layer; selecting
+    # literally everything *else* is exactly what `merge_into_base` below
+    # already detects and handles as the real full-stack case.
+    layer_names = [
+        name for name in dict.fromkeys(layer_names or [])
+        if name and name != root_name and cmds.objExists(name)
+    ]
     if len(layer_names) < 2:
         raise RuntimeError("Select two or more animation layers to merge.")
-    locked_names = [name for name in layer_names if cmds.getAttr("{}.lock".format(name))]
-    if locked_names:
-        raise RuntimeError("{} is locked -- unlock it before merging.".format(locked_names[0]))
 
-    root_name = root_layer_name()
-    all_real_layers = [name for name in _ordered_layer_names() if name != root_name]
-    merge_into_base = bool(root_name) and set(layer_names) == set(all_real_layers)
+    ordered = [name for name in _ordered_layer_names() if name != root_name]
+    positions = {name: index for index, name in enumerate(ordered)}
+    merge_into_base = bool(root_name) and set(layer_names) == set(ordered)
+
+    # `ordered`/`positions` follow the UI list's own stack order: index 0 is
+    # the top row (highest evaluation priority, applied last/overrides),
+    # larger indices sit progressively closer to BaseAnimation at the bottom
+    # (lowest priority/foundation). So "bottom-most" is the *largest*
+    # position, and "the layers stacked above the merge set" (the ones that
+    # must be muted during the capture bake below, see the docstring) are
+    # the ones with a *smaller* position than the merge set's own topmost
+    # (smallest-position) member -- both were previously inverted.
+    bottom_name = max(layer_names, key=lambda name: positions.get(name, -1))
+
     if merge_into_base:
         try:
             base_locked = bool(cmds.getAttr("{}.lock".format(root_name)))
@@ -809,6 +893,9 @@ def smart_merge_layers(layer_names, operation=None):
             base_locked = False
         if base_locked:
             raise RuntimeError("{} is locked -- unlock it before merging every layer into it.".format(root_name))
+    else:
+        if cmds.getAttr("{}.lock".format(bottom_name)):
+            raise RuntimeError("{} is locked -- unlock it before merging.".format(bottom_name))
 
     members = set()
     for name in layer_names:
@@ -828,12 +915,11 @@ def smart_merge_layers(layer_names, operation=None):
             delete_layer(name, recursive=False)
         return None
 
-    ordered = [name for name in _ordered_layer_names() if name != root_layer_name()]
-    merge_indices = [ordered.index(name) for name in layer_names if name in ordered]
-    top_index = max(merge_indices) if merge_indices else -1
+    merge_positions = [positions[name] for name in layer_names if name in positions]
+    topmost_index = min(merge_positions) if merge_positions else -1
     others_above = [
         name for name in ordered
-        if name not in layer_names and ordered.index(name) > top_index
+        if name not in layer_names and positions[name] < topmost_index
     ]
 
     muted_state = {}
@@ -853,7 +939,12 @@ def smart_merge_layers(layer_names, operation=None):
         if merge_into_base:
             destination = root_name
         else:
-            lowest_parent = animation.AnimationLayer(layer_names[0]).parent or root_layer_name()
+            # Anchored on the corrected bottom-most (closest to
+            # BaseAnimation) layer in the selection, not just whichever
+            # layer happened to be first in the caller's (arbitrary) order --
+            # that's the layer whose position in the stack the merged result
+            # should inherit.
+            lowest_parent = animation.AnimationLayer(bottom_name).parent or root_layer_name()
             destination = anim_layers.create_layer({
                 "name": _unique_layer_name("Merged"),
                 "override": True,
@@ -961,6 +1052,7 @@ def _serialize_layer(node):
     data = {
         "name": node["name"],
         "is_group": node["is_group"],
+        "color": node.get("color") if node["is_group"] else None,
         "override": node["override"],
         "passthrough": node["passthrough"],
         "mute": node["mute"],
@@ -987,18 +1079,47 @@ def _serialize_layer(node):
 
 
 def export_layers_data(layer_names):
-    """Serialize the given layers (and any nested children) for the clipboard."""
+    """Serialize the given layers (and any nested children) for the clipboard.
+
+    ``_serialize_layer`` already recurses into a node's own children, so a
+    name whose ancestor is *also* in *layer_names* is skipped here -- that
+    ancestor's own export already carries it as a nested child; exporting it
+    again at the top level would duplicate the whole subtree in the file.
+    """
     tree = layer_tree()
     if tree is None:
         return None
+    names = list(dict.fromkeys(layer_names or ()))
+    name_set = set(names)
     exported = []
-    for name in layer_names or ():
+    for name in names:
         node = find_node(tree, name)
-        if node is not None:
-            exported.append(_serialize_layer(node))
+        if node is None:
+            continue
+        ancestor = node.get("parent")
+        covered_by_ancestor = False
+        while ancestor:
+            if ancestor in name_set:
+                covered_by_ancestor = True
+                break
+            ancestor_node = find_node(tree, ancestor)
+            ancestor = ancestor_node.get("parent") if ancestor_node else None
+        if covered_by_ancestor:
+            continue
+        exported.append(_serialize_layer(node))
     if not exported:
         return None
     return {"layers": exported}
+
+
+def _current_preferred_layer_name():
+    try:
+        for name in animation.scene_layer_names(include_root=False):
+            if cmds.animLayer(name, query=True, preferred=True):
+                return name
+    except _COMMAND_ERRORS:
+        pass
+    return None
 
 
 def _import_layer(entry, parent=None):
@@ -1014,14 +1135,17 @@ def _import_layer(entry, parent=None):
         return None
     if entry.get("is_group"):
         _mark_as_group(created)
+        set_group_color(created, entry.get("color"))
     for plug, member in (entry.get("members") or {}).items():
         node_name = plug.split(".")[0]
         if not cmds.objExists(node_name):
             continue
-        try:
-            cmds.select(node_name, replace=True)
-            cmds.animLayer(created, edit=True, addSelectedObjects=True)
-        except _COMMAND_ERRORS:
+        # Adds exactly this attribute, not every keyable attribute of the
+        # node -- ``cmds.animLayer(edit=True, addSelectedObjects=True)`` (the
+        # previous approach here) adds *all* of a selected node's keyable
+        # attributes to the layer, silently over-adding members an export
+        # never actually included.
+        if not anim_layers.add_plug_to_layer(created, plug):
             continue
         # Back-compat: earlier-exported files store a bare list of keys
         # instead of the current {"keys": [...]} / {"value": ...} shape.
@@ -1030,37 +1154,72 @@ def _import_layer(entry, parent=None):
             for key in keys:
                 try:
                     cmds.setKeyframe(plug, time=(key["time"],), value=key["value"], animLayer=created)
-                    cmds.keyTangent(plug, time=(key["time"], key["time"]), inTangentType=key.get("itt", "auto"), outTangentType=key.get("ott", "auto"))
                 except _COMMAND_ERRORS:
                     continue
+                # Target the tangent edit at *this layer's* curve, resolved
+                # the same layer-aware way `_curve_keyframe_data` reads it
+                # back on export -- keying `plug` directly above can leave
+                # more than one layer's curve feeding it via a blend node,
+                # and a plain `keyTangent(plug, ...)` isn't guaranteed to hit
+                # the curve this import just created the key on.
+                try:
+                    found = cmds.animLayer(created, query=True, findCurveForPlug=plug) or []
+                    curve = found[0] if found else None
+                except _COMMAND_ERRORS:
+                    curve = None
+                if curve:
+                    try:
+                        cmds.keyTangent(curve, time=(key["time"], key["time"]), inTangentType=key.get("itt", "auto"), outTangentType=key.get("ott", "auto"))
+                    except _COMMAND_ERRORS:
+                        pass
         elif isinstance(member, dict) and "value" in member:
             # A static override with no keys -- write it directly into this
             # layer by making it the preferred (edit-target) layer first,
-            # same targeting ``select_layer()`` uses for keying.
+            # same targeting ``select_layer()`` uses for keying. The caller
+            # (``import_layers_data``) restores whichever layer was
+            # preferred before the import started once the whole tree is done.
             try:
                 cmds.animLayer(created, edit=True, preferred=True)
                 cmds.setAttr(plug, member["value"])
             except _COMMAND_ERRORS:
                 continue
+    # Children are created (and fully settled -- including their own
+    # mute/lock/weight) before this layer's own lock is applied: locking a
+    # group cascades onto whatever descendants already exist at that moment
+    # (see `set_lock`'s snapshot logic), so locking a freshly-created,
+    # still-childless group here would cascade onto nothing and leave every
+    # imported child unlocked regardless of the source group's lock state.
+    for child in entry.get("children") or ():
+        _import_layer(child, parent=created)
     set_mute(created, bool(entry.get("mute")))
     set_lock(created, bool(entry.get("lock")))
     try:
         set_weight(created, float(entry.get("weight", 1.0)))
     except (TypeError, ValueError):
         pass
-    for child in entry.get("children") or ():
-        _import_layer(child, parent=created)
     return created
 
 
 def import_layers_data(data):
     if not isinstance(data, dict):
         return []
+    # Writing a static-override value (above) has to make its layer
+    # "preferred" to route the setAttr correctly, which otherwise silently
+    # leaves whatever layer was being actively edited before the import
+    # switched to some deeply-nested imported layer instead.
+    previous_preferred = _current_preferred_layer_name()
     created = []
-    for entry in data.get("layers") or ():
-        result = _import_layer(entry, parent=None)
-        if result:
-            created.append(result)
+    try:
+        for entry in data.get("layers") or ():
+            result = _import_layer(entry, parent=None)
+            if result:
+                created.append(result)
+    finally:
+        if previous_preferred and cmds.objExists(previous_preferred):
+            try:
+                cmds.animLayer(previous_preferred, edit=True, preferred=True)
+            except _COMMAND_ERRORS:
+                pass
     return created
 
 
@@ -1070,8 +1229,12 @@ def export_selected(layer_names, file_path=None, operation=None):
         raise RuntimeError("Select one or more animation layers to export.")
     if operation is not None:
         operation.set_status("Exporting Animation Layers")
+    # Always populate the clipboard slot first -- clipboard.export_dialog()
+    # only ever copies whatever's *already* saved to that slot's file on
+    # disk; without this, calling it directly (the no-file_path/dialog path)
+    # exported nothing but stale or nonexistent data from a previous run.
+    clipboard.save(CLIPBOARD_SLOT, data)
     if file_path:
-        clipboard.save(CLIPBOARD_SLOT, data)
         return clipboard.export_to(CLIPBOARD_SLOT, file_path, operation=operation)
     return clipboard.export_dialog(CLIPBOARD_SLOT, "Export Animation Layers", operation=operation)
 
