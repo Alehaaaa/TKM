@@ -2329,7 +2329,7 @@ class InlineRenameLineEdit(QtWidgets.QLineEdit):
 
 
 class InlineRenameButton(QtWidgets.QPushButton):
-    def __init__(self, text="", parent=None, line_edit_class=None, rename_alignment=None, rename_margins=None):
+    def __init__(self, text="", parent=None, line_edit_class=None, rename_alignment=None, rename_margins=None, rename_style_extra=None):
         super().__init__(text, parent)
         self._renaming_active = False
         self._original_text = text
@@ -2342,6 +2342,11 @@ class InlineRenameButton(QtWidgets.QPushButton):
         # alignment/margins pair so the editor lands exactly where the text
         # it's replacing sits, instead of the centered default.
         self._rename_margins = rename_margins or (DPI(6), DPI(5), DPI(6), DPI(5))
+        # Extra QSS appended only while renaming (e.g. a background/border
+        # "chip" so the field reads as active) -- opt-in and empty by default
+        # so other InlineRenameButton callers (isolate, workspaces,
+        # selection_sets) keep their current plain look unchanged.
+        self._rename_style_extra = rename_style_extra or ""
         editor_class = line_edit_class or InlineRenameLineEdit
         self.inline_rename_field = editor_class(self)
         self.inline_rename_field.setFrame(False)
@@ -2441,6 +2446,7 @@ class InlineRenameButton(QtWidgets.QPushButton):
                     color: transparent;
                 }
                 """
+                + self._rename_style_extra
             )
         elif self._rename_hidden_text_stylesheet is not None:
             self.setStyleSheet(self._rename_hidden_text_stylesheet)

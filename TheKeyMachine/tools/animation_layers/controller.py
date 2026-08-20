@@ -49,6 +49,26 @@ from TheKeyMachine.data.colors import COLORS
 
 _COMMAND_ERRORS = (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError)
 
+
+def _plug(layer_name, attribute):
+    """Shorthand for the ``layer.attribute`` plug strings used throughout
+    this module (weight/mute/lock/override)."""
+    return "{}.{}".format(layer_name, attribute)
+
+
+def _tool_debug_flag():
+    # Same .env parser as tools.common._debug_timing_enabled(); read once at
+    # import (reorder_layer() runs on every drag) -- reload after changing the flag.
+    try:
+        from TheKeyMachine.core import debug as _debug
+
+        return _debug.is_enabled()
+    except Exception:
+        return False
+
+
+_TOOL_DEBUG = _tool_debug_flag()
+
 GROUP_ATTRIBUTE = "tkmAnimLayerGroup"
 GROUP_COLOR_ATTRIBUTE = "tkmAnimLayerColor"
 GROUP_LOCK_SNAPSHOT_ATTRIBUTE = "tkmAnimLayerLockSnapshot"
@@ -63,6 +83,10 @@ CLIPBOARD_SLOT = "animation_layers"
 
 def root_layer_name():
     return anim_graph.root_layer_name()
+
+
+def _is_root(layer_name):
+    return bool(layer_name) and layer_name == root_layer_name()
 
 
 def has_layers():
@@ -103,7 +127,7 @@ def _mark_as_group(layer_name):
 
 def get_weight(layer_name):
     try:
-        return float(cmds.getAttr("{}.weight".format(layer_name)))
+        return float(cmds.getAttr(_plug(layer_name, "weight")))
     except _COMMAND_ERRORS:
         return 1.0
 
@@ -172,18 +196,10 @@ def _layer_node(name, is_root):
 
 
 def _ordered_layer_names():
-    """Layer names in Maya's real stacking/evaluation order, root first.
-
-    ``animation.scene_layer_names()`` comes from ``cmds.ls(type="animLayer")``,
-    which is node-creation order and never changes when a layer is moved
-    with ``moveLayerAfter``/``moveLayerBefore`` -- using it here made the
-    window's list silently ignore every drag-reorder even though the scene
-    itself reordered correctly. ``scene_layer_objects()`` instead walks each
-    layer's ``childrenLayers`` connections (the same array those commands
-    edit), so it's already a depth-first walk in true sibling order; filtered
-    down to one parent's direct children -- which is exactly what
-    ``layer_tree()`` below does -- that relative order survives intact.
-    """
+    """Layer names in real stacking order, root first. ``scene_layer_names()``
+    is node-creation order and ignores moveLayerBefore/After (so drag-reorders
+    wouldn't show); ``scene_layer_objects()`` walks ``childrenLayers``
+    connections instead, which is already depth-first sibling order."""
     try:
         objects = anim_graph.scene_layer_objects()
     except _COMMAND_ERRORS:
@@ -193,14 +209,9 @@ def _ordered_layer_names():
     seen = set()
     for obj in objects:
         try:
-            # absolute=False -> MFnDependencyNode.name(), not .absoluteName():
-            # the latter always root-namespace-qualifies with a leading ":"
-            # (":BaseAnimation", ":Layer1", ...), which both leaked into the
-            # UI as a stray ":" prefix and broke the `name == root_name`
-            # check below (root_layer_name() returns the plain cmds name),
-            # making BaseAnimation register as a non-root layer and show up
-            # inline with everything else instead of being excluded/placed
-            # at the bottom.
+            # absolute=False avoids a leading ":" namespace prefix
+            # (.absoluteName() adds one), which otherwise broke the
+            # name == root_name check below.
             name = maya_api.mobject_name(obj, absolute=False)
         except _COMMAND_ERRORS:
             name = None
@@ -327,9 +338,10 @@ def rename_layer(layer_name, new_name):
 
 
 def create_layer_from_selection(name=None, additive=True, objects=None, parent=None):
+    """Create a new animation layer, adding whichever objects are selected
+    (or passed via *objects*) as members. An empty selection just creates an
+    empty layer, same as create_empty_layer()."""
     objs = objects if objects is not None else (cmds.ls(selection=True, long=True) or [])
-    if not objs:
-        raise RuntimeError("Select one or more objects to create an animation layer from.")
 
     metadata = {
         "name": _unique_layer_name(name or "AnimLayer"),
@@ -343,13 +355,14 @@ def create_layer_from_selection(name=None, additive=True, objects=None, parent=N
     if not created:
         raise RuntimeError("Could not create the animation layer.")
 
-    previous_selection = cmds.ls(selection=True, long=True) or []
-    try:
-        cmds.select(objs, replace=True)
-        cmds.animLayer(created, edit=True, addSelectedObjects=True)
-    finally:
-        if previous_selection:
-            cmds.select(previous_selection, replace=True)
+    if objs:
+        previous_selection = cmds.ls(selection=True, long=True) or []
+        try:
+            cmds.select(objs, replace=True)
+            cmds.animLayer(created, edit=True, addSelectedObjects=True)
+        finally:
+            if previous_selection:
+                cmds.select(previous_selection, replace=True)
     return created
 
 
@@ -391,7 +404,8 @@ def move_layer_to_parent(layer_name, parent_name=None):
     try:
         cmds.animLayer(layer_name, edit=True, parent=target_parent)
         return True
-    except _COMMAND_ERRORS:
+    except _COMMAND_ERRORS as exc:
+        cmds.warning("Animation Layers: couldn't reparent '{}' to '{}': {}".format(layer_name, target_parent, exc))
         return False
 
 
@@ -399,29 +413,49 @@ def delete_layer(layer_name, recursive=False):
     """Delete one layer. Children are reparented to the deleted layer's own
     parent unless *recursive* is set, in which case the whole subtree goes.
 
-    The root/BaseAnimation layer is never deleted directly here -- Maya
-    doesn't allow it while any real layer still exists, and once the last
-    real layer is gone BaseAnimation disappears on its own (it only exists
-    as a side effect of having at least one animLayer), so "delete
-    BaseAnimation along with everything else" already falls out of deleting
-    every real layer without needing a special case for it.
+    BaseAnimation can only be deleted once it's the last layer left in the
+    scene -- Maya refuses while any real layer still exists. Deleting a
+    batch that mixes BaseAnimation with real layers should go through
+    ``delete_layers()`` instead, which deletes the real layers first.
     """
-    if not layer_name or layer_name == root_layer_name():
+    if not layer_name or not cmds.objExists(layer_name):
         return False
-    if not cmds.objExists(layer_name):
-        return False
+    if _is_root(layer_name):
+        if animation.has_anim_layers():
+            return False
+        try:
+            cmds.delete(layer_name)
+            return True
+        except _COMMAND_ERRORS:
+            return False
+    try:
+        children = list(cmds.animLayer(layer_name, query=True, children=True) or [])
+    except _COMMAND_ERRORS:
+        children = []
     if recursive:
-        for child in list(cmds.animLayer(layer_name, query=True, children=True) or []):
+        for child in children:
             delete_layer(child, recursive=True)
     else:
         parent = animation.AnimationLayer(layer_name).parent or root_layer_name()
-        for child in list(cmds.animLayer(layer_name, query=True, children=True) or []):
+        for child in children:
             move_layer_to_parent(child, parent)
     try:
         cmds.delete(layer_name)
         return True
     except _COMMAND_ERRORS:
         return False
+
+
+def delete_layers(layer_names, recursive=False):
+    """Delete every layer in *layer_names*, deferring BaseAnimation (if
+    included) to the very end -- it only actually deletes once every other
+    real layer is gone (see ``delete_layer()``), so attempting it first
+    would always silently no-op even when the whole scene is being cleared.
+    """
+    names = [name for name in dict.fromkeys(layer_names or []) if name]
+    root_name = root_layer_name()
+    ordered = sorted(names, key=lambda name: name == root_name)
+    return [name for name in ordered if delete_layer(name, recursive=recursive)]
 
 
 # ---------------------------------------------------------------------------
@@ -434,13 +468,23 @@ def reorder_layer(layer_name, reference_name, before=False):
     its siblings, using animLayer's own evaluation-order flags."""
     if not layer_name or not reference_name or layer_name == reference_name:
         return False
+    # animLayer's -moveLayerBefore/-moveLayerAfter flags are named for
+    # evaluation order, not UI list position -- "before" in the evaluation
+    # stack means *lower* priority (evaluated earlier), which is the
+    # opposite of "before" in the row's visual before/after among siblings
+    # that this function's own *before* argument means. Swapped here so the
+    # two stay in sync with reorder_layer()'s own before/after contract.
+    if _TOOL_DEBUG:
+        flag = "moveLayerAfter" if before else "moveLayerBefore"
+        print('animLayer -edit -{} "{}" "{}";'.format(flag, reference_name, layer_name))
     try:
         if before:
-            cmds.animLayer(layer_name, edit=True, moveLayerBefore=reference_name)
-        else:
             cmds.animLayer(layer_name, edit=True, moveLayerAfter=reference_name)
+        else:
+            cmds.animLayer(layer_name, edit=True, moveLayerBefore=reference_name)
         return True
-    except _COMMAND_ERRORS:
+    except _COMMAND_ERRORS as exc:
+        cmds.warning("Animation Layers: couldn't reorder '{}' relative to '{}': {}".format(layer_name, reference_name, exc))
         return False
 
 
@@ -450,12 +494,24 @@ def reorder_layer(layer_name, reference_name, before=False):
 
 
 def set_mute(layer_name, muted):
-    # Direct attribute set, same as set_weight() below -- animLayer's own
-    # -mute edit flag is a thin wrapper around this same .mute attribute,
-    # so going straight to setAttr is just as correct and one command
-    # cheaper, with no edit-flag indirection to go wrong.
+    muted = bool(muted)
+    # BaseAnimation can't be excluded from evaluation -- there's no "layer
+    # beneath it" to fall back to -- so muting it isn't allowed, the same
+    # way delete_layer() refuses to delete the root layer outright.
+    if _is_root(layer_name):
+        return False
+    # Mirrors Maya's own Mute/Lock pairing: muting a layer also locks it
+    # (nothing should be keyable on a layer that isn't even contributing
+    # right now), and unmuting it releases that lock again. Routed through
+    # set_lock() -- not a second, separate setAttr -- since that's the one
+    # place the group lock-cascade/snapshot behavior lives: muting a
+    # *group* layer this way correctly cascades the lock onto its children
+    # too, and unmuting it restores their own prior individual lock states
+    # via the same snapshot set_lock() already keeps for a direct
+    # lock/unlock through the Lock toggle.
+    set_lock(layer_name, muted)
     try:
-        cmds.setAttr("{}.mute".format(layer_name), bool(muted))
+        cmds.setAttr(_plug(layer_name, "mute"), muted)
         return True
     except _COMMAND_ERRORS:
         return False
@@ -511,7 +567,7 @@ def _has_locked_ancestor_group(layer_name):
         seen.add(current)
         if is_group(current):
             try:
-                if cmds.getAttr("{}.lock".format(current)):
+                if cmds.getAttr(_plug(current, "lock")):
                     return True
             except _COMMAND_ERRORS:
                 pass
@@ -542,26 +598,26 @@ def set_lock(layer_name, locked):
             previously_locked = []
             for name in descendants:
                 try:
-                    if cmds.getAttr("{}.lock".format(name)):
+                    if cmds.getAttr(_plug(name, "lock")):
                         previously_locked.append(name)
                 except _COMMAND_ERRORS:
                     continue
             _set_lock_snapshot(layer_name, previously_locked)
             for name in descendants:
                 try:
-                    cmds.setAttr("{}.lock".format(name), True)
+                    cmds.setAttr(_plug(name, "lock"), True)
                 except _COMMAND_ERRORS:
                     continue
         else:
             previously_locked = set(_get_lock_snapshot(layer_name))
             for name in descendants:
                 try:
-                    cmds.setAttr("{}.lock".format(name), name in previously_locked)
+                    cmds.setAttr(_plug(name, "lock"), name in previously_locked)
                 except _COMMAND_ERRORS:
                     continue
             _set_lock_snapshot(layer_name, [])
     try:
-        cmds.setAttr("{}.lock".format(layer_name), locked)
+        cmds.setAttr(_plug(layer_name, "lock"), locked)
         return True
     except _COMMAND_ERRORS:
         return False
@@ -569,7 +625,7 @@ def set_lock(layer_name, locked):
 
 def set_override(layer_name, override):
     try:
-        cmds.setAttr("{}.override".format(layer_name), bool(override))
+        cmds.setAttr(_plug(layer_name, "override"), bool(override))
         return True
     except _COMMAND_ERRORS:
         return False
@@ -577,7 +633,7 @@ def set_override(layer_name, override):
 
 def set_weight(layer_name, weight):
     try:
-        cmds.setAttr("{}.weight".format(layer_name), max(0.0, min(1.0, float(weight))))
+        cmds.setAttr(_plug(layer_name, "weight"), max(0.0, min(1.0, float(weight))))
         return True
     except _COMMAND_ERRORS:
         return False
@@ -604,13 +660,9 @@ def get_parent(layer_name):
     return animation.AnimationLayer(layer_name).parent or root_layer_name()
 
 
-# Remembers the layer node this module last auto-selected for the Channel
-# Box, so a later click on a *different* row can tell "the user has since
-# selected something of their own" apart from "the only thing selected is
-# the layer node our own previous click put there" -- otherwise the very
-# first auto-select would leave a selection behind that permanently looks
-# like a "prior object selection" and silently disables the behavior for
-# every click after the first.
+# Tracks our own last auto-selected layer node, so we can tell "user selected
+# something else since" from "selection is just our own prior auto-select" --
+# without this, the first auto-select would permanently look like a user one.
 _last_auto_selected = {"name": None}
 
 
@@ -686,7 +738,10 @@ def remove_selected_from_layer(layer_name):
 
 
 def select_layer_objects(layer_name):
-    members = cmds.animLayer(layer_name, query=True, attribute=True) or []
+    try:
+        members = cmds.animLayer(layer_name, query=True, attribute=True) or []
+    except _COMMAND_ERRORS:
+        members = []
     objects = sorted({plug.split(".")[0] for plug in members})
     if not objects:
         raise RuntimeError("This layer has no members.")
@@ -706,9 +761,9 @@ def _weight_curve_for(layer_name):
 
 def _layer_weight_at(layer_name, frame):
     try:
-        if cmds.getAttr("{}.mute".format(layer_name)):
+        if cmds.getAttr(_plug(layer_name, "mute")):
             return 0.0
-        return float(cmds.getAttr("{}.weight".format(layer_name), time=frame))
+        return float(cmds.getAttr(_plug(layer_name, "weight"), time=frame))
     except _COMMAND_ERRORS:
         return 0.0
 
@@ -740,7 +795,7 @@ def _active_ranges(layer_names, pad=1.0):
     any_curve = False
     for layer_name in layer_names:
         try:
-            muted = bool(cmds.getAttr("{}.mute".format(layer_name)))
+            muted = bool(cmds.getAttr(_plug(layer_name, "mute")))
         except _COMMAND_ERRORS:
             muted = False
         if muted:
@@ -810,7 +865,7 @@ def _key_group_weight_envelope(layer_name, ranges, transition=1.0):
     the default constant extrapolation outside its keyed range."""
     scene_start = cmds.playbackOptions(query=True, animationStartTime=True)
     scene_end = cmds.playbackOptions(query=True, animationEndTime=True)
-    weight_plug = "{}.weight".format(layer_name)
+    weight_plug = _plug(layer_name, "weight")
 
     if len(ranges) == 1 and ranges[0][0] <= scene_start and ranges[0][1] >= scene_end:
         cmds.setAttr(weight_plug, 1.0)
@@ -833,68 +888,57 @@ def _key_group_weight_envelope(layer_name, ranges, transition=1.0):
 
 def smart_merge_layers(layer_names, operation=None):
     """Bake the combined contribution of *layer_names* into one new override
-    layer and delete the sources.
-
-    Efficiency first: only the frame ranges where the merging layers can
-    actually change the result get sampled (see ``_active_ranges``) instead
-    of the full playback range, and only layers stacked *above* the merge
-    set are muted during the capture pass -- layers below keep contributing
-    normally, since their contribution belongs in the captured value, and
-    layers above are restored afterwards to keep applying on top of the new
-    layer exactly as they did on top of the old ones. See
-    ``_key_group_weight_envelope`` for how the destination avoids affecting
-    anything outside its own active window(s).
-
-    Selecting literally every real layer merges down into BaseAnimation
-    itself instead of creating a new "Merged" layer -- matching Maya's own
-    native Merge Layers behavior when the whole stack is selected.
-
+    layer and delete the sources. Only the frame ranges where the merging
+    layers can actually change the result get sampled (see
+    ``_active_ranges``); layers stacked above the merge set are muted during
+    the capture pass and restored after, so they keep applying on top of the
+    new layer exactly as before. Merging into BaseAnimation itself (rather
+    than a new layer) happens either by selecting every real layer -- same
+    as Maya's own Merge Layers -- or by including BaseAnimation itself in
+    the selection alongside one or more real layers, to bake just those
+    layers down into the base without touching the rest of the stack.
     Locking only ever protects the one layer whose position anchors the
-    result -- every *other* selected layer can be locked and still gets
-    merged away. For a partial batch (destination: a new "Merged" layer),
-    that's the bottom-most (closest to BaseAnimation) layer in the
-    selection; for a full-stack merge (destination: BaseAnimation itself),
-    that's BaseAnimation.
+    result -- every other selected layer can be locked and still gets
+    merged away.
     """
     root_name = root_layer_name()
-    # BaseAnimation can't itself be "merged into" something else -- it's the
-    # foundation everything else stacks on. Including it alongside other
-    # layers in a partial selection used to silently drag its own animated
-    # attributes into the merge (and, since positions has no entry for it,
-    # could even skew which layer got picked as the bottom-most anchor), so
-    # it's dropped here rather than treated as just another layer; selecting
-    # literally everything *else* is exactly what `merge_into_base` below
-    # already detects and handles as the real full-stack case.
-    layer_names = [
-        name for name in dict.fromkeys(layer_names or [])
-        if name and name != root_name and cmds.objExists(name)
-    ]
-    if len(layer_names) < 2:
-        raise RuntimeError("Select two or more animation layers to merge.")
+    raw_names = list(dict.fromkeys(layer_names or []))
+    # Explicitly selecting BaseAnimation is itself the signal to merge into
+    # it -- it's dropped from layer_names below (it's the destination, not
+    # a source to merge), so that intent has to be captured before filtering.
+    merge_into_base = bool(root_name) and root_name in raw_names
+    layer_names = [name for name in raw_names if name and name != root_name and cmds.objExists(name)]
 
     ordered = [name for name in _ordered_layer_names() if name != root_name]
-    positions = {name: index for index, name in enumerate(ordered)}
-    merge_into_base = bool(root_name) and set(layer_names) == set(ordered)
+    if not merge_into_base:
+        # Selecting every real layer implies the same thing, without
+        # requiring BaseAnimation to also be explicitly clicked.
+        merge_into_base = bool(root_name) and set(layer_names) == set(ordered)
 
-    # `ordered`/`positions` follow the UI list's own stack order: index 0 is
-    # the top row (highest evaluation priority, applied last/overrides),
-    # larger indices sit progressively closer to BaseAnimation at the bottom
-    # (lowest priority/foundation). So "bottom-most" is the *largest*
-    # position, and "the layers stacked above the merge set" (the ones that
-    # must be muted during the capture bake below, see the docstring) are
-    # the ones with a *smaller* position than the merge set's own topmost
-    # (smallest-position) member -- both were previously inverted.
+    if len(layer_names) < (1 if merge_into_base else 2):
+        if merge_into_base:
+            raise RuntimeError("Select one or more animation layers to merge into BaseAnimation.")
+        raise RuntimeError("Select two or more animation layers to merge.")
+
+    positions = {name: index for index, name in enumerate(ordered)}
+
+    # ordered[0] is topmost/highest-priority; "above the merge set" (muted
+    # during the capture bake below) = smaller position than its topmost member.
     bottom_name = max(layer_names, key=lambda name: positions.get(name, -1))
 
     if merge_into_base:
         try:
-            base_locked = bool(cmds.getAttr("{}.lock".format(root_name)))
+            base_locked = bool(cmds.getAttr(_plug(root_name, "lock")))
         except _COMMAND_ERRORS:
             base_locked = False
         if base_locked:
-            raise RuntimeError("{} is locked -- unlock it before merging every layer into it.".format(root_name))
+            raise RuntimeError("{} is locked -- unlock it before merging into it.".format(root_name))
     else:
-        if cmds.getAttr("{}.lock".format(bottom_name)):
+        try:
+            bottom_locked = bool(cmds.getAttr(_plug(bottom_name, "lock")))
+        except _COMMAND_ERRORS:
+            bottom_locked = False
+        if bottom_locked:
             raise RuntimeError("{} is locked -- unlock it before merging.".format(bottom_name))
 
     members = set()
@@ -925,12 +969,12 @@ def smart_merge_layers(layer_names, operation=None):
     muted_state = {}
     for name in others_above:
         try:
-            muted_state[name] = bool(cmds.getAttr("{}.mute".format(name)))
+            muted_state[name] = bool(cmds.getAttr(_plug(name, "mute")))
         except _COMMAND_ERRORS:
             continue
         if not muted_state[name]:
             try:
-                cmds.setAttr("{}.mute".format(name), True)
+                cmds.setAttr(_plug(name, "mute"), True)
             except _COMMAND_ERRORS:
                 pass
 
@@ -992,7 +1036,7 @@ def smart_merge_layers(layer_names, operation=None):
         for name, was_muted in muted_state.items():
             if not was_muted:
                 try:
-                    cmds.setAttr("{}.mute".format(name), False)
+                    cmds.setAttr(_plug(name, "mute"), False)
                 except _COMMAND_ERRORS:
                     pass
 
@@ -1008,18 +1052,9 @@ def smart_merge_layers(layer_names, operation=None):
 
 
 def _curve_keyframe_data(layer_name, plug):
-    """Return this *layer's own* keyframe data for *plug* -- not whatever
-    curve happens to be nearest.
-
-    With more than one animation layer touching an attribute, the object's
-    plug is fed by a blend node (``animBlendNodeAdditive``/...), not by any
-    single layer's curve directly -- a plain ``listConnections(plug,
-    type="animCurve")`` from the object's own attribute stops at that blend
-    node and finds nothing, silently dropping every layer's animation except
-    in the degenerate single-curve case. ``animLayer -findCurveForPlug`` is
-    the documented, layer-aware way to resolve *this* layer's curve for the
-    plug regardless of how many other layers also touch it.
-    """
+    """Return this *layer's own* keyframe data for *plug* via ``animLayer
+    -findCurveForPlug`` -- a plain ``listConnections`` stops at the blend
+    node feeding a multi-layer plug and finds nothing."""
     curve = None
     try:
         found = cmds.animLayer(layer_name, query=True, findCurveForPlug=plug) or []
@@ -1061,7 +1096,11 @@ def _serialize_layer(node):
         "members": {},
     }
     if not node["is_group"]:
-        for plug in cmds.animLayer(node["name"], query=True, attribute=True) or []:
+        try:
+            member_plugs = cmds.animLayer(node["name"], query=True, attribute=True) or []
+        except _COMMAND_ERRORS:
+            member_plugs = []
+        for plug in member_plugs:
             keys = _curve_keyframe_data(node["name"], plug)
             if keys:
                 data["members"][plug] = {"keys": keys}
@@ -1122,6 +1161,113 @@ def _current_preferred_layer_name():
     return None
 
 
+def _write_member_onto_layer(layer_name, plug, member):
+    """Add *plug* to *layer_name* as a member and write its keyframe/static
+    data onto it -- shared by ``_import_layer`` and ``extract_to_new_layer``.
+    *member* is the ``{"keys": [...]}`` / ``{"value": ...}`` shape
+    ``_curve_keyframe_data``/export produce (a bare list of keys is also
+    accepted, for back-compat with older export files)."""
+    node_name = plug.split(".")[0]
+    if not cmds.objExists(node_name):
+        return False
+    # Adds exactly this attribute, not every keyable attribute of the node
+    # -- ``cmds.animLayer(edit=True, addSelectedObjects=True)`` adds *all*
+    # of a selected node's keyable attributes to the layer, silently
+    # over-adding members the source data never actually included.
+    if not anim_layers.add_plug_to_layer(layer_name, plug):
+        return False
+    keys = member.get("keys") if isinstance(member, dict) else member
+    if keys:
+        for key in keys:
+            try:
+                cmds.setKeyframe(plug, time=(key["time"],), value=key["value"], animLayer=layer_name)
+            except _COMMAND_ERRORS:
+                continue
+            # Target the tangent edit at *this layer's* curve, resolved the
+            # same layer-aware way `_curve_keyframe_data` reads it back --
+            # keying `plug` directly can leave more than one layer's curve
+            # feeding it via a blend node, and a plain `keyTangent(plug,
+            # ...)` isn't guaranteed to hit the curve just keyed above.
+            try:
+                found = cmds.animLayer(layer_name, query=True, findCurveForPlug=plug) or []
+                curve = found[0] if found else None
+            except _COMMAND_ERRORS:
+                curve = None
+            if curve:
+                try:
+                    cmds.keyTangent(curve, time=(key["time"], key["time"]), inTangentType=key.get("itt", "auto"), outTangentType=key.get("ott", "auto"))
+                except _COMMAND_ERRORS:
+                    pass
+    elif isinstance(member, dict) and "value" in member:
+        # A static override with no keys -- write it directly by making
+        # this the preferred (edit-target) layer first, same targeting
+        # ``select_layer()`` uses for keying.
+        try:
+            cmds.animLayer(layer_name, edit=True, preferred=True)
+            cmds.setAttr(plug, member["value"])
+        except _COMMAND_ERRORS:
+            return False
+    return True
+
+
+def extract_to_new_layer(layer_name, name=None):
+    """Move the currently selected objects' membership (and animation) out
+    of *layer_name* into a new sibling layer of the same type.
+
+    Snapshots each selected object's own keyframe/static data on
+    *layer_name* first (the same layer-aware read export uses), so the new
+    layer keeps the exact animation instead of starting from a flat,
+    unkeyed override once ``removeSelectedObjects`` clears it off the source.
+    """
+    if not layer_name or not cmds.objExists(layer_name):
+        raise RuntimeError("Layer no longer exists.")
+    if _is_root(layer_name):
+        raise RuntimeError("BaseAnimation can't be extracted from.")
+
+    selected_objs = set(cmds.ls(selection=True, long=True) or [])
+    if not selected_objs:
+        raise RuntimeError("Select one or more objects to extract.")
+
+    try:
+        member_plugs = cmds.animLayer(layer_name, query=True, attribute=True) or []
+    except _COMMAND_ERRORS:
+        member_plugs = []
+    plugs = [plug for plug in member_plugs if plug.split(".")[0] in selected_objs]
+    if not plugs:
+        raise RuntimeError("None of the selected objects are members of this layer.")
+
+    snapshots = {}
+    for plug in plugs:
+        keys = _curve_keyframe_data(layer_name, plug)
+        if keys:
+            snapshots[plug] = {"keys": keys}
+            continue
+        try:
+            snapshots[plug] = {"value": cmds.getAttr(plug)}
+        except _COMMAND_ERRORS:
+            continue
+    if not snapshots:
+        raise RuntimeError("Could not read any animation from the selected objects on this layer.")
+
+    metadata = {
+        "name": _unique_layer_name(name or "Extracted"),
+        "override": bool(cmds.getAttr(_plug(layer_name, "override"))),
+        "passthrough": True,
+    }
+    parent = animation.AnimationLayer(layer_name).parent
+    if parent and cmds.objExists(parent):
+        metadata["parent"] = parent
+
+    created = anim_layers.create_layer(metadata)
+    if not created:
+        raise RuntimeError("Could not create the extracted layer.")
+
+    cmds.animLayer(layer_name, edit=True, removeSelectedObjects=True)
+    for plug, member in snapshots.items():
+        _write_member_onto_layer(created, plug, member)
+    return created
+
+
 def _import_layer(entry, parent=None):
     metadata = {
         "name": _unique_layer_name(entry.get("name") or "AnimLayer"),
@@ -1136,59 +1282,15 @@ def _import_layer(entry, parent=None):
     if entry.get("is_group"):
         _mark_as_group(created)
         set_group_color(created, entry.get("color"))
+    # Writing a static-override value above has to make this layer
+    # "preferred" to route the setAttr correctly; import_layers_data()
+    # restores whichever layer was preferred before the import started
+    # once the whole tree is done.
     for plug, member in (entry.get("members") or {}).items():
-        node_name = plug.split(".")[0]
-        if not cmds.objExists(node_name):
-            continue
-        # Adds exactly this attribute, not every keyable attribute of the
-        # node -- ``cmds.animLayer(edit=True, addSelectedObjects=True)`` (the
-        # previous approach here) adds *all* of a selected node's keyable
-        # attributes to the layer, silently over-adding members an export
-        # never actually included.
-        if not anim_layers.add_plug_to_layer(created, plug):
-            continue
-        # Back-compat: earlier-exported files store a bare list of keys
-        # instead of the current {"keys": [...]} / {"value": ...} shape.
-        keys = member.get("keys") if isinstance(member, dict) else member
-        if keys:
-            for key in keys:
-                try:
-                    cmds.setKeyframe(plug, time=(key["time"],), value=key["value"], animLayer=created)
-                except _COMMAND_ERRORS:
-                    continue
-                # Target the tangent edit at *this layer's* curve, resolved
-                # the same layer-aware way `_curve_keyframe_data` reads it
-                # back on export -- keying `plug` directly above can leave
-                # more than one layer's curve feeding it via a blend node,
-                # and a plain `keyTangent(plug, ...)` isn't guaranteed to hit
-                # the curve this import just created the key on.
-                try:
-                    found = cmds.animLayer(created, query=True, findCurveForPlug=plug) or []
-                    curve = found[0] if found else None
-                except _COMMAND_ERRORS:
-                    curve = None
-                if curve:
-                    try:
-                        cmds.keyTangent(curve, time=(key["time"], key["time"]), inTangentType=key.get("itt", "auto"), outTangentType=key.get("ott", "auto"))
-                    except _COMMAND_ERRORS:
-                        pass
-        elif isinstance(member, dict) and "value" in member:
-            # A static override with no keys -- write it directly into this
-            # layer by making it the preferred (edit-target) layer first,
-            # same targeting ``select_layer()`` uses for keying. The caller
-            # (``import_layers_data``) restores whichever layer was
-            # preferred before the import started once the whole tree is done.
-            try:
-                cmds.animLayer(created, edit=True, preferred=True)
-                cmds.setAttr(plug, member["value"])
-            except _COMMAND_ERRORS:
-                continue
-    # Children are created (and fully settled -- including their own
-    # mute/lock/weight) before this layer's own lock is applied: locking a
-    # group cascades onto whatever descendants already exist at that moment
-    # (see `set_lock`'s snapshot logic), so locking a freshly-created,
-    # still-childless group here would cascade onto nothing and leave every
-    # imported child unlocked regardless of the source group's lock state.
+        _write_member_onto_layer(created, plug, member)
+    # Children must be created first -- locking a still-childless group here
+    # would cascade onto nothing (see set_lock's snapshot logic) and leave
+    # every imported child unlocked regardless of the source group's state.
     for child in entry.get("children") or ():
         _import_layer(child, parent=created)
     set_mute(created, bool(entry.get("mute")))

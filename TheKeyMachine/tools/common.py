@@ -2184,6 +2184,21 @@ class FloatingToolWindowMixin:
     def clamp_to_current_screen(self):
         return self.clamp_to_screen(self._current_screen_geometry())
 
+    def _preferred_floating_size(self):
+        """Return a fixed ``QSize`` to anchor with instead of autosizing, or
+        ``None`` (the default) to keep sizing off ``adjustSize()`` as before.
+
+        ``move_above_toolbar_button()``/``move_beside_cursor()`` both need a
+        width/height to anchor around every time they run -- not just once at
+        construction -- and ``adjustSize()`` recomputes that from the window's
+        *current* child-widget content, which is wrong for a window with a
+        deliberate fixed/default shape (e.g. a list that's still empty before
+        its first refresh()). Subclasses with that kind of fixed shape
+        override this instead of fighting adjustSize() with their own no-op
+        override.
+        """
+        return None
+
     def move_above_toolbar_button(self, button=None, gap=None):
         """Move above a toolbar button without changing window visibility."""
         if not wutil.is_valid_widget(self):
@@ -2192,9 +2207,14 @@ class FloatingToolWindowMixin:
         if not button or not wutil.is_valid_widget(button) or not button.isVisible():
             return False
 
-        self.adjustSize()
-        width = self.width()
-        height = self.height()
+        preferred_size = self._preferred_floating_size()
+        if preferred_size is not None:
+            width = preferred_size.width()
+            height = preferred_size.height()
+        else:
+            self.adjustSize()
+            width = self.width()
+            height = self.height()
 
         top_left = button.mapToGlobal(QtCore.QPoint(0, 0))
         button_rect = QtCore.QRect(top_left, button.size())
@@ -2221,9 +2241,14 @@ class FloatingToolWindowMixin:
         if not wutil.is_valid_widget(self):
             return False
 
-        self.adjustSize()
-        width = self.width()
-        height = self.height()
+        preferred_size = self._preferred_floating_size()
+        if preferred_size is not None:
+            width = preferred_size.width()
+            height = preferred_size.height()
+        else:
+            self.adjustSize()
+            width = self.width()
+            height = self.height()
         cursor_position = QtGui.QCursor.pos()
         screen = (
             QtGui.QGuiApplication.screenAt(cursor_position)

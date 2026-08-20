@@ -16,19 +16,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-"""The Animation Layers window.
+"""The Animation Layers window: a floating, indented, drag-reorderable list of the scene's animation layers and groups."""
 
-A floating, list-based tool window (same shell family as Selection Sets and
-Attribute Switcher) showing every animation layer and group in the scene as
-one flat, indented, drag-reorderable list -- mirroring how Maya's own
-Animation Layer Editor presents nested layers. Groups are just animation
-layers used purely as parent containers (see ``controller.create_group``),
-so the same row widget renders both; nesting depth drives indentation only.
-"""
-
-from maya import cmds  # type: ignore
-
-from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtSvg, QtWidgets  # type: ignore
 from TheKeyMachine.data import icons
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.core import runtime
@@ -50,76 +40,91 @@ SELECTED_COLOR = "#5f88a8"
 ARROW_COLUMN_WIDTH = wutil.DPI(14)
 BORDER_WIDTH_INHERITED = wutil.DPI(3)
 TOGGLE_BUTTON_SIZE = wutil.DPI(20)
+ICON_BUTTON_RADIUS = wutil.DPI(4)
+DRAG_HANDLE_WIDTH = wutil.DPI(16)
+WEIGHT_COLUMN_WIDTH = wutil.DPI(46)
+TYPE_ICON_SIZE = wutil.DPI(16)
+COLLAPSE_ICON_SIZE = wutil.DPI(9)
+# Qt5/6 renamed QMenu.exec_() to exec(); fall back to whichever exists.
+_STALE_WIDGET_ERRORS = (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError)
+
+
+def _popup_menu(menu, pos):
+    exec_fn = getattr(menu, "exec", None) or getattr(menu, "exec_", None)
+    if exec_fn:
+        exec_fn(pos)
 
 
 # ---------------------------------------------------------------------------
-# Small painted icons -- kept local rather than shared, matching how
-# tools.workspaces.widgets and tools.hotkeys.controller each keep their own
-# copy of the same kind of tiny presentation helper (see ARCHITECTURE.md:
-# feature-specific widgets stay inside their own tools/<feature> package).
+# Small painted icons
 # ---------------------------------------------------------------------------
 
 
-def _grip_icon(size, color="#8a8a8a"):
-    """2x3 dot-grid pixmap used as the row drag handle."""
-    dim = max(1, int(size))
-    pixmap = QtGui.QPixmap(dim, dim)
+def _screen_dpr():
+    screen = QtGui.QGuiApplication.primaryScreen()
+    return screen.devicePixelRatio() if screen else 1.0
+
+
+def _rasterize_svg(icon_path, pixel_dim):
+    """Render an SVG file into an untagged QPixmap of exactly pixel_dim x
+    pixel_dim device pixels (devicePixelRatio left at the default 1).
+
+    Callers set the pixmap's real devicePixelRatio themselves, as the very
+    last step after any further painting (e.g. _tinted_pixmap's SourceIn
+    recolor) -- tagging it *before* that would make Qt mix logical and
+    physical coordinates for the remaining painter calls on this pixmap,
+    silently shrinking the result into one corner of its own buffer. Matches
+    ``customDialogs``'s own svg icon loader.
+    """
+    if not icon_path:
+        return QtGui.QPixmap()
+    renderer = QtSvg.QSvgRenderer(icon_path)
+    if not renderer.isValid():
+        return QtGui.QPixmap()
+    pixmap = QtGui.QPixmap(pixel_dim, pixel_dim)
     pixmap.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(pixmap)
     painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(QtGui.QColor(color))
-    radius = max(0.75, dim / 9.0)
-    for x_ratio in (0.3, 0.75):
-        for y_ratio in (0.2, 0.5, 0.8):
-            painter.drawEllipse(QtCore.QPointF(dim * x_ratio, dim * y_ratio), radius, radius)
+    renderer.render(painter, QtCore.QRectF(0, 0, pixel_dim, pixel_dim))
     painter.end()
     return pixmap
 
 
-def _text_badge_icon(text, size, color="#1a1a1a", background="#787878"):
-    """A small filled circle with a bold letter -- used for the Additive/
-    Override type badge, matching ``workspaces.widgets._text_badge_qicon``'s
-    approach of a painted badge instead of a static icon file."""
+def _flat_pixmap(icon_path, size):
+    """Load an icon file as-is, no runtime tint -- for icons that only ever
+    appear in one fixed, baked-into-the-file color. Rendered at the screen's
+    device pixel ratio (see _rasterize_svg) so it stays crisp on HiDPI displays,
+    instead of the flat 1x a plain QPixmap(path) load would give."""
     dim = max(1, int(size))
-    pixmap = QtGui.QPixmap(dim, dim)
-    pixmap.fill(QtCore.Qt.transparent)
-    painter = QtGui.QPainter(pixmap)
-    painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(QtGui.QColor(background))
-    painter.drawEllipse(pixmap.rect().adjusted(1, 1, -1, -1))
-    painter.setPen(QtGui.QColor(color))
-    font = QtGui.QFont()
-    font.setBold(True)
-    font.setPixelSize(max(1, int(dim * 0.58)))
-    painter.setFont(font)
-    painter.drawText(pixmap.rect(), QtCore.Qt.AlignCenter, text or "")
-    painter.end()
-    return QtGui.QIcon(pixmap)
+    dpr = _screen_dpr()
+    pixmap = _rasterize_svg(icon_path, max(1, int(dim * dpr)))
+    if not pixmap.isNull():
+        pixmap.setDevicePixelRatio(dpr)
+    return pixmap
+
+
+def _grip_icon(size):
+    """2x3 dot-grid pixmap for the row drag handle (single fixed color, baked into grip.svg)."""
+    return _flat_pixmap(icons.get("grip"), size)
+
+
+def _text_badge_icon(is_override, size):
+    """Additive/Override type badge -- each variant is a fixed letter+color
+    baked into its own file (badge_additive.svg/badge_override.svg), same as _grip_icon."""
+    return QtGui.QIcon(_flat_pixmap(icons.get("badge_override" if is_override else "badge_additive"), size))
 
 
 def _tinted_pixmap(icon_path, size, color):
-    """Recolor a flat-fill svg/icon file, same SourceIn-composite trick
-    ``AttributeItem._refresh_pill_style`` uses to tint the rotate-order globe
-    icon -- there's no shared tint helper in ``ui.widgets.util`` to call
-    instead, so this stays a small local copy of that idiom.
-
-    Loads via a plain ``QPixmap(path)`` + ``.scaled(..., SmoothTransformation)``
-    rather than ``QIcon(path).pixmap(dim, dim)`` -- the latter lets Qt fetch a
-    HiDPI-scaled render tagged with its own devicePixelRatio, which then gets
-    silently dropped by the plain ``QPixmap(pixmap.size())`` below (it always
-    starts at devicePixelRatio 1), leaving the tinted result reporting a
-    logical size roughly double what it should be and rendering into only
-    the top-left quarter of the icon slot it's placed in.
-    """
+    """Recolor a flat-fill SVG icon via SourceIn compositing, rendered at the
+    screen's device pixel ratio (see _rasterize_svg) so tinted icons stay
+    crisp on HiDPI displays instead of the softer 1x a plain QPixmap(path)
+    load would give."""
     dim = max(1, int(size))
-    if not icon_path:
-        return QtGui.QPixmap()
-    pixmap = QtGui.QPixmap(icon_path)
+    dpr = _screen_dpr()
+    pixel_dim = max(1, int(dim * dpr))
+    pixmap = _rasterize_svg(icon_path, pixel_dim)
     if pixmap.isNull():
         return pixmap
-    pixmap = pixmap.scaled(dim, dim, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
     tinted = QtGui.QPixmap(pixmap.size())
     tinted.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(tinted)
@@ -127,6 +132,7 @@ def _tinted_pixmap(icon_path, size, color):
     painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceIn)
     painter.fillRect(tinted.rect(), QtGui.QColor(color))
     painter.end()
+    tinted.setDevicePixelRatio(dpr)
     return tinted
 
 
@@ -145,77 +151,20 @@ def _color_swatch_icon(size, color):
 
 
 def _arrow_icon(size, expanded, color="#c0c0c0"):
-    """Small triangle -- right when collapsed, down when expanded -- for the
-    group row's collapse/expand toggle."""
-    dim = max(1, int(size))
-    pixmap = QtGui.QPixmap(dim, dim)
-    pixmap.fill(QtCore.Qt.transparent)
-    painter = QtGui.QPainter(pixmap)
-    painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(QtGui.QColor(color))
-    inset = dim * 0.22
-    if expanded:
-        triangle = QtGui.QPolygonF([
-            QtCore.QPointF(inset, dim * 0.35),
-            QtCore.QPointF(dim - inset, dim * 0.35),
-            QtCore.QPointF(dim / 2.0, dim - inset),
-        ])
-    else:
-        triangle = QtGui.QPolygonF([
-            QtCore.QPointF(dim * 0.35, inset),
-            QtCore.QPointF(dim * 0.35, dim - inset),
-            QtCore.QPointF(dim - inset, dim / 2.0),
-        ])
-    painter.drawPolygon(triangle)
-    painter.end()
-    return QtGui.QIcon(pixmap)
+    """Group row collapse/expand triangle."""
+    return QtGui.QIcon(_tinted_pixmap(icons.get("arrow_down" if expanded else "arrow_right"), size, color))
 
 
-def _lock_icon(size, color):
-    """Padlock glyph -- shackle arc over a rounded body -- for the Lock toggle."""
-    dim = max(1, int(size))
-    pixmap = QtGui.QPixmap(dim, dim)
-    pixmap.fill(QtCore.Qt.transparent)
-    painter = QtGui.QPainter(pixmap)
-    painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    pen_width = max(1.0, dim * 0.13)
-    painter.setPen(QtGui.QPen(QtGui.QColor(color), pen_width, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap))
-    painter.setBrush(QtCore.Qt.NoBrush)
-    shackle_rect = QtCore.QRectF(dim * 0.27, dim * 0.06, dim * 0.46, dim * 0.5)
-    painter.drawArc(shackle_rect, 0, 180 * 16)
-    painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(QtGui.QColor(color))
-    body_rect = QtCore.QRectF(dim * 0.16, dim * 0.44, dim * 0.68, dim * 0.44)
-    painter.drawRoundedRect(body_rect, dim * 0.08, dim * 0.08)
-    painter.end()
-    return QtGui.QIcon(pixmap)
+def _lock_icon(size, color, locked=True):
+    """Padlock glyph for the Lock toggle; *locked* picks open vs closed shackle."""
+    return QtGui.QIcon(_tinted_pixmap(icons.get("lock" if locked else "lock_open"), size, color))
 
 
-def _mute_icon(size, color):
-    """Speaker-with-slash glyph for the Mute toggle."""
-    dim = max(1, int(size))
-    pixmap = QtGui.QPixmap(dim, dim)
-    pixmap.fill(QtCore.Qt.transparent)
-    painter = QtGui.QPainter(pixmap)
-    painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(QtGui.QColor(color))
-    speaker = QtGui.QPolygonF([
-        QtCore.QPointF(dim * 0.10, dim * 0.38),
-        QtCore.QPointF(dim * 0.32, dim * 0.38),
-        QtCore.QPointF(dim * 0.54, dim * 0.16),
-        QtCore.QPointF(dim * 0.54, dim * 0.84),
-        QtCore.QPointF(dim * 0.32, dim * 0.62),
-        QtCore.QPointF(dim * 0.10, dim * 0.62),
-    ])
-    painter.drawPolygon(speaker)
-    pen_width = max(1.0, dim * 0.12)
-    painter.setPen(QtGui.QPen(QtGui.QColor(color), pen_width, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap))
-    painter.drawLine(QtCore.QPointF(dim * 0.64, dim * 0.32), QtCore.QPointF(dim * 0.90, dim * 0.68))
-    painter.drawLine(QtCore.QPointF(dim * 0.90, dim * 0.32), QtCore.QPointF(dim * 0.64, dim * 0.68))
-    painter.end()
-    return QtGui.QIcon(pixmap)
+def _mute_icon(size, color, muted=True):
+    """Speaker-with-slash glyph for the Mute toggle. *muted* is unused (only
+    one glyph exists, unlike _lock_icon) -- kept so _make_icon_toggle can
+    call either icon_fn the same way."""
+    return QtGui.QIcon(_tinted_pixmap(icons.get("mute"), size, color))
 
 
 def _contrast_color(hex_color):
@@ -225,17 +174,41 @@ def _contrast_color(hex_color):
     return "#1a1a1a" if luminance > 0.55 else "#f0f0f0"
 
 
+def _shade(hex_color, factor):
+    """Darken (factor > 100) or lighten (factor < 100) a hex color."""
+    return QtGui.QColor(hex_color).darker(int(factor)).name()
+
+
+NEUTRAL_BUTTON_BG = "#3c3c3c"
+NEUTRAL_BUTTON_BORDER = "#525252"
+NEUTRAL_BUTTON_HOVER_BG = "#484848"
+NEUTRAL_BUTTON_HOVER_BORDER = "#606060"
+
+
+def _row_icon_button_stylesheet(accent_color, filled=False):
+    """Shared chip stylesheet for row icon buttons. ``filled`` tints indicator
+    buttons (badge/folder) by accent color; toggles stay neutral until checked."""
+    idle_bg = _shade(accent_color, 260) if filled else NEUTRAL_BUTTON_BG
+    idle_border = accent_color if filled else NEUTRAL_BUTTON_BORDER
+    hover_bg = _shade(accent_color, 200) if filled else NEUTRAL_BUTTON_HOVER_BG
+    hover_border = accent_color if filled else NEUTRAL_BUTTON_HOVER_BORDER
+    checked_bg = _shade(accent_color, 220)
+    checked_hover_bg = _shade(accent_color, 170)
+    return (
+        "QToolButton{background:%s;border:1px solid %s;border-radius:%dpx;}"
+        "QToolButton:hover{background:%s;border:1px solid %s;}"
+        "QToolButton:checked{background:%s;border:1px solid %s;}"
+        "QToolButton:checked:hover{background:%s;}"
+    ) % (idle_bg, idle_border, ICON_BUTTON_RADIUS, hover_bg, hover_border, checked_bg, accent_color, checked_hover_bg)
+
+
 # ---------------------------------------------------------------------------
 # List + drag/drop
 # ---------------------------------------------------------------------------
 
 
 class _DropIndicator(QtWidgets.QFrame):
-    """Line marking where a dragged row will land -- drawn over the
-    viewport ourselves, since rows here are opaque item widgets that sit on
-    top of (and hide) the view's own native drop-indicator painting. See
-    ``tools.workspaces.widgets._DropIndicator`` for the original of this
-    pattern."""
+    """Line marking where a dragged row will land, painted manually since rows are opaque widgets."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -245,16 +218,8 @@ class _DropIndicator(QtWidgets.QFrame):
 
 
 class LayerListWidget(QtWidgets.QListWidget):
-    """A flat, indented, drag-reorderable list of animation layer rows.
-
-    Reordering stays a plain, native ``InternalMove`` drag on a
-    ``QListWidget`` -- nesting is expressed only by each row's own
-    indentation (mirroring Maya's own Animation Layer Editor), not by a real
-    ``QTreeWidget``, which does not combine item widgets and drag-reordering
-    as cleanly. A drag only ever starts from a row's own grip handle (see
-    ``LayerRowWidget``/``_DragHandle``) -- ordinary clicks on the row itself
-    (buttons, name, weight field) never trigger one.
-    """
+    """A flat, indented, drag-reorderable list of animation layer rows. Nesting is
+    expressed via indentation, not QTreeWidget; drags start only from the row's grip handle."""
 
     layerDropped = QtCore.Signal(str)
     emptyAreaClicked = QtCore.Signal()
@@ -276,10 +241,7 @@ class LayerListWidget(QtWidgets.QListWidget):
         self._dragging_name = None
 
     def mousePressEvent(self, event):
-        # Rows are opaque item widgets that fill their item rect entirely,
-        # so itemAt() returning None here means the click landed on genuinely
-        # empty space (below the last row, or in side padding) -- clear the
-        # window's selection the way clicking empty list space normally does.
+        # itemAt() None means the click landed on empty list space.
         if self.itemAt(event.pos()) is None:
             self.emptyAreaClicked.emit()
         super().mousePressEvent(event)
@@ -334,7 +296,7 @@ class _DragHandle(QtWidgets.QLabel):
     def __init__(self, row, parent=None):
         super().__init__(parent)
         self._row = row
-        self.setFixedSize(wutil.DPI(16), ROW_HEIGHT)
+        self.setFixedSize(DRAG_HANDLE_WIDTH, ROW_HEIGHT)
         self.setAlignment(QtCore.Qt.AlignCenter)
         self.setPixmap(_grip_icon(wutil.DPI(10)))
         self.setCursor(QtCore.Qt.OpenHandCursor)
@@ -395,12 +357,7 @@ class LayerRowWidget(QtWidgets.QWidget):
         layout.setContentsMargins(wutil.DPI(3), 0, wutil.DPI(4), 0)
         layout.setSpacing(wutil.DPI(2))
 
-        # Gutter column: the collapse arrow and the color border share this
-        # one reserved slot instead of stacking a separate painted strip next
-        # to a separate arrow button. A group paints the whole gutter in its
-        # own color with the arrow drawn on top of it; a plain layer nested
-        # under a colored group gets a thinner bar of that inherited color;
-        # the root row and an ungrouped top-level layer get a blank gutter.
+        # Gutter: group shows arrow on its own color; nested layer gets an inherited color bar; root/ungrouped is blank.
         self.collapse_button = None
         gutter = QtWidgets.QWidget(self)
         gutter.setFixedSize(ARROW_COLUMN_WIDTH, ROW_HEIGHT)
@@ -411,7 +368,7 @@ class LayerRowWidget(QtWidgets.QWidget):
             self.collapse_button = QtWidgets.QToolButton(gutter)
             self.collapse_button.setAutoRaise(True)
             self.collapse_button.setFixedSize(ARROW_COLUMN_WIDTH, ROW_HEIGHT)
-            self.collapse_button.setIconSize(QtCore.QSize(wutil.DPI(8), wutil.DPI(8)))
+            self.collapse_button.setIconSize(QtCore.QSize(COLLAPSE_ICON_SIZE, COLLAPSE_ICON_SIZE))
             self.collapse_button.setCursor(QtCore.Qt.PointingHandCursor)
             self.collapse_button.setStyleSheet(
                 "QToolButton{background-color:%s;border:none;}"
@@ -429,10 +386,7 @@ class LayerRowWidget(QtWidgets.QWidget):
 
         # The root/BaseAnimation row can't be reordered -- no drag handle.
         if self.is_root:
-            handle_spacer = QtWidgets.QWidget(self)
-            handle_spacer.setFixedSize(wutil.DPI(16), ROW_HEIGHT)
-            handle_spacer.setStyleSheet("background:transparent;")
-            layout.addWidget(handle_spacer)
+            layout.addWidget(self._spacer(DRAG_HANDLE_WIDTH, ROW_HEIGHT))
         else:
             self.handle = _DragHandle(self, self)
             layout.addWidget(self.handle)
@@ -443,14 +397,18 @@ class LayerRowWidget(QtWidgets.QWidget):
         self.lock_button.toggled.connect(lambda checked: self.lockToggled.emit(self.layer_name, checked))
         layout.addWidget(self.lock_button)
 
-        self.mute_button = self._make_icon_toggle(
-            _mute_icon, node.get("mute"), "#c96b68", "Mute -- disables this layer's effect"
-        )
-        self.mute_button.toggled.connect(lambda checked: self.muteToggled.emit(self.layer_name, checked))
-        layout.addWidget(self.mute_button)
+        if self.is_root:
+            # BaseAnimation can't be muted -- hidden, not disabled; spacer keeps columns aligned.
+            self.mute_button = None
+            layout.addWidget(self._spacer(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE))
+        else:
+            self.mute_button = self._make_icon_toggle(
+                _mute_icon, node.get("mute"), "#c96b68", "Mute -- disables this layer's effect"
+            )
+            self.mute_button.toggled.connect(lambda checked: self.muteToggled.emit(self.layer_name, checked))
+            layout.addWidget(self.mute_button)
 
-        # Indent only pushes the name over -- lock/mute stay aligned in one
-        # column across every row regardless of nesting depth.
+        # Indent pushes the name only; lock/mute stay column-aligned.
         if depth:
             indent = QtWidgets.QWidget(self)
             indent.setFixedWidth(INDENT_WIDTH * depth)
@@ -461,6 +419,10 @@ class LayerRowWidget(QtWidgets.QWidget):
             node["name"], self,
             rename_alignment=QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             rename_margins=(wutil.DPI(2), wutil.DPI(2), wutil.DPI(6), wutil.DPI(2)),
+            rename_style_extra=(
+                "QPushButton{background-color:%s;border:1px solid %s;border-radius:%dpx;}"
+                % (NEUTRAL_BUTTON_BG, NEUTRAL_BUTTON_BORDER, ICON_BUTTON_RADIUS)
+            ),
         )
         self.name_button.setFlat(True)
         self.name_button.setFixedHeight(ROW_HEIGHT)
@@ -470,79 +432,80 @@ class LayerRowWidget(QtWidgets.QWidget):
         self.name_button.clicked.connect(self._emit_clicked)
         layout.addWidget(self.name_button, 1)
 
-        self.weight_spin = cw.QFlatDoubleSpinBox(
-            decimals=0,
-            minimum=0.0,
-            maximum=100.0,
-            value=round(float(node.get("weight", 1.0)) * 100.0),
-            single_step=5.0,
-        )
-        self.weight_spin.setFixedWidth(wutil.DPI(46))
-        self.weight_spin.setFixedHeight(wutil.DPI(18))
-        self.weight_spin.setSuffix("%")
-        self.weight_spin.setAlignment(QtCore.Qt.AlignCenter)
-        self.weight_spin.setToolTip("Layer weight")
-        self.weight_spin.setFocusPolicy(QtCore.Qt.StrongFocus)
-        # Without this, valueChanged fires once per keystroke while typing a
-        # value (e.g. "8", then "5" for "85") -- and each of those routes
-        # through the window's own tool_operation(undo=True) wrapper, so
-        # typing one weight flooded the undo stack with one entry per digit.
-        # Wheel/arrow-driven single-step changes are unaffected: those are
-        # already one deliberate change each.
-        self.weight_spin.setKeyboardTracking(False)
-        self.weight_spin.valueChanged.connect(self._on_weight_changed)
         if self.is_root:
-            # BaseAnimation has no meaningful override weight to blend.
-            self.weight_spin.setEnabled(False)
-        layout.addWidget(self.weight_spin)
+            # BaseAnimation has no weight; spacer keeps columns aligned.
+            self.weight_spin = None
+            layout.addWidget(self._spacer(WEIGHT_COLUMN_WIDTH, ROW_HEIGHT))
+        else:
+            self.weight_spin = cw.QFlatDoubleSpinBox(
+                decimals=0,
+                minimum=0.0,
+                maximum=100.0,
+                value=round(float(node.get("weight", 1.0)) * 100.0),
+                single_step=5.0,
+            )
+            self.weight_spin.setFixedWidth(WEIGHT_COLUMN_WIDTH)
+            self.weight_spin.setFixedHeight(wutil.DPI(18))
+            self.weight_spin.setSuffix("%")
+            self.weight_spin.setAlignment(QtCore.Qt.AlignCenter)
+            self.weight_spin.setToolTip("Layer weight")
+            self.weight_spin.setFocusPolicy(QtCore.Qt.StrongFocus)
+            # Avoids flooding the undo stack with one entry per keystroke.
+            self.weight_spin.setKeyboardTracking(False)
+            self.weight_spin.valueChanged.connect(self._on_weight_changed)
+            layout.addWidget(self.weight_spin)
 
-        # Type indicator, at the very end of the row: for a group this is a
-        # clickable folder icon that opens the color menu; for an ordinary
-        # layer it's the clickable Additive/Override badge; the root row gets
-        # neither (just a same-size blank spacer, for column alignment).
+        # End-of-row: group -> color-menu folder icon; layer -> Additive/Override badge; root -> spacer.
         if self.is_group:
             self._own_color_hex = self._border_hex if self._is_color_owner else None
-            self.type_button = QtWidgets.QToolButton(self)
-            self.type_button.setAutoRaise(True)
-            self.type_button.setFixedSize(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE)
-            self.type_button.setIconSize(QtCore.QSize(wutil.DPI(16), wutil.DPI(16)))
-            self.type_button.setCursor(QtCore.Qt.PointingHandCursor)
+            self.type_button = self._make_type_button(self._own_color_hex or "#8a8a8a")
             self._refresh_group_icon()
             self.type_button.setToolTip("Group -- click to set its color.")
             self.type_button.clicked.connect(self._open_color_menu)
             layout.addWidget(self.type_button)
         elif not self.is_root:
-            badge = "O" if self._override else "A"
             badge_color = "#c9a76b" if self._override else "#689d85"
-            self.type_button = QtWidgets.QToolButton(self)
-            self.type_button.setAutoRaise(True)
-            self.type_button.setFixedSize(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE)
-            self.type_button.setIconSize(QtCore.QSize(wutil.DPI(16), wutil.DPI(16)))
-            self.type_button.setIcon(_text_badge_icon(badge, wutil.DPI(16), background=badge_color))
+            self.type_button = self._make_type_button(badge_color)
+            self.type_button.setIcon(_text_badge_icon(self._override, TYPE_ICON_SIZE))
             self.type_button.setToolTip(
                 "Override layer -- replaces the value below it. Click to switch to Additive."
                 if self._override else
                 "Additive layer -- adds on top of the value below it. Click to switch to Override."
             )
-            self.type_button.setCursor(QtCore.Qt.PointingHandCursor)
             self.type_button.clicked.connect(self._on_type_clicked)
             layout.addWidget(self.type_button)
         else:
             self.type_button = None
-            end_spacer = QtWidgets.QWidget(self)
-            end_spacer.setFixedSize(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE)
-            end_spacer.setStyleSheet("background:transparent;")
-            layout.addWidget(end_spacer)
+            layout.addWidget(self._spacer(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE))
 
         self.set_selected(bool(node.get("selected")))
 
     # ------------------------------------------------------------ helpers
 
+    def _spacer(self, width, height):
+        """Blank placeholder filling a column a root row has no real widget for."""
+        widget = QtWidgets.QWidget(self)
+        widget.setFixedSize(width, height)
+        widget.setStyleSheet("background:transparent;")
+        return widget
+
+    def _make_type_button(self, accent_color):
+        """Shared chip setup for the end-of-row group-folder/Additive-Override-badge button."""
+        button = QtWidgets.QToolButton(self)
+        button.setAutoRaise(False)
+        button.setStyleSheet(_row_icon_button_stylesheet(accent_color, filled=True))
+        button.setFixedSize(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE)
+        button.setIconSize(QtCore.QSize(TYPE_ICON_SIZE, TYPE_ICON_SIZE))
+        button.setCursor(QtCore.Qt.PointingHandCursor)
+        return button
+
     def _make_icon_toggle(self, icon_fn, checked, active_color, tooltip):
         button = QtWidgets.QToolButton(self)
         button.setCheckable(True)
         button.setChecked(bool(checked))
-        button.setAutoRaise(True)
+        # autoRaise off; explicit stylesheet draws its own chip instead of platform chrome.
+        button.setAutoRaise(False)
+        button.setStyleSheet(_row_icon_button_stylesheet(active_color))
         button.setFixedSize(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE)
         icon_dim = int(TOGGLE_BUTTON_SIZE * 0.8)
         button.setIconSize(QtCore.QSize(icon_dim, icon_dim))
@@ -550,7 +513,7 @@ class LayerRowWidget(QtWidgets.QWidget):
         button.setCursor(QtCore.Qt.PointingHandCursor)
 
         def _refresh(is_checked):
-            button.setIcon(icon_fn(icon_dim, active_color if is_checked else "#8a8a8a"))
+            button.setIcon(icon_fn(icon_dim, active_color if is_checked else "#8a8a8a", is_checked))
 
         button.toggled.connect(_refresh)
         _refresh(button.isChecked())
@@ -577,16 +540,13 @@ class LayerRowWidget(QtWidgets.QWidget):
         self._list_widget = list_widget
         self._item = item
 
-    def item(self):
-        return self._item
-
     def begin_drag(self):
         if self._list_widget is not None and self._item is not None:
             self._list_widget.start_drag_for_item(self._item)
 
     def _refresh_collapse_icon(self):
         arrow_color = _contrast_color(self._border_hex) if self._border_hex else "#c0c0c0"
-        self.collapse_button.setIcon(_arrow_icon(wutil.DPI(9), expanded=not self._collapsed, color=arrow_color))
+        self.collapse_button.setIcon(_arrow_icon(COLLAPSE_ICON_SIZE, expanded=not self._collapsed, color=arrow_color))
         self.collapse_button.setToolTip("Expand group" if self._collapsed else "Collapse group")
 
     def _on_collapse_clicked(self, *_args):
@@ -595,18 +555,12 @@ class LayerRowWidget(QtWidgets.QWidget):
         self.collapseToggled.emit(self.layer_name, self._collapsed)
 
     def _refresh_group_icon(self):
-        group_icon_path = icons.get("layer_group")
         color = self._own_color_hex or "#bdbdbd"
-        icon_dim = wutil.DPI(16)
-        pixmap = _tinted_pixmap(group_icon_path, icon_dim, color)
+        pixmap = _tinted_pixmap(icons.get("layer_group"), TYPE_ICON_SIZE, color)
         self.type_button.setIcon(QtGui.QIcon(pixmap) if not pixmap.isNull() else QtGui.QIcon())
-        self.type_button.setIconSize(QtCore.QSize(icon_dim, icon_dim))
 
     def _open_color_menu(self, *_args):
-        # Parented to the top-level window, not this row -- a scriptjob-
-        # driven refresh() can tear down and rebuild every row (including
-        # this one) while the menu is still open, and a QMenu whose parent
-        # got deleted out from under it is a use-after-free risk.
+        # Parented to the window, not the row -- refresh() can delete this row while the menu is open.
         menu = QtWidgets.QMenu(self.window())
         swatch_size = wutil.DPI(12)
         default_hex = COLORS.selection.get(controller.DEFAULT_GROUP_COLOR_SUFFIX).hex
@@ -616,15 +570,12 @@ class LayerRowWidget(QtWidgets.QWidget):
         for color in COLORS.selection.all:
             action = menu.addAction(_color_swatch_icon(swatch_size, color.hex), color.label)
             action.triggered.connect(lambda *_, s=color.suffix: self.colorChosen.emit(self.layer_name, s))
-        exec_fn = getattr(menu, "exec", None) or getattr(menu, "exec_", None)
-        if exec_fn:
-            exec_fn(QtGui.QCursor.pos())
+        _popup_menu(menu, QtGui.QCursor.pos())
 
     # ------------------------------------------------------------ events
 
     def mousePressEvent(self, event):
-        # Clicking anywhere on the row's own background (not a child
-        # control) still selects the layer.
+        # Clicking the row background also selects it.
         self._emit_clicked()
         super().mousePressEvent(event)
 
@@ -651,16 +602,7 @@ class LayerRowWidget(QtWidgets.QWidget):
 
 
 class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnableToolBarPopupDialog):
-    """Floating manager for the scene's animation layers and groups.
-
-    Uses the same shell every other toolbar popup shares (see
-    ``QFlatPinnableToolBarPopupDialog``): opens as a transient popup that
-    pins into a normal window (native bottom-bar Close button) once dragged
-    or opened non-transiently, with the icon+title header built the same way
-    for every tool -- ``QFlatToolBarDialog`` renders it from ``self.title`` /
-    ``self.icon``, matching Bake Custom Interval and Attribute Switcher's own
-    selection header exactly rather than re-implementing it here.
-    """
+    """Floating manager window for the scene's animation layers and groups."""
 
     REFRESH_KEY = "animation_layers_window_refresh"
 
@@ -675,9 +617,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         )
         self.setObjectName(WINDOW_NAME)
         self.title_label.setText(self.title)
-        # 3:5 (height:width) aspect ratio, horizontal.
-        self.resize(wutil.DPI(500), wutil.DPI(300))
-        self.setMinimumSize(wutil.DPI(360), wutil.DPI(216))
+        self.setMinimumSize(wutil.DPI(380), wutil.DPI(140))
         self.mainLayout.setContentsMargins(0, 0, 0, wutil.DPI(4))
 
         self._rows = {}
@@ -687,7 +627,8 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
         self._build_ui()
         self._init_floating_window_behavior()
-        self.adjustSize()
+        # Explicit resize after _build_ui() to set a fixed wide-and-short default shape.
+        self.resize(wutil.DPI(560), wutil.DPI(190))
         self._restore_saved_geometry()
         self.apply_stay_on_top_setting()
         self.update_transparency_state(False)
@@ -696,51 +637,73 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         self._refreshing = False
         self.refresh()
 
+    def _preferred_floating_size(self):
+        # Fixed shape set in __init__ (resize()/_restore_saved_geometry()) --
+        # see FloatingToolWindowMixin._preferred_floating_size()'s docstring
+        # for why this beats the mixin's default adjustSize().
+        return self.size()
+
     # ------------------------------------------------------------ layout
 
     def _build_ui(self):
-        # A plain toolbar row under the title -- unlike Selection Sets, this
-        # window has no user-customizable/hideable button set, so it skips
-        # QFlatSectionWidget and just lays the buttons out directly.
         toolbar_layout = QtWidgets.QHBoxLayout()
         toolbar_layout.setContentsMargins(wutil.DPI(6), 0, wutil.DPI(6), wutil.DPI(6))
         toolbar_layout.setSpacing(wutil.DPI(2))
 
+        # Left: pinnable section, same treatment Selection Sets' header
+        # buttons get (see its QFlatSectionWidget usage) -- each button here
+        # is individually hideable via a right-click "manage pinned tools"
+        # menu. The right-side group below is plain/always-visible instead.
+        self.toolbar_section = cw.QFlatSectionWidget(
+            spacing=wutil.DPI(2),
+            hiddeable=True,
+            settings_namespace=animationLayersApi.SETTINGS_NAMESPACE,
+        )
+        section_layout = self.toolbar_section.layout()
+        section_layout.setContentsMargins(0, 0, 0, 0)
+        section_layout.setSpacing(wutil.DPI(2))
+
         self.new_layer_button = self._create_toolbar_button(
             icons.add, "New Layer From Selected",
             self._create_layer_from_selection,
+            key="animation_layers_new_layer_btn",
             description="Create a new animation layer from the current selection.",
         )
         self.new_group_button = self._create_toolbar_button(
             icons.get("layer_group"), "New Group", self._create_group,
+            key="animation_layers_new_group_btn",
             description="Group the selected layers under a new layer with its own weight.",
-        )
-        self.merge_button = self._create_toolbar_button(
-            icons.get("layer_merge"), "Smart Merge Selected", self._merge_selected,
-            description="Bake the selected layers together, sampling only the frames where they actually have weight.",
         )
         self.delete_button = self._create_toolbar_button(
             icons.trash, "Delete Selected", self._delete_selected,
+            key="animation_layers_delete_btn",
             description="Delete the selected layers or groups.",
         )
-        for button in (self.new_layer_button, self.new_group_button, self.merge_button, self.delete_button):
-            toolbar_layout.addWidget(button)
+        self.refresh_button = self._create_toolbar_button(
+            icons.refresh, "Refresh", self.refresh,
+            key="animation_layers_refresh_btn", default=False,
+            description="Reload the layer list from the current scene.",
+        )
+
+        toolbar_layout.addWidget(self.toolbar_section)
+        self._install_toolbar_context_menu()
 
         toolbar_layout.addStretch(1)
 
-        self.refresh_button = self._create_toolbar_button(
-            icons.refresh, "Refresh", self.refresh,
-            description="Reload the layer list from the current scene.",
+        # Right: plain, non-hideable actions (see toolbar_section comment above).
+        self.merge_button = self._create_plain_toolbar_button(
+            icons.get("layer_merge"), "Smart Merge Selected", self._merge_selected,
+            description="Bake the selected layers together, sampling only the frames where they actually have weight.",
         )
-        self.export_button = self._create_toolbar_button(
+        self.export_button = self._create_plain_toolbar_button(
             icons.get("export"), "Export Selected", self._export_selected,
             description="Export the selected layers (and their animation) to a file.",
         )
-        self.import_button = self._create_toolbar_button(
+        self.import_button = self._create_plain_toolbar_button(
             icons.get("import"), "Import Layers", self._import_layers,
             description="Import previously exported animation layers.",
         )
-        for button in (self.refresh_button, self.export_button, self.import_button):
+        for button in (self.merge_button, self.export_button, self.import_button):
             toolbar_layout.addWidget(button)
 
         self.mainLayout.addLayout(toolbar_layout)
@@ -757,7 +720,19 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         self.empty_label.setVisible(False)
         self.mainLayout.addWidget(self.empty_label)
 
-    def _create_toolbar_button(self, icon, tooltip, callback, description=None):
+    def _create_toolbar_button(self, icon, tooltip, callback, key, default=True, description=None):
+        button = self._make_toolbar_button(icon, tooltip, callback, description)
+        self.toolbar_section.addWidget(
+            button, label=tooltip, key=key, default=default,
+            description=description or tooltip, tooltip=tooltip,
+        )
+        return button
+
+    def _create_plain_toolbar_button(self, icon, tooltip, callback, description=None):
+        # Same button, just not routed through the pinnable section.
+        return self._make_toolbar_button(icon, tooltip, callback, description)
+
+    def _make_toolbar_button(self, icon, tooltip, callback, description=None):
         button = cw.create_tool_button_from_data(
             {"label": tooltip, "icon": icon, "tooltip": tooltip, "description": description},
             callback=None,
@@ -767,18 +742,44 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         button.connect_tool(callback)
         return button
 
+    # ------------------------------------------------------------ toolbar pin menu
+
+    def _install_toolbar_context_menu(self):
+        # Right-clicking any left-side toolbar button (not just empty section
+        # background) opens the same "manage pinned tools" menu -- mirrors
+        # Selection Sets' own header pin-menu wiring. The right-side group
+        # (Merge/Export/Import) isn't registered -- plain/non-hideable.
+        self._toolbar_menu_targets = []
+        self._register_toolbar_menu_target(self.toolbar_section)
+        for button in (
+            self.new_layer_button, self.new_group_button, self.delete_button, self.refresh_button,
+        ):
+            self._register_toolbar_menu_target(button)
+
+    def _register_toolbar_menu_target(self, widget):
+        if not widget:
+            return
+        widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        widget.customContextMenuRequested.connect(lambda pos, w=widget: self._open_toolbar_section_menu(pos, w))
+        widget.installEventFilter(self)
+        self._toolbar_menu_targets.append(widget)
+
+    def _open_toolbar_section_menu(self, pos=None, widget=None):
+        global_pos = widget.mapToGlobal(pos) if widget is not None and pos is not None else QtGui.QCursor.pos()
+        self.toolbar_section.open_menu(global_pos)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.ContextMenu and obj in getattr(self, "_toolbar_menu_targets", []):
+            self._open_toolbar_section_menu(event.pos(), obj)
+            return True
+        return super().eventFilter(obj, event)
+
     # ------------------------------------------------------------ refresh
 
     def refresh(self, *_args):
         if not wutil.is_valid_widget(self):
             return
-        # A scriptjob-driven refresh (Undo/Redo/animLayerRebuild, see
-        # _connect_runtime) can in principle fire again while one is already
-        # rebuilding the list -- e.g. a signal handler triggered mid-rebuild
-        # synchronously touching the scene. Rebuilding the list is not
-        # reentrant (it tears down and repopulates self._rows), so a nested
-        # call is simply dropped rather than risking it running against a
-        # half-cleared list.
+        # Guard against reentrant refresh (rebuild isn't safe to nest).
         if getattr(self, "_refreshing", False):
             return
         self._refreshing = True
@@ -788,9 +789,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             self.list_widget.clear()
             self._rows = {}
 
-            # Show BaseAnimation by itself once it exists, even with zero real
-            # layers under it yet -- only truly nothing (no root at all) falls
-            # back to the empty-state message.
+            # Empty state only when there's no root at all.
             if tree is None:
                 self.empty_label.setVisible(True)
                 self.list_widget.setVisible(False)
@@ -804,6 +803,14 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             for row_index, node in enumerate(flat):
                 item = QtWidgets.QListWidgetItem(self.list_widget)
                 item.setSizeHint(QtCore.QSize(0, ROW_HEIGHT))
+                # Qt's InternalMove drag-drop for QListWidget doesn't actually move the
+                # dragged QListWidgetItem -- it removes it and decodes a brand-new item
+                # from the drag's mime data at the drop position, which orphans that row's
+                # cached bind_to_item() reference and drops its setItemWidget() association.
+                # Tagging the item with its layer name (which mime encoding preserves) lets
+                # _on_layer_dropped() re-locate the dropped row by scanning current items
+                # instead of trusting a now-stale row.item().
+                item.setData(QtCore.Qt.UserRole, node["name"])
                 row = LayerRowWidget(
                     node, node.get("_depth", 0), row_index,
                     collapsed=node["name"] in self._collapsed_groups,
@@ -829,13 +836,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             self._refreshing = False
 
     def _filter_visible(self, flat):
-        """Drop every node nested under a collapsed group.
-
-        ``flatten_tree`` is a depth-first pre-order walk, so a collapsed
-        group's descendants are exactly the contiguous run right after it
-        whose depth is greater than its own -- once depth drops back to (or
-        below) that level, we've left the collapsed subtree.
-        """
+        """Drop nodes nested under a collapsed group (relies on flatten_tree's depth-first pre-order)."""
         visible = []
         skip_depth = None
         for node in flat:
@@ -857,6 +858,11 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             row.set_selected(name in self._selected_names)
 
     def _on_empty_area_clicked(self):
+        # Empty list space isn't focusable, so it never steals focus from an
+        # active rename editor the way clicking another row/widget naturally
+        # does -- commit it explicitly (a no-op if nothing's being renamed).
+        for row in self._rows.values():
+            row.name_button.commit_inline_rename()
         self._set_selection(set())
         self._last_anchor = None
 
@@ -882,15 +888,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             self._set_selection({layer_name})
             self._last_anchor = layer_name
 
-        # A single selected layer keeps select_layer()'s extra Channel-Box
-        # convenience (selecting the layer node itself so Weight shows up
-        # there); a multi-selection needs the full set written to Maya's
-        # native animLayer selection, or toolbar quick actions reading that
-        # live selection (Smart Merge/Export/Import) would only ever see the
-        # one layer clicked last. Ctrl-click can leave exactly one *other*
-        # layer selected (toggling the clicked one off), so this reads back
-        # whichever name is actually left in self._selected_names rather
-        # than assuming it's still layer_name.
+        # Single selection uses select_layer() for Channel-Box convenience; multi writes the full Maya selection.
         if len(self._selected_names) == 1:
             controller.select_layer(next(iter(self._selected_names)), weight_attribute=True)
         elif self._selected_names:
@@ -899,18 +897,16 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
     # ------------------------------------------------------------ per-row mutations
 
     def _on_lock_toggled(self, layer_name, checked):
-        # Refresh afterwards, not just on this one row -- a group cascades
-        # its lock state onto every child's row, and an unlock blocked by a
-        # still-locked ancestor group needs this row's own checkbox reverted
-        # back to checked rather than left showing the click that didn't
-        # actually take effect.
+        # Refresh: lock cascades to children/ancestors, so this row's checkbox may need reverting.
         with toolCommon.tool_operation(tool_id="animation_layers_lock", label="Lock Animation Layer", undo=True, progress=False):
             controller.set_lock(layer_name, checked)
         self.refresh()
 
     def _on_mute_toggled(self, layer_name, checked):
+        # Refresh: set_mute() also toggles lock, cascading to children.
         with toolCommon.tool_operation(tool_id="animation_layers_mute", label="Mute Animation Layer", undo=True, progress=False):
             controller.set_mute(layer_name, checked)
+        self.refresh()
 
     def _on_override_toggled(self, layer_name, override):
         with toolCommon.tool_operation(tool_id="animation_layers_override", label="Change Layer Type", undo=True, progress=False):
@@ -933,10 +929,20 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         self.refresh()
 
     def _on_layer_dropped(self, layer_name):
-        row = self._rows.get(layer_name)
-        if row is None or row.item() is None:
+        # Don't trust self._rows[layer_name].item() here -- QListWidget's InternalMove
+        # drop rebuilds the dragged item from mime data rather than moving the original
+        # object, so that cached reference is already stale by the time this runs. Find
+        # the row's real post-drop position by scanning the list's own current items
+        # instead (see the matching UserRole tag set in refresh()).
+        index = -1
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item is not None and item.data(QtCore.Qt.UserRole) == layer_name:
+                index = i
+                break
+        if index < 0:
+            self.refresh()
             return
-        index = self.list_widget.row(row.item())
         previous_item = self.list_widget.item(index - 1) if index > 0 else None
         next_item = self.list_widget.item(index + 1) if index < self.list_widget.count() - 1 else None
         previous_widget = self.list_widget.itemWidget(previous_item) if previous_item is not None else None
@@ -975,11 +981,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         self.refresh()
 
     def _create_group(self, *_args):
-        # self._selected_names is a set -- iterate self._rows (insertion-
-        # ordered, top-to-bottom the same as the visible list) instead of it
-        # directly, so the new group's children land in the same relative
-        # order the user actually saw them in rather than an arbitrary set
-        # iteration order.
+        # Iterate self._rows (ordered) rather than the set, to preserve visible order.
         ordered_selected = [name for name in self._rows.keys() if name in self._selected_names]
         try:
             with toolCommon.tool_operation(tool_id="animation_layers_new_group", label="Group Animation Layers", undo=True, progress=False):
@@ -991,8 +993,8 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
     def _merge_selected(self, *_args):
         selected = list(self._selected_names)
-        if len(selected) < 2:
-            wutil.make_inViewMessage("Select two or more animation layers to merge")
+        if not selected:
+            wutil.make_inViewMessage("Select one or more animation layers to merge")
             return
         try:
             with toolCommon.tool_operation(
@@ -1026,8 +1028,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         if clicked != customDialogs.QFlatConfirmDialog.Yes:
             return
         with toolCommon.tool_operation(tool_id="animation_layers_delete", label="Delete Animation Layers", undo=True, progress=False):
-            for name in selected:
-                controller.delete_layer(name, recursive=False)
+            controller.delete_layers(selected, recursive=False)
         self._selected_names = set()
         self._collapsed_groups -= set(selected)
         self.refresh()
@@ -1059,9 +1060,10 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             self._set_selection({layer_name})
         menu = cw.OpenMenuWidget(self)
         selected = list(self._selected_names)
+        root_name = controller.root_layer_name()
 
         menu.addAction(
-            QtGui.QIcon(icons.add), "New Layer From Selected Objects",
+            QtGui.QIcon(icons.add), "New Layer From Selected",
             description="Create a new animation layer from the current scene selection.",
             callback=lambda *_: self._create_layer_from_selection(),
         )
@@ -1099,21 +1101,25 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             description="Remove the current scene selection from this layer.",
             callback=lambda *_: self._remove_selected_from_layer(layer_name),
         )
+        menu.addAction(
+            "Extract to New Layer",
+            description="Move the current scene selection's animation off this layer into a new one.",
+            callback=lambda *_: self._extract_to_new_layer(layer_name),
+        ).setEnabled(len(selected) == 1 and layer_name != root_name and not controller.is_group(layer_name))
         menu.addSeparator()
+        can_ungroup = any(controller.get_parent(name) not in (None, root_name) for name in selected)
         menu.addAction(
             "Remove From Group",
             description="Move the selected layers back to the top level.",
             callback=lambda *_: self._ungroup_selected(),
-        )
+        ).setEnabled(can_ungroup)
         menu.addSeparator()
         menu.addAction(
             QtGui.QIcon(icons.trash), "Delete",
             description="Delete the selected layers.",
             callback=lambda *_: self._delete_selected(),
         )
-        exec_fn = getattr(menu, "exec", None) or getattr(menu, "exec_", None)
-        if exec_fn:
-            exec_fn(global_pos)
+        _popup_menu(menu, global_pos)
 
     def _start_rename(self, layer_name):
         row = self._rows.get(layer_name)
@@ -1140,6 +1146,15 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
 
+    def _extract_to_new_layer(self, layer_name):
+        try:
+            with toolCommon.tool_operation(tool_id="animation_layers_extract", label="Extract To New Animation Layer", undo=True, progress=False):
+                controller.extract_to_new_layer(layer_name)
+        except RuntimeError as exc:
+            wutil.make_inViewMessage(str(exc))
+            return
+        self.refresh()
+
     def _ungroup_selected(self, *_args):
         with toolCommon.tool_operation(tool_id="animation_layers_ungroup", label="Remove From Group", undo=True, progress=False):
             for name in list(self._selected_names):
@@ -1155,7 +1170,8 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         return animationLayersApi.is_stay_on_top()
 
     def _geometry_settings_key(self):
-        return "animation_layers_geometry"
+        # Bumped key so an old tall/vertical saved geometry doesn't override the new default shape.
+        return "animation_layers_geometry_v2"
 
     def _geometry_settings_namespace(self):
         return animationLayersApi.SETTINGS_NAMESPACE
@@ -1164,13 +1180,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
     def showEvent(self, event):
         super().showEvent(event)
-        # Wired up here (idempotently), not just __init__: this window is
-        # reused rather than recreated across close/reopen (see
-        # ``api.animation_layers_window``'s reuse_existing path), and
-        # closeEvent() below tears the scriptjob connections down -- without
-        # reconnecting on the next show, a reopened window would silently
-        # stop live-syncing to Undo/Redo/scene layer changes for the rest of
-        # the Maya session.
+        # Window is reused across close/reopen; reconnect since closeEvent() tears these down.
         if not getattr(self, "_runtime_connected", False):
             self._connect_runtime()
             self._runtime_connected = True
@@ -1180,10 +1190,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
     def _connect_runtime(self):
         manager = runtime.get_runtime_manager()
-        # "Undo"/"Redo" so an undone/redone layer create/delete/reorder/etc.
-        # is reflected immediately, same as a live scene edit -- all four
-        # share one key so closeEvent()'s single disconnect_callbacks() call
-        # tears them all down together.
+        # Undo/Redo included so layer changes stay in sync; one key for easy teardown.
         for event_name in ("animLayerRebuild", "animLayerRefresh", "Undo", "Redo"):
             manager.add_scriptjob(event=event_name, key=self.REFRESH_KEY, callback=self._on_scene_layers_changed)
 
@@ -1194,20 +1201,18 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
     # ------------------------------------------------------------ focus handling
 
     def _install_click_outside_filter(self):
-        # Same app-level installEventFilter/removeEventFilter idiom
-        # ``core.runtime``'s modifier-state watcher uses -- the weight
-        # spinbox needs "strong" focus so scrolling/typing works while it's
-        # focused, but that alone doesn't make an unrelated click elsewhere
-        # release it (QAbstractSpinBox only loses focus to a *focusable*
-        # sibling); this makes any outside click do that explicitly.
+        # Delegated through the shared RuntimeManager (one app-level
+        # QApplication.installEventFilter() backs every watcher) instead of a
+        # self-managed installEventFilter/removeEventFilter pair. Reuses
+        # REFRESH_KEY so closeEvent()'s disconnect_callbacks() already tears
+        # this down -- no separate cleanup needed.
         try:
-            app = QtWidgets.QApplication.instance()
-            if app:
-                app.installEventFilter(self)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            runtime.get_runtime_manager().add_event_filter_watcher(self.REFRESH_KEY, self._handle_app_event)
+        except _STALE_WIDGET_ERRORS:
             pass
 
-    def eventFilter(self, obj, event):
+    def _handle_app_event(self, obj, event):
+        # Weight spinbox needs strong focus, which doesn't auto-release on an outside click; this forces it.
         try:
             if event.type() == QtCore.QEvent.MouseButtonPress:
                 focus_widget = QtWidgets.QApplication.focusWidget()
@@ -1218,25 +1223,17 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
                     and not (isinstance(obj, QtWidgets.QWidget) and focus_widget.isAncestorOf(obj))
                 ):
                     focus_widget.clearFocus()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        except _STALE_WIDGET_ERRORS:
             pass
-        return False
 
     # ------------------------------------------------------------ lifecycle
 
     def closeEvent(self, event):
         try:
             runtime.get_runtime_manager().disconnect_callbacks(self.REFRESH_KEY)
-        except Exception:
+        except _STALE_WIDGET_ERRORS:
             pass
-        try:
-            app = QtWidgets.QApplication.instance()
-            if app:
-                app.removeEventFilter(self)
-        except Exception:
-            pass
-        # Matches showEvent()'s guards -- a later reshow of this same reused
-        # instance needs to know it has to reconnect both.
+        # Reset so showEvent() reconnects on next reshow.
         self._runtime_connected = False
         self._click_outside_filter_installed = False
         animationLayersApi._emit_animation_layers_window_state(False)

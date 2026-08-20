@@ -402,6 +402,7 @@ class RuntimeManager(QtCore.QObject):
         self._anim_curve_coalesce_preset = None
 
         self._event_filter_installed = False
+        self._event_filter_watchers: Dict[str, Callable[..., Any]] = {}
         self._background_runner_controller = None
 
     # ----------------------------
@@ -771,6 +772,9 @@ class RuntimeManager(QtCore.QObject):
             except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
+        if self._event_filter_watchers.pop(key, None) is not None:
+            self._refresh_event_filter_state()
+
         self._persist_state()
 
     def register_managed_widget(self, widget, key: Optional[str] = None, owner=None):
@@ -1048,7 +1052,28 @@ class RuntimeManager(QtCore.QObject):
             self._remove_event_filter()
 
     def _should_install_event_filter(self) -> bool:
-        return bool(self._graph_editor_watch_enabled or self._modifier_watch_enabled)
+        return bool(self._graph_editor_watch_enabled or self._modifier_watch_enabled or self._event_filter_watchers)
+
+    def add_event_filter_watcher(self, key: str, callback: Callable[..., Any]) -> bool:
+        """Delegate an app-level ``QApplication.installEventFilter()`` to the
+        shared runtime instead of a tool self-managing its own -- every event
+        the app sees is forwarded to *callback(obj, event)* until
+        ``remove_event_filter_watcher()``/``disconnect_callbacks(key)`` tears
+        it down. One real app-level filter backs every registered watcher,
+        the same way one set of scriptJobs backs every ``add_scriptjob()``
+        caller; *key* both identifies the watcher and doubles as its
+        ``disconnect_callbacks()`` cleanup group, so a tool window can retire
+        its scriptjobs and its event-filter watcher with a single call.
+        """
+        if not key or not callable(callback):
+            return False
+        self._event_filter_watchers[key] = callback
+        self._refresh_event_filter_state()
+        return True
+
+    def remove_event_filter_watcher(self, key: str) -> None:
+        if self._event_filter_watchers.pop(key, None) is not None:
+            self._refresh_event_filter_state()
 
     def _sync_enabled_ui_watchers(self) -> None:
         if self._graph_editor_watch_enabled:
@@ -1141,6 +1166,11 @@ class RuntimeManager(QtCore.QObject):
             return False
         self._handle_modifier_event(event_type, event)
         self._handle_graph_editor_event(obj, event_type)
+        for watcher in list(self._event_filter_watchers.values()):
+            try:
+                watcher(obj, event)
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
         return False
 
     def _handle_modifier_event(self, event_type, event) -> None:

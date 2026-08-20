@@ -42,6 +42,7 @@ PLUGIN_SPEC = maya_runtime.NativePluginSpec(
     },
 )
 RUNTIME_CALLBACK_KEY = "micro_move:tool_changed"
+COLOR_CURSOR_FILTER_KEY = "micro_move:color_cursor"
 _CONTROLLER = None
 
 
@@ -150,7 +151,11 @@ class _ColorCursorFilter(QtCore.QObject):
         buttons = application.mouseButtons()
         self._set_cursor(bool(buttons & QtCore.Qt.LeftButton))
 
-    def eventFilter(self, _obj, event):
+    def _handle_app_event(self, _obj, event):
+        # Delegated to RuntimeManager's shared app-level filter (below)
+        # rather than a self-managed QApplication.installEventFilter --
+        # this callback only ever observes, never consumes an event, so it
+        # fits that filter's contract cleanly.
         event_type = event.type()
         if event_type == QtCore.QEvent.MouseButtonPress:
             self._set_cursor(pinched=True)
@@ -158,19 +163,14 @@ class _ColorCursorFilter(QtCore.QObject):
             self._set_cursor(pinched=False)
         elif event_type == QtCore.QEvent.CursorChange:
             self._poll_mouse_buttons()
-        return False
 
     def install(self):
-        application = QtWidgets.QApplication.instance()
-        if application is not None:
-            application.installEventFilter(self)
-            self._poll_timer.start()
+        runtime.get_runtime_manager().add_event_filter_watcher(COLOR_CURSOR_FILTER_KEY, self._handle_app_event)
+        self._poll_timer.start()
 
     def uninstall(self):
-        application = QtWidgets.QApplication.instance()
         self._poll_timer.stop()
-        if application is not None:
-            application.removeEventFilter(self)
+        runtime.get_runtime_manager().remove_event_filter_watcher(COLOR_CURSOR_FILTER_KEY)
         self._clear_cursor()
 
 
