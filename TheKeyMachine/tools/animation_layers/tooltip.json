@@ -4,9 +4,7 @@
     "Lock, mute, rename, and reorder layers by dragging the handle at the start of each row. Double-click a name to rename it.",
     "Right-click one or more layers to group them, or to run a Smart Merge that bakes only the frames where the selected layers actually have weight.",
     {"separator": true},
-    "Use the window's own toolbar to create a layer from the current selection, create a group, merge, delete, or import/export layers.",
-    {"separator": true},
-    "Ctrl-click to Smart Merge, Alt-click to Export, Ctrl+Alt-click to Import -- all acting on whichever animation layers are currently selected, without opening the window."
+    "Use the window's own toolbar to create a layer from the current selection, create a group, merge, delete, or import/export layers."
   ],
   "smart_merge": [
     "Smart Merge Selected -- bake the currently selected animation layers together into one, sampling only the frames where they actually have weight."

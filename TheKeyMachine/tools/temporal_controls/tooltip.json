@@ -1,0 +1,15 @@
+{
+  "temporal_controls": [
+    "Open the Temporal Controls dialog for the current selection: choose a control System, a Position/Orientation space, a label, and a color, then build one control per object -- sized and positioned to match it, carrying a copy of its animation keys, and driving the object back through the chosen spaces."
+  ],
+  "temporal_controls_bake": [
+    "Extract the selected Temporal Controls' keyframes onto their original objects and remove the controls.",
+    {"separator": true},
+    "If nothing is selected, bakes every Temporal Control in the scene."
+  ],
+  "temporal_controls_revert": [
+    "Remove the selected Temporal Controls and restore their original objects' animation and connections.",
+    {"separator": true},
+    "If nothing is selected, reverts every Temporal Control in the scene."
+  ]
+}
