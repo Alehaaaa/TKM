@@ -2,6 +2,8 @@
 
 Static website branch for TheKeyMachine.
 
+Live site: https://alehaaaa.github.io/TKM/
+
 This branch is independent from the application source branches and contains only the files needed for GitHub Pages.
 
 Pages:
