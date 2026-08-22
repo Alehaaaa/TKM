@@ -198,6 +198,43 @@ class _EtaEstimator(object):
         return displayed
 
 
+class _ProgressCancelFilter(QtCore.QObject):
+    """Let Esc cancel the active Maya progress operation.
+
+    Maya's native progress bar exposes a Cancel button, but Esc does not
+    reliably flip ``isCancelled`` for tool-owned operations. Installing this
+    while a progress session is alive gives threaded tools a cheap, shared
+    cancellation source that their existing ``operation.cancelled`` checks
+    can see.
+    """
+
+    def __init__(self, progress):
+        super().__init__()
+        self._progress = progress
+
+    def eventFilter(self, watched, event):
+        progress = self._progress
+        if (
+            progress is not None
+            and progress.interruptable
+            and not progress._finished
+            and event.type() == QtCore.QEvent.KeyPress
+            and event.key() == QtCore.Qt.Key_Escape
+        ):
+            progress._cancelled = True
+            return True
+        return False
+
+    def detach(self):
+        app = QtCore.QCoreApplication.instance()
+        if app is not None:
+            try:
+                app.removeEventFilter(self)
+            except Exception:
+                pass
+        self._progress = None
+
+
 class AdaptiveProgress(object):
     def __init__(
         self,
@@ -236,6 +273,7 @@ class AdaptiveProgress(object):
         self._status_timer = QtCore.QTimer()
         self._status_timer.setInterval(self.update_interval_ms)
         self._status_timer.timeout.connect(self._poll_status)
+        self._cancel_filter = None
 
     def set_total(self, max_value, reset=False):
         """Declare or revise the amount of work without replacing the processor."""
@@ -276,6 +314,10 @@ class AdaptiveProgress(object):
 
     def __enter__(self):
         _ACTIVE_PROGRESS_STACK.append(self)
+        app = QtCore.QCoreApplication.instance()
+        if app is not None and self.interruptable:
+            self._cancel_filter = _ProgressCancelFilter(self)
+            app.installEventFilter(self._cancel_filter)
         if self._show_timer:
             self._show_timer.start(self.show_after_ms)
         return self
@@ -450,8 +492,16 @@ class AdaptiveProgress(object):
     def cancelled(self):
         return self._cancelled
 
+    def cancel(self):
+        self._cancelled = True
+        return True
+
     def finish(self):
         self._finished = True
+        if self._cancel_filter is not None:
+            self._cancel_filter.detach()
+            self._cancel_filter.deleteLater()
+            self._cancel_filter = None
         for timer in (self._show_timer, self._status_timer):
             if not timer:
                 continue

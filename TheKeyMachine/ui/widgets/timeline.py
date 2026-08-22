@@ -74,6 +74,20 @@ def _set_native_selected_range(start_frame, end_frame):
     )
 
 
+def highlight_timeline_range(frames):
+    """Highlight a timeline range using TKM/Maya-owned behavior only."""
+    frames = list(frames or [])
+    if not frames:
+        return False
+    start_frame, end_frame = min(frames), max(frames)
+
+    if maya_runtime.supports_playback_selection():
+        _set_native_selected_range(start_frame, end_frame)
+        return True
+
+    return False
+
+
 class TimelineFramePicker(QtCore.QObject):
     """Preview timeline frames while scrubbing and commit one on release."""
 
@@ -346,6 +360,82 @@ def _send_time_slider_mouse_event(app, slider, event_type, position, button, but
     app.sendEvent(slider, event)
 
 
+def _double_click_time_slider(app, slider, position=None):
+    position = position or QtCore.QPoint(0, 0)
+    _send_time_slider_mouse_event(
+        app,
+        slider,
+        QtCore.QEvent.MouseButtonDblClick,
+        position,
+        QtCore.Qt.LeftButton,
+        QtCore.Qt.LeftButton,
+        QtCore.Qt.NoModifier,
+    )
+
+
+def _select_range_via_playback_double_click(start_frame, end_frame):
+    """Select a range by temporarily making it the playback range."""
+    app = QtWidgets.QApplication.instance()
+    slider = TimelineTint.get_timeline_widget()
+    if not app or not slider:
+        return False
+
+    try:
+        start_frame = float(start_frame)
+        end_frame = float(end_frame)
+    except (TypeError, ValueError):
+        return False
+
+    if end_frame < start_frame:
+        start_frame, end_frame = end_frame, start_frame
+
+    old_min = cmds.playbackOptions(query=True, minTime=True)
+    old_max = cmds.playbackOptions(query=True, maxTime=True)
+    old_animation_start = cmds.playbackOptions(query=True, animationStartTime=True)
+    old_animation_end = cmds.playbackOptions(query=True, animationEndTime=True)
+    updates_were_enabled = True
+    try:
+        updates_were_enabled = bool(slider.updatesEnabled())
+    except (RuntimeError, TypeError):
+        pass
+
+    try:
+        slider.setUpdatesEnabled(False)
+        cmds.playbackOptions(
+            edit=True,
+            minTime=start_frame,
+            maxTime=end_frame,
+            animationStartTime=start_frame,
+            animationEndTime=end_frame,
+        )
+        _double_click_time_slider(app, slider, QtCore.QPoint(0, 0))
+        cmds.playbackOptions(
+            edit=True,
+            minTime=old_min,
+            maxTime=old_max,
+            animationStartTime=old_animation_start,
+            animationEndTime=old_animation_end,
+        )
+    finally:
+        try:
+            cmds.playbackOptions(
+                edit=True,
+                minTime=old_min,
+                maxTime=old_max,
+                animationStartTime=old_animation_start,
+                animationEndTime=old_animation_end,
+            )
+        finally:
+            try:
+                slider.setUpdatesEnabled(updates_were_enabled)
+            except (RuntimeError, TypeError):
+                pass
+            app.processEvents()
+            if wutil.is_valid_widget(slider):
+                slider.repaint()
+    return True
+
+
 @contextmanager
 def suspend_time_slider_updates():
     """Prevent intermediate time-slider redraws and restore its prior state."""
@@ -392,19 +482,58 @@ def _restore_current_frame(current_frame, playback_start):
     cmds.currentTime(current_frame, edit=True)
 
 
+def _clear_click_frame(selected_range, playback_start, playback_end, fallback_frame):
+    """Choose an empty timeline spot for the synthetic clear-range click.
+
+    The click must be outside the highlighted range. Pick the opposite side
+    of the timeline from the range's center, then use the middle of that
+    empty side so integer/pixel rounding cannot land back on the range edge.
+    """
+    if not selected_range:
+        return fallback_frame
+
+    try:
+        start_frame = float(selected_range[0])
+        end_frame = float(selected_range[1])
+        playback_start = float(playback_start)
+        playback_end = float(playback_end)
+    except (TypeError, ValueError):
+        return fallback_frame
+
+    if end_frame < start_frame:
+        start_frame, end_frame = end_frame, start_frame
+
+    timeline_center = (playback_start + playback_end) * 0.5
+    range_center = (start_frame + end_frame) * 0.5
+    prefer_right = range_center <= timeline_center
+    guard = 1.0
+
+    def _right_candidate():
+        right_start = max(end_frame + guard, playback_start)
+        if right_start <= playback_end:
+            return (right_start + playback_end) * 0.5
+        return None
+
+    def _left_candidate():
+        left_end = min(start_frame - guard, playback_end)
+        if playback_start <= left_end:
+            return (playback_start + left_end) * 0.5
+        return None
+
+    candidate = _right_candidate() if prefer_right else _left_candidate()
+    if candidate is None:
+        candidate = _left_candidate() if prefer_right else _right_candidate()
+    return candidate if candidate is not None else fallback_frame
+
+
 def _clear_selected_range_input(context, selected_range):
     app, slider, playback_start, playback_end, position = context
-    if selected_range:
-        start_frame, end_frame = selected_range
-        space_before = start_frame - playback_start
-        space_after = playback_end - end_frame
-        clear_frame = (
-            end_frame + (space_after * 0.5)
-            if space_after >= space_before
-            else playback_start + (space_before * 0.5)
-        )
-    else:
-        clear_frame = cmds.currentTime(query=True)
+    clear_frame = _clear_click_frame(
+        selected_range,
+        playback_start,
+        playback_end,
+        cmds.currentTime(query=True),
+    )
 
     clear_position = position(clear_frame)
     for event_type, button, buttons in (
@@ -474,43 +603,10 @@ def select_time_slider_range(frames):
         return False
 
     start_frame, end_frame = min(frames), max(frames)
-    if maya_runtime.supports_playback_selection():
-        _set_native_selected_range(start_frame, end_frame)
+    if highlight_timeline_range((start_frame, end_frame)):
         return True
 
-    context = _time_slider_input_context()
-    if not context:
-        return False
-    app, slider, playback_start, _playback_end, position = context
-
-    start_position = position(start_frame + 1)
-    # Maya reports rangeArray's end one frame past the inclusive selection.
-    end_position = position(end_frame + 1)
-    current_frame = cmds.currentTime(query=True)
-
-    with suspend_time_slider_updates():
-        _clear_selected_range_input(context, (start_frame, end_frame))
-        # Maya caches the time-slider hover position as its drag origin.
-        # Prime it explicitly so backward drags do not retain the old end.
-        _send_time_slider_mouse_event(
-            app, slider, QtCore.QEvent.MouseMove, start_position,
-            QtCore.Qt.NoButton, QtCore.Qt.NoButton, QtCore.Qt.ShiftModifier,
-        )
-        _send_time_slider_mouse_event(
-            app, slider, QtCore.QEvent.MouseButtonPress, start_position,
-            QtCore.Qt.LeftButton, QtCore.Qt.LeftButton, QtCore.Qt.ShiftModifier,
-        )
-        _send_time_slider_mouse_event(
-            app, slider, QtCore.QEvent.MouseMove, end_position,
-            QtCore.Qt.LeftButton, QtCore.Qt.LeftButton, QtCore.Qt.ShiftModifier,
-        )
-        _send_time_slider_mouse_event(
-            app, slider, QtCore.QEvent.MouseButtonRelease, end_position,
-            QtCore.Qt.LeftButton, QtCore.Qt.LeftButton, QtCore.Qt.ShiftModifier,
-        )
-        app.processEvents()
-        _restore_current_frame(current_frame, playback_start)
-    return True
+    return _select_range_via_playback_double_click(start_frame, end_frame)
 
 
 class TimelineTint(QtWidgets.QWidget):

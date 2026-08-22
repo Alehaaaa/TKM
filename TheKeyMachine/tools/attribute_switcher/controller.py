@@ -18,6 +18,7 @@ ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY = "attribute_switcher_stays_on_top"
 SUPER_MODE_KEY = "rotate_order_lightning_mode"
 
 ROTATE_ORDER_OPTIONS = ("xyz", "yzx", "zxy", "xzy", "yxz", "zyx")
+APPLY_BATCH_SIZE = 8
 
 # Flipped to True for the rest of the Maya session the first time Super
 # mode's general (non-rotateOrder) fast path disagrees with the proven,
@@ -32,6 +33,13 @@ def _as_bool(value):
     if isinstance(value, str):
         return value.lower() == "true"
     return bool(value) if isinstance(value, (bool, int)) else False
+
+
+def _chunks(items, size=APPLY_BATCH_SIZE):
+    items = list(items or [])
+    size = max(1, int(size or 1))
+    for index in range(0, len(items), size):
+        yield items[index:index + size]
 
 
 class AttributeSwitcherController:
@@ -894,15 +902,23 @@ class AttributeSwitcherController:
         if isinstance(keyframes, dict) and keyframes:
             if operation:
                 if owns_progress:
-                    operation.set_total(len(keyframes) * 2, reset=True)
+                    work_units = sum(len(frame_targets) for frame_targets in keyframes.values())
+                    operation.set_total(max(1, work_units * 2), reset=True)
                 operation.set_status("Saving Positions")
             for frame, frame_targets in keyframes.items():
                 if operation and operation.cancelled:
                     complete = False
                     break
-                transforms[frame] = snapshot(frame, frame_targets)
-                if operation:
-                    operation.step()
+                transforms[frame] = {}
+                for target_batch in _chunks(frame_targets):
+                    if operation and operation.cancelled:
+                        complete = False
+                        break
+                    transforms[frame].update(snapshot(frame, target_batch))
+                    if operation:
+                        operation.step(amount=len(target_batch))
+                if not complete:
+                    break
         else:
             transforms[current_frame] = snapshot(current_frame, targets)
 
@@ -1123,9 +1139,13 @@ class AttributeSwitcherController:
                 if needs_scope
                 else {}
             )
-            frame_count = len(keyframes) if isinstance(keyframes, dict) else 0
-            save_cost = frame_count if needs_scope else 0
-            apply_cost = frame_count
+            frame_target_count = (
+                sum(len(frame_targets) for frame_targets in keyframes.values())
+                if isinstance(keyframes, dict)
+                else 0
+            )
+            save_cost = frame_target_count if needs_scope else 0
+            apply_cost = frame_target_count
             if attribute == "rotateOrder" and self._super_mode_active():
                 apply_cost += len(targets)
             total_cost += save_cost + max(1, apply_cost)
@@ -1443,8 +1463,8 @@ class AttributeSwitcherController:
         """
         failed = set()
 
-        def _apply_frame(frame, frame_transforms):
-            for target in targets:
+        def _apply_frame(frame, frame_transforms, target_batch):
+            for target in target_batch:
                 if target in failed:
                     continue
                 baseline = frame_transforms.get(target)
@@ -1464,7 +1484,12 @@ class AttributeSwitcherController:
         for frame, frame_transforms in (transforms or {}).items():
             if operation and operation.cancelled:
                 break
-            self._on_main(operation, _apply_frame, frame, frame_transforms)
+            for target_batch in _chunks(targets):
+                if operation and operation.cancelled:
+                    break
+                self._on_main(operation, _apply_frame, frame, frame_transforms, target_batch)
+                if operation:
+                    operation.step(amount=len(target_batch))
         return targets - failed
 
     @staticmethod
@@ -1650,13 +1675,20 @@ class AttributeSwitcherController:
                     if target not in fast_targets
                 }
                 if relevant:
-                    self._on_main(
-                        operation,
-                        self._apply_relevant_at_frame,
-                        frame, relevant, attribute, value, target_attributes,
-                        target_switch_nodes,
-                    )
-                if operation:
+                    relevant_items = list(relevant.items())
+                    for relevant_batch in _chunks(relevant_items):
+                        if operation and operation.cancelled:
+                            break
+                        batch_relevant = dict(relevant_batch)
+                        self._on_main(
+                            operation,
+                            self._apply_relevant_at_frame,
+                            frame, batch_relevant, attribute, value, target_attributes,
+                            target_switch_nodes,
+                        )
+                        if operation:
+                            operation.step(amount=len(batch_relevant))
+                elif operation and not fast_targets:
                     operation.step()
         finally:
             self._on_main(operation, maya_api.set_current_time, current_time)

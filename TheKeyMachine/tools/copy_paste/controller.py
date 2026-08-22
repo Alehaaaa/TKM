@@ -1377,30 +1377,42 @@ def copy_animation(*args, **kwargs):
         ) as operation:
             processor = operation["operation"]
             processor.set_status("Copying Animation")
-            for control in selected_objects:
-                if processor.cancelled:
-                    return
-                control_name = control
-                animated_channels = channels_by_control[control]
 
-                controls_data[control_name] = {}
-                for channel in animated_channels:
-                    plug = f"{control}.{channel}"
-                    channel_data = _query_layered_anim_channel_data(
-                        plug,
-                        time_context,
-                        layer_context=layer_context,
-                        selected_curves=target_info.curves,
-                        selected_keyframes=target_info.selected_keys,
-                        scene_layers=scene_layers,
-                    )
-                    if channel_data.get(ANIMATION_FRAME_KEY) or channel_data.get(ANIMATION_LAYERS_KEY):
-                        controls_data[control_name][channel] = channel_data
-                    elif time_context.mode != "graph_editor_keys":
-                        static_data = _query_static_channel_value(plug)
-                        if static_data:
-                            controls_data[control_name][channel] = static_data
-                    processor.step()
+            def _query_channel(plug):
+                channel_data = _query_layered_anim_channel_data(
+                    plug,
+                    time_context,
+                    layer_context=layer_context,
+                    selected_curves=target_info.curves,
+                    selected_keyframes=target_info.selected_keys,
+                    scene_layers=scene_layers,
+                )
+                if channel_data.get(ANIMATION_FRAME_KEY) or channel_data.get(ANIMATION_LAYERS_KEY):
+                    return channel_data
+                if time_context.mode != "graph_editor_keys":
+                    return _query_static_channel_value(plug)
+                return {}
+
+            def _copy_all_channels():
+                for control in selected_objects:
+                    if processor.cancelled:
+                        return
+                    control_name = control
+                    animated_channels = channels_by_control[control]
+                    controls_data[control_name] = {}
+
+                    for channel in animated_channels:
+                        if processor.cancelled:
+                            return
+                        plug = f"{control}.{channel}"
+                        channel_data = processor.run_on_main(_query_channel, plug)
+                        if channel_data:
+                            controls_data[control_name][channel] = channel_data
+                        processor.step()
+
+            toolCommon.run_on_worker_thread(_copy_all_channels)
+            if processor.cancelled:
+                return
 
             animation_data[ANIMATION_CONTROLS_KEY] = {
                 control: channels
@@ -1733,22 +1745,34 @@ def copy_pose(*args, **kwargs):
         progress_max=attribute_total,
     ) as operation:
         processor = operation["operation"].set_status("Copying Pose")
-        for control in selected_objects:
-            control_name = control
-            attributes = attributes_by_control[control]
 
-            pose_data[control_name] = {}
-            for attr in attributes:
+        def _read_pose_attr(control, attr):
+            try:
+                return True, cmds.getAttr(f"{control}.{attr}")
+            except Exception as e:
+                import TheKeyMachine.tools.bug_report.controller as report
+
+                report.report_detected_exception(e, context="copy pose attribute read")
+                return False, None
+
+        def _copy_all_pose_attrs():
+            for control in selected_objects:
                 if processor.cancelled:
                     return
-                try:
-                    values = cmds.getAttr(f"{control}.{attr}")
-                    pose_data[control_name][attr] = values
-                except Exception as e:
-                    import TheKeyMachine.tools.bug_report.controller as report
+                control_name = control
+                attributes = attributes_by_control[control]
+                pose_data[control_name] = {}
+                for attr in attributes:
+                    if processor.cancelled:
+                        return
+                    ok, values = processor.run_on_main(_read_pose_attr, control, attr)
+                    if ok:
+                        pose_data[control_name][attr] = values
+                    processor.step()
 
-                    report.report_detected_exception(e, context="copy pose attribute read")
-                processor.step()
+        toolCommon.run_on_worker_thread(_copy_all_pose_attrs)
+        if processor.cancelled:
+            return
 
         pose_data = {
             control: attributes
