@@ -49,6 +49,8 @@ jobs:
             cp "$source" "plugins/$relative"
           done < <(find main/TheKeyMachine/tools -mindepth 2 -maxdepth 2 -name plugin.cpp -print0)
 
+          find plugins/native_plugins plugins/TheKeyMachine/tools -type f -exec chmod -x {} +
+
       - name: Commit changes
         shell: bash
         working-directory: plugins
