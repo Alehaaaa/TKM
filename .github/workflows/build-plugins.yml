@@ -5,16 +5,14 @@ on:
     paths:
       - ".github/workflows/build-plugins.yml"
       - "native_plugins/**"
-      - "TheKeyMachine/tools/depth_mover/plugin.cpp"
-      - "TheKeyMachine/tools/micro_move/plugin.cpp"
+      - "TheKeyMachine/tools/*/plugin.cpp"
   push:
-    branches: [main, master, plugins]
+    branches: [plugins]
     tags: ["v*"]
     paths:
       - ".github/workflows/build-plugins.yml"
       - "native_plugins/**"
-      - "TheKeyMachine/tools/depth_mover/plugin.cpp"
-      - "TheKeyMachine/tools/micro_move/plugin.cpp"
+      - "TheKeyMachine/tools/*/plugin.cpp"
   workflow_dispatch:
 
 permissions:
