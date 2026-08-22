@@ -20,7 +20,7 @@ TKM was developed by <b>Rodrigo Torres</b> (<a href="https://www.rodritorres.com
 
 This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.io">alehaaaa.github.io</a>), currently working at <b>Framestore</b>.
 
-<a href="https://www.thekeymachine.xyz">thekeymachine.xyz</a>
+<a href="https://alehaaaa.github.io/TKM/">https://alehaaaa.github.io/TKM/</a>
 
 <img src="./TheKeyMachine/data/icons/toolbar_example.png" />
 
