@@ -1,10 +1,26 @@
 {
-  "latest": "0.1.46",
+  "latest": "0.1.47",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.47",
+      "tag": "TKM-0.1.47",
+      "publishedAt": "2026-08-22T16:57:52Z",
+      "publishedLabel": "August 22, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.47",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.47/TKM-0.1.47.zip",
+      "entries": [
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Toolbar reloads and tab restores avoid leftover callbacks and keep docked areas from stretching"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.46...TKM-0.1.47"
+    },
     {
       "version": "0.1.46",
       "tag": "TKM-0.1.46",
