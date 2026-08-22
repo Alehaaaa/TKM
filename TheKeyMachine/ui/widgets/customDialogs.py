@@ -899,6 +899,189 @@ class QFlatTooltipConfirm(QFlatDialog):
         return cls._run(anchor_widget, title=title, message=message, buttons=buttons, **kwargs)
 
 
+class QFlatAutoHideMessage(QFlatDialog):
+    """A borderless, buttonless notification popup -- the same dark rounded
+    XML-tooltip look ``QFlatTooltipConfirm`` uses (arrow included, same
+    ``paintEvent``/margin-reservation approach), minus its buttons (nothing
+    to confirm): it just states its piece and closes itself after
+    *duration* milliseconds. A thin ``QProgressBar`` along the bottom of
+    the inner layout counts down visibly so the user can see how long is
+    left to read it before it auto-hides -- use ``show_message`` rather
+    than the constructor directly, which also keeps the instance alive (it
+    isn't parented to anything modal, so nothing else would)."""
+
+    BG_COLOR = "#333333"
+    TEXT_COLOR = "#bbbbbb"
+    BORDER_RADIUS = 8
+    ARROW_W = 12
+    ARROW_H = 8
+    PROGRESS_INTERVAL_MS = 50
+
+    _live_instances = []
+
+    def __init__(self, tooltip="", duration=5000, parent=None):
+        QFlatDialog.__init__(self, parent=parent)
+
+        self.setWindowFlags(QtCore.Qt.ToolTip | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
+
+        # None until show_message anchors this to a real widget -- no
+        # arrow drawn (see paintEvent) for the no-anchor cursor fallback,
+        # since there's nothing for it to point at there.
+        self.side = None
+        self.arrow_x = None
+
+        self.setStyleSheet(
+            "QFlatAutoHideMessage > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(
+                self.BG_COLOR, DPI(self.BORDER_RADIUS)
+            )
+        )
+
+        self.bg_frame = QtWidgets.QFrame()
+        self.bg_frame.setObjectName("BgFrame")
+        self.bg_frame.setMinimumWidth(DPI(240))
+        self.bg_frame.setMaximumWidth(DPI(360))
+        self.bg_layout = QtWidgets.QVBoxLayout(self.bg_frame)
+        self.bg_layout.setContentsMargins(0, 0, 0, 0)
+        self.bg_layout.setSpacing(0)
+        self.root_layout.addWidget(self.bg_frame)
+
+        self.bg_layout.addWidget(QFlatTooltipContent(tooltip, parent=self.bg_frame))
+        self.bg_layout.addSpacing(DPI(8))
+
+        radius = DPI(self.BORDER_RADIUS)
+        self.progress_bar = QtWidgets.QProgressBar(self.bg_frame)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setRange(0, max(1, duration))
+        self.progress_bar.setValue(duration)
+        self.progress_bar.setFixedHeight(DPI(4))
+        self.progress_bar.setStyleSheet(
+            "QProgressBar {{ background: #222222; border: none; "
+            "border-bottom-left-radius: {r}px; border-bottom-right-radius: {r}px; }} "
+            # The chunk (the actual fill, not just the track) needs both
+            # bottom corners rounded too, not just the left one -- it
+            # starts at full width, so its right edge sits flush against
+            # the track's rounded bottom-right corner and was squaring it
+            # off, poking a sharp corner out past bg_frame's rounded shape
+            # instead of sitting flush inside it.
+            "QProgressBar::chunk {{ background: #8a8a8a; border-bottom-left-radius: {r}px; "
+            "border-bottom-right-radius: {r}px; }}".format(r=radius)
+        )
+        self.bg_layout.addWidget(self.progress_bar)
+
+        self._remaining_ms = duration
+        self._tick_timer = QtCore.QTimer(self)
+        self._tick_timer.setInterval(self.PROGRESS_INTERVAL_MS)
+        self._tick_timer.timeout.connect(self._on_tick)
+
+    def _on_tick(self):
+        self._remaining_ms -= self.PROGRESS_INTERVAL_MS
+        self.progress_bar.setValue(max(0, self._remaining_ms))
+        if self._remaining_ms <= 0:
+            self._tick_timer.stop()
+            self.close()
+
+    def closeEvent(self, event):
+        self._tick_timer.stop()
+        if self in QFlatAutoHideMessage._live_instances:
+            QFlatAutoHideMessage._live_instances.remove(self)
+        QFlatDialog.closeEvent(self, event)
+
+    def paintEvent(self, event):
+        # Same arrow-triangle painting QFlatTooltipConfirm.paintEvent does --
+        # the rounded dark frame itself is drawn by bg_frame's own
+        # stylesheet, this just adds the little pointer in the margin
+        # root_layout reserved for it (see show_message). No anchor ->
+        # self.side is None -> nothing to draw, no arrow.
+        if not self.side:
+            return
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(self.BG_COLOR))
+
+        aw = DPI(self.ARROW_W)
+        ah = DPI(self.ARROW_H)
+        ax = self.arrow_x if self.arrow_x is not None else self.width() / 2
+
+        if self.side == "top":
+            poly = QtGui.QPolygonF([QtCore.QPointF(ax, 0), QtCore.QPointF(ax - aw / 2, ah + 1), QtCore.QPointF(ax + aw / 2, ah + 1)])
+        else:
+            poly = QtGui.QPolygonF(
+                [
+                    QtCore.QPointF(ax, self.height()),
+                    QtCore.QPointF(ax - aw / 2, self.height() - ah - 1),
+                    QtCore.QPointF(ax + aw / 2, self.height() - ah - 1),
+                ]
+            )
+        painter.drawPolygon(poly)
+
+    @classmethod
+    def show_message(cls, tooltip, duration=5000, anchor_widget=None, parent=None):
+        """Build, position, show, and start counting down one of these --
+        the usual entry point instead of the constructor.
+
+        With *anchor_widget* (a still-valid, visible widget -- typically
+        the toolbar button that triggered whatever's being reported on),
+        this lands just under it, arrow pointing up at it, like a tooltip
+        would -- flipping above (arrow pointing down) if there's no room
+        below. Without one (or if it's gone/hidden by the time this
+        fires), it falls back to centered near the top of the cursor's own
+        screen, with no arrow (nothing to point at there)."""
+        msg = cls(tooltip=tooltip, duration=duration, parent=parent)
+        cls._live_instances.append(msg)
+
+        ah = DPI(cls.ARROW_H)
+        aw = DPI(cls.ARROW_W)
+
+        if anchor_widget is not None and is_valid_widget(anchor_widget) and anchor_widget.isVisible():
+            anchor_rect = QtCore.QRect(anchor_widget.mapToGlobal(QtCore.QPoint(0, 0)), anchor_widget.size())
+            screen = QtGui.QGuiApplication.screenAt(anchor_rect.center()) or QtGui.QGuiApplication.primaryScreen()
+            geo = screen.availableGeometry()
+
+            # Box below the anchor: the arrow sits on the box's *top* edge,
+            # pointing up at the anchor above it -- that's paintEvent's
+            # "top" branch (apex at y=0), so self.side is "top" here even
+            # though the box itself is below the anchor. Margin reserves
+            # room for it the same way QFlatTooltipConfirm._show_around does.
+            msg.side = "top"
+            msg.root_layout.setContentsMargins(0, ah, 0, 0)
+            msg.root_layout.activate()
+            msg.adjustSize()
+
+            x = anchor_rect.center().x() - msg.width() // 2
+            y = anchor_rect.bottom() + DPI(2)
+            if y + msg.height() > geo.bottom():
+                # Flipped above the anchor instead: arrow moves to the
+                # box's *bottom* edge, pointing down at the anchor below it.
+                msg.side = "bottom"
+                msg.root_layout.setContentsMargins(0, 0, 0, ah)
+                msg.root_layout.activate()
+                msg.adjustSize()
+                y = anchor_rect.top() - msg.height() - DPI(2)
+        else:
+            msg.adjustSize()
+            cursor_pos = QtGui.QCursor.pos()
+            screen = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
+            geo = screen.availableGeometry()
+            x = geo.center().x() - msg.width() // 2
+            y = geo.top() + DPI(60)
+
+        final_x = max(geo.left() + DPI(5), min(x, geo.right() - msg.width() - DPI(5)))
+        final_y = max(geo.top() + DPI(5), min(y, geo.bottom() - msg.height() - DPI(5)))
+        msg.move(final_x, final_y)
+
+        if msg.side:
+            arrow_x = anchor_rect.center().x() - final_x
+            msg.arrow_x = max(DPI(6) + aw / 2, min(arrow_x, msg.width() - DPI(6) - aw / 2))
+
+        msg.show()
+        msg.raise_()
+        msg._tick_timer.start()
+        return msg
+
+
 class QFlatFloatingWidget(QFlatDialog):
     """
     A draggable, frameless, rounded widget wrapper.

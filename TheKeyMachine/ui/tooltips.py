@@ -965,6 +965,38 @@ class QFlatTooltipManager(object):
         cls._current_source_key = None
 
     @classmethod
+    def shutdown(cls):
+        """Tear down app-level state before an in-process module reload.
+
+        ``_mouse_filter`` is installed lazily, once, on Maya's persistent
+        QApplication (see ``_ensure_mouse_filter``) -- that registration
+        outlives ``TheKeyMachine.reload()``'s ``sys.modules`` purge, since
+        the QApplication itself is never recreated. Without this, every
+        reload leaves the previous filter installed forever (it keeps
+        receiving and acting on every application-wide mouse event, via a
+        ``cls`` reference to this now-orphaned class), while the freshly
+        re-imported module lazily installs one more on top of it the next
+        time a tooltip is shown -- one extra permanently-running filter
+        per reload, each still doing real per-event work.
+        """
+        cls.hide()
+        if cls._timer is not None:
+            try:
+                cls._timer.stop()
+            except Exception:
+                pass
+            cls._timer = None
+        app = QtWidgets.QApplication.instance()
+        if app is not None and cls._mouse_filter is not None:
+            try:
+                app.removeEventFilter(cls._mouse_filter)
+            except Exception:
+                pass
+        cls._mouse_filter = None
+        cls._current_source_key = None
+        cls._clear_pending()
+
+    @classmethod
     def show(
         cls,
         text="",
@@ -1058,6 +1090,18 @@ class QFlatTooltipManager(object):
         )
         cls._timer.setInterval(delay)
         cls._timer.start()
+
+
+def shutdown():
+    """Module-level hook for ``runtime.shutdown_tool_modules()``'s reload sweep.
+
+    That sweep resolves cleanups as ``(module_name, attr_name)`` pairs and
+    calls ``getattr(module, attr_name)`` directly -- it has no notion of a
+    class nested inside the module, so this thin wrapper is what actually
+    gets found and called; see ``QFlatTooltipManager.shutdown()`` for what
+    it tears down.
+    """
+    QFlatTooltipManager.shutdown()
 
 
 def parse_tt(tooltip):

@@ -234,6 +234,23 @@ class TimelineFramePicker(QtCore.QObject):
         return False
 
 
+def shutdown():
+    """Cancel any in-flight frame picker before an in-process module reload.
+
+    ``TimelineFramePicker.__init__`` installs an app-level event filter
+    that only ``cancel()`` removes (see its ``app.installEventFilter(self)``
+    above). A reload landing mid-drag on the timeline scrubber would
+    otherwise leave that filter permanently installed on Maya's persistent
+    QApplication, referencing a picker instance whose module is about to be
+    purged. ``notify=False`` matches ``_commit_frame``'s own use of a quiet
+    cancel -- the owning tool is being torn down, not asking to abort.
+    """
+    global _active_frame_picker
+    if _active_frame_picker is not None:
+        _active_frame_picker.cancel(notify=False)
+        _active_frame_picker = None
+
+
 def begin_frame_picker(
     callback,
     owner=None,

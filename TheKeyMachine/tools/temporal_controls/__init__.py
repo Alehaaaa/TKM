@@ -14,9 +14,12 @@ class TemporalControlsToolObject(ToolObject):
         "temporal_controls": {
             "type": "tool", "label": "Temporal Controls", "icon": "temporal_controls",
             "callback": api.create_controls, "tooltip": TOOLTIPS["temporal_controls"],
-            "menu": {"label": "Temporal Controls", "icon": "temporal_controls", "items": [
-                "temporal_controls_bake", "temporal_controls_revert",
-            ]},
+            # Callable, not the declarative {"label"/"icon"/"items"} dict every
+            # other section item uses -- this menu needs an exclusive Bake
+            # Mode group, a Lightning Mode checkbox, and a live Space-switch
+            # list, none of which a plain list of command ids can express.
+            # See api.build_temporal_controls_context_menu.
+            "menu": api.build_temporal_controls_context_menu,
         },
         "temporal_controls_bake": {
             "type": "tool", "label": "Bake", "icon": "bake_animation_1",

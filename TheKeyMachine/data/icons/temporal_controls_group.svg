@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+        stroke: #72dbdb;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2.4px;
+      }
+
+      .st1 {
+        fill: #878a90;
+      }
+
+      .st2 {
+        fill: none;
+        stroke: #66686b;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2px;
+        stroke-dasharray: 3.2 3.4;
+      }
+    </style>
+  </defs>
+  <g id="surface2">
+    <rect class="st2" x="7" y="9" width="36" height="32" rx="6" ry="6"/>
+    <ellipse class="st0" cx="25" cy="30" rx="13" ry="6.6"/>
+    <circle class="st1" cx="25" cy="23.4" r="5.6"/>
+  </g>
+</svg>

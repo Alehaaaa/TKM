@@ -26,7 +26,7 @@ class SelectorDialog(QFlatToolBarPopupDialog):
         self.list_widget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.list_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.list_widget.setUniformItemSizes(True)
-        self.list_widget.selectionel().selectionChanged.connect(self._on_list_selection_changed)
+        self.list_widget.selectionModel().selectionChanged.connect(self._on_list_selection_changed)
         self.mainLayout.addWidget(self.list_widget, 1)
 
         try:
@@ -50,7 +50,7 @@ class SelectorDialog(QFlatToolBarPopupDialog):
         self.title_label.setText(str(len(self._objects)))
         self._list_model.setStringList([node.rsplit("|", 1)[-1] for node in self._objects])
 
-        model = self.list_widget.selectionel()
+        model = self.list_widget.selectionModel()
         if model and self._objects:
             model.select(
                 QtCore.QItemSelection(self._list_model.index(0, 0), self._list_model.index(len(self._objects) - 1, 0)),
@@ -63,7 +63,7 @@ class SelectorDialog(QFlatToolBarPopupDialog):
             return
         from maya import cmds
 
-        names = [self._objects[index.row()] for index in self.list_widget.selectionel().selectedIndexes()]
+        names = [self._objects[index.row()] for index in self.list_widget.selectionModel().selectedIndexes()]
         names = [name for name in names if cmds.objExists(name)]
         self._suppress_next_refresh = True
         if names:

@@ -4,15 +4,19 @@
     <style>
       .st0 {
         fill: none;
-        stroke: #bdbdbd;
+        stroke: #72dbdb;
         stroke-linecap: round;
         stroke-linejoin: round;
-        stroke-width: 5px;
+        stroke-width: 2.4px;
+      }
+
+      .st1 {
+        fill: #878a90;
       }
     </style>
   </defs>
-  <g transform="translate(25 25) scale(0.819) translate(-25 -25)">
-    <polyline class="st0" points="10 10 25 25 25 42"/>
-    <polyline class="st0" points="40 10 25 25"/>
+  <g id="surface2">
+    <ellipse class="st0" cx="25" cy="29" rx="16" ry="8"/>
+    <circle class="st1" cx="25" cy="21" r="6.4"/>
   </g>
 </svg>

@@ -246,6 +246,8 @@ def shutdown_tool_modules() -> None:
         ("TheKeyMachine.maya.shelf", "cleanup_open_menus"),
         ("TheKeyMachine.tools.common", "finish_active_progress"),
         ("TheKeyMachine.tools.graph_toolbar.controller", "shutdown_graph_toolbar_runtime"),
+        ("TheKeyMachine.ui.tooltips", "shutdown"),
+        ("TheKeyMachine.ui.widgets.timeline", "shutdown"),
         ("TheKeyMachine.maya.runtime", "shutdown_all"),
     )
     for module_name, attr_name in module_cleanups:

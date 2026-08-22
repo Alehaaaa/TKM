@@ -5,10 +5,10 @@
     <style>
       .st0 {
         fill: none;
-        stroke: #b46060;
+        stroke: #72dbdb;
         stroke-linecap: round;
         stroke-linejoin: round;
-        stroke-width: 2.16px;
+        stroke-width: 3.5px;
       }
 
       .st1 {

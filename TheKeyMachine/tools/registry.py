@@ -124,7 +124,7 @@ TOOLBAR_SECTION_IDS = {
         "animation_offset_tools", "movers_tools",
         "temp_pivot_tools", "follow_cam_tools", "temporal_controls_tools",
         "link_tools",
-        "attribute_tools", "selection_set_tools", "orbit_tools", "tracer_tools",
+        "attribute_tools", "selection_set_tools", "orbit_tools", "tracer_tools", "pause_viewport_tools",
         "global_tools",
         "graph_tools", "animation_tools", "animation_layer_tools", "custom_tools_section", "snapshot_rig_tools", "background_runner_tools",
         "animation_recovery_tools", "search_tools",

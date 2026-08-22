@@ -56,10 +56,26 @@ class _OptionRow(QtWidgets.QWidget):
         layout.setContentsMargins(wutil.DPI(6), 0, wutil.DPI(6), 0)
         layout.setSpacing(wutil.DPI(6))
 
+        # Optional color swatch before the icon -- used by the Temp Controls
+        # Panel's rig list (option["swatch_color"], a "#rrggbb" string) to
+        # show each rig's control color; every other _OptionList caller
+        # (System/Position/Orientation here, the panel's control list) just
+        # omits it and gets the plain icon+label row it always has.
+        swatch_color = option.get("swatch_color")
+        if swatch_color:
+            swatch_size = wutil.DPI(10)
+            swatch = QtWidgets.QLabel(self)
+            swatch.setFixedSize(swatch_size, swatch_size)
+            swatch.setStyleSheet(
+                "background:%s;border-radius:%dpx;" % (swatch_color, swatch_size // 2)
+            )
+            layout.addWidget(swatch)
+
         icon_size = wutil.DPI(16)
         icon_label = QtWidgets.QLabel(self)
         icon_label.setFixedSize(icon_size, icon_size)
-        icon_label.setPixmap(QtGui.QIcon(icons.temporal_controls).pixmap(icon_size, icon_size))
+        row_icon = icons.get(option.get("icon"), icons.temporal_controls)
+        icon_label.setPixmap(QtGui.QIcon(row_icon).pixmap(icon_size, icon_size))
         layout.addWidget(icon_label)
 
         self.title_label = QtWidgets.QLabel(option["label"], self)
@@ -85,12 +101,18 @@ class _OptionRow(QtWidgets.QWidget):
         self.update()
 
     def mousePressEvent(self, event):
-        if self._enabled_option:
+        # self.isEnabled() is the *effective* state (own + every ancestor,
+        # including the containing _OptionList) -- checked in addition to
+        # the per-option "disabled" flag so a whole disabled/locked list
+        # (see TempControlsPanelWindow's Orientation column) can't still be
+        # clicked into just because this row itself was never individually
+        # disabled.
+        if self._enabled_option and self.isEnabled():
             self.clicked.emit()
         super().mousePressEvent(event)
 
     def eventFilter(self, watched, event):
-        if event.type() == QtCore.QEvent.MouseButtonPress and self._enabled_option:
+        if event.type() == QtCore.QEvent.MouseButtonPress and self._enabled_option and self.isEnabled():
             self.clicked.emit()
         return super().eventFilter(watched, event)
 
@@ -114,13 +136,36 @@ class _OptionList(QtWidgets.QListWidget):
     """A compact single-select list of icon+label rows for one option column."""
 
     ROW_HEIGHT = wutil.DPI(28)
+    # Emits the newly selected option id (or None once a not-required list
+    # is explicitly cleared) -- the Temp Controls Panel's rig/control lists
+    # listen to this to react to selection; System/Position/Orientation's
+    # columns don't need to (their creation dialog just reads
+    # selected_id() at confirm time), so this is unused there.
+    selectionChanged = QtCore.Signal(object)
 
-    def __init__(self, options, parent=None):
+    def __init__(self, options, parent=None, cap_to_content=False):
         super().__init__(parent)
+        # cap_to_content (Position/Orientation's columns only, see
+        # TempControlsPanelWindow._build_space_column) means this list caps
+        # its own height to exactly fit however many rows it has instead of
+        # stretching into any extra space a taller window gives it (see
+        # _content_height/refresh below). The rig/control lists -- and
+        # System/Position/Orientation in the original creation dialog --
+        # leave this off and just stretch/scroll normally, same as always.
+        self._cap_to_content = cap_to_content
         self.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
         self.setUniformItemSizes(True)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        if cap_to_content:
+            # Off, not just AsNeeded -- _content_height's own height cap is
+            # meant to fit every row exactly, so a vertical scrollbar should
+            # never be needed; forcing it off avoids one popping into a
+            # couple-px-short gap and clipping a row's own icon/swatch/
+            # selected-highlight color. Lists that don't cap (rig/control)
+            # keep the normal AsNeeded default -- they can genuinely have
+            # more rows than fit and need to scroll.
+            self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.setStyleSheet(
             """
             QListWidget {
@@ -140,6 +185,24 @@ class _OptionList(QtWidgets.QListWidget):
         self._row_order = []
         self._rows_by_id = {}
         self._selected_id = None
+        self.refresh(options)
+
+    def refresh(self, options):
+        """Rebuild every row from *options* -- used both at construction and
+        by the Temp Controls Panel's rig/control lists, which repopulate
+        dynamically as the scene changes rather than staying fixed like
+        System/Position/Orientation's option sets do.
+
+        If this list was built with cap_to_content=True, also caps its own
+        height to exactly fit however many rows it has (see
+        _content_height) -- a caller that wants a fixed height regardless
+        of content (the original creation dialog's columns, via
+        setFixedHeight after construction) still wins, since that call
+        happens after this one and setFixedHeight pins both min and max."""
+        self.clear()
+        self._row_order = []
+        self._rows_by_id = {}
+        self._selected_id = None
 
         for row_index, option in enumerate(options):
             item = QtWidgets.QListWidgetItem(self)
@@ -154,22 +217,45 @@ class _OptionList(QtWidgets.QListWidget):
             self._row_order.append(option_id)
             self._rows_by_id[option_id] = row
 
-    def select_id(self, option_id):
-        row = self._rows_by_id.get(option_id)
+        if self._cap_to_content:
+            self.setMaximumHeight(self._content_height())
+
+    def _content_height(self):
+        # At least one row's worth even when empty, so the box doesn't
+        # collapse to a sliver -- +4 covers the stylesheet's 1px top/bottom
+        # border plus a little slack for QAbstractItemView's own internal
+        # frame/spacing this doesn't otherwise account for (scrollbar is
+        # forced off above regardless, so this only affects a possible
+        # couple px of empty space at the bottom, never a scrollbar/clip).
+        rows = max(1, len(self._row_order))
+        return rows * self.ROW_HEIGHT + 4
+
+    def select_id(self, option_id, required=True):
+        """Select *option_id*. When *required* (System/Position/Orientation's
+        default), an invalid/disabled id falls back to the first enabled
+        row -- these columns always want something selected. When not
+        required (the panel's rig/control lists), an invalid id -- including
+        an explicit ``None`` -- just clears the selection instead."""
+        row = self._rows_by_id.get(option_id) if option_id is not None else None
         if row is None or not row.is_enabled():
             row, option_id = None, None
-            for candidate_id in self._row_order:
-                candidate = self._rows_by_id[candidate_id]
-                if candidate.is_enabled():
-                    row, option_id = candidate, candidate_id
-                    break
+            if required:
+                for candidate_id in self._row_order:
+                    candidate = self._rows_by_id[candidate_id]
+                    if candidate.is_enabled():
+                        row, option_id = candidate, candidate_id
+                        break
 
         for row_id, candidate_row in self._rows_by_id.items():
             candidate_row.set_selected(row_id == option_id)
         self._selected_id = option_id
+        self.selectionChanged.emit(option_id)
 
     def selected_id(self):
         return self._selected_id
+
+    def clear_selection(self):
+        self.select_id(None, required=False)
 
 
 class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
@@ -194,8 +280,6 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         self._color_buttons = {}
 
         self.setObjectName("temporal_controls_dialog")
-        self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-        self.grip.hide()
 
         self._build_columns()
         self._build_reset_row()
@@ -314,7 +398,11 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         self.mainLayout.addWidget(top_row)
 
     def _build_color_row(self):
+        # Matches selection_sets' own color row exactly (size policy, spacing,
+        # trailing stretch) -- see selection_sets/widgets.py's equivalent
+        # _build_color_row/_create_color_button, which this was modeled on.
         self.color_row = QtWidgets.QWidget()
+        self.color_row.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         color_layout = QtWidgets.QHBoxLayout(self.color_row)
         color_layout.setContentsMargins(0, 0, 0, 0)
         color_layout.setSpacing(wutil.DPI(1))
@@ -322,16 +410,16 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         for color in COLORS.selection.all:
             color_layout.addWidget(self._create_color_button(color))
 
+        color_layout.addStretch(1)
         self.mainLayout.addSpacing(wutil.DPI(4))
         self.mainLayout.addWidget(self.color_row)
         self.mainLayout.setSpacing(wutil.DPI(4))
 
     def _create_color_button(self, color):
         tooltip = "Apply with {} Control Color".format(color.label)
-        # Smaller than selection_sets' own swatches -- keeps the whole dialog
-        # (which is sized to exactly fit this row) from getting too wide.
-        button_size = max(1, int(round(wutil.DPI(22) * 0.7)))
-        icon_size = max(1, int(round(wutil.DPI(20) * 0.7)))
+        # Same size as selection_sets' own swatches.
+        button_size = max(1, int(round(wutil.DPI(30) * 0.7)))
+        icon_size = max(1, int(round(wutil.DPI(28) * 0.7)))
         button = cw.create_tool_button_from_data(
             {
                 "key": "temporal_controls_color_{}".format(color.suffix),
@@ -391,17 +479,17 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         self._compress_to_contents()
         self.place_near_cursor()
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.grip.hide()
-
     def _compress_to_contents(self):
         # Width matches the color-swatch row exactly -- it's the narrowest
         # "natural" row, so pinning to it (rather than the wider column list)
-        # keeps the dialog no bigger than it needs to be.
+        # keeps the dialog no bigger than it needs to be on first show.
+        # setMinimumWidth (not setFixedWidth) so this is just a starting
+        # size -- like every other TKM popup (Bake Custom Interval,
+        # Animation Layers, Selector), the window stays resizable via its
+        # grip afterward instead of being locked to it.
         margins = self.mainLayout.contentsMargins()
         target_width = self.color_row.sizeHint().width() + margins.left() + margins.right()
-        self.setFixedWidth(target_width)
+        self.setMinimumWidth(target_width)
         self.adjustSize()
 
     def closeEvent(self, event):
