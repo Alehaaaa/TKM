@@ -154,7 +154,7 @@ jobs:
             TheKeyMachine/tools/micro_move/__builds__
           cp -R /tmp/tkm-builds/TheKeyMachine/. TheKeyMachine/
       - name: Commit generated builds to main
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/plugins')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/plugins'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
