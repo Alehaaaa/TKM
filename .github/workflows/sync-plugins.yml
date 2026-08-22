@@ -1,0 +1,68 @@
+name: Sync plug-in branch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-plugins.yml"
+      - "native_plugins/**"
+      - "TheKeyMachine/tools/*/plugin.cpp"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-plugins
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Copy native sources to plugins
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          path: main
+
+      - name: Checkout plugins
+        uses: actions/checkout@v7
+        with:
+          ref: plugins
+          path: plugins
+
+      - name: Sync skeleton files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf plugins/native_plugins plugins/TheKeyMachine/tools
+          mkdir -p plugins/.github/workflows plugins/TheKeyMachine/tools
+
+          cp main/.github/workflows/build-plugins.yml plugins/.github/workflows/build-plugins.yml
+          cp -R main/native_plugins plugins/native_plugins
+
+          while IFS= read -r -d '' source; do
+            relative="${source#main/}"
+            mkdir -p "plugins/$(dirname "$relative")"
+            cp "$source" "plugins/$relative"
+          done < <(find main/TheKeyMachine/tools -mindepth 2 -maxdepth 2 -name plugin.cpp -print0)
+
+      - name: Commit changes
+        shell: bash
+        working-directory: plugins
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A .github/workflows/build-plugins.yml native_plugins TheKeyMachine/tools
+
+          if git diff --cached --quiet; then
+            echo "plugins already matches main native sources."
+            exit 0
+          fi
+
+          git commit -m "Sync native plug-in sources"
+          git push origin HEAD:plugins

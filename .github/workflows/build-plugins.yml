@@ -4,14 +4,14 @@ on:
   pull_request:
     paths:
       - ".github/workflows/build-plugins.yml"
-      - ".github/native_plugins/**"
+      - "native_plugins/**"
       - "TheKeyMachine/tools/*/plugin.cpp"
   push:
-    branches: [main, master, plugins]
+    branches: [plugins]
     tags: ["v*"]
     paths:
       - ".github/workflows/build-plugins.yml"
-      - ".github/native_plugins/**"
+      - "native_plugins/**"
       - "TheKeyMachine/tools/*/plugin.cpp"
   workflow_dispatch:
 
@@ -23,49 +23,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate-tool-structure:
-    name: Validate tool package structure
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v7
-      - name: Validate discovered tool packages
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          tools_root = Path("TheKeyMachine/tools")
-          expected_python = {"__init__.py", "api.py", "controller.py", "widgets.py"}
-          errors = []
-          packages = []
-
-          for package in sorted(path for path in tools_root.iterdir() if path.is_dir() and not path.name.startswith("__")):
-              packages.append(package.name)
-              files = {path.name for path in package.iterdir() if path.is_file()}
-              missing = sorted(expected_python - files)
-              init_file = package / "__init__.py"
-              if init_file.is_file() and "ToolObject" in init_file.read_text(encoding="utf-8") and "tooltip.json" not in files:
-                  missing.append("tooltip.json")
-              python_files = {name for name in files if name.endswith(".py")}
-              unexpected_python = sorted(python_files - expected_python)
-              if missing:
-                  errors.append(f"{package}: missing {', '.join(missing)}")
-              if unexpected_python:
-                  errors.append(f"{package}: unexpected Python modules {', '.join(unexpected_python)}")
-
-          for package_name in ("depth_mover", "micro_move"):
-              source = tools_root / package_name / "plugin.cpp"
-              if not source.is_file():
-                  errors.append(f"{source}: native plug-in source is missing")
-
-          if errors:
-              raise SystemExit("Invalid tool package structure:\n- " + "\n- ".join(errors))
-          print(f"Validated {len(packages)} tool packages.")
-          PY
-
   build-windows-macos:
     name: Maya ${{ matrix.maya }} / ${{ matrix.platform }}-${{ matrix.arch }}
-    needs: validate-tool-structure
     strategy:
       fail-fast: false
       matrix:
@@ -98,7 +57,7 @@ jobs:
           cache: true
       - name: Configure
         run: >-
-          cmake -S .github/native_plugins -B build/native_plugins
+          cmake -S native_plugins -B build/native_plugins
           ${{ matrix.cmake_arch }}
           -DMAYA_VERSION=${{ matrix.maya }}
           -DMAYA_DEVKIT_ROOT="${{ steps.devkit.outputs.devkit-path }}"
@@ -118,7 +77,6 @@ jobs:
 
   build-linux:
     name: Maya ${{ matrix.maya }} / linux-x86_64
-    needs: validate-tool-structure
     strategy:
       fail-fast: false
       matrix:
@@ -151,7 +109,7 @@ jobs:
             bash -lc '
               yum install -y mesa-libGLU-devel &&
               /opt/python/cp39-cp39/bin/python -m pip install --disable-pip-version-check cmake==3.27.9 &&
-              /opt/python/cp39-cp39/bin/cmake -S .github/native_plugins -B build/native_plugins \
+              /opt/python/cp39-cp39/bin/cmake -S native_plugins -B build/native_plugins \
                 -DMAYA_VERSION=${{ matrix.maya }} \
                 -DMAYA_DEVKIT_ROOT=/maya-devkit \
                 -DTKM_PLATFORM=linux \
@@ -170,7 +128,7 @@ jobs:
 
   package:
     name: Package complete cross-platform release
-    needs: [validate-tool-structure, build-windows-macos, build-linux]
+    needs: [build-windows-macos, build-linux]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -182,46 +140,23 @@ jobs:
           path: builds-package
           merge-multiple: true
       - name: Validate complete binary matrix
-        run: python3 .github/native_plugins/validate_matrix.py builds-package
+        run: python3 native_plugins/validate_matrix.py builds-package
+      - name: Preserve generated matrix
+        run: |
+          cp -R builds-package /tmp/tkm-builds
+      - name: Checkout main release source
+        run: |
+          git fetch origin main
+          git checkout -B release-source origin/main
       - name: Replace release builds with generated matrix
         run: |
           rm -rf \
             TheKeyMachine/tools/depth_mover/__builds__ \
             TheKeyMachine/tools/micro_move/__builds__
-          cp -R builds-package/TheKeyMachine/. TheKeyMachine/
-      - name: Validate assembled release structure
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          root = Path("TheKeyMachine/tools")
-          expected_python = {"__init__.py", "api.py", "controller.py", "widgets.py"}
-          errors = []
-          for package in sorted(path for path in root.iterdir() if path.is_dir() and not path.name.startswith("__")):
-              missing = sorted(name for name in expected_python if not (package / name).is_file())
-              init_file = package / "__init__.py"
-              if init_file.is_file() and "ToolObject" in init_file.read_text(encoding="utf-8") and not (package / "tooltip.json").is_file():
-                  missing.append("tooltip.json")
-              if missing:
-                  errors.append(f"{package}: missing {', '.join(missing)}")
-          if errors:
-              raise SystemExit("Invalid assembled release:\n- " + "\n- ".join(errors))
-          PY
-          python3 .github/native_plugins/validate_matrix.py .
+          cp -R /tmp/tkm-builds/TheKeyMachine/. TheKeyMachine/
       - name: Commit generated builds to main
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/plugins')
         run: |
-          cp -R builds-package /tmp/tkm-builds
-          git restore --source=HEAD --staged --worktree \
-            TheKeyMachine/tools/depth_mover/__builds__ \
-            TheKeyMachine/tools/micro_move/__builds__
-          git fetch origin main
-          git checkout -B generated-builds origin/main
-          rm -rf \
-            TheKeyMachine/tools/depth_mover/__builds__ \
-            TheKeyMachine/tools/micro_move/__builds__
-          cp -R /tmp/tkm-builds/TheKeyMachine/. TheKeyMachine/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A \
@@ -242,9 +177,7 @@ jobs:
             'TheKeyMachine_Drag&Drop_installer.py' \
             README.md \
             how_to_install.txt \
-            license_gpl-3.0.txt \
-            -x '*/__pycache__/*' '*.pyc' '*.pyo' \
-               'TheKeyMachine/tools/micro_move/_native/*'
+            license_gpl-3.0.txt
       - uses: actions/upload-artifact@v7
         with:
           name: TheKeyMachine-complete-release

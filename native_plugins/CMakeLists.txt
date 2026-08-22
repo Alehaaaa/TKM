@@ -104,7 +104,7 @@ function(tkm_add_maya_plugin target tool output_name source)
             "${CMAKE_CURRENT_BINARY_DIR}/build-id.txt" "${_output_directory}/build-id.txt")
 endfunction()
 
-get_filename_component(TKM_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+get_filename_component(TKM_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
 tkm_add_maya_plugin(
     tkmDepthMoverNative
