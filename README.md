@@ -10,13 +10,16 @@ Pages:
 - `changelog.html`
 - `help.html`
 - `about.html`
+- `site.js`
+- `releases.json`
 
 Assets:
 
 - `images/web_logo_230.png`
 - `images/favicon.png`
-- `images/youtube.png`
-- `images/instagram.png`
-- `images/discord.png`
+- `images/github.svg`
+- `images/youtube.svg`
+- `images/instagram.svg`
+- `images/discord.svg`
 
-The homepage links to the latest GitHub release. The changelog links each version title directly to that release zip.
+The homepage and changelog use `releases.json` for current release data, with static HTML content kept as a fallback.
