@@ -90,6 +90,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self._dock_refresh_timer.setSingleShot(True)
         self._dock_refresh_timer.timeout.connect(self._refresh_dock_ui)
         self._dock_widget = None
+        self._pending_restore_timers = []
 
         # Start the manager while this widget is still unmarked so its orphan
         # sweep only removes leftovers from earlier sessions.
@@ -154,12 +155,19 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if self._shutting_down:
             return
         self._shutting_down = True
+        self._clear_workspace_visible_change()
         try:
             self._graph_toolbar_sync_timer.stop()
             self._height_timer.stop()
             self._dock_refresh_timer.stop()
+            for timer in list(self._pending_restore_timers):
+                if timer and QtCompat.isValid(timer):
+                    timer.stop()
+                    timer.deleteLater()
+            self._pending_restore_timers = []
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
+        self._disconnect_toolbar_signals()
 
     def _is_active(self):
         return not self._shutting_down and QtCompat.isValid(self)
@@ -208,6 +216,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             self.show()
 
         self._bind_dock_events()
+        self._bind_workspace_visible_change()
         self._queue_dock_refresh()
         self._height_timer.start(500)
         return True
@@ -225,12 +234,210 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         dock_widget = self.parentWidget()
         if dock_widget is None or dock_widget is self._dock_widget:
             return
+        self._disconnect_dock_widget_signals()
         self._dock_widget = dock_widget
 
         for signal_name in ("visibilityChanged", "topLevelChanged"):
             signal = getattr(dock_widget, signal_name, None)
             if signal is not None:
                 signal.connect(self._queue_dock_refresh)
+
+    def _bind_workspace_visible_change(self):
+        try:
+            if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True):
+                cmds.workspaceControl(
+                    WORKSPACE_CONTROL_NAME,
+                    edit=True,
+                    visibleChangeCommand=self.visible_change_command,
+                )
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+
+    def _clear_workspace_visible_change(self):
+        try:
+            if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True):
+                cmds.workspaceControl(
+                    WORKSPACE_CONTROL_NAME,
+                    edit=True,
+                    visibleChangeCommand="",
+                )
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+
+    def _disconnect_toolbar_signals(self):
+        self._disconnect_dock_widget_signals()
+        runtime_manager = getattr(self, "_runtime_manager", None)
+        if runtime_manager is not None:
+            for signal_name, handler in (
+                ("scene_opened", self._on_scene_opened),
+                ("scene_new", self._on_scene_opened),
+                ("graph_editor_opened", self._on_graph_editor_opened),
+            ):
+                signal = getattr(runtime_manager, signal_name, None)
+                if signal is not None:
+                    try:
+                        signal.disconnect(handler)
+                    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                        pass
+        toolbar_widget = getattr(self, "main_toolbar_widget", None)
+        if toolbar_widget is not None:
+            signal = getattr(toolbar_widget, "heightChanged", None)
+            if signal is not None:
+                try:
+                    signal.disconnect(self._on_toolbar_content_height_changed)
+                except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                    pass
+
+    def _disconnect_dock_widget_signals(self):
+        dock_widget = getattr(self, "_dock_widget", None)
+        if dock_widget is not None and QtCompat.isValid(dock_widget):
+            for signal_name in ("visibilityChanged", "topLevelChanged"):
+                signal = getattr(dock_widget, signal_name, None)
+                if signal is not None:
+                    try:
+                        signal.disconnect(self._queue_dock_refresh)
+                    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                        pass
+        self._dock_widget = None
+
+    def _single_shot(self, delay_ms, callback):
+        if not self._is_active() or not callable(callback):
+            return None
+        timer = QtCore.QTimer(self)
+        timer.setSingleShot(True)
+        self._pending_restore_timers.append(timer)
+
+        def _run_callback():
+            if timer in self._pending_restore_timers:
+                self._pending_restore_timers.remove(timer)
+            try:
+                if self._is_active():
+                    callback()
+            finally:
+                try:
+                    timer.deleteLater()
+                except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                    pass
+
+        timer.timeout.connect(_run_callback)
+        timer.start(int(delay_ms))
+        return timer
+
+    def visible_change_command(self, *_args):
+        if not self._is_active() or not self.isDockable():
+            return
+
+        try:
+            is_visible = cmds.workspaceControl(
+                WORKSPACE_CONTROL_NAME, query=True, visible=True
+            )
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return
+
+        if not is_visible:
+            self._delete_tabbar_painter()
+            return
+
+        if self.isFloating():
+            if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
+                self.tabbar_painter.hide()
+            self._height_timer.start(0)
+            return
+
+        try:
+            is_collapsed = cmds.workspaceControl(
+                WORKSPACE_CONTROL_NAME, query=True, collapse=True
+            )
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            is_collapsed = False
+
+        if is_collapsed:
+            anchor_snapshot = self._snapshot_anchor_layout()
+
+            def _restore_workspace_tab():
+                if not self._is_active():
+                    return
+                try:
+                    if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True):
+                        cmds.workspaceControl(
+                            WORKSPACE_CONTROL_NAME,
+                            edit=True,
+                            collapse=False,
+                            tabPosition=("west", 0),
+                        )
+                except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                    return
+                self._queue_dock_refresh()
+                self._reapply_anchor_layout(anchor_snapshot)
+                self._single_shot(0, lambda: self._reapply_anchor_layout(anchor_snapshot))
+                self._single_shot(100, lambda: self._reapply_anchor_layout(anchor_snapshot))
+
+            self._single_shot(100, _restore_workspace_tab)
+
+        self._queue_dock_refresh()
+
+    def _snapshot_anchor_layout(self):
+        target_widget = None
+        try:
+            target_name = self._dock_target_name(self.docking_position[0])
+            target_pointer = mui.MQtUtil.findControl(target_name)
+            if target_pointer:
+                target_widget = wutil.get_maya_qt(target_pointer, QtWidgets.QWidget)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            target_widget = None
+
+        widgets = []
+        splitters = []
+        seen = set()
+        widget = target_widget
+        if widget is not None and QtCompat.isValid(widget):
+            widgets.append(
+                (
+                    widget,
+                    widget.height(),
+                    widget.minimumHeight(),
+                    widget.maximumHeight(),
+                )
+            )
+        while widget is not None and QtCompat.isValid(widget):
+            ident = id(widget)
+            if ident in seen:
+                break
+            seen.add(ident)
+            parent = widget.parentWidget()
+            if (
+                parent is not None
+                and QtCompat.isValid(parent)
+                and isinstance(parent, QtWidgets.QSplitter)
+                and parent.orientation() == QtCore.Qt.Vertical
+            ):
+                splitters.append((parent, list(parent.sizes())))
+            widget = parent
+
+        return {"widgets": widgets, "splitters": splitters}
+
+    @staticmethod
+    def _reapply_anchor_layout(snapshot):
+        if not snapshot:
+            return
+        for widget, height, minimum, maximum in snapshot.get("widgets", []):
+            if widget is None or not QtCompat.isValid(widget):
+                continue
+            try:
+                widget.setMinimumHeight(int(minimum))
+                widget.setMaximumHeight(int(maximum))
+                widget.resize(widget.width(), int(height))
+                widget.updateGeometry()
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
+        for splitter, sizes in snapshot.get("splitters", []):
+            if splitter is None or not QtCompat.isValid(splitter):
+                continue
+            try:
+                splitter.setSizes(list(sizes))
+                splitter.updateGeometry()
+            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+                pass
 
     def _queue_dock_refresh(self, *_args):
         if self._is_active():
@@ -435,6 +642,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             tabPosition=("west", 0),
             resizeWidth=900,
             resizeHeight=40,
+            visibleChangeCommand=self.visible_change_command,
         )
 
         self.docking_position = [layout, orient]
@@ -475,7 +683,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def reload(self, *args):
         import TheKeyMachine
 
-        return TheKeyMachine.reload()
+        TheKeyMachine.reload()
 
     def unload(self, *args):
         """
@@ -595,10 +803,10 @@ def show(cleanup_existing=True):
     existing = get_toolbar()
     if existing is not None:
         if existing.isVisible():
-            return existing
+            return
         try:
             if existing.showWindow():
-                return existing
+                return
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
         if _toolbar_instance is existing:
@@ -634,7 +842,6 @@ def show(cleanup_existing=True):
         except Exception:
             pass
         raise
-    return instance
 
 
 def unload(*_args):

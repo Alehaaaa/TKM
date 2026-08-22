@@ -16,7 +16,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.45"
+__version__ = "0.1.47"
 __stage__ = "beta"
 __build__ = "344"
 __codename__ = "Cortado"
@@ -49,7 +49,7 @@ def reload():
     toolbar = importlib.import_module("TheKeyMachine.ui.widgets.toolbar")
 
     # Cleanup has already removed the old control and callbacks.
-    return toolbar.show(cleanup_existing=False)
+    toolbar.show(cleanup_existing=False)
 
 
 def unload():
