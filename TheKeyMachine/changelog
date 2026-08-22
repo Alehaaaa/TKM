@@ -15,6 +15,10 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.46:
+  - polish: Updates show download progress with file size and time remaining
+  - bugfix: Update prompts show changelog details without errors
+
 0.1.45:
   - polish: Long tool operations keep progress and time remaining responsive while work continues
   - bugfix: Attribute Switcher can cancel multi-frame applies with Esc and no longer stalls in Normal or Super mode

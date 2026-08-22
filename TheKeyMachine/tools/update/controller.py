@@ -32,6 +32,7 @@ _REPO_ARCHIVE_REF = None
 DOWNLOAD_PROGRESS_UNITS = 1000
 DOWNLOAD_PROGRESS_UPDATE_MS = 80
 DOWNLOAD_ETA_MIN_BYTES = 262144
+DOWNLOAD_ETA_MIN_MS = 1000
 
 # SSL Context
 unverified_ssl_context = ssl.create_default_context()
@@ -67,25 +68,51 @@ def compare_versions(version1, version2):
     return 0
 
 
+def _format_download_size(byte_count):
+    try:
+        size = float(max(0, int(byte_count or 0)))
+    except Exception:
+        return ""
+
+    units = ("B", "KB", "MB", "GB")
+    unit_index = 0
+    while size >= 1024.0 and unit_index < len(units) - 1:
+        size /= 1024.0
+        unit_index += 1
+
+    if unit_index == 0:
+        return "{} {}".format(int(size), units[unit_index])
+    return "{:.1f} {}".format(size, units[unit_index])
+
+
 def _download_status(downloaded, total_size, elapsed_ms):
     label = "Downloading Update"
-    if (
-        total_size <= 0
-        or downloaded <= 0
-        or elapsed_ms <= 0
-        or downloaded < min(total_size, DOWNLOAD_ETA_MIN_BYTES)
-    ):
+    if downloaded <= 0:
         return label
 
-    remaining = max(0, total_size - downloaded)
-    if remaining <= 0:
-        return label
+    downloaded_label = _format_download_size(downloaded)
+    if total_size <= 0:
+        return "{}... {} downloaded".format(label, downloaded_label)
+
+    percent = int(min(100, max(0, round((downloaded / float(total_size)) * 100))))
+    total_label = _format_download_size(total_size)
+    status = "{}... {}% ({} / {})".format(
+        label, percent, downloaded_label, total_label
+    )
+
+    if elapsed_ms < DOWNLOAD_ETA_MIN_MS or downloaded < min(
+        total_size, DOWNLOAD_ETA_MIN_BYTES
+    ):
+        return status
 
     bytes_per_second = downloaded / max(0.001, elapsed_ms / 1000.0)
     if bytes_per_second <= 0:
-        return label
+        return status
+    remaining = max(0, total_size - downloaded)
+    if remaining <= 0:
+        return "{}... complete".format(label)
     eta = toolCommon.format_eta(remaining / bytes_per_second)
-    return "{}, about {} left".format(label, eta) if eta else label
+    return "{}, about {} left".format(status, eta) if eta else status
 
 
 def _reopen_after_install():
@@ -400,14 +427,14 @@ def _update_buttons(dialog_cls):
     ]
 
 
-def _update_template(latest_version, installed_version, changelog):
+def _update_template(latest_version, installed_version, raw_changelog):
     return (
         "<title>Update {} available\n(using {})</title>\n".format(
             latest_version, installed_version
         )
         + "<text>A new version of TheKeyMachine is ready to download and install.</text>\n"
-        + changelog.changelog_template(
-            changelog, latest_version, installed_version=installed_version
+        + changelog_service.changelog_template(
+            raw_changelog, latest_version, installed_version=installed_version
         )
         + "<separator/>"
         + '<spacing size="8"/>\n'
