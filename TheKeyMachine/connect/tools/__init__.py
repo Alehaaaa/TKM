@@ -1,1 +1,0 @@
-"""Custom tool package template."""

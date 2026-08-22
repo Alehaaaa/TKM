@@ -1,127 +1,17 @@
-<p align="center">
-  <img width="269px" align="center" src="./TheKeyMachine/data/icons/TheKeyMachine_logo_500.png" alt="TheKeyMachine Logo" />
-</p>
+# TheKeyMachine Native Plug-ins
 
-# TheKeyMachine, animation toolbar
+This branch is an independent build lane for TheKeyMachine's native Maya plug-ins.
+It intentionally contains only the files needed to compile and package native
+plug-in binaries:
 
-![Version](https://img.shields.io/badge/version-0.1.27-blue.svg)
+- `.github/workflows/build-plugins.yml`
+- `native_plugins/`
+- `TheKeyMachine/tools/depth_mover/plugin.cpp`
+- `TheKeyMachine/tools/micro_move/plugin.cpp`
 
-TheKeyMachine (TKM) is an open source Maya animation toolset built for faster key editing, cleaner selection workflows, smarter copy/paste utilities, floating tools, and timeline-aware operations.
+The full Python toolset, UI, icons, docs, release metadata, and generated
+`__builds__` binaries live on `main`. When this branch builds successfully, the
+workflow checks out `origin/main`, replaces only the generated native build
+folders there, and pushes those binaries back to `main`.
 
-It is designed for 3D animators working in Autodesk Maya and supports Maya 2022 and up on Windows, Linux, and macOS.
-
-The native Micro Move and Depth Mover viewport plug-ins are prebuilt for Maya
-2022–2027 on Windows, Linux, and macOS. One TKM release ZIP contains the full
-binary matrix plus the C++ sources; Maya automatically loads the matching
-version for the current platform and architecture. User machines never compile
-native code.
-
-TKM was developed by <b>Rodrigo Torres</b> (<a href="https://www.rodritorres.com">rodritorres.com</a>).
-
-This version is maintained by <b>Alehaaaa</b> (<a href="https://alehaaaa.github.io">alehaaaa.github.io</a>), currently working at <b>Framestore</b>.
-
-<a href="https://alehaaaa.github.io/TKM/">https://alehaaaa.github.io/TKM/</a>
-
-<img src="./TheKeyMachine/data/icons/toolbar_example.png" />
-
-## Main Tool Areas
-
-### Key Editing
-
-- `Nudge Left / Nudge Right` to move selected keys in time, including insert/remove inbetween variants
-- `Share Keys` to unify keyed times across selected objects
-- `reBlock` to rebuild selected animation onto a shared stepped timing structure
-- `Bake on Ones / Twos / Threes / Fours / Custom` for fixed or custom sampling
-- `Clear Selection` to remove key selection quickly
-- `Select Scene Anim` to collect animation curves from the scene
-- `Anim Curve Tools` for selection-aware clear/copy/cut/paste/crop/reverse/filter workflows
-- `Set Smart Key` for animated curves, selected channels, Graph Editor keys, and highlighted time ranges
-- `Smart Euler Filter`, redundant-key removal, and static-curve cleanup that respect the active selection context
-- `Snap Keys` grouped with the Anim Curve Tools
-- nudge, inbetween, bake, tangent, and background-runner actions use clearer toolbar icons
-
-### Tangents
-
-- tangent buttons support modifier-click variants for Maya default tangent and all-keys operations
-- stepped tangent menus focus on stepped-safe actions
-- slider mode menus stay connected to visible modes, including torn-off menus and live pin/default changes
-
-### Selection And Scene Tools
-
-- `Select Rig Controls`, including animated-controls-only variants
-- `Isolate` with bookmark support and down-one-level options
-- `Create Locator` tools for quick temporary setup work
-- `Align` for translation, rotation, scale, full transform, and range matching
-- `Tracer` for animation tracing, refresh, visibility, and style switching
-- `Default Values` on the current frame, selected keys, or ranges
-- `Clear Animation` in the active time context
-- `Selector` for a live selection list window
-- `Select Opposite` and `Mirror` for side-based workflows
-- `Select Hierarchy` for deeper rig selection
-
-### Copy / Paste
-
-- `Copy Pose / Paste Pose` for current-frame value transfer
-- `Copy Animation / Paste Animation` between matching controls
-- `Paste Insert` to place copied animation at the current time
-- `Paste Opposite` for mirrored transfers
-- `Paste To` for chosen target sets
-
-### Offset And Pivot
-
-- `Animation Offset` to protect the current frame while offsetting the surrounding range
-- `Temp Pivot` to create or reuse a temporary manipulation pivot
-- `Micro Move` for live, object-oriented precision translation and rotation with cursor acceleration
-- `Depth Mover` to push selected controls toward or away from the camera with drag-adjusted sensitivity
-
-### Linking And Space
-
-- `Link Objects` for relative links and optional auto-link behavior
-- `World Space` copy/paste for single-frame and range-based motion
-- `Attribute Switcher` for enum and attribute-driven switching workflows
-
-### Floating Windows
-
-- `Selection Sets`
-- `Orbit`
-- `Search`
-- `Graph Editor Toolbar`
-- `Isolate Bookmarks`
-
-## Timeline Feedback
-
-Many tools tint the Maya time slider while they run. Full-range tools tint the full slider holder, while range-based tools tint only the working range, making it easier to see the current operation at a glance.
-
-## Tooltips And Menus
-
-Tooltips use the active tool labels and icons, including torn-off menus and shelf buttons. Menu actions keep their full rich tooltip content while hovering, so videos, media, and multi-line help remain available from menu-driven tools.
-
-The `Custom Tools` menu loads manifest-defined commands, folders, Maya resource icons, toolbar pins, hotkeys, and shelf buttons.
-
-## Selection Sets
-
-Selection Sets support:
-
-- quick creation from the current selection
-- duplicate-content detection
-- inline rename
-- multiple color families
-- scene import/export and quick-file import/export
-- floating window and toolbar integration
-
-## Integrated Tool Modules
-
-Dedicated tools live under `TheKeyMachine/tools/` for:
-
-- `animation_offset`
-- `attribute_switcher`
-- `depth_mover`
-- `gimbal_fixer`
-- `graph_toolbar`
-- `isolate_bookmarks`
-- `micro_move`
-- `orbit`
-- `search`
-- `selection_sets`
-
-<img width="200px" src="./TheKeyMachine/data/icons/install_example.png" />
+Website: https://alehaaaa.github.io/TKM/

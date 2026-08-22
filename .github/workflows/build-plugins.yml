@@ -143,25 +143,22 @@ jobs:
           merge-multiple: true
       - name: Validate complete binary matrix
         run: python3 native_plugins/validate_matrix.py builds-package
+      - name: Preserve generated matrix
+        run: |
+          cp -R builds-package /tmp/tkm-builds
+      - name: Checkout main release source
+        run: |
+          git fetch origin main
+          git checkout -B release-source origin/main
       - name: Replace release builds with generated matrix
         run: |
           rm -rf \
             TheKeyMachine/tools/depth_mover/__builds__ \
             TheKeyMachine/tools/micro_move/__builds__
-          cp -R builds-package/TheKeyMachine/. TheKeyMachine/
+          cp -R /tmp/tkm-builds/TheKeyMachine/. TheKeyMachine/
       - name: Commit generated builds to main
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/plugins')
         run: |
-          cp -R builds-package /tmp/tkm-builds
-          git restore --source=HEAD --staged --worktree \
-            TheKeyMachine/tools/depth_mover/__builds__ \
-            TheKeyMachine/tools/micro_move/__builds__
-          git fetch origin main
-          git checkout -B generated-builds origin/main
-          rm -rf \
-            TheKeyMachine/tools/depth_mover/__builds__ \
-            TheKeyMachine/tools/micro_move/__builds__
-          cp -R /tmp/tkm-builds/TheKeyMachine/. TheKeyMachine/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A \
