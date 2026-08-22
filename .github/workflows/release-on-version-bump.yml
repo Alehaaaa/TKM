@@ -58,16 +58,7 @@ jobs:
           python3 scripts/release/render_release_notes.py "${args[@]}" > release_notes.md
 
       - name: Build release zip
-        run: |
-          mkdir -p dist
-          zip -rq "dist/TKM-${{ steps.sync.outputs.version }}.zip" \
-            TheKeyMachine \
-            "TheKeyMachine_Drag&Drop_installer.py" \
-            README.md \
-            how_to_install.txt \
-            license_gpl-3.0.txt \
-            -x '*/__pycache__/*' '*.pyc' '*.pyo' \
-               'TheKeyMachine/tools/micro_move/_native/*'
+        run: python3 scripts/release/build_release_zip.py "${{ steps.sync.outputs.version }}"
 
       - name: Publish release
         env:
