@@ -81,3 +81,34 @@ jobs:
             gh release create "$tag" --title "TheKeyMachine ${VERSION}" --notes-file release_notes.md
           fi
           gh release upload "$tag" "dist/TKM-${VERSION}.zip" --clobber
+
+      - name: Read GitHub release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/${{ github.repository }}/releases?per_page=100" > release_metadata.json
+
+      - name: Checkout website branch
+        uses: actions/checkout@v7
+        with:
+          ref: website
+          path: website-branch
+
+      - name: Generate website release data
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 scripts/release/update_website_release_data.py \
+            website-branch \
+            --release-metadata release_metadata.json \
+            --repository "$REPOSITORY"
+
+      - name: Commit website update
+        working-directory: website-branch
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add index.html changelog.html releases.json
+            git commit -m "Update website for TKM-${{ steps.sync.outputs.version }}"
+            git push origin HEAD:website
+          fi
