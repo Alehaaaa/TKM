@@ -1,0 +1,759 @@
+{
+  "latest": "0.1.44",
+  "generatedFrom": {
+    "versionFile": "TheKeyMachine/version",
+    "changelog": "TheKeyMachine/changelog"
+  },
+  "releases": [
+    {
+      "version": "0.1.44",
+      "tag": "TKM-0.1.44",
+      "publishedAt": "2026-08-22T14:17:23Z",
+      "publishedLabel": "August 22, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.44",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.44/TKM-0.1.44.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbars open and reload faster"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Reloading and unloading cleans up callbacks and leftover UI elements"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.43...TKM-0.1.44"
+    },
+    {
+      "version": "0.1.43",
+      "tag": "TKM-0.1.43",
+      "publishedAt": "2026-08-21T07:22:31Z",
+      "publishedLabel": "August 21, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.43",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.43/TKM-0.1.43.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Temporal Controls builds a driven curve control for each selected object, with System, Position/Orientation space, and color, then Bake or Revert"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Locators removed"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Manipulators, Micro Move, Tracer, Temp Pivot, Follow Cam, and Animation Layers trimmed from the Graph Editor toolbar"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.42...TKM-0.1.43"
+    },
+    {
+      "version": "0.1.42",
+      "tag": "TKM-0.1.42",
+      "publishedAt": "2026-08-15T10:04:31Z",
+      "publishedLabel": "August 15, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.42",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.42/TKM-0.1.42.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Global Curve reshapes selected or visible Graph Editor curves together with live time and tangent controls"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.41...TKM-0.1.42"
+    },
+    {
+      "version": "0.1.41",
+      "tag": "TKM-0.1.41",
+      "publishedAt": "2026-08-14T22:50:37Z",
+      "publishedLabel": "August 14, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.41",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.41/TKM-0.1.41.zip",
+      "entries": [
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Tooltips stay accurate and correctly localized across animation, selection, attribute, tangent, and tracer tools"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Create and manage multiple tracers"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Rotation-aware tracer offsets"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Auto Update is enabled by default with selectable performance presets"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.40...TKM-0.1.41"
+    },
+    {
+      "version": "0.1.40",
+      "tag": "TKM-0.1.40",
+      "publishedAt": "2026-08-14T21:46:14Z",
+      "publishedLabel": "August 14, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.40",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.40/TKM-0.1.40.zip",
+      "entries": [
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Toolbar alignment, pinning, and reloads stay responsive without clipped rows or menu errors"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.39...TKM-0.1.40"
+    },
+    {
+      "version": "0.1.39",
+      "tag": "TKM-0.1.39",
+      "publishedAt": "2026-08-14T21:22:28Z",
+      "publishedLabel": "August 14, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.39",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.39/TKM-0.1.39.zip",
+      "entries": [
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Copy and Paste Animation reliably recognizes the same control across full and short scene paths"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Smart Key and other layer-aware tools read animation layers without errors"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "The codebase was restructured for clearer tool ownership and easier future development"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.38...TKM-0.1.39"
+    },
+    {
+      "version": "0.1.38",
+      "tag": "TKM-0.1.38",
+      "publishedAt": "2026-08-11T22:35:19Z",
+      "publishedLabel": "August 11, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.38",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.38/TKM-0.1.38.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Search and Hotkeys open faster and keep menu options clear and in sync"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Attribute Switcher stays responsive on large multi-control changes"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Mirror and opposite pasting work reliably across full rigs, animation ranges, and parented controls"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Snapshot Rig safely handles posed rigs and detects mirror behavior more reliably"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Sliders now create keys on frames without existing keys"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Cycle Matcher can match tangents only or include key values"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.37...TKM-0.1.38"
+    },
+    {
+      "version": "0.1.37",
+      "tag": "TKM-0.1.37",
+      "publishedAt": "2026-08-10T07:31:26Z",
+      "publishedLabel": "August 10, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.37",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.37/TKM-0.1.37.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Tool progress shows smooth second-by-second time remaining without item counters"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Rig analysis resolves opposite controls across separate branches and safely skips malformed attributes"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Snapshot Rig saves default poses, opposite controls, and automatically tested mirror directions per rig"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Default, Opposite, and Mirror right-click menus expose their matching Snapshot actions"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.36...TKM-0.1.37"
+    },
+    {
+      "version": "0.1.36",
+      "tag": "TKM-0.1.36",
+      "publishedAt": "2026-08-09T16:40:41Z",
+      "publishedLabel": "August 9, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.36",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.36/TKM-0.1.36.zip",
+      "entries": [
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Attribute Switcher's Cancel and Esc reliably stop an in-progress switch in Normal and Super mode, and its popup selector no longer occasionally errors while dragging"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Cancelling Animation Recovery, World Space, or Copy and Paste Pose and Animation mid-operation now reverts cleanly instead of leaving a partial result"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.35...TKM-0.1.36"
+    },
+    {
+      "version": "0.1.35",
+      "tag": "TKM-0.1.35",
+      "publishedAt": "2026-08-05T22:16:46Z",
+      "publishedLabel": "August 5, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.35",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.35/TKM-0.1.35.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Tool progress is steadier, more responsive, and less intrusive"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Selection Sets and toolbar popups close reliably after losing focus"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Smart Key and Snap Keys run faster while respecting Channel Box channels, highlighted ranges, and selected animation layers"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "World Space frame pastes keep timeline feedback and cleanup reliable"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Anim Layer Weights displays live layer-weight curves on the timeline"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Anim Curve Tools share consistent targeting, concise feedback, and a tangent-aware key clipboard with channel remapping and relative pasting"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.34...TKM-0.1.35"
+    },
+    {
+      "version": "0.1.34",
+      "tag": "TKM-0.1.34",
+      "publishedAt": "2026-07-28T19:18:52Z",
+      "publishedLabel": "July 28, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.34",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.34/TKM-0.1.34.zip",
+      "entries": [
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Tooltips, shortcuts, and right-click action menus (including Bake, Share Keys, and Remove Redundant Keys) stay translated after switching languages"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Windows like About, Donate, Hotkeys, and Workspaces refresh immediately when you switch languages instead of needing a restart"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Added Catalan, Chinese, Japanese, Korean, and Arabic translations across every menu, dialog, and hotkey editor"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.33...TKM-0.1.34"
+    },
+    {
+      "version": "0.1.33",
+      "tag": "TKM-0.1.33",
+      "publishedAt": "2026-07-27T19:58:10Z",
+      "publishedLabel": "July 27, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.33",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.33/TKM-0.1.33.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Fixing startup time by optimizing processes and deduping logic"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Workspaces update correctly on toolbar right click menu"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Super mode to switch Rotation Orders almost instantly"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Early stages of implementing different language translations"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.32...TKM-0.1.33"
+    },
+    {
+      "version": "0.1.32",
+      "tag": "TKM-0.1.32",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.32",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.32/TKM-0.1.32.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Tool actions share consistent progress feedback with automatic time estimates"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Simplify and Bake sliders preserve the intended animation curve tendency"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Animation Recovery keeps resilient incremental checkpoints and alerts when an older scene file is opened"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Attribute Switcher can apply different options across multiple controls"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Anim Curve Tools adds refireable key and frame navigation with reliable channel-aware key pasting"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Copy Animation, Align, World Space and Relationship tools preserve the active animation-layer context"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.31...TKM-0.1.32"
+    },
+    {
+      "version": "0.1.31",
+      "tag": "TKM-0.1.31",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.31",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.31/TKM-0.1.31.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Attribute Switcher scrolls attributes lists within to be able to see them all!"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Smart Key handles exact subframes and mixed keyed or unkeyed selections"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Snap Keys merges multiple subframes per frame from object or range selections"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Fixed World Space toolbuttons, it bakes selected or visible ranges without removing outside keys"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Auto Hide Static Curves refreshes already-open Graph Editors reliably"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Align Objects uses the objecy keys and selects the target object at the end"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.30...TKM-0.1.31"
+    },
+    {
+      "version": "0.1.30",
+      "tag": "TKM-0.1.30",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.30",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.30/TKM-0.1.30.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Toolbar workspaces (Standard, Professional, Minimal) switch pinned tools from the right-click menu"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.29...TKM-0.1.30"
+    },
+    {
+      "version": "0.1.29",
+      "tag": "TKM-0.1.29",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.29",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.29/TKM-0.1.29.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Reordered files to standarize all tools under tools/"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Copy Relationship pastes selected or playback ranges only on existing relationship-object keys"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Copy and Paste Pose and Animation handle remapped targets and single-object pastes reliably"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Smart Key supports subframes"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Snap Keys merges near-integer keys correctly"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Each Animation Offset gesture undoes in one step"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.28...TKM-0.1.29"
+    },
+    {
+      "version": "0.1.28",
+      "tag": "TKM-0.1.28",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.28",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.28/TKM-0.1.28.zip",
+      "entries": [
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Micro Move and Depth Mover now ship together across supported Maya versions and platforms with Shift/Control precision; Micro Move also keeps full-color cursors and reliable middle-button object drags"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.27...TKM-0.1.28"
+    },
+    {
+      "version": "0.1.27",
+      "tag": "TKM-0.1.27",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.27",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.27/TKM-0.1.27.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Depth Mover pushes selected controls through camera depth with drag-adjusted sensitivity"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Micro Move uses translate and rotate manipulators with Maya tool switching, cursor acceleration and modifiers"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.26...TKM-0.1.27"
+    },
+    {
+      "version": "0.1.26",
+      "tag": "TKM-0.1.26",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.26",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.26/TKM-0.1.26.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Search finds and runs any TheKeyMachine tool"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.25...TKM-0.1.26"
+    },
+    {
+      "version": "0.1.25",
+      "tag": "TKM-0.1.25",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.25",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.25/TKM-0.1.25.zip",
+      "entries": [
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Animation curve tools now consistently respect selected Graph Editor keys, Channel Box channels and highlighted timeline ranges"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Smart Euler Filter unwraps only the active rotation keys while preserving the exact key selection"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Wave alternates positive and negative offsets per key with range-aware amplitude"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Tangent, alignment and snapping tools use the active animation context more consistently"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Blend to Buffer follows each curve's own buffered shape and rotates manual tangents only when necessary"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Static and redundant key cleanup stays scoped, and pin menus retain tool icons, hotkeys and shelf actions"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.24...TKM-0.1.25"
+    },
+    {
+      "version": "0.1.24",
+      "tag": "TKM-0.1.24",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.24",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.24/TKM-0.1.24.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Custom Tools supports folders, local icons, toolbar pinning and button-triggered refresh"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Auto Hide Static Animation Curves keeps the Graph Editor focused on animated channels"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Attribute Switcher and Orbit popups open beside their trigger on the correct screen"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Animation Offset and frame-based slider handles snap and tint accurately as the timeline changes"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar sections, Graph Editor placement, menus and in-view feedback are clearer and more consistent"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "About and Follow Cam work reliably, and disabled online or Bug Report features stay hidden"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.23...TKM-0.1.24"
+    },
+    {
+      "version": "0.1.23",
+      "tag": "TKM-0.1.23",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.23",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.23/TKM-0.1.23.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Frame-based sliders can pick and display independent timeline targets"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Buffer and Undo sliders blend animation curve shapes without moving keys"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Tangent sliders use contextual targets, mirrored blending and exact modes at full strength"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Time Offset preserves key timing while Stagger moves complete object animation"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Gap Stitcher, Noise, Wave, Infinity and World Space sliders produce more natural results"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Slider previews, generated keys, timeline picking and Undo now finish reliably"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.22...TKM-0.1.23"
+    },
+    {
+      "version": "0.1.22",
+      "tag": "TKM-0.1.22",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.22",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.22/TKM-0.1.22.zip",
+      "entries": [
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "TKM menu commands now live in the main TKM Menu section"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Global Tools now appears before Background Runners in the toolbar"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar maintenance actions carry clearer toolbox tooltips"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Hotkeys window shows the same tooltip text as the matching tools"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "TKM menu entries are available in the hotkeys list again"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Version metadata is synced across the package and installer"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.21...TKM-0.1.22"
+    },
+    {
+      "version": "0.1.21",
+      "tag": "TKM-0.1.21",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.21",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.21/TKM-0.1.21.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Welcome prompt can add the TheKeyMachine shelf button after install"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Toolbar command routing is cleaner and more reliable"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Tooltips show assigned hotkeys and cleaner header actions"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Smart Manipulators now sit after Tangents in the toolbar"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Hotkeys window uses the correct command tooltip details"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Paste Animation is faster on dense animation clips"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.20...TKM-0.1.21"
+    },
+    {
+      "version": "0.1.20",
+      "tag": "TKM-0.1.20",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.20",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.20/TKM-0.1.20.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Some more tools have refined icons"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Fixed sliders messing with rotations and not saving Undo Chunks"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Fixed Animation Offset setting keys on timeChange in heavy scenes"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.20"
+    }
+  ]
+}
