@@ -8,7 +8,7 @@ on:
       - "TheKeyMachine/tools/depth_mover/plugin.cpp"
       - "TheKeyMachine/tools/micro_move/plugin.cpp"
   push:
-    branches: [main, master, plugin_build]
+    branches: [main, master, plugins]
     tags: ["v*"]
     paths:
       - ".github/workflows/build-plugins.yml"
@@ -150,7 +150,7 @@ jobs:
             TheKeyMachine/tools/micro_move/__builds__
           cp -R builds-package/TheKeyMachine/. TheKeyMachine/
       - name: Commit generated builds to main
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/plugin_build')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/plugins')
         run: |
           cp -R builds-package /tmp/tkm-builds
           git restore --source=HEAD --staged --worktree \

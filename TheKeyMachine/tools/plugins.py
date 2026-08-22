@@ -139,7 +139,7 @@ def loaded_plugin(spec):
     return None
 
 
-def plugin_build_id(spec):
+def native_build_id(spec):
     if not spec.build_command:
         return None
     result = getattr(cmds, spec.build_command)()
@@ -155,7 +155,7 @@ def is_ready(spec):
         return False
     if spec.expected_build is not None:
         try:
-            return plugin_build_id(spec) == spec.expected_build
+            return native_build_id(spec) == spec.expected_build
         except (RuntimeError, AttributeError, TypeError):
             return False
     return True
@@ -217,7 +217,7 @@ def load(spec, force_reload=False):
                 )
             )
         if spec.expected_build is not None:
-            loaded_build = plugin_build_id(spec)
+            loaded_build = native_build_id(spec)
             if loaded_build != spec.expected_build:
                 raise RuntimeError(
                     "{} loaded stale native code: expected {}, Maya reported {}.".format(
