@@ -1,9 +1,8 @@
 name: Release on version bump
 
-# Deliberately lightweight: single ubuntu-latest job (cheapest runner, 1x minute
-# multiplier), no matrix, no setup-python/upload-artifact steps, and a tag prefix
-# ("TKM-") that never overlaps with the "v*" tags that trigger the heavier
-# build-plugins.yml native-plugin matrix.
+# Deliberately lightweight: single ubuntu-latest job, no matrix, no setup-python
+# step, and one release path. Native plug-ins are built by build-plugins.yml and
+# committed back to main before this workflow packages a version bump.
 
 on:
   push:
