@@ -8,7 +8,6 @@ on:
       - "TheKeyMachine/tools/*/plugin.cpp"
   push:
     branches: [plugins]
-    tags: ["v*"]
     paths:
       - ".github/workflows/build-plugins.yml"
       - "native_plugins/**"
@@ -170,37 +169,11 @@ jobs:
           git push origin HEAD:main
       - name: Assemble one release containing every target
         run: |
-          mkdir -p dist
           version="${GITHUB_REF_NAME//\//-}"
-          zip -r "dist/TheKeyMachine-${version}.zip" \
-            TheKeyMachine \
-            'TheKeyMachine_Drag&Drop_installer.py' \
-            README.md \
-            how_to_install.txt \
-            license_gpl-3.0.txt
+          python3 scripts/release/build_release_zip.py "$version"
       - uses: actions/upload-artifact@v7
         with:
           name: TheKeyMachine-complete-release
           path: dist/*.zip
           retention-days: 7
           if-no-files-found: error
-
-  release:
-    name: Publish tagged release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: package
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: TheKeyMachine-complete-release
-          path: dist
-      - name: Create or update GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
-          gh release upload "$GITHUB_REF_NAME" dist/*.zip --clobber
