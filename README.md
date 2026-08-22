@@ -12,7 +12,7 @@ TheKeyMachine (TKM) is a Maya toolbar for Animation. Change timing, posing, curv
 
 Supports Maya 2022+ on Windows, Linux, and macOS.
 
-[Website](https://www.thekeymachine.xyz) · [Documentation](https://thekeymachine.gitbook.io/base) · [Discord](https://discord.gg/G2J5yyjz)
+[Website](https://alehaaaa.github.io/TKM/) · [Documentation](https://thekeymachine.gitbook.io/base) · [Discord](https://discord.gg/G2J5yyjz)
 
 This independent fork is maintained by [Alehaaaa](https://alehaaaa.github.io). The original tool was created by [Rodrigo Torres](https://www.rodritorres.com). Issues and support here apply to this version.
 
