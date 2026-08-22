@@ -612,11 +612,7 @@ class TimelineTint(QtWidgets.QWidget):
                 self._parent_widget.removeEventFilter(self)
         except Exception:
             pass
-        try:
-            self.setParent(None)
-            self.deleteLater()
-        except RuntimeError:
-            pass
+        runtime.delete_widget(self)
 
     def eventFilter(self, watched, event):
         if watched is self._parent_widget and event.type() in (

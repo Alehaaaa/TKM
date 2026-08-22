@@ -49,6 +49,9 @@ def _load_state() -> Dict[str, Any]:
 
 
 def _save_state(state: Dict[str, Any]) -> None:
+    if not (state.get("om") or state.get("scriptjob")):
+        _clear_state()
+        return
     try:
         cmds.optionVar(sv=(_OPTIONVAR_NAME, json.dumps(state)))
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
@@ -61,6 +64,14 @@ def _clear_state() -> None:
             cmds.optionVar(remove=_OPTIONVAR_NAME)
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
+
+
+def has_persisted_callback_state() -> bool:
+    state = _load_state()
+    has_callbacks = bool(state.get("om") or state.get("scriptjob"))
+    if not has_callbacks:
+        _clear_state()
+    return has_callbacks
 
 
 def _scriptjob_exists(job_id: int) -> bool:
@@ -140,6 +151,14 @@ def cleanup_previous_runtime(current=None) -> None:
         pass
 
 
+def has_previous_runtime(current=None) -> bool:
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return False
+    previous = getattr(app, _APP_RUNTIME_ATTRIBUTE, None)
+    return previous is not None and previous is not current
+
+
 def _safe_process_events() -> None:
     app = QtWidgets.QApplication.instance()
     if app is None:
@@ -152,7 +171,8 @@ def _safe_process_events() -> None:
         pass
 
 
-def _safe_delete_widget(widget) -> None:
+def delete_widget(widget) -> None:
+    """Hide and schedule a widget for deletion without making it top-level."""
     if widget is None:
         return
     try:
@@ -160,13 +180,6 @@ def _safe_delete_widget(widget) -> None:
             return
     except Exception:
         pass
-    delete_tint = getattr(widget, "delete_tint", None)
-    if callable(delete_tint):
-        try:
-            delete_tint()
-            return
-        except Exception:
-            pass
     try:
         widget.blockSignals(True)
     except Exception:
@@ -183,10 +196,6 @@ def _safe_delete_widget(widget) -> None:
     except Exception:
         pass
     try:
-        widget.setParent(None)
-    except Exception:
-        pass
-    try:
         widget.close()
     except Exception:
         pass
@@ -194,6 +203,19 @@ def _safe_delete_widget(widget) -> None:
         widget.deleteLater()
     except Exception:
         pass
+
+
+def _safe_delete_widget(widget) -> None:
+    if widget is None:
+        return
+    delete_tint = getattr(widget, "delete_tint", None)
+    if callable(delete_tint):
+        try:
+            delete_tint()
+            return
+        except Exception:
+            pass
+    delete_widget(widget)
 
 
 def _is_tkm_cleanup_widget(widget) -> bool:
@@ -234,6 +256,11 @@ def cleanup_workspace_controls(process_events=True) -> None:
                     cmds.deleteUI(control_name)
             except Exception:
                 pass
+        try:
+            if cmds.workspaceControlState(control_name, exists=True):
+                cmds.workspaceControlState(control_name, remove=True)
+        except Exception:
+            pass
     if process_events:
         _safe_process_events()
 
@@ -251,11 +278,14 @@ def shutdown_tool_modules() -> None:
         ("TheKeyMachine.maya.runtime", "shutdown_all"),
     )
     for module_name, attr_name in module_cleanups:
+        module = sys.modules.get(module_name)
+        if module is None:
+            continue
+        cleanup = getattr(module, attr_name, None)
+        if not callable(cleanup):
+            continue
         try:
-            module = __import__(module_name, fromlist=[attr_name])
-            cleanup = getattr(module, attr_name, None)
-            if callable(cleanup):
-                cleanup()
+            cleanup()
         except Exception:
             pass
 
@@ -289,8 +319,6 @@ def cleanup_for_reload(delete_workspace=True, process_events=True) -> None:
     """Best-effort full cleanup before unloading, reloading, or replacing TKM files."""
     shutdown_tool_modules()
     shutdown_runtime_manager(cleanup_widgets=False)
-    cleanup_previous_runtime()
-    cleanup_orphaned_callbacks()
     cleanup_tkm_widgets(process_events=False)
     if delete_workspace:
         cleanup_workspace_controls(process_events=False)
@@ -406,6 +434,11 @@ class RuntimeManager(QtCore.QObject):
         self._event_filter_installed = False
         self._event_filter_watchers: Dict[str, Callable[..., Any]] = {}
         self._background_runner_controller = None
+        self._defer_callback_persistence = False
+
+        self._background_start_timer = QtCore.QTimer(self)
+        self._background_start_timer.setSingleShot(True)
+        self._background_start_timer.timeout.connect(self._start_background_runners)
 
     # ----------------------------
     # Lifecycle
@@ -422,17 +455,31 @@ class RuntimeManager(QtCore.QObject):
         if app is not None:
             setattr(app, _APP_RUNTIME_ATTRIBUTE, self)
 
-        # Built-in, long-lived callbacks while the tool is loaded.
-        self._install_scene_callbacks()
-        self._install_selection_callback()
-        self._install_time_changed_callback()
-        self._install_undo_callback()
-        self._install_playback_state_callback()
-        self._refresh_event_filter_state()
-        self._start_background_runners()
+        self._defer_callback_persistence = True
+        try:
+            # Built-in, long-lived callbacks while the tool is loaded.
+            self._install_scene_callbacks()
+            self._install_selection_callback()
+            self._install_time_changed_callback()
+            self._install_undo_callback()
+            self._install_playback_state_callback()
+            self._refresh_event_filter_state()
+        except Exception:
+            self._defer_callback_persistence = False
+            self._remove_event_filter()
+            self._remove_all()
+            _clear_state()
+            if app is not None and getattr(app, _APP_RUNTIME_ATTRIBUTE, None) is self:
+                try:
+                    delattr(app, _APP_RUNTIME_ATTRIBUTE)
+                except Exception:
+                    pass
+            raise
 
+        self._defer_callback_persistence = False
         self._started = True
         self._persist_state()
+        self._background_start_timer.start(0)
 
     def shutdown(self, cleanup_widgets: bool = True) -> None:
         self._shutdown_background_runners()
@@ -977,33 +1024,41 @@ class RuntimeManager(QtCore.QObject):
             except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
 
-        cb_open = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterOpen, _after_open)
-        cb_new = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterNew, _after_new)
-        cb_save = om.MSceneMessage.addCallback(om.MSceneMessage.kAfterSave, _after_save)
-        cb_before_save = om.MSceneMessage.addCallback(om.MSceneMessage.kBeforeSave, _before_save)
-        self._track_om("scene_opened", int(cb_open))
-        self._track_om("scene_new", int(cb_new))
-        self._track_om("scene_saved", int(cb_save))
-        self._track_om("scene_before_saved", int(cb_before_save))
+        callbacks = (
+            ("scene_opened", om.MSceneMessage.kAfterOpen, _after_open),
+            ("scene_new", om.MSceneMessage.kAfterNew, _after_new),
+            ("scene_saved", om.MSceneMessage.kAfterSave, _after_save),
+            ("scene_before_saved", om.MSceneMessage.kBeforeSave, _before_save),
+        )
+        for key, event, handler in callbacks:
+            cb_id = om.MSceneMessage.addCallback(event, handler)
+            self._track_om(key, int(cb_id))
 
     def _start_background_runners(self) -> None:
+        if not self._started:
+            return
         try:
             self.background_runners().start_enabled()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        except Exception:
             pass
 
     def _shutdown_background_runners(self) -> None:
         try:
-            if self._background_runner_controller is not None:
+            self._background_start_timer.stop()
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+        background_runners = sys.modules.get("TheKeyMachine.tools.background_runners.service")
+        shutdown_controller = getattr(background_runners, "shutdown_controller", None)
+        if callable(shutdown_controller):
+            try:
+                shutdown_controller()
+            except Exception:
+                pass
+        elif self._background_runner_controller is not None:
+            try:
                 self._background_runner_controller.shutdown()
-        except Exception:
-            pass
-        try:
-            from TheKeyMachine.tools.background_runners import service as background_runners
-
-            background_runners.shutdown_controller()
-        except Exception:
-            pass
+            except Exception:
+                pass
         self._background_runner_controller = None
 
     def _install_event_filter(self) -> None:
@@ -1146,11 +1201,8 @@ class RuntimeManager(QtCore.QObject):
             return
 
         self._graph_editor_visible = visible
-        try:
-            if visible:
-                QtCore.QTimer.singleShot(0, self._emit_graph_editor_opened)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
+        if visible:
+            self._emit_graph_editor_opened()
 
     def _emit_graph_editor_opened(self) -> None:
         try:
@@ -1232,6 +1284,8 @@ class RuntimeManager(QtCore.QObject):
         self._persist_state()
 
     def _persist_state(self) -> None:
+        if self._defer_callback_persistence:
+            return
         state = {
             "om": sorted({cb_id for ids in self._om_callbacks.values() for cb_id in ids}),
             "scriptjob": sorted({job_id for ids in self._scriptjobs.values() for job_id in ids}),
@@ -1296,6 +1350,13 @@ def get_runtime_manager(start: bool = True) -> RuntimeManager:
         _MANAGER = RuntimeManager()
     if start:
         _MANAGER.start()
+    return _MANAGER
+
+
+def get_existing_runtime_manager() -> Optional[RuntimeManager]:
+    global _MANAGER
+    if _MANAGER is not None and not QtCompat.isValid(_MANAGER):
+        _MANAGER = None
     return _MANAGER
 
 

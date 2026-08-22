@@ -85,9 +85,12 @@ reload_toolbar._tkm_non_tool_action = True
 
 def unload_toolbar(*_args):
     from TheKeyMachine.ui.widgets import toolbar
+    from TheKeyMachine.core import runtime
 
     toolbar_instance = toolbar.get_toolbar()
-    return toolbar_instance.unload() if toolbar_instance else None
+    if toolbar_instance:
+        return toolbar_instance.unload()
+    return runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
 
 
 def uninstall(*_args):

@@ -15,6 +15,10 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.44:
+  - polish: Toolbars open and reload faster
+  - bugfix: Reloading and unloading cleans up callbacks and leftover UI elements
+
 0.1.43:
   - new: Temporal Controls builds a driven curve control for each selected object, with System, Position/Orientation space, and color, then Bake or Revert
   - changed: Locators removed

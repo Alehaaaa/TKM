@@ -24,10 +24,6 @@ from maya.app.general.mayaMixin import MayaQWidgetDockableMixin  # type: ignore
 from TheKeyMachine.core.Qt import QtCompat, QtCore, QtWidgets  # type: ignore
 
 
-from functools import partial
-
-from importlib import import_module, reload
-
 from TheKeyMachine.core import settings  # type: ignore
 import TheKeyMachine.tools.bug_report.controller as report  # type: ignore
 from TheKeyMachine.ui.widgets import toolbar_widgets  # type: ignore
@@ -66,11 +62,34 @@ DOCKING_AREAS = {
     "RangeSlider": "Range Slider",
     "Shelf": "Shelf",
 }
+DEFAULT_DOCKING_POSITION = ("TimeSlider", "top")
+
+
+def _normalize_docking_position(value):
+    try:
+        layout, area = value
+    except (TypeError, ValueError):
+        return list(DEFAULT_DOCKING_POSITION)
+    if layout not in DOCKING_AREAS or area not in DOCKING_ORIENTATIONS:
+        return list(DEFAULT_DOCKING_POSITION)
+    return [layout, area]
 
 
 class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+
+        self._shutting_down = False
+        self._graph_toolbar_sync_timer = QtCore.QTimer(self)
+        self._graph_toolbar_sync_timer.setSingleShot(True)
+        self._graph_toolbar_sync_timer.timeout.connect(self._sync_graph_toolbar)
+        self._height_timer = QtCore.QTimer(self)
+        self._height_timer.setSingleShot(True)
+        self._height_timer.timeout.connect(self.update_height)
+        self._dock_refresh_timer = QtCore.QTimer(self)
+        self._dock_refresh_timer.setSingleShot(True)
+        self._dock_refresh_timer.timeout.connect(self._refresh_dock_ui)
+        self._dock_widget = None
 
         # Start the manager while this widget is still unmarked so its orphan
         # sweep only removes leftovers from earlier sessions.
@@ -89,13 +108,13 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self._runtime_manager.graph_editor_opened.connect(self._on_graph_editor_opened)
 
         self.tabbar_painter = None
-        self._height_update_pending = False
-        self.current_layout = cmds.workspaceLayoutManager(q=True, current=True)
 
         # Initial state variables from settings
         self.orbit_button_widget = None
 
-        self.docking_position = settings.get_setting("docking_position", ["TimeSlider", "top"])
+        self.docking_position = _normalize_docking_position(
+            settings.get_setting("docking_position", DEFAULT_DOCKING_POSITION)
+        )
         self.docking_orients = dict(DOCKING_ORIENTATIONS)
         self.docking_layouts = dict(DOCKING_AREAS)
 
@@ -105,7 +124,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.buildUI()
 
         # Reconcile Graph Editor state at startup; ongoing tracking uses the event filter.
-        QtCore.QTimer.singleShot(0, self._sync_graph_editor_on_startup)
+        self._schedule_graph_toolbar_sync()
 
     def closeEvent(self, event):
         """
@@ -113,6 +132,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         Stops all background threads and performs necessary cleanup.
         """
         global _toolbar_instance
+        self._begin_shutdown()
         owns_runtime = _toolbar_instance is self
         if owns_runtime:
             _toolbar_instance = None
@@ -127,131 +147,104 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
     def _delete_tabbar_painter(self):
         if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
-            try:
-                self.tabbar_painter.setParent(None)
-                self.tabbar_painter.deleteLater()
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
+            runtime.delete_widget(self.tabbar_painter)
         self.tabbar_painter = None
 
+    def _begin_shutdown(self):
+        if self._shutting_down:
+            return
+        self._shutting_down = True
+        try:
+            self._graph_toolbar_sync_timer.stop()
+            self._height_timer.stop()
+            self._dock_refresh_timer.stop()
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+
+    def _is_active(self):
+        return not self._shutting_down and QtCompat.isValid(self)
+
     def _on_scene_opened(self, *_args):
-        if not QtCompat.isValid(self):
+        if not self._is_active():
             return
         isolateApi.update_isolate_popup_menu()
 
     def _on_graph_editor_opened(self, *_args):
-        if not QtCompat.isValid(self):
+        if not self._is_active():
             return
-        if not settings.get_setting("graph_toolbar_enabled", True):
-            return
-        # ensure() reuses an already-valid toolbar instead of tearing it down
-        # and rebuilding every section from scratch -- this and
-        # _sync_graph_editor_on_startup() can both fire for the same
-        # already-open Graph Editor during the same startup window.
-        QtCore.QTimer.singleShot(0, graph_toolbar.ensure)
+        self._schedule_graph_toolbar_sync()
 
-    def _sync_graph_editor_on_startup(self):
-        if not QtCompat.isValid(self):
+    def _schedule_graph_toolbar_sync(self):
+        if not self._is_active() or self._graph_toolbar_sync_timer.isActive():
+            return
+        self._graph_toolbar_sync_timer.start(0)
+
+    def _sync_graph_toolbar(self):
+        if not self._is_active():
             return
         if not settings.get_setting("graph_toolbar_enabled", True):
             return
 
         graph_vis = cmds.getPanel(vis=True) or []
         if "graphEditor1" in graph_vis:
-            QtCore.QTimer.singleShot(0, graph_toolbar.ensure)
+            graph_toolbar.ensure()
 
     def showWindow(self):
-        # Build up kwargs for the visibleChangeCommand
-        visible_change_kwargs = {
-            "visibleChangeCommand": self.visible_change_command,
-        }
-
-        # Show the window first to ensure parenting is established
-        self.show(dockable=True, retain=False, **visible_change_kwargs)
-
-        kwargs = {
-            "e": True,
-            "visibleChangeCommand": self.visible_change_command,
-        }
-
-        if self.isFloating():
-            kwargs["tp"] = ["west", 0]
-            kwargs["rsw"] = 900
-            kwargs["rsh"] = 40
-
-        if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, exists=True):
-            try:
-                layout, orient = self.docking_position
-                if wutil.check_visible_layout(layout):
-                    dock_to = self.get_dock_to_control_name(layout)
-                    cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, dtc=(dock_to, orient))
-
-                cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, tabPosition=["west", 0])
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
-
-            # Update the workspace control with our kwargs (like visibleChangeCommand)
-            cmds.workspaceControl(WORKSPACE_CONTROL_NAME, **kwargs)
-
-        # Force initial resize
-        if not self.ensure_shelf_painter():
-            cmds.evalDeferred(self.ensure_shelf_painter, lowestPriority=True)
-        QtCore.QTimer.singleShot(500, self.update_height)
-
-    def visible_change_command(self, *args):
-        if not QtCompat.isValid(self):
-            return
+        if not self._is_active():
+            return False
 
         if not self.isDockable():
+            self._parent_to_dock_target()
+            _layout, area = self.docking_position
+            self.show(
+                dockable=True,
+                floating=False,
+                area=area,
+                retain=False,
+            )
+            if not self.isDockable():
+                raise RuntimeError("Maya did not create the toolbar workspace control")
+        else:
+            self.show()
+
+        self._bind_dock_events()
+        self._queue_dock_refresh()
+        self._height_timer.start(500)
+        return True
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._is_active():
+            self._height_timer.start(0)
+
+    def hideEvent(self, event):
+        self._delete_tabbar_painter()
+        super().hideEvent(event)
+
+    def _bind_dock_events(self):
+        dock_widget = self.parentWidget()
+        if dock_widget is None or dock_widget is self._dock_widget:
             return
-        if not cmds.workspaceControl(
-            WORKSPACE_CONTROL_NAME, query=True, visible=True
-        ):
+        self._dock_widget = dock_widget
+
+        for signal_name in ("visibilityChanged", "topLevelChanged"):
+            signal = getattr(dock_widget, signal_name, None)
+            if signal is not None:
+                signal.connect(self._queue_dock_refresh)
+
+    def _queue_dock_refresh(self, *_args):
+        if self._is_active():
+            self._dock_refresh_timer.start(0)
+
+    def _refresh_dock_ui(self):
+        if not self._is_active() or not self.isVisible() or self.isFloating():
             self._delete_tabbar_painter()
             return
-        if self.current_layout != cmds.workspaceLayoutManager(q=1, current=True):
-            self.current_layout = cmds.workspaceLayoutManager(q=1, current=True)
-            if not self.isVisible():
-                if QtCompat.isValid(self):
-                    cmds.evalDeferred(show, lowestPriority=True)
-
-                if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
-                    self.tabbar_painter.show()
-                else:
-                    cmds.evalDeferred(
-                        self.ensure_shelf_painter, lowestPriority=True
-                    )
-                return
-
-        if not self.isFloating():
-            if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, q=True, collapse=True):
-                timer = QtCore.QTimer(self)
-                timer.setSingleShot(True)
-
-                timer.timeout.connect(
-                    partial(
-                        cmds.workspaceControl,
-                        WORKSPACE_CONTROL_NAME,
-                        e=True,
-                        collapse=False,
-                        tp=["west", 0],
-                    )
-                )
-                timer.start(100)
-            if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
-                self.tabbar_painter.show()
-            else:
-                cmds.evalDeferred(
-                    self.ensure_shelf_painter, lowestPriority=True
-                )
-        else:
-            if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
-                self.tabbar_painter.hide()
-
-        self.update_height()
+        self.ensure_shelf_painter()
+        self._height_timer.start(0)
 
     def ensure_shelf_painter(self):
-        if not QtCompat.isValid(self):
+        if not self._is_active():
             return False
 
         if self.tabbar_painter and QtCompat.isValid(self.tabbar_painter):
@@ -262,31 +255,36 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         qctrl = mui.MQtUtil.findControl(WORKSPACE_CONTROL_NAME)
         if not qctrl:
             return False
-        control = wutil.get_maya_qt(qctrl)
+        control = wutil.get_maya_qt(qctrl, QtWidgets.QWidget)
         if control is None or not QtCompat.isValid(control):
             return False
-        control_parent = control.parent()
-        tab_handle = control_parent.parent() if control_parent else None
-        if tab_handle is None or not QtCompat.isValid(tab_handle):
+
+        try:
+            tab_handle = control.parentWidget()
+            while tab_handle is not None and not isinstance(tab_handle, QtWidgets.QTabWidget):
+                tab_handle = tab_handle.parentWidget()
+            if tab_handle is None or not QtCompat.isValid(tab_handle):
+                return False
+
+            control.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+            if tab_handle.tabPosition() != QtWidgets.QTabWidget.West:
+                tab_handle.setTabPosition(QtWidgets.QTabWidget.West)
+                self._queue_dock_refresh()
+                return False
+            tab_bar = tab_handle.tabBar()
+            if self.isFloating():
+                tab_bar.setVisible(False)
+                return False
+
+            tab_bar.setVisible(True)
+            tab_bar.setFixedHeight(wutil.DPI(1000))
+            self.tabbar_painter = cw.QFlatTabBarPainter(tab_bar, tab_handle)
+            return True
+        except RuntimeError:
             return False
-
-        control.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-
-        tab_bar = tab_handle.tabBar()
-        if self.isFloating():
-            tab_bar.setVisible(False)
-            return False
-
-        # Temporary tab-bar experiment: paint the shelf treatment directly on
-        # Maya's tab bar instead of creating the full-height shelf overlay.
-        tab_bar.setVisible(True)
-        tab_bar.setFixedHeight(wutil.DPI(1000))
-
-        self.tabbar_painter = cw.QFlatTabBarPainter(tab_bar, tab_handle)
-        return True
 
     def update_height(self):
-        if not QtCompat.isValid(self):
+        if not self._is_active():
             return
         tkm_widget = mui.MQtUtil.findControl(WORKSPACE_CONTROL_NAME)
         if not tkm_widget:
@@ -383,54 +381,67 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             parent = parent.parentWidget()
 
     def _on_toolbar_content_height_changed(self, _height):
-        if self._height_update_pending:
-            return
-        self._height_update_pending = True
-
-        def _apply_height():
-            self._height_update_pending = False
-            if QtCompat.isValid(self):
-                self.update_height()
-
-        QtCore.QTimer.singleShot(0, _apply_height)
+        if self._is_active():
+            self._height_timer.start(0)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         # Trigger height update when internal width changes (wrapping happens)
         self.update_height()
 
-    def get_dock_to_control_name(self, layout):
-        if layout == "TimeSlider":
-            return mel.eval('getUIComponentToolBar("Time Slider", false)')
-        elif layout == "RangeSlider":
-            return mel.eval('getUIComponentToolBar("Range Slider", false)')
-        elif layout == "Shelf":
-            return mel.eval('getUIComponentToolBar("Shelf", false)')
+    @staticmethod
+    def _dock_target_name(layout):
+        component_names = {
+            "TimeSlider": "Time Slider",
+            "RangeSlider": "Range Slider",
+            "Shelf": "Shelf",
+        }
+        component = component_names.get(layout)
+        if component:
+            return mel.eval('getUIComponentToolBar("{}", false)'.format(component))
         return layout
+
+    def _parent_to_dock_target(self):
+        target_name = self._dock_target_name(self.docking_position[0])
+        target_pointer = mui.MQtUtil.findControl(target_name)
+        if not target_pointer:
+            raise RuntimeError("Maya docking target is unavailable: {}".format(target_name))
+        target = wutil.get_maya_qt(target_pointer, QtWidgets.QWidget)
+        if target is None or not QtCompat.isValid(target):
+            raise RuntimeError("Maya docking target is invalid: {}".format(target_name))
+
+        dock_parent = next(
+            (child for child in target.findChildren(QtWidgets.QWidget) if not child.objectName()),
+            None,
+        )
+        if dock_parent is None:
+            raise RuntimeError("Maya docking target has no content: {}".format(target_name))
+        self.setParent(dock_parent)
 
     def dock_to_ui(self, layout=None, orient=None):
         current_layout, current_orient = self.docking_position
         layout = layout or current_layout
         orient = orient or current_orient
+        if layout not in DOCKING_AREAS or orient not in DOCKING_ORIENTATIONS:
+            return False
+        if not wutil.check_visible_layout(layout):
+            return False
 
-        # Build up kwargs for the workspaceControl command
-        kwargs = {
-            "e": True,
-            "visibleChangeCommand": self.visible_change_command,
-            "tp": ["west", 0],
-            "rsw": 900,
-            "rsh": 40,
-        }
+        self._delete_tabbar_painter()
+        cmds.workspaceControl(
+            WORKSPACE_CONTROL_NAME,
+            edit=True,
+            dockToControl=(self._dock_target_name(layout), orient),
+            tabPosition=("west", 0),
+            resizeWidth=900,
+            resizeHeight=40,
+        )
 
-        if wutil.check_visible_layout(layout):
-            dock_to = self.get_dock_to_control_name(layout)
-            kwargs["dockToControl"] = [dock_to, orient]
-            self.docking_position = [layout, orient]
-            settings.set_setting("docking_position", self.docking_position)
-            self._sync_dock_action_groups()
-
-        # Make the workspaceControl call just once
-        cmds.workspaceControl(WORKSPACE_CONTROL_NAME, **kwargs)
+        self.docking_position = [layout, orient]
+        settings.set_setting("docking_position", self.docking_position)
+        self._sync_dock_action_groups()
+        self._queue_dock_refresh()
+        return True
 
     def _sync_dock_action_groups(self):
         """Keep toolbar-owned groups aligned with docking from any menu."""
@@ -462,35 +473,16 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.showWindow()
 
     def reload(self, *args):
-        global _toolbar_instance
+        import TheKeyMachine
 
-        # A delayed closeEvent from this widget must not clear or shut down the
-        # replacement toolbar after the module dictionary has been reloaded.
-        if _toolbar_instance is self:
-            _toolbar_instance = None
-
-        try:
-            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-
-        toolbar_module = import_module("TheKeyMachine.ui.widgets.toolbar")
-        graph_toolbar_widgets = import_module(
-            "TheKeyMachine.tools.graph_toolbar.widgets"
-        )
-
-        reload(toolbar_module)
-        reload(graph_toolbar_widgets)
-
-        # Cleanup was completed and flushed above. Running it again here can
-        # queue deletion of the newly hosted workspace-control child.
-        toolbar_module.show(cleanup_existing=False)
+        return TheKeyMachine.reload()
 
     def unload(self, *args):
         """
         Closes the tool and removes callbacks (safe to call multiple times).
         """
         global _toolbar_instance
+        self._begin_shutdown()
         _toolbar_instance = None
 
         try:
@@ -578,57 +570,89 @@ def get_toolbar():
     global _toolbar_instance
     if _toolbar_instance is not None:
         try:
-            if not QtCompat.isValid(_toolbar_instance):
+            if not QtCompat.isValid(_toolbar_instance) or getattr(_toolbar_instance, "_shutting_down", False):
                 _toolbar_instance = None
         except (RuntimeError, TypeError):
             _toolbar_instance = None
     return _toolbar_instance
 
 
+def _workspace_control_exists():
+    return mui.MQtUtil.findControl(WORKSPACE_CONTROL_NAME) is not None
+
+
+def _needs_pre_show_cleanup():
+    return (
+        _workspace_control_exists()
+        or runtime.has_previous_runtime()
+        or runtime.has_persisted_callback_state()
+    )
+
+
 def show(cleanup_existing=True):
     global _toolbar_instance
 
-    if cleanup_existing:
+    existing = get_toolbar()
+    if existing is not None:
+        if existing.isVisible():
+            return existing
+        try:
+            if existing.showWindow():
+                return existing
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+        if _toolbar_instance is existing:
+            _toolbar_instance = None
+        try:
+            existing._begin_shutdown()
+            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+        else:
+            cleanup_existing = False
+
+    if cleanup_existing and _needs_pre_show_cleanup():
         try:
             runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
-    instance = toolbar()
-    _toolbar_instance = instance
+    instance = None
     try:
+        instance = toolbar()
+        _toolbar_instance = instance
         instance.showWindow()
     except Exception:
         if _toolbar_instance is instance:
             _toolbar_instance = None
         try:
-            instance.close()
-            instance.deleteLater()
-            runtime.cleanup_workspace_controls(process_events=True)
+            if instance is not None:
+                instance._begin_shutdown()
+                instance.close()
+                instance.deleteLater()
+            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
         except Exception:
             pass
         raise
     return instance
 
 
+def unload(*_args):
+    toolbar_instance = get_toolbar()
+    if toolbar_instance is not None:
+        return toolbar_instance.unload()
+    return runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
+
+
 def toggle():
     toolbar_instance = get_toolbar()
     try:
-        if toolbar_instance is not None and cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True):
-            vis_state = cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, visible=True)
-
-            if vis_state:
-                toolbar_instance._delete_tabbar_painter()
-                cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, visible=False)
+        if toolbar_instance is not None:
+            if toolbar_instance.isVisible():
+                toolbar_instance.hide()
                 return False
-            else:
-                cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
-                if not toolbar_instance.ensure_shelf_painter():
-                    cmds.evalDeferred(
-                        toolbar_instance.ensure_shelf_painter,
-                        lowestPriority=True,
-                    )
-                return True
+            toolbar_instance.showWindow()
+            return True
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
     show()

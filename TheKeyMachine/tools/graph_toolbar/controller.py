@@ -53,6 +53,37 @@ class CustomGraphBus(QtCore.QObject):
 
 
 custom_graph_bus = CustomGraphBus()
+_APPLY_TIMER = None
+
+
+def _apply_enabled_state() -> None:
+    if get_graph_toolbar_checkbox_state():
+        create()
+    else:
+        remove()
+
+
+def _get_apply_timer():
+    global _APPLY_TIMER
+    if _APPLY_TIMER is None:
+        _APPLY_TIMER = QtCore.QTimer(custom_graph_bus)
+        _APPLY_TIMER.setSingleShot(True)
+        _APPLY_TIMER.timeout.connect(_apply_enabled_state)
+    return _APPLY_TIMER
+
+
+def _dispose_apply_timer() -> None:
+    global _APPLY_TIMER
+    timer = _APPLY_TIMER
+    _APPLY_TIMER = None
+    if timer is None:
+        return
+    try:
+        timer.stop()
+        timer.timeout.disconnect(_apply_enabled_state)
+        timer.deleteLater()
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
 
 
 def get_graph_toolbar_checkbox_state() -> bool:
@@ -73,10 +104,12 @@ def emit_graph_toolbar_state() -> None:
         custom_graph_bus.graph_toolbar_enabled_changed.emit(state)
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
-    try:
-        runtime.get_runtime_manager().set_tool_state("custom_graph", state)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
+    manager = runtime.get_existing_runtime_manager()
+    if manager is not None:
+        try:
+            manager.set_tool_state("custom_graph", state)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
 
 
 def sync_graph_toolbar_watch() -> None:
@@ -107,23 +140,20 @@ def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
         return
 
     try:
-        if enabled:
-            QtCore.QTimer.singleShot(0, create)
-        else:
-            QtCore.QTimer.singleShot(0, remove)
+        _get_apply_timer().start(0)
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        if enabled:
-            create()
-        else:
-            remove()
+        _apply_enabled_state()
 
 
 def shutdown_graph_toolbar_runtime() -> None:
     """Remove the live Graph Editor toolbar without changing the saved preference."""
-    try:
-        runtime.get_runtime_manager().set_graph_editor_watch_enabled(False)
-    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-        pass
+    _dispose_apply_timer()
+    manager = runtime.get_existing_runtime_manager()
+    if manager is not None:
+        try:
+            manager.set_graph_editor_watch_enabled(False)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
 
     try:
         remove()

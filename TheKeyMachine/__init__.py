@@ -16,9 +16,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.43"
+__version__ = "0.1.44"
 __stage__ = "beta"
-__build__ = "342"
+__build__ = "343"
 __codename__ = "Cortado"
 
 
@@ -48,19 +48,14 @@ def reload():
     importlib.invalidate_caches()
     toolbar = importlib.import_module("TheKeyMachine.ui.widgets.toolbar")
 
-    # The sys.modules purge above always resets toolbar's module-level
-    # _toolbar_instance to None, so a get_toolbar() check here can never
-    # find the widget torn down by cleanup_for_reload() a few lines up --
-    # it would always fall through to this same show() call anyway, just
-    # after a second, redundant instance.reload() -> import_module/reload
-    # round trip on modules that were just freshly imported.
-    #
-    # cleanup_for_reload() above has already removed the previous toolbar,
-    # its callbacks, and its workspaceControl, so show()'s own
-    # cleanup_existing=True pass would only repeat that work -- and, per
-    # toolbar.reload()'s own comment on this exact hazard, risks queuing
-    # deletion of the workspace-control child this call is about to create.
-    toolbar.show(cleanup_existing=False)
+    # Cleanup has already removed the old control and callbacks.
+    return toolbar.show(cleanup_existing=False)
+
+
+def unload():
+    from TheKeyMachine.core import runtime
+
+    return runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
 
 
 def toggle():

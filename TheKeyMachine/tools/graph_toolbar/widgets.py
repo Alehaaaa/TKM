@@ -32,7 +32,7 @@ from TheKeyMachine.ui import toolbar_modes
 
 from TheKeyMachine.ui.widgets import customWidgets as cw  # type: ignore
 from TheKeyMachine.ui.widgets import util as wutil  # type: ignore
-from TheKeyMachine.core import settings  # type: ignore
+from TheKeyMachine.core import runtime, settings  # type: ignore
 import TheKeyMachine.tools.graph_toolbar.controller as graphToolbarController  # type: ignore
 
 
@@ -40,6 +40,7 @@ _GRAPH_TOOLBAR_OBJECT = "tkm_customGraph_flowToolbar"
 _DOCK_POSITION_IDS = {position for position, _label, _description in graphToolbarController.DOCK_OPTIONS}
 
 _GRAPH_TOOLBAR_WIDGET = None
+_CREATE_RETRY_TIMER = None
 
 
 def _graph_toolbar_alignment():
@@ -112,10 +113,10 @@ def getCustomGraphWidget():
     ):
         return _GRAPH_TOOLBAR_WIDGET
 
-    toolbar_widget = graph_qw.findChild(QtWidgets.QWidget, _GRAPH_TOOLBAR_OBJECT)
-    if toolbar_widget and wutil.is_valid_widget(toolbar_widget):
-        _GRAPH_TOOLBAR_WIDGET = toolbar_widget
-        return toolbar_widget
+    for toolbar_widget in graph_qw.findChildren(QtWidgets.QWidget, _GRAPH_TOOLBAR_OBJECT):
+        if wutil.is_valid_widget(toolbar_widget) and not toolbar_widget.isHidden():
+            _GRAPH_TOOLBAR_WIDGET = toolbar_widget
+            return toolbar_widget
 
     _GRAPH_TOOLBAR_WIDGET = None
     return None
@@ -123,22 +124,47 @@ def getCustomGraphWidget():
 
 def removeCustomGraph() -> None:
     global _GRAPH_TOOLBAR_WIDGET
+    _cancel_create_retry()
     graph_qw = _find_graph_editor_widget()
     if graph_qw:
         for toolbar_widget in graph_qw.findChildren(QtWidgets.QWidget, _GRAPH_TOOLBAR_OBJECT):
             if not wutil.is_valid_widget(toolbar_widget):
                 continue
-            try:
-                parent = toolbar_widget.parentWidget()
-                if parent and parent.layout():
-                    parent.layout().removeWidget(toolbar_widget)
-                toolbar_widget.setObjectName("{}_deleted".format(_GRAPH_TOOLBAR_OBJECT))
-                toolbar_widget.setParent(None)
-                toolbar_widget.deleteLater()
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
+            runtime.delete_widget(toolbar_widget)
     _GRAPH_TOOLBAR_WIDGET = None
     graphToolbarController.emit_graph_toolbar_state()
+
+
+def _cancel_create_retry():
+    global _CREATE_RETRY_TIMER
+    timer = _CREATE_RETRY_TIMER
+    _CREATE_RETRY_TIMER = None
+    if timer is None:
+        return
+    try:
+        timer.stop()
+        timer.deleteLater()
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
+
+
+def _schedule_create_retry(attempt):
+    global _CREATE_RETRY_TIMER
+    _cancel_create_retry()
+    timer = QtCore.QTimer()
+    timer.setSingleShot(True)
+
+    def _retry():
+        global _CREATE_RETRY_TIMER
+        try:
+            _CREATE_RETRY_TIMER = None
+            createCustomGraph(force=True, _attempt=attempt)
+        finally:
+            timer.deleteLater()
+
+    timer.timeout.connect(_retry)
+    _CREATE_RETRY_TIMER = timer
+    timer.start(100)
 
 # -----------------------------------------------------------------------------------------------------------------------------
 #                                                       customGraph build                                                     #
@@ -239,7 +265,7 @@ def ensureCustomGraph():
 def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs):
     global _GRAPH_TOOLBAR_WIDGET
 
-    if not force and not settings.get_setting("graph_toolbar_enabled", True):
+    if not settings.get_setting("graph_toolbar_enabled", True):
         return removeCustomGraph()
 
     # Idempotency guard: more than one startup/panel-open trigger can land
@@ -267,7 +293,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         graph_vis = cmds.getPanel(vis=True) or []
         if "graphEditor1" not in graph_vis:
             if _attempt < 5:
-                QtCore.QTimer.singleShot(100, lambda: createCustomGraph(force=True, _attempt=_attempt + 1))
+                _schedule_create_retry(_attempt + 1)
             return
 
     removeCustomGraph()
@@ -275,8 +301,12 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     graph_qw = _find_graph_editor_widget()
     if not graph_qw:
         return
+    graph_host, _graph_layout, _graph_content = _graph_editor_layout_host()
+    if not graph_host:
+        return
 
     flow_qw = cw.QFlatToolbar(
+        parent=graph_host,
         settings_namespace="graph_toolbar_toolbuttons",
         margin=2,
         spacing_w=10,
@@ -284,7 +314,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         alignment=_graph_toolbar_alignment(),
     )
     flow_qw.setObjectName(_GRAPH_TOOLBAR_OBJECT)
-    flow_qw.setProperty("tkm_floating_widget", True)
+    flow_qw.setProperty("tkm_managed_transient", True)
     flow_qw.hide()
     _GRAPH_TOOLBAR_WIDGET = flow_qw
 
@@ -308,4 +338,8 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
     toolbar_widgets.bind_toolbar_pinning_context(flow_qw)
 
     _place_graph_toolbar_widget(flow_qw)
-    QtCore.QTimer.singleShot(50, flow_qw._update_height)
+    height_timer = QtCore.QTimer(flow_qw)
+    height_timer.setSingleShot(True)
+    height_timer.timeout.connect(flow_qw._update_height)
+    flow_qw._tkm_initial_height_timer = height_timer
+    height_timer.start(50)

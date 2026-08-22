@@ -3039,8 +3039,7 @@ class QFlatSectionWidget(QtWidgets.QWidget):
         self.layout().removeWidget(widget)
         self._menu_metadata = [item for item in self._menu_metadata if item.get("id") != key]
         self._default_keys = [item_key for item_key in self._default_keys if item_key != key]
-        widget.setParent(None)
-        widget.deleteLater()
+        runtime.delete_widget(widget)
         self._sync_section_visibility()
         return True
 

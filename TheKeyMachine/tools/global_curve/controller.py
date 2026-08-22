@@ -749,8 +749,10 @@ def remove_all(*_args):
     global _PROCESSING
     _PROCESSING = True
     try:
-        runtime.get_runtime_manager().disconnect_callbacks(CALLBACK_KEY)
-        runtime.get_runtime_manager().disconnect_callbacks(SCENE_CALLBACK_KEY)
+        manager = runtime.get_existing_runtime_manager()
+        if manager is not None:
+            manager.disconnect_callbacks(CALLBACK_KEY)
+            manager.disconnect_callbacks(SCENE_CALLBACK_KEY)
         _remove_graph_display()
         for session in list(_SESSIONS):
             _remove_session(session)
