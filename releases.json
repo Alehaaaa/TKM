@@ -1,10 +1,41 @@
 {
-  "latest": "0.1.47",
+  "latest": "0.1.48",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.48",
+      "tag": "TKM-0.1.48",
+      "publishedAt": "2026-08-23T13:07:44Z",
+      "publishedLabel": "August 23, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.48",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.48/TKM-0.1.48.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Auto Pause Viewport pauses refresh and updates after animation changes"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Temporal Controls Panel has a larger default size and cleaner icon sliders"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Graph Editor toolbar docking is clearer and stays synced"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Global Curve creates dense guide curves faster"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.47...TKM-0.1.48"
+    },
     {
       "version": "0.1.47",
       "tag": "TKM-0.1.47",
