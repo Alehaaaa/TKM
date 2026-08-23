@@ -389,6 +389,32 @@ def is_graph_editor_visible():
         return False
 
 
+def is_graph_editor_available():
+    if not is_graph_editor_visible():
+        return False
+    try:
+        return bool(cmds.animCurveEditor(GRAPH_EDITOR, exists=True))
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return False
+
+
+def refresh_graph_editor(editor=None):
+    """Refresh Graph Editor curve display without disturbing selection state."""
+    editor = editor or GRAPH_EDITOR
+    try:
+        if not cmds.animCurveEditor(editor, exists=True):
+            return False
+        cmds.animCurveEditor(editor, edit=True, updateMainConnection=True)
+        return True
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        pass
+    try:
+        cmds.animCurveEditor(editor, query=True, curvesShownForceUpdate=True)
+        return True
+    except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+        return False
+
+
 def get_graph_editor_outliner_items():
     if not is_graph_editor_visible():
         return []
@@ -460,6 +486,7 @@ def get_graph_editor_selected_keyframes(include_tangents=False):
         return []
 
     keyframes = []
+    seen = set()
     for curve in anim_curves:
         try:
             curve_frames = cmds.keyframe(
@@ -484,7 +511,8 @@ def get_graph_editor_selected_keyframes(include_tangents=False):
                 pass
         for frame in curve_frames:
             pair = (curve, float(frame))
-            if pair not in keyframes:
+            if pair not in seen:
+                seen.add(pair)
                 keyframes.append(pair)
 
     return keyframes

@@ -43,6 +43,14 @@ def toggle_selector_toolbar_pin(*args):
     return controller.toggle_selector_toolbar_pin(*args)
 
 
+def toggle_auto_pause_viewport(*args):
+    return controller.toggle_auto_pause_viewport(*args)
+
+
+def set_auto_pause_viewport(*args):
+    return controller.set_auto_pause_viewport(*args)
+
+
 def turn_all_off(*args):
     return controller.turn_all_off(*args)
 

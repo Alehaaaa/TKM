@@ -156,4 +156,5 @@ filterUIClearFilter graphEditor1OutlineEd;
 
 def set_filter_enabled(enabled):
     mel.eval(_FILTER_ON if enabled else _FILTER_OFF)
+    maya_selection.refresh_graph_editor()
     return bool(enabled)

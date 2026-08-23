@@ -35,7 +35,7 @@ _STANDARD_MAIN = frozenset([
 _STANDARD_GRAPH = frozenset([
     "align_objects", "animation_offset", "attribute_switcher", "bake_animation_1",
     "global_curve", "copy_animation", "copy_pose", "create_tracer", "custom_graph", "default_object_values", "follow_cam", "graph_extra_tools",
-    "isolate_master", "link_copy", "mirror", "nudge_left", "nudge_right", "nudge_value", "orbit", "overshoot_sliders", "select_opposite",
+    "isolate_master", "link_copy", "mirror", "nudge_left", "nudge_right", "nudge_value", "orbit", "overshoot_sliders", "pause_viewport", "select_opposite",
     "select_rig_controls", "selection_sets", "selector", "share_keys", "snap", "tangent_auto", "tangent_bouncy", "tangent_linear",
     "tangent_spline", "tangent_step", "temp_pivot", "ws_copy_frame"
 ])

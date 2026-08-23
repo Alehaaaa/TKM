@@ -136,7 +136,7 @@ TOOLBAR_SECTION_IDS = {
         "pose_animation_section", "tangents",
         "animation_offset_tools",
         "link_tools",
-        "attribute_tools", "selection_set_tools", "orbit_tools",
+        "attribute_tools", "selection_set_tools", "orbit_tools", "pause_viewport_tools",
         "global_curve_tools", "graph_tools", "animation_tools", "custom_tools_section", "snapshot_rig_tools",
     ),
 }

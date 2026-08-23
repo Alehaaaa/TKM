@@ -26,6 +26,7 @@ from TheKeyMachine.core.Qt import QtCore, QtGui  # type: ignore
 from TheKeyMachine.core import settings
 from TheKeyMachine.maya import maya_api
 from TheKeyMachine.maya import animation
+from TheKeyMachine.maya import selection as maya_selection
 from TheKeyMachine.maya import runtime as maya_runtime
 from TheKeyMachine.data import icons
 from TheKeyMachine.ui.widgets import timeline as timelineWidgets
@@ -40,6 +41,7 @@ HIDE_STATIC_CURVES_ID = "hide_static_animation_curves"
 ANIMATION_RECOVERY_ID = "animation_recovery"
 ANIM_LAYER_WEIGHTS_ID = "anim_layer_weights"
 SELECTOR_TOOLBAR_PIN_ID = "selector_toolbar_pin"
+AUTO_PAUSE_VIEWPORT_ID = "auto_pause_viewport"
 CHANNELBOX_TINT_KEY = "background_runner:channelbox_selection_highlight"
 ANIM_LAYER_WEIGHTS_TINT_KEY = "background_runner:anim_layer_weights"
 
@@ -56,6 +58,7 @@ RUNNER_COMMAND_IDS = {
     ANIMATION_RECOVERY_ID: "background_runner_animation_recovery",
     ANIM_LAYER_WEIGHTS_ID: "background_runner_anim_layer_weights",
     SELECTOR_TOOLBAR_PIN_ID: "background_runner_selector_toolbar_pin",
+    AUTO_PAUSE_VIEWPORT_ID: "auto_pause_viewport",
 }
 
 _CONTROLLER: Optional["BackgroundRunnerController"] = None
@@ -125,6 +128,39 @@ def toggle_anim_layer_weights():
 
 def toggle_selector_toolbar_pin():
     return toggle_runner_enabled(SELECTOR_TOOLBAR_PIN_ID)
+
+
+def toggle_auto_pause_viewport():
+    return toggle_runner_enabled(AUTO_PAUSE_VIEWPORT_ID)
+
+
+def changed_signal_for_runner(runner_id, manager=None):
+    if manager is None:
+        from TheKeyMachine.core import runtime
+
+        manager = runtime.get_runtime_manager(start=False)
+    signal = getattr(manager, "backgroundRunnerChanged", None)
+    if signal is None:
+        return None
+
+    class _RunnerSignal(QtCore.QObject):
+        changed = QtCore.Signal()
+
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self._runner_id = runner_id
+            signal.connect(self._relay)
+
+        def _relay(self, changed_runner_id, *_args):
+            if changed_runner_id == self._runner_id:
+                self.changed.emit()
+
+    relay_attr = "_tkm_background_runner_signal_{}".format(runner_id)
+    relay = getattr(manager, relay_attr, None)
+    if relay is None:
+        relay = _RunnerSignal(manager)
+        setattr(manager, relay_attr, relay)
+    return relay.changed
 
 
 def _emit_runner_triggered(manager, runner_id):
@@ -677,9 +713,7 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
                     edit=True,
                     forceMainConnection=self.OUTLINER_SELECTION,
                 )
-                cmds.animCurveEditor(
-                    editor, query=True, curvesShownForceUpdate=True
-                )
+                maya_selection.refresh_graph_editor(editor)
                 updated = True
             except Exception:
                 continue
@@ -1338,32 +1372,12 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
     from TheKeyMachine.core import runtime
     from TheKeyMachine.tools.animation_recovery import controller as animationRecovery
     from TheKeyMachine.tools.selection import controller as selectionController
+    from TheKeyMachine.maya import viewport as mayaViewport
 
     manager = runtime.get_runtime_manager(start=False)
 
     def _background_runner_signal(runner_id):
-        signal = getattr(manager, "backgroundRunnerChanged", None)
-        if signal is None:
-            return None
-
-        class _RunnerSignal(QtCore.QObject):
-            changed = QtCore.Signal()
-
-            def __init__(self, parent=None):
-                super().__init__(parent)
-                self._runner_id = runner_id
-                signal.connect(self._relay)
-
-            def _relay(self, changed_runner_id, *_args):
-                if changed_runner_id == self._runner_id:
-                    self.changed.emit()
-
-        relay_attr = "_tkm_background_runner_signal_{}".format(runner_id)
-        relay = getattr(manager, relay_attr, None)
-        if relay is None:
-            relay = _RunnerSignal(manager)
-            setattr(manager, relay_attr, relay)
-        return relay.changed
+        return changed_signal_for_runner(runner_id, manager=manager)
 
     specs = {
         ANIMATION_RECOVERY_ID: {
@@ -1457,6 +1471,16 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
             "get_enabled": selectionController.is_selector_pinned,
             "set_enabled": selectionController.set_selector_pinned,
             "changed_signal": _background_runner_signal(SELECTOR_TOOLBAR_PIN_ID),
+        },
+        AUTO_PAUSE_VIEWPORT_ID: {
+            "id": AUTO_PAUSE_VIEWPORT_ID,
+            "label": "Auto Pause Viewport",
+            "icon": icons.auto_pause_viewport,
+            "description": "Automatically pause viewport refresh and briefly reopen it after animation key changes.",
+            "default": False,
+            "get_enabled": mayaViewport.is_auto_pause_enabled,
+            "set_enabled": mayaViewport.set_auto_pause_enabled,
+            "changed_signal": _background_runner_signal(AUTO_PAUSE_VIEWPORT_ID),
         },
     }
     for runner_id, spec in specs.items():

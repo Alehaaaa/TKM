@@ -1,6 +1,6 @@
-"""The Temp Controls Panel.
+"""The Temporal Controls Panel.
 
-Opens from the Temporal Controls right-click menu's "Temp Controls Panel"
+Opens from the Temporal Controls right-click menu's "Temporal Controls Panel"
 item (``api.open_temp_controls_panel``). Two lists on the left: every "rig"
 in the scene (a target object plus every Temporal Control that traces back
 to it -- see ``api.list_rigs``), and, once a rig is picked, that rig's
@@ -11,6 +11,9 @@ slider, a rotation nudge slider, a shape picker, and Add Child/Add Parent/
 Remove Control/Edit Pivot/Reset Pivot actions. The sidebar stays disabled
 until a control is selected -- picking a rig alone isn't enough.
 
+Selecting a control row also selects that Temporal Control in Maya, so the
+viewport/Channel Box follow the panel's focused control.
+
 Window behavior matches attribute_switcher's own ``FloatingWidget``: opens
 as a borderless auto-close popup that closes itself once the cursor strays
 far enough away and stays there past a short grace period, exactly like
@@ -20,25 +23,48 @@ appears in the window's bottom bar. Export and Remove and Bake live in the
 sidebar itself instead (stacked, full width, right under the shape/action
 controls) since they only make sense once a control is selected -- exactly
 when the sidebar is enabled. Remove and Bake is scoped to whichever single
-control is currently selected in this panel, independent of the scene's
-actual selection (see ``api.bake_control``).
+control is currently selected in this panel (see ``api.bake_control``).
+
+Both lists stay live while the panel is open (see "live sync" below):
+Undo/Redo, or a Temporal Control freshly created from anywhere else (the
+right-click menu, a script, another instance of this same panel -- see
+api.controls_bus), re-runs ``refresh()`` (debounced, same coalescing
+pattern animation_layers' own live sync uses) without closing and
+reopening the window. Deletion/reparenting done through this panel's own
+actions already calls refresh() directly; nothing else currently notifies
+it of those, so a delete/reparent from elsewhere (a script, another
+instance of this panel) doesn't show up here until something else -- an
+Undo/Redo, or the next control creation -- happens to trigger a refresh.
 """
 
+from maya import cmds
+
+from TheKeyMachine.core import runtime
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 from TheKeyMachine.data import icons
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.temporal_controls import api, shapes
 from TheKeyMachine.tools.temporal_controls.widgets import _OptionList
 from TheKeyMachine.ui.widgets import customDialogs, customWidgets as cw, util as wutil
+
+_STALE_WIDGET_ERRORS = (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError)
 
 
 def _short_name(node):
     return (node or "").split("|")[-1].split(":")[-1]
 
 
-class _NudgeSlider(QtWidgets.QWidget):
-    """A slider backing the panel's Size and Rotation controls.
+class _NudgeSlider(QtWidgets.QSlider):
+    """A rounded, icon-only slider backing the panel's Size and Rotation
+    controls -- same pill-track/round-handle language as
+    attribute_switcher's own sliders, but grey (not accent-colored) and a
+    real ``QSlider`` subclass (dragging is native, not hand-rolled). No
+    "Size"/"Rotation" text sits next to it -- the handle carries a small
+    icon glyph instead, and hovering surfaces the same information as a
+    native tooltip plus a Maya statustip (see ``cw.HelpSystem.push``).
+
     ``liveValue`` fires continuously (with the slider's raw position, in
     whatever units *value_range* is) while the handle is being dragged, so
     a caller can apply a live effect as the user drags rather than only
@@ -71,66 +97,225 @@ class _NudgeSlider(QtWidgets.QWidget):
     liveValue = QtCore.Signal(int)
     released = QtCore.Signal()
 
-    def __init__(self, label, spring_back=True, snap_size=None, value_range=(-100, 100), parent=None):
-        super().__init__(parent)
+    # Track thickness and handle diameter -- the pill background is the
+    # thick, dominant shape (like attribute_switcher's own PillSlider,
+    # whose track fills nearly the full widget height) and the round
+    # handle is a visibly smaller circle riding inside it, not the other
+    # way around. HANDLE_MARGIN (half the leftover TRACK_HEIGHT-HANDLE_SIZE)
+    # is the gap the handle keeps from the track's edges on every side --
+    # top/bottom simply from being centered in a taller widget,
+    # left/right from _handle_center_bounds() applying that same gap. A
+    # bigger handle relative to the track (was 20/28, a 4px margin) keeps
+    # that gap small and uniform instead of reading as a wide top/bottom
+    # band -- the track's rounded end caps already add their own visual
+    # buffer on the left/right that the flat top/bottom edges don't get,
+    # so a smaller shared margin is what actually looks even on both axes.
+    TRACK_HEIGHT = wutil.DPI(28)
+    HANDLE_SIZE = wutil.DPI(24)
+    HANDLE_MARGIN = (TRACK_HEIGHT - HANDLE_SIZE) // 2
+    ICON_SIZE = wutil.DPI(14)
+
+    # Grey palette (COLORS.ui) -- deliberately not the accent color
+    # attribute_switcher's own PillSlider uses, since these two sliders
+    # sit in a neutral sidebar next to plain grey list/space widgets.
+    _TRACK_COLOR = QtGui.QColor(COLORS.ui.darker_gray.hex)
+    _HANDLE_COLOR = QtGui.QColor(COLORS.ui.gray.hex)
+    _HANDLE_HOVER_COLOR = QtGui.QColor(COLORS.ui.light_gray.hex)
+
+    def __init__(self, label, icon, description="", spring_back=True, snap_size=None, value_range=(-100, 100), parent=None):
+        super().__init__(QtCore.Qt.Horizontal, parent)
         self._spring_back = spring_back
         self._snap_size = snap_size
+        self._hover = False
+        self._dragging = False
 
-        layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(wutil.DPI(6))
+        # Widget height follows the track now, not the handle -- the track
+        # is the larger of the two shapes (see TRACK_HEIGHT/HANDLE_SIZE
+        # above), so it's what defines the control's own footprint.
+        self.setFixedHeight(self.TRACK_HEIGHT)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.setMouseTracking(True)
+        self.setRange(*value_range)
+        self.setValue(value_range[0] if not spring_back else 0)
 
-        title = QtWidgets.QLabel(label, self)
-        title.setStyleSheet("color:#9a9a9a;font-size:%spx;" % wutil.DPI(11))
-        title.setFixedWidth(wutil.DPI(52))
-        layout.addWidget(title)
+        # Hand-painted (see paintEvent/mouse* below), not QSS ::handle
+        # sizing -- three rounds of QSS tweaks all came out lopsided, since
+        # this style engine kept the handle's painted height pinned to the
+        # groove's height regardless of what the stylesheet's own "height"
+        # said. Painting the circle directly with QPainter.drawEllipse (the
+        # same technique attribute_switcher's PillSlider uses) is immune to
+        # that -- it's just pixels at a radius, not a subcontrol Qt gets to
+        # reinterpret. Mouse handling is reimplemented to match (click/drag
+        # anywhere jumps the handle there), since QSlider's own hit-testing
+        # otherwise still trusts the style's -- wrong -- handle geometry.
+        self.setStyleSheet("QSlider{background:transparent;border:none;}")
 
-        self.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-        self.slider.setRange(*value_range)
-        self.slider.setValue(value_range[0] if not spring_back else 0)
-        self.slider.valueChanged.connect(self._on_value_changed)
-        self.slider.sliderReleased.connect(self._on_released)
-        layout.addWidget(self.slider, 1)
+        self._icon_pixmap = QtGui.QIcon(icon).pixmap(self.ICON_SIZE, self.ICON_SIZE)
+
+        # Native Maya tooltip (Qt's own tooltip bubble) and statustip
+        # (Maya's help line, via HelpSystem.push -- the same channel every
+        # other TKM control's help text goes through) instead of the
+        # in-panel label this slider used to carry.
+        self.setToolTip("{}\n{}".format(label, description) if description else label)
+        cw.HelpSystem.push(self, label, description)
+
+        self.valueChanged.connect(self._on_value_changed)
+        self.sliderReleased.connect(self._on_released)
 
     def _nearest_snap(self, value):
         snapped = round(value / self._snap_size) * self._snap_size
-        return int(round(max(self.slider.minimum(), min(self.slider.maximum(), snapped))))
+        return int(round(max(self.minimum(), min(self.maximum(), snapped))))
 
     def _on_value_changed(self, value):
         if self._snap_size:
             snapped = self._nearest_snap(value)
             if snapped != value:
-                block = self.slider.blockSignals(True)
-                self.slider.setValue(snapped)
-                self.slider.blockSignals(block)
+                block = self.blockSignals(True)
+                self.setValue(snapped)
+                self.blockSignals(block)
                 value = snapped
+        self.update()
         self.liveValue.emit(value)
 
     def _on_released(self):
         if self._spring_back:
-            block = self.slider.blockSignals(True)
-            self.slider.setValue(0)
-            self.slider.blockSignals(block)
+            block = self.blockSignals(True)
+            self.setValue(0)
+            self.blockSignals(block)
+            self.update()
         self.released.emit()
 
     def set_value(self, value):
         """Reposition the handle to *value* without emitting liveValue --
         for a caller resyncing this slider to a newly selected control's
         state (only meaningful when spring_back is False)."""
-        block = self.slider.blockSignals(True)
-        self.slider.setValue(int(round(value)))
-        self.slider.blockSignals(block)
+        block = self.blockSignals(True)
+        self.setValue(int(round(value)))
+        self.blockSignals(block)
+        self.update()
+
+    # ------------------------------------------------------------------
+    # Painting and hit-testing -- both driven off the same _track_rect()/
+    # _handle_center_x() geometry, so what's drawn and what's clickable
+    # never disagree with each other.
+    # ------------------------------------------------------------------
+
+    def _track_rect(self):
+        y = (self.height() - self.TRACK_HEIGHT) // 2
+        return QtCore.QRect(0, y, self.width(), self.TRACK_HEIGHT)
+
+    def _handle_center_bounds(self):
+        """(left, right) the handle's *center* can reach -- HANDLE_MARGIN
+        inset from each edge, so its travel stops short of the track's
+        rounded ends instead of touching them, the same gap it already
+        keeps from the top/bottom."""
+        left = self.HANDLE_MARGIN + self.HANDLE_SIZE / 2.0
+        right = max(left, self.width() - self.HANDLE_MARGIN - self.HANDLE_SIZE / 2.0)
+        return left, right
+
+    def _handle_center_x(self):
+        span = self.maximum() - self.minimum()
+        ratio = 0.0 if span == 0 else (self.value() - self.minimum()) / float(span)
+        left, right = self._handle_center_bounds()
+        return left + ratio * (right - left)
+
+    def _handle_rect(self):
+        cx = self._handle_center_x()
+        cy = self.height() / 2.0
+        r = self.HANDLE_SIZE / 2.0
+        return QtCore.QRectF(cx - r, cy - r, self.HANDLE_SIZE, self.HANDLE_SIZE)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+
+        track = self._track_rect()
+        painter.setBrush(self._TRACK_COLOR)
+        painter.drawRoundedRect(track, self.TRACK_HEIGHT / 2.0, self.TRACK_HEIGHT / 2.0)
+
+        handle = self._handle_rect()
+        painter.setBrush(self._HANDLE_HOVER_COLOR if (self._hover or self._dragging) else self._HANDLE_COLOR)
+        painter.drawEllipse(handle)
+
+        icon_pos = handle.center() - QtCore.QPointF(self.ICON_SIZE / 2.0, self.ICON_SIZE / 2.0)
+        painter.drawPixmap(icon_pos, self._icon_pixmap)
+        painter.end()
+
+    def _value_from_x(self, x):
+        left, right = self._handle_center_bounds()
+        usable = right - left
+        if usable <= 0:
+            return self.minimum()
+        ratio = (x - left) / usable
+        ratio = max(0.0, min(1.0, ratio))
+        return self.minimum() + ratio * (self.maximum() - self.minimum())
+
+    def mousePressEvent(self, event):
+        if event.button() != QtCore.Qt.LeftButton or not self.isEnabled():
+            return super().mousePressEvent(event)
+        self._dragging = True
+        self.setSliderDown(True)
+        self.setValue(int(round(self._value_from_x(event.x()))))
+        self.update()
+        event.accept()
+
+    def mouseMoveEvent(self, event):
+        if self._dragging:
+            self.setValue(int(round(self._value_from_x(event.x()))))
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() != QtCore.Qt.LeftButton or not self._dragging:
+            return super().mouseReleaseEvent(event)
+        self._dragging = False
+        self.setSliderDown(False)
+        self.update()
+        event.accept()
+
+    def enterEvent(self, event):
+        # isEnabled() guard -- Qt still delivers hover enter/leave events to
+        # a disabled widget (mouse *press* is what it blocks), so without
+        # this the handle kept brightening on hover even while the sidebar
+        # (and so this slider) was disabled -- a highlight implying it was
+        # interactive when it wasn't.
+        if self.isEnabled():
+            self._hover = True
+            self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hover = False
+        self.update()
+        super().leaveEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update()
 
 
 class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
     """See module docstring for the overall behavior contract."""
 
-    title = "Temp Controls Panel"
+    title = "Temporal Controls Panel"
     icon = icons.temporal_controls
 
     # Cursor-distance auto-close -- see attribute_switcher.widgets.FloatingWidget,
     # which this mirrors (reimplemented here rather than imported cross-tool).
-    AUTO_CLOSE_DIST = wutil.DPI(10)
+    # FloatingWidget can get away with a tight DPI(10) tolerance because it
+    # opens flush against the toolbar button that launched it -- the cursor
+    # already sits right on its edge. This panel instead opens via
+    # place_near_cursor() (see customDialogs.QFlatToolBarDialog), which
+    # deliberately leaves a DPI(30) gap between the window and the cursor so
+    # the popup doesn't appear directly under the pointer. A DPI(10)
+    # tolerance is narrower than that gap, so the very first auto-close
+    # check (after AUTO_CLOSE_GRACE_MS) already saw the cursor "too far
+    # away" and closed the panel before the user could do anything with it.
+    # Comfortably clearing that placement gap fixes it.
+    AUTO_CLOSE_DIST = wutil.DPI(45)
     AUTO_CLOSE_POLL_MS = 200
     AUTO_CLOSE_GRACE_MS = 400
     DRAG_PIN_DISTANCE = wutil.DPI(10)
@@ -142,6 +327,30 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         {"id": "edit_pivot", "icon": "temp_pivot_edit", "tooltip": "Edit Pivot"},
         {"id": "reset_pivot", "icon": "temp_pivot_reset", "tooltip": "Reset Pivot"},
     )
+
+    # The size this panel actually opens at. place_near_cursor() (see
+    # api.open_temp_controls_panel) calls adjustSize(), which resizes to
+    # sizeHint() -- so it's sizeHint() below, not just the minimums, that
+    # decides the panel's initial on-screen size; the minimums only keep it
+    # from being dragged/resized smaller than that afterward.
+    DEFAULT_WIDTH = wutil.DPI(700)
+    DEFAULT_HEIGHT = wutil.DPI(450)
+
+    # Live sync (see "Both lists stay live..." in the module docstring) --
+    # one key for every RuntimeManager-tracked callback this window owns
+    # (currently just the Undo/Redo scriptjobs), so closeEvent() can tear
+    # them all down in one disconnect_callbacks() call. The
+    # api.controls_bus connection isn't RuntimeManager-tracked -- it's a
+    # plain Qt signal connection, disconnected by hand in closeEvent
+    # instead (see _connect_live_refresh/closeEvent below).
+    REFRESH_KEY = "temp_controls_panel_refresh"
+    # Any single one of these could in principle fire in a burst (Undo/Redo
+    # of a multi-object creation, several controls_bus emits back to back
+    # from a scripted loop). Restarting a short singleShot timer on each
+    # event instead (same coalescing pattern as background_runners'
+    # AnimLayerWeightsRunner) collapses a whole burst into one refresh()
+    # once things settle, rather than rebuilding both lists on every event.
+    LIVE_REFRESH_DELAY_MS = 150
 
     def __init__(self, parent=None):
         super().__init__(parent=parent, popup=True, closeButton=False)
@@ -160,9 +369,20 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         self._auto_close_timer.setInterval(self.AUTO_CLOSE_POLL_MS)
         self._auto_close_timer.timeout.connect(self._process_auto_close_request)
 
+        # Live sync -- see REFRESH_KEY/LIVE_REFRESH_DELAY_MS above and the
+        # "live sync" section near showEvent()/closeEvent() below.
+        self._runtime_connected = False
+        self._live_refresh_timer = QtCore.QTimer(self)
+        self._live_refresh_timer.setSingleShot(True)
+        self._live_refresh_timer.setInterval(self.LIVE_REFRESH_DELAY_MS)
+        self._live_refresh_timer.timeout.connect(self._apply_live_refresh)
+
         self._build_ui()
         self.grip.installEventFilter(self)
         self.refresh()
+
+    def sizeHint(self):
+        return QtCore.QSize(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT)
 
     # ------------------------------------------------------------------
     # Layout
@@ -225,7 +445,14 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         self.lock_button.setAutoRaise(True)
         self.lock_button.setCursor(QtCore.Qt.PointingHandCursor)
         self.lock_button.setIcon(QtGui.QIcon(icons.lock_open))
-        self.lock_button.setIconSize(QtCore.QSize(wutil.DPI(16), wutil.DPI(16)))
+        self.lock_button.setIconSize(QtCore.QSize(wutil.DPI(15), wutil.DPI(15)))
+        # Fixed chip size -- lock.svg and lock_open.svg's shackles aren't
+        # identical shapes, and without an explicit size the button's own
+        # sizeHint (and the open shackle in particular, which reaches
+        # further than the closed one) could grow past this fixed-width
+        # column and read as overflowing it. A size clearly larger than
+        # the icon keeps the button constant across the toggle either way.
+        self.lock_button.setFixedSize(wutil.DPI(24), wutil.DPI(24))
         self.lock_button.setToolTip("Lock Orientation Space to Position Space")
         # Simple native grey checked state -- no custom color, just enough
         # to read as "toggled" against the panel's own dark background.
@@ -249,7 +476,12 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         layout.addWidget(anim_title)
 
         self._size_last_value = 0
-        self.size_slider = _NudgeSlider("Size", spring_back=True)
+        self.size_slider = _NudgeSlider(
+            "Size",
+            icons.size,
+            description="Drag to nudge the selected control's size. Releases back to center.",
+            spring_back=True,
+        )
         self.size_slider.liveValue.connect(self._on_size_live)
         self.size_slider.released.connect(self._on_size_released)
         layout.addWidget(self.size_slider)
@@ -266,7 +498,11 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # at the range's left edge (index 0, "Up") rather than centered
         # the way Size's symmetric range is.
         self.rotation_slider = _NudgeSlider(
-            "Rotation", spring_back=False, value_range=(0, len(api.ORIENTATIONS) - 1)
+            "Rotation",
+            icons.refresh,
+            description="Drag to snap the control to one of six fixed orientation poses.",
+            spring_back=False,
+            value_range=(0, len(api.ORIENTATIONS) - 1),
         )
         self.rotation_slider.liveValue.connect(self._on_rotation_live)
         layout.addWidget(self.rotation_slider)
@@ -322,6 +558,16 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # own fixed DPI(34) height.
         button = cw.QFlatButton(text=text, icon=icon, border=wutil.DPI(5))
         button.setFixedHeight(wutil.DPI(24))
+        # QFlatButton.DEFAULT_DISABLED_BACKGROUND ("#444444") is exactly
+        # this dialog's own background (QFlatDialog.COLOR_BG_TRACK) -- while
+        # disabled (no control selected), Export/Remove and Bake vanish into
+        # the window instead of just reading as unavailable. #4d4d4d sits
+        # about a third of the way from that background toward the button's
+        # own enabled fill (QFlatButton.DEFAULT_BACKGROUND, "#5D5D5D") --
+        # enough to separate it from the window without reading as enabled.
+        # Appended after QFlatButton's own stylesheet, so this :disabled
+        # rule -- and only this one -- wins the cascade over its default.
+        button.setStyleSheet(button.styleSheet() + "QPushButton:disabled{background-color:#4d4d4d;}")
         return button
 
     def _build_space_column(self, title):
@@ -352,7 +598,7 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
 
     @staticmethod
     def _column_title_style():
-        return "color: #9a9a9a; font-weight: bold; font-size: %spx;" % wutil.DPI(11)
+        return "color: #9a9a9a; font-size: %spx;" % wutil.DPI(11)
 
     # ------------------------------------------------------------------
     # Data
@@ -422,6 +668,11 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         self.sidebar.setEnabled(bool(control_id))
         if not control_id:
             return
+        try:
+            if cmds.objExists(control_id):
+                cmds.select(control_id)
+        except _STALE_WIDGET_ERRORS:
+            pass
         self._sync_sidebar(control_id)
 
     def _sync_sidebar(self, control):
@@ -570,9 +821,8 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
     # Sidebar bottom actions (see _build_sidebar) -- always visible whenever
     # the sidebar itself is (i.e. a control is selected), unlike the
     # window's own bottom bar (see _pin), which only appears once pinned
-    # and only ever holds Close. Remove and Bake is scoped to whichever
-    # control is currently selected in this panel, not the scene's actual
-    # selection (see api.bake_control).
+    # and only ever holds Close. Remove and Bake uses the same selection-
+    # aware batch path as the right-click menu (see api.bake_controls).
     # ------------------------------------------------------------------
 
     def _on_export(self):
@@ -582,8 +832,41 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         if not self._current_control:
             wutil.make_inViewMessage("Select a control first")
             return
-        toolCommon.run_tool_callback(self, api.bake_control, self._current_control)
+        toolCommon.run_tool_callback(self, api.bake_controls)
         self.refresh()
+
+    # ------------------------------------------------------------------
+    # Live sync -- see the module docstring's "Both lists stay live..."
+    # paragraph and REFRESH_KEY/LIVE_REFRESH_DELAY_MS above. Reconnected on
+    # every showEvent() (not just __init__) since api.open_temp_controls_panel
+    # reuses this same instance across close/reopen, and closeEvent() tears
+    # the callbacks down each time -- same pattern animation_layers' own
+    # live sync uses for the same reason.
+    # ------------------------------------------------------------------
+
+    def _connect_live_refresh(self):
+        manager = runtime.get_runtime_manager()
+        for event_name in ("Undo", "Redo"):
+            manager.add_scriptjob(event=event_name, key=self.REFRESH_KEY, callback=self._on_scene_changed)
+        # Not RuntimeManager-tracked (see REFRESH_KEY above) -- a direct Qt
+        # connection to api.controls_bus, which create_controls_with_options
+        # emits right after it actually builds new controls. Narrower than
+        # the DAG-change watching this replaced (that fired for every node
+        # create/parent/delete in the scene, Temporal Control or not).
+        api.controls_bus.controlsCreated.connect(self._on_scene_changed)
+
+    def _on_scene_changed(self, *_args):
+        # Restart, not fire directly -- see LIVE_REFRESH_DELAY_MS above.
+        self._live_refresh_timer.start()
+
+    def _apply_live_refresh(self):
+        if not (wutil.is_valid_widget(self) and self.isVisible()):
+            return
+        # Keep whichever control is currently open in the sidebar selected
+        # across the rebuild instead of snapping back to the first rig --
+        # refresh() already falls back to that on its own if the control
+        # no longer exists (e.g. it was the thing just deleted).
+        self.refresh(preselect_control=self._current_control)
 
     # ------------------------------------------------------------------
     # Window chrome: cursor-distance auto-close, drag/resize-to-pin
@@ -594,6 +877,29 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         if not self._pinned:
             self._shown_elapsed.start()
             self._auto_close_timer.start()
+        if not self._runtime_connected:
+            try:
+                self._connect_live_refresh()
+                self._runtime_connected = True
+            except _STALE_WIDGET_ERRORS:
+                pass
+
+    def closeEvent(self, event):
+        try:
+            runtime.get_runtime_manager().disconnect_callbacks(self.REFRESH_KEY)
+        except _STALE_WIDGET_ERRORS:
+            pass
+        if self._runtime_connected:
+            # Plain Qt connection, not RuntimeManager-tracked -- see
+            # _connect_live_refresh -- so it needs its own disconnect here
+            # rather than going through disconnect_callbacks() above.
+            try:
+                api.controls_bus.controlsCreated.disconnect(self._on_scene_changed)
+            except (RuntimeError, TypeError):
+                pass
+        self._runtime_connected = False
+        self._live_refresh_timer.stop()
+        super().closeEvent(event)
 
     def eventFilter(self, watched, event):
         if watched is self.grip and event.type() == QtCore.QEvent.MouseButtonRelease:

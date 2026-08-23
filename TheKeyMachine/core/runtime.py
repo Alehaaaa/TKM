@@ -24,11 +24,29 @@ except ImportError:  # pragma: no cover
     om = None
 
 try:
+    from maya import OpenMaya as om1  # type: ignore
+except ImportError:  # pragma: no cover
+    om1 = None
+
+try:
     from maya.api import OpenMayaAnim as oma  # type: ignore
 except ImportError:  # pragma: no cover
     oma = None
 
+try:
+    from maya import OpenMayaUI as omui  # type: ignore
+except ImportError:  # pragma: no cover
+    omui = None
 
+
+# This is the one deliberate exception to TKM's "no per-tool optionVars"
+# rule (see core/settings.py, which every other module uses instead). It
+# isn't a user preference -- it's a live status flag recording native
+# OpenMaya callback / scriptJob ids owned by *this* session, so a leftover
+# Python reload or crash can be detected and cleaned up on the next load.
+# It has to be a real Maya optionVar (not the JSON preferences file) because
+# it must survive a `TheKeyMachine` Python module reload within the same
+# Maya session, independent of any file I/O.
 _OPTIONVAR_NAME = "TKM_RuntimeManager"
 _APP_RUNTIME_ATTRIBUTE = "_tkm_runtime_manager"
 _TRANSIENT_WIDGET_PROPERTY = "tkm_managed_transient"
@@ -89,6 +107,21 @@ def _kill_scriptjob(job_id: int) -> None:
         pass
 
 
+def _remove_om_callback(callback_id: int) -> None:
+    removed = False
+    if om:
+        try:
+            om.MMessage.removeCallback(int(callback_id))
+            removed = True
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+    if not removed and om1:
+        try:
+            om1.MMessage.removeCallback(int(callback_id))
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+
+
 def cleanup_orphaned_callbacks() -> None:
     """
     Best-effort cleanup for callbacks that may have survived a python reload.
@@ -97,12 +130,8 @@ def cleanup_orphaned_callbacks() -> None:
     state = _load_state()
 
     # OpenMaya callbacks
-    if om:
-        for cb_id in state.get("om", []) or []:
-            try:
-                om.MMessage.removeCallback(int(cb_id))
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
+    for cb_id in state.get("om", []) or []:
+        _remove_om_callback(int(cb_id))
 
     # scriptJobs
     for job_id in state.get("scriptjob", []) or []:
@@ -526,6 +555,11 @@ class RuntimeManager(QtCore.QObject):
             cleanups.append(animationToolsApi.cleanup)
         except Exception:
             pass
+        try:
+            from TheKeyMachine.maya import viewport as viewportApi
+            cleanups.append(viewportApi.cleanup)
+        except Exception:
+            pass
 
         for cleanup in cleanups:
             try:
@@ -704,7 +738,13 @@ class RuntimeManager(QtCore.QObject):
         self._track_om(key, int(cb_id))
         return int(cb_id)
 
-    def add_anim_curve_edited_callback(self, handler: Callable[..., Any], *, key: str) -> Optional[int]:
+    def add_anim_curve_edited_callback(
+        self,
+        handler: Callable[..., Any],
+        *,
+        key: str,
+        coalesce: bool = True,
+    ) -> Optional[int]:
         """Register Maya's batched animation-curve edit callback."""
         if not oma:
             return None
@@ -712,7 +752,7 @@ class RuntimeManager(QtCore.QObject):
         queue_key = object()
 
         def _wrapped(*args):
-            if self._anim_curve_coalesce_depth:
+            if coalesce and self._anim_curve_coalesce_depth:
                 self._queue_anim_curve_callback(queue_key, handler, key, args)
                 return
             try:
@@ -722,6 +762,48 @@ class RuntimeManager(QtCore.QObject):
 
         try:
             cb_id = oma.MAnimMessage.addAnimCurveEditedCallback(_wrapped)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return None
+        self._track_om(key, int(cb_id))
+        return int(cb_id)
+
+    def add_anim_keyframe_edited_callback(self, handler: Callable[..., Any], *, key: str) -> Optional[int]:
+        """Register Maya's keyframe edit callback and own its cleanup."""
+        if not oma:
+            return None
+
+        def _wrapped(*args):
+            try:
+                handler(*args)
+            finally:
+                self._emit(key)
+
+        try:
+            cb_id = oma.MAnimMessage.addAnimKeyframeEditedCallback(_wrapped)
+        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            return None
+        self._track_om(key, int(cb_id))
+        return int(cb_id)
+
+    def add_3d_view_pre_render_callback(
+        self,
+        panel: str,
+        handler: Callable[..., Any],
+        *,
+        key: str,
+    ) -> Optional[int]:
+        """Register a 3D-view pre-render callback and own its cleanup."""
+        if not omui or not panel:
+            return None
+
+        def _wrapped(*args):
+            try:
+                handler(*args)
+            finally:
+                self._emit(key)
+
+        try:
+            cb_id = omui.MUiMessage.add3dViewPreRenderMsgCallback(str(panel), _wrapped)
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             return None
         self._track_om(key, int(cb_id))
@@ -804,12 +886,7 @@ class RuntimeManager(QtCore.QObject):
         # the group in one pass and persist once instead of rewriting the
         # optionVar after every callback.
         for cb_id in self._om_callbacks.pop(key, []) or []:
-            if not om:
-                break
-            try:
-                om.MMessage.removeCallback(int(cb_id))
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
+            _remove_om_callback(int(cb_id))
 
         for job_id in list(self._scriptjobs.get(key, []) or []):
             _kill_scriptjob(int(job_id))
@@ -1296,12 +1373,7 @@ class RuntimeManager(QtCore.QObject):
     # Removal
     # ----------------------------
     def _remove_om_callback_id(self, cb_id: int) -> None:
-        if not om:
-            return
-        try:
-            om.MMessage.removeCallback(int(cb_id))
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
+        _remove_om_callback(int(cb_id))
         for key, ids in list(self._om_callbacks.items()):
             self._om_callbacks[key] = [i for i in ids if int(i) != int(cb_id)]
             if not self._om_callbacks[key]:
@@ -1310,12 +1382,8 @@ class RuntimeManager(QtCore.QObject):
 
     def _remove_all(self) -> None:
         # Remove OpenMaya callbacks
-        if om:
-            for cb_id in [cb_id for ids in self._om_callbacks.values() for cb_id in ids]:
-                try:
-                    om.MMessage.removeCallback(int(cb_id))
-                except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                    pass
+        for cb_id in [cb_id for ids in self._om_callbacks.values() for cb_id in ids]:
+            _remove_om_callback(int(cb_id))
         self._om_callbacks.clear()
 
         # Remove scriptJobs

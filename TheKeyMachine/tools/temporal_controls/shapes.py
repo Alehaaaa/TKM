@@ -126,18 +126,24 @@ def sphere(name, size):
 
 
 def rhombus(name, size):
-    """A volumetric 4-facet gem outline -- top point, four equatorial
-    points, bottom point -- like the classic floating-diamond marker (The
-    Sims' "plumbob"), but shorter/squatter: height is well under the
-    equatorial radius rather than equal to it."""
-    height = size * 0.6
-    points = [
-        (0, height, 0), (size, 0, 0), (0, 0, size), (0, height, 0),
-        (0, 0, -size), (size, 0, 0), (0, -height, 0), (0, 0, size),
-        (0, -height, 0), (0, 0, -size),
-    ]
-    curve = cmds.curve(degree=1, point=points)
-    return cmds.rename(curve, name)
+    """A Sims-style double-pointed diamond / plumbob outline."""
+    height = size * 1.35
+    mid = size * 0.55
+    top = (0, height, 0)
+    bottom = (0, -height, 0)
+    ring = (
+        (mid, 0, 0),
+        (0, 0, mid),
+        (-mid, 0, 0),
+        (0, 0, -mid),
+    )
+
+    ring_curve = cmds.curve(degree=1, point=list(ring) + [ring[0]])
+    edges = []
+    for point in ring:
+        edges.append(cmds.curve(degree=1, point=[top, point]))
+        edges.append(cmds.curve(degree=1, point=[bottom, point]))
+    return _combine_curves(name, [ring_curve] + edges)
 
 
 def _flat_compass_directions():
@@ -174,19 +180,95 @@ def _flat_arrow_outline(direction, size):
 
 
 def arrow_cross(name, size):
-    """Four flat, double-sided arrow outlines pointing out along the
-    ground plane's compass directions -- real outline silhouettes, not
-    center-line strokes."""
-    pieces = [_flat_arrow_outline(direction, size) for direction in _flat_compass_directions()]
-    return _combine_curves(name, pieces)
+    """Four flat arrow outlines as one continuous curve shape."""
+    shaft_len = size * 0.55
+    shaft_half_w = size * 0.10
+    head_half_w = size * 0.24
+    join_half_w = shaft_half_w
+
+    def pt(x, z):
+        return (x, 0, z)
+
+    points = [
+        pt(join_half_w, -join_half_w),
+        pt(shaft_len, -shaft_half_w),
+        pt(shaft_len, -head_half_w),
+        pt(size, 0),
+        pt(shaft_len, head_half_w),
+        pt(shaft_len, shaft_half_w),
+        pt(join_half_w, join_half_w),
+        pt(shaft_half_w, shaft_len),
+        pt(head_half_w, shaft_len),
+        pt(0, size),
+        pt(-head_half_w, shaft_len),
+        pt(-shaft_half_w, shaft_len),
+        pt(-join_half_w, join_half_w),
+        pt(-shaft_len, shaft_half_w),
+        pt(-shaft_len, head_half_w),
+        pt(-size, 0),
+        pt(-shaft_len, -head_half_w),
+        pt(-shaft_len, -shaft_half_w),
+        pt(-join_half_w, -join_half_w),
+        pt(-shaft_half_w, -shaft_len),
+        pt(-head_half_w, -shaft_len),
+        pt(0, -size),
+        pt(head_half_w, -shaft_len),
+        pt(shaft_half_w, -shaft_len),
+        pt(join_half_w, -join_half_w),
+    ]
+    curve = cmds.curve(degree=1, point=points)
+    return cmds.rename(curve, name)
 
 
 def arrow_circle(name, size):
-    """arrow_cross plus a circle expanding from the center -- reads as a
-    combined move/rotate control icon."""
-    pieces = [_flat_arrow_outline(direction, size) for direction in _flat_compass_directions()]
-    pieces.append(cmds.circle(normal=(0, 1, 0), radius=size * 0.5, constructionHistory=False)[0])
-    return _combine_curves(name, pieces)
+    """Four arrow outlines fused into one smaller central ring."""
+    ring_radius = size * 0.38
+    shaft_len = size * 0.55
+    shaft_half_w = size * 0.10
+    head_half_w = size * 0.24
+    arc_steps = 7
+
+    def arrow_points(direction):
+        dx, dz = direction
+        px, pz = -dz, dx
+
+        def pt(d, p):
+            return (dx * d + px * p, 0, dz * d + pz * p)
+
+        return [
+            pt(ring_radius, -shaft_half_w),
+            pt(shaft_len, -shaft_half_w),
+            pt(shaft_len, -head_half_w),
+            pt(size, 0),
+            pt(shaft_len, head_half_w),
+            pt(shaft_len, shaft_half_w),
+            pt(ring_radius, shaft_half_w),
+        ]
+
+    def arc_points(start, end):
+        start_angle = math.atan2(start[2], start[0])
+        end_angle = math.atan2(end[2], end[0])
+        while end_angle <= start_angle:
+            end_angle += math.tau
+        return [
+            (
+                ring_radius * math.cos(start_angle + (end_angle - start_angle) * step / arc_steps),
+                0,
+                ring_radius * math.sin(start_angle + (end_angle - start_angle) * step / arc_steps),
+            )
+            for step in range(1, arc_steps + 1)
+        ]
+
+    directions = ((1, 0), (0, 1), (-1, 0), (0, -1))
+    outlines = [arrow_points(direction) for direction in directions]
+    points = []
+    for index, outline in enumerate(outlines):
+        points.extend(outline if index == 0 else outline[1:])
+        next_outline = outlines[(index + 1) % len(outlines)]
+        points.extend(arc_points(outline[-1], next_outline[0]))
+
+    curve = cmds.curve(degree=1, point=points)
+    return cmds.rename(curve, name)
 
 
 def cog(name, size, teeth=8):
@@ -240,7 +322,7 @@ SHAPES = {
 # builder, see SHAPES above).
 SHAPE_LIST = (
     {"id": "none", "label": "No Shape"},
-    {"id": "rounded_square", "label": "Default"},
+    {"id": "rounded_square", "label": "Rounded Square"},
     {"id": "square", "label": "Square"},
     {"id": "circle", "label": "Circle"},
     {"id": "locator", "label": "Locator"},

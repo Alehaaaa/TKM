@@ -173,13 +173,58 @@ def _schedule_create_retry(attempt):
 
 def _place_graph_toolbar_widget(toolbar_widget, dock_position=None):
     if dock_position is None:
-        dock_position = settings.get_setting(graphToolbarController.GRAPH_TOOLBAR_DOCK_SETTING, graphToolbarController.DOCK_BOTTOM_GRAPH)
+        dock_position = settings.get_setting(graphToolbarController.GRAPH_TOOLBAR_DOCK_SETTING, graphToolbarController.DOCK_DEFAULT)
     if dock_position not in _DOCK_POSITION_IDS:
-        dock_position = graphToolbarController.DOCK_BOTTOM_GRAPH
+        dock_position = graphToolbarController.DOCK_DEFAULT
 
     host, graph_layout, graph_content = _graph_editor_layout_host()
     if not host or not graph_layout or not graph_content:
         return False
+
+    if dock_position == graphToolbarController.DOCK_OVER_GRAPH:
+        # graph_content (formLayout117) is a real Maya formLayout -- its Qt
+        # layout only knows how to position the two children MEL attached
+        # it to (the native button toolbar and the graph/outliner pane), so
+        # parenting anything else into it directly leaves it with no
+        # geometry. Swap that layout for a plain QVBoxLayout we control, and
+        # insert the toolbar right after the native buttons.
+        frame_widget = pane_widget = None
+        for child in graph_content.children():
+            if not isinstance(child, QtWidgets.QWidget):
+                continue
+            name = child.objectName().lower()
+            if frame_widget is None and name.startswith("framelayout"):
+                frame_widget = child
+            elif pane_widget is None and name.startswith("panelayout"):
+                pane_widget = child
+
+        if frame_widget and pane_widget:
+            form_layout = graph_content.layout()
+            if not isinstance(form_layout, QtWidgets.QVBoxLayout):
+                form_layout.removeWidget(frame_widget)
+                form_layout.removeWidget(pane_widget)
+                QtWidgets.QWidget().setLayout(form_layout)  # detach without deleting its children
+                form_layout = QtWidgets.QVBoxLayout()
+                form_layout.setContentsMargins(0, 0, 0, 0)
+                form_layout.setSpacing(0)
+                graph_content.setLayout(form_layout)
+                form_layout.addWidget(frame_widget, 0)  # native toolbar: fixed height
+                form_layout.addWidget(pane_widget, 1)  # graph/outliner: stretches to fill
+
+            parent = toolbar_widget.parentWidget()
+            if parent and parent.layout():
+                parent.layout().removeWidget(toolbar_widget)
+            toolbar_widget.setParent(graph_content)
+            toolbar_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+            form_layout.insertWidget(form_layout.indexOf(frame_widget) + 1, toolbar_widget, 0)
+
+            toolbar_widget.show()
+            form_layout.invalidate()
+            form_layout.activate()
+            return True
+        # No frameLayout/paneLayout pair found -- fall through to the
+        # plain graph_layout placement below instead of leaving the
+        # toolbar unparented.
 
     parent = toolbar_widget.parentWidget()
     if parent and parent.layout():
@@ -188,16 +233,16 @@ def _place_graph_toolbar_widget(toolbar_widget, dock_position=None):
     toolbar_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
     graph_index = graph_layout.indexOf(graph_content)
-    if dock_position == graphToolbarController.DOCK_BOTTOM_MENU:
+    if dock_position == graphToolbarController.DOCK_OVER_MENU:
         menu_indices = [
             graph_layout.indexOf(widget)
             for widget in _layout_widgets(graph_layout)
             if isinstance(widget, QtWidgets.QMenuBar)
         ]
         insert_index = max(menu_indices) + 1 if menu_indices else max(0, graph_index)
-    elif dock_position == graphToolbarController.DOCK_TOP_GRAPH:
+    elif dock_position == graphToolbarController.DOCK_OVER_GRAPH:
         insert_index = max(0, graph_index)
-    else:  # graphToolbarController.DOCK_BOTTOM_GRAPH
+    else:  # graphToolbarController.DOCK_UNDER_GRAPH
         insert_index = graph_index + 1
 
     graph_layout.insertWidget(insert_index, toolbar_widget)
@@ -329,7 +374,7 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
             source_widget or flow_qw,
             dock_options=graphToolbarController.DOCK_OPTIONS,
             dock_setting=graphToolbarController.GRAPH_TOOLBAR_DOCK_SETTING,
-            default_dock_position=graphToolbarController.DOCK_BOTTOM_GRAPH,
+            default_dock_position=graphToolbarController.DOCK_DEFAULT,
             move_dock_fn=moveCustomGraphDock,
             apply_alignment_fn=applyCustomGraphAlignment,
         )

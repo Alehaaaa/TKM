@@ -146,6 +146,8 @@ def add_tool_button(section, item_data, *, overrides=None):
     btn = cw.create_tool_button_from_data(data)
     if tool_id == "background_runners":
         bind_background_runners_activity_button(btn)
+    elif tool_id == "pause_viewport":
+        bind_pause_viewport_auto_icon(btn)
     elif tool_id == "animation_recovery":
         from TheKeyMachine.tools.animation_recovery import api as animationRecoveryApi
 
@@ -290,6 +292,49 @@ def bind_background_runners_activity_button(btn):
             _pulse,
             parent=btn,
         )
+    return btn
+
+
+def bind_pause_viewport_auto_icon(btn):
+    if not wutil.is_valid_widget(btn):
+        return btn
+
+    from TheKeyMachine.tools import registry
+    from TheKeyMachine.tools.pause_viewport import api as pauseViewportApi
+
+    shortcut_variants = list(getattr(btn, "_shortcut_variants", []) or [])
+    base_shortcuts = list((getattr(btn, "_base_state", {}) or {}).get("shortcuts", []) or [])
+
+    def _display_state(tool_id):
+        tool = registry.get_tool(tool_id)
+        state = cw._tooltip_state_from_data(tool, display_text=tool.get("text"))
+        state["shortcuts"] = base_shortcuts
+        return state
+
+    def _sync_icon(*_args, target=btn):
+        if not wutil.is_valid_widget(target):
+            return
+        tool_id = "auto_pause_viewport" if pauseViewportApi.is_auto_pause_enabled() else "pause_viewport"
+        state = _display_state(tool_id)
+        try:
+            target._base_state.update(state)
+            target._icon = state.get("icon")
+            if getattr(target, "_active_variant_mask", None) is None:
+                target._apply_display_state(state)
+            target.setShortcutVariants(shortcut_variants)
+        except Exception:
+            target.setIcon(QtGui.QIcon(state.get("icon") or ""))
+
+    signal = pauseViewportApi.auto_pause_changed_signal()
+    if signal is not None:
+        toolCommon.replace_tracked_connection(
+            btn,
+            "_tkm_pause_viewport_auto_icon_sync",
+            signal,
+            _sync_icon,
+            parent=btn,
+        )
+    _sync_icon()
     return btn
 
 

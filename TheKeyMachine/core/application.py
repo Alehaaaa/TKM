@@ -94,6 +94,12 @@ def get_thekeymachine_codename():
     return getattr(TheKeyMachine, "__codename__", "unknown")
 
 
+def get_thekeymachine_website():
+    import TheKeyMachine
+
+    return getattr(TheKeyMachine, "__website__", "https://alehaaaa.github.io/TKM/")
+
+
 # ----- RUTAS ----------------------------------------------------------------------
 
 

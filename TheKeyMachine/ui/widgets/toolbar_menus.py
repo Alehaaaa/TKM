@@ -589,6 +589,18 @@ def _refresh_toolbar_pinning_footer(menu, toolbar_widget):
             finally:
                 action.blockSignals(blocked)
 
+    dock_actions = getattr(menu, "_tkm_dock_actions", None) or {}
+    if dock_actions and wutil.is_valid_widget(toolbar_widget):
+        current_position = settings.get_setting(graph_toolbar.GRAPH_TOOLBAR_DOCK_SETTING, graph_toolbar.DOCK_DEFAULT)
+        for position, action in dock_actions.items():
+            if not wutil.is_valid_widget(action):
+                continue
+            blocked = action.blockSignals(True)
+            try:
+                action.setChecked(position == current_position)
+            finally:
+                action.blockSignals(blocked)
+
 
 def _workspace_menu_fingerprint():
     """A snapshot of "what the workspace footer should currently show".
@@ -787,6 +799,39 @@ def _add_alignment_actions(
     return group, actions
 
 
+def _add_dock_actions(menu, dock_options, dock_setting, default_dock_position, move_dock_fn):
+    """Add one exclusive, checkable action per dock_options row to *menu*.
+
+    Shared by the graph toolbar's standalone Dock submenu and the inline
+    anchor section in its Settings menu, so both stay in sync off the same
+    (id, label, description) rows.
+    """
+    from TheKeyMachine.core import i18n
+    from TheKeyMachine.tools import registry
+
+    group = QtGui.QActionGroup(menu)
+    group.setExclusive(True)
+
+    current_position = settings.get_setting(dock_setting, default_dock_position)
+    valid_positions = {position for position, _label, _description in dock_options}
+    if current_position not in valid_positions:
+        current_position = default_dock_position
+
+    actions = {}
+    for position, label, description in dock_options:
+        actions[position] = _add_checkable_action(
+            menu,
+            i18n.tr("graph_dock_{}".format(position), label),
+            toolCommon.mark_non_tool_action(
+                partial(registry.apply_choice_value, move_dock_fn, position)
+            ),
+            checked=position == current_position,
+            group=group,
+            description=i18n.tr("graph_dock_{}_desc".format(position), description),
+        )
+    return group, actions
+
+
 def _workspace_action_state(ws, active_ws):
     """Single source of truth for a workspace action's label/checked state.
 
@@ -854,6 +899,17 @@ def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
         apply_alignment_fn,
         sections,
     )
+
+    is_graph_toolbar = toolbar_widget.objectName() == "tkm_customGraph_flowToolbar"
+    if is_graph_toolbar:
+        menu.addSeparator()
+        menu._tkm_dock_group, menu._tkm_dock_actions = _add_dock_actions(
+            menu,
+            graph_toolbar.DOCK_OPTIONS,
+            graph_toolbar.GRAPH_TOOLBAR_DOCK_SETTING,
+            graph_toolbar.DOCK_DEFAULT,
+            graph_toolbar.move_dock,
+        )
 
     menu.addSeparator()
     restore_defaults_callback = toolCommon.mark_non_tool_action(
@@ -1169,15 +1225,15 @@ def _main_menu_builders(toolbar):
 
 
 def _graph_menu_builders():
+    dock_args = (
+        graph_toolbar.DOCK_OPTIONS,
+        graph_toolbar.GRAPH_TOOLBAR_DOCK_SETTING,
+        graph_toolbar.DOCK_DEFAULT,
+        graph_toolbar.move_dock,
+    )
     return {
-        "graph_settings_menu": partial(build_graph_settings_submenu, graph_toolbar.apply_alignment),
-        "graph_dock_menu": partial(
-            build_graph_dock_menu,
-            graph_toolbar.DOCK_OPTIONS,
-            graph_toolbar.GRAPH_TOOLBAR_DOCK_SETTING,
-            graph_toolbar.DOCK_BOTTOM_GRAPH,
-            graph_toolbar.move_dock,
-        ),
+        "graph_settings_menu": partial(build_graph_settings_submenu, *dock_args, graph_toolbar.apply_alignment),
+        "graph_dock_menu": partial(build_graph_dock_menu, *dock_args),
     }
 
 
@@ -1236,7 +1292,7 @@ def build_main_settings_menu(
     return toolbar_menu
 
 
-def build_graph_settings_submenu(apply_alignment_fn):
+def build_graph_settings_submenu(dock_options, dock_setting, default_dock_position, move_dock_fn, apply_alignment_fn):
     from TheKeyMachine.core import i18n
 
     settings_menu = cw.MenuWidget(
@@ -1271,6 +1327,15 @@ def build_graph_settings_submenu(apply_alignment_fn):
         apply_alignment_fn,
     )
 
+    settings_menu.addSection(i18n.tr("toolbar_anchor_section", "Anchor"))
+    settings_menu._tkm_dock_group, settings_menu._tkm_dock_actions = _add_dock_actions(
+        settings_menu,
+        dock_options,
+        dock_setting,
+        default_dock_position,
+        move_dock_fn,
+    )
+
     settings_menu.addSection(i18n.tr("general_section", "General"))
     settings_menu.addAction(
         QtGui.QIcon(icons.close),
@@ -1287,33 +1352,19 @@ def build_graph_settings_submenu(apply_alignment_fn):
 
 def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, move_dock_fn):
     from TheKeyMachine.core import i18n
-    from TheKeyMachine.tools import registry
 
     dock_menu = cw.MenuWidget(
         QtGui.QIcon(icons.dock),
         i18n.tr("dock_menu", "Dock"),
         description=i18n.tr("graph_dock_menu_desc", "Move the Graph Editor toolbar."),
     )
-    dock_group = QtGui.QActionGroup(dock_menu)
-    dock_group.setExclusive(True)
-
-    dock_actions = {}
-    for position, label, description in dock_options:
-        dock_actions[position] = _add_checkable_action(
-            dock_menu,
-            i18n.tr("graph_dock_{}".format(position), label),
-            toolCommon.mark_non_tool_action(
-                partial(registry.apply_choice_value, move_dock_fn, position)
-            ),
-            group=dock_group,
-            description=i18n.tr("graph_dock_{}_desc".format(position), description),
-        )
-
-    current_position = settings.get_setting(dock_setting, default_dock_position)
-    if current_position not in dock_actions:
-        current_position = default_dock_position
-    for position, action in dock_actions.items():
-        toolCommon.set_checked_safely(action, position == current_position)
+    dock_menu._tkm_dock_group, dock_menu._tkm_dock_actions = _add_dock_actions(
+        dock_menu,
+        dock_options,
+        dock_setting,
+        default_dock_position,
+        move_dock_fn,
+    )
     return dock_menu
 
 
@@ -1329,7 +1380,14 @@ def build_graph_settings_menu(
     from TheKeyMachine.tools.tkm_menu import api as tkmMenuApi
 
     menu.addAction(tkmMenuApi.create_logo_action(menu))
-    build_settings_submenu = partial(build_graph_settings_submenu, apply_alignment_fn)
+    build_settings_submenu = partial(
+        build_graph_settings_submenu,
+        dock_options,
+        dock_setting,
+        default_dock_position,
+        move_dock_fn,
+        apply_alignment_fn,
+    )
     build_dock_submenu = partial(
         build_graph_dock_menu,
         dock_options,

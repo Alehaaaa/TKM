@@ -15,6 +15,12 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.48:
+  - polish: Temporal Controls Panel has a larger default size and cleaner icon sliders
+  - polish: Graph Editor toolbar docking is clearer and stays synced
+  - polish: Global Curve creates dense guide curves faster
+  - new: Auto Pause Viewport pauses refresh and updates after animation changes
+
 0.1.47:
   - bugfix: Toolbar reloads and tab restores avoid leftover callbacks and keep docked areas from stretching
 

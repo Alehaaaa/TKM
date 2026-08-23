@@ -10,6 +10,7 @@ from maya.api import OpenMaya as om
 
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core import runtime
+from TheKeyMachine.core import settings
 from TheKeyMachine.maya import selection
 import TheKeyMachine.ui.widgets.util as wutil
 from TheKeyMachine.maya.runtime import TkmSceneNode
@@ -26,16 +27,20 @@ TRACER_CONSTRAINT = "Tracer_parentConstraint"
 TRACERS_GROUP = "Tracers"
 _TRACER_GROUP_ATTR = "tkmTracerGroup"
 
-_STYLE_OPTION = "TKM_TracerStyle"
-_SIZE_OPTION = "TKM_TracerSize"
-_COLOR_OPTION = "TKM_TracerColor"
-_RANGE_OPTION = "TKM_TracerRange"
-_PERFORMANCE_OPTION = "TKM_TracerPerformance"
-_AUTO_UPDATE_OPTION = "TKM_TracerAutoUpdate"
-_FALLOFF_OPTION = "TKM_TracerFalloff"
-_XRAY_OPTION = "TKM_TracerXray"
-_DIRECTION_OPTION = "TKM_TracerDirection"
-_ACTIVE_TRACER_OPTION = "TKM_ActiveTracer"
+# All tracer preferences live in the shared TKM preferences store (see
+# core/settings.py) rather than as individual Maya optionVars, so they sync
+# with the rest of TKM's state and stay out of userPrefs.mel.
+TRACER_SETTINGS_NAMESPACE = "tracer"
+_STYLE_OPTION = "style"
+_SIZE_OPTION = "size"
+_COLOR_OPTION = "color"
+_RANGE_OPTION = "range"
+_PERFORMANCE_OPTION = "performance"
+_AUTO_UPDATE_OPTION = "auto_update"
+_FALLOFF_OPTION = "falloff"
+_XRAY_OPTION = "xray"
+_DIRECTION_OPTION = "direction"
+_ACTIVE_TRACER_OPTION = "active_tracer"
 _CALLBACK_KEY = "tracer:auto_update"
 
 # Deliberately process-local: offsets survive tracer removal/recreation during
@@ -160,24 +165,11 @@ PERFORMANCE_ORDER = ("update", "balanced", "interaction")
 
 
 def _option_value(name, default):
-    try:
-        if cmds.optionVar(exists=name):
-            return cmds.optionVar(query=name)
-    except (RuntimeError, TypeError, ValueError, AttributeError):
-        pass
-    return default
+    return settings.get_setting(name, default, namespace=TRACER_SETTINGS_NAMESPACE)
 
 
 def _set_option(name, value):
-    try:
-        if isinstance(value, bool):
-            cmds.optionVar(integerValue=(name, int(value)))
-        elif isinstance(value, int):
-            cmds.optionVar(integerValue=(name, value))
-        else:
-            cmds.optionVar(stringValue=(name, str(value)))
-    except (RuntimeError, TypeError, ValueError, AttributeError):
-        pass
+    settings.set_setting(name, value, namespace=TRACER_SETTINGS_NAMESPACE)
 
 
 def _stored_tracer_group(node_name):

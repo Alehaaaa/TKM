@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .body {
+        fill: #d37e7e;
+        stroke: #3a3a3a;
+        stroke-width: 1.5px;
+        stroke-linejoin: round;
+        stroke-miterlimit: 10;
+      }
+
+      .antenna-fill {
+        fill: #b5b7ba;
+      }
+
+      .antenna-stroke {
+        fill: none;
+        stroke: #3a3a3a;
+        stroke-width: 2.2px;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+    </style>
+  </defs>
+  <path class="body" d="M18,8 L32,8 L42,18 L42,32 L32,42 L18,42 L8,32 L8,18 Z"/>
+  <g transform="translate(2 0.5) scale(0.46)">
+    <path class="antenna-stroke" d="M17,40 L17,29"/>
+    <circle class="antenna-fill" cx="17" cy="25" r="4"/>
+    <circle class="antenna-stroke" cx="17" cy="25" r="4"/>
+    <path class="antenna-stroke" d="M10,31 C7,28 7,22 10,19"/>
+    <path class="antenna-stroke" d="M24,31 C27,28 27,22 24,19"/>
+    <path class="antenna-stroke" d="M5,36 C0,30 0,20 5,14"/>
+    <path class="antenna-stroke" d="M29,36 C34,30 34,20 29,14"/>
+  </g>
+</svg>

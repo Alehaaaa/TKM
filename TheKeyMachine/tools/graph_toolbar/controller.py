@@ -8,13 +8,18 @@ from TheKeyMachine.tools import common as toolCommon
 
 GRAPH_TOOLBAR_ENABLED_SETTING = "graph_toolbar_enabled"
 GRAPH_TOOLBAR_DOCK_SETTING = "graph_toolbar_dock_position"
-DOCK_BOTTOM_GRAPH = "bottom_graph_editor"
-DOCK_TOP_GRAPH = "top_graph_editor"
-DOCK_BOTTOM_MENU = "bottom_menu"
+
+# Anchor positions for the Graph Editor toolbar.
+DOCK_OVER_MENU = "bottom_menu"  # directly below the Graph Editor's own menu bar
+DOCK_OVER_GRAPH = "top_graph_editor"  # between the native button toolbar and the graph panel
+DOCK_UNDER_GRAPH = "bottom_graph_editor"  # below the whole Graph Editor content
+
+DOCK_DEFAULT = DOCK_OVER_GRAPH
+
 DOCK_OPTIONS = (
-    (DOCK_BOTTOM_MENU, "Under Menu", "Place the toolbar directly below the Graph Editor menu."),
-    (DOCK_TOP_GRAPH, "Top of Graph Editor", "Place the toolbar at the top of the Graph Editor."),
-    (DOCK_BOTTOM_GRAPH, "Bottom of Graph Editor", "Place the toolbar at the bottom of the Graph Editor."),
+    (DOCK_OVER_MENU, "Over Menu", "Place the toolbar directly below the Graph Editor menu."),
+    (DOCK_OVER_GRAPH, "Over Graph", "Place the toolbar between the native toolbar and the graph panel."),
+    (DOCK_UNDER_GRAPH, "Under Graph", "Place the toolbar below the graph panel."),
 )
 
 

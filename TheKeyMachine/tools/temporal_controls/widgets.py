@@ -278,15 +278,22 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         self._completed = False
         self._selected_color = None
         self._color_buttons = {}
+        # Tracks Position's own last value (independent of Orientation) so
+        # _on_position_space_changed can tell whether Orientation was
+        # "following" Position (selected_id() still equal to the value
+        # Position just moved away from) -- see that method.
+        self._last_position_space = None
 
         self.setObjectName("temporal_controls_dialog")
 
         self._build_columns()
+        self.position_list.selectionChanged.connect(self._on_position_space_changed)
         self._build_reset_row()
         self._build_entry_row()
         self._build_color_row()
 
         self._apply_last_used_options()
+        self.resize(self.OPEN_WIDTH, self.OPEN_HEIGHT)
 
     # ------------------------------------------------------------------
     # Layout
@@ -294,6 +301,7 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
 
     def _build_columns(self):
         columns_row = QtWidgets.QWidget()
+        columns_row.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         columns_layout = QtWidgets.QHBoxLayout(columns_row)
         columns_layout.setContentsMargins(0, 0, 0, 0)
         columns_layout.setSpacing(wutil.DPI(6))
@@ -302,10 +310,11 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         self.position_list = self._add_column(columns_layout, "Position", api.SPACES)
         self.orientation_list = self._add_column(columns_layout, "Orientation", api.SPACES)
 
-        self.mainLayout.addWidget(columns_row)
+        self.mainLayout.addWidget(columns_row, 1)
 
     def _add_column(self, parent_layout, title, options):
         column = QtWidgets.QWidget()
+        column.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         column_layout = QtWidgets.QVBoxLayout(column)
         column_layout.setContentsMargins(0, 0, 0, 0)
         column_layout.setSpacing(wutil.DPI(3))
@@ -315,7 +324,8 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         column_layout.addWidget(title_label)
 
         option_list = _OptionList(options)
-        option_list.setFixedHeight(wutil.DPI(190))
+        option_list.setMinimumHeight(wutil.DPI(120))
+        option_list.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         column_layout.addWidget(option_list, 1)
 
         parent_layout.addWidget(column, 1)
@@ -450,6 +460,20 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         self.orientation_list.select_id(last.get("orientation_space") or api.DEFAULT_SPACE)
         self._set_selected_color(COLORS.selection.get(last.get("color"), COLORS.selection.default))
 
+    def _on_position_space_changed(self, space_id):
+        """Move Orientation along with Position when Orientation was still
+        matching Position's previous space -- i.e. it read as "following"
+        Position rather than a deliberate separate choice. If the user had
+        already picked a different Orientation space, that choice is left
+        alone. There's no explicit lock toggle here (unlike the Temp
+        Controls Panel's own lock_button on an existing control) since this
+        dialog is a one-shot creation form -- "still equal to Position"
+        is the only signal available for "was following"."""
+        previous_position_space = self._last_position_space
+        if previous_position_space is not None and self.orientation_list.selected_id() == previous_position_space:
+            self.orientation_list.select_id(space_id)
+        self._last_position_space = space_id
+
     def _on_reset_toggled(self, checked):
         if not checked:
             return
@@ -476,21 +500,28 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
-        self._compress_to_contents()
-        self.place_near_cursor()
+        self._place_current_size_near_cursor()
 
-    def _compress_to_contents(self):
-        # Width matches the color-swatch row exactly -- it's the narrowest
-        # "natural" row, so pinning to it (rather than the wider column list)
-        # keeps the dialog no bigger than it needs to be on first show.
-        # setMinimumWidth (not setFixedWidth) so this is just a starting
-        # size -- like every other TKM popup (Bake Custom Interval,
-        # Animation Layers, Selector), the window stays resizable via its
-        # grip afterward instead of being locked to it.
-        margins = self.mainLayout.contentsMargins()
-        target_width = self.color_row.sizeHint().width() + margins.left() + margins.right()
-        self.setMinimumWidth(target_width)
-        self.adjustSize()
+    OPEN_WIDTH = wutil.DPI(320)
+    OPEN_HEIGHT = wutil.DPI(396)
+
+    def _place_current_size_near_cursor(self):
+        w, h = self.width(), self.height()
+        cursor_pos = QtGui.QCursor.pos()
+        screen = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
+        if screen is None:
+            return
+        geo = screen.availableGeometry()
+
+        v_offset = wutil.DPI(30)
+        y = cursor_pos.y() - h - v_offset
+        if y < geo.top():
+            y = cursor_pos.y() + v_offset
+
+        x = cursor_pos.x() - w // 2
+        x = max(geo.left(), min(x, geo.right() - w))
+        y = max(geo.top(), min(y, geo.bottom() - h))
+        self.move(x, y)
 
     def closeEvent(self, event):
         if not self._completed and callable(self.on_rejected):

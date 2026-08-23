@@ -507,7 +507,13 @@ class LayerRowWidget(QtWidgets.QWidget):
         button.setAutoRaise(False)
         button.setStyleSheet(_row_icon_button_stylesheet(active_color))
         button.setFixedSize(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE)
-        icon_dim = int(TOGGLE_BUTTON_SIZE * 0.8)
+        # 0.7, not 0.8 -- the stylesheet chip's own 1px border already eats
+        # into TOGGLE_BUTTON_SIZE, so an 0.8-ratio icon (e.g. the Lock
+        # toggle's open-shackle glyph, which reaches further than the
+        # closed one) left only ~1px of clearance and could read as
+        # overflowing the chip. This keeps a little more breathing room on
+        # every side regardless of which glyph is showing.
+        icon_dim = int(TOGGLE_BUTTON_SIZE * 0.7)
         button.setIconSize(QtCore.QSize(icon_dim, icon_dim))
         button.setToolTip(tooltip)
         button.setCursor(QtCore.Qt.PointingHandCursor)
@@ -627,8 +633,8 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
         self._build_ui()
         self._init_floating_window_behavior()
-        # Explicit resize after _build_ui() to set a fixed wide-and-short default shape.
-        self.resize(wutil.DPI(560), wutil.DPI(190))
+        # Explicit resize after _build_ui() to set a fixed default shape.
+        self.resize(wutil.DPI(550), wutil.DPI(250))
         self._restore_saved_geometry()
         self.apply_stay_on_top_setting()
         self.update_transparency_state(False)

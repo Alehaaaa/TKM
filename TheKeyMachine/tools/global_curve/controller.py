@@ -489,9 +489,11 @@ def _make_guide(points):
         cmds.setAttr(holder + ".hiddenInOutliner", True)
     except (RuntimeError, TypeError, ValueError, AttributeError):
         pass
-    for time, value in points:
-        cmds.setKeyframe(holder, attribute=DRIVER_ATTR, time=(time,), value=value)
-    curve = (cmds.listConnections(holder + "." + DRIVER_ATTR, source=True, destination=False, type="animCurve") or [None])[0]
+    curve = _make_guide_curve_api(holder, points)
+    if not curve:
+        for time, value in points:
+            cmds.setKeyframe(holder, attribute=DRIVER_ATTR, time=(time,), value=value)
+        curve = (cmds.listConnections(holder + "." + DRIVER_ATTR, source=True, destination=False, type="animCurve") or [None])[0]
     if curve:
         try:
             cmds.keyTangent(curve, edit=True, inTangentType="spline", outTangentType="spline")
@@ -499,6 +501,52 @@ def _make_guide(points):
             pass
         _set_do_not_write(curve)
     return holder, curve
+
+
+def _make_guide_curve_api(holder, points):
+    """Create and fill the guide curve with one native API addKeys call.
+
+    animBot's Master Spline builds its editable master curve by preparing
+    MTimeArray/MDoubleArray data and calling MFnAnimCurve.addKeys once. That
+    avoids the command-layer notification churn of one cmds.setKeyframe call
+    per guide key, which is especially noticeable when creating a master from
+    dense visible Graph Editor curves.
+    """
+    if not points or om is None or oma is None:
+        return None
+    curve = None
+    try:
+        curve = cmds.createNode("animCurveTU", skipSelect=True)
+        cmds.connectAttr(curve + ".output", holder + "." + DRIVER_ATTR, force=True)
+        fn = maya_api.anim_curve_fn(curve)
+        if fn is None:
+            raise RuntimeError("Could not create guide anim curve function set")
+
+        unit = om.MTime.uiUnit()
+        inputs = om.MTimeArray()
+        values = om.MDoubleArray()
+        for time, value in points:
+            inputs.append(om.MTime(float(time), unit))
+            values.append(float(value))
+
+        tangent = getattr(oma.MFnAnimCurve, "kTangentSmooth", None)
+        if tangent is None:
+            tangent = getattr(oma.MFnAnimCurve, "kTangentAuto", None)
+        if tangent is None:
+            raise RuntimeError("Could not resolve guide tangent type")
+        try:
+            change = oma.MAnimCurveChange()
+            fn.addKeys(inputs, values, tangent, tangent, False, change)
+        except TypeError:
+            fn.addKeys(inputs, values, tangent, tangent, False)
+        return curve
+    except Exception:
+        if curve:
+            try:
+                cmds.delete(curve)
+            except (RuntimeError, TypeError, ValueError, AttributeError):
+                pass
+        return None
 
 
 def _publish_state():
@@ -558,6 +606,10 @@ def _editor_main_connection():
     return None
 
 
+def _update_graph_editor_connection():
+    return maya_selection.refresh_graph_editor()
+
+
 def _repair_obsolete_display_connection(current=None):
     """Recover editors left attached to a proxy used by older builds."""
     if current is None:
@@ -575,11 +627,7 @@ def _repair_obsolete_display_connection(current=None):
                 edit=True,
                 forceMainConnection=maya_selection.GRAPH_EDITOR_OUTLINER,
             )
-            cmds.animCurveEditor(
-                maya_selection.GRAPH_EDITOR,
-                query=True,
-                curvesShownForceUpdate=True,
-            )
+            _update_graph_editor_connection()
             current = maya_selection.GRAPH_EDITOR_OUTLINER
         except (RuntimeError, TypeError, ValueError, AttributeError):
             return current
@@ -611,11 +659,7 @@ def _sync_display_items(*_args):
                 changed = True
         _DISPLAY_TOUCHED_CONNECTIONS.add(source)
         if changed:
-            cmds.animCurveEditor(
-                maya_selection.GRAPH_EDITOR,
-                query=True,
-                curvesShownForceUpdate=True,
-            )
+            _update_graph_editor_connection()
         return True
     except (RuntimeError, TypeError, ValueError, AttributeError):
         return False
@@ -654,15 +698,7 @@ def _remove_graph_display():
                 cmds.selectionConnection(source, edit=True, deselect=plug)
             except (RuntimeError, TypeError, ValueError, AttributeError):
                 pass
-    try:
-        if cmds.animCurveEditor(maya_selection.GRAPH_EDITOR, exists=True):
-            cmds.animCurveEditor(
-                maya_selection.GRAPH_EDITOR,
-                query=True,
-                curvesShownForceUpdate=True,
-            )
-    except (RuntimeError, TypeError, ValueError, AttributeError):
-        pass
+    _update_graph_editor_connection()
     _delete_display_connection(DISPLAY_CONNECTION)
     _delete_display_connection(DISPLAY_ITEMS_CONNECTION)
     _DISPLAY_SOURCE_CONNECTION = None

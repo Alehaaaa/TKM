@@ -128,7 +128,7 @@ def get_position_options(toolbar_id):
 
 def get_current_position(toolbar_id):
     if toolbar_id == "graph":
-        return settings.get_setting(graph_toolbar.GRAPH_TOOLBAR_DOCK_SETTING, graph_toolbar.DOCK_BOTTOM_GRAPH)
+        return settings.get_setting(graph_toolbar.GRAPH_TOOLBAR_DOCK_SETTING, graph_toolbar.DOCK_DEFAULT)
 
     inst = get_toolbar_instance()
     if inst is not None:

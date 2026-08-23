@@ -1,3 +1,5 @@
+import webbrowser
+
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core.Qt import QtGui, QtWidgets  # type: ignore
 
@@ -31,10 +33,15 @@ class LogoAction(QtWidgets.QWidgetAction):
             )
             logo_label.setAlignment(QtCore.Qt.AlignCenter)
             layout.addWidget(logo_label)
+        else:
+            logo_label = None
 
         if self.clickable:
             container.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-            container.mouseReleaseEvent = self._on_clicked
+            container.installEventFilter(self)
+            if logo_label is not None:
+                logo_label.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+                logo_label.installEventFilter(self)
 
         self._widgets.append(container)
         return container
@@ -47,8 +54,30 @@ class LogoAction(QtWidgets.QWidgetAction):
     def isClickable(self):
         return self.clickable
 
-    def _on_clicked(self, _event):
-        application.open_url("https://github.com/Alehaaaa/TKM")
+    def eventFilter(self, watched, event):
+        if self.clickable and event.type() == QtCore.QEvent.MouseButtonRelease:
+            try:
+                if event.button() == QtCore.Qt.LeftButton:
+                    self._open_website()
+                    event.accept()
+                    return True
+            except (RuntimeError, AttributeError, TypeError, ValueError):
+                pass
+        return QtWidgets.QWidgetAction.eventFilter(self, watched, event)
+
+    @staticmethod
+    def _website_url():
+        return application.get_thekeymachine_website()
+
+    def _open_website(self):
+        url = self._website_url()
+        opened = False
+        try:
+            opened = bool(QtGui.QDesktopServices.openUrl(QtCore.QUrl(url)))
+        except (RuntimeError, AttributeError, TypeError, ValueError):
+            opened = False
+        if not opened:
+            webbrowser.open(url, new=2)
         parent = self.parent()
         if parent and hasattr(parent, "hide"):
             parent.hide()

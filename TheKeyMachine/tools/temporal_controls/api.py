@@ -30,13 +30,28 @@ dialog (see ``widgets.TemporalControlsDialog``) offering:
   Nothing in this tool drives anything through an expression anymore.
 
 Confirming the dialog calls ``create_controls_with_options()``, which
-builds one control per object: sized and positioned to match it (a static
-starting pose -- an already-animated object's own keys stay its own,
-freed up for the constraint to drive rather than copied onto the new
-control, see ``_capture_channel``), and driving the object back through
-whichever mechanism the chosen spaces call for -- *unless* the object being
-controlled is itself another Temporal Control's control (nesting one
-Temporal Control inside another). In that case Position/Orientation space
+builds one control per object: sized and positioned to match it, with a
+real copy of whatever animation it already had -- translate/rotate *and*
+every other keyframed custom attribute (enums included) -- copied onto
+the new control first if it was already animated
+(``_gather_copyable_animation``/``_copy_source_keys_to_control``: translate,
+rotate, and every extra attribute each copied as direct frame/value pairs
+at exactly *its own* key times, through a temporary reverse constraint for
+translate/rotate or a temporary connectAttr for everything else, in
+control's own space -- the same space-mismatch pitfall
+``_capture_channel``'s own docstring covers)
+-- so the object keeps showing its original motion/values, now via
+control, for the animator to key or nudge on top of instead of it just
+vanishing the moment control takes over, for then to be applied back onto
+the object at Bake time. This step reports progress through the same
+progress bar/ETA (``ToolOperation``) the rest of control creation already
+uses -- a heavily-keyed object can take far longer to hand off than the
+control build itself. Only then does the object's own live connection
+actually get freed up for the constraint to drive (``_capture_channel``),
+and driving the object back through whichever mechanism the chosen spaces
+call for -- *unless* the object being controlled is itself another
+Temporal Control's control (nesting one Temporal Control inside another).
+In that case Position/Orientation space
 is ignored entirely and ``_parent_nested_control`` makes the new control a
 real Maya parent of the nested one instead -- no constraint, no
 expression, no connection of any kind, just an ordinary child transform
@@ -97,7 +112,7 @@ from functools import partial
 
 from maya import cmds
 
-from TheKeyMachine.core.Qt import QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 from TheKeyMachine.maya import selection
 from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.data import icons
@@ -105,6 +120,21 @@ from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.temporal_controls import shapes
 import TheKeyMachine.ui.widgets.util as wutil
 
+
+class _ControlsBus(QtCore.QObject):
+    """Direct notification for the Temp Controls Panel's live sync -- see
+    create_controls_with_options' own emit and panel.py's
+    _connect_live_refresh. Same one-signal-bus-per-module pattern as
+    custom_tools.service's connect_entries_bus: a plain QObject singleton a
+    mutation function emits on directly, instead of a listener having to
+    infer "something relevant happened" from a broad, unrelated signal
+    (DAG-change callbacks fire for literally every node create/parent/
+    delete in the scene, Temporal Control or not)."""
+
+    controlsCreated = QtCore.Signal()
+
+
+controls_bus = _ControlsBus()
 
 ROOT_GROUP = "Temporal_Controls"
 
@@ -115,6 +145,16 @@ RESTORE_ATTR = "tkmTemporalRestore"
 DRIVER_NODES_ATTR = "tkmTemporalDriverNodes"
 NESTED_PARENT_ATTR = "tkmTemporalNestedParent"
 MUTED_ATTR = "tkmTemporalMuted"
+# JSON list of extra (non translate/rotate) attribute names control got a
+# copy of at creation time from an already-animated obj -- see
+# _gather_copyable_animation/_copy_source_keys_to_control. Read back by
+# _copied_attrs_for at Bake time (_apply_copied_attrs_to_target) to know
+# which of control's own attributes to reapply to target -- unlike
+# RESTORE_ATTR's channels, these were never kept live-connected back to
+# target during the tool's lifetime, so Bake/Revert don't otherwise have
+# any way to know they exist. Not locked, same as RESTORE_ATTR -- neither
+# is part of _tag_control's identity/lock block.
+COPIED_ATTRS_ATTR = "tkmTemporalCopiedAttrs"
 
 # Temp Controls Panel state -- BASE_RADIUS/SHAPE/SIZE_MULT/ORIENTATION back
 # the panel's shape picker + size/rotation sliders (see set_control_shape,
@@ -412,8 +452,6 @@ def create_controls_with_options(
             toolCommon.ensure_operation_tint(
                 operation, tint="current", default_mode="current_frame", tint_key="temporal_controls",
             )
-        operation.set_total(len(objects)).set_status("Creating Temporal Controls")
-
         options = {
             "system": system,
             "position_space": position_space,
@@ -421,6 +459,26 @@ def create_controls_with_options(
             "label": (label or "").strip(),
             "color": color,
         }
+
+        # Pre-scan every object that will actually get a new control (not
+        # already one -- _existing_control_for) for whatever pre-existing
+        # animation/attributes it's about to hand off to that control (see
+        # _gather_copyable_animation/_copy_source_keys_to_control): one
+        # build step per object below, plus one step per key time being
+        # copied -- all known up front, so the progress bar's own ETA
+        # reflects the real amount of work instead of just the object
+        # count. A heavily-keyed object (or one with several animated
+        # custom attributes) can take far longer to hand off than the
+        # control build itself.
+        pending = [obj for obj in objects if not _existing_control_for(obj)]
+        animation_by_obj = {obj: _gather_copyable_animation(obj) for obj in pending}
+        total_steps = len(objects) + sum(
+            sum(len(times) for _channel, times in translate_key_data)
+            + sum(len(times) for _channel, times in rotate_key_data)
+            + sum(len(attr_key_times) for _name, _enum, attr_key_times in extra_attrs)
+            for translate_key_data, rotate_key_data, extra_attrs in animation_by_obj.values()
+        )
+        operation.set_total(total_steps).set_status("Creating Temporal Controls")
 
         new_controls = []
         locked_report = []
@@ -430,7 +488,10 @@ def create_controls_with_options(
                 break
             if not _existing_control_for(obj):
                 options["chain_parent"] = chain_parent if system == "fk_chain" else None
-                control, chain_anchor = _create_control_for(obj, group.name, options, locked_report=locked_report)
+                control, chain_anchor = _create_control_for(
+                    obj, group.name, options, locked_report=locked_report,
+                    operation=operation, animation=animation_by_obj.get(obj),
+                )
                 if control:
                     new_controls.append(control)
                     chain_parent = chain_anchor
@@ -441,6 +502,10 @@ def create_controls_with_options(
 
         if new_controls:
             cmds.select(new_controls)
+            # Direct notification for the panel's live sync -- see
+            # _ControlsBus above -- fired here rather than left to the
+            # panel's own DAG-change watching to pick up.
+            controls_bus.controlsCreated.emit()
             return new_controls
         return wutil.make_inViewMessage("Selected objects already have Temporal Controls")
 
@@ -550,7 +615,7 @@ def _debug_log_creation_step(step, obj, options, control=None, delete_root=None,
         print("    {}".format(line))
 
 
-def _create_control_for(obj, group, options, locked_report=None):
+def _create_control_for(obj, group, options, locked_report=None, operation=None, animation=None):
     control, delete_root, chain_anchor = _build_control_hierarchy(obj, group, options)
     _debug_log_creation_step("built", obj, options, control=control, delete_root=delete_root, chain_anchor=chain_anchor)
 
@@ -560,17 +625,45 @@ def _create_control_for(obj, group, options, locked_report=None):
         # chosen color too instead of being left at its unstyled default.
         _apply_control_color(delete_root, options["color"])
 
-    _tag_control(control, obj, delete_root)
-
     if _is_temporal_control(obj):
         # obj is itself another Temporal Control's control -- nesting one
         # Temporal Control inside another. See _parent_nested_control: real
         # parenting instead of channel-driving, so there's nothing here for
         # RESTORE_ATTR/DRIVER_NODES_ATTR to track -- they're left at their
         # empty default (both getters already treat "unset" as empty).
+        #
+        # _parent_nested_control has to run *before* _tag_control here: it
+        # reparents obj under control, which changes obj's own full DAG
+        # path -- and _tag_control's TARGET_ATTR is a snapshot of exactly
+        # that path (cmds.ls(obj, long=True)[0]). Tagging first (the order
+        # every other branch uses) froze in a path that stopped existing
+        # the instant the reparent happened right after, so
+        # root_target_for's walk could never resolve control back to obj
+        # again -- it fell through to control's own unrelated Maya parent
+        # chain instead and came up empty, silently dropping control out
+        # of every rig's list (and, transitively, anything nested on top
+        # of it afterward, e.g. an Add Child control added to it later).
         _parent_nested_control(control, obj)
+        _tag_control(control, obj, delete_root)
         _debug_log_creation_step("nested (parented directly, no channel-driving)", obj, options, control=control)
         return control, chain_anchor
+
+    _tag_control(control, obj, delete_root)
+
+    # Must run before the _capture_channel loop below -- it reads obj's
+    # still-live, still-connected animCurves (see
+    # _copy_source_keys_to_control's own docstring) to give control a real
+    # copy of obj's existing motion/attribute values before _capture_channel
+    # disconnects translate/rotate's curves to make room for the forward
+    # constraint. *animation* lets create_controls_with_options pass in
+    # what it already scanned obj for up front (to size its progress bar's
+    # total correctly) instead of this scanning obj all over again.
+    translate_key_data, rotate_key_data, extra_attrs = animation or _gather_copyable_animation(obj)
+    copied_attrs = _copy_source_keys_to_control(
+        control, obj, translate_key_data, rotate_key_data, extra_attrs, operation=operation,
+    )
+    if copied_attrs:
+        TkmSceneNode(control).set_attr(COPIED_ATTRS_ATTR, json.dumps(copied_attrs))
 
     restore_map = {}
     for channel in CHANNELS:
@@ -907,7 +1000,7 @@ def set_control_orientation(control, orientation_id):
                 x, y, z = _rotate_point(x, y, z, axis, degrees)
             cmds.xform(cv, translation=(x, y, z), objectSpace=True)
     except RuntimeError as exc:
-        cmds.warning("Temp Controls Panel: couldn't orient {}: {}".format(control, exc))
+        cmds.warning("Temporal Controls Panel: couldn't orient {}: {}".format(control, exc))
         return False
     node = TkmSceneNode(control)
     node.set_attr(ORIENTATION_ATTR, orientation_id)
@@ -930,24 +1023,33 @@ def set_control_shape(control, shape_id):
     short_name = control.split("|")[-1].split(":")[-1]
     temp = shapes.build(shape_id, "{}_shapeSwap#".format(short_name), radius)
 
-    # shapes.build() always comes out at "up" -- apply whatever pose
-    # control is currently in on top of that, same as set_control_orientation
-    # does for an existing shape's CVs.
-    orientation_id = get_control_orientation(control)
-    cvs = _shape_cv_selector(cmds.listRelatives(temp, shapes=True, fullPath=True) or [])
-    _apply_orientation_transform(cvs, _ORIENTATION_TRANSFORMS.get(orientation_id))
+    try:
+        # shapes.build() always comes out at "up" -- apply whatever pose
+        # control is currently in on top of that, same as set_control_orientation
+        # does for an existing shape's CVs.
+        orientation_id = get_control_orientation(control)
+        cvs = _shape_cv_selector(cmds.listRelatives(temp, shapes=True, fullPath=True) or [])
+        _apply_orientation_transform(cvs, _ORIENTATION_TRANSFORMS.get(orientation_id))
 
-    for shape_node in cmds.listRelatives(temp, shapes=True, fullPath=True) or []:
-        cmds.parent(shape_node, control, shape=True, relative=True)
-    cmds.delete(temp)
-    if old_shapes:
-        existing_old = [node for node in old_shapes if cmds.objExists(node)]
-        if existing_old:
-            cmds.delete(existing_old)
+        for shape_node in cmds.listRelatives(temp, shapes=True, fullPath=True) or []:
+            cmds.parent(shape_node, control, shape=True, relative=True)
+        cmds.delete(temp)
+        if old_shapes:
+            existing_old = [node for node in old_shapes if cmds.objExists(node)]
+            if existing_old:
+                cmds.delete(existing_old)
 
-    _apply_shape_color(_control_shape_nodes(control), color)
-    TkmSceneNode(control).set_attr(SHAPE_ATTR, shape_id)
-    return True
+        _apply_shape_color(_control_shape_nodes(control), color)
+        TkmSceneNode(control).set_attr(SHAPE_ATTR, shape_id)
+        return True
+    finally:
+        try:
+            if cmds.objExists(temp):
+                cmds.delete(temp)
+            if cmds.objExists(control):
+                cmds.select(control)
+        except RuntimeError:
+            pass
 
 
 def _tag_control(control, obj, delete_root):
@@ -980,6 +1082,278 @@ def _tag_control(control, obj, delete_root):
     node.set_attr(SHAPE_ATTR, shapes.DEFAULT_SHAPE)
     node.set_attr(SIZE_MULT_ATTR, DEFAULT_SIZE_MULT)
     node.set_attr(ORIENTATION_ATTR, DEFAULT_ORIENTATION)
+
+
+def _channel_is_keyed(obj, channel):
+    """Whether *obj*'s *channel* has any keyframes on it. Deliberately
+    ``cmds.keyframe(..., keyframeCount=True)`` rather than a hand-rolled
+    "is the plug's direct source an animCurve" connection check (which is
+    what this used to be, and what _capture_channel's own per-channel
+    check still is): a direct-connection check misses a channel routed
+    through an intermediate node before the animCurve -- most commonly a
+    unitConversion node on a rotate/angle channel -- and would wrongly
+    report it as unkeyed. cmds.keyframe already follows a plug's real
+    animation curve correctly through any such intermediate node, the
+    same way the Graph Editor/Channel Box do, so it doesn't miss those."""
+    plug = _plug(obj, channel)
+    if not cmds.objExists(plug):
+        return False
+    return bool(cmds.keyframe(plug, query=True, keyframeCount=True))
+
+
+def _key_times_for(obj, channel):
+    """Every keyframe time on *obj*'s *channel*, sorted -- empty if it has
+    none. One plug per call (not a batched list) -- matching exactly the
+    per-channel-then-union pattern _extract_keys_to_target already uses
+    for the same query, the one other place in this tool needs a
+    channel's own key times."""
+    plug = _plug(obj, channel)
+    if not cmds.objExists(plug):
+        return []
+    return sorted(set(cmds.keyframe(plug, query=True, timeChange=True) or []))
+
+
+def _key_times_by_channel(obj, channels):
+    """Copy/Paste-style per-channel key time payload."""
+    return [
+        (channel, times)
+        for channel in channels
+        for times in (_key_times_for(obj, channel),)
+        if times
+    ]
+
+
+def _gather_copyable_animation(obj):
+    """Everything create_controls_with_options/_create_control_for need in
+    order to give a new control a real copy of *obj*'s own pre-existing
+    animation (see _copy_source_keys_to_control). Computed once, up
+    front, for two reasons: create_controls_with_options needs the total
+    key-time count before it builds a single control, to size its
+    progress bar's total correctly (see its own call site), and
+    _copy_source_keys_to_control itself needs the exact same data a
+    moment later -- scanning obj twice for the same thing would be
+    wasted work.
+
+    Returns ``(translate_key_data, rotate_key_data, extra_attrs)`` --
+    translate/rotate data are ``(channel_name, key_times)`` tuples;
+    extra_attrs a list of ``(attr_name, enum_names_or_None, key_times)``
+    tuples (enum_names whatever cmds.attributeQuery(..., listEnum=True)
+    reports, so _ensure_matching_attribute can build a matching enum
+    attribute on control).
+
+    Each of these three -- translate as a whole, rotate as a whole, and
+    every individual extra attribute -- keeps its *own* key times
+    separate rather than merged into one shared set across all of them.
+    translate/rotate are copied per channel, matching Copy/Paste
+    animation's frame/value payloads. Earlier merged-time passes landed
+    extra, unintended keys
+    on channels that never had one there in the original animation --
+    e.g. a control whose translate was keyed at frames 1/10/20 and rotate
+    at 5/15 would get translate keys stamped onto frames 5/15 too, values
+    that were never actually keyed there. _copy_source_keys_to_control
+    now bakes each of the three independently, exactly preserving each
+    one's own key times.
+
+    Scale is out of scope, same as the rest of control creation (see
+    _create_control_for: scale isn't driven at all right now)."""
+    translate_key_data = _key_times_by_channel(obj, TRANSLATE_CHANNELS)
+    rotate_key_data = _key_times_by_channel(obj, ROTATE_CHANNELS)
+
+    extra_attrs = []
+    for attr_name in cmds.listAttr(obj, userDefined=True, keyable=True) or []:
+        if attr_name in CHANNELS:
+            continue
+        plug = _plug(obj, attr_name)
+        if not cmds.objExists(plug) or cmds.getAttr(plug, lock=True):
+            continue
+        if not _channel_is_keyed(obj, attr_name):
+            continue
+        enum_names = None
+        if cmds.getAttr(plug, type=True) == "enum":
+            try:
+                enum_names = cmds.attributeQuery(attr_name, node=obj, listEnum=True)[0]
+            except (RuntimeError, ValueError, TypeError, IndexError):
+                enum_names = None
+        extra_attrs.append((attr_name, enum_names, _key_times_for(obj, attr_name)))
+
+    return translate_key_data, rotate_key_data, extra_attrs
+
+
+def _ensure_matching_attribute(control, obj, attr_name, enum_names):
+    """Make sure *control* has an attribute matching obj's own *attr_name*
+    before _copy_source_keys_to_control connects/bakes it across -- an
+    enum needs the same enumName list as obj's (Maya requires compatible
+    enum fields on both ends of a connection), every other copyable type
+    just needs to exist, unlocked and keyable. Returns whether control now
+    has a usable attribute of that name -- False (skip this attribute
+    entirely rather than risk a malformed one or a bakeResults crash) for
+    any type this doesn't know how to safely recreate, e.g. string/
+    message/compound attributes -- not plain keyable numeric/enum values
+    bakeResults can key in the first place."""
+    control_plug = _plug(control, attr_name)
+    if cmds.objExists(control_plug):
+        return not cmds.getAttr(control_plug, lock=True)
+
+    obj_plug = _plug(obj, attr_name)
+    attr_type = cmds.getAttr(obj_plug, type=True)
+    try:
+        if attr_type == "enum":
+            if not enum_names:
+                return False
+            cmds.addAttr(control, longName=attr_name, attributeType="enum", enumName=enum_names, keyable=True)
+        elif attr_type == "bool":
+            cmds.addAttr(control, longName=attr_name, attributeType="bool", keyable=True)
+        elif attr_type in ("long", "short", "byte"):
+            cmds.addAttr(control, longName=attr_name, attributeType="long", keyable=True)
+        elif attr_type in ("double", "float", "doubleLinear", "doubleAngle"):
+            cmds.addAttr(control, longName=attr_name, attributeType=attr_type, keyable=True)
+        else:
+            return False
+    except RuntimeError:
+        return False
+
+    cmds.setAttr(control_plug, keyable=True)
+    return True
+
+
+def _copy_driven_channel_keys(control, channel_key_data, cleanup, operation=None):
+    """Copy/Paste-style copy for a temporarily-driven control.
+
+    First sample ``frames``/``values`` per channel while the temporary
+    constraint/connectAttr is live, then clean up that driver and paste
+    those arrays onto the control with explicit setKeyframe calls. This
+    mirrors copy_paste.controller's animation data path and avoids setting
+    keys while the destination plug is still connected."""
+    current_time = cmds.currentTime(query=True)
+    sampled = []
+    try:
+        if operation is not None:
+            operation.set_status("Copying Source Animation")
+        for channel, times in channel_key_data:
+            frames = []
+            values = []
+            for t in times:
+                plug = _plug(control, channel)
+                if not cmds.objExists(plug) or cmds.getAttr(plug, lock=True):
+                    continue
+                try:
+                    cmds.currentTime(t, edit=True)
+                    values.append(cmds.getAttr(plug))
+                    frames.append(t)
+                except RuntimeError:
+                    pass
+            if frames and values:
+                sampled.append((channel, frames, values))
+    finally:
+        try:
+            cmds.currentTime(current_time, edit=True)
+        except RuntimeError:
+            pass
+        cleanup()
+
+    for channel, frames, values in sampled:
+        for frame, value in zip(frames, values):
+            try:
+                cmds.setKeyframe(
+                    control,
+                    time=(frame,),
+                    attribute=channel,
+                    value=value,
+                    shape=False,
+                )
+            except RuntimeError:
+                pass
+            if operation is not None:
+                operation.step()
+
+
+def _copy_source_keys_to_control(control, obj, translate_key_data, rotate_key_data, extra_attrs, operation=None):
+    """Give *control* a real copy of *obj*'s own pre-existing animation --
+    translate/rotate (if keyed) and every entry in *extra_attrs* (enums
+    included) -- before _capture_channel below disconnects any of it from
+    obj and obj starts being driven by control instead. Without this,
+    obj's original motion/attribute values would simply vanish the moment
+    control took over -- _capture_channel only frees translate/rotate up
+    and stashes a revert reference, it was never meant to preserve the
+    *visible* result, just make room for the forward constraint; custom
+    attributes aren't touched by it at all. Copying it onto control here
+    means the animator keeps seeing -- and can keep keying/nudging on top
+    of -- obj's original motion/values, for then to be applied back onto
+    obj at Bake time (see _apply_copied_attrs_to_target for the extra-
+    attrs half of that; translate/rotate already flow back through the
+    normal live constraint + Bake/Revert path once control is driving obj).
+
+    Translate, rotate, and every extra_attrs entry are copied as direct
+    frame/value arrays (_copy_driven_channel_keys), at exactly that
+    group/attribute's own key times -- not one shared set merged across
+    all of them. See _gather_copyable_animation's own docstring for why:
+    merging across unrelated channels/attributes was stamping keys onto a
+    channel at times it was never actually keyed at in the original
+    animation.
+
+    Translate/rotate go through a temporary reverse constraint each --
+    control can't just copy obj's raw local numbers onto its own,
+    differently-parented local channel, the exact space-mismatch pitfall
+    _capture_channel's own docstring covers. Every other attribute goes
+    through a temporary direct connectAttr instead -- a plain value, not a
+    spatial transform, so there's no space to convert between; see
+    _ensure_matching_attribute for why an enum needs a matching attribute
+    built on control first for that connection to even be legal.
+
+    Reports progress through *operation* (the same ToolOperation
+    create_controls_with_options already has open for the whole batch),
+    one step per key time across all three passes -- create_controls_
+    with_options' own call site already added up exactly that many steps
+    to that operation's total up front, so the two stay in sync across
+    every object in the batch.
+
+    Returns the list of extra_attrs names actually copied (control got a
+    usable matching attribute for and a connection was made) -- what
+    create_controls_with_options stores on control as COPIED_ATTRS_ATTR
+    for Bake to read back later."""
+    copied_attrs = []
+
+    if translate_key_data:
+        constraint = cmds.pointConstraint(obj, control, maintainOffset=False)[0]
+        _copy_driven_channel_keys(
+            control, translate_key_data,
+            lambda c=constraint: cmds.delete(c) if cmds.objExists(c) else None,
+            operation=operation,
+        )
+
+    if rotate_key_data:
+        constraint = cmds.orientConstraint(obj, control, maintainOffset=False)[0]
+        _copy_driven_channel_keys(
+            control, rotate_key_data,
+            lambda c=constraint: cmds.delete(c) if cmds.objExists(c) else None,
+            operation=operation,
+        )
+
+    for attr_name, enum_names, attr_key_times in extra_attrs:
+        if not attr_key_times:
+            continue
+        if not _ensure_matching_attribute(control, obj, attr_name, enum_names):
+            continue
+        obj_plug = _plug(obj, attr_name)
+        control_plug = _plug(control, attr_name)
+        if cmds.getAttr(control_plug, lock=True):
+            continue
+        try:
+            cmds.connectAttr(obj_plug, control_plug, force=True)
+        except RuntimeError:
+            continue
+
+        def _disconnect(obj_plug=obj_plug, control_plug=control_plug):
+            try:
+                if cmds.isConnected(obj_plug, control_plug):
+                    cmds.disconnectAttr(obj_plug, control_plug)
+            except RuntimeError:
+                pass
+
+        _copy_driven_channel_keys(control, [(attr_name, attr_key_times)], _disconnect, operation=operation)
+        copied_attrs.append(attr_name)
+
+    return copied_attrs
 
 
 def _capture_channel(control, obj, channel):
@@ -1216,6 +1590,14 @@ def bake_control(control):
         else:
             _extract_keys_to_target(control, target, restore_map)
 
+        # Same order every time: right after whichever of the above just
+        # handled translate/rotate. Extra copied attributes (see
+        # COPIED_ATTRS_ATTR/_copy_source_keys_to_control) are a no-op here
+        # for any control that was never given any -- every control built
+        # before this existed, and nested/Add-Child controls, which never
+        # go through _copy_source_keys_to_control in the first place.
+        _apply_copied_attrs_to_target(control, target, _copied_attrs_for(control))
+
     _delete_driver_nodes(control)
     _delete_control_nodes(control)
     return target
@@ -1236,12 +1618,25 @@ def bake_controls(*_args):
         operation.set_total(len(controls)).set_status("Baking Temporal Controls")
 
     baked_targets = []
-    for control in controls:
+    queued = list(controls)
+    processed = set()
+    while queued:
+        control = queued.pop(0)
         if operation is not None and operation.cancelled:
             break
+        if not cmds.objExists(control):
+            continue
+        control_long = cmds.ls(control, long=True)[0]
+        if control_long in processed:
+            continue
+        processed.add(control_long)
         target = bake_control(control)
         if target:
             baked_targets.append(target)
+            if cmds.objExists(target) and _is_temporal_control(target):
+                target_long = cmds.ls(target, long=True)[0]
+                if target_long not in processed:
+                    queued.insert(0, target_long)
         if operation is not None:
             operation.step()
 
@@ -1319,6 +1714,45 @@ def _extract_keys_to_target(control, target, restore_map):
 
     for t in sorted(key_times):
         _bake_range_to_target(target, keyed_channels, t, t)
+
+
+def _apply_copied_attrs_to_target(control, target, copied_attrs):
+    """Reapply control's own copy of obj's originally-keyed custom
+    attributes (see COPIED_ATTRS_ATTR/_copy_source_keys_to_control) back
+    onto target at Bake time -- the "for then to be reapplied" half of
+    what _copy_source_keys_to_control set up at creation.
+
+    Unlike translate/rotate (_extract_keys_to_target/_bake_frames_to_target),
+    these were deliberately never kept live-connected from control back to
+    target during the tool's lifetime -- see _copy_source_keys_to_control's
+    own docstring: just a one-shot copy at creation, matching "apply the
+    changes to the source on bake", not a continuous drive. So there's no
+    "target's own live, constraint-driven value" here for
+    _bake_range_to_target's technique to read the way the channel bake
+    above relies on -- target's own copy of these attributes was never
+    touched, still sitting on whatever it originally was the whole time
+    control existed. A plain value copy at control's own key times is
+    correct here in a way it never is for translate/rotate: a custom
+    attribute's value isn't parent-space-relative, so there's no space-
+    mismatch to sidestep -- control and target simply agree on what the
+    number means."""
+    for attr_name in copied_attrs:
+        control_plug = _plug(control, attr_name)
+        target_plug = _plug(target, attr_name)
+        if not cmds.objExists(control_plug) or not cmds.objExists(target_plug):
+            continue
+        if cmds.getAttr(target_plug, lock=True):
+            continue
+        times = sorted(set(cmds.keyframe(control_plug, query=True, timeChange=True) or []))
+        if not times:
+            if cmds.getAttr(target_plug, settable=True):
+                cmds.setAttr(target_plug, cmds.getAttr(control_plug))
+            continue
+        for t in times:
+            try:
+                cmds.setKeyframe(target_plug, time=(t, t), value=cmds.getAttr(control_plug, time=t))
+            except RuntimeError:
+                pass
 
 
 def _bake_range_to_target(target, channels, start, end):
@@ -1414,12 +1848,25 @@ def revert_controls(*_args):
         operation.set_total(len(controls)).set_status("Reverting Temporal Controls")
 
     reverted_targets = []
-    for control in controls:
+    queued = list(controls)
+    processed = set()
+    while queued:
+        control = queued.pop(0)
         if operation is not None and operation.cancelled:
             break
+        if not cmds.objExists(control):
+            continue
+        control_long = cmds.ls(control, long=True)[0]
+        if control_long in processed:
+            continue
+        processed.add(control_long)
         target = revert_control(control)
         if target:
             reverted_targets.append(target)
+            if cmds.objExists(target) and _is_temporal_control(target):
+                target_long = cmds.ls(target, long=True)[0]
+                if target_long not in processed:
+                    queued.insert(0, target_long)
         if operation is not None:
             operation.step()
 
@@ -1676,10 +2123,14 @@ def add_parent_control(control):
     *control* is itself a Temporal Control) by targeting control itself,
     then flags the result EXTRA_ATTR so the panel's Remove Control action
     is allowed to delete it later, unlike a System's original main control.
+    Inherits *control*'s own color (get_control_color) so the new parent
+    reads as part of the same rig instead of falling back to the creation
+    dialog's unstyled default -- the panel itself skips the color dialog
+    entirely for this action, so there's no other color choice to honor.
     The mirror of add_child_control below."""
     if not cmds.objExists(control):
         return None
-    new_controls = create_controls_with_options([control])
+    new_controls = create_controls_with_options([control], color=get_control_color(control))
     if not new_controls:
         return None
     parent_control = new_controls[0]
@@ -1695,7 +2146,11 @@ def add_child_control(parent_control):
     -- the mirror of add_parent_control. Unlike a normal Temporal Control,
     this one doesn't drive an external object (TARGET_ATTR is left ""):
     it's a free, hand-key-able control layered under parent_control, purely
-    local, flagged EXTRA_ATTR the same way add_parent_control's result is."""
+    local, flagged EXTRA_ATTR the same way add_parent_control's result is.
+    Also inherits parent_control's own color, same reasoning as
+    add_parent_control -- this doesn't go through
+    create_controls_with_options at all (it builds/parents the shape
+    directly), so that coloring has to happen here instead."""
     if not cmds.objExists(parent_control):
         return None
     radius = max(_control_base_radius(parent_control) * get_control_size_mult(parent_control) * 0.6, 0.5)
@@ -1709,7 +2164,16 @@ def add_child_control(parent_control):
     node.set_attr(EXTRA_ATTR, True, attributeType="bool")
     cmds.setAttr(_plug(child_control, EXTRA_ATTR), lock=True)
 
+    color = get_control_color(parent_control)
+    if color:
+        _apply_control_color(child_control, color)
+
     cmds.select(child_control)
+    # Not routed through create_controls_with_options (see docstring), so
+    # its own controls_bus.controlsCreated emit doesn't cover this path --
+    # fired here instead for the same reason: other live-sync listeners
+    # (another open panel instance) should pick this up too.
+    controls_bus.controlsCreated.emit()
     return child_control
 
 
@@ -1810,6 +2274,9 @@ def _controls_to_process():
     """Every Temporal Control relevant to the current selection: one whose
     control is selected, or whose *target* (the original object it drives)
     is selected -- so Bake/Revert work from either end, control or object.
+    If a picked control is itself driven by parent Temporal Controls, those
+    parents are included too, recursively, so baking/reverting a stacked
+    setup can collapse the whole selected control chain in one action.
 
     Falls back to every Temporal Control in the scene only when nothing at
     all is selected. Selecting something that isn't a Temporal Control or
@@ -1820,17 +2287,23 @@ def _controls_to_process():
     all_controls = cmds.ls("*." + TAG_ATTR, objectsOnly=True) or []
     if not all_controls:
         return []
+    all_controls = [
+        cmds.ls(control, long=True)[0]
+        for control in all_controls
+        if cmds.objExists(control) and cmds.ls(control, long=True)
+    ]
 
     selected = selection.get_selected_objects(long=True)
     if not selected:
-        return all_controls
+        return _dependency_ordered_controls(all_controls, all_controls)
 
     selected = set(selected)
     picked = []
+    picked_set = set()
     for control in all_controls:
-        control_long = cmds.ls(control, long=True)[0]
-        if control_long in selected:
+        if control in selected:
             picked.append(control)
+            picked_set.add(control)
             continue
         # _target_for already returns a full path -- it's stored that way by
         # _tag_control (cmds.ls(obj, long=True)[0]) -- so no need to
@@ -1838,7 +2311,63 @@ def _controls_to_process():
         target = _target_for(control)
         if target and target in selected:
             picked.append(control)
-    return picked
+            picked_set.add(control)
+
+    # Include Temporal Controls that drive the picked controls (Add Parent /
+    # nested stacks). Repeat until stable so grandparent chains are included
+    # too. This lets selecting a target object, or its direct control, bake
+    # the whole parent stack down before baking that direct control to the
+    # final target.
+    changed = True
+    while changed:
+        changed = False
+        for control in all_controls:
+            if control in picked_set:
+                continue
+            target = _target_for(control)
+            if target and target in picked_set:
+                picked.append(control)
+                picked_set.add(control)
+                changed = True
+
+    return _dependency_ordered_controls(all_controls, picked)
+
+
+def _dependency_ordered_controls(all_controls, controls):
+    """Order controls so parent/nested controls are processed before the
+    controls they target. Deleting a direct child first can invalidate its
+    parent control's target, so batch Bake/Revert/Mute all use this."""
+    wanted = set(controls or [])
+    if not wanted:
+        return []
+
+    parents_by_target = {}
+    for control in all_controls:
+        if control not in wanted:
+            continue
+        target = _target_for(control)
+        if target in wanted:
+            parents_by_target.setdefault(target, []).append(control)
+
+    ordered = []
+    visiting = set()
+    visited = set()
+
+    def visit(control):
+        if control in visited or control in visiting:
+            return
+        visiting.add(control)
+        for parent_control in parents_by_target.get(control, []):
+            visit(parent_control)
+        visiting.remove(control)
+        visited.add(control)
+        if control in wanted and cmds.objExists(control):
+            ordered.append(control)
+
+    for control in all_controls:
+        if control in wanted:
+            visit(control)
+    return ordered
 
 
 def _target_for(control):
@@ -1904,6 +2433,22 @@ def _restore_map_for(control):
         return json.loads(raw)
     except (TypeError, ValueError):
         return {}
+
+
+def _copied_attrs_for(control):
+    """COPIED_ATTRS_ATTR as a plain list -- see its own declaration above
+    and _gather_copyable_animation/_copy_source_keys_to_control, which
+    write it. Empty for any control that was never given a copy of an
+    already-animated obj's extra attributes (including every control
+    built before this existed)."""
+    raw = TkmSceneNode(control).get_attr(COPIED_ATTRS_ATTR)
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    return data if isinstance(data, list) else []
 
 
 def _driver_nodes_map_for(control):
@@ -2025,7 +2570,7 @@ def build_temporal_controls_context_menu(menu, source_widget=None):
     )
     menu.addSeparator()
     menu.addAction(
-        QtGui.QIcon(icons.temporal_controls), "Temp Controls Panel",
+        QtGui.QIcon(icons.temporal_controls), "Temporal Controls Panel",
         callback=open_temp_controls_panel,
         description="Browse and manage every Temporal Control in the scene.",
     )

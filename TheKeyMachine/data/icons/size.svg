@@ -7,13 +7,13 @@
         stroke: #bdbdbd;
         stroke-linecap: round;
         stroke-linejoin: round;
-        stroke-width: 3.2px;
+        stroke-width: 5px;
       }
     </style>
   </defs>
-  <g transform="translate(25 25) scale(0.9196) translate(-25 -25)">
-    <polygon class="st0" points="25 7.5 42.5 17 25 26.5 7.5 17 25 7.5"/>
-    <polyline class="st0" points="7.5 25 25 34.5 42.5 25"/>
-    <polyline class="st0" points="7.5 33 25 42.5 42.5 33"/>
-  </g>
+  <line class="st0" x1="13" y1="13" x2="37" y2="37"/>
+  <line class="st0" x1="13" y1="13" x2="13" y2="21"/>
+  <line class="st0" x1="13" y1="13" x2="21" y2="13"/>
+  <line class="st0" x1="37" y1="37" x2="37" y2="29"/>
+  <line class="st0" x1="37" y1="37" x2="29" y2="37"/>
 </svg>
