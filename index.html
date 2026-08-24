@@ -5,18 +5,20 @@
   <link rel="icon" type="image/png" href="images/favicon.png">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Download TheKeyMachine, an open source animation toolset for Autodesk Maya.">
+  <link rel="canonical" href="./">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="top-row-container">
     <div class="logo-container">
-      <a href="index.html"><img src="images/web_logo_230.png" width="180" alt="TheKeyMachine"></a>
+      <a href="./"><img src="images/web_logo_230.png" width="180" alt="TheKeyMachine"></a>
     </div>
     <nav class="button-container" aria-label="Main navigation">
-      <a href="index.html">Home</a>
-      <a href="changelog.html">Changelog</a>
-      <a href="help.html">Help</a>
-      <a href="about.html">About</a>
+      <a href="./" aria-current="page">Home</a>
+      <a href="changelog/">Changelog</a>
+      <a href="about/">About</a>
+      <a href="help/">Help</a>
     </nav>
   </header>
 
@@ -35,8 +37,9 @@
         <p>Published August 23, 2026. Supports Maya 2022 through 2027 on Windows, Linux and macOS.</p>
       </div>
       <div class="download-actions">
-        <a class="primary-button" href="https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.48/TKM-0.1.48.zip">Download latest</a>
-        <a class="secondary-link" href="changelog.html">View changelog</a>
+        <a class="primary-button" href="https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.48/TKM-0.1.48.zip">Download latest · 0.1.48</a>
+        <span class="download-context" data-platform-note>Universal package · ZIP</span>
+        <a class="secondary-link" href="changelog/">View changelog</a>
       </div>
     </section>
 
@@ -53,6 +56,30 @@
         <h2>Graph Editor tools</h2>
         <p>Curve editing, tangent helpers, tween and blend sliders, cycle matching and newer global curve controls.</p>
       </article>
+    </section>
+
+    <section class="home-featured-tools" id="featured-tools">
+      <p class="section-kicker">Featured tools</p>
+      <h2>See some of them in action</h2>
+      <p class="featured-tools-intro">The same short demonstrations shown inside TheKeyMachine’s tooltips.</p>
+      <div class="tool-showcase">
+        <article class="tool-card">
+          <div class="tool-media"><img src="https://raw.githubusercontent.com/Alehaaaa/TKM/main/TheKeyMachine/tools/nudge/media/nudge.gif" alt="Nudge moving selected animation keys along the timeline" loading="lazy"></div>
+          <div class="tool-card-copy"><span class="tool-number">01</span><h3>Nudge</h3><p>Move targeted keys by a precise frame count, or insert and remove time on selected curves or across the scene.</p></div>
+        </article>
+        <article class="tool-card">
+          <div class="tool-media"><img src="https://raw.githubusercontent.com/Alehaaaa/TKM/main/TheKeyMachine/tools/tracer/media/tracer.gif" alt="Tracer drawing an animated object's path in the Maya viewport" loading="lazy"></div>
+          <div class="tool-card-copy"><span class="tool-number">02</span><h3>Tracer</h3><p>Draw motion paths in the viewport to inspect spacing and arcs in world, camera or relative space.</p></div>
+        </article>
+        <article class="tool-card">
+          <div class="tool-media tool-media-pair"><img src="https://raw.githubusercontent.com/Alehaaaa/TKM/main/TheKeyMachine/tools/temp_pivot/media/temp_pivot.gif" alt="Temporary pivot driving multiple selected controls" loading="lazy"><img src="https://raw.githubusercontent.com/Alehaaaa/TKM/main/TheKeyMachine/tools/temp_pivot/media/temp_pivot_chain.gif" alt="Temporary pivot controlling a chain of selected objects" loading="lazy"></div>
+          <div class="tool-card-copy"><span class="tool-number">03</span><h3>Temp Pivot</h3><p>Drive selected controls as one transform from a temporary pivot you can place and edit freely.</p></div>
+        </article>
+        <article class="tool-card">
+          <div class="tool-media"><img src="https://raw.githubusercontent.com/Alehaaaa/TKM/main/TheKeyMachine/tools/animation_offset/media/animation_offset.gif" alt="Animation Offset repositioning animated controls while preserving their motion" loading="lazy"></div>
+          <div class="tool-card-copy"><span class="tool-number">04</span><h3>Animation Offset</h3><p>Reposition animated controls with Maya’s manipulators while preserving their motion and timing.</p></div>
+        </article>
+      </div>
     </section>
   </main>
 
