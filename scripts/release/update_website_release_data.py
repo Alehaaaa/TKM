@@ -99,7 +99,12 @@ def load_release_metadata(path):
     releases = raw if isinstance(raw, list) else raw.get("releases", [])
     by_version = {}
     for release in releases:
-        tag = str(release.get("tagName") or release.get("tag_name") or "")
+        tag = str(
+            release.get("tagName")
+            or release.get("tag_name")
+            or release.get("tag")
+            or ""
+        )
         if not tag.startswith(RELEASE_TAG_PREFIX):
             continue
         by_version[tag[len(RELEASE_TAG_PREFIX) :]] = release
@@ -171,8 +176,9 @@ def render_latest_panel(latest):
         <p>{published}. Supports Maya 2022 through 2027 on Windows, Linux and macOS.</p>
       </div>
       <div class="download-actions">
-        <a class="primary-button" href="{download}">Download latest</a>
-        <a class="secondary-link" href="changelog.html">View changelog</a>
+        <a class="primary-button" href="{download}">Download latest · {version}</a>
+        <span class="download-context" data-platform-note>Universal package · ZIP</span>
+        <a class="secondary-link" href="changelog/">View changelog</a>
       </div>
     </section>""".format(
         version=html.escape(latest["version"]),
@@ -199,7 +205,7 @@ def render_release_card(record):
     if not entries:
         entries = "          <li>No changelog entries recorded for this version.</li>"
 
-    return """      <article class="release-card">
+    return """      <article class="release-card" id="release-{anchor}">
         <h2><a href="{download}">{version}</a></h2>
         <p class="release-date">{date}</p>
         <ul>
@@ -209,6 +215,7 @@ def render_release_card(record):
       </article>""".format(
         download=html.escape(record["downloadUrl"], quote=True),
         version=html.escape(record["version"]),
+        anchor=html.escape(record["version"].replace(".", "-"), quote=True),
         date=html.escape(published_phrase(record)),
         entries=entries,
         compare=html.escape(record["compareUrl"], quote=True),
@@ -239,7 +246,7 @@ def update_website(website_root, records):
         raise SystemExit("No changelog releases found to publish to the website")
 
     index_path = website_root / "index.html"
-    changelog_path = website_root / "changelog.html"
+    changelog_path = website_root / "changelog" / "index.html"
     for path in (index_path, changelog_path):
         if not path.is_file():
             raise SystemExit("Missing website file: {}".format(path))
