@@ -1,5 +1,6 @@
 (function () {
-  const releasesUrl = new URL('releases.json', document.baseURI);
+  const siteRootUrl = new URL('./', document.baseURI);
+  const releasesUrl = new URL('releases.json', siteRootUrl);
   let releasesPromise;
   let releaseObserver;
 
@@ -23,6 +24,28 @@
       if (isActive) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     });
+  }
+
+  function siteUrl(path) {
+    return new URL(path, siteRootUrl).toString();
+  }
+
+  function stabilizePersistentLinks() {
+    const routes = {
+      'index.html': '',
+      'changelog.html': 'changelog/',
+      'about.html': 'about/',
+      'help.html': 'help/'
+    };
+    document.querySelectorAll('.logo-container a, .button-container a').forEach((link) => {
+      link.href = siteUrl(routes[normalizePage(link.href)] || '');
+    });
+    const logo = document.querySelector('.logo-container img');
+    const icon = document.querySelector('link[rel="icon"]');
+    const stylesheet = document.querySelector('link[rel="stylesheet"]');
+    if (logo) logo.src = siteUrl('images/web_logo_230.png');
+    if (icon) icon.href = siteUrl('images/favicon.png');
+    if (stylesheet) stylesheet.href = siteUrl('styles.css');
   }
 
   // ---------------------------------------------------------------------
@@ -77,7 +100,7 @@
       download.textContent = `Download latest · ${release.version}`;
     }
     const changelog = panel.querySelector('.secondary-link');
-    if (changelog) changelog.href = 'changelog/';
+    if (changelog) changelog.href = siteUrl('changelog/');
   }
 
   function renderReleaseCard(release) {
@@ -225,31 +248,33 @@
 
   function searchItems(releases) {
     const pages = [
-      { title: 'Home', eyebrow: 'Page', description: 'Latest download and tool highlights', href: './' },
-      { title: 'Install TheKeyMachine', eyebrow: 'Help', description: 'Personal installation, studio setup and updates', href: 'help/' },
-      { title: 'Troubleshooting', eyebrow: 'Help', description: 'Installation, GitHub issues and community support', href: 'help/' },
-      { title: 'Featured tools', eyebrow: 'Home', description: 'Nudge, Tracer, Temp Pivot and Animation Offset demonstrations', href: './#featured-tools' },
-      { title: 'About TheKeyMachine', eyebrow: 'Page', description: 'Project, license, tools and supported platforms', href: 'about/' },
-      { title: 'Release history', eyebrow: 'Changelog', description: 'Browse every feature, improvement and bug fix', href: 'changelog/' }
+      { title: 'Home', eyebrow: 'Page', description: 'Latest download and tool highlights', href: siteUrl('') },
+      { title: 'Install TheKeyMachine', eyebrow: 'Help', description: 'Personal installation, studio setup and updates', href: siteUrl('help/') },
+      { title: 'Troubleshooting', eyebrow: 'Help', description: 'Installation, GitHub issues and community support', href: siteUrl('help/') },
+      { title: 'Featured tools', eyebrow: 'Home', description: 'Nudge, Tracer, Temp Pivot and Animation Offset demonstrations', href: siteUrl('#featured-tools') },
+      { title: 'About TheKeyMachine', eyebrow: 'Page', description: 'Project, license, tools and supported platforms', href: siteUrl('about/') },
+      { title: 'Release history', eyebrow: 'Changelog', description: 'Browse every feature, improvement and bug fix', href: siteUrl('changelog/') }
     ];
     const versions = releases.map((release) => ({
       title: `Version ${release.version}`,
       eyebrow: 'Release',
       description: (release.entries || []).map((entry) => entry.description).join(' · '),
-      href: `changelog/#release-${release.version.replace(/\./g, '-')}`
+      href: siteUrl(`changelog/#release-${release.version.replace(/\./g, '-')}`)
     }));
     return pages.concat(versions);
   }
 
   function ensureSearchDialog() {
     if (document.querySelector('[data-site-search]')) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'site-search-button';
-    button.dataset.searchOpen = '';
-    button.setAttribute('aria-label', 'Search this site');
-    button.innerHTML = '<svg class="search-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.25 4.25"></path></svg><span>Search</span><kbd>⌘ K</kbd>';
-    document.querySelector('.button-container')?.append(button);
+    if (!document.querySelector('[data-search-open]')) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'site-search-button';
+      button.dataset.searchOpen = '';
+      button.setAttribute('aria-label', 'Search this site');
+      button.innerHTML = '<svg class="search-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.25 4.25"></path></svg><span>Search</span><kbd>⌘ K</kbd>';
+      document.querySelector('.button-container')?.append(button);
+    }
 
     const dialog = document.createElement('dialog');
     dialog.className = 'site-search-dialog';
@@ -313,6 +338,57 @@
     initVersionNavigator();
   }
 
+  function shouldNavigateClientSide(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if (link.target && link.target !== '_self') return false;
+
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin) return false;
+    if (url.pathname === window.location.pathname && url.hash && document.querySelector(url.hash)) return false;
+    return ['index.html', 'about.html', 'changelog.html', 'help.html'].includes(normalizePage(url));
+  }
+
+  function updatePageMetadata(doc, url) {
+    document.title = doc.title;
+
+    const nextDescription = doc.querySelector('meta[name="description"]')?.content;
+    const currentDescription = document.querySelector('meta[name="description"]');
+    if (nextDescription && currentDescription) currentDescription.content = nextDescription;
+
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = `${url.origin}${url.pathname}`;
+  }
+
+  async function loadPage(url, pushState) {
+    const target = new URL(url, window.location.href);
+    const response = await fetch(target, { headers: { 'X-Requested-With': 'fetch' } });
+    if (!response.ok) throw new Error(`Page request failed with ${response.status}`);
+
+    const html = await response.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const nextMain = doc.querySelector('main');
+    const currentMain = document.querySelector('main');
+    if (!nextMain || !currentMain) throw new Error('Page content is missing');
+
+    if (releaseObserver) releaseObserver.disconnect();
+    currentMain.replaceWith(nextMain);
+    updatePageMetadata(doc, target);
+    if (pushState) window.history.pushState({}, doc.title, target);
+
+    setActiveNav(target);
+    await hydrateReleaseData();
+    initPageFeatures();
+    document.querySelector('[data-site-search]')?.close();
+
+    if (!handleHashTarget()) window.scrollTo({ top: 0, behavior: 'smooth' });
+    const heading = document.querySelector('main h1');
+    if (heading) {
+      heading.setAttribute('tabindex', '-1');
+      heading.focus({ preventScroll: true });
+    }
+  }
+
   document.addEventListener('click', (event) => {
     if (event.target.matches('[data-site-search]')) {
       event.target.close();
@@ -328,6 +404,11 @@
       document.querySelector('[data-site-search]')?.close();
       return;
     }
+
+    const link = event.target.closest('a[href]');
+    if (!shouldNavigateClientSide(link, event)) return;
+    event.preventDefault();
+    loadPage(link.href, true).catch(() => window.location.assign(link.href));
   });
 
   document.addEventListener('input', (event) => {
@@ -341,10 +422,15 @@
     document.querySelector('[data-search-open]')?.click();
   });
 
+  window.addEventListener('popstate', () => {
+    loadPage(window.location.href, false).catch(() => window.location.reload());
+  });
+
   // ---------------------------------------------------------------------
   // Init
   // ---------------------------------------------------------------------
 
+  stabilizePersistentLinks();
   setActiveNav(window.location.href);
   ensureSearchDialog();
   hydrateReleaseData().then(() => {
