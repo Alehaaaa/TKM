@@ -2,10 +2,41 @@
   const pageSelector = 'a[href$=".html"]';
   let releasesPromise;
 
+  // ---------------------------------------------------------------------
+  // URL helpers
+  // ---------------------------------------------------------------------
+
+  // Returns the actual filename ("about.html", "index.html", ...) for a
+  // given URL, whether or not the URL already has a .html extension.
   function normalizePage(url) {
     const parsed = new URL(url, window.location.href);
-    const file = parsed.pathname.split('/').pop() || 'index.html';
-    return file === '' ? 'index.html' : file;
+    let file = parsed.pathname.split('/').pop() || 'index.html';
+    if (file === '') file = 'index.html';
+    if (!file.endsWith('.html')) file += '.html';
+    return file;
+  }
+
+  // Given any URL (clean or with .html), returns the URL that should
+  // actually be fetched from the server (always ends in .html).
+  function toFetchUrl(url) {
+    const parsed = new URL(url, window.location.href);
+    if (!parsed.pathname.endsWith('.html')) {
+      const segments = parsed.pathname.split('/');
+      const last = segments[segments.length - 1];
+      segments[segments.length - 1] = (last || 'index') + '.html';
+      parsed.pathname = segments.join('/');
+    }
+    return parsed.toString();
+  }
+
+  // Given a URL (typically one that ends in .html), returns the "pretty"
+  // URL without the extension, for use with history.pushState.
+  function toCleanUrl(url) {
+    const parsed = new URL(url, window.location.href);
+    parsed.pathname = parsed.pathname
+      .replace(/(^|\/)index\.html$/, '$1')
+      .replace(/\.html$/, '');
+    return parsed.toString();
   }
 
   function setActiveNav(url) {
@@ -15,6 +46,10 @@
       link.toggleAttribute('aria-current', isActive);
     });
   }
+
+  // ---------------------------------------------------------------------
+  // Release data rendering
+  // ---------------------------------------------------------------------
 
   function releaseText(text) {
     return String(text || '').trim();
@@ -129,6 +164,10 @@
       });
   }
 
+  // ---------------------------------------------------------------------
+  // Client-side navigation
+  // ---------------------------------------------------------------------
+
   function shouldHandle(link, event) {
     if (!link || event.defaultPrevented) {
       return false;
@@ -147,7 +186,8 @@
   }
 
   async function loadPage(url, pushState) {
-    const response = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
+    const fetchUrl = toFetchUrl(url);
+    const response = await fetch(fetchUrl, { headers: { 'X-Requested-With': 'fetch' } });
 
     if (!response.ok) {
       window.location.href = url;
@@ -168,10 +208,10 @@
     currentMain.replaceWith(nextMain);
 
     if (pushState) {
-      window.history.pushState({}, doc.title, url);
+      window.history.pushState({}, doc.title, toCleanUrl(fetchUrl));
     }
 
-    setActiveNav(url);
+    setActiveNav(fetchUrl);
     hydrateReleaseData();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -200,6 +240,10 @@
       window.location.reload();
     });
   });
+
+  // ---------------------------------------------------------------------
+  // Init
+  // ---------------------------------------------------------------------
 
   setActiveNav(window.location.href);
   hydrateReleaseData();
