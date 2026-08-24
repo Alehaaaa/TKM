@@ -1,10 +1,51 @@
 {
-  "latest": "0.1.48",
+  "latest": "0.1.49",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.49",
+      "tag": "TKM-0.1.49",
+      "publishedAt": "2026-08-24T21:50:39Z",
+      "publishedLabel": "August 24, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.49",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.49/TKM-0.1.49.zip",
+      "entries": [
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Animation Layers, Global Curve, Temporal Controls, and viewport controls have expanded translations"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Tools share consistent progress feedback, delayed time remaining, and animation selection targeting"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Animation and pose paste actions process large clips substantially faster"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Rapid Nudge clicks stay responsive, preserve the active selection, and resolve key collisions without flicker"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Rotation Order changes use Smart Euler Filter for selected keys and highlighted ranges when enabled"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Temporal Controls and Tracer create full-resolution results reliably and update in efficient batches"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.48...TKM-0.1.49"
+    },
     {
       "version": "0.1.48",
       "tag": "TKM-0.1.48",
