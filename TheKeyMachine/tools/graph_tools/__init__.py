@@ -9,6 +9,7 @@ TOOLTIPS = load_tooltips(__file__)
 
 class GraphToolsToolObject(ToolObject):
     ORDER = 940
+    OPERATION = {"capture_animation_context": True}
     TOOLS = {
         "graph_extra_tools": {
             "type": "menu", "label": "Graph Extras", "text": "E",

@@ -12,11 +12,21 @@ every object that was selected when the dialog was opened -- not just one.
 """
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.core import i18n
 
 from TheKeyMachine.data import icons
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.temporal_controls import api
 from TheKeyMachine.ui.widgets import customDialogs, customWidgets as cw, util as wutil
+
+
+def _t(text):
+    return i18n.tr_text(text)
+
+
+def _localized_options(options):
+    """Return display copies so language changes never mutate API constants."""
+    return tuple(dict(option, label=_t(option.get("label", ""))) for option in options)
 
 
 class _OptionRow(QtWidgets.QWidget):
@@ -306,9 +316,9 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         columns_layout.setContentsMargins(0, 0, 0, 0)
         columns_layout.setSpacing(wutil.DPI(6))
 
-        self.system_list = self._add_column(columns_layout, "System", api.SYSTEMS)
-        self.position_list = self._add_column(columns_layout, "Position", api.SPACES)
-        self.orientation_list = self._add_column(columns_layout, "Orientation", api.SPACES)
+        self.system_list = self._add_column(columns_layout, _t("System"), _localized_options(api.SYSTEMS))
+        self.position_list = self._add_column(columns_layout, _t("Position"), _localized_options(api.SPACES))
+        self.orientation_list = self._add_column(columns_layout, _t("Orientation"), _localized_options(api.SPACES))
 
         self.mainLayout.addWidget(columns_row, 1)
 
@@ -332,7 +342,7 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         return option_list
 
     def _build_reset_row(self):
-        self.reset_checkbox = QtWidgets.QCheckBox("Reset Properties")
+        self.reset_checkbox = QtWidgets.QCheckBox(_t("Reset Properties"))
         self.reset_checkbox.setStyleSheet("color: #a8a8a8; font-size: %spx;" % wutil.DPI(11))
         self.reset_checkbox.toggled.connect(self._on_reset_toggled)
         self.mainLayout.addSpacing(wutil.DPI(4))
@@ -363,7 +373,7 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         entry_layout.setSpacing(0)
 
         self.name_field = cw.PersistentPlaceholderLineEdit()
-        self.name_field.setPlaceholderText("Optional Label")
+        self.name_field.setPlaceholderText(_t("Optional Label"))
         self.name_field.setAlignment(QtCore.Qt.AlignCenter)
         self.name_field.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.name_field.setStyleSheet(

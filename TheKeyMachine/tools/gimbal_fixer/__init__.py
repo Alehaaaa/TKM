@@ -8,6 +8,17 @@ TOOLTIPS = load_tooltips(__file__)
 class GimbalFixerToolObject(ToolObject):
     ORDER = 810
     TOOLS = {
+        "gimbal_convert_rotation_order": {
+            "type": "tool",
+            "label": "Convert Rotation Order",
+            "callback": api.convert_rotation_order,
+            "pinnable": False,
+            "operation": {
+                "capture_animation_context": True,
+                "rollback_on_cancel": True,
+                "suspend_refresh": True,
+            },
+        },
         "gimbal": {
             "type": "check",
             "state_key": "gimbal",

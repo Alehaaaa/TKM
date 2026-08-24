@@ -14,65 +14,22 @@ from TheKeyMachine.ui.widgets import util as wutil
 SELECTION_SETS_ROOT = "TheKeyMachine_SelectionSet"
 SET_GROUP_SUFFIX = "_setgroup"
 
-# --- animBot selection set import ------------------------------------------
-#
-# animBot keeps its own selection sets in a scene hierarchy rooted at
-# ANIMBOT_SELECTION_SETS_ROOT, grouped under per-color transforms that carry
-# an int `colorIndex` attribute (animBot's 0-29 swatch palette). The table
-# below maps each animBot swatch to the closest TKM selection color index
-# (see TheKeyMachine.data.colors.COLORS.selection). Swatches that aren't
-# listed here, or whose colorIndex can't be read, fall back to
-# ANIMBOT_FALLBACK_SUFFIX -- an unrecognized color should never cause a set
-# to be skipped during import.
 ANIMBOT_SELECTION_SETS_ROOT = "animBot_Select_Sets"
 _ANIMBOT_COLOR_INDEX_TO_TKM_INDEX = {
-    0: 1,
-    1: 8,
-    2: 14,
-    3: 2,
-    4: 3,
-    5: 3,
-    6: 4,
-    7: 5,
-    8: 6,
-    9: 7,
-    10: 8,
-    11: 9,
-    12: 10,
-    13: 11,
-    14: 12,
-    15: 13,
-    17: 15,
-    18: 19,
-    19: 20,
-    20: 21,
-    21: 16,
-    22: 17,
-    23: 18,
-    24: 22,
-    25: 23,
-    26: 24,
-    27: 25,
-    28: 26,
-    29: 27,
+    0: 1, 1: 8, 2: 14, 3: 2, 4: 3, 5: 3, 6: 4, 7: 5, 8: 6,
+    9: 7, 10: 8, 11: 9, 12: 10, 13: 11, 14: 12, 15: 13,
+    17: 15, 18: 19, 19: 20, 20: 21, 21: 16, 22: 17, 23: 18,
+    24: 22, 25: 23, 26: 24, 27: 25, 28: 26, 29: 27,
 }
 _TKM_SELECTION_COLOR_BY_INDEX = {
     color.index: color for color in selectionSetsApi.SELECTION_COLORS.all
 }
 ANIMBOT_FALLBACK_SUFFIX = selectionSetsApi.SELECTION_COLORS.default.suffix
-
-
-def _build_animbot_color_suffix_map():
-    suffix_by_animbot_index = {}
-    for animbot_index, tkm_index in _ANIMBOT_COLOR_INDEX_TO_TKM_INDEX.items():
-        color = _TKM_SELECTION_COLOR_BY_INDEX.get(tkm_index)
-        if color:
-            suffix_by_animbot_index[animbot_index] = color.suffix
-    return suffix_by_animbot_index
-
-
-ANIMBOT_COLOR_INDEX_TO_SUFFIX = _build_animbot_color_suffix_map()
-
+ANIMBOT_COLOR_INDEX_TO_SUFFIX = {
+    animbot_index: _TKM_SELECTION_COLOR_BY_INDEX[tkm_index].suffix
+    for animbot_index, tkm_index in _ANIMBOT_COLOR_INDEX_TO_TKM_INDEX.items()
+    if tkm_index in _TKM_SELECTION_COLOR_BY_INDEX
+}
 
 def normalize_scene_items(items):
     """Return comparable long Maya paths for scene items."""
@@ -90,16 +47,9 @@ class SelectionSetsController:
 
     # --- export / import -----------------------------------------------
 
-    def export_sets(self, file_path=None, *args, **kwargs):
-        operation = toolCommon.current_tool_operation()
-        if operation is not None:
-            return self._export_sets(operation, file_path, *args, **kwargs)
-        with toolCommon.tool_operation(
-            tool_id="selection_sets_export",
-            label="Export Selection Sets",
-            undo=False,
-        ) as operation:
-            return self._export_sets(operation, file_path, *args, **kwargs)
+    def export_sets(self, file_path=None, *args, tool_operation=None, **kwargs):
+        operation = toolCommon.require_tool_operation(tool_operation)
+        return self._export_sets(operation, file_path, *args, **kwargs)
 
     def _export_sets(self, operation, file_path=None, *args, **kwargs):
         quick = bool(kwargs.get("quick", False))
@@ -153,16 +103,9 @@ class SelectionSetsController:
             "selection_sets", "Export Selection Sets", operation=operation
         )
 
-    def import_sets(self, file_path=None, *args, **kwargs):
-        operation = toolCommon.current_tool_operation()
-        if operation is not None:
-            return self._import_sets(operation, file_path, *args, **kwargs)
-        with toolCommon.tool_operation(
-            tool_id="selection_sets_import",
-            label="Import Selection Sets",
-            undo=True,
-        ) as operation:
-            return self._import_sets(operation, file_path, *args, **kwargs)
+    def import_sets(self, file_path=None, *args, tool_operation=None, **kwargs):
+        operation = toolCommon.require_tool_operation(tool_operation)
+        return self._import_sets(operation, file_path, *args, **kwargs)
 
     def _import_sets(self, operation, file_path=None, *args, **kwargs):
         quick = bool(kwargs.get("quick", False))
@@ -451,8 +394,6 @@ class SelectionSetsController:
         for set_group in self.get_set_groups():
             combo_widget.addItem(set_group.replace(SET_GROUP_SUFFIX, ""), set_group)
 
-    # --- animBot import ------------------------------------------------------
-
     def _animbot_root(self):
         matches = cmds.ls(ANIMBOT_SELECTION_SETS_ROOT, long=True) or []
         if not matches:
@@ -463,19 +404,15 @@ class SelectionSetsController:
         return matches[0] if matches else None
 
     def _animbot_color_suffix(self, color_group):
-        """Resolve the TKM color suffix for an animBot color group.
-
-        Always returns a usable suffix: an unread or unmapped animBot
-        colorIndex falls back to ANIMBOT_FALLBACK_SUFFIX rather than
-        dropping the group's sets from the import.
-        """
         if not cmds.attributeQuery("colorIndex", node=color_group, exists=True):
             return ANIMBOT_FALLBACK_SUFFIX
         try:
             animbot_index = int(cmds.getAttr(f"{color_group}.colorIndex"))
         except Exception:
             return ANIMBOT_FALLBACK_SUFFIX
-        return ANIMBOT_COLOR_INDEX_TO_SUFFIX.get(animbot_index, ANIMBOT_FALLBACK_SUFFIX)
+        return ANIMBOT_COLOR_INDEX_TO_SUFFIX.get(
+            animbot_index, ANIMBOT_FALLBACK_SUFFIX
+        )
 
     def _animbot_entry_from_set_node(self, set_node, color_suffix):
         if not cmds.attributeQuery("contents", node=set_node, exists=True):
@@ -495,12 +432,15 @@ class SelectionSetsController:
         root = self._animbot_root()
         if not root:
             return []
-
         entries = []
-        color_groups = cmds.listRelatives(root, children=True, type="transform", fullPath=True) or []
+        color_groups = cmds.listRelatives(
+            root, children=True, type="transform", fullPath=True
+        ) or []
         for color_group in color_groups:
             color_suffix = self._animbot_color_suffix(color_group)
-            set_nodes = cmds.listRelatives(color_group, children=True, type="transform", fullPath=True) or []
+            set_nodes = cmds.listRelatives(
+                color_group, children=True, type="transform", fullPath=True
+            ) or []
             for set_node in set_nodes:
                 entry = self._animbot_entry_from_set_node(set_node, color_suffix)
                 if entry:
@@ -508,15 +448,16 @@ class SelectionSetsController:
         return entries
 
     def pending_animbot_selection_sets(self):
-        pending = []
-        for entry in self._animbot_selection_sets():
-            if self._find_matching_selection_set(entry["objects"]):
-                continue
-            pending.append(entry)
-        return pending
+        return [
+            entry for entry in self._animbot_selection_sets()
+            if not self._find_matching_selection_set(entry["objects"])
+        ]
 
     def convert_animbot_selection_sets(self, entries=None):
-        entries = entries if entries is not None else self.pending_animbot_selection_sets()
+        entries = (
+            self.pending_animbot_selection_sets()
+            if entries is None else entries
+        )
         created = []
         for entry in entries:
             new_set = self.create_selection_set_from_data(
@@ -533,6 +474,7 @@ class SelectionSetsController:
 
     # --- selection <-> set membership ----------------------------------------
 
+    @toolCommon.mark_non_tool_action
     def handle_set_selection(self, set_name, shift_pressed, ctrl_pressed):
         mods = runtime.get_modifier_mask()
         shift_pressed = bool(mods & 1)

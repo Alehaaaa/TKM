@@ -1,7 +1,7 @@
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.data import icons
-from TheKeyMachine.core import settings
+from TheKeyMachine.core import settings, trigger
 from TheKeyMachine.maya import selection
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
@@ -173,17 +173,10 @@ def create_selection_set_from_data(name, color_suffix, objects, controller=None,
 def _maybe_convert_animbot_selection_sets(controller=None):
     controller = _resolve_toolbar_controller(controller)
     if controller is None:
-        return True
-
-    pending_fn = getattr(controller, "pending_animbot_selection_sets", None)
-    convert_fn = getattr(controller, "convert_animbot_selection_sets", None)
-    if not callable(pending_fn) or not callable(convert_fn):
-        return True
-
-    pending = pending_fn()
+        return
+    pending = controller.pending_animbot_selection_sets()
     if not pending:
-        return True
-
+        return
     clicked = customDialogs.QFlatConfirmDialog.question(
         parent=wutil.get_maya_qt(qt=QtWidgets.QWidget),
         window="Selection Sets",
@@ -193,24 +186,24 @@ def _maybe_convert_animbot_selection_sets(controller=None):
             f"{'' if len(pending) == 1 else 's'} into TKM Selection Sets?"
         ),
         buttons=[
-            customDialogs.QFlatConfirmDialog.CustomButton("Import", positive=True, icon=icons.apply),
-            customDialogs.QFlatConfirmDialog.CustomButton("Not Now", positive=False, icon=icons.cancel),
+            customDialogs.QFlatConfirmDialog.CustomButton(
+                "Import", positive=True, icon=icons.apply
+            ),
+            customDialogs.QFlatConfirmDialog.CustomButton(
+                "Not Now", positive=False, icon=icons.cancel
+            ),
         ],
         highlight="Import",
         closeButton=False,
         icon=icons.selection_sets,
     )
-    choice = (clicked or {}).get("name")
-    if choice == "Import":
-        convert_fn(pending)
-    return True
+    if (clicked or {}).get("name") == "Import":
+        controller.convert_animbot_selection_sets(pending)
 
 
 def open_selection_sets_toolbar_action(controller=None):
     controller = _resolve_toolbar_controller(controller)
-    if not _maybe_convert_animbot_selection_sets(controller):
-        _emit_selection_sets_window_state(False)
-        return
+    _maybe_convert_animbot_selection_sets(controller)
     if not _has_any_selection_sets(controller):
         if not _can_open_selection_set_creation(show_message=True):
             _emit_selection_sets_window_state(False)
@@ -272,28 +265,28 @@ def _place_selection_sets_window_default(win):
     )
 
 
-def quick_import_selection_sets(controller=None):
+def quick_import_selection_sets(controller=None, tool_operation=None):
     controller = _resolve_toolbar_controller(controller)
     if controller:
-        controller.import_sets(quick=True)
+        controller.import_sets(quick=True, tool_operation=tool_operation)
 
 
-def quick_export_selection_sets(controller=None):
+def quick_export_selection_sets(controller=None, tool_operation=None):
     controller = _resolve_toolbar_controller(controller)
     if controller:
-        controller.export_sets(quick=True)
+        controller.export_sets(quick=True, tool_operation=tool_operation)
 
 
-def import_selection_sets(controller=None):
+def import_selection_sets(controller=None, tool_operation=None):
     controller = _resolve_toolbar_controller(controller)
     if controller:
-        controller.import_sets()
+        controller.import_sets(tool_operation=tool_operation)
 
 
-def export_selection_sets(controller=None):
+def export_selection_sets(controller=None, tool_operation=None):
     controller = _resolve_toolbar_controller(controller)
     if controller:
-        controller.export_sets()
+        controller.export_sets(tool_operation=tool_operation)
 
 
 def clear_all_selection_sets(controller=None, parent=None, menu=None):
@@ -313,7 +306,22 @@ def clear_all_selection_sets(controller=None, parent=None, menu=None):
         closeButton=False,
     )
     if clicked and clicked.get("name") == "Yes":
-        controller.clear_selection_sets()
+        # Let the UI-only confirmation command close before the edit command
+        # opens its dispatcher-owned undo/progress operation.
+        QtCore.QTimer.singleShot(
+            0,
+            lambda: trigger.execute_command(
+                "selection_sets_clear_all_apply", controller=controller
+            ),
+        )
+
+
+def clear_all_selection_sets_apply(controller=None, tool_operation=None):
+    controller = _resolve_toolbar_controller(controller)
+    if controller is None:
+        return
+    toolCommon.require_tool_operation(tool_operation)
+    controller.clear_selection_sets()
 
 
 def restore_selection_sets_default_position():
@@ -342,32 +350,39 @@ def build_selection_sets_context_menu(parent=None, controller=None):
         QtGui.QIcon(icons.selection_sets_import),
         "Quick Import",
         description="Import selection sets from the shared quick file.",
-    ).triggered.connect(lambda *_: controller and controller.import_sets(quick=True))
+    ).triggered.connect(lambda *_: trigger.execute_command("selection_sets_quick_import"))
 
     menu.addAction(
         QtGui.QIcon(icons.selection_sets_export),
         "Quick Export",
         description="Export selection sets to the shared quick file, overwriting it.",
-    ).triggered.connect(lambda *_: controller and controller.export_sets(quick=True))
+    ).triggered.connect(lambda *_: trigger.execute_command("selection_sets_quick_export"))
 
     menu.addAction(
         QtGui.QIcon(icons.selection_sets_import),
         "Import",
         description="Import selection sets from a chosen file.",
-    ).triggered.connect(lambda *_: controller and controller.import_sets())
+    ).triggered.connect(lambda *_: trigger.execute_command("selection_sets_import"))
 
     menu.addAction(
         QtGui.QIcon(icons.selection_sets_export),
         "Export",
         description="Export selection sets to a chosen file.",
-    ).triggered.connect(lambda *_: controller and controller.export_sets())
+    ).triggered.connect(lambda *_: trigger.execute_command("selection_sets_export"))
 
     menu.addSeparator()
     menu.addAction(
         QtGui.QIcon(icons.trash),
         "Clear All Select Sets",
         description="Delete every selection set in the current scene.",
-    ).triggered.connect(lambda *_: clear_all_selection_sets(controller=controller, parent=parent, menu=menu))
+    ).triggered.connect(
+        lambda *_: trigger.execute_command(
+            "selection_sets_clear_all",
+            controller=controller,
+            parent=parent,
+            menu=menu,
+        )
+    )
 
     menu.addSeparator()
 

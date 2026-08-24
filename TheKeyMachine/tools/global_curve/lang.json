@@ -1,8 +1,27 @@
 {
-  "global_curve": {"en": {"label": "Global Curve"}},
-  "global_curve_create": {"en": {"label": "Create"}},
-  "global_curve_remove": {"en": {"label": "Remove"}},
-  "global_curve_edit": {"en": {"label": "Edit"}},
-  "global_curve_affect_time": {"en": {"label": "Affect Time"}},
-  "global_curve_snap_keys": {"en": {"label": "Snap Keys"}}
+  "global_curve": {
+    "en": {"label": "Global Curve", "tooltip": ["Create or remove a live Global Curve for selected or visible Graph Editor curves.", "Edit it to reshape every captured curve together."]},
+    "es": {"label": "Curva Global", "tooltip": ["Crea o elimina una Curva Global activa para las curvas seleccionadas o visibles.", "Edítala para modificar juntas todas las curvas capturadas."]},
+    "fr": {"label": "Courbe Globale", "tooltip": ["Crée ou supprime une Courbe globale pour les courbes sélectionnées ou visibles.", "Modifiez-la pour remodeler ensemble toutes les courbes capturées."]},
+    "ca": {"label": "Corba Global", "tooltip": ["Crea o elimina una Corba Global activa per a les corbes seleccionades o visibles.", "Edita-la per modificar juntes totes les corbes capturades."]},
+    "zh": {"label": "全局曲线", "tooltip": ["为图形编辑器中选中或可见的曲线创建或移除实时全局曲线。", "编辑它可同时重塑所有捕获的曲线。"]},
+    "ja": {"label": "グローバルカーブ", "tooltip": ["選択中または表示中のグラフエディタカーブにライブのグローバルカーブを作成または削除します。", "編集するとキャプチャしたすべてのカーブをまとめて変形できます。"]},
+    "ko": {"label": "글로벌 커브", "tooltip": ["선택되거나 표시된 그래프 에디터 커브에 라이브 글로벌 커브를 생성하거나 제거합니다.", "편집하여 캡처된 모든 커브를 함께 변형합니다."]},
+    "ar": {"label": "المنحنى العام", "tooltip": ["أنشئ أو أزل منحنى عامًا حيًا للمنحنيات المحددة أو الظاهرة في محرر الرسم.", "عدّله لإعادة تشكيل كل المنحنيات الملتقطة معًا."]}
+  },
+  "global_curve_create": {
+    "en": {"label": "Create", "tooltip": ["Capture selected or visible Graph Editor curves in another Global Curve."]}, "es": {"label": "Crear", "tooltip": ["Captura las curvas seleccionadas o visibles en otra Curva Global."]}, "fr": {"label": "Créer", "tooltip": ["Capture les courbes sélectionnées ou visibles dans une autre Courbe globale."]}, "ca": {"label": "Crear", "tooltip": ["Captura les corbes seleccionades o visibles en una altra Corba Global."]}, "zh": {"label": "创建", "tooltip": ["将选中或可见的图形编辑器曲线捕获到另一条全局曲线中。"]}, "ja": {"label": "作成", "tooltip": ["選択中または表示中のカーブを別のグローバルカーブにキャプチャします。"]}, "ko": {"label": "생성", "tooltip": ["선택되거나 표시된 커브를 다른 글로벌 커브로 캡처합니다."]}, "ar": {"label": "إنشاء", "tooltip": ["التقط المنحنيات المحددة أو الظاهرة في منحنى عام آخر."]}
+  },
+  "global_curve_remove": {
+    "en": {"label": "Remove", "tooltip": ["Remove every Global Curve and all live callbacks."]}, "es": {"label": "Eliminar", "tooltip": ["Elimina todas las Curvas Globales y sus callbacks activos."]}, "fr": {"label": "Supprimer", "tooltip": ["Supprime toutes les Courbes globales et leurs rappels actifs."]}, "ca": {"label": "Eliminar", "tooltip": ["Elimina totes les Corbes Globals i els seus callbacks actius."]}, "zh": {"label": "移除", "tooltip": ["移除所有全局曲线及其实时回调。"]}, "ja": {"label": "削除", "tooltip": ["すべてのグローバルカーブとライブコールバックを削除します。"]}, "ko": {"label": "제거", "tooltip": ["모든 글로벌 커브와 라이브 콜백을 제거합니다."]}, "ar": {"label": "إزالة", "tooltip": ["أزل كل المنحنيات العامة والاستدعاءات الحية."]}
+  },
+  "global_curve_edit": {
+    "en": {"label": "Edit", "tooltip": ["Replace the active Global Curve with a fresh capture of the current Graph Editor curves."]}, "es": {"label": "Editar", "tooltip": ["Reemplaza la Curva Global activa con una captura nueva de las curvas actuales."]}, "fr": {"label": "Modifier", "tooltip": ["Remplace la Courbe globale active par une nouvelle capture des courbes actuelles."]}, "ca": {"label": "Editar", "tooltip": ["Substitueix la Corba Global activa per una captura nova de les corbes actuals."]}, "zh": {"label": "编辑", "tooltip": ["使用当前图形编辑器曲线的新捕获替换活动全局曲线。"]}, "ja": {"label": "編集", "tooltip": ["現在のグラフエディタカーブを再キャプチャしてアクティブなグローバルカーブを置き換えます。"]}, "ko": {"label": "편집", "tooltip": ["현재 그래프 에디터 커브를 새로 캡처해 활성 글로벌 커브를 교체합니다."]}, "ar": {"label": "تعديل", "tooltip": ["استبدل المنحنى العام النشط بالتقاط جديد لمنحنيات محرر الرسم الحالية."]}
+  },
+  "global_curve_affect_time": {
+    "en": {"label": "Affect Time", "tooltip": ["Move captured keys in time when Global Curve keys move horizontally."]}, "es": {"label": "Afectar Tiempo", "tooltip": ["Mueve las claves capturadas en el tiempo al mover horizontalmente las claves globales."]}, "fr": {"label": "Affecter le Temps", "tooltip": ["Déplace les clés capturées dans le temps lorsque les clés globales bougent horizontalement."]}, "ca": {"label": "Afectar Temps", "tooltip": ["Mou les claus capturades en el temps quan les claus globals es mouen horitzontalment."]}, "zh": {"label": "影响时间", "tooltip": ["水平移动全局曲线关键帧时，同时移动捕获关键帧的时间。"]}, "ja": {"label": "時間に影響", "tooltip": ["グローバルカーブのキーを水平移動したとき、キャプチャしたキーの時間も移動します。"]}, "ko": {"label": "시간에 영향", "tooltip": ["글로벌 커브 키를 수평 이동할 때 캡처된 키의 시간도 이동합니다."]}, "ar": {"label": "التأثير في الزمن", "tooltip": ["حرّك المفاتيح الملتقطة زمنيًا عند تحريك مفاتيح المنحنى العام أفقيًا."]}
+  },
+  "global_curve_snap_keys": {
+    "en": {"label": "Snap Keys", "tooltip": ["Round time changes made through the Global Curve to whole frames."]}, "es": {"label": "Ajustar Claves", "tooltip": ["Redondea a fotogramas enteros los cambios de tiempo hechos con la Curva Global."]}, "fr": {"label": "Aligner les Clés", "tooltip": ["Arrondit aux images entières les changements temporels faits avec la Courbe globale."]}, "ca": {"label": "Ajustar Claus", "tooltip": ["Arrodoneix a fotogrames enters els canvis de temps fets amb la Corba Global."]}, "zh": {"label": "吸附关键帧", "tooltip": ["将通过全局曲线进行的时间更改取整到完整帧。"]}, "ja": {"label": "キーをスナップ", "tooltip": ["グローバルカーブによる時間変更を整数フレームに丸めます。"]}, "ko": {"label": "키 스냅", "tooltip": ["글로벌 커브를 통한 시간 변경을 정수 프레임으로 반올림합니다."]}, "ar": {"label": "محاذاة المفاتيح", "tooltip": ["قرّب تغييرات الزمن عبر المنحنى العام إلى إطارات كاملة."]}
+  }
 }

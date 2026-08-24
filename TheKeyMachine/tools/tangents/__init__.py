@@ -85,6 +85,7 @@ def _shortcuts(tangent_type, maya_default=True):
 
 
 class TangentsToolObject(ToolObject):
+    OPERATION = {"capture_animation_context": True}
     ORDER = 350
     TOOLS = {
         "tangent_cycle_matcher": {

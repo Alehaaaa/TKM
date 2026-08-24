@@ -1,6 +1,17 @@
-from TheKeyMachine.core.Qt import QtCore, QtGui
+import re
 
-from TheKeyMachine.ui.widgets import customWidgets as cw, util as wutil
+from maya import cmds
+
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
+from TheKeyMachine.core import trigger
+from TheKeyMachine.data import icons
+from TheKeyMachine.data.colors import COLORS
+from TheKeyMachine.maya import selection as maya_selection
+from TheKeyMachine.tools import common as toolCommon
+import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
+from TheKeyMachine.tools.selection_sets import controller as selectionSetsController
+from TheKeyMachine.tools.common import FloatingToolWindowMixin
+from TheKeyMachine.ui.widgets import customDialogs, customWidgets as cw, util as wutil
 
 
 class SelectionSetButton(cw.InlineRenameButton):
@@ -18,7 +29,14 @@ class SelectionSetButton(cw.InlineRenameButton):
 
     def _commit_inline_rename(self, subset_name, new_name):
         if self._controller and subset_name:
-            self._controller.rename_set(subset_name, new_name)
+            toolCommon.run_tool_callback(
+                self,
+                self._controller.rename_set,
+                subset_name,
+                new_name,
+                _tkm_tool_id="selection_sets_rename",
+                _tkm_tool_label="Rename Selection Set",
+            )
 
     def set_match_state(self, match_state):
         self._match_state = match_state or "none"
@@ -51,22 +69,6 @@ class SelectionSetButton(cw.InlineRenameButton):
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.drawRoundedRect(rect, radius, radius)
         painter.end()
-
-import re
-
-from maya import cmds
-
-from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
-
-from TheKeyMachine.data import icons
-from TheKeyMachine.data.colors import COLORS
-import TheKeyMachine.tools.selection_sets.api as selectionSetsApi
-from TheKeyMachine.tools.selection_sets import controller as selectionSetsController
-from TheKeyMachine.maya import selection as maya_selection
-from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.ui.widgets import customDialogs, customWidgets as cw, util as wutil
-from TheKeyMachine.tools.common import FloatingToolWindowMixin
-
 
 class SelectionSetCreationDialog(
     customDialogs.ActivationAutoCloseMixin,
@@ -272,7 +274,14 @@ class SelectionSetCreationDialog(
             if not set_name:
                 self.name_field.setFocus(QtCore.Qt.ActiveWindowFocusReason)
                 return
-            created = self.controller.create_new_set_and_update_buttons(suffix, self.name_field)
+            created = toolCommon.run_tool_callback(
+                self,
+                self.controller.create_new_set_and_update_buttons,
+                suffix,
+                self.name_field,
+                _tkm_tool_id="selection_sets_create",
+                _tkm_tool_label="Create Selection Set",
+            )
             if created:
                 self._completed = True
                 self.close()
@@ -520,12 +529,12 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
     def _export_sets(self):
         controller = self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller and self._has_exportable_sets(controller):
-            controller.export_sets()
+            trigger.execute_command("selection_sets_export")
 
     def _import_sets(self):
         controller = self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller:
-            controller.import_sets()
+            trigger.execute_command("selection_sets_import")
 
     def _has_exportable_sets(self, controller=None):
         controller = controller or self.controller or selectionSetsApi._resolve_toolbar_controller()
@@ -633,7 +642,15 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
     def _select_set(self, controller, subset):
         """Remember the explicitly clicked set before Maya changes selection."""
         self._primary_selected_set = subset
-        controller.handle_set_selection(subset, False, False)
+        toolCommon.run_tool_callback(
+            self,
+            controller.handle_set_selection,
+            subset,
+            False,
+            False,
+            _tkm_tool_id="selection_sets_select",
+            _tkm_tool_label="Select Selection Set",
+        )
 
     def _apply_set_button_style(self, button, match_state="none"):
         color = button.property("tkm_base_color") or "#333333"
@@ -720,34 +737,58 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
             self._primary_selected_set = None
 
     def _show_set_menu(self, controller, subset):
-        menu = QtWidgets.QMenu()
-        menu.addAction(QtGui.QIcon(icons.add), "Add Selection").triggered.connect(lambda: controller.add_selection_to_set(subset))
-        menu.addAction(QtGui.QIcon(icons.subtract), "Remove Selection").triggered.connect(
-            lambda: controller.remove_selection_from_set(subset)
+        menu = cw.MenuWidget(self, tearoff=False)
+        menu.addAction(
+            QtGui.QIcon(icons.add),
+            "Add Selection",
+            callback=lambda: controller.add_selection_to_set(subset),
+            command_id="selection_sets_add_members",
         )
-        menu.addAction(QtGui.QIcon(icons.reload), "Update Selection").triggered.connect(
-            lambda: controller.update_selection_to_set(subset)
+        menu.addAction(
+            QtGui.QIcon(icons.subtract),
+            "Remove Selection",
+            callback=lambda: controller.remove_selection_from_set(subset),
+            command_id="selection_sets_remove_members",
+        )
+        menu.addAction(
+            QtGui.QIcon(icons.reload),
+            "Update Selection",
+            callback=lambda: controller.update_selection_to_set(subset),
+            command_id="selection_sets_update_members",
         )
         menu.addSeparator()
 
-        color_menu = QtWidgets.QMenu("Change Color")
+        color_menu = cw.MenuWidget("Change Color", menu, tearoff=False)
         color_menu.setIcon(QtGui.QIcon(icons.color))
         menu.addMenu(color_menu)
         for suffix, label in controller.color_names.items():
-            color_menu.addAction(QtGui.QIcon(icons.selection_set_color_icons.get(suffix, "")), label).triggered.connect(
-                lambda *_, s=subset, suf=suffix: controller.set_set_color(s, suf)
+            color_menu.addAction(
+                QtGui.QIcon(icons.selection_set_color_icons.get(suffix, "")),
+                label,
+                callback=lambda s=subset, suf=suffix: controller.set_set_color(s, suf),
+                command_id="selection_sets_change_color",
             )
 
-        menu.addAction(QtGui.QIcon(icons.rename), "Rename").triggered.connect(
-            lambda: self._set_buttons.get(subset).start_inline_rename()
+        menu.addAction(
+            QtGui.QIcon(icons.rename),
+            "Rename",
+            callback=lambda: self._set_buttons.get(subset).start_inline_rename(),
+            command_id="selection_sets_begin_rename",
         )
-        menu.addAction(QtGui.QIcon(icons.trash), "Delete").triggered.connect(lambda: controller.remove_set_and_update_buttons(subset))
+        menu.addAction(
+            QtGui.QIcon(icons.trash),
+            "Delete",
+            callback=lambda: controller.remove_set_and_update_buttons(subset),
+            command_id="selection_sets_delete",
+        )
         current_color_suffix = f"_{subset.rsplit('_', 1)[-1]}"
         current_color_label = controller.color_names.get(current_color_suffix, current_color_suffix.strip("_"))
         menu.addAction(
             QtGui.QIcon(icons.selection_set_color_trash_icons.get(current_color_suffix, icons.trash)),
             f"Delete All {current_color_label}",
-        ).triggered.connect(lambda: controller.delete_sets_by_color_suffix(current_color_suffix))
+            callback=lambda: controller.delete_sets_by_color_suffix(current_color_suffix),
+            command_id="selection_sets_delete_color",
+        )
         menu.exec_(QtGui.QCursor.pos())
 
 

@@ -11,7 +11,8 @@ from maya.api import OpenMaya as om
 from TheKeyMachine.core.Qt import QtCore  # type: ignore
 from TheKeyMachine.core import runtime
 from TheKeyMachine.core import settings
-from TheKeyMachine.maya import selection
+from TheKeyMachine.maya import animation, selection
+from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.ui.widgets.util as wutil
 from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.data import icons
@@ -136,28 +137,29 @@ DIRECTION_PRESETS = {
 }
 DIRECTION_ORDER = ("before", "all", "after")
 
-# A refresh is progressively refined.  The interaction-biased profile waits
-# until the animator has settled, then deliberately stops at a coarser sample.
+# Every pass samples every frame in its range. Profiles differ only in when
+# they begin and how they expand a full-resolution window around current time;
+# a superseding edit cancels the remaining wider passes.
 PERFORMANCE_PROFILES = {
     "update": {
         "label": "Faster Update",
-        "description": "Refresh quickly at full frame accuracy.",
+        "description": "Refresh the complete range in one full-resolution pass.",
         "debounce_ms": 45,
-        "increments": (1,),
+        "batch_radii": (0,),
         "pass_gap_ms": 0,
     },
     "balanced": {
         "label": "Balanced",
-        "description": "Show a coarse result first, then refine it.",
+        "description": "Update 24 nearby frames first, then complete the range.",
         "debounce_ms": 180,
-        "increments": (3, 1),
+        "batch_radii": (12, 0),
         "pass_gap_ms": 70,
     },
     "interaction": {
         "label": "Faster Interaction",
-        "description": "Wait longer and keep fewer samples in heavy scenes.",
+        "description": "Expand outward from the current frame in small full-resolution batches.",
         "debounce_ms": 650,
-        "increments": (8, 4),
+        "batch_radii": (6, 18, 48, 0),
         "pass_gap_ms": 140,
     },
 }
@@ -209,7 +211,11 @@ def _tracer_names():
     result = []
     for candidate in candidates:
         handle_shape = "{}HandleShape".format(candidate)
-        if cmds.objExists("{}.points".format(candidate)) and cmds.objExists(handle_shape):
+        if (
+            cmds.objExists("{}.points".format(candidate))
+            and cmds.objExists(handle_shape)
+            and _stored_tracer_group(candidate)
+        ):
             if candidate not in result:
                 result.append(candidate)
     return result
@@ -217,8 +223,13 @@ def _tracer_names():
 
 def _sync_active_names():
     requested = str(_option_value(_ACTIVE_TRACER_OPTION, TRACER_NODE))
-    if cmds.objExists(requested) and cmds.objExists("{}HandleShape".format(requested)):
-        _set_active_names(requested)
+    requested_group = _stored_tracer_group(requested)
+    if (
+        requested_group
+        and cmds.objExists(requested)
+        and cmds.objExists("{}HandleShape".format(requested))
+    ):
+        _set_active_names(requested, group_name=requested_group)
         return requested
     names = _tracer_names()
     _set_active_names(names[-1] if names else "tracer")
@@ -421,8 +432,11 @@ def _set_shape_attr_globally(name, value):
         _set_shape_attr_for(node_name, name, value)
 
 
-def create_tracer(*_args):
-    selected_objects = selection.get_selected_objects()
+def create_tracer(*_args, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
+    snapshot = operation.selection_snapshot or animation.capture_selection_snapshot()
+    operation.selection_snapshot = snapshot
+    selected_objects = list(snapshot.objects)
     if len(selected_objects) != 1:
         return wutil.make_inViewMessage("Select only one object")
 
@@ -433,11 +447,15 @@ def create_tracer(*_args):
         base_name="tracer",
         group_name=_object_tracer_group_name(selected_objects[0]),
         replace=False,
+        tool_operation=operation,
     )
 
 
-def create_additional_tracer(*_args):
-    selected_objects = selection.get_selected_objects()
+def create_additional_tracer(*_args, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
+    snapshot = operation.selection_snapshot or animation.capture_selection_snapshot()
+    operation.selection_snapshot = snapshot
+    selected_objects = list(snapshot.objects)
     if len(selected_objects) != 1:
         return wutil.make_inViewMessage("Select one object for the new tracer")
     return _build_tracer(
@@ -445,12 +463,14 @@ def create_additional_tracer(*_args):
         base_name=_next_tracer_name(),
         group_name=_object_tracer_group_name(selected_objects[0]),
         replace=False,
+        tool_operation=operation,
     )
 
 
-def set_tracer_enabled(enabled=False, *_args):
+def set_tracer_enabled(enabled=False, *_args, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
     if bool(enabled):
-        return create_tracer()
+        return create_tracer(tool_operation=operation)
     return remove_tracer()
 
 
@@ -460,8 +480,40 @@ def _build_tracer(
     base_name=None,
     group_name=None,
     replace=True,
+    tool_operation=None,
 ):
-    """Build the native Maya tracer, optionally relative to an anchor."""
+    """Build a tracer while auto-refresh callbacks are exclusively paused."""
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_status("Creating Tracer")
+    controller = get_controller(create=False)
+    was_enabled = bool(controller and controller.is_enabled())
+    if controller is not None:
+        controller.cancel_pending()
+        controller.disable()
+    try:
+        return _build_tracer_scene(
+            source_object,
+            anchor_transform=anchor_transform,
+            base_name=base_name,
+            group_name=group_name,
+            replace=replace,
+        )
+    finally:
+        if bool(_option_value(_AUTO_UPDATE_OPTION, True)) and has_any_tracer():
+            controller = controller or get_controller()
+            controller.enable()
+        elif was_enabled and controller is not None:
+            controller.disable()
+
+
+def _build_tracer_scene(
+    source_object,
+    anchor_transform=None,
+    base_name=None,
+    group_name=None,
+    replace=True,
+):
+    """Perform the main-thread Maya scene edits for one native tracer."""
 
     if base_name is None:
         _sync_active_names()
@@ -491,8 +543,6 @@ def _build_tracer(
     _connect_tracer_follow(source_object)
     _restore_offset(source_object, TRACER_OFFSET)
     _configure_offset_channels(TRACER_OFFSET)
-    cmds.select(source_object, replace=True)
-
     start_frame = cmds.playbackOptions(query=True, minTime=True)
     end_frame = cmds.playbackOptions(query=True, maxTime=True)
     snapshot_options = dict(
@@ -501,12 +551,22 @@ def _build_tracer(
         constructionHistory=True,
         startTime=start_frame,
         endTime=end_frame,
+        # Creation is the authoritative sample, not an interactive preview.
+        # Performance profiles only control later auto-refresh passes; using
+        # their coarse first increment here permanently omitted frames until
+        # another edit happened to request a refinement pass.
         increment=1,
         update="demand",
     )
     if anchor_transform:
         snapshot_options["anchorTransform"] = anchor_transform
     cmds.snapshot(source_object, **snapshot_options)
+    points_source = "{}.points".format(TRACER_NODE)
+    points_destination = "{}.points".format(TRACER_SHAPE)
+    if cmds.isConnected(points_source, points_destination):
+        # The native live connection can repeatedly evaluate the whole range
+        # while the remaining tracer attributes and hierarchy are configured.
+        cmds.disconnectAttr(points_source, points_destination)
     _store_tracer_group(TRACER_NODE, TRACER_GROUP)
     apply_tracer_style(get_tracer_style())
     set_tracer_size(get_tracer_size())
@@ -515,20 +575,14 @@ def _build_tracer(
     set_transparency_falloff(has_transparency_falloff())
     set_xray(is_xray_enabled())
     set_tracer_direction(get_tracer_direction())
-    if is_physically_connected():
-        cmds.disconnectAttr("{}.points".format(TRACER_NODE), "{}.points".format(TRACER_SHAPE))
     # The rendered motion tracer is a sibling of the tracking branch.  It
     # must not inherit the source object's world motion through Offset.
     cmds.parent(TRACER_HANDLE, TRACER_GROUP)
     _connect_offset_to_tracer()
     _make_tracer_unselectable()
     _set_asset_black_box(TRACER_GROUP)
-    cmds.select(source_object, replace=True)
-    if bool(_option_value(_AUTO_UPDATE_OPTION, True)):
-        controller = get_controller()
-        controller.enable()
-        controller.request_refresh(immediate=True)
     _publish_tracer_state()
+    return TRACER_NODE
 
 
 def _tracer_sources_for(node_name):
@@ -636,7 +690,7 @@ def populate_tracer_offsets_menu(menu, *_args):
         return menu
 
     for node_name in tracer_names:
-        group_name = _stored_tracer_group(node_name) or node_name
+        group_name = _stored_tracer_group(node_name)
         menu.addAction(
             group_name,
             callback=partial(_select_tracer_offset, node_name),
@@ -664,28 +718,9 @@ def remove_tracer(*_args):
     _publish_tracer_state()
 
 
-def is_physically_connected():
-    _sync_active_names()
-    return bool(
-        cmds.objExists(TRACER_NODE)
-        and cmds.objExists(TRACER_SHAPE)
-        and cmds.isConnected(
-            "{}.points".format(TRACER_NODE),
-            "{}.points".format(TRACER_SHAPE),
-        )
-    )
-
-
 def is_connected():
-    """Return the auto-update state (and migrate the old live connection)."""
+    """Return the current demand-refresh auto-update state."""
     enabled = bool(_option_value(_AUTO_UPDATE_OPTION, True))
-    if has_any_tracer() and is_physically_connected():
-        enabled = True
-        _set_option(_AUTO_UPDATE_OPTION, True)
-        cmds.disconnectAttr(
-            "{}.points".format(TRACER_NODE),
-            "{}.points".format(TRACER_SHAPE),
-        )
     if enabled and _has_tracer():
         get_controller().enable()
     return enabled
@@ -703,11 +738,6 @@ def set_connected(connected=False, update_cb=None, *_args):
             update_cb(connected)
         return connected
 
-    # Legacy versions left the expensive points connection live.  The new
-    # controller connects only for each scheduled refresh pass.
-    if is_physically_connected():
-        cmds.disconnectAttr("{}.points".format(TRACER_NODE), "{}.points".format(TRACER_SHAPE))
-
     controller = get_controller() if connected else get_controller(create=False)
     if controller is not None:
         if connected:
@@ -719,34 +749,25 @@ def set_connected(connected=False, update_cb=None, *_args):
         update_cb(connected)
 
 
-def _refresh_pass(increment=1):
-    """Recompute one sampling pass; must be called on Maya's main thread."""
-    tracer_names = _tracer_names()
-    if not tracer_names:
-        return False
-    active_name = _sync_active_names()
-    increment = max(1, int(increment))
-    for node_name in tracer_names:
-        source = "{}.points".format(node_name)
-        destination = "{}HandleShape.points".format(node_name)
-        if cmds.isConnected(source, destination):
-            cmds.disconnectAttr(source, destination)
-        cmds.connectAttr(source, destination, force=True)
-        try:
-            # Touching a different value first guarantees that the snapshot is
-            # dirtied even when this pass uses the same sampling as the last one.
-            cmds.setAttr("{}.increment".format(node_name), increment + 1)
-            cmds.setAttr("{}.increment".format(node_name), increment)
-        finally:
-            if cmds.isConnected(source, destination):
-                cmds.disconnectAttr(source, destination)
-    if active_name:
-        _set_active_names(active_name)
-    return True
+def _playback_sample_range(radius=0):
+    """Return a full-resolution playback range centered on current time.
+
+    ``radius=0`` means the complete playback range. Positive radii produce
+    progressively wider batches without ever changing snapshot.increment.
+    """
+    full_start = float(cmds.playbackOptions(query=True, minTime=True))
+    full_end = float(cmds.playbackOptions(query=True, maxTime=True))
+    if not radius:
+        return full_start, full_end
+    # A tracer is frame-sampled; keep centered batches on whole frames even
+    # when Maya's current time is temporarily fractional during scrubbing.
+    current = float(round(cmds.currentTime(query=True)))
+    radius = max(1, int(radius))
+    return max(full_start, current - radius), min(full_end, current + radius)
 
 
-def _refresh_offset_pass(node_name):
-    """Resample only the tracer whose offset changed."""
+def _evaluate_tracer_range(node_name, start_frame, end_frame):
+    """Evaluate one demand snapshot at frame accuracy for the given range."""
     source = "{}.points".format(node_name)
     destination = "{}HandleShape.points".format(node_name)
     if not cmds.objExists(source) or not cmds.objExists(destination):
@@ -755,18 +776,46 @@ def _refresh_offset_pass(node_name):
         cmds.disconnectAttr(source, destination)
     try:
         cmds.connectAttr(source, destination, force=True)
-        # Demand-mode snapshot nodes do not rebuild their sampled points from
-        # localPosition dirtiness alone. Toggle this snapshot's current
-        # increment to force its evaluation, without touching other tracers or
-        # scheduling the progressive full-refresh passes.
         increment_plug = "{}.increment".format(node_name)
-        increment = max(1, int(cmds.getAttr(increment_plug)))
-        cmds.setAttr(increment_plug, increment + 1)
-        cmds.setAttr(increment_plug, increment)
+        if int(cmds.getAttr(increment_plug)) != 1:
+            cmds.setAttr(increment_plug, 1)
+
+        start_plug = "{}.startTime".format(node_name)
+        end_plug = "{}.endTime".format(node_name)
+        old_start = float(cmds.getAttr(start_plug))
+        old_end = float(cmds.getAttr(end_plug))
+        cmds.setAttr(start_plug, start_frame)
+        cmds.setAttr(end_plug, end_frame)
+        if old_start == float(start_frame) and old_end == float(end_frame):
+            # Demand snapshots need an input change even when the requested
+            # batch matches the previous one. Dirty the range, never sampling
+            # increment, so the resulting points remain frame-accurate.
+            cmds.setAttr(end_plug, end_frame + 1.0)
+            cmds.setAttr(end_plug, end_frame)
     finally:
         if cmds.isConnected(source, destination):
             cmds.disconnectAttr(source, destination)
     return True
+
+
+def _refresh_pass(batch_radius=0):
+    """Recompute one centered, full-resolution batch on Maya's main thread."""
+    tracer_names = _tracer_names()
+    if not tracer_names:
+        return False
+    active_name = _sync_active_names()
+    start_frame, end_frame = _playback_sample_range(batch_radius)
+    for node_name in tracer_names:
+        _evaluate_tracer_range(node_name, start_frame, end_frame)
+    if active_name:
+        _set_active_names(active_name)
+    return True
+
+
+def _refresh_offset_pass(node_name):
+    """Resample only the tracer whose offset changed."""
+    start_frame, end_frame = _playback_sample_range(0)
+    return _evaluate_tracer_range(node_name, start_frame, end_frame)
 
 
 def refresh_tracer(*_args):
@@ -775,7 +824,7 @@ def refresh_tracer(*_args):
     controller = get_controller(create=False)
     if controller is not None:
         controller.cancel_pending()
-    return _refresh_pass(1)
+    return _refresh_pass(0)
 
 
 def set_tracer_playback_range(*_args):
@@ -1023,7 +1072,7 @@ class _RefreshScheduler(QtCore.QThread):
             self._request = (
                 generation,
                 time.monotonic() + (delay / 1000.0),
-                tuple(profile["increments"]),
+                tuple(profile["batch_radii"]),
                 int(profile["pass_gap_ms"]),
             )
             self._condition.notify_all()
@@ -1049,21 +1098,21 @@ class _RefreshScheduler(QtCore.QThread):
                     self._condition.wait()
                 if self._stopping:
                     return
-                generation, deadline, increments, pass_gap_ms = self._request
+                generation, deadline, batch_radii, pass_gap_ms = self._request
                 remaining = deadline - time.monotonic()
                 if remaining > 0:
                     self._condition.wait(remaining)
                     continue
                 self._request = None
 
-            for index, increment in enumerate(increments):
+            for index, batch_radius in enumerate(batch_radii):
                 with self._condition:
                     if self._stopping:
                         return
                     if self._request is not None or generation != self._generation:
                         break
-                self.refreshPass.emit(int(increment), int(generation))
-                if index + 1 < len(increments) and pass_gap_ms:
+                self.refreshPass.emit(int(batch_radius), int(generation))
+                if index + 1 < len(batch_radii) and pass_gap_ms:
                     with self._condition:
                         self._condition.wait(pass_gap_ms / 1000.0)
 
@@ -1181,10 +1230,10 @@ class TracerUpdateController(QtCore.QObject):
         self._generation = self._scheduler.cancel()
 
     @QtCore.Slot(int, int)
-    def _apply_refresh_pass(self, increment, generation):
+    def _apply_refresh_pass(self, batch_radius, generation):
         if not self._enabled or generation != self._generation:
             return
-        _refresh_pass(increment)
+        _refresh_pass(batch_radius)
 
 
 _CONTROLLER = None

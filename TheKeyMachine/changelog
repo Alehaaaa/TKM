@@ -15,6 +15,14 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.49:
+  - polish: Tools share consistent progress feedback, delayed time remaining, and animation selection targeting
+  - polish: Animation and pose paste actions process large clips substantially faster
+  - bugfix: Rapid Nudge clicks stay responsive, preserve the active selection, and resolve key collisions without flicker
+  - bugfix: Rotation Order changes use Smart Euler Filter for selected keys and highlighted ranges when enabled
+  - bugfix: Temporal Controls and Tracer create full-resolution results reliably and update in efficient batches
+  - changed: Animation Layers, Global Curve, Temporal Controls, and viewport controls have expanded translations
+
 0.1.48:
   - polish: Temporal Controls Panel has a larger default size and cleaner icon sliders
   - polish: Graph Editor toolbar docking is clearer and stays synced

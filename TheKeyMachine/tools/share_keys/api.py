@@ -77,18 +77,22 @@ def bake_tangent_mode_choices():
     ]
 
 
-def share_keys(*args): return controller.share_keys(*args)
-def share_keys_from_last_selected(*args): return controller.share_keys_from_last_selected(*args)
-def reblock_move(*args): return controller.reblock_move(*args)
-def reblock_insert(*args): return controller.reblock_insert(*args)
+def share_keys(*args, **kwargs): return controller.share_keys(*args, **kwargs)
+def share_keys_from_last_selected(*args, **kwargs): return controller.share_keys_from_last_selected(*args, **kwargs)
+def reblock_move(*args, **kwargs): return controller.reblock_move(*args, **kwargs)
+def reblock_insert(*args, **kwargs): return controller.reblock_insert(*args, **kwargs)
 def bake_animation(*args, **kwargs): return controller.bake_animation(*args, **kwargs)
-def bake_animation_1(*args): return controller.bake_animation_1(*args)
-def bake_animation_2(*args): return controller.bake_animation_2(*args)
-def bake_animation_3(*args): return controller.bake_animation_3(*args)
-def bake_animation_4(*args): return controller.bake_animation_4(*args)
-def bake_animation_from_last_selected(*args): return controller.bake_animation_from_last_selected(*args)
+def bake_animation_1(*args, **kwargs): return controller.bake_animation_1(*args, **kwargs)
+def bake_animation_2(*args, **kwargs): return controller.bake_animation_2(*args, **kwargs)
+def bake_animation_3(*args, **kwargs): return controller.bake_animation_3(*args, **kwargs)
+def bake_animation_4(*args, **kwargs): return controller.bake_animation_4(*args, **kwargs)
+def bake_animation_from_last_selected(*args, **kwargs): return controller.bake_animation_from_last_selected(*args, **kwargs)
 
 
 def bake_animation_custom(*args, anchor_widget=None):
     from TheKeyMachine.tools.share_keys.widgets import open_custom_bake
     return open_custom_bake(anchor_button=anchor_widget)
+
+
+def apply_custom_bake(*args, **kwargs):
+    return controller.bake_animation(*args, **kwargs)

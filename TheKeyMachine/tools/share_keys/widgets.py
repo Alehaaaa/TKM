@@ -1,9 +1,9 @@
 """Bake Custom Interval window owned by the Share Keys package."""
 
 from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
+from TheKeyMachine.core import trigger
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.tools.share_keys import controller
 from TheKeyMachine.ui.widgets import customDialogs
 from TheKeyMachine.ui.widgets import customWidgets as cw
 from TheKeyMachine.ui.widgets.util import DPI
@@ -88,7 +88,12 @@ def open_custom_bake(anchor_button=None):
             widget.deleteLater()
 
     dialog = BakeCustomIntervalWindow(
-        callback=lambda value, window: controller.bake_animation(bake_interval=value, window=window),
+        callback=lambda value, window: trigger.execute_command(
+            "bake_animation_custom_apply",
+            bake_interval=value,
+            window=window,
+            _tkm_anchor_widget=window,
+        ),
         parent=None,
     )
     if anchor_button is not None:

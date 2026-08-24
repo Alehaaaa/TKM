@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
+from TheKeyMachine.core import i18n
 
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.data import icons
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
 from TheKeyMachine.tools.attribute_switcher import controller as switchController
 from TheKeyMachine.tools.attribute_switcher.controller import (
@@ -31,6 +33,11 @@ COLOR_ACCENT_WHITE = ACCENT_LIGHT_COLOR.hover.hex
 COLOR_TEXT_MAIN = UI_COLOR.darker_gray.hex
 COLOR_TEXT_SECONDARY = UI_COLOR.dark_white.hex
 COLOR_BLEND_MULTI = ACCENT_DARK_COLOR.hover.hex
+
+
+def _t(text):
+    """Translate literal Attribute Switcher chrome through the shared catalog."""
+    return i18n.tr_text(text)
 
 ATTRIBUTE_SWITCHER_GLOBE_IMAGE = icons.globe
 
@@ -103,6 +110,13 @@ def _add_option_state_indicator(button, is_current=False, is_keyed=False):
         "background: {}; border-radius: {}px;".format(color, dot_size // 2)
     )
     dot_layout.addWidget(dot)
+
+
+def _rotation_order_option_text(option, gimbal_info):
+    """Render the shared GimbalAnalyzer result in every option picker."""
+    info = (gimbal_info or {}).get(option, {})
+    label = str(info.get("label", "")).strip()
+    return "{} ({})".format(option, label) if label else option
 
 
 def _connect_checkable_button(button, callback, *callback_args):
@@ -649,13 +663,12 @@ class AttributePopup(QtWidgets.QWidget):
         self.content_layout.addWidget(self._create_title(title_text))
 
         for i, opt in enumerate(self.options):
-            # Special formatting for rotation orders
-            display_text = opt
-            if is_rr and self.item_widget.gimbal_info:
-                info = self.item_widget.gimbal_info.get(opt, {})
-                label = info.get("label", "")
-                if label:
-                    display_text = "{} ({})".format(opt, label)
+            display_text = (
+                _rotation_order_option_text(
+                    opt, self.item_widget.gimbal_info
+                )
+                if is_rr else opt
+            )
 
             btn = self._create_option_button(display_text, i, is_all)
             self.content_layout.addWidget(btn)
@@ -857,6 +870,45 @@ class AttributePopup(QtWidgets.QWidget):
         self.show()
 
 
+def _populate_attribute_entry_state(entry, objects_map):
+    """Populate the shared option/current/key state used by both row types."""
+    entry.objects_map = objects_map
+    any_obj = next(iter(objects_map.values()))
+    entry.is_enum = any_obj.get("type") == "enum"
+    entry.min_val = any_obj.get("min", 0)
+    entry.max_val = any_obj.get("max", 1)
+    entry.options = any_obj.get("enum", [])
+    entry.current_indices = {
+        obj.get("current") for obj in objects_map.values()
+    }
+    entry.marked_indices = {
+        index
+        for obj in objects_map.values()
+        for index in obj.get("marked", [])
+    }
+    keyed_values = {
+        index
+        for obj in objects_map.values()
+        for index in obj.get("keyed_values", [])
+    }
+    entry.has_mixed_key_values = entry.is_enum and len(keyed_values) > 1
+    entry.indices = entry.current_indices | entry.marked_indices
+    entry.current_idx = any_obj.get("current", 0)
+    entry.gimbal_info = any_obj.get("gimbal", {})
+
+
+class _StagedAttributeEntry:
+    """Non-visual per-target view of a collapsed AttributeItem."""
+
+    def __init__(self, source_item, target, object_data):
+        self.enum_attr = source_item.enum_attr
+        self.object_label = source_item.parent_dialog._format_object_name(
+            [target]
+        )
+        self.attribute_label = source_item.attribute_label
+        _populate_attribute_entry_state(self, {target: object_data})
+
+
 class MultiAttributeSwitchDialog(FloatingWidget):
     """Stage independent enum choices in a responsive column grid."""
 
@@ -869,7 +921,7 @@ class MultiAttributeSwitchDialog(FloatingWidget):
         self._option_groups = []
         self._column_widgets = []
         self._all_frames = False
-        self.setWindowTitle("Switch Multiple Attributes")
+        self.setWindowTitle(_t("Switch Multiple Attributes"))
         self.setMinimumWidth(wutil.DPI(220))
         self._build_ui()
 
@@ -940,7 +992,7 @@ class MultiAttributeSwitchDialog(FloatingWidget):
     def _add_scope_controls(self):
         layout = QtWidgets.QHBoxLayout()
         layout.setSpacing(wutil.DPI(4))
-        label = QtWidgets.QLabel("Keyframes", self.mainContent)
+        label = QtWidgets.QLabel(_t("Keyframes"), self.mainContent)
         label.setStyleSheet(
             "color: {}; font-size: {}px;".format(
                 COLOR_TEXT_SECONDARY, wutil.DPI(11)
@@ -1010,11 +1062,10 @@ class MultiAttributeSwitchDialog(FloatingWidget):
                 if option not in options_map:
                     continue
                 option_count += 1
-                display_option = option
-                gimbal = item.gimbal_info.get(option, {})
-                gimbal_label = gimbal.get("label", "")
-                if item.enum_attr == "rotateOrder" and gimbal_label:
-                    display_option = "{} ({})".format(option, gimbal_label)
+                display_option = (
+                    _rotation_order_option_text(option, item.gimbal_info)
+                    if item.enum_attr == "rotateOrder" else option
+                )
                 button = QtWidgets.QPushButton(display_option, column)
                 button.setCheckable(True)
                 _configure_option_button(button)
@@ -1029,7 +1080,7 @@ class MultiAttributeSwitchDialog(FloatingWidget):
                 group.addButton(button)
                 layout.addWidget(button)
             if not option_count:
-                empty = QtWidgets.QLabel("No options", column)
+                empty = QtWidgets.QLabel(_t("No options"), column)
                 empty.setStyleSheet(
                     "color: {}; background: transparent;".format(
                         COLOR_TEXT_SECONDARY
@@ -1136,27 +1187,9 @@ class AttributeItem(QtWidgets.QWidget):
         self.label_text = "{} {}".format(object_label, attribute_label)
         self.enum_attr = enum_attr
         self.unique_controls = unique_controls
-        self.objects_map = objects_map
         self.parent_dialog = parent_dialog
 
-        # Extract options and status
-        any_obj = next(iter(objects_map.values()))
-        self.is_enum = any_obj.get("type") == "enum"
-        self.min_val = any_obj.get("min", 0)
-        self.max_val = any_obj.get("max", 1)
-
-        self.options = any_obj.get("enum", [])
-        self.current_indices = {obj.get("current") for obj in objects_map.values()}
-        self.marked_indices = {idx for obj in objects_map.values() for idx in obj.get("marked", [])}
-        keyed_values = {
-            idx
-            for obj in objects_map.values()
-            for idx in obj.get("keyed_values", [])
-        }
-        self.has_mixed_key_values = self.is_enum and len(keyed_values) > 1
-        self.indices = self.current_indices | self.marked_indices
-        self.current_idx = any_obj.get("current", 0)
-        self.gimbal_info = any_obj.get("gimbal", {})
+        _populate_attribute_entry_state(self, objects_map)
 
         self.is_toggle = self.is_enum and len(self.options) <= 2
         self._hover_active = False
@@ -1173,7 +1206,7 @@ class AttributeItem(QtWidgets.QWidget):
         self.multi_checkbox = QtWidgets.QCheckBox(self)
         self.multi_checkbox.setObjectName("HotkeyCommandCheckBox")
         self.multi_checkbox.setVisible(False)
-        self.multi_checkbox.setToolTip("Select this channel for a staged multi-switch")
+        self.multi_checkbox.setToolTip(_t("Select this channel for a staged multi-switch"))
         self.multi_checkbox.setCursor(QtCore.Qt.PointingHandCursor)
         self.multi_checkbox.setSizePolicy(
             QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
@@ -1452,7 +1485,7 @@ class SetupTargetsDialog(FloatingWidget):
             self.targets_list.add_target(obj)
 
     def _create_layouts(self):
-        title = QtWidgets.QLabel("Xform targets")
+        title = QtWidgets.QLabel(_t("Xform targets"))
         title.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         title.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 4px;")
 
@@ -1905,7 +1938,7 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         title_layout.addWidget(title_icon)
         title_layout.addWidget(selection_title, 1)
 
-        self.selection_label = QtWidgets.QLabel("No switches for selection")
+        self.selection_label = QtWidgets.QLabel(_t("No switches for selection"))
         self.selection_label.setStyleSheet("color: %s; background: transparent;" % self.TEXT_COLOR)
 
         selection_layout.addLayout(title_layout)
@@ -1947,7 +1980,13 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
 
     def apply_active_changes(self):
         """Commits all currently selected enum values to the scene."""
-        self.controller.apply_active_changes(self._active_switch_widgets)
+        toolCommon.run_tool_callback(
+            self,
+            self.controller.apply_active_changes,
+            self._active_switch_widgets,
+            _tkm_tool_id="attribute_switcher_apply_active",
+            _tkm_tool_label="Attribute Switcher",
+        )
 
     def _disconnect_runtime_manager(self):
         self.controller.disconnect_runtime()
@@ -2097,19 +2136,45 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
                 entries.append((item, options_map))
         return entries
 
+    def _expanded_multi_entries(self, selected_entries=None):
+        """Expand collapsed rows into independently configurable targets."""
+        entries = []
+        for item, options_map in (
+            selected_entries
+            if selected_entries is not None
+            else self._selected_multi_entries()
+        ):
+            if len(item.objects_map) <= 1:
+                entries.append((item, options_map))
+                continue
+            for target, object_data in item.objects_map.items():
+                staged_item = _StagedAttributeEntry(
+                    item, target, object_data
+                )
+                staged_options = self.controller.build_options_map(
+                    staged_item.objects_map
+                )
+                entries.append((staged_item, staged_options))
+        return entries
+
     def _on_attribute_multi_checked(self, item, checked):
         """Update the staged multi-switch UI without changing the scene."""
         self._popup_timer.stop()
         self._popup_pending_item = None
         self._close_active_popup()
 
-        entries = self._selected_multi_entries()
+        selected_entries = self._selected_multi_entries()
+        entries = self._expanded_multi_entries(selected_entries)
         self._close_multi_switch_dialog(clear_selection=False)
         if len(entries) < 2:
             return
 
         self._multi_switch_dialog = MultiAttributeSwitchDialog(self, entries)
-        anchor = item if checked and wutil.is_valid_widget(item) else entries[-1][0]
+        anchor = (
+            item
+            if checked and wutil.is_valid_widget(item)
+            else selected_entries[-1][0]
+        )
         self._multi_switch_dialog.show_beside(anchor)
         self._update_interaction_state(True, force=True)
 
@@ -2139,7 +2204,13 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         ]
         self._close_multi_switch_dialog(clear_selection=True)
         if requests:
-            self.controller.apply_switches(requests)
+            toolCommon.run_tool_callback(
+                self,
+                self.controller.apply_switches,
+                requests,
+                _tkm_tool_id="attribute_switcher_multi",
+                _tkm_tool_label="Switch Multiple Attributes",
+            )
 
     # =================================================================================
     #  8. HELPERS
@@ -2252,11 +2323,15 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
     def _apply_attribute_switch(
         self, enum_value, enum_attr, options_and_objects, all_frames_override=None
     ):
-        self.controller.apply_switch(
+        toolCommon.run_tool_callback(
+            self,
+            self.controller.apply_switch,
             enum_value,
             enum_attr,
             options_and_objects,
             all_frames_override=all_frames_override,
+            _tkm_tool_id="attribute_switcher_apply",
+            _tkm_tool_label="Attribute Switcher",
         )
 
     def _show_context_menu(self, pos):
@@ -2265,12 +2340,15 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         self.context_menu.aboutToShow.connect(self._suspend_auto_close)
         self.context_menu.aboutToHide.connect(self._resume_auto_close)
 
-        self.toggle_namespaces_action = self.context_menu.addAction("Show namespaces", description="Show namespaces for listed attributes.")
+        self.toggle_namespaces_action = self.context_menu.addAction(
+            _t("Show namespaces"), description=_t("Show namespaces for listed attributes.")
+        )
         self.toggle_namespaces_action.setCheckable(True)
         self.toggle_namespaces_action.setChecked(self.namespace_display)
 
         self.show_rotate_order_action = self.context_menu.addAction(
-            "Enable Rotate Order", description="List Rotate Order attributes for selected objects."
+            _t("Enable Rotate Order"),
+            description=_t("List Rotate Order attributes for selected objects."),
         )
         self.show_rotate_order_action.setCheckable(True)
         self.show_rotate_order_action.setChecked(self.show_rotate_order)
@@ -2278,7 +2356,8 @@ class AttributeSwitcherWidget(FloatingToolWindowMixin, FloatingWidget):
         self.context_menu.addSeparator()
 
         self.euler_filter_action = self.context_menu.addAction(
-            "Auto Euler Filter", description="Apply euler filter to switched attributes."
+            _t("Auto Euler Filter"),
+            description=_t("Apply euler filter to switched attributes."),
         )
         self.euler_filter_action.setCheckable(True)
         self.euler_filter_action.setChecked(self.euler_filter)
@@ -2348,7 +2427,7 @@ class AttributeSwitcherWindow(AttributeSwitcherWidget):
     def __init__(self, parent=None, popup=False):
         super().__init__(popup=popup, parent=parent)
         self.setObjectName("attribute_switcher_window")
-        self.setWindowTitle("Attribute Switcher")
+        self.setWindowTitle(_t("Attribute Switcher"))
 
     def closeEvent(self, event):
         attributeSwitcherApi._emit_attribute_switcher_window_state(False)

@@ -8,6 +8,7 @@ TOOLTIPS = load_tooltips(__file__)
 
 class AnimationToolsToolObject(ToolObject):
     ORDER = 330
+    OPERATION = {"capture_animation_context": True}
     DOC_URL = "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools"
 
     TOOLS = {

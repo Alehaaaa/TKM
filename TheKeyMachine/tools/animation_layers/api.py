@@ -27,8 +27,7 @@ instance through the standard ``tool_operation()`` dispatch boundary.
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 from TheKeyMachine.data import icons
-from TheKeyMachine.core import settings
-from TheKeyMachine.core import runtime
+from TheKeyMachine.core import i18n, runtime, settings, trigger
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
 from TheKeyMachine.tools.animation_layers import controller
@@ -169,7 +168,7 @@ def _refresh_open_window():
         dlg.refresh()
 
 
-def smart_merge_selected_layers(*_args):
+def smart_merge_selected_layers(*_args, tool_operation=None):
     """Toolbar-button/shortcut/menu quick action -- bakes the layers
     currently selected in the scene (see ``controller.selected_layer_names``)
     without needing the Animation Layers window open first."""
@@ -178,36 +177,31 @@ def smart_merge_selected_layers(*_args):
         wutil.make_inViewMessage("Select two or more animation layers to merge")
         return
     try:
-        with toolCommon.tool_operation(
-            tool_id="animation_layers_merge",
-            label="Smart Merge Animation Layers",
-            undo=True,
-            progress=True,
-        ) as operation:
-            operation.start()
-            controller.smart_merge_layers(layer_names, operation=operation)
+        operation = toolCommon.require_tool_operation(tool_operation)
+        operation.set_status("Smart Merge Animation Layers")
+        controller.smart_merge_layers(layer_names, operation=operation)
     except RuntimeError as exc:
         wutil.make_inViewMessage(str(exc))
         return
     _refresh_open_window()
 
 
-def export_selected_layers(*_args):
+def export_selected_layers(*_args, tool_operation=None):
     layer_names = controller.selected_layer_names()
     if not layer_names:
         wutil.make_inViewMessage("Select one or more animation layers to export")
         return
-    with toolCommon.tool_operation(tool_id="animation_layers_export", label="Export Animation Layers", undo=False) as operation:
-        try:
-            controller.export_selected(layer_names, operation=operation)
-        except RuntimeError as exc:
-            wutil.make_inViewMessage(str(exc))
-
-
-def import_layers_file(*_args):
+    operation = toolCommon.require_tool_operation(tool_operation)
     try:
-        with toolCommon.tool_operation(tool_id="animation_layers_import", label="Import Animation Layers", undo=True) as operation:
-            controller.import_from_file(operation=operation)
+        controller.export_selected(layer_names, operation=operation)
+    except RuntimeError as exc:
+        wutil.make_inViewMessage(str(exc))
+
+
+def import_layers_file(*_args, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
+    try:
+        controller.import_from_file(operation=operation)
     except RuntimeError as exc:
         wutil.make_inViewMessage(str(exc))
         return
@@ -219,23 +213,23 @@ def build_animation_layers_context_menu(parent=None):
 
     menu.addAction(
         QtGui.QIcon(icons.get("layer_merge")),
-        "Smart Merge Selected",
-        description="Bake the selected layers together, sampling only the frames where they actually have weight.",
-    ).triggered.connect(lambda *_: smart_merge_selected_layers())
+        i18n.tr_text("Smart Merge Selected"),
+        description=i18n.tr_text("Bake the selected layers together, sampling only the frames where they actually have weight."),
+    ).triggered.connect(lambda *_: trigger.execute_command("animation_layers_smart_merge"))
 
     menu.addSeparator()
 
     menu.addAction(
         QtGui.QIcon(icons.get("export")),
-        "Export Selected",
-        description="Export the selected layers (and their animation) to a file.",
-    ).triggered.connect(lambda *_: export_selected_layers())
+        i18n.tr_text("Export Selected"),
+        description=i18n.tr_text("Export the selected layers (and their animation) to a file."),
+    ).triggered.connect(lambda *_: trigger.execute_command("animation_layers_export"))
 
     menu.addAction(
         QtGui.QIcon(icons.get("import")),
-        "Import",
-        description="Import previously exported animation layers.",
-    ).triggered.connect(lambda *_: import_layers_file())
+        i18n.tr_text("Import"),
+        description=i18n.tr_text("Import previously exported animation layers."),
+    ).triggered.connect(lambda *_: trigger.execute_command("animation_layers_import"))
 
     menu.addSeparator()
 

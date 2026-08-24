@@ -17,6 +17,10 @@ def paste_pose_to(*args, **kwargs):
     return controller.paste_pose_to(*args, **kwargs)
 
 
+def paste_pose_to_apply(*args, **kwargs):
+    return controller.paste_pose_to_apply(*args, **kwargs)
+
+
 def export_pose_file(*args, **kwargs):
     return controller.export_pose_file(*args, **kwargs)
 
@@ -43,6 +47,10 @@ def paste_opposite_animation(*args, **kwargs):
 
 def paste_animation_to(*args, **kwargs):
     return controller.paste_animation_to(*args, **kwargs)
+
+
+def paste_animation_to_apply(*args, **kwargs):
+    return controller.paste_animation_to_apply(*args, **kwargs)
 
 
 def export_animation_file(*args, **kwargs):

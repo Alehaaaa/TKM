@@ -1,38 +1,44 @@
 from TheKeyMachine.tools.tangents import controller
-from TheKeyMachine.tools import common as toolCommon
 
 
 CYCLE_MATCH_MODE_ORIENTATION = controller.CYCLE_MATCH_MODE_ORIENTATION
 CYCLE_MATCH_MODE_KEY_COPY = controller.CYCLE_MATCH_MODE_KEY_COPY
 
 
-def _run(tool_id, callback):
-    with toolCommon.tool_operation(tool_id=tool_id, undo=True, progress=False):
-        return callback()
-
-
 def set_tangent(tangent_type, *_args, **kwargs):
     handle_mode = kwargs.pop("handle_mode", "both")
     key_scope = kwargs.pop("key_scope", "selection")
-    return _run(
-        "tangent_{}".format(tangent_type),
-        lambda: controller.set_tangent(tangent_type, handle_mode=handle_mode, key_scope=key_scope),
+    return controller.set_tangent(
+        tangent_type,
+        handle_mode=handle_mode,
+        key_scope=key_scope,
+        tool_operation=kwargs.pop("tool_operation", None),
     )
 
 
 def set_bouncy(*_args, **kwargs):
     handle_mode = kwargs.pop("handle_mode", "both")
     key_scope = kwargs.pop("key_scope", "selection")
-    return _run("tangent_bouncy", lambda: controller.set_bouncy(handle_mode=handle_mode, key_scope=key_scope))
+    return controller.set_bouncy(
+        handle_mode=handle_mode,
+        key_scope=key_scope,
+        tool_operation=kwargs.pop("tool_operation", None),
+    )
 
 
-def set_maya_default(tangent_type, *_args, **_kwargs):
-    return _run("tangent_{}_default".format(tangent_type), lambda: controller.set_maya_default(tangent_type))
+def set_maya_default(tangent_type, *_args, **kwargs):
+    return controller.set_maya_default(
+        tangent_type,
+        tool_operation=kwargs.pop("tool_operation", None),
+    )
 
 
 def match_cycle(*_args, **kwargs):
     target_key = kwargs.pop("target_key", "last")
-    return _run("tangent_cycle_matcher", lambda: controller.match_cycle(target_key=target_key))
+    return controller.match_cycle(
+        target_key=target_key,
+        tool_operation=kwargs.pop("tool_operation", None),
+    )
 
 
 def get_cycle_match_mode():

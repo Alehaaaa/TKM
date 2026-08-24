@@ -22,6 +22,105 @@ _TANGENT_QUERY_FLAGS = (
 )
 
 
+def euler_full_turn():
+    """Return one complete turn in Maya's current angular unit."""
+    try:
+        angular_unit = cmds.currentUnit(query=True, angle=True)
+    except _COMMAND_ERRORS:
+        angular_unit = "deg"
+    return math.tau if str(angular_unit).lower().startswith("rad") else 360.0
+
+
+def _closest_euler_turn_offset(value, reference, full_turn):
+    if (
+        not all(math.isfinite(float(item)) for item in (value, reference, full_turn))
+        or full_turn <= 0.0
+    ):
+        return 0.0
+    closest_value = maya_api.closest_euler_angle_cut(value, reference)
+    if closest_value is not None:
+        return float(closest_value) - float(value)
+    turns = math.floor(((float(reference) - float(value)) / float(full_turn)) + 0.5)
+    return float(turns) * float(full_turn)
+
+
+def euler_turn_groups(curve, tool_context, full_turn=None):
+    """Return contiguous Euler-turn edits inside one shared key/time context."""
+    try:
+        key_times = [
+            float(value)
+            for value in (cmds.keyframe(curve, query=True, timeChange=True) or [])
+        ]
+        key_values = [
+            float(value)
+            for value in (cmds.keyframe(curve, query=True, valueChange=True) or [])
+        ]
+    except _COMMAND_ERRORS:
+        return []
+    if not key_times or len(key_times) != len(key_values):
+        return []
+
+    target_times = set(float(value) for value in tool_context.key_times(curve))
+    if not target_times:
+        return []
+    full_turn = euler_full_turn() if full_turn is None else full_turn
+    groups = []
+    group_start = group_end = group_offset = None
+    previous_value = None
+
+    def finish_group():
+        if group_start is not None:
+            groups.append((group_start, group_end, group_offset))
+
+    for key_time, key_value in zip(key_times, key_values):
+        if key_time not in target_times:
+            finish_group()
+            group_start = group_end = group_offset = None
+            previous_value = key_value
+            continue
+        offset = (
+            0.0
+            if previous_value is None
+            else _closest_euler_turn_offset(key_value, previous_value, full_turn)
+        )
+        filtered_value = key_value + offset
+        if abs(offset) <= 1e-10:
+            finish_group()
+            group_start = group_end = group_offset = None
+        elif group_start is not None and abs(offset - group_offset) <= 1e-10:
+            group_end = key_time
+        else:
+            finish_group()
+            group_start = group_end = key_time
+            group_offset = offset
+        previous_value = filtered_value
+    finish_group()
+    return groups
+
+
+def apply_smart_euler_filter(curves, tool_context, operation=None):
+    """Filter rotation curves only at keys selected by ``tool_context``."""
+    changed_groups = 0
+    full_turn = euler_full_turn()
+    for curve in list(dict.fromkeys(curves or [])):
+        if operation is not None and operation.cancelled:
+            break
+        for start_time, end_time, offset in euler_turn_groups(
+            curve, tool_context, full_turn=full_turn
+        ):
+            cmds.keyframe(
+                curve,
+                edit=True,
+                time=(start_time, end_time),
+                relative=True,
+                valueChange=offset,
+            )
+            changed_groups += 1
+        if operation is not None:
+            operation.step()
+    return changed_groups
+
+
 def _query_tangents(curve, time_range, flags):
     values = {}
     for flag in flags:
@@ -164,6 +263,106 @@ def apply_key_tangent_snapshot(
         for flag in ("lock", "weightLock")
         if flag in snapshot
     })
+    return True
+
+
+def apply_key_tangent_snapshots(
+    curve,
+    key_times,
+    snapshots,
+    apply_weighted=True,
+    attribute=None,
+):
+    """Restore many key tangents with grouped Maya commands.
+
+    Lock state and tangent types commonly repeat across an entire copied
+    curve. Grouping identical edits avoids issuing three to five commands for
+    every key while preserving per-key angles and weights when they differ.
+    """
+    pairs = [
+        (float(key_time), dict(snapshot or {}))
+        for key_time, snapshot in zip(key_times or (), snapshots or ())
+        if snapshot
+    ]
+    if not curve or not pairs:
+        return False
+
+    def edit(times, **values):
+        if not times or not values:
+            return
+        kwargs = {
+            "edit": True,
+            "time": [(time, time) for time in times],
+        }
+        if attribute:
+            kwargs["attribute"] = attribute
+        kwargs.update(values)
+        try:
+            cmds.keyTangent(curve, **kwargs)
+        except _COMMAND_ERRORS:
+            pass
+
+    if apply_weighted:
+        weighted = next(
+            (
+                snapshot.get("weightedTangents")
+                for _time, snapshot in pairs
+                if snapshot.get("weightedTangents") is not None
+            ),
+            None,
+        )
+        if weighted is not None:
+            apply_weighted_tangents(curve, weighted, attribute=attribute)
+
+    all_times = [time for time, _snapshot in pairs]
+    edit(all_times, lock=False, weightLock=False)
+
+    automatic = {"auto", "autoease", "autoEase", "autoMix"}
+    type_groups = {}
+    detail_groups = {}
+    lock_groups = {}
+    for key_time, snapshot in pairs:
+        tangent_types = tuple(
+            (flag, snapshot[flag])
+            for flag in ("inTangentType", "outTangentType")
+            if flag in snapshot
+        )
+        if tangent_types:
+            type_groups.setdefault(tangent_types, []).append(key_time)
+
+        details = {}
+        if snapshot.get("inTangentType") not in automatic:
+            details.update(
+                (flag, snapshot[flag])
+                for flag in ("inAngle", "inWeight")
+                if flag in snapshot
+            )
+        if snapshot.get("outTangentType") not in automatic:
+            details.update(
+                (flag, snapshot[flag])
+                for flag in ("outAngle", "outWeight")
+                if flag in snapshot
+            )
+        if details:
+            detail_key = (tuple(sorted(details.items())), tangent_types)
+            detail_groups.setdefault(detail_key, []).append(key_time)
+
+        locks = tuple(
+            (flag, snapshot[flag])
+            for flag in ("lock", "weightLock")
+            if flag in snapshot
+        )
+        if locks:
+            lock_groups.setdefault(locks, []).append(key_time)
+
+    for values, times in type_groups.items():
+        edit(times, **dict(values))
+    for (values, tangent_types), times in detail_groups.items():
+        edit(times, **dict(values))
+        if tangent_types:
+            edit(times, **dict(tangent_types))
+    for values, times in lock_groups.items():
+        edit(times, **dict(values))
     return True
 
 

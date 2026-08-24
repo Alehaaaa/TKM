@@ -21,7 +21,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtSvg, QtWidgets  # type: ignore
 from TheKeyMachine.data import icons
 from TheKeyMachine.data.colors import COLORS
-from TheKeyMachine.core import runtime
+from TheKeyMachine.core import i18n, runtime
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import FloatingToolWindowMixin
 from TheKeyMachine.tools.animation_layers import api as animationLayersApi
@@ -47,6 +47,10 @@ TYPE_ICON_SIZE = wutil.DPI(16)
 COLLAPSE_ICON_SIZE = wutil.DPI(9)
 # Qt5/6 renamed QMenu.exec_() to exec(); fall back to whichever exists.
 _STALE_WIDGET_ERRORS = (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError)
+
+
+def _t(text):
+    return i18n.tr_text(text)
 
 
 def _popup_menu(menu, pos):
@@ -300,7 +304,7 @@ class _DragHandle(QtWidgets.QLabel):
         self.setAlignment(QtCore.Qt.AlignCenter)
         self.setPixmap(_grip_icon(wutil.DPI(10)))
         self.setCursor(QtCore.Qt.OpenHandCursor)
-        self.setToolTip("Drag to reorder")
+        self.setToolTip(_t("Drag to reorder"))
         self.setStyleSheet("background:transparent;")
 
     def mousePressEvent(self, event):
@@ -392,7 +396,8 @@ class LayerRowWidget(QtWidgets.QWidget):
             layout.addWidget(self.handle)
 
         self.lock_button = self._make_icon_toggle(
-            _lock_icon, node.get("lock"), "#c9a76b", "Lock -- prevents keying this layer"
+            _lock_icon, node.get("lock"), "#c9a76b",
+            "Lock this layer to prevent keying.",
         )
         self.lock_button.toggled.connect(lambda checked: self.lockToggled.emit(self.layer_name, checked))
         layout.addWidget(self.lock_button)
@@ -403,7 +408,8 @@ class LayerRowWidget(QtWidgets.QWidget):
             layout.addWidget(self._spacer(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE))
         else:
             self.mute_button = self._make_icon_toggle(
-                _mute_icon, node.get("mute"), "#c96b68", "Mute -- disables this layer's effect"
+                _mute_icon, node.get("mute"), "#c96b68",
+                "Mute this layer to disable its effect.",
             )
             self.mute_button.toggled.connect(lambda checked: self.muteToggled.emit(self.layer_name, checked))
             layout.addWidget(self.mute_button)
@@ -448,7 +454,7 @@ class LayerRowWidget(QtWidgets.QWidget):
             self.weight_spin.setFixedHeight(wutil.DPI(18))
             self.weight_spin.setSuffix("%")
             self.weight_spin.setAlignment(QtCore.Qt.AlignCenter)
-            self.weight_spin.setToolTip("Layer weight")
+            self.weight_spin.setToolTip(_t("Layer weight"))
             self.weight_spin.setFocusPolicy(QtCore.Qt.StrongFocus)
             # Avoids flooding the undo stack with one entry per keystroke.
             self.weight_spin.setKeyboardTracking(False)
@@ -460,7 +466,7 @@ class LayerRowWidget(QtWidgets.QWidget):
             self._own_color_hex = self._border_hex if self._is_color_owner else None
             self.type_button = self._make_type_button(self._own_color_hex or "#8a8a8a")
             self._refresh_group_icon()
-            self.type_button.setToolTip("Group -- click to set its color.")
+            self.type_button.setToolTip(_t("Click to set the group color."))
             self.type_button.clicked.connect(self._open_color_menu)
             layout.addWidget(self.type_button)
         elif not self.is_root:
@@ -468,9 +474,9 @@ class LayerRowWidget(QtWidgets.QWidget):
             self.type_button = self._make_type_button(badge_color)
             self.type_button.setIcon(_text_badge_icon(self._override, TYPE_ICON_SIZE))
             self.type_button.setToolTip(
-                "Override layer -- replaces the value below it. Click to switch to Additive."
+                "Override layers replace the value below. Click to switch to Additive."
                 if self._override else
-                "Additive layer -- adds on top of the value below it. Click to switch to Override."
+                "Additive layers build on the value below. Click to switch to Override."
             )
             self.type_button.clicked.connect(self._on_type_clicked)
             layout.addWidget(self.type_button)
@@ -570,7 +576,9 @@ class LayerRowWidget(QtWidgets.QWidget):
         menu = QtWidgets.QMenu(self.window())
         swatch_size = wutil.DPI(12)
         default_hex = COLORS.selection.get(controller.DEFAULT_GROUP_COLOR_SUFFIX).hex
-        default_action = menu.addAction(_color_swatch_icon(swatch_size, default_hex), "Default (Light Gray)")
+        default_action = menu.addAction(
+            _color_swatch_icon(swatch_size, default_hex), _t("Default (Light Gray)")
+        )
         default_action.triggered.connect(lambda *_: self.colorChosen.emit(self.layer_name, None))
         menu.addSeparator()
         for color in COLORS.selection.all:
@@ -719,7 +727,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         self.list_widget.emptyAreaClicked.connect(self._on_empty_area_clicked)
         self.mainLayout.addWidget(self.list_widget, 1)
 
-        self.empty_label = QtWidgets.QLabel("No animation layers in this scene.", self)
+        self.empty_label = QtWidgets.QLabel(_t("No animation layers in this scene."), self)
         self.empty_label.setAlignment(QtCore.Qt.AlignCenter)
         self.empty_label.setWordWrap(True)
         self.empty_label.setStyleSheet("color:#7b7b7b;background:transparent;padding:12px;")
@@ -904,28 +912,43 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
     def _on_lock_toggled(self, layer_name, checked):
         # Refresh: lock cascades to children/ancestors, so this row's checkbox may need reverting.
-        with toolCommon.tool_operation(tool_id="animation_layers_lock", label="Lock Animation Layer", undo=True, progress=False):
-            controller.set_lock(layer_name, checked)
+        toolCommon.run_tool_callback(
+            self, controller.set_lock, layer_name, checked,
+            _tkm_tool_id="animation_layers_lock",
+            _tkm_tool_label="Lock Animation Layer",
+        )
         self.refresh()
 
     def _on_mute_toggled(self, layer_name, checked):
         # Refresh: set_mute() also toggles lock, cascading to children.
-        with toolCommon.tool_operation(tool_id="animation_layers_mute", label="Mute Animation Layer", undo=True, progress=False):
-            controller.set_mute(layer_name, checked)
+        toolCommon.run_tool_callback(
+            self, controller.set_mute, layer_name, checked,
+            _tkm_tool_id="animation_layers_mute",
+            _tkm_tool_label="Mute Animation Layer",
+        )
         self.refresh()
 
     def _on_override_toggled(self, layer_name, override):
-        with toolCommon.tool_operation(tool_id="animation_layers_override", label="Change Layer Type", undo=True, progress=False):
-            controller.set_override(layer_name, override)
+        toolCommon.run_tool_callback(
+            self, controller.set_override, layer_name, override,
+            _tkm_tool_id="animation_layers_override",
+            _tkm_tool_label="Change Layer Type",
+        )
         self.refresh()
 
     def _on_weight_edited(self, layer_name, weight):
-        with toolCommon.tool_operation(tool_id="animation_layers_weight", label="Set Layer Weight", undo=True, progress=False):
-            controller.set_weight(layer_name, weight)
+        toolCommon.run_tool_callback(
+            self, controller.set_weight, layer_name, weight,
+            _tkm_tool_id="animation_layers_weight",
+            _tkm_tool_label="Set Layer Weight",
+        )
 
     def _on_renamed(self, layer_name, new_name):
-        with toolCommon.tool_operation(tool_id="animation_layers_rename", label="Rename Animation Layer", undo=True, progress=False):
-            renamed = controller.rename_layer(layer_name, new_name)
+        renamed = toolCommon.run_tool_callback(
+            self, controller.rename_layer, layer_name, new_name,
+            _tkm_tool_id="animation_layers_rename",
+            _tkm_tool_label="Rename Animation Layer",
+        )
         if layer_name in self._selected_names:
             self._selected_names.discard(layer_name)
             self._selected_names.add(renamed)
@@ -954,13 +977,18 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         previous_widget = self.list_widget.itemWidget(previous_item) if previous_item is not None else None
         next_widget = self.list_widget.itemWidget(next_item) if next_item is not None else None
 
-        with toolCommon.tool_operation(tool_id="animation_layers_reorder", label="Reorder Animation Layers", undo=True, progress=False):
+        def _reorder():
             if previous_widget is not None:
                 controller.move_layer_to_parent(layer_name, controller.get_parent(previous_widget.layer_name))
                 controller.reorder_layer(layer_name, previous_widget.layer_name, before=False)
             elif next_widget is not None:
                 controller.move_layer_to_parent(layer_name, controller.get_parent(next_widget.layer_name))
                 controller.reorder_layer(layer_name, next_widget.layer_name, before=True)
+        toolCommon.run_tool_callback(
+            self, _reorder,
+            _tkm_tool_id="animation_layers_reorder",
+            _tkm_tool_label="Reorder Animation Layers",
+        )
         self.refresh()
 
     def _on_group_collapse_toggled(self, layer_name, collapsed):
@@ -971,16 +999,22 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         self.refresh()
 
     def _on_group_color_chosen(self, layer_name, suffix):
-        with toolCommon.tool_operation(tool_id="animation_layers_color", label="Set Group Color", undo=True, progress=False):
-            controller.set_group_color(layer_name, suffix)
+        toolCommon.run_tool_callback(
+            self, controller.set_group_color, layer_name, suffix,
+            _tkm_tool_id="animation_layers_color",
+            _tkm_tool_label="Set Group Color",
+        )
         self.refresh()
 
     # ------------------------------------------------------------ toolbar actions
 
     def _create_layer_from_selection(self, *_args):
         try:
-            with toolCommon.tool_operation(tool_id="animation_layers_new", label="Create Animation Layer", undo=True, progress=False):
-                controller.create_layer_from_selection()
+            toolCommon.run_tool_callback(
+                self, controller.create_layer_from_selection,
+                _tkm_tool_id="animation_layers_new",
+                _tkm_tool_label="Create Animation Layer",
+            )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
             return
@@ -990,8 +1024,12 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         # Iterate self._rows (ordered) rather than the set, to preserve visible order.
         ordered_selected = [name for name in self._rows.keys() if name in self._selected_names]
         try:
-            with toolCommon.tool_operation(tool_id="animation_layers_new_group", label="Group Animation Layers", undo=True, progress=False):
-                controller.create_group(member_names=ordered_selected)
+            toolCommon.run_tool_callback(
+                self, controller.create_group,
+                member_names=ordered_selected,
+                _tkm_tool_id="animation_layers_new_group",
+                _tkm_tool_label="Group Animation Layers",
+            )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
             return
@@ -1003,14 +1041,15 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
             wutil.make_inViewMessage("Select one or more animation layers to merge")
             return
         try:
-            with toolCommon.tool_operation(
-                tool_id="animation_layers_merge",
-                label="Smart Merge Animation Layers",
-                undo=True,
-                progress=True,
-            ) as operation:
-                operation.start()
-                controller.smart_merge_layers(selected, operation=operation)
+            def _merge():
+                controller.smart_merge_layers(
+                    selected, operation=toolCommon.current_tool_operation()
+                )
+            toolCommon.run_tool_callback(
+                self, _merge,
+                _tkm_tool_id="animation_layers_merge",
+                _tkm_tool_label="Smart Merge Animation Layers",
+            )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
             return
@@ -1033,8 +1072,11 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         )
         if clicked != customDialogs.QFlatConfirmDialog.Yes:
             return
-        with toolCommon.tool_operation(tool_id="animation_layers_delete", label="Delete Animation Layers", undo=True, progress=False):
-            controller.delete_layers(selected, recursive=False)
+        toolCommon.run_tool_callback(
+            self, controller.delete_layers, selected, recursive=False,
+            _tkm_tool_id="animation_layers_delete",
+            _tkm_tool_label="Delete Animation Layers",
+        )
         self._selected_names = set()
         self._collapsed_groups -= set(selected)
         self.refresh()
@@ -1044,16 +1086,30 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         if not selected:
             wutil.make_inViewMessage("Select one or more layers to export")
             return
-        with toolCommon.tool_operation(tool_id="animation_layers_export", label="Export Animation Layers", undo=False) as operation:
-            try:
-                controller.export_selected(selected, operation=operation)
-            except RuntimeError as exc:
-                wutil.make_inViewMessage(str(exc))
+        try:
+            def _export():
+                controller.export_selected(
+                    selected, operation=toolCommon.current_tool_operation()
+                )
+            toolCommon.run_tool_callback(
+                self, _export,
+                _tkm_tool_id="animation_layers_export",
+                _tkm_tool_label="Export Animation Layers",
+            )
+        except RuntimeError as exc:
+            wutil.make_inViewMessage(str(exc))
 
     def _import_layers(self, *_args):
         try:
-            with toolCommon.tool_operation(tool_id="animation_layers_import", label="Import Animation Layers", undo=True) as operation:
-                controller.import_from_file(operation=operation)
+            def _import():
+                controller.import_from_file(
+                    operation=toolCommon.current_tool_operation()
+                )
+            toolCommon.run_tool_callback(
+                self, _import,
+                _tkm_tool_id="animation_layers_import",
+                _tkm_tool_label="Import Animation Layers",
+            )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
             return
@@ -1069,60 +1125,60 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         root_name = controller.root_layer_name()
 
         menu.addAction(
-            QtGui.QIcon(icons.add), "New Layer From Selected",
-            description="Create a new animation layer from the current scene selection.",
+            QtGui.QIcon(icons.add), _t("New Layer From Selected"),
+            description=_t("Create a new animation layer from the current scene selection."),
             callback=lambda *_: self._create_layer_from_selection(),
         )
         group_icon = icons.get("layer_group")
         menu.addAction(
-            QtGui.QIcon(group_icon) if group_icon else QtGui.QIcon(), "Group Selected Layers",
-            description="Group the selected layers under a new layer with its own weight.",
+            QtGui.QIcon(group_icon) if group_icon else QtGui.QIcon(), _t("Group Selected Layers"),
+            description=_t("Group the selected layers under a new layer with its own weight."),
             callback=lambda *_: self._create_group(),
         )
         if len(selected) >= 2:
             merge_icon = icons.get("layer_merge")
             menu.addAction(
-                QtGui.QIcon(merge_icon) if merge_icon else QtGui.QIcon(), "Smart Merge",
-                description="Bake the selected layers together, sampling only where they have weight.",
+                QtGui.QIcon(merge_icon) if merge_icon else QtGui.QIcon(), _t("Smart Merge"),
+                description=_t("Bake the selected layers together, sampling only where they have weight."),
                 callback=lambda *_: self._merge_selected(),
             )
         menu.addSeparator()
         menu.addAction(
-            QtGui.QIcon(icons.rename), "Rename",
-            description="Rename this layer.",
+            QtGui.QIcon(icons.rename), _t("Rename"),
+            description=_t("Rename this layer."),
             callback=lambda *_: self._start_rename(layer_name),
         )
         menu.addAction(
-            "Select Objects",
-            description="Select this layer's member objects.",
+            _t("Select Objects"),
+            description=_t("Select this layer's member objects."),
             callback=lambda *_: self._select_layer_objects(layer_name),
         )
         menu.addAction(
-            "Add Selected Objects",
-            description="Add the current scene selection to this layer.",
+            _t("Add Selected Objects"),
+            description=_t("Add the current scene selection to this layer."),
             callback=lambda *_: self._add_selected_to_layer(layer_name),
         )
         menu.addAction(
-            "Remove Selected Objects",
-            description="Remove the current scene selection from this layer.",
+            _t("Remove Selected Objects"),
+            description=_t("Remove the current scene selection from this layer."),
             callback=lambda *_: self._remove_selected_from_layer(layer_name),
         )
         menu.addAction(
-            "Extract to New Layer",
-            description="Move the current scene selection's animation off this layer into a new one.",
+            _t("Extract to New Layer"),
+            description=_t("Move the current scene selection's animation off this layer into a new one."),
             callback=lambda *_: self._extract_to_new_layer(layer_name),
         ).setEnabled(len(selected) == 1 and layer_name != root_name and not controller.is_group(layer_name))
         menu.addSeparator()
         can_ungroup = any(controller.get_parent(name) not in (None, root_name) for name in selected)
         menu.addAction(
-            "Remove From Group",
-            description="Move the selected layers back to the top level.",
+            _t("Remove From Group"),
+            description=_t("Move the selected layers back to the top level."),
             callback=lambda *_: self._ungroup_selected(),
         ).setEnabled(can_ungroup)
         menu.addSeparator()
         menu.addAction(
-            QtGui.QIcon(icons.trash), "Delete",
-            description="Delete the selected layers.",
+            QtGui.QIcon(icons.trash), _t("Delete"),
+            description=_t("Delete the selected layers."),
             callback=lambda *_: self._delete_selected(),
         )
         _popup_menu(menu, global_pos)
@@ -1140,31 +1196,45 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
     def _add_selected_to_layer(self, layer_name):
         try:
-            with toolCommon.tool_operation(tool_id="animation_layers_add_members", label="Add To Animation Layer", undo=True, progress=False):
-                controller.add_selected_to_layer(layer_name)
+            toolCommon.run_tool_callback(
+                self, controller.add_selected_to_layer, layer_name,
+                _tkm_tool_id="animation_layers_add_members",
+                _tkm_tool_label="Add To Animation Layer",
+            )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
 
     def _remove_selected_from_layer(self, layer_name):
         try:
-            with toolCommon.tool_operation(tool_id="animation_layers_remove_members", label="Remove From Animation Layer", undo=True, progress=False):
-                controller.remove_selected_from_layer(layer_name)
+            toolCommon.run_tool_callback(
+                self, controller.remove_selected_from_layer, layer_name,
+                _tkm_tool_id="animation_layers_remove_members",
+                _tkm_tool_label="Remove From Animation Layer",
+            )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
 
     def _extract_to_new_layer(self, layer_name):
         try:
-            with toolCommon.tool_operation(tool_id="animation_layers_extract", label="Extract To New Animation Layer", undo=True, progress=False):
-                controller.extract_to_new_layer(layer_name)
+            toolCommon.run_tool_callback(
+                self, controller.extract_to_new_layer, layer_name,
+                _tkm_tool_id="animation_layers_extract",
+                _tkm_tool_label="Extract To New Animation Layer",
+            )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
             return
         self.refresh()
 
     def _ungroup_selected(self, *_args):
-        with toolCommon.tool_operation(tool_id="animation_layers_ungroup", label="Remove From Group", undo=True, progress=False):
+        def _ungroup():
             for name in list(self._selected_names):
                 controller.move_layer_to_parent(name, None)
+        toolCommon.run_tool_callback(
+            self, _ungroup,
+            _tkm_tool_id="animation_layers_ungroup",
+            _tkm_tool_label="Remove From Group",
+        )
         self.refresh()
 
     # ------------------------------------------------------------ floating window hooks

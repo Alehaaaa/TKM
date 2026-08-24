@@ -10,6 +10,7 @@ TOOLTIPS = load_tooltips(__file__)
 
 class DefaultValuesToolObject(ToolObject):
     ORDER = 200
+    OPERATION = {"capture_animation_context": True}
     DOC_URL = "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/default-to-default"
     TOOLS = {
         "default_object_values": {"type": "tool", "label": "Default Pose", "icon": "default", "callback": api.apply_all, "tooltip": TOOLTIPS["all"]},

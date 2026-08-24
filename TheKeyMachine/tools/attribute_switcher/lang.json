@@ -87,7 +87,7 @@
         "en": {
             "label": "Normal Mode",
             "description": "Preserve world position and orientation by evaluating the scene at every keyframe.",
-            "tooltip": "Slower, but safe for every rig and every switchable attribute -- including animation layers, driven keys, expressions, and joints."
+            "tooltip": "Slower, but safe for every rig and switchable attribute. This includes animation layers, driven keys, expressions, and joints."
         },
         "es": {
             "label": "Modo Normal",
@@ -97,7 +97,7 @@
         "fr": {
             "label": "Mode Normal",
             "description": "Convertit l'ordre de rotation en préservant l'orientation dans l'espace monde à chaque image clé.",
-            "tooltip": "Plus lent, mais sûr pour tous les rigs -- y compris les calques d'animation, les clés pilotées et les expressions."
+            "tooltip": "Plus lent, mais sûr pour tous les rigs, y compris ceux utilisant des calques d'animation, des clés pilotées et des expressions."
         },
         "ca": {
             "label": "Mode Normal",
@@ -122,10 +122,10 @@
         "ar": {
             "label": "الوضع العادي",
             "description": "تحويل ترتيب الدوران مع الحفاظ على الاتجاه في الفضاء العالمي عند كل إطار مفتاحي",
-            "tooltip": "أبطأ، لكنه آمن لأي ريغ -- بما في ذلك طبقات الحركة والمفاتيح المُدارة والتعبيرات"
+            "tooltip": "أبطأ، لكنه آمن لأي ريغ، بما في ذلك طبقات الحركة والمفاتيح المُدارة والتعبيرات"
         }
     },
-    "rotate_order_lightning_mode": {
+    "rotate_order_super_mode": {
         "en": {
             "label": "Super Mode",
             "description": "Skip per-frame evaluation with pure math wherever it's safe to do so.",

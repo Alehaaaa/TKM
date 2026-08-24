@@ -90,14 +90,7 @@ def sanitize_orbit_configuration(config):
 def execute_action(action_identifier):
     if action_identifier not in ORBIT_ACTION_SET or not trigger.has_command(action_identifier):
         return
-
-    chunk_opened = False
-    try:
-        chunk_opened = toolCommon.open_undo_chunk()
-        getattr(trigger, action_identifier)()
-    finally:
-        if chunk_opened:
-            toolCommon.close_undo_chunk()
+    return trigger.execute_command(action_identifier)
 
 def save_orbit_button_config():
     sanitized = sanitize_orbit_configuration(orbit_configuration)

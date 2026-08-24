@@ -8,6 +8,17 @@ TOOLTIPS = load_tooltips(__file__)
 class AnimationRecoveryToolObject(ToolObject):
     ORDER = 970
     TOOLS = {
+        "animation_recovery_restore": {
+            "type": "tool",
+            "label": "Recover Animation",
+            "callback": api.restore,
+            "pinnable": False,
+            "operation": {
+                "suspend_refresh": True,
+                "rollback_on_cancel": True,
+                "show_success_message": False,
+            },
+        },
         "animation_recovery": {
             "type": "tool",
             "label": "Animation Recovery",

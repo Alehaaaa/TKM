@@ -1,0 +1,42 @@
+{
+  "animation_layers": {
+    "en": {"label": "Animation Layers", "tooltip": ["Open the Animation Layers manager with every layer and group in the scene.", "Lock, mute, rename, or drag layers to reorder them.", "Right-click layers to group them or run Smart Merge.", "Use the toolbar to create, merge, delete, import, or export layers."]},
+    "es": {"label": "Capas de Animación", "tooltip": ["Abre el gestor con todas las capas y grupos de la escena.", "Bloquea, silencia, renombra o arrastra capas para reordenarlas.", "Haz clic derecho para agruparlas o usar Fusión Inteligente.", "Usa la barra para crear, fusionar, eliminar, importar o exportar capas."]},
+    "fr": {"label": "Calques d'Animation", "tooltip": ["Ouvre le gestionnaire avec tous les calques et groupes de la scène.", "Verrouillez, désactivez, renommez ou faites glisser les calques.", "Cliquez avec le bouton droit pour les grouper ou lancer la Fusion intelligente.", "Utilisez la barre pour créer, fusionner, supprimer, importer ou exporter."]},
+    "ca": {"label": "Capes d'Animació", "tooltip": ["Obre el gestor amb totes les capes i grups de l'escena.", "Bloqueja, silencia, canvia el nom o arrossega capes per reordenar-les.", "Fes clic dret per agrupar-les o executar la Fusió Intel·ligent.", "Usa la barra per crear, fusionar, eliminar, importar o exportar capes."]},
+    "zh": {"label": "动画层", "tooltip": ["打开包含场景中所有动画层和组的管理器。", "锁定、静音、重命名或拖动图层以重新排序。", "右键单击图层可分组或运行智能合并。", "使用工具栏创建、合并、删除、导入或导出图层。"]},
+    "ja": {"label": "アニメーションレイヤー", "tooltip": ["シーン内のすべてのレイヤーとグループを管理します。", "ロック、ミュート、名前変更、ドラッグによる並べ替えができます。", "右クリックでグループ化またはスマートマージを実行します。", "ツールバーで作成、マージ、削除、読み込み、書き出しを行います。"]},
+    "ko": {"label": "애니메이션 레이어", "tooltip": ["씬의 모든 레이어와 그룹을 관리하는 창을 엽니다.", "레이어를 잠그고, 음소거하고, 이름을 바꾸거나 드래그해 재정렬합니다.", "오른쪽 클릭으로 그룹화하거나 스마트 병합을 실행합니다.", "도구 모음에서 생성, 병합, 삭제, 가져오기 또는 내보내기를 합니다."]},
+    "ar": {"label": "طبقات الحركة", "tooltip": ["افتح مدير كل طبقات ومجموعات الحركة في المشهد.", "اقفل الطبقات أو اكتمها أو أعد تسميتها أو اسحبها لترتيبها.", "انقر بزر الفأرة الأيمن لتجميعها أو تشغيل الدمج الذكي.", "استخدم الشريط للإنشاء والدمج والحذف والاستيراد والتصدير."]}
+  },
+  "animation_layers_smart_merge": {
+    "en": {"label": "Smart Merge Selected", "tooltip": ["Bake the selected animation layers into one. Smart Merge samples only frames where those layers have weight."]},
+    "es": {"label": "Fusión Inteligente", "tooltip": ["Hornea las capas seleccionadas en una. Solo muestrea los fotogramas donde tienen peso."]},
+    "fr": {"label": "Fusion Intelligente", "tooltip": ["Convertit les calques sélectionnés en un seul et n'échantillonne que les images où ils ont du poids."]},
+    "ca": {"label": "Fusió Intel·ligent", "tooltip": ["Enforna les capes seleccionades en una i només mostra els fotogrames on tenen pes."]},
+    "zh": {"label": "智能合并所选层", "tooltip": ["将所选动画层烘焙为一层，只采样这些层具有权重的帧。"]},
+    "ja": {"label": "選択をスマートマージ", "tooltip": ["選択したレイヤーを1つにベイクし、ウェイトがあるフレームだけをサンプリングします。"]},
+    "ko": {"label": "선택 항목 스마트 병합", "tooltip": ["선택한 레이어를 하나로 베이크하며 가중치가 있는 프레임만 샘플링합니다."]},
+    "ar": {"label": "دمج المحدد بذكاء", "tooltip": ["اخبز طبقات الحركة المحددة في طبقة واحدة مع أخذ عينات الإطارات ذات الوزن فقط."]}
+  },
+  "animation_layers_export": {
+    "en": {"label": "Export", "tooltip": ["Export the selected animation layers and their animation to a file."]},
+    "es": {"label": "Exportar", "tooltip": ["Exporta las capas seleccionadas y su animación a un archivo."]},
+    "fr": {"label": "Exporter", "tooltip": ["Exporte les calques sélectionnés et leur animation vers un fichier."]},
+    "ca": {"label": "Exportar", "tooltip": ["Exporta les capes seleccionades i la seva animació a un fitxer."]},
+    "zh": {"label": "导出", "tooltip": ["将所选动画层及其动画导出到文件。"]},
+    "ja": {"label": "書き出し", "tooltip": ["選択したアニメーションレイヤーとそのアニメーションをファイルへ書き出します。"]},
+    "ko": {"label": "내보내기", "tooltip": ["선택한 애니메이션 레이어와 애니메이션을 파일로 내보냅니다."]},
+    "ar": {"label": "تصدير", "tooltip": ["صدّر طبقات الحركة المحددة وحركتها إلى ملف."]}
+  },
+  "animation_layers_import": {
+    "en": {"label": "Import", "tooltip": ["Import previously exported animation layers from a file."]},
+    "es": {"label": "Importar", "tooltip": ["Importa desde un archivo capas de animación exportadas anteriormente."]},
+    "fr": {"label": "Importer", "tooltip": ["Importe depuis un fichier des calques exportés auparavant."]},
+    "ca": {"label": "Importar", "tooltip": ["Importa des d'un fitxer capes exportades anteriorment."]},
+    "zh": {"label": "导入", "tooltip": ["从文件导入先前导出的动画层。"]},
+    "ja": {"label": "読み込み", "tooltip": ["以前に書き出したアニメーションレイヤーをファイルから読み込みます。"]},
+    "ko": {"label": "가져오기", "tooltip": ["이전에 내보낸 애니메이션 레이어를 파일에서 가져옵니다."]},
+    "ar": {"label": "استيراد", "tooltip": ["استورد طبقات حركة مصدّرة سابقًا من ملف."]}
+  }
+}

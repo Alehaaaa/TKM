@@ -7,9 +7,13 @@ directly, so they live with the feature instead of in the shared
 ``widgets`` package.
 """
 
+from maya import cmds
+
 from TheKeyMachine.core.Qt import QtCore, QtWidgets
+from TheKeyMachine.core import trigger
 from TheKeyMachine.data import icons
 from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.ui.widgets import util as wutil
 from TheKeyMachine.ui.widgets.util import DPI
 
 
@@ -34,8 +38,6 @@ def _paste_to_node_with_namespace(base_name, namespace):
 
 
 def _paste_to_scene_namespaces():
-    from maya import cmds
-
     namespaces = set()
     try:
         namespaces.update(cmds.namespaceInfo(listOnlyNamespaces=True, recurse=True) or [])
@@ -52,8 +54,6 @@ def _paste_to_namespace_display(namespace):
 
 
 def _paste_to_resolve_node(source_node, namespace):
-    from maya import cmds
-
     candidate = _paste_to_node_with_namespace(_paste_to_node_base_name(source_node), namespace)
     if cmds.objExists(candidate):
         return candidate
@@ -71,9 +71,10 @@ def _paste_to_asset_display(asset_key):
 
 
 class PasteToDialog:
-    def __init__(self, saved_data, apply_callback, data_label="animation", parent=None):
+    def __init__(self, saved_data, apply_command, payload, data_label="animation", parent=None):
         self.saved_data = saved_data or {}
-        self.apply_callback = apply_callback
+        self.apply_command = apply_command
+        self.payload = payload
         self.data_label = data_label
         self._asset_rows = {}
         self._asset_sources = {}
@@ -254,11 +255,15 @@ class PasteToDialog:
         return resolved, missing
 
     def _apply(self, insert=False):
-        from maya import cmds
-
         mappings, _missing = self.mappings()
         if not mappings:
-            cmds.warning(f"No matching {self.data_label} targets found")
-            return
-        if self.apply_callback(mappings, insert=insert):
+            return wutil.make_inViewMessage(
+                f"No matching {self.data_label} targets found"
+            )
+        if trigger.execute_command(
+            self.apply_command,
+            self.payload,
+            mappings,
+            insert=insert,
+        ):
             self.close()

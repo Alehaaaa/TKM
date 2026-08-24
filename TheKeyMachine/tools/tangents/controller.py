@@ -1,11 +1,9 @@
 from maya import cmds
 
 from TheKeyMachine.maya import animation
-from TheKeyMachine.tools import registry
 from TheKeyMachine.maya import selection
 from TheKeyMachine.core import settings
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.ui.widgets import timeline
 from TheKeyMachine.ui.widgets import util as wutil
 
 CYCLE_MATCH_MODE_SETTING = "cycle_match_mode"
@@ -94,34 +92,30 @@ def _set_tangent_on_target(target, tangent_type, frames, handle_mode="both"):
         cmds.keyTangent(target, **kwargs)
 
 
-def set_maya_default(tangent_type):
+def set_maya_default(tangent_type, tool_operation=None):
+    toolCommon.require_tool_operation(tool_operation)
     cmds.keyTangent(**{"global": True, "inTangentType": tangent_type, "outTangentType": tangent_type})
 
 
-def set_tangent(tangent_type, handle_mode="both", key_scope="selection", tint_color=None):
+def set_tangent(tangent_type, handle_mode="both", key_scope="selection", tint_color=None, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
     targets, time_context = _collect_targets(key_scope)
     if not targets:
         return animation.notify_empty("keys", "edit")
     timerange = _target_range(targets) or (time_context.timerange if time_context else None)
-    tint = timeline.begin_timeline_tint(
+    toolCommon.ensure_operation_tint(
+        operation,
+        tint="range",
         timerange=timerange,
-        color=tint_color
-        or registry.get_tool_tint_color("tangent_{}".format(tangent_type)),
-        key="tangent_{}".format(tangent_type),
-    ) if timerange else None
-    try:
-        operation = toolCommon.current_tool_operation()
-        if operation:
-            operation.set_total(len(targets))
-        for curve, frames in targets.items():
-            if operation and operation.cancelled:
-                return
-            _set_tangent_on_target(curve, tangent_type, frames, handle_mode)
-            if operation:
-                operation.step()
-    finally:
-        if tint:
-            tint.finish()
+        tint_color=tint_color,
+        tint_key="tangent_{}".format(tangent_type),
+    )
+    operation.set_total(len(targets))
+    for curve, frames in targets.items():
+        if operation.cancelled:
+            return
+        _set_tangent_on_target(curve, tangent_type, frames, handle_mode)
+        operation.step()
 
 
 def _filter_bouncy_targets(targets, key_scope):
@@ -134,7 +128,8 @@ def _filter_bouncy_targets(targets, key_scope):
     return [(curve, frame) for curve, frame in targets if float(frame) == target]
 
 
-def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle_adjustment_factor=1.3):
+def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle_adjustment_factor=1.3, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
     default_mode = "all_animation" if key_scope == "all" else "current_frame"
     target_info = animation.resolve_context(
         default_mode=default_mode,
@@ -160,32 +155,27 @@ def set_bouncy(handle_mode="both", key_scope="selection", tint_color=None, angle
 
     frames = sorted({float(frame) for _curve, frame in targets})
     timerange = (frames[0], frames[-1]) if frames else None
-    tint = timeline.begin_timeline_tint(
+    toolCommon.ensure_operation_tint(
+        operation,
+        tint="range",
         timerange=timerange,
-        color=tint_color or registry.get_tool_tint_color("tangent_bouncy"),
-        key="tangent_bouncy",
-    ) if timerange else None
-    try:
-        operation = toolCommon.current_tool_operation()
-        if operation:
-            operation.set_total(len(targets))
-        for curve, frame in targets:
-            if operation and operation.cancelled:
-                return
-            in_angle, out_angle = animation.bouncy_tangent_angles(
-                curve, frame, angle_adjustment_factor=angle_adjustment_factor
-            )
-            kwargs = {"time": (frame, frame), "edit": True, "lock": False, "absolute": True}
-            if handle_mode in ("both", "in"):
-                kwargs["inAngle"] = in_angle
-            if handle_mode in ("both", "out"):
-                kwargs["outAngle"] = out_angle
-            cmds.keyTangent(curve, **kwargs)
-            if operation:
-                operation.step()
-    finally:
-        if tint:
-            tint.finish()
+        tint_color=tint_color,
+        tint_key="tangent_bouncy",
+    )
+    operation.set_total(len(targets))
+    for curve, frame in targets:
+        if operation.cancelled:
+            return
+        in_angle, out_angle = animation.bouncy_tangent_angles(
+            curve, frame, angle_adjustment_factor=angle_adjustment_factor
+        )
+        kwargs = {"time": (frame, frame), "edit": True, "lock": False, "absolute": True}
+        if handle_mode in ("both", "in"):
+            kwargs["inAngle"] = in_angle
+        if handle_mode in ("both", "out"):
+            kwargs["outAngle"] = out_angle
+        cmds.keyTangent(curve, **kwargs)
+        operation.step()
 
 
 def _copy_key_state(curve, source_time, target_time, copy_value=True):
@@ -233,7 +223,7 @@ def _selected_end_by_curve(target_info):
     return selected_end
 
 
-def match_cycle(target_key="last"):
+def match_cycle(target_key="last", tool_operation=None):
     """Match the current end of the cycle to its opposite end.
 
     When a curve has exactly one end key selected in the Graph Editor, that
@@ -251,11 +241,10 @@ def match_cycle(target_key="last"):
     curves = target_info.curves
     selected_end_by_curve = _selected_end_by_curve(target_info)
     copy_value = get_cycle_match_mode() == CYCLE_MATCH_MODE_KEY_COPY
-    operation = toolCommon.current_tool_operation()
-    if operation:
-        operation.set_total(len(curves))
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_total(len(curves))
     for curve in curves:
-        if operation and operation.cancelled:
+        if operation.cancelled:
             return
         first = cmds.findKeyframe(curve, which="first")
         last = cmds.findKeyframe(curve, which="last")
@@ -264,5 +253,4 @@ def match_cycle(target_key="last"):
             _copy_key_state(curve, last, first, copy_value=copy_value)
         else:
             _copy_key_state(curve, first, last, copy_value=copy_value)
-        if operation:
-            operation.step()
+        operation.step()

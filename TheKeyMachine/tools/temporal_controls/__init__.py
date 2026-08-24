@@ -16,10 +16,21 @@ class TemporalControlsToolObject(ToolObject):
             "callback": api.create_controls, "tooltip": TOOLTIPS["temporal_controls"],
             # Callable, not the declarative {"label"/"icon"/"items"} dict every
             # other section item uses -- this menu needs an exclusive Bake
-            # Mode group, a Lightning Mode checkbox, and a live Space-switch
+            # Mode group, a Super Mode checkbox, and a live Space-switch
             # list, none of which a plain list of command ids can express.
             # See api.build_temporal_controls_context_menu.
             "menu": api.build_temporal_controls_context_menu,
+            "operation": {"progress": False, "undo": False},
+        },
+        "temporal_controls_create_apply": {
+            "type": "tool",
+            "label": "Create Temporal Controls",
+            "callback": api.create_controls_with_options,
+            "pinnable": False,
+            "operation": {
+                "rollback_on_cancel": True,
+                "suspend_refresh": True,
+            },
         },
         "temporal_controls_bake": {
             "type": "tool", "label": "Bake", "icon": "bake_animation_1",
@@ -31,7 +42,8 @@ class TemporalControlsToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "temporal_controls_tools", "label": "Temporal Controls",
+        "id": "temporal_controls_tools", "i18n_key": "temporal_controls",
+        "label": "Temporal Controls",
         "color": COLORS.toolbar.turquoise.hex,
         "items": [
             {"id": "temporal_controls", "shortcuts": [

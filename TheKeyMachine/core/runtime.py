@@ -297,7 +297,6 @@ def cleanup_workspace_controls(process_events=True) -> None:
 def shutdown_tool_modules() -> None:
     """Stop module-level workers, dialogs, native contexts, and exception hooks."""
     module_cleanups = (
-        ("TheKeyMachine.tools.update.controller", "shutdown_update_worker"),
         ("TheKeyMachine.tools.bug_report.controller", "uninstall_bug_exception_handler"),
         ("TheKeyMachine.maya.shelf", "cleanup_open_menus"),
         ("TheKeyMachine.tools.common", "finish_active_progress"),

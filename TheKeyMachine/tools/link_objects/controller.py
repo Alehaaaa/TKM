@@ -5,7 +5,6 @@ from maya.api import OpenMaya as om
 
 from TheKeyMachine.core import runtime
 from TheKeyMachine.maya import animation
-from TheKeyMachine.tools import registry
 from TheKeyMachine.maya import selection as maya_selection
 from TheKeyMachine.core import settings
 from TheKeyMachine.tools import clipboard
@@ -61,6 +60,7 @@ def _existing_relationship(data, warn=True):
 
 
 def copy_relationship(*_args, tool_operation=None, **_kwargs):
+    operation = toolCommon.require_tool_operation(tool_operation)
     selection = maya_selection.get_selected_objects()
     if len(selection) < 2:
         return wutil.make_inViewMessage("Select followers first, then the driver")
@@ -85,11 +85,7 @@ def copy_relationship(*_args, tool_operation=None, **_kwargs):
     )
     if is_auto_link_enabled():
         enable_auto_link()
-    if tool_operation is not None:
-        tool_operation.success = True
-        tool_operation.success_message = "Relationship Copied"
-    else:
-        wutil.make_inViewMessage("Relationship Copied")
+    operation.succeed("Relationship Copied")
     return True
 
 
@@ -142,20 +138,6 @@ def _apply_relationship(
     if locked_destination and warn:
         wutil.make_inViewMessage("Current animation layer is locked")
     return applied
-
-
-def _begin_paste_tint(timerange, tool_id, tool_operation=None, anchor_widget=None):
-    tint_session = timelineWidgets.begin_timeline_tint(
-        timerange=timerange,
-        color=registry.get_tool_tint_color(tool_id),
-        owner=anchor_widget,
-        key=tool_id,
-    )
-    if tool_operation is not None:
-        tool_operation.timerange = timerange
-        tool_operation.tint_session = tint_session
-        return None
-    return tint_session
 
 
 def _relationship_key_times(data, timerange, layer_context=None, selected_frames=None):
@@ -231,19 +213,19 @@ def _paste_relationship_over_range(
     timerange,
     *,
     tool_operation=None,
-    anchor_widget=None,
     tool_id="link_paste_range",
     layer_context=None,
     selected_frames=None,
 ):
     global _callback_suspended
 
+    operation = toolCommon.require_tool_operation(tool_operation)
     timerange = (float(timerange[0]), float(timerange[1]))
-    local_tint = _begin_paste_tint(
-        timerange,
-        tool_id,
-        tool_operation=tool_operation,
-        anchor_widget=anchor_widget,
+    toolCommon.ensure_operation_tint(
+        operation,
+        tint="range",
+        timerange=timerange,
+        tint_key=tool_id,
     )
     created_layers = {}
     if layer_context is None:
@@ -256,48 +238,41 @@ def _paste_relationship_over_range(
     )
     if not frames:
         animation.restore_created_layer_states(created_layers)
-        if local_tint is not None:
-            local_tint.finish()
         wutil.make_inViewMessage("No relationship object keys found in the animation range")
         return False
 
-    if tool_operation is not None:
-        tool_operation.set_total(len(frames), reset=True)
-        tool_operation.set_status("Pasting Relationship")
+    operation.set_total(len(frames), reset=True)
+    operation.set_status("Pasting Relationship")
 
     original_time = cmds.currentTime(query=True)
     applied_frames = 0
     _callback_suspended = True
     try:
-        with toolCommon.suspend_maya_refresh():
-            for frame_index, frame in enumerate(frames):
-                if tool_operation is not None and tool_operation.cancelled:
-                    break
-                cmds.currentTime(frame)
-                if _apply_relationship(
-                    data,
-                    keyframe=True,
-                    frame=frame,
-                    warn=frame_index == 0,
-                    layer_context=layer_context,
-                ):
-                    applied_frames += 1
-                if tool_operation is not None:
-                    tool_operation.step()
+        for frame_index, frame in enumerate(frames):
+            if operation.cancelled:
+                break
+            cmds.currentTime(frame)
+            if _apply_relationship(
+                data,
+                keyframe=True,
+                frame=frame,
+                warn=frame_index == 0,
+                layer_context=layer_context,
+            ):
+                applied_frames += 1
+            operation.step()
     finally:
         cmds.currentTime(original_time)
         _callback_suspended = False
         animation.restore_created_layer_states(created_layers)
-        if local_tint is not None:
-            local_tint.finish()
 
-    if applied_frames and tool_operation is not None:
-        tool_operation.success = True
-        tool_operation.success_message = "Relationship Pasted to Range"
+    if applied_frames:
+        operation.succeed("Relationship Pasted to Range", timerange=timerange)
     return bool(applied_frames)
 
 
-def paste_relationship(*_args, tool_operation=None, anchor_widget=None, **_kwargs):
+def paste_relationship(*_args, tool_operation=None, **_kwargs):
+    operation = toolCommon.require_tool_operation(tool_operation)
     data = _load_relationship()
     if not data:
         return False
@@ -312,8 +287,7 @@ def paste_relationship(*_args, tool_operation=None, anchor_widget=None, **_kwarg
             return _paste_relationship_over_range(
                 data,
                 time_context.timerange,
-                tool_operation=tool_operation,
-                anchor_widget=anchor_widget,
+                tool_operation=operation,
                 tool_id="link_paste",
                 layer_context=layer_context,
                 selected_frames=(
@@ -326,11 +300,11 @@ def paste_relationship(*_args, tool_operation=None, anchor_widget=None, **_kwarg
             animation.restore_created_layer_states(created_layers)
 
     frame = cmds.currentTime(query=True)
-    local_tint = _begin_paste_tint(
-        (frame, frame),
-        "link_paste",
-        tool_operation=tool_operation,
-        anchor_widget=anchor_widget,
+    toolCommon.ensure_operation_tint(
+        operation,
+        tint="current",
+        timerange=(frame, frame),
+        tint_key="link_paste",
     )
     try:
         applied = _apply_relationship(
@@ -341,22 +315,18 @@ def paste_relationship(*_args, tool_operation=None, anchor_widget=None, **_kwarg
         )
     finally:
         animation.restore_created_layer_states(created_layers)
-        if local_tint is not None:
-            local_tint.finish()
     if not applied:
         return False
-    if tool_operation is not None:
-        tool_operation.success = True
-        tool_operation.success_message = "Relationship Pasted"
+    operation.succeed("Relationship Pasted", timerange=(frame, frame))
     return True
 
 
 def paste_relationship_to_range(
     *_args,
     tool_operation=None,
-    anchor_widget=None,
     **_kwargs
 ):
+    operation = toolCommon.require_tool_operation(tool_operation)
     data = _load_relationship()
     if not data:
         return False
@@ -367,8 +337,7 @@ def paste_relationship_to_range(
     return _paste_relationship_over_range(
         data,
         timerange,
-        tool_operation=tool_operation,
-        anchor_widget=anchor_widget,
+        tool_operation=operation,
     )
 
 

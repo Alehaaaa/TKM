@@ -84,7 +84,7 @@ class GimbalOrderButton(QtWidgets.QFrame):
 from maya import cmds
 
 from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
-from TheKeyMachine.core import runtime
+from TheKeyMachine.core import runtime, trigger
 from TheKeyMachine.data import icons
 from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import common as toolCommon
@@ -92,7 +92,6 @@ from TheKeyMachine.tools.gimbal_fixer.controller import (
     GimbalAnalyzer,
     ROTATE_ORDERS,
     WINDOW_NAME,
-    convert_rotation_order,
     has_rotate_order,
     rotate_gimbal_state,
     selected_control,
@@ -226,7 +225,7 @@ class GimbalFixerWindow(
             button.set_data(rank, order, percentage, current=order == current_order)
 
     def apply_order(self, order):
-        convert_rotation_order(order)
+        trigger.execute_command("gimbal_convert_rotation_order", order)
         self.refresh()
 
     def apply_best_order(self, *_args):

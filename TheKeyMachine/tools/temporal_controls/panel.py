@@ -39,10 +39,18 @@ Undo/Redo, or the next control creation -- happens to trigger a refresh.
 
 from maya import cmds
 
-from TheKeyMachine.core import runtime
+from TheKeyMachine.core import i18n, runtime
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
 
 from TheKeyMachine.data import icons
+
+
+def _t(text):
+    return i18n.tr_text(text)
+
+
+def _localized_options(options):
+    return tuple(dict(option, label=_t(option.get("label", ""))) for option in options)
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.temporal_controls import api, shapes
@@ -432,7 +440,7 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         spaces_layout.setContentsMargins(0, 0, 0, 0)
         spaces_layout.setSpacing(wutil.DPI(4))
 
-        position_col, self.position_list = self._build_space_column("Position")
+        position_col, self.position_list = self._build_space_column(_t("Position"))
         self.position_list.selectionChanged.connect(self._on_position_selected)
         spaces_layout.addWidget(position_col, 1)
 
@@ -453,7 +461,7 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # column and read as overflowing it. A size clearly larger than
         # the icon keeps the button constant across the toggle either way.
         self.lock_button.setFixedSize(wutil.DPI(24), wutil.DPI(24))
-        self.lock_button.setToolTip("Lock Orientation Space to Position Space")
+        self.lock_button.setToolTip(_t("Lock Orientation Space to Position Space"))
         # Simple native grey checked state -- no custom color, just enough
         # to read as "toggled" against the panel's own dark background.
         self.lock_button.setStyleSheet(
@@ -464,22 +472,22 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         lock_col_layout.addStretch(1)
         spaces_layout.addWidget(lock_col, 0)
 
-        orientation_col, self.orientation_list = self._build_space_column("Orientation")
+        orientation_col, self.orientation_list = self._build_space_column(_t("Orientation"))
         self.orientation_list.selectionChanged.connect(self._on_orientation_selected)
         spaces_layout.addWidget(orientation_col, 1)
 
         layout.addWidget(spaces_row)
 
-        anim_title = QtWidgets.QLabel("Anim Controls")
+        anim_title = QtWidgets.QLabel(_t("Anim Controls"))
         anim_title.setAlignment(QtCore.Qt.AlignCenter)
         anim_title.setStyleSheet(self._column_title_style())
         layout.addWidget(anim_title)
 
         self._size_last_value = 0
         self.size_slider = _NudgeSlider(
-            "Size",
+            _t("Size"),
             icons.size,
-            description="Drag to nudge the selected control's size. Releases back to center.",
+            description=_t("Drag to nudge the selected control's size. Releases back to center."),
             spring_back=True,
         )
         self.size_slider.liveValue.connect(self._on_size_live)
@@ -498,9 +506,9 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # at the range's left edge (index 0, "Up") rather than centered
         # the way Size's symmetric range is.
         self.rotation_slider = _NudgeSlider(
-            "Rotation",
+            _t("Rotation"),
             icons.refresh,
-            description="Drag to snap the control to one of six fixed orientation poses.",
+            description=_t("Drag to snap the control to one of six fixed orientation poses."),
             spring_back=False,
             value_range=(0, len(api.ORIENTATIONS) - 1),
         )
@@ -571,7 +579,7 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         return button
 
     def _build_space_column(self, title):
-        # Preferred/Maximum -- the list caps its own height to its 3 rows
+        # Preferred/Maximum -- the list caps its own height to its rows
         # (see _OptionList._content_height), and this column just follows
         # it instead of stretching the list past that.
         column = QtWidgets.QWidget()
@@ -591,7 +599,7 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # (_add_space_switch_actions), which already excludes Grab Release
         # for exactly this reason: it's documented as a one-shot
         # creation-time concept, not something to switch back into later.
-        option_list = _OptionList(list(api.SWITCHABLE_SPACES), cap_to_content=True)
+        option_list = _OptionList(list(_localized_options(api.SWITCHABLE_SPACES)), cap_to_content=True)
         option_list.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
         column_layout.addWidget(option_list)
         return column, option_list

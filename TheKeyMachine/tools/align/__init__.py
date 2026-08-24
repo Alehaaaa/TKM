@@ -12,6 +12,11 @@ TOOLTIPS = load_tooltips(__file__)
 
 
 class AlignToolObject(ToolObject):
+    OPERATION = {
+        "capture_animation_context": True,
+        "suspend_refresh": True,
+        "rollback_on_cancel": True,
+    }
     ORDER = 400
     DOC_URL = (
         "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/match-align"
@@ -105,6 +110,12 @@ class AlignToolObject(ToolObject):
             "callback": lambda: general.open_url(AlignToolObject.DOC_URL),
             "tooltip": TOOLTIPS["help"],
             "pinnable": False,
+            "operation": {
+                "progress": False,
+                "undo": False,
+                "suspend_refresh": False,
+                "rollback_on_cancel": False,
+            },
         },
     }
     SECTION = {

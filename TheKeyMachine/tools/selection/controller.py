@@ -90,22 +90,24 @@ def _nurbs_curve_controls(roots):
     return list(dict.fromkeys(controls))
 
 
-def _rig_controls(animated_only=False):
+def _rig_controls(animated_only=False, operation=None):
     controls = _nurbs_curve_controls(_selected_roots())
     if not animated_only:
         return controls
-    operation = toolCommon.current_tool_operation()
-    if operation:
-        operation.set_total(len(controls))
-    animated = []
-    for node in controls:
-        if operation and operation.cancelled:
-            break
-        if selection.is_node_animated(node):
-            animated.append(node)
-        if operation:
-            operation.step()
-    return animated
+    def _filter_batch(batch):
+        return [node for node in batch if selection.is_node_animated(node)]
+
+    return [
+        node
+        for batch in operation.process(
+            controls,
+            _filter_batch,
+            batch_size=32,
+            status="Finding Animated Rig Controls",
+            strategy="worker",
+        )
+        for node in batch
+    ]
 
 
 def open_selector(*args, **kwargs):
@@ -125,22 +127,38 @@ def open_selector(*args, **kwargs):
     return dialog
 
 
-def select_hierarchy(*args):
+def select_hierarchy(*args, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
     selected = selection.get_selected_objects(long=True)
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
 
-    controls = []
-    for node in selected:
-        for descendant in _descendant_transforms(node):
-            if _is_curve_control(descendant) and descendant not in controls:
-                controls.append(descendant)
+    def _collect_batch(batch):
+        return [
+            descendant
+            for node in batch
+            for descendant in _descendant_transforms(node)
+            if _is_curve_control(descendant)
+        ]
+
+    controls = list(dict.fromkeys(
+        control
+        for batch in operation.process(
+            selected,
+            _collect_batch,
+            batch_size=8,
+            status="Finding Hierarchy Controls",
+            strategy="worker",
+        )
+        for control in batch
+    ))
     if controls:
         cmds.select(controls, add=True)
     return controls
 
 
-def select_rig_controls(*args):
+def select_rig_controls(*args, tool_operation=None):
+    toolCommon.require_tool_operation(tool_operation)
     controls = _rig_controls(animated_only=False)
     if not controls:
         return wutil.make_inViewMessage("No rig controls found")
@@ -148,8 +166,9 @@ def select_rig_controls(*args):
     return controls
 
 
-def select_rig_controls_animated(*args):
-    controls = _rig_controls(animated_only=True)
+def select_rig_controls_animated(*args, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
+    controls = _rig_controls(animated_only=True, operation=operation)
     if not controls:
         return wutil.make_inViewMessage("No animated rig controls found")
     cmds.select(controls, replace=True)

@@ -11,6 +11,10 @@ class ToolObject(object):
 
     ORDER = 1000
     TOOLS = {}
+    # Package-wide execution defaults. Individual tools may override any key
+    # in their own ``operation`` mapping. Keeping this next to TOOLS lets a
+    # family of commands declare shared context requirements once.
+    OPERATION = {}
     SECTION = None
     SECTIONS = ()
     # Set by _collect_package_definitions() to this package's __init__.py path,
@@ -19,7 +23,22 @@ class ToolObject(object):
 
     @classmethod
     def tools(cls):
-        return cls._resolve_icons(dict(cls.TOOLS or {}))
+        tools = dict(cls.TOOLS or {})
+        defaults = dict(cls.OPERATION or {})
+        if defaults:
+            tools = {
+                tool_id: cls._with_operation_defaults(definition, defaults)
+                for tool_id, definition in tools.items()
+            }
+        return cls._resolve_icons(tools)
+
+    @staticmethod
+    def _with_operation_defaults(definition, defaults):
+        definition = dict(definition or {})
+        operation = dict(defaults)
+        operation.update(definition.get("operation") or {})
+        definition["operation"] = operation
+        return definition
 
     @classmethod
     def _resolve_icons(cls, value, key=None):

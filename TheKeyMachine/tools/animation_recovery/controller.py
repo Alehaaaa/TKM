@@ -1874,7 +1874,7 @@ def _curves_timerange(curves_data):
     return (min(frames), max(frames))
 
 
-def restore_recovery(path):
+def restore_recovery(path, tool_operation=None):
     checkpoint_scene_id = _recovery_scene_id(path)
     scene_id = current_scene_id(create=False)
     if not checkpoint_scene_id:
@@ -1883,31 +1883,22 @@ def restore_recovery(path):
         raise ValueError("This recovery belongs to another Maya scene")
     chain_paths = _recovery_chain_paths(path)
     service = get_service()
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_total(max(1, len(chain_paths))).set_status(
+        "Recovering Animation"
+    )
+    toolCommon.ensure_operation_tint(
+        operation,
+        tint="range",
+        tint_key="animation_recovery_restore",
+        tint_color=registry.get_tool_tint_color("animation_recovery"),
+    )
     with service.restoring() if service else _null_context():
-        with toolCommon.tool_operation(
-            tool_id="animation_recovery_restore",
-            label="Recovering Animation",
-            progress=True,
-            progress_max=max(1, len(chain_paths)),
-            undo=True,
-            undo_name=toolCommon.make_undo_chunk_name(tool_id="animation_recovery_restore"),
-            suspend_refresh=True,
-            tint="range",
-            tint_color=registry.get_tool_tint_color("animation_recovery"),
-            show_success_message=False,
-            rollback_on_cancel=True,
-        ) as operation:
-            # The heavy work below (potentially every keyed curve/object in
-            # the whole scene) runs on a worker thread so the main thread's
-            # Qt event loop stays free to dispatch a Cancel press while it's
-            # working -- see tools/common.py's run_on_worker_thread /
-            # ToolOperation.run_on_main, and attribute_switcher's controller
-            # for the same pattern applied first.
-            result = toolCommon.run_on_worker_thread(
-                _restore_recovery_worker, operation, path, chain_paths, scene_id
-            )
-            if not result:
-                return False
+        result = operation.run_worker(
+            _restore_recovery_worker, operation, path, chain_paths, scene_id
+        )
+        if not result:
+            return False
 
     wutil.make_inViewMessage("Animation recovered")
     return True
@@ -1915,7 +1906,7 @@ def restore_recovery(path):
 
 def _restore_recovery_worker(operation, path, chain_paths, scene_id):
     """Runs off the main thread -- see restore_recovery's
-    run_on_worker_thread call. Every Maya touch reachable from here must go
+    run_worker() call. Every Maya touch reachable from here must go
     through operation.run_on_main() rather than calling cmds directly.
 
     The one-time setup below (loading/merging the recovery payload, scoping
@@ -2102,12 +2093,7 @@ def _restore_recovery_worker(operation, path, chain_paths, scene_id):
     if not operation.run_on_main(_lock_restored_layers, restore_layers_data, layer_name_map):
         return False
 
-    # tool_operation() paints the timeline tint itself once it sees
-    # operation.success + operation.timerange -- same handoff paste
-    # animation uses, just resolved after restore instead of before it,
-    # since the recovered range isn't known until curves_data loads.
-    operation.timerange = _curves_timerange(curves_data)
-    operation.success = True
+    operation.succeed(timerange=_curves_timerange(curves_data))
     return True
 
 

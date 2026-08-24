@@ -3,7 +3,7 @@ from maya import cmds
 from TheKeyMachine.core.Qt import QtCompat, QtCore, QtWidgets
 
 from TheKeyMachine.core import runtime
-from TheKeyMachine.maya import selection
+from TheKeyMachine.maya import animation, selection
 from TheKeyMachine.data import icons
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
@@ -44,6 +44,26 @@ MANIP_CONTEXT_TOKENS = (
     "manip",
 )
 _CONTROLLER = None
+_ROTATION_CHANNELS = {"rx", "ry", "rz", "rotateX", "rotateY", "rotateZ"}
+
+
+def _attribute_delta(
+    attr,
+    baseline_value,
+    current_value,
+    euler_filter_enabled=False,
+):
+    """Return a channel delta, optionally correcting signed Euler wrapping."""
+    delta = current_value - baseline_value
+    full_turn = animation.euler_full_turn()
+    if (
+        euler_filter_enabled
+        and attr in _ROTATION_CHANNELS
+        and abs(delta) > full_turn * 0.5
+    ):
+        half_turn = full_turn * 0.5
+        return (delta + half_turn) % full_turn - half_turn
+    return delta
 
 
 class AnimationOffsetController(QtCore.QObject):
@@ -84,6 +104,7 @@ class AnimationOffsetController(QtCore.QObject):
         
         self._offset_operation_context = None
         self._offset_operation = None
+        self._selection_snapshot = None
 
     def is_enabled(self):
         return self._enabled
@@ -99,8 +120,18 @@ class AnimationOffsetController(QtCore.QObject):
     def _current_time(self):
         return int(cmds.currentTime(query=True))
 
-    def _resolve_locked_time_range(self):
-        return timelineWidgets.resolve_time_context(default_mode="all_animation").timerange
+    def _resolve_locked_time_range(self, snapshot=None):
+        snapshot = snapshot or self._selection_snapshot
+        if snapshot is None:
+            return None
+        if snapshot.time_slider_range:
+            return tuple(snapshot.time_slider_range)
+        graph_frames = [
+            float(frame) for _curve, frame in snapshot.graph_keyframes
+        ]
+        if graph_frames:
+            return min(graph_frames), max(graph_frames)
+        return tuple(snapshot.playback_range)
 
     def _on_tint_range_changed(self, timerange):
         self._time_range = tuple(timerange)
@@ -178,6 +209,7 @@ class AnimationOffsetController(QtCore.QObject):
             undo_name="Animation Offset",
             suspend_refresh=False,
             show_success_message=False,
+            selection_snapshot=self._selection_snapshot,
         )
         operation = context.__enter__()
         self._offset_operation_context = context
@@ -195,19 +227,17 @@ class AnimationOffsetController(QtCore.QObject):
             self._offset_operation = None
 
     def _iter_candidate_attrs(self, obj):
-        seen = set()
-        for attr in cmds.listAttr(obj, keyable=True) or []:
-            children = []
-            try:
-                children = cmds.attributeQuery(attr, node=obj, listChildren=True) or []
-            except Exception:
-                children = []
-            leaf_attrs = children or [attr]
-            for leaf_attr in leaf_attrs:
-                if leaf_attr in seen:
-                    continue
-                seen.add(leaf_attr)
-                yield leaf_attr
+        try:
+            attrs = cmds.listAttr(
+                obj,
+                keyable=True,
+                scalar=True,
+                unlocked=True,
+                settable=True,
+            ) or []
+        except Exception:
+            attrs = []
+        yield from dict.fromkeys(attrs)
 
     def _get_attr_type(self, plug):
         try:
@@ -292,16 +322,19 @@ class AnimationOffsetController(QtCore.QObject):
         obj_snapshot = {}
         for attr in self._iter_candidate_attrs(obj):
             plug = self._plug_name(obj, attr)
-            if not self._is_supported_plug(plug):
-                continue
-
+            # _iter_candidate_attrs already asks Maya for keyable, scalar,
+            # unlocked, settable attributes. Reading the value is the final
+            # numeric/type filter; repeating objExists/settable/lock/type
+            # queries here multiplied activation cost by every selected plug.
             current_value, ok = self._get_plug_value(plug)
             if not ok:
                 continue
 
             obj_snapshot[attr] = {
                 "current": current_value,
-                "keys": self._get_keyed_values_in_range(obj, attr),
+                # Key values are expensive and unnecessary until this exact
+                # attribute changes. Capture them lazily in _apply_changes.
+                "keys": None,
             }
         return obj_snapshot
 
@@ -336,16 +369,21 @@ class AnimationOffsetController(QtCore.QObject):
                     changed_plugs.add((obj, attr))
         return changed_plugs
 
-    def _resnapshot(self, update_range=False):
+    def _resnapshot(self, update_range=False, snapshot=None):
+        self._selection_snapshot = snapshot or animation.capture_selection_snapshot()
         if update_range or self._time_range is None:
-            self._time_range = self._resolve_locked_time_range()
+            self._time_range = self._resolve_locked_time_range(
+                self._selection_snapshot
+            )
 
-        selection = self._selection()
-        self._selection_signature = self._selection_signature_value(selection)
+        selected_objects = list(self._selection_snapshot.objects)
+        self._selection_signature = self._selection_signature_value(
+            selected_objects
+        )
         self._snapshot_time = self._current_time()
         baseline = {}
 
-        for obj in selection:
+        for obj in selected_objects:
             if not cmds.objExists(obj):
                 continue
             obj_snapshot = self._capture_object_snapshot(obj)
@@ -409,6 +447,12 @@ class AnimationOffsetController(QtCore.QObject):
         self._state = self.STATE_APPLYING
         current_time = self._current_time()
         any_applied = False
+        from TheKeyMachine.tools.global_tools import controller as global_tools
+
+        try:
+            euler_filter_enabled = global_tools.is_euler_filter_enabled()
+        except Exception:
+            euler_filter_enabled = False
 
         try:
             with runtime.suppress_undo_notifications():
@@ -432,13 +476,42 @@ class AnimationOffsetController(QtCore.QObject):
                     if baseline_current is None:
                         continue
 
-                    delta = current_value - baseline_current
+                    raw_delta = current_value - baseline_current
+                    delta = _attribute_delta(
+                        attr,
+                        baseline_current,
+                        current_value,
+                        euler_filter_enabled=euler_filter_enabled,
+                    )
                     if abs(delta) <= 1e-6:
                         continue
 
-                    self._ensure_driver_key(obj, attr, current_value)
+                    driver_value = baseline_current + delta
+                    if abs(delta - raw_delta) > 1e-6:
+                        # Keep the current Euler key on the same numeric turn
+                        # as the rest of the curve. -179 and 181 represent the
+                        # same orientation, but only 181 preserves continuity
+                        # when the other keys receive a +2 degree offset.
+                        try:
+                            cmds.setAttr(plug, driver_value)
+                            cmds.setKeyframe(
+                                obj,
+                                attribute=attr,
+                                time=(current_time,),
+                                value=driver_value,
+                            )
+                        except Exception:
+                            continue
+                    else:
+                        self._ensure_driver_key(obj, attr, current_value)
 
-                    keyed_values = dict(baseline_data.get("keys") or {})
+                    keyed_values = baseline_data.get("keys")
+                    if keyed_values is None:
+                        keyed_values = self._get_keyed_values_in_range(
+                            obj, attr
+                        )
+                        baseline_data["keys"] = keyed_values
+                    keyed_values = dict(keyed_values or {})
                     other_frames = [
                         frame for frame in keyed_values.keys() if self._time_range[0] <= frame <= self._time_range[1] and frame != current_time
                     ]
@@ -520,12 +593,16 @@ class AnimationOffsetController(QtCore.QObject):
 
     def activate(self):
         self._enabled = True
-        locked_range = self._resolve_locked_time_range()
+        snapshot = animation.capture_selection_snapshot()
+        self._selection_snapshot = snapshot
+        locked_range = self._resolve_locked_time_range(snapshot)
         if locked_range:
             self._time_range = locked_range
-        cmds.select(selection.get_selected_objects())
         self._connect_runtime_manager()
-        self._resnapshot(update_range=self._time_range is None)
+        self._resnapshot(
+            update_range=self._time_range is None,
+            snapshot=snapshot,
+        )
         _offset_widgets().show_animation_offset_tint(
             timerange=self._time_range,
             color=COLORS.toolbar.purple.hex,
@@ -553,6 +630,7 @@ class AnimationOffsetController(QtCore.QObject):
         self._settling_after_resnapshot = False
         self._time_range = None
         self._finish_offset_operation()
+        self._selection_snapshot = None
         self.stateChanged.emit(False)
         self._runtime_manager.set_tool_state("animation_offset", False)
 

@@ -50,6 +50,7 @@ class AnimationLayersToolObject(ToolObject):
             "type": "tool", "label": "Export", "text": "Ex",
             "icon": "export", "callback": api.export_selected_layers,
             "tooltip": TOOLTIPS["export"],
+            "operation": {"undo": False},
         },
         "animation_layers_import": {
             "type": "tool", "label": "Import", "text": "Im",

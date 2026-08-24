@@ -5,10 +5,9 @@ from contextlib import contextmanager
 from maya import cmds
 from maya.api import OpenMaya as om
 
-from TheKeyMachine.maya import maya_api
+from TheKeyMachine.maya import animation, maya_api
 from TheKeyMachine.tools.mirror import math as mirror_math
 from TheKeyMachine.tools.snapshot_rig import rig_snapshot
-from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.copy_paste.controller import (
     ANIMATION_CONTROLS_KEY,
@@ -19,11 +18,10 @@ from TheKeyMachine.tools.copy_paste.controller import (
     ANIMATION_TANGENT_KEY,
     _animation_data_timerange,
     _apply_animation_channels_to_targets,
-    _copy_paste_operation,
+    configure_copy_paste_operation,
     _query_layered_anim_channel_data,
     _transform_channel_values,
 )
-import TheKeyMachine.ui.widgets.timeline as timelineWidgets
 import TheKeyMachine.ui.widgets.util as wutil
 
 
@@ -219,7 +217,7 @@ def _matrix_channel_solver(node):
 # ___________________________ SELECT OPPOSITE _____________________________________
 
 def select_opposite(*args):
-    selected_objects = selection.get_selected_objects()
+    selected_objects = list(animation.current_selection_snapshot().objects)
     opposite_controls = []
 
     for obj in selected_objects:
@@ -232,7 +230,7 @@ def select_opposite(*args):
 
 
 def add_select_opposite(*args):
-    selected_objects = selection.get_selected_objects()
+    selected_objects = list(animation.current_selection_snapshot().objects)
     opposite_controls = []
 
     for obj in selected_objects:
@@ -248,19 +246,10 @@ def add_select_opposite(*args):
 
 
 def copy_opposite(*args):
-    operation_manager = None
-    operation_context = None
+    operation = toolCommon.require_tool_operation()
     try:
-        selected_objects = selection.get_selected_objects()
-        operation_manager = toolCommon.tool_operation(
-            tool_id="copy_opposite",
-            label="Copy Opposite",
-            progress=True,
-            progress_max=len(selected_objects),
-            undo=True
-        )
-        operation_context = operation_manager.__enter__()
-        operation_context.start()
+        selected_objects = list(animation.current_selection_snapshot().objects)
+        operation.set_total(len(selected_objects)).set_status("Copy Opposite")
         ATTRIBUTES_TO_IGNORE = {"tag"}
 
         def replace_pattern_in_attribute(attr):
@@ -270,7 +259,7 @@ def copy_opposite(*args):
             return attr
 
         for obj in selected_objects:
-            if operation_context.cancelled:
+            if operation.cancelled:
                 break
             opposite_obj = find_opposite_name(obj)
 
@@ -297,48 +286,38 @@ def copy_opposite(*args):
                             import TheKeyMachine.tools.bug_report.controller as report
 
                             report.report_detected_exception(e, context="copy opposite attribute compile")
-            operation_context.step()
+            operation.step()
     except Exception as e:
         cmds.warning("Error during copy: {}".format(str(e)))
-    finally:
-        if operation_manager and operation_context is not None:
-            try:
-                operation_manager.__exit__(None, None, None)
-            except Exception:
-                pass
 
 
 # ________________________________________________________________ MIRROR _______________________________________________________________________ #
 
 
 def mirror(*args):
-    selected_controls = selection.get_selected_objects()
+    target_info = animation.resolve_context(
+        default_mode="current_frame", include_channels=True
+    )
+    selected_controls = target_info.objects
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 
-    time_context = timelineWidgets.resolve_time_context(default_mode="current_frame")
+    time_context = target_info.time
     if time_context.mode != "current_frame":
         # A time-slider range or Graph Editor key selection is active -- mirror
         # just those keys instead of swapping the current frame's live value.
         return _mirror_keys(selected_controls, time_context, tool_id="mirror", label="Mirror")
 
-    operation_manager = None
-    operation_context = None
+    operation = toolCommon.require_tool_operation()
     try:
-        selected_channels = set(selection.get_selected_channels() or [])
-
-        operation_manager = toolCommon.tool_operation(
-            tool_id="mirror",
-            label="Mirror",
-            progress=True,
-            progress_max=len(selected_controls),
-            undo=True,
+        selected_channels = set(target_info.channels or [])
+        operation.set_total(len(selected_controls)).set_status("Mirror")
+        toolCommon.ensure_operation_tint(
+            operation,
             tint="context",
             default_mode="current_frame",
             tint_key="mirror",
         )
-        operation_context = operation_manager.__enter__()
-        operation_context.start()
         pending_writes = []
 
         def swap_control_values(control1, control2):
@@ -394,12 +373,11 @@ def mirror(*args):
             processed_controls = set()
 
             for control in selected_controls:
-                if operation_context and operation_context.cancelled:
+                if operation.cancelled:
                     break
                 control_identity = _node_identity(control)
                 if control_identity in processed_controls:
-                    if operation_context:
-                        operation_context.step()
+                    operation.step()
                     continue
 
                 opposite_name = find_opposite_name(control)
@@ -413,11 +391,10 @@ def mirror(*args):
                     swap_control_values(control, None)
                     processed_controls.add(control_identity)
 
-                if operation_context:
-                    operation_context.step()
+                operation.step()
 
         mirror_controls()
-        if not operation_context.cancelled:
+        if not operation.cancelled:
             for control, attr, value in pending_writes:
                 try:
                     cmds.setAttr(f"{control}.{attr}", value)
@@ -425,12 +402,6 @@ def mirror(*args):
                     cmds.warning(f"Could not set the attribute {attr} on {control}: {str(e)}")
     except Exception as e:
         cmds.warning("Error during mirroring: {}".format(str(e)))
-    finally:
-        if operation_manager and operation_context is not None:
-            try:
-                operation_manager.__exit__(None, None, None)
-            except Exception:
-                pass
 
 
 # ------------------------------- mirror to opposite
@@ -742,7 +713,7 @@ def _capture_pair_key_channels(source, target, attrs, time_context):
 
 
 def _mirror_keys(selected_controls, time_context, tool_id, label, target_side=None):
-    selected_channels = set(selection.get_selected_channels() or [])
+    selected_channels = set(animation.current_selection_snapshot().channels)
     mirrored_data = {
         ANIMATION_META_KEY: {
             "type": "animation",
@@ -762,104 +733,104 @@ def _mirror_keys(selected_controls, time_context, tool_id, label, target_side=No
     center_plans = []
     pair_plans = []
 
-    with _copy_paste_operation(
+    operation = configure_copy_paste_operation(
         tool_id,
         label,
-        undo=True,
         tint="range",
-        progress=True,
         progress_max=len(selected_controls),
-    ) as state:
-        operation = state["operation"]
-        operation.start()
-        for source in selected_controls:
-            if operation.cancelled:
-                break
-            source_identity = _node_identity(source)
-            if source_identity in processed_controls:
-                operation.step()
-                continue
-            if source_side and _mirror_control_side(source) != source_side:
-                operation.step()
-                continue
-            target = find_opposite_name(source)
-            if target_side and (
-                not target or _mirror_control_side(target) != target_side
-            ):
-                operation.step()
-                continue
-            if not target or not cmds.objExists(target):
-                attrs = _target_attrs(source, selected_channels)
-                center_plan = _capture_center_key_plan(source, attrs, time_context)
-                if center_plan["frames"]:
-                    center_plans.append(center_plan)
-                    processed_frames.update(center_plan["frames"])
-                processed_controls.add(source_identity)
-                operation.step()
-                continue
+    )
+    operation.start()
+    for source in selected_controls:
+        if operation.cancelled:
+            break
+        source_identity = _node_identity(source)
+        if source_identity in processed_controls:
+            operation.step()
+            continue
+        if source_side and _mirror_control_side(source) != source_side:
+            operation.step()
+            continue
+        target = find_opposite_name(source)
+        if target_side and (
+            not target or _mirror_control_side(target) != target_side
+        ):
+            operation.step()
+            continue
+        if not target or not cmds.objExists(target):
+            attrs = _target_attrs(source, selected_channels)
+            center_plan = _capture_center_key_plan(source, attrs, time_context)
+            if center_plan["frames"]:
+                center_plans.append(center_plan)
+                processed_frames.update(center_plan["frames"])
             processed_controls.add(source_identity)
-            processed_controls.add(_node_identity(target))
-            target_channels = _capture_pair_key_channels(
-                source, target,
-                _target_attrs(source, selected_channels),
+            operation.step()
+            continue
+        processed_controls.add(source_identity)
+        processed_controls.add(_node_identity(target))
+        target_channels = _capture_pair_key_channels(
+            source, target,
+            _target_attrs(source, selected_channels),
+            time_context,
+        )
+        if target_channels:
+            pair_plans.append((target, target_channels))
+            channel_range = _animation_data_timerange({
+                ANIMATION_CONTROLS_KEY: {target: target_channels},
+            })
+            if channel_range:
+                processed_frames.update(channel_range)
+
+        # Regular Mirror is a true two-sided swap. Directional commands
+        # intentionally capture only source -> destination.
+        if target_side is None:
+            source_channels = _capture_pair_key_channels(
+                target, source,
+                _target_attrs(target, selected_channels),
                 time_context,
             )
-            if target_channels:
-                pair_plans.append((target, target_channels))
+            if source_channels:
+                pair_plans.append((source, source_channels))
                 channel_range = _animation_data_timerange({
-                    ANIMATION_CONTROLS_KEY: {target: target_channels},
+                    ANIMATION_CONTROLS_KEY: {source: source_channels},
                 })
                 if channel_range:
                     processed_frames.update(channel_range)
 
-            # Regular Mirror is a true two-sided swap. Directional commands
-            # intentionally capture only source -> destination.
-            if target_side is None:
-                source_channels = _capture_pair_key_channels(
-                    target, source,
-                    _target_attrs(target, selected_channels),
-                    time_context,
-                )
-                if source_channels:
-                    pair_plans.append((source, source_channels))
-                    channel_range = _animation_data_timerange({
-                        ANIMATION_CONTROLS_KEY: {source: source_channels},
-                    })
-                    if channel_range:
-                        processed_frames.update(channel_range)
+        operation.step()
 
-            operation.step()
+    # Nothing is written until every selected control has been sampled.
+    # Cancellation during capture therefore leaves the scene untouched.
+    if not operation.cancelled:
+        for plan in center_plans:
+            key_count += _apply_center_key_plan(plan)
+        for destination, channels in pair_plans:
+            key_count += _apply_animation_channels_to_targets(
+                [destination], channels, replace=True,
+            )
+            mirrored_data[ANIMATION_CONTROLS_KEY][destination] = channels
 
-        # Nothing is written until every selected control has been sampled.
-        # Cancellation during capture therefore leaves the scene untouched.
-        if not operation.cancelled:
-            for plan in center_plans:
-                key_count += _apply_center_key_plan(plan)
-            for destination, channels in pair_plans:
-                key_count += _apply_animation_channels_to_targets(
-                    [destination], channels, replace=True,
-                )
-                mirrored_data[ANIMATION_CONTROLS_KEY][destination] = channels
-
-        if key_count:
-            payload_range = _animation_data_timerange(mirrored_data)
-            if payload_range:
-                processed_frames.update(payload_range)
-            if processed_frames:
-                state["timerange"] = (
-                    min(processed_frames), max(processed_frames),
-                )
-            state["success"] = True
-        else:
-            cmds.warning("No mirrorable animation keys found")
+    if key_count:
+        payload_range = _animation_data_timerange(mirrored_data)
+        if payload_range:
+            processed_frames.update(payload_range)
+        timerange = (
+            (min(processed_frames), max(processed_frames))
+            if processed_frames else None
+        )
+        operation.succeed(label, timerange=timerange)
+    else:
+        cmds.warning("No mirrorable animation keys found")
 
 
 def _mirror_current_values(target_side=None, operation=None):
-    selected_controls = selection.get_selected_objects()
+    target_info = animation.resolve_context(
+        default_mode="current_frame", include_channels=True
+    )
+    selected_controls = target_info.objects
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 
-    selected_channels = set(selection.get_selected_channels() or [])
+    selected_channels = set(target_info.channels or [])
     copied = 0
     source_side = (
         "left" if target_side == "right"
@@ -935,8 +906,9 @@ def _mirror_current_values(target_side=None, operation=None):
 
 
 def mirror_to_right(*args):
-    selected_controls = selection.get_selected_objects()
-    time_context = timelineWidgets.resolve_time_context(default_mode="current_frame")
+    target_info = animation.resolve_context(default_mode="current_frame", include_channels=True)
+    selected_controls = target_info.objects
+    time_context = target_info.time
     if time_context.mode != "current_frame":
         return _mirror_keys(
             selected_controls,
@@ -945,23 +917,21 @@ def mirror_to_right(*args):
             label="Mirror To Right",
             target_side="right",
         )
-    with toolCommon.tool_operation(
-        tool_id="mirror_to_right",
-        label="Mirror To Right",
-        progress=True,
-        progress_max=len(selected_controls) if selected_controls else 0,
-        undo=True,
+    operation = toolCommon.require_tool_operation()
+    operation.set_total(len(selected_controls)).set_status("Mirror To Right")
+    toolCommon.ensure_operation_tint(
+        operation,
         tint="context",
         default_mode="current_frame",
         tint_key="mirror_to_right",
-    ) as operation:
-        operation.start()
-        return _mirror_current_values(target_side="right", operation=operation)
+    )
+    return _mirror_current_values(target_side="right", operation=operation)
 
 
 def mirror_to_left(*args):
-    selected_controls = selection.get_selected_objects()
-    time_context = timelineWidgets.resolve_time_context(default_mode="current_frame")
+    target_info = animation.resolve_context(default_mode="current_frame", include_channels=True)
+    selected_controls = target_info.objects
+    time_context = target_info.time
     if time_context.mode != "current_frame":
         return _mirror_keys(
             selected_controls,
@@ -970,32 +940,31 @@ def mirror_to_left(*args):
             label="Mirror To Left",
             target_side="left",
         )
-    with toolCommon.tool_operation(
-        tool_id="mirror_to_left",
-        label="Mirror To Left",
-        progress=True,
-        progress_max=len(selected_controls) if selected_controls else 0,
-        undo=True,
+    operation = toolCommon.require_tool_operation()
+    operation.set_total(len(selected_controls)).set_status("Mirror To Left")
+    toolCommon.ensure_operation_tint(
+        operation,
         tint="context",
         default_mode="current_frame",
         tint_key="mirror_to_left",
-    ) as operation:
-        operation.start()
-        return _mirror_current_values(target_side="left", operation=operation)
+    )
+    return _mirror_current_values(target_side="left", operation=operation)
 
 
 def mirror_all_keys(*args):
-    selected_controls = selection.get_selected_objects()
+    target_info = animation.resolve_context(default_mode="all_animation", include_channels=True)
+    selected_controls = target_info.objects
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 
-    time_context = timelineWidgets.resolve_time_context(default_mode="all_animation")
+    time_context = target_info.time
     return _mirror_keys(selected_controls, time_context, tool_id="mirror_all_keys", label="Animation Mirrored")
 
 
 def _update_mirror_directions(direction):
-    selected_controls = selection.get_selected_objects()
-    selected_channels = selection.get_selected_channels()
+    snapshot = animation.current_selection_snapshot()
+    selected_controls = list(snapshot.objects)
+    selected_channels = list(snapshot.channels)
     if not selected_controls or not selected_channels:
         action = "create an exception" if direction is not None else "remove exceptions"
         return wutil.make_inViewMessage(f"Select controls and channels to {action}")

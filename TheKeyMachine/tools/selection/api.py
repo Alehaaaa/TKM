@@ -4,6 +4,11 @@ from TheKeyMachine.tools.selection import controller
 
 
 def open_selector(*args): return controller.open_selector(*args)
-def select_hierarchy(*args): return controller.select_hierarchy(*args)
-def select_rig_controls(*args): return controller.select_rig_controls(*args)
-def select_rig_controls_animated(*args): return controller.select_rig_controls_animated(*args)
+def select_hierarchy(*args, tool_operation=None):
+    return controller.select_hierarchy(*args, tool_operation=tool_operation)
+def select_rig_controls(*args, tool_operation=None):
+    return controller.select_rig_controls(*args, tool_operation=tool_operation)
+def select_rig_controls_animated(*args, tool_operation=None):
+    return controller.select_rig_controls_animated(
+        *args, tool_operation=tool_operation
+    )

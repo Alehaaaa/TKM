@@ -11,6 +11,7 @@ except ImportError:
 
 from TheKeyMachine.core import runtime
 from TheKeyMachine.data.colors import COLORS
+from TheKeyMachine.maya import animation
 from TheKeyMachine.tools import common as tool_common
 from TheKeyMachine.ui.widgets import timeline
 
@@ -77,6 +78,9 @@ class SliderSession:
         self.committing_preview = False
         self.command_preview = False
         self.anim_change = self._new_anim_change()
+        self.selection_snapshot = animation.capture_selection_snapshot()
+        self._operation_context = None
+        self._operation = None
         self._tint_key = "slider_{}_range".format(self.mode)
         self._tint_range = None
 
@@ -95,16 +99,25 @@ class SliderSession:
         self.ensure_undo_open()
 
     def ensure_undo_open(self):
-        """Lazily open the undo chunk on the first operation."""
+        """Lazily enter the shared operation on the first committed edit."""
         if self._is_open:
             return
-        chunk_name = tool_common.make_undo_chunk_name(
+        self._operation_context = tool_common.tool_operation(
             tool_id=self.mode,
-            title=self.title,
-            description=self.description,
-            tooltip=self.tooltip,
+            label=self.title,
+            progress=False,
+            undo=True,
+            undo_name=tool_common.make_undo_chunk_name(
+                tool_id=self.mode,
+                title=self.title,
+                description=self.description,
+                tooltip=self.tooltip,
+            ),
+            suspend_refresh=False,
+            show_success_message=False,
+            selection_snapshot=self.selection_snapshot,
         )
-        cmds.undoInfo(openChunk=True, chunkName=chunk_name)
+        self._operation = self._operation_context.__enter__()
         self._is_open = True
 
     def switch_mode(
@@ -212,10 +225,11 @@ class SliderSession:
         self.clear_tint()
         if self._is_open:
             try:
-                cmds.undoInfo(closeChunk=True)
-            except Exception:
-                pass
-            self._is_open = False
+                self._operation_context.__exit__(None, None, None)
+            finally:
+                self._operation_context = None
+                self._operation = None
+                self._is_open = False
         if cancel_command_preview:
             try:
                 with runtime.suppress_undo_notifications():

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass
+import math
 
 from maya import cmds
 
@@ -20,8 +22,153 @@ _COMMAND_ERRORS = (RuntimeError, ValueError, TypeError, AttributeError, KeyError
 _EXPLICIT_CHANNEL_SOURCES = {"channel_box", "graph_editor", "graph_editor_outliner"}
 
 
+@dataclass(frozen=True)
+class SelectionSnapshot:
+    """Immutable Maya UI selection state captured before a command mutates it."""
+
+    objects: tuple
+    channels: tuple
+    graph_keyframes: tuple
+    graph_curves: tuple
+    graph_outliner_items: tuple
+    time_slider_range: object
+    current_time: float
+    playback_range: tuple
+
+
+def capture_selection_snapshot():
+    """Capture every animation targeting input through one main-thread path."""
+    objects = tuple(dict.fromkeys(
+        selection.get_selected_objects(long=True, ordered=True) or []
+    ))
+    channels = tuple(dict.fromkeys(selection.get_selected_channels() or []))
+    graph_keyframes = tuple(
+        selection.get_graph_editor_selected_keyframes(include_tangents=True)
+        or []
+    )
+    graph_curves = tuple(dict.fromkeys(
+        selection.get_graph_editor_selected_curves() or []
+    ))
+    graph_outliner_items = tuple(dict.fromkeys(
+        selection.get_graph_editor_outliner_items() or []
+    ))
+    time_slider_range = selection.get_selected_time_range()
+    try:
+        current_time = float(cmds.currentTime(query=True))
+    except _COMMAND_ERRORS:
+        current_time = 0.0
+    try:
+        playback_range = tuple(timeline.get_playback_range())
+    except _COMMAND_ERRORS:
+        playback_range = (current_time, current_time)
+    return SelectionSnapshot(
+        objects=objects,
+        channels=channels,
+        graph_keyframes=graph_keyframes,
+        graph_curves=graph_curves,
+        graph_outliner_items=graph_outliner_items,
+        time_slider_range=(
+            tuple(time_slider_range) if time_slider_range else None
+        ),
+        current_time=current_time,
+        playback_range=playback_range,
+    )
+
+
+def current_selection_snapshot():
+    """Return the invocation snapshot, capturing one when no operation owns it."""
+    snapshot = None
+    operation = None
+    try:
+        from TheKeyMachine.tools import common as tool_common
+
+        operation = tool_common.current_tool_operation()
+        snapshot = operation.selection_snapshot if operation is not None else None
+    except Exception:
+        pass
+    if snapshot is None:
+        snapshot = capture_selection_snapshot()
+        if operation is not None:
+            operation.selection_snapshot = snapshot
+    return snapshot
+
+
+def _snapshot_time_context(snapshot, default_mode, graph_frames):
+    if snapshot.time_slider_range:
+        start_frame, end_frame = snapshot.time_slider_range
+        first_whole = int(math.ceil(start_frame))
+        last_whole = int(math.floor(end_frame))
+        return timeline.TimeContext(
+            mode="time_slider_range",
+            start_frame=start_frame,
+            end_frame=end_frame,
+            frames=(
+                tuple(range(first_whole, last_whole + 1))
+                if last_whole >= first_whole
+                else (start_frame, end_frame)
+            ),
+        )
+    graph_frames = tuple(sorted(set(float(frame) for frame in graph_frames or [])))
+    if graph_frames:
+        return timeline.TimeContext(
+            mode="graph_editor_keys",
+            start_frame=graph_frames[0],
+            end_frame=graph_frames[-1],
+            frames=graph_frames,
+        )
+    if default_mode == "current_frame":
+        return timeline.TimeContext(
+            mode="current_frame",
+            start_frame=snapshot.current_time,
+            end_frame=snapshot.current_time,
+            frames=(snapshot.current_time,),
+        )
+    start_frame, end_frame = snapshot.playback_range
+    return timeline.TimeContext(
+        mode="all_animation",
+        start_frame=start_frame,
+        end_frame=end_frame,
+        frames=tuple(range(int(start_frame), int(end_frame) + 1)),
+    )
+
+
 class ToolContext(dict):
-    """One resolved animation operation, including its layer and time scope."""
+    """Public contract for one resolved animation selection and time scope.
+
+    Tools consume named properties rather than the resolver's storage keys.
+    Derived contexts are created with ``replace`` so they remain ToolContext
+    instances and keep the complete interface.
+    """
+
+    _REPLACE_FIELDS = {
+        "selection_snapshot": "selection_snapshot",
+        "time": "time_context",
+        "layer_scope": "layer_context",
+        "objects": "target_objects",
+        "plugs": "target_plugs",
+        "curves": "selected_curves",
+        "channels": "selected_channels",
+        "selected_keys": "selected_keyframes",
+        "source": "source",
+        "has_graph_keys": "has_graph_keys",
+    }
+
+    def replace(self, **changes):
+        """Return a context copy with public fields replaced."""
+        unknown = sorted(set(changes) - set(self._REPLACE_FIELDS))
+        if unknown:
+            raise TypeError(
+                "Unknown ToolContext field(s): {}".format(", ".join(unknown))
+            )
+        values = dict(self)
+        for public_name, value in changes.items():
+            values[self._REPLACE_FIELDS[public_name]] = value
+        return type(self)(values)
+
+    @property
+    def selection_snapshot(self):
+        """Immutable invocation state used to resolve this context."""
+        return self.get("selection_snapshot")
 
     @property
     def time(self):
@@ -246,27 +393,21 @@ def resolve_context(
     include_graph=True,
     include_shapes=False,
     resolve_curves=False,
+    snapshot=None,
 ):
     """Resolve the shared animation-tool selection and time precedence.
 
-    A highlighted Time Slider range wins. Channel Box attributes then restrict
-    the target channels. Without either, exact Graph Editor keys or tangent
-    handles win; otherwise tools use selected objects and the default time.
+    Target and time scopes are resolved independently. Channel Box attributes
+    restrict targets first, followed by explicit Graph Editor keys or tangent
+    handles, then selected objects. A highlighted Time Slider range restricts
+    time without discarding the selected Graph Editor curves.
     """
 
     # Capture the UI attribute selection before any scene or graph queries.
     # Every animation tool consumes this one snapshot for the whole command.
-    channel_selection = (
-        selection.get_selected_channels()
-        if include_channels
-        else []
-    )
-    selected_objects = list(dict.fromkeys(
-        selection.get_selected_objects(
-            long=True,
-            ordered=True,
-        ) or []
-    ))
+    snapshot = snapshot or current_selection_snapshot()
+    channel_selection = list(snapshot.channels) if include_channels else []
+    selected_objects = list(snapshot.objects)
     attribute_nodes = list(selected_objects)
     if include_shapes:
         for node in selected_objects:
@@ -288,18 +429,14 @@ def resolve_context(
     has_channel_selection = bool(
         channel_source == "channel_box" and channel_plugs
     )
-    selected_keyframes = (
-        selection.get_graph_editor_selected_keyframes(include_tangents=True)
-        if include_graph
-        else []
-    )
-    time_context = timeline.resolve_time_context(
-        default_mode=default_mode,
-        graph_frames=(
-            []
-            if has_channel_selection
-            else [key_time for _curve, key_time in selected_keyframes]
-        ),
+    selected_keyframes = list(snapshot.graph_keyframes) if include_graph else []
+    graph_curves = list(snapshot.graph_curves) if include_graph else []
+    time_context = _snapshot_time_context(
+        snapshot,
+        default_mode,
+        [] if has_channel_selection else [
+            key_time for _curve, key_time in selected_keyframes
+        ],
     )
     target_plugs = []
     selected_curves = []
@@ -311,21 +448,26 @@ def resolve_context(
         selected_channels = selection.attribute_names_from_plugs(target_plugs)
         selected_keyframes = []
         source = "channel_box"
-    elif time_context.mode == "graph_editor_keys":
+    elif selected_keyframes or graph_curves:
         selected_curves = list(dict.fromkeys(
             curve for curve, _key_time in selected_keyframes
-        ))
+        )) or graph_curves
         target_plugs = selection.get_anim_curve_output_plugs(selected_curves)
         selected_channels = selection.attribute_names_from_plugs(target_plugs)
         graph_objects = selection.object_names_from_plugs(target_plugs)
         if graph_objects:
             selected_objects = graph_objects
-        source = "graph_editor"
+        source = (
+            "graph_editor" if selected_keyframes else "graph_editor_outliner"
+        )
+        if time_context.mode != "graph_editor_keys":
+            # The curves remain the explicit target, while the highlighted
+            # Time Slider range becomes the operation's time scope.
+            selected_keyframes = []
     else:
         selected_keyframes = []
     if (
-        not has_channel_selection
-        and time_context.mode != "graph_editor_keys"
+        source not in _EXPLICIT_CHANNEL_SOURCES
         and include_channels
     ):
         channel_plugs, channel_source = selection.get_attribute_plugs_from_nodes(
@@ -349,11 +491,14 @@ def resolve_context(
         "source": source,
         "has_graph_keys": bool(selected_keyframes),
         "layer_context": layer_context,
+        "selection_snapshot": snapshot,
     })
     if resolve_curves:
-        target_info["selected_curves"] = _resolve_curves(
-            target_info,
-            include_shapes=include_shapes,
+        target_info = target_info.replace(
+            curves=_resolve_curves(
+                target_info,
+                include_shapes=include_shapes,
+            )
         )
     return target_info
 

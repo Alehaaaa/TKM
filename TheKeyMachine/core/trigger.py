@@ -24,8 +24,12 @@ class OperationPolicy:
     undo: bool = True
     suspend_refresh: bool = False
     preserve_time_selection: bool = False
-    # Opt in only when every Maya API call is routed back to the main thread.
-    threaded: bool = False
+    rollback_on_cancel: bool = False
+    interruptable: bool = True
+    show_success_message: bool = True
+    capture_animation_context: bool = False
+    queue_group: Optional[str] = None
+    queue_delta: int = 0
 
 
 @dataclass(frozen=True)
@@ -49,14 +53,25 @@ def _policy_from_definition(
 ) -> OperationPolicy:
     explicit = (definition or {}).get("operation") or {}
     if explicit:
+        undo = bool(explicit.get("undo", True))
+        interruptable = bool(explicit.get("interruptable", True))
         return OperationPolicy(
             progress=bool(explicit.get("progress", True)),
-            undo=bool(explicit.get("undo", True)),
+            undo=undo,
             suspend_refresh=bool(explicit.get("suspend_refresh", False)),
             preserve_time_selection=bool(
                 explicit.get("preserve_time_selection", False)
             ),
-            threaded=bool(explicit.get("threaded", False)),
+            rollback_on_cancel=bool(
+                explicit.get("rollback_on_cancel", undo and interruptable)
+            ),
+            interruptable=interruptable,
+            show_success_message=bool(explicit.get("show_success_message", True)),
+            capture_animation_context=bool(
+                explicit.get("capture_animation_context", False)
+            ),
+            queue_group=explicit.get("queue_group"),
+            queue_delta=int(explicit.get("queue_delta", 0)),
         )
     if getattr(callback, "_tkm_non_tool_action", False):
         return OperationPolicy(progress=False, undo=False)
@@ -65,7 +80,15 @@ def _policy_from_definition(
         definition_type in (None, "tool")
         and not command_name.endswith(("_menu", "_window"))
     )
-    return OperationPolicy(progress=is_tool_operation, undo=is_tool_operation)
+    is_timed_action = (
+        definition_type != "menu"
+        and not command_name.endswith(("_menu", "_window"))
+    )
+    return OperationPolicy(
+        progress=is_timed_action,
+        undo=is_tool_operation,
+        rollback_on_cancel=is_tool_operation,
+    )
 
 
 def register_command(
@@ -112,7 +135,32 @@ def register_command(
 
         label = kwargs.pop("_tkm_tool_label", None)
         anchor = kwargs.pop("_tkm_anchor_widget", None)
-        kwargs.pop("tool_operation", None)
+        selection_snapshot = kwargs.pop("_tkm_selection_snapshot", None)
+        if "tool_operation" in kwargs:
+            raise TypeError(
+                "Registered commands own their ToolOperation; callers must not "
+                "inject one"
+            )
+
+        active_operation = toolCommon.current_tool_operation()
+        queued_delta = kwargs.get("steps", resolved_policy.queue_delta)
+        if (
+            active_operation is not None
+            and getattr(active_operation, "accepts_deferred_commands", False)
+        ):
+            deferred_kwargs = dict(kwargs)
+            if label is not None:
+                deferred_kwargs["_tkm_tool_label"] = label
+            if anchor is not None:
+                deferred_kwargs["_tkm_anchor_widget"] = anchor
+            return toolCommon.defer_tool_callback(
+                dispatch,
+                *args,
+                _tkm_queue_group=resolved_policy.queue_group,
+                _tkm_queue_delta=queued_delta,
+                _tkm_queue_argument="steps",
+                **deferred_kwargs
+            )
 
         with toolCommon.tool_operation(
             tool_id=name,
@@ -122,7 +170,18 @@ def register_command(
             undo=resolved_policy.undo,
             suspend_refresh=resolved_policy.suspend_refresh,
             preserve_time_selection=resolved_policy.preserve_time_selection,
+            rollback_on_cancel=resolved_policy.rollback_on_cancel,
+            interruptable=resolved_policy.interruptable,
+            show_success_message=resolved_policy.show_success_message,
+            selection_snapshot=selection_snapshot,
         ) as operation:
+            if (
+                resolved_policy.capture_animation_context
+                and operation.selection_snapshot is None
+            ):
+                from TheKeyMachine.maya import animation
+
+                operation.selection_snapshot = animation.capture_selection_snapshot()
             call_kwargs = dict(kwargs)
             call_kwargs.setdefault("anchor_widget", anchor)
             call_kwargs.setdefault("tool_operation", operation)
@@ -133,12 +192,6 @@ def register_command(
                     if key in accepted_keywords
                 }
 
-            if resolved_policy.threaded:
-                return toolCommon.run_on_worker_thread(
-                    original,
-                    *args,
-                    **call_kwargs
-                )
             return original(*args, **call_kwargs)
 
     dispatch.__name__ = name
@@ -244,7 +297,11 @@ def operation_policy(name: str) -> OperationPolicy:
     """Return the standardized execution policy for a registered command."""
     _discover_commands()
     command = _COMMANDS.get(name)
-    return command.policy if command else OperationPolicy()
+    return (
+        command.policy
+        if command
+        else _policy_from_definition(name, {"type": "tool"})
+    )
 
 
 def execute_command(name: str, *args, **kwargs):

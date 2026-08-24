@@ -1,8 +1,12 @@
-from maya import cmds
-from maya import OpenMaya as om
+import math
 
-from TheKeyMachine.maya import selection as maya_selection
+from maya import cmds
+from maya.api import OpenMaya as om
+
+from TheKeyMachine.maya import animation, maya_api
 from TheKeyMachine.tools import common as toolCommon
+from TheKeyMachine.tools.global_tools import controller as global_tools
+from TheKeyMachine.ui.widgets import util as wutil
 WINDOW_NAME = "gimbal_fixer"
 ROTATE_ORDERS = ["xyz", "yzx", "zxy", "xzy", "yxz", "zyx"]
 
@@ -28,29 +32,30 @@ def gimbal_tolerance(obj):
 
 
 def selected_control():
-    selection = maya_selection.get_selected_objects()
+    selection = list(animation.current_selection_snapshot().objects)
     return selection[0] if selection else None
 
 
-def convert_rotation_order(rot_order="zxy"):
+def convert_rotation_order(rot_order="zxy", tool_operation=None):
     if rot_order not in ROTATE_ORDERS:
-        om.MGlobal.displayWarning("Wrong rotation order " + str(rot_order))
-        return
+        return wutil.make_inViewMessage("Invalid rotation order")
 
-    selection = maya_selection.get_selected_objects()
+    operation = toolCommon.require_tool_operation(tool_operation)
+    target_info = animation.resolve_context(
+        default_mode="all_animation", include_channels=True, resolve_curves=True
+    )
+    selection = target_info.objects
     if not selection:
-        om.MGlobal.displayWarning("Please select a control.")
-        return
+        return wutil.make_inViewMessage("Select a control")
 
     skipped = [obj for obj in selection if not has_rotate_order(obj)]
     selection = [obj for obj in selection if has_rotate_order(obj)]
     if skipped:
-        om.MGlobal.displayWarning("Skipped objects without rotateOrder: " + ", ".join(skipped))
+        wutil.make_inViewMessage("Skipped controls without rotation order")
     if not selection:
-        om.MGlobal.displayWarning("Please select a control with rotateOrder.")
-        return
+        return wutil.make_inViewMessage("Select a control with rotation order")
 
-    current_time = cmds.currentTime(query=True)
+    current_time = target_info.selection_snapshot.current_time
     key_times = {}
     previous_orders = {}
     all_key_times = []
@@ -59,6 +64,19 @@ def convert_rotation_order(rot_order="zxy"):
 
     for obj in selection:
         rotate_keys = cmds.keyframe(obj, attribute="rotate", query=True, timeChange=True)
+        if rotate_keys:
+            if target_info.time.mode == "graph_editor_keys":
+                selected_times = {
+                    float(frame)
+                    for curve, frame in target_info.selected_keys
+                    if curve in target_info.curves
+                }
+                rotate_keys = [frame for frame in rotate_keys if float(frame) in selected_times]
+            elif target_info.time.mode == "time_slider_range":
+                rotate_keys = [
+                    frame for frame in rotate_keys
+                    if target_info.time.start_frame <= frame <= target_info.time.end_frame
+                ]
         if rotate_keys:
             key_times[obj] = set(rotate_keys)
             previous_orders[obj] = ROTATE_ORDERS[cmds.getAttr(obj + ".rotateOrder")]
@@ -69,59 +87,60 @@ def convert_rotation_order(rot_order="zxy"):
 
     keyed_work = sum(len(key_times[obj]) for obj in keyed_objects)
     progress_total = keyed_work * 2 + len(keyed_objects) + len(unkeyed_objects)
-    with toolCommon.tool_operation(
-        tool_id="gimbal_fixer",
-        label="Gimbal Fixer",
-        progress=True,
-        progress_max=max(1, progress_total),
-        undo=True,
-        suspend_refresh=False,
-    ) as operation:
+    operation.set_total(max(1, progress_total)).set_status("Gimbal Fixer")
+    try:
         if keyed_objects:
             all_key_times = sorted(set(all_key_times))
-            with toolCommon.suspend_maya_refresh():
-                for frame in all_key_times:
-                    if operation.cancelled:
-                        break
-                    cmds.currentTime(frame, edit=True)
-                    for obj in keyed_objects:
-                        if frame in key_times[obj]:
-                            cmds.setKeyframe(obj, attribute="rotate")
-                            operation.step()
-
-                for frame in all_key_times:
-                    if operation.cancelled:
-                        break
-                    cmds.currentTime(frame, edit=True)
-                    for obj in keyed_objects:
-                        if frame in key_times[obj]:
-                            cmds.xform(obj, preserve=True, rotateOrder=rot_order)
-                            cmds.setKeyframe(obj, attribute="rotate")
-                            cmds.xform(obj, preserve=False, rotateOrder=previous_orders[obj])
-                            operation.step()
-
-                cmds.currentTime(current_time, edit=True)
-
+            for frame in all_key_times:
+                if operation.cancelled:
+                    break
+                cmds.currentTime(frame, edit=True)
                 for obj in keyed_objects:
-                    if operation.cancelled:
-                        break
-                    cmds.xform(obj, preserve=False, rotateOrder=rot_order)
-                    cmds.filterCurve(obj)
-                    operation.step()
+                    if frame in key_times[obj]:
+                        cmds.setKeyframe(obj, attribute="rotate")
+                        operation.step()
+
+            for frame in all_key_times:
+                if operation.cancelled:
+                    break
+                cmds.currentTime(frame, edit=True)
+                for obj in keyed_objects:
+                    if frame in key_times[obj]:
+                        cmds.xform(obj, preserve=True, rotateOrder=rot_order)
+                        cmds.setKeyframe(obj, attribute="rotate")
+                        cmds.xform(obj, preserve=False, rotateOrder=previous_orders[obj])
+                        operation.step()
+
+            cmds.currentTime(current_time, edit=True)
+
+            for obj in keyed_objects:
+                if operation.cancelled:
+                    break
+                cmds.xform(obj, preserve=False, rotateOrder=rot_order)
+                operation.step()
+
+            if global_tools.is_euler_filter_enabled():
+                rotation_curves = []
+                for obj in keyed_objects:
+                    rotation_curves.extend(
+                        animation.layer_graph.curves_for_plugs(
+                            [f"{obj}.rx", f"{obj}.ry", f"{obj}.rz"],
+                            include_all_layers=True,
+                        )
+                    )
+                operation.set_status("Euler Filtering")
+                with animation.preserve_key_selection():
+                    animation.apply_smart_euler_filter(
+                        rotation_curves, target_info, operation=operation
+                    )
 
         for obj in unkeyed_objects:
             if operation.cancelled:
                 break
             cmds.xform(obj, preserve=True, rotateOrder=rot_order)
             operation.step()
-
-import math
-
-from maya import cmds
-from maya.api import OpenMaya as om
-
-from TheKeyMachine.maya import maya_api
-
+    finally:
+        cmds.currentTime(current_time, edit=True)
 
 class GimbalAnalyzer:
     def radians_to_degrees(self, radians):

@@ -21,6 +21,7 @@ class SelectionSetsToolObject(ToolObject):
             "type": "tool", "label": "Quick Export", "text": "QEx",
             "icon": "selection_sets_export", "callback": api.quick_export_selection_sets,
             "tooltip": TOOLTIPS["quick_export"],
+            "operation": {"undo": False},
         },
         "selection_sets_quick_import": {
             "type": "tool", "label": "Quick Import", "text": "QIm",
@@ -31,6 +32,7 @@ class SelectionSetsToolObject(ToolObject):
             "type": "tool", "label": "Export", "text": "Ex",
             "icon": "selection_sets_export", "callback": api.export_selection_sets,
             "tooltip": TOOLTIPS["export"],
+            "operation": {"undo": False},
         },
         "selection_sets_import": {
             "type": "tool", "label": "Import", "text": "Im",
@@ -41,6 +43,13 @@ class SelectionSetsToolObject(ToolObject):
             "type": "tool", "label": "Clear All Selection Sets", "text": "Clr",
             "icon": "trash", "callback": api.clear_all_selection_sets,
             "tooltip": TOOLTIPS["clear_all"],
+            "operation": {"progress": False, "undo": False},
+        },
+        "selection_sets_clear_all_apply": {
+            "type": "tool", "label": "Clear All Selection Sets",
+            "callback": api.clear_all_selection_sets_apply,
+            "pinnable": False,
+            "operation": {"rollback_on_cancel": True},
         },
     }
     SECTION = {

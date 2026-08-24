@@ -19,6 +19,7 @@ class TempPivotToolObject(ToolObject):
             "get_checked": api.is_temp_pivot_active, "set_checked": api.toggle,
             "bind_checked_fn": api.bind_temp_pivot_toolbar_button,
             "tooltip": TOOLTIPS["temp_pivot"],
+            "operation": {"undo": True, "rollback_on_cancel": True},
         },
         "temp_pivot_last_object": {
             "type": "tool", "label": "Temp Pivot to Last Object",

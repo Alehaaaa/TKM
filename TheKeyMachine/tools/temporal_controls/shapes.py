@@ -10,10 +10,7 @@ for any entry here afterward.
 
 ``SHAPE_LIST`` is the ordered, human-labeled version of this dictionary --
 what the panel's shape picker actually shows -- while ``SHAPES`` stays the
-plain id-to-builder lookup every other caller (``build``) uses. A couple of
-ids exist only for backward-compatible/internal reuse and are deliberately
-left out of ``SHAPE_LIST``: ``"cross"`` (the bare 3-axis jack ``"locator"``
-reuses) and the pre-panel ``AIM_TARGET_SHAPE`` default.
+plain id-to-builder lookup every other caller (``build``) uses.
 """
 
 import math
@@ -305,7 +302,6 @@ SHAPES = {
     "circle": circle,
     "square": square,
     "rounded_square": rounded_square,
-    "cross": cross,
     "locator": cross,
     "diamond": diamond,
     "box": box,
@@ -316,10 +312,7 @@ SHAPES = {
     "cog": cog,
 }
 
-# Ordered, human-labeled shape list -- what the Temp Controls Panel's shape
-# picker actually shows, in the order it should list them. Deliberately
-# excludes "cross" (superseded by "locator" for panel purposes -- same
-# builder, see SHAPES above).
+# Ordered, human-labeled shape list shown by the Temp Controls Panel.
 SHAPE_LIST = (
     {"id": "none", "label": "No Shape"},
     {"id": "rounded_square", "label": "Rounded Square"},
@@ -339,5 +332,4 @@ DEFAULT_SHAPE = "rounded_square"
 
 
 def build(shape_id, name, size):
-    builder = SHAPES.get(shape_id) or SHAPES[DEFAULT_SHAPE]
-    return builder(name, size)
+    return SHAPES[shape_id](name, size)

@@ -9,6 +9,7 @@ TOOLTIPS = load_tooltips(__file__)
 
 class ShareKeysToolObject(ToolObject):
     ORDER = 310
+    OPERATION = {"capture_animation_context": True}
     DOC_URL = "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/share-keys"
     TOOLS = {
         "share_keys": {
@@ -59,7 +60,16 @@ class ShareKeysToolObject(ToolObject):
         "bake_animation_2": {"type": "tool", "label": "Bake on Twos", "icon": "bake_animation_2", "callback": api.bake_animation_2, "tooltip": TOOLTIPS["bake_2"]},
         "bake_animation_3": {"type": "tool", "label": "Bake on Threes", "icon": "bake_animation_3", "callback": api.bake_animation_3, "tooltip": TOOLTIPS["bake_3"]},
         "bake_animation_4": {"type": "tool", "label": "Bake on Fours", "icon": "bake_animation_3", "callback": api.bake_animation_4, "tooltip": TOOLTIPS["bake_4"]},
-        "bake_animation_custom": {"type": "tool", "label": "Bake Custom Interval", "icon": "bake_animation_custom", "callback": api.bake_animation_custom, "tooltip": TOOLTIPS["bake_custom"]},
+        "bake_animation_custom": {
+            "type": "tool", "label": "Bake Custom Interval", "icon": "bake_animation_custom",
+            "callback": api.bake_animation_custom, "tooltip": TOOLTIPS["bake_custom"],
+            "operation": {"progress": False, "undo": False},
+        },
+        "bake_animation_custom_apply": {
+            "type": "tool", "label": "Bake Custom Interval", "icon": "bake_animation_custom",
+            "callback": api.apply_custom_bake, "tooltip": TOOLTIPS["bake_custom"],
+            "pinnable": False,
+        },
         "bake_animation_from_last_selected": {"type": "tool", "label": "Bake From Last Selected", "icon": "bake_animation_1", "callback": api.bake_animation_from_last_selected, "tooltip": TOOLTIPS["bake_last"]},
     }
     SECTIONS = (

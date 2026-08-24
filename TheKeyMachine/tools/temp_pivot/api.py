@@ -579,16 +579,12 @@ def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False
     else:
         placement_mode = PLACEMENT_ORIGINAL
 
-    operation = toolCommon.current_tool_operation()
+    operation = toolCommon.require_tool_operation()
     driven_selection = _driven_selection(selection, placement_mode)
-    if operation is not None:
-        operation.set_total(len(driven_selection) + 3).set_status(
-            "Setting Up Temp Pivot"
-        )
-    open_chunk = False
+    operation.set_total(len(driven_selection) + 3).set_status(
+        "Setting Up Temp Pivot"
+    )
     try:
-        open_chunk = toolCommon.open_undo_chunk()
-
         pivot = _ensure_pivot_node()
         _session["suppress"] = True
         recovered_offset = False
@@ -600,12 +596,10 @@ def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False
                 selection,
                 placement_mode=placement_mode,
             )
-            if operation is not None:
-                operation.step()
+            operation.step()
             origin_matrix = _matrix(pivot)
             recovered_offset = _apply_session_offset(pivot, selection, placement_mode)
-            if operation is not None:
-                operation.step()
+            operation.step()
         finally:
             _session["suppress"] = False
 
@@ -632,22 +626,16 @@ def create_temp_pivot(*args, last_object=False, centered=False, worldspace=False
             _enter_pivot_edit_mode(pivot)
         _sync_time_slider_to_original_selection()
         _emit_temp_pivot_state_changed()
-        if operation is not None:
-            operation.step()
+        operation.step()
 
-    except Exception as exc:
+    except Exception:
         try:
             runtime.get_runtime_manager().disconnect_callbacks(RUNTIME_KEY)
         except Exception:
             pass
         _clear_time_slider_connection()
         _reset_session_state(selection if "selection" in locals() else None)
-        import TheKeyMachine.tools.bug_report.controller as report
-
-        report.report_detected_exception(exc, context="temp pivot")
-    finally:
-        if open_chunk:
-            toolCommon.close_undo_chunk(open_chunk)
+        raise
 
 
 def create_centered_temp_pivot(*args):

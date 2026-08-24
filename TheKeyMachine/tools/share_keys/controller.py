@@ -192,7 +192,8 @@ def find_all_roots_in_selection():
 relative_data = {}
 
 
-def share_keys(*args):
+def share_keys(*args, tool_operation=None, **_kwargs):
+    operation = toolCommon.require_tool_operation(tool_operation)
     target_info = animation.resolve_context(
         default_mode="all_animation",
         include_shapes=True,
@@ -214,22 +215,19 @@ def share_keys(*args):
     shared_frames = sorted(all_frames)
     preserve_curve_shape = get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE
 
-    with toolCommon.tool_operation(
-        tool_id="share_keys",
-        label="Share Keys",
-        progress=True,
-        progress_max=len(curves) * len(shared_frames),
-        undo=True,
+    operation.set_total(len(curves) * len(shared_frames))
+    toolCommon.ensure_operation_tint(
+        operation,
         tint="range",
         timerange=(int(shared_frames[0]), int(shared_frames[-1])),
-    ) as operation:
-        operation.start()
-        _set_missing_keys(
-            curves,
-            shared_frames,
-            insert=preserve_curve_shape,
-            operation=operation,
-        )
+        tint_key="share_keys",
+    )
+    _set_missing_keys(
+        curves,
+        shared_frames,
+        insert=preserve_curve_shape,
+        operation=operation,
+    )
 
 
 def _frames_from_last_selected(target_info):
@@ -283,7 +281,8 @@ def _bake_curves_to_source_frames(curves, frames, operation=None, preserve_shape
         animation.apply_curve_shape(shape_data)
 
 
-def share_keys_from_last_selected(*args):
+def share_keys_from_last_selected(*args, tool_operation=None, **_kwargs):
+    operation = toolCommon.require_tool_operation(tool_operation)
     target_info = animation.resolve_context(
         default_mode="all_animation",
         include_graph=False,
@@ -296,30 +295,28 @@ def share_keys_from_last_selected(*args):
 
     keep_curve_shape = get_share_keys_mode() == SHARE_KEYS_MODE_PRESERVE_SHAPE
     curves_by_target = _curves_by_object(target_info, targets)
-    with toolCommon.tool_operation(
-        tool_id="share_keys",
-        label="Share Keys",
-        progress=True,
-        progress_max=sum(
-            len(curves) * len(frames) for curves in curves_by_target.values()
-        ),
-        undo=True,
+    operation.set_total(sum(
+        len(curves) * len(frames) for curves in curves_by_target.values()
+    ))
+    toolCommon.ensure_operation_tint(
+        operation,
         tint="range",
         timerange=(int(frames[0]), int(frames[-1])),
-    ) as operation:
-        for target in targets:
-            if operation.cancelled:
-                return
-            _set_missing_keys(
-                curves_by_target[target],
-                frames,
-                insert=keep_curve_shape,
-                operation=operation,
-            )
+        tint_key="share_keys_from_last_selected",
+    )
+    for target in targets:
+        if operation.cancelled:
+            return
+        _set_missing_keys(
+            curves_by_target[target],
+            frames,
+            insert=keep_curve_shape,
+            operation=operation,
+        )
 
 
 # ______________________________________ ReBlock Move
-def reblock_move(*args):
+def reblock_move(*args, tool_operation=None, **_kwargs):
     """Adjust animation curves to match the majority keyframe timing pattern."""
     target_info = animation.resolve_context(
         default_mode="all_animation",
@@ -349,43 +346,38 @@ def reblock_move(*args):
 
     majority_profile, _ = profiles.most_common(1)[0]
 
-    with toolCommon.tool_operation(
-        tool_id="reblock_move",
-        label="ReBlock Move",
-        progress=True,
-        progress_max=len(curves),
-        undo=True,
-    ) as operation:
-        for curve in curves:
-            if operation.cancelled:
-                return
-            frames = frames_by_curve.get(curve)
-            if frames is None:
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_total(len(curves))
+    for curve in curves:
+        if operation.cancelled:
+            return
+        frames = frames_by_curve.get(curve)
+        if frames is None:
+            operation.step()
+            continue
+
+        if frames != majority_profile:
+            shape_data = animation.capture_curve_shape([curve], majority_profile)
+            if not shape_data.get(curve):
                 operation.step()
                 continue
-
-            if frames != majority_profile:
-                shape_data = animation.capture_curve_shape([curve], majority_profile)
-                if not shape_data.get(curve):
-                    operation.step()
-                    continue
-                remove_frames = [
-                    frame for frame in frames if frame not in majority_profile
-                ]
-                if remove_frames:
-                    cmds.cutKey(
-                        curve,
-                        time=[(frame, frame) for frame in remove_frames],
-                        clear=True,
-                    )
-                animation.apply_curve_shape(
-                    shape_data,
-                    preserve_tangent_types=True,
+            remove_frames = [
+                frame for frame in frames if frame not in majority_profile
+            ]
+            if remove_frames:
+                cmds.cutKey(
+                    curve,
+                    time=[(frame, frame) for frame in remove_frames],
+                    clear=True,
                 )
-            operation.step()
+            animation.apply_curve_shape(
+                shape_data,
+                preserve_tangent_types=True,
+            )
+        operation.step()
 
 
-def reblock_insert(*args):
+def reblock_insert(*args, tool_operation=None, **_kwargs):
     """Insert missing strict-majority key times across resolved curves."""
     target_info = animation.resolve_context(
         default_mode="all_animation",
@@ -414,23 +406,18 @@ def reblock_insert(*args):
     if not majority_frames:
         return wutil.make_inViewMessage("No shared key pattern found")
 
-    with toolCommon.tool_operation(
-        tool_id="reblock_insert",
-        label="ReBlock Insert",
-        progress=True,
-        progress_max=len(curves),
-        undo=True,
-    ) as operation:
-        for curve in curves:
-            if operation.cancelled:
-                return
-            existing_frames = set(frames_by_curve.get(curve) or [])
-            for frame in sorted(majority_frames - existing_frames):
-                try:
-                    cmds.setKeyframe(curve, time=(frame,), insert=True)
-                except (RuntimeError, ValueError, TypeError):
-                    pass
-            operation.step()
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_total(len(curves))
+    for curve in curves:
+        if operation.cancelled:
+            return
+        existing_frames = set(frames_by_curve.get(curve) or [])
+        for frame in sorted(majority_frames - existing_frames):
+            try:
+                cmds.setKeyframe(curve, time=(frame,), insert=True)
+            except (RuntimeError, ValueError, TypeError):
+                pass
+        operation.step()
 
 
 # ___________________________ BAKE ANIM  _____________________________________
@@ -450,13 +437,13 @@ def _bake_sample_times(start_frame, end_frame, interval):
     return animation.sample_times(start_frame, end_frame, interval)
 
 
-def bake_animation(bake_interval=1, window=None):
+def bake_animation(bake_interval=1, window=None, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
     try:
         bake_interval = _validate_bake_interval(bake_interval)
     except ValueError as error:
         return wutil.make_inViewMessage(str(error))
 
-    bake_title = BAKE_TITLES.get(bake_interval, "Bake Animation")
     tool_key = (
         "bake_animation_{}".format(bake_interval)
         if bake_interval in BAKE_TITLES
@@ -506,59 +493,56 @@ def bake_animation(bake_interval=1, window=None):
             sample_times = _bake_sample_times(start_frame, end_frame, bake_interval)
             curve_shape_data = animation.capture_curve_shape(curves_to_update, sample_times)
 
-        with toolCommon.tool_operation(
-            tool_id=tool_key,
-            label=bake_title,
-            progress=True,
-            progress_max=max(
-                1, int((end_frame - start_frame) / float(bake_interval or 1)) + 1
-            ),
-            undo=True,
+        operation.set_total(max(
+            1, int((end_frame - start_frame) / float(bake_interval or 1)) + 1
+        ))
+        toolCommon.ensure_operation_tint(
+            operation,
             tint="range",
             timerange=time_context.timerange,
-            anchor_widget=window,
-        ) as operation:
-            operation.start()
-            # Hacer bake a las curvas de animación de los objetos seleccionados.
-            bake_kwargs = {
-                "time": (start_frame, end_frame),
-                "sampleBy": bake_interval,
-                "preserveOutsideKeys": True,
-                # A sparse bake can legitimately add no keys to an existing
-                # anim curve.  Keep-shape mode still needs a key at every
-                # sample; bakeResults samples the evaluated curve before it
-                # replaces the animation, preserving those full-frame values.
-                "sparseAnimCurveBake": False,
-                "removeBakedAttributeFromLayer": False,
-                "bakeOnOverrideLayer": False,
-                "controlPoints": False,
-                "shape": True,
-            }
-            if selected_channels:
-                bake_kwargs["attribute"] = selected_channels
-            cmds.bakeResults(selected_objects, **bake_kwargs)
-            operation.step(
-                amount=operation.progress.max_value if operation.progress else 1
-            )
+            tint_key=tool_key,
+        )
+        operation.start()
+        # Hacer bake a las curvas de animación de los objetos seleccionados.
+        bake_kwargs = {
+            "time": (start_frame, end_frame),
+            "sampleBy": bake_interval,
+            "preserveOutsideKeys": True,
+            # A sparse bake can legitimately add no keys to an existing
+            # anim curve.  Keep-shape mode still needs a key at every
+            # sample; bakeResults samples the evaluated curve before it
+            # replaces the animation, preserving those full-frame values.
+            "sparseAnimCurveBake": False,
+            "removeBakedAttributeFromLayer": False,
+            "bakeOnOverrideLayer": False,
+            "controlPoints": False,
+            "shape": True,
+        }
+        if selected_channels:
+            bake_kwargs["attribute"] = selected_channels
+        cmds.bakeResults(selected_objects, **bake_kwargs)
+        operation.step(
+            amount=operation.progress.max_value if operation.progress else 1
+        )
 
-            if bake_tangent_mode == BAKE_TANGENT_MODE_STEP:
-                _apply_step_tangents(curves_to_update, (start_frame, end_frame))
-            elif bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_TYPE:
-                for curve, (in_tangent, out_tangent) in tangent_types_by_curve.items():
-                    tangent_kwargs = {}
-                    if in_tangent:
-                        tangent_kwargs["inTangentType"] = in_tangent
-                    if out_tangent:
-                        tangent_kwargs["outTangentType"] = out_tangent
-                    if tangent_kwargs:
-                        cmds.keyTangent(
-                            curve,
-                            edit=True,
-                            time=(start_frame, end_frame),
-                            **tangent_kwargs,
-                        )
-            elif bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_SHAPE:
-                animation.apply_curve_shape(curve_shape_data)
+        if bake_tangent_mode == BAKE_TANGENT_MODE_STEP:
+            _apply_step_tangents(curves_to_update, (start_frame, end_frame))
+        elif bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_TYPE:
+            for curve, (in_tangent, out_tangent) in tangent_types_by_curve.items():
+                tangent_kwargs = {}
+                if in_tangent:
+                    tangent_kwargs["inTangentType"] = in_tangent
+                if out_tangent:
+                    tangent_kwargs["outTangentType"] = out_tangent
+                if tangent_kwargs:
+                    cmds.keyTangent(
+                        curve,
+                        edit=True,
+                        time=(start_frame, end_frame),
+                        **tangent_kwargs,
+                    )
+        elif bake_tangent_mode == BAKE_TANGENT_MODE_KEEP_SHAPE:
+            animation.apply_curve_shape(curve_shape_data)
 
     except Exception as e:
         cmds.warning("An error occurred: {}".format(e))
@@ -567,7 +551,8 @@ def bake_animation(bake_interval=1, window=None):
         window.close()
 
 
-def bake_animation_from_last_selected(*args):
+def bake_animation_from_last_selected(*args, tool_operation=None, **_kwargs):
+    operation = toolCommon.require_tool_operation(tool_operation)
     target_info = animation.resolve_context(
         default_mode="all_animation",
         include_graph=False,
@@ -580,45 +565,43 @@ def bake_animation_from_last_selected(*args):
 
     current_time = cmds.currentTime(query=True)
     curves_by_target = _curves_by_object(target_info, targets)
+    operation.set_total(sum(len(curves) for curves in curves_by_target.values()))
+    toolCommon.ensure_operation_tint(
+        operation,
+        tint="range",
+        timerange=(int(frames[0]), int(frames[-1])),
+        tint_key="bake_animation_from_last_selected",
+    )
     try:
-        with toolCommon.tool_operation(
-            tool_id="bake_animation_1",
-            label="Bake Animation",
-            progress=True,
-            progress_max=sum(len(curves) for curves in curves_by_target.values()),
-            undo=True,
-            tint="range",
-            timerange=(int(frames[0]), int(frames[-1])),
-        ) as operation:
-            for target in targets:
-                if operation.cancelled:
-                    return
-                curves = curves_by_target[target]
-                tangent_mode = get_bake_tangent_mode()
-                _bake_curves_to_source_frames(
-                    curves,
-                    frames,
-                    operation=operation,
-                    preserve_shape=tangent_mode == BAKE_TANGENT_MODE_KEEP_SHAPE,
-                )
+        for target in targets:
+            if operation.cancelled:
+                return
+            curves = curves_by_target[target]
+            tangent_mode = get_bake_tangent_mode()
+            _bake_curves_to_source_frames(
+                curves,
+                frames,
+                operation=operation,
+                preserve_shape=tangent_mode == BAKE_TANGENT_MODE_KEEP_SHAPE,
+            )
 
-                if tangent_mode == BAKE_TANGENT_MODE_STEP:
-                    _apply_step_tangents(curves, (frames[0], frames[-1]))
+            if tangent_mode == BAKE_TANGENT_MODE_STEP:
+                _apply_step_tangents(curves, (frames[0], frames[-1]))
     finally:
         cmds.currentTime(current_time)
 
 
-def bake_animation_1(*args):
-    bake_animation(bake_interval=1)
+def bake_animation_1(*args, tool_operation=None, **_kwargs):
+    return bake_animation(bake_interval=1, tool_operation=tool_operation)
 
 
-def bake_animation_2(*args):
-    bake_animation(bake_interval=2)
+def bake_animation_2(*args, tool_operation=None, **_kwargs):
+    return bake_animation(bake_interval=2, tool_operation=tool_operation)
 
 
-def bake_animation_3(*args):
-    bake_animation(bake_interval=3)
+def bake_animation_3(*args, tool_operation=None, **_kwargs):
+    return bake_animation(bake_interval=3, tool_operation=tool_operation)
 
 
-def bake_animation_4(*args):
-    bake_animation(bake_interval=4)
+def bake_animation_4(*args, tool_operation=None, **_kwargs):
+    return bake_animation(bake_interval=4, tool_operation=tool_operation)

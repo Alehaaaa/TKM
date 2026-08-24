@@ -178,11 +178,7 @@ def _unique(items):
 
 
 def _euler_full_turn():
-    try:
-        angular_unit = cmds.currentUnit(query=True, angle=True)
-    except _COMMAND_ERRORS:
-        angular_unit = "deg"
-    return math.tau if str(angular_unit).lower().startswith("rad") else 360.0
+    return animation.euler_full_turn()
 
 
 def _closest_turn_offset(value, reference, full_turn):
@@ -199,84 +195,18 @@ def _closest_turn_offset(value, reference, full_turn):
 
 
 def _euler_turn_groups(curve, target_info, full_turn):
-    try:
-        key_times = [
-            float(value)
-            for value in (cmds.keyframe(curve, query=True, timeChange=True) or [])
-        ]
-        key_values = [
-            float(value)
-            for value in (cmds.keyframe(curve, query=True, valueChange=True) or [])
-        ]
-    except _COMMAND_ERRORS:
-        return []
-    if not key_times or len(key_times) != len(key_values):
-        return []
-
-    target_times = set(
-        float(value) for value in target_info.key_times(curve)
-    )
-    if not target_times:
-        return []
-
-    groups = []
-    group_start = group_end = group_offset = None
-    previous_value = None
-
-    def finish_group():
-        if group_start is not None:
-            groups.append((group_start, group_end, group_offset))
-
-    for key_time, key_value in zip(key_times, key_values):
-        if key_time not in target_times:
-            finish_group()
-            group_start = group_end = group_offset = None
-            previous_value = key_value
-            continue
-        offset = (
-            0.0
-            if previous_value is None
-            else _closest_turn_offset(key_value, previous_value, full_turn)
-        )
-        filtered_value = key_value + offset
-        if abs(offset) <= 1e-10:
-            finish_group()
-            group_start = group_end = group_offset = None
-        elif group_start is not None and abs(offset - group_offset) <= 1e-10:
-            group_end = key_time
-        else:
-            finish_group()
-            group_start = group_end = key_time
-            group_offset = offset
-        previous_value = filtered_value
-    finish_group()
-    return groups
+    return animation.euler_turn_groups(curve, target_info, full_turn=full_turn)
 
 
 def _apply_euler_filter(curves, target_info, operation=None):
-    changed_groups = 0
-    full_turn = _euler_full_turn()
     with animation.preserve_key_selection():
-        for curve in curves or []:
-            if operation is not None and operation.cancelled:
-                break
-            for start_time, end_time, offset in _euler_turn_groups(
-                curve, target_info, full_turn
-            ):
-                cmds.keyframe(
-                    curve,
-                    edit=True,
-                    time=(start_time, end_time),
-                    relative=True,
-                    valueChange=offset,
-                )
-                changed_groups += 1
-            if operation is not None:
-                operation.step()
-    return changed_groups
+        return animation.apply_smart_euler_filter(
+            curves, target_info, operation=operation
+        )
 
 
-def delete_keyframes_before_current_time():
+def delete_keyframes_before_current_time(tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
     target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
@@ -284,25 +214,29 @@ def delete_keyframes_before_current_time():
     if not _validate_curve_tool_targets(target_info, curves, "delete"):
         return None
     current_time = cmds.currentTime(query=True)
-    operation = toolCommon.current_tool_operation()
-    if operation is not None:
-        operation.set_total(len(curves)).set_status("Deleting Keys Before Current")
-    deleted = False
-    for curve in curves:
-        if operation is not None and operation.cancelled:
-            break
-        keyframes = cmds.keyframe(curve, query=True, timeChange=True) or []
-        before = [frame for frame in keyframes if frame < current_time]
-        if before:
-            cmds.cutKey(curve, time=(min(before), max(before)), clear=True)
-            deleted = True
-        if operation is not None:
-            operation.step()
+    def _delete_batch(batch):
+        deleted = False
+        for curve in batch:
+            keyframes = cmds.keyframe(curve, query=True, timeChange=True) or []
+            before = [frame for frame in keyframes if frame < current_time]
+            if before:
+                cmds.cutKey(curve, time=(min(before), max(before)), clear=True)
+                deleted = True
+        return deleted
+
+    deleted = any(operation.process(
+        curves,
+        _delete_batch,
+        batch_size=32,
+        status="Deleting Keys Before Current",
+        strategy="worker",
+    ))
     if not deleted:
         return animation.notify_empty("keys", "delete")
 
 
-def delete_keyframes_after_current_time():
+def delete_keyframes_after_current_time(tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
     target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
@@ -310,20 +244,23 @@ def delete_keyframes_after_current_time():
     if not _validate_curve_tool_targets(target_info, curves, "delete"):
         return None
     current_time = cmds.currentTime(query=True)
-    operation = toolCommon.current_tool_operation()
-    if operation is not None:
-        operation.set_total(len(curves)).set_status("Deleting Keys After Current")
-    deleted = False
-    for curve in curves:
-        if operation is not None and operation.cancelled:
-            break
-        keyframes = cmds.keyframe(curve, query=True, timeChange=True) or []
-        after = [frame for frame in keyframes if frame > current_time]
-        if after:
-            cmds.cutKey(curve, time=(min(after), max(after)), clear=True)
-            deleted = True
-        if operation is not None:
-            operation.step()
+    def _delete_batch(batch):
+        deleted = False
+        for curve in batch:
+            keyframes = cmds.keyframe(curve, query=True, timeChange=True) or []
+            after = [frame for frame in keyframes if frame > current_time]
+            if after:
+                cmds.cutKey(curve, time=(min(after), max(after)), clear=True)
+                deleted = True
+        return deleted
+
+    deleted = any(operation.process(
+        curves,
+        _delete_batch,
+        batch_size=32,
+        status="Deleting Keys After Current",
+        strategy="worker",
+    ))
     if not deleted:
         return animation.notify_empty("keys", "delete")
 
@@ -375,34 +312,25 @@ def _animation_command_context(
     progress_max=1,
     preserve_time_selection=False,
 ):
-    """Wrap animation hotkey commands with the shared tool operation.
-
-    tint=False disables the timeline/context tint for commands that should feel silent.
-
-    ``toolCommon.tool_operation()`` itself detects when core/trigger.py's
-    dispatcher already has an operation open for this command and merges
-    into it -- so calling it here, even from a command that dispatch already
-    wrapped, still yields exactly one operation, one undo chunk, and one
-    TKM_DEBUG_TIMING line per click. No reuse plumbing needed at this layer.
-    """
+    """Configure and yield the dispatcher-owned animation operation."""
+    operation = toolCommon.require_tool_operation()
     operation_tint = "none"
     if tint:
         operation_tint = "range" if timerange is not None else "context"
 
-    with toolCommon.tool_operation(
-        tool_id=tint_key,
-        label=label,
-        progress=True,
-        progress_max=progress_max,
-        undo=True,
-        undo_name=toolCommon.make_undo_chunk_name(title=label),
+    operation.set_status(label)
+    if progress_max:
+        operation.set_total(progress_max)
+    if preserve_time_selection and not operation.preserved_time_selection:
+        operation.preserved_time_selection = animation.capture_time_slider_selection()
+    toolCommon.ensure_operation_tint(
+        operation,
         tint=operation_tint,
         timerange=timerange,
         default_mode=default_mode,
         tint_key=tint_key,
-        preserve_time_selection=preserve_time_selection,
-    ) as operation:
-        yield operation
+    )
+    yield operation
 
 
 @contextmanager
@@ -452,39 +380,38 @@ def _run_key_command(
         return None
     time_context = target_info.time
 
-    with toolCommon.tool_operation(
-        tool_id=command_name,
-        label=toolCommon.humanize_tool_name(command_name),
-        progress=False,
-        undo=True,
-        undo_name=toolCommon.make_undo_chunk_name(tool_id=command_name),
+    operation = toolCommon.require_tool_operation()
+    if preserve_time_selection and not operation.preserved_time_selection:
+        operation.preserved_time_selection = animation.capture_time_slider_selection()
+    toolCommon.ensure_operation_tint(
+        operation,
         tint="range" if tint_range else "none",
         timerange=tint_range,
-        preserve_time_selection=preserve_time_selection,
-    ):
-        kwargs = dict(base_kwargs)
-        selected_keyframes = target_info.selected_keys or []
-        if selected_keyframes:
-            curve_times = {}
-            for curve, key_time in selected_keyframes:
-                curve_times.setdefault(curve, []).append(float(key_time))
-            result = None
-            for curve, key_times in curve_times.items():
-                for key_time in sorted(set(key_times)):
-                    command_kwargs = dict(kwargs)
-                    command_kwargs["time"] = (key_time, key_time)
-                    result = command(curve, **command_kwargs)
-            return result
-
-        kwargs.update(animation.selection_time_kwargs(time_context))
-        if default_mode == "current_frame" and not _has_key_time_filter(kwargs):
-            frame = cmds.currentTime(query=True)
-            kwargs["time"] = (frame, frame)
-
+        tint_key=command_name,
+    )
+    kwargs = dict(base_kwargs)
+    selected_keyframes = target_info.selected_keys or []
+    if selected_keyframes:
+        curve_times = {}
+        for curve, key_time in selected_keyframes:
+            curve_times.setdefault(curve, []).append(float(key_time))
         result = None
-        for curve in curves:
-            result = command(curve, **kwargs)
+        for curve, key_times in curve_times.items():
+            for key_time in sorted(set(key_times)):
+                command_kwargs = dict(kwargs)
+                command_kwargs["time"] = (key_time, key_time)
+                result = command(curve, **command_kwargs)
         return result
+
+    kwargs.update(animation.selection_time_kwargs(time_context))
+    if default_mode == "current_frame" and not _has_key_time_filter(kwargs):
+        frame = cmds.currentTime(query=True)
+        kwargs["time"] = (frame, frame)
+
+    result = None
+    for curve in curves:
+        result = command(curve, **kwargs)
+    return result
 
 
 def _has_key_time_filter(kwargs):
@@ -881,7 +808,8 @@ def _paste_entry_to_curve(
     )
 
     changed = False
-    weighted_applied = False
+    pasted_times = []
+    pasted_tangents = []
     for key in keys:
         destination_time = anchor + (float(key["time"]) - source_start)
         if (
@@ -897,15 +825,16 @@ def _paste_entry_to_curve(
             continue
         value = float(key["value"]) + value_offset
         cmds.setKeyframe(curve, time=(destination_time,), value=value)
-        tangent = key.get("tangent") or {}
-        animation.apply_key_tangent_snapshot(
-            curve,
-            destination_time,
-            tangent,
-            apply_weighted=not weighted_applied,
-        )
-        weighted_applied = weighted_applied or "weightedTangents" in tangent
+        pasted_times.append(destination_time)
+        pasted_tangents.append(key.get("tangent") or {})
         changed = True
+
+    if pasted_times and any(pasted_tangents):
+        animation.apply_key_tangent_snapshots(
+            curve,
+            pasted_times,
+            pasted_tangents,
+        )
 
     if relative and anchor_exists:
         cmds.keyframe(
@@ -1108,16 +1037,16 @@ def copy_keys(*args):
     if not _save_curve_clipboard(clipboard_data):
         return animation.notify_empty("keys", "copy")
     tint_range = (clipboard_data["start"], clipboard_data["end"])
-    with toolCommon.tool_operation(
-        tool_id="copy_keys",
-        label=toolCommon.humanize_tool_name("copy_keys"),
-        progress=False,
-        undo=False,
+    operation = toolCommon.require_tool_operation()
+    if not operation.preserved_time_selection:
+        operation.preserved_time_selection = animation.capture_time_slider_selection()
+    toolCommon.ensure_operation_tint(
+        operation,
         tint="range",
         timerange=tint_range,
-        preserve_time_selection=True,
-    ):
-        return True
+        tint_key="copy_keys",
+    )
+    return True
 
 
 def cut_keys(*args):
@@ -1186,11 +1115,12 @@ def crop_animation(*args):
 
     time_context = target_info.time
     crop_range = (time_context.start_frame, time_context.end_frame)
-    clipboard_target_info = dict(target_info)
-    clipboard_target_info.time = timeline.TimeContext(
-        mode="time_slider_range",
-        start_frame=crop_range[0],
-        end_frame=crop_range[1],
+    clipboard_target_info = target_info.replace(
+        time=timeline.TimeContext(
+            mode="time_slider_range",
+            start_frame=crop_range[0],
+            end_frame=crop_range[1],
+        )
     )
     clipboard_data = _capture_curve_clipboard(clipboard_target_info, curves)
     if not _save_curve_clipboard(clipboard_data):
@@ -1982,7 +1912,8 @@ def _validate_curve_tool_targets(
     return True
 
 
-def snap_keyframes():
+def snap_keyframes(*_args, tool_operation=None, **_kwargs):
+    operation = toolCommon.require_tool_operation(tool_operation)
     target_info = animation.resolve_context(
         include_channels=True, include_shapes=True, resolve_curves=True
     )
@@ -2036,29 +1967,22 @@ def snap_keyframes():
         return animation.notify_empty("keys", "snap")
 
     snapped = False
-    with toolCommon.tool_operation(
-        tool_id="snap",
-        label="Snap Keyframes",
-        progress=True,
-        progress_max=work_items,
-        undo=True,
-    ) as operation:
-        operation.start()
-        for curve, curve_times, snap_data in curve_key_times:
-            for rounded_time, key_times, target_value in snap_data:
-                if operation.cancelled:
-                    return
-                snapped = (
-                    _snap_curve_keys(
-                        curve,
-                        rounded_time,
-                        key_times,
-                        target_value,
-                        curve_times,
-                    )
-                    or snapped
+    operation.set_total(work_items)
+    for curve, curve_times, snap_data in curve_key_times:
+        for rounded_time, key_times, target_value in snap_data:
+            if operation.cancelled:
+                return
+            snapped = (
+                _snap_curve_keys(
+                    curve,
+                    rounded_time,
+                    key_times,
+                    target_value,
+                    curve_times,
                 )
-                operation.step()
+                or snapped
+            )
+            operation.step()
 
     if not snapped:
         return animation.notify_empty("keys", "snap")

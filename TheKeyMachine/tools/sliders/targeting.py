@@ -20,6 +20,7 @@ def resolve_keyframe_targets(session):
         default_mode="current_frame",
         include_shapes=True,
         resolve_curves=True,
+        snapshot=session.selection_snapshot,
     )
     session.targets.layer_context = dict(target_info.layer_scope or {})
     plugs = target_info.plugs
@@ -70,6 +71,7 @@ def resolve_curve_targets(session):
         default_mode="current_frame",
         include_shapes=True,
         resolve_curves=True,
+        snapshot=session.selection_snapshot,
     )
     session.targets.layer_context = dict(target_info.layer_scope or {})
     curves = target_info.curves

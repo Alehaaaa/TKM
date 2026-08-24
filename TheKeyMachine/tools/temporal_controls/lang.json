@@ -1,0 +1,35 @@
+{
+  "temporal_controls": {
+    "en": {"label": "Temporal Controls", "tooltip": ["Open Temporal Controls for the current selection. Choose a control system, position and orientation spaces, a label, and a color. Each object gets a matching control that carries its animation keys and drives it through the chosen spaces."]},
+    "es": {"label": "Controles Temporales", "tooltip": ["Abre Controles Temporales para la selección actual. Elige sistema, espacios de posición y orientación, etiqueta y color. Cada objeto recibe un control que conserva sus claves y lo maneja en los espacios elegidos."]},
+    "fr": {"label": "Contrôles Temporels", "tooltip": ["Ouvre les Contrôles temporels pour la sélection. Choisissez le système, les espaces de position et d'orientation, un libellé et une couleur. Chaque objet reçoit un contrôle qui conserve ses clés."]},
+    "ca": {"label": "Controls Temporals", "tooltip": ["Obre els Controls Temporals per a la selecció actual. Tria sistema, espais de posició i orientació, etiqueta i color. Cada objecte rep un control que conserva les seves claus."]},
+    "zh": {"label": "临时控制器", "tooltip": ["为当前选择打开临时控制器。选择控制系统、位置和方向空间、标签及颜色。每个对象都会获得一个保留动画关键帧的匹配控制器。"]},
+    "ja": {"label": "テンポラルコントロール", "tooltip": ["現在の選択にテンポラルコントロールを開きます。システム、位置・方向空間、ラベル、色を選択します。各オブジェクトにアニメーションキーを保持するコントロールを作成します。"]},
+    "ko": {"label": "임시 컨트롤", "tooltip": ["현재 선택에 임시 컨트롤을 엽니다. 시스템, 위치·방향 공간, 레이블과 색상을 선택합니다. 각 오브젝트에 애니메이션 키를 유지하는 컨트롤이 생성됩니다."]},
+    "ar": {"label": "عناصر التحكم المؤقتة", "tooltip": ["افتح عناصر التحكم المؤقتة للتحديد الحالي. اختر النظام ومساحتي الموضع والاتجاه والتسمية واللون. يحصل كل كائن على عنصر تحكم يحتفظ بمفاتيح حركته."]}
+  },
+  "temporal_controls_create_apply": {
+    "en": {"label": "Create Temporal Controls"}, "es": {"label": "Crear Controles Temporales"}, "fr": {"label": "Créer des Contrôles Temporels"}, "ca": {"label": "Crear Controls Temporals"}, "zh": {"label": "创建临时控制器"}, "ja": {"label": "テンポラルコントロールを作成"}, "ko": {"label": "임시 컨트롤 생성"}, "ar": {"label": "إنشاء عناصر تحكم مؤقتة"}
+  },
+  "temporal_controls_bake": {
+    "en": {"label": "Bake", "tooltip": ["Extract the selected Temporal Controls' keyframes onto their original objects and remove the controls.", "If nothing is selected, bakes every Temporal Control in the scene."]},
+    "es": {"label": "Hornear", "tooltip": ["Extrae las claves de los Controles Temporales a sus objetos originales y elimina los controles.", "Si no hay selección, hornea todos los Controles Temporales de la escena."]},
+    "fr": {"label": "Convertir", "tooltip": ["Transfère les clés des Contrôles temporels sélectionnés vers leurs objets d'origine et supprime les contrôles.", "Sans sélection, convertit tous les Contrôles temporels de la scène."]},
+    "ca": {"label": "Enfornar", "tooltip": ["Extreu les claus dels Controls Temporals als objectes originals i elimina els controls.", "Si no hi ha selecció, enforna tots els Controls Temporals de l'escena."]},
+    "zh": {"label": "烘焙", "tooltip": ["将所选临时控制器的关键帧提取到原始对象并移除控制器。", "未选择任何内容时，烘焙场景中的所有临时控制器。"]},
+    "ja": {"label": "ベイク", "tooltip": ["選択したテンポラルコントロールのキーを元のオブジェクトへ抽出し、コントロールを削除します。", "未選択の場合はシーン内のすべてをベイクします。"]},
+    "ko": {"label": "베이크", "tooltip": ["선택한 임시 컨트롤의 키를 원래 오브젝트로 추출하고 컨트롤을 제거합니다.", "선택 항목이 없으면 씬의 모든 임시 컨트롤을 베이크합니다."]},
+    "ar": {"label": "خبز", "tooltip": ["انقل مفاتيح عناصر التحكم المؤقتة المحددة إلى كائناتها الأصلية ثم أزل العناصر.", "عند عدم وجود تحديد، اخبز كل عناصر التحكم المؤقتة في المشهد."]}
+  },
+  "temporal_controls_revert": {
+    "en": {"label": "Revert", "tooltip": ["Remove the selected Temporal Controls and restore their original objects' animation and connections.", "If nothing is selected, reverts every Temporal Control in the scene."]},
+    "es": {"label": "Revertir", "tooltip": ["Elimina los Controles Temporales seleccionados y restaura la animación y conexiones originales.", "Si no hay selección, revierte todos los Controles Temporales de la escena."]},
+    "fr": {"label": "Rétablir", "tooltip": ["Supprime les Contrôles temporels sélectionnés et restaure l'animation et les connexions d'origine.", "Sans sélection, rétablit tous les Contrôles temporels de la scène."]},
+    "ca": {"label": "Revertir", "tooltip": ["Elimina els Controls Temporals seleccionats i restaura l'animació i les connexions originals.", "Si no hi ha selecció, reverteix tots els Controls Temporals de l'escena."]},
+    "zh": {"label": "还原", "tooltip": ["移除所选临时控制器并恢复原始对象的动画和连接。", "未选择任何内容时，还原场景中的所有临时控制器。"]},
+    "ja": {"label": "元に戻す", "tooltip": ["選択したテンポラルコントロールを削除し、元のアニメーションと接続を復元します。", "未選択の場合はシーン内のすべてを元に戻します。"]},
+    "ko": {"label": "되돌리기", "tooltip": ["선택한 임시 컨트롤을 제거하고 원래 애니메이션과 연결을 복원합니다.", "선택 항목이 없으면 씬의 모든 임시 컨트롤을 되돌립니다."]},
+    "ar": {"label": "استعادة", "tooltip": ["أزل عناصر التحكم المؤقتة المحددة واستعد حركة كائناتها الأصلية واتصالاتها.", "عند عدم وجود تحديد، استعد كل عناصر التحكم المؤقتة في المشهد."]}
+  }
+}

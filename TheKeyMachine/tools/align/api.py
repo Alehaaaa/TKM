@@ -1,7 +1,6 @@
 from maya import cmds
 
 from TheKeyMachine.maya import animation
-from TheKeyMachine.maya import selection as maya_selection
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.ui.widgets.util as wutil
 
@@ -65,7 +64,7 @@ def _keyable_transform_attributes(pos, rot, scl):
     return attributes
 
 
-def _apply_auto_euler_filter(objects, layer_context=None):
+def _apply_auto_euler_filter(objects, target_info, layer_context=None, operation=None):
     from TheKeyMachine.tools.attribute_switcher import api as attributeSwitcherApi
 
     if not attributeSwitcherApi.is_euler_filter_enabled():
@@ -95,7 +94,12 @@ def _apply_auto_euler_filter(objects, layer_context=None):
             include_all_layers=True,
         )
     if curves:
-        cmds.filterCurve(*list(dict.fromkeys(curves)))
+        with animation.preserve_key_selection():
+            animation.apply_smart_euler_filter(
+                list(dict.fromkeys(curves)),
+                target_info,
+                operation=operation,
+            )
 
 
 def align_selected_objects(*_args, **kwargs):
@@ -103,90 +107,90 @@ def align_selected_objects(*_args, **kwargs):
     rot = kwargs.get("rot", True)
     scl = kwargs.get("scl", False)
     key_scope = kwargs.get("key_scope", "selection")
-    selection = maya_selection.get_selected_objects(ordered=True)
+    operation = toolCommon.require_tool_operation(kwargs.get("tool_operation"))
+    target_info = animation.resolve_context(
+        default_mode="current_frame", include_channels=True
+    )
+    selection = list(target_info.selection_snapshot.objects)
     if len(selection) < 2:
         return wutil.make_inViewMessage("Select at least two objects")
 
     source_objects = selection[:-1]
     target_object = selection[-1]
-    start_frame = cmds.currentTime(query=True)
+    start_frame = target_info.selection_snapshot.current_time
     modified_objects = []
     layer_context = animation.layer_cache.capture()
     key_attributes = _keyable_transform_attributes(pos, rot, scl)
-    with toolCommon.suspend_maya_refresh():
-        try:
-            frames = []
-            set_keys = False
-            if key_scope == "all":
-                frames = _collect_keyframes(
-                    [target_object],
+    try:
+        frames = []
+        set_keys = False
+        if key_scope == "all":
+            frames = _collect_keyframes(
+                [target_object],
+                attributes=key_attributes,
+                layer_context=layer_context,
+            )
+            set_keys = True
+        else:
+            time_context = target_info.time
+            if time_context.mode in ("graph_editor_keys", "time_slider_range"):
+                frames = _target_keyframes_for_context(
+                    target_object,
+                    time_context,
                     attributes=key_attributes,
                     layer_context=layer_context,
                 )
                 set_keys = True
-            else:
-                time_context = animation.resolve_context(
-                    default_mode="current_frame", include_channels=True
-                )["time_context"]
-                if time_context.mode in ("graph_editor_keys", "time_slider_range"):
-                    frames = _target_keyframes_for_context(
-                        target_object,
-                        time_context,
-                        attributes=key_attributes,
-                        layer_context=layer_context,
-                    )
-                    set_keys = True
 
-            if set_keys and not frames:
-                return wutil.make_inViewMessage(
-                    "No matching-object keys available in the selected time scope."
+        if set_keys and not frames:
+            return wutil.make_inViewMessage(
+                "No matching-object keys available in the selected time scope."
+            )
+
+        if not set_keys:
+            for source_object in source_objects:
+                cmds.matchTransform(
+                    source_object, target_object, pos=pos, rot=rot, scl=scl
                 )
+                modified_objects.append(source_object)
+            return
 
-            if not set_keys:
-                for source_object in source_objects:
-                    cmds.matchTransform(
-                        source_object, target_object, pos=pos, rot=rot, scl=scl
-                    )
+        operation.set_total(len(frames)).set_status("Aligning Objects")
+        locked_destination = False
+        for frame in operation.iterate(frames):
+            if operation.cancelled:
+                break
+            cmds.currentTime(frame)
+            for source_object in source_objects:
+                groups, blocked = layer_context.group_by_destination(
+                    source_object, key_attributes
+                )
+                locked_destination = locked_destination or bool(blocked)
+                if not groups:
+                    continue
+                cmds.matchTransform(
+                    source_object, target_object, pos=pos, rot=rot, scl=scl
+                )
+                _keyed, blocked = layer_context.set_keyframe(
+                    source_object,
+                    key_attributes,
+                    time=frame,
+                )
+                locked_destination = locked_destination or bool(blocked)
+                if source_object not in modified_objects:
                     modified_objects.append(source_object)
-                return
 
-            with toolCommon.tool_operation(
-                tool_id="align_selected_objects",
-                label="Aligning Objects",
-                progress_max=len(frames),
-                undo=True,
-            ) as operation:
-                locked_destination = False
-                for frame in operation.iterate(frames):
-                    if operation.cancelled:
-                        break
-                    cmds.currentTime(frame)
-                    for source_object in source_objects:
-                        groups, blocked = layer_context.group_by_destination(
-                            source_object, key_attributes
-                        )
-                        locked_destination = locked_destination or bool(blocked)
-                        if not groups:
-                            continue
-                        cmds.matchTransform(
-                            source_object, target_object, pos=pos, rot=rot, scl=scl
-                        )
-                        _keyed, blocked = layer_context.set_keyframe(
-                            source_object,
-                            key_attributes,
-                            time=frame,
-                        )
-                        locked_destination = locked_destination or bool(blocked)
-                        if source_object not in modified_objects:
-                            modified_objects.append(source_object)
-
-                if locked_destination:
-                    wutil.make_inViewMessage("Current animation layer is locked")
-                if rot and modified_objects:
-                    _apply_auto_euler_filter(
-                        modified_objects, layer_context=layer_context
-                    )
-        finally:
-            cmds.currentTime(start_frame)
-            if modified_objects:
-                cmds.select(modified_objects, replace=True)
+        if locked_destination:
+            wutil.make_inViewMessage("Current animation layer is locked")
+        if rot and modified_objects:
+            operation.set_status("Euler Filtering")
+            _apply_auto_euler_filter(
+                modified_objects,
+                target_info,
+                layer_context=layer_context,
+                operation=operation,
+            )
+    finally:
+        cmds.currentTime(start_frame)
+        if modified_objects:
+            cmds.select(modified_objects, replace=True)

@@ -2,6 +2,7 @@ import os
 import ssl
 import json
 import shutil
+import tempfile
 import zipfile
 import sys
 import importlib
@@ -20,7 +21,7 @@ from TheKeyMachine.ui.widgets.customDialogs import QFlatConfirmDialog, QFlatTool
 
 from TheKeyMachine.data import icons
 import TheKeyMachine.ui.widgets.util as wutil
-from TheKeyMachine.core import settings
+from TheKeyMachine.core import settings, trigger
 from TheKeyMachine.tools.update import changelog as changelog_service
 
 
@@ -166,14 +167,18 @@ def _repo_parts():
     return owner, repo, branch
 
 
-def download(downloadUrl, saveFile):
+def _download_file(download_url, save_file, operation):
+    """Transfer one update archive off the Maya thread.
+
+    UI feedback is owned by the caller's ToolOperation; ``step`` safely
+    marshals progress updates back to Maya's main thread.
+    """
     response = urllib_request.urlopen(
-        downloadUrl, context=unverified_ssl_context, timeout=60
+        download_url, context=unverified_ssl_context, timeout=60
     )
 
     if response is None:
-        cmds.warning("Error trying to install.")
-        return
+        return False
 
     try:
         total_size = _response_header(response, "Content-Length")
@@ -186,53 +191,63 @@ def download(downloadUrl, saveFile):
         progress_timer = QtCore.QElapsedTimer()
         progress_timer.start()
         progress_max = DOWNLOAD_PROGRESS_UNITS if total_size > 0 else 0
-        with toolCommon.tool_operation(
-            tool_id="download_update",
-            label="Downloading Update",
-            progress_max=progress_max,
-            progress=True,
-            interruptable=False,
-            undo=False,
-            suspend_refresh=False,
-        ) as operation:
-            with open(saveFile, "wb") as output:
-                while True:
-                    buffer = response.read(block_size)
-                    if not buffer:
-                        break
-                    downloaded += len(buffer)
-                    output.write(buffer)
+        operation.set_total(progress_max, reset=True)
+        with open(save_file, "wb") as output:
+            while not operation.cancelled:
+                buffer = response.read(block_size)
+                if not buffer:
+                    break
+                downloaded += len(buffer)
+                output.write(buffer)
 
-                    now = progress_timer.elapsed()
-                    if total_size > 0:
-                        target_units = int(
-                            (downloaded / float(total_size)) * DOWNLOAD_PROGRESS_UNITS
+                now = progress_timer.elapsed()
+                if total_size > 0:
+                    target_units = int(
+                        (downloaded / float(total_size)) * DOWNLOAD_PROGRESS_UNITS
+                    )
+                    target_units = min(
+                        DOWNLOAD_PROGRESS_UNITS, max(displayed_units, target_units)
+                    )
+                    if target_units > displayed_units and (
+                        now - last_update_ms >= DOWNLOAD_PROGRESS_UPDATE_MS
+                        or target_units >= DOWNLOAD_PROGRESS_UNITS
+                    ):
+                        operation.step(
+                            target_units - displayed_units,
+                            exact_status=_download_status(downloaded, total_size, now),
                         )
-                        target_units = min(
-                            DOWNLOAD_PROGRESS_UNITS, max(displayed_units, target_units)
-                        )
-                        if target_units > displayed_units and (
-                            now - last_update_ms >= DOWNLOAD_PROGRESS_UPDATE_MS
-                            or target_units >= DOWNLOAD_PROGRESS_UNITS
-                        ):
-                            operation.step(
-                                target_units - displayed_units,
-                                exact_status=_download_status(downloaded, total_size, now),
-                            )
-                            displayed_units = target_units
-                            last_update_ms = now
-                    elif now - last_update_ms >= DOWNLOAD_PROGRESS_UPDATE_MS:
-                        operation.step(exact_status="Downloading Update")
+                        displayed_units = target_units
                         last_update_ms = now
+                elif now - last_update_ms >= DOWNLOAD_PROGRESS_UPDATE_MS:
+                    operation.step(exact_status="Downloading Update")
+                    last_update_ms = now
 
-            if total_size > 0 and displayed_units < DOWNLOAD_PROGRESS_UNITS:
-                operation.step(DOWNLOAD_PROGRESS_UNITS - displayed_units)
+        if operation.cancelled:
+            try:
+                os.remove(save_file)
+            except OSError:
+                pass
+            return False
+        if total_size > 0 and displayed_units < DOWNLOAD_PROGRESS_UNITS:
+            operation.step(DOWNLOAD_PROGRESS_UNITS - displayed_units)
     finally:
         try:
             response.close()
         except Exception:
             pass
     return True
+
+
+def download(downloadUrl, saveFile, tool_operation=None):
+    """Download an update through the standard responsive operation path."""
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_total(DOWNLOAD_PROGRESS_UNITS).set_status("Downloading Update")
+    return operation.run_worker(
+        _download_file,
+        downloadUrl,
+        saveFile,
+        operation,
+    )
 
 
 def _repo_archive_ref():
@@ -277,7 +292,8 @@ def _repo_archive_url(ref):
     return "https://github.com/%s/%s/archive/%s.zip" % (owner, repo, ref)
 
 
-def install(command=None, file_path=None):
+def install(command=None, file_path=None, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
     # Derive the actual installation path of TKM
     toolsFolder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     scriptPath = os.path.dirname(toolsFolder)
@@ -291,12 +307,35 @@ def install(command=None, file_path=None):
             pass
 
     if file_path:
-        shutil.copy(file_path, tmpZipFile)
+        operation.set_status("Preparing Update")
+        operation.run_worker(shutil.copyfile, file_path, tmpZipFile)
     else:
-        download(_repo_archive_url(_repo_archive_ref()), tmpZipFile)
+        operation.set_status("Resolving Update")
+        archive_ref = operation.run_worker(_repo_archive_ref)
+        if not download(
+            _repo_archive_url(archive_ref),
+            tmpZipFile,
+            tool_operation=operation,
+        ):
+            return False
 
     if not os.path.isfile(tmpZipFile):
         return cmds.error("Error trying to install.")
+
+    operation.set_status("Validating Update")
+    staging_root, staged_package = operation.run_worker(
+        _stage_update_archive,
+        tmpZipFile,
+        scriptPath,
+        operation,
+    )
+    if not staged_package:
+        shutil.rmtree(staging_root, ignore_errors=True)
+        if os.path.isfile(tmpZipFile):
+            os.remove(tmpZipFile)
+        if operation.cancelled:
+            return False
+        return wutil.make_inViewMessage("Update archive is empty or invalid")
 
     try:
         from TheKeyMachine.core import runtime
@@ -305,61 +344,109 @@ def install(command=None, file_path=None):
     except Exception:
         pass
 
-    zfobj = zipfile.ZipFile(tmpZipFile)
-    fileList = zfobj.namelist()
-
-    if not fileList:
-        return cmds.error("Error trying to install.")
-
-    # Remove old tools files cautiously - only files inside TheKeyMachine
-    if os.path.isdir(toolsFolder) and os.path.basename(toolsFolder) == "TheKeyMachine":
-        for item in os.listdir(toolsFolder):
-            item_path = os.path.join(toolsFolder, item)
-            if item == "data":  # maybe skip data or not? user_data is outside
-                continue
-            if os.path.isfile(item_path):
-                try:
-                    os.remove(item_path)
-                except OSError:
-                    pass
-            elif os.path.isdir(item_path):
-                try:
-                    shutil.rmtree(item_path)
-                except OSError:
-                    pass
-
-    for name in fileList:
-        # GitHub archives look like: TKM-main/TheKeyMachine/__init__.py
-        parts = name.replace("\\", "/").split("/")
-
-        try:
-            aleha_idx = parts.index("TheKeyMachine")
-            rel_parts = parts[aleha_idx + 1 :]
-        except ValueError:
-            continue
-
-        if not rel_parts:
-            # This is the directory itself
-            continue
-
-        filename = os.path.join(toolsFolder, *rel_parts)
-        d = os.path.dirname(filename)
-
-        if not os.path.exists(d):
-            os.makedirs(d)
-
-        if name.endswith("/") or name.endswith(os.sep):
-            continue
-
-        uncompressed = zfobj.read(name)
-        with open(filename, "wb") as output:
-            output.write(uncompressed)
-
-    zfobj.close()
-    if os.path.isfile(tmpZipFile):
-        os.remove(tmpZipFile)
-
+    operation.set_status("Installing Update")
+    try:
+        operation.run_worker(
+            _commit_staged_update,
+            toolsFolder,
+            staged_package,
+        )
+    finally:
+        shutil.rmtree(staging_root, ignore_errors=True)
+        if os.path.isfile(tmpZipFile):
+            os.remove(tmpZipFile)
     return True
+
+
+def _archive_package_path(name):
+    """Return a safe path relative to the archive's TheKeyMachine folder."""
+    parts = [part for part in name.replace("\\", "/").split("/") if part]
+    try:
+        package_index = parts.index("TheKeyMachine")
+    except ValueError:
+        return None
+    relative = parts[package_index + 1 :]
+    if not relative or any(part in (".", "..") for part in relative):
+        return None
+    return relative
+
+
+def _stage_update_archive(archive_path, script_path, operation):
+    """Validate and extract an update without touching the live installation."""
+    staging_root = tempfile.mkdtemp(prefix=".tkm-update-", dir=script_path)
+    staged_package = os.path.join(staging_root, "TheKeyMachine")
+    os.makedirs(staged_package)
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            entries = [
+                (info, _archive_package_path(info.filename))
+                for info in archive.infolist()
+            ]
+            entries = [(info, relative) for info, relative in entries if relative]
+            if not entries:
+                return staging_root, None
+            operation.set_total(len(entries), reset=True).set_status("Extracting Update")
+            for info, relative in entries:
+                if operation.cancelled:
+                    return staging_root, None
+                destination = os.path.abspath(os.path.join(staged_package, *relative))
+                package_root = os.path.abspath(staged_package) + os.sep
+                if not destination.startswith(package_root):
+                    return staging_root, None
+                if info.is_dir():
+                    os.makedirs(destination, exist_ok=True)
+                else:
+                    os.makedirs(os.path.dirname(destination), exist_ok=True)
+                    with archive.open(info) as source, open(destination, "wb") as output:
+                        shutil.copyfileobj(source, output, length=1024 * 1024)
+                operation.step()
+        required = ("__init__.py", "version")
+        if not all(os.path.isfile(os.path.join(staged_package, item)) for item in required):
+            return staging_root, None
+        return staging_root, staged_package
+    except Exception:
+        shutil.rmtree(staging_root, ignore_errors=True)
+        raise
+
+
+def _copy_missing_tree(source_root, destination_root):
+    """Preserve local-only data files without replacing files from the update."""
+    if not os.path.isdir(source_root):
+        return
+    for root, directories, files in os.walk(source_root):
+        relative_root = os.path.relpath(root, source_root)
+        target_root = (
+            destination_root
+            if relative_root == "."
+            else os.path.join(destination_root, relative_root)
+        )
+        os.makedirs(target_root, exist_ok=True)
+        for directory in directories:
+            os.makedirs(os.path.join(target_root, directory), exist_ok=True)
+        for filename in files:
+            destination = os.path.join(target_root, filename)
+            if not os.path.exists(destination):
+                shutil.copy2(os.path.join(root, filename), destination)
+
+
+def _commit_staged_update(tools_folder, staged_package):
+    """Replace the validated package as one recoverable filesystem transaction."""
+    if os.path.basename(tools_folder) != "TheKeyMachine":
+        raise RuntimeError("Refusing to replace an unexpected installation path")
+    _copy_missing_tree(
+        os.path.join(tools_folder, "data"),
+        os.path.join(staged_package, "data"),
+    )
+    backup_folder = tools_folder + ".update-backup"
+    if os.path.exists(backup_folder):
+        shutil.rmtree(backup_folder)
+    os.replace(tools_folder, backup_folder)
+    try:
+        os.replace(staged_package, tools_folder)
+    except Exception:
+        os.replace(backup_folder, tools_folder)
+        raise
+    shutil.rmtree(backup_folder, ignore_errors=True)
 
 
 def _fetch_repo_file(filename):
@@ -443,194 +530,126 @@ def _update_template(latest_version, installed_version, raw_changelog):
     )
 
 
-class UpdateCheckWorker(QtCore.QThread):
-    result_ready = QtCore.Signal(bool, object)
+def _check_update_payload(installed_version, operation):
+    """Fetch update metadata on an I/O worker and report two bounded phases."""
+    operation.set_total(2, reset=True)
+    operation.set_status("Checking for Updates")
+    success, latest_version = get_latest_version()
+    operation.step()
+    if not success:
+        return False, latest_version
+    if compare_versions(latest_version, installed_version) <= 0:
+        operation.step()
+        return True, None
 
-    def __init__(self, installed_version, force=False, delay=0, parent=None):
-        QtCore.QThread.__init__(self, parent)
-        self.installed_version = installed_version
-        self.force = force
-        self.delay = delay
+    operation.set_status("Loading Changelog")
+    changelog_success, changelog = get_changelog()
+    operation.step()
+    return True, {
+        "version": latest_version,
+        "changelog": changelog if changelog_success else "",
+    }
 
-    def run(self):
-        if self.delay > 0:
-            self.msleep(self.delay)
 
-        success, latest_version = get_latest_version()
-        if not success:
-            self.result_ready.emit(False, latest_version)
-            return
-
-        comp = compare_versions(latest_version, self.installed_version)
-        if comp <= 0:
-            # We still want to let them know they are up to date instead of prompting a false update.
-            self.result_ready.emit(True, None)
-            return
-
-        changelog_success, changelog = get_changelog()
-        self.result_ready.emit(
-            True,
-            {
-                "version": latest_version,
-                "changelog": changelog if changelog_success else "",
-            },
+def _show_installed_result(latest_version):
+    reopen_error = None
+    try:
+        _reopen_after_install()
+    except Exception as error:
+        reopen_error = error
+        cmds.warning(
+            "TheKeyMachine was updated but could not reopen: {}".format(error)
         )
 
+    message = "You have successfully updated the tool!"
+    if reopen_error is not None:
+        message += (
+            "<br><br>\nThe files were updated, but TheKeyMachine could not "
+            "reopen automatically. Please restart Maya."
+        )
+    else:
+        message += "<br><br>\nPlease restart Maya if you experience any issues."
+    QFlatConfirmDialog.information(
+        None,
+        "Updated",
+        title="Installed TheKeyMachine {}".format(latest_version),
+        message=message,
+        icon=icons.success,
+        closeButton=True,
+    )
 
-updates_worker = None
-updates_result_dispatcher = None
 
-
-class UpdateResultDispatcher(QtCore.QObject):
-    result_ready = QtCore.Signal(bool, object)
-
-    def emit_result(self, success, result):
-        self.result_ready.emit(success, result)
-
-
-def shutdown_update_worker(wait_ms=1000):
-    global updates_worker, updates_result_dispatcher
-    worker = updates_worker
-    updates_worker = None
-    updates_result_dispatcher = None
-    if worker is None:
+def install_update(latest_version, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
+    if not install(tool_operation=operation):
         return
-    try:
-        if worker.isRunning():
-            worker.quit()
-            worker.wait(int(wait_ms))
-    except Exception:
-        pass
-    try:
-        worker.deleteLater()
-    except Exception:
-        pass
+    settings.set_setting("skip_updates", False)
+    QtCore.QTimer.singleShot(100, lambda: _show_installed_result(latest_version))
 
 
-def check_for_updates(anchor_widget=None, warning=True, force=False):
-    global updates_worker, updates_result_dispatcher
+def check_for_updates(anchor_widget=None, warning=True, force=False, tool_operation=None):
     from TheKeyMachine.core import application as general
 
     if not general.config.get("INTERNET_CONNECTION", True):
         return None
-    if updates_worker is not None and updates_worker.isRunning():
-        return
 
     installed_version = get_thekeymachine_version()
-
-    def cleanup_worker():
-        global updates_worker
-        worker = updates_worker
-        updates_worker = None
-        if worker is not None:
-            try:
-                worker.deleteLater()
-            except Exception:
-                pass
-
-    def handle_result(success, latest_version):
-        global updates_result_dispatcher
-        if not success:
-            if warning:
-                wutil.make_inViewMessage(
-                    latest_version
-                )  # latest_version contains error msg here
-            updates_result_dispatcher = None
-            return
-
-        if latest_version is None:
-            if warning:
-                wutil.make_inViewMessage(
-                    "<hl>" + installed_version + "</hl>\nYou are up-to-date."
-                )
-            updates_result_dispatcher = None
-            return
-
-        try:
-            changelog = ""
-            if isinstance(latest_version, dict):
-                changelog = latest_version.get("changelog") or ""
-                latest_version = latest_version.get("version")
-
-            # Update the icon
-            if anchor_widget and hasattr(anchor_widget, "setIcon"):
-                anchor_widget.setIcon(QtGui.QIcon(icons.tkm_main_update))
-
-            # If we are skipping updates and this isn't a forced check, don't do anything else
-            if not force and settings.get_setting("skip_updates", False):
-                return
-
-            latest_version = latest_version.strip()
-            template = _update_template(latest_version, installed_version, changelog)
-            if anchor_widget:
-                result = QFlatTooltipConfirm.question(
-                    anchor_widget,
-                    title="Update available",
-                    tooltip=template,
-                    icon=icons.tkm_main_update,
-                    buttons=_update_buttons(QFlatTooltipConfirm),
-                    highlight="Install",
-                )
-            else:
-                result = QFlatConfirmDialog.question(
-                    None,
-                    "Update available",
-                    title="",
-                    message="",
-                    tooltip=template,
-                    icon=icons.tkm_main_update,
-                    buttons=_update_buttons(QFlatConfirmDialog),
-                    highlight="Install",
-                )
-
-            if result and result.get("positive"):
-                if result.get("name") == "Install":
-                    if not install():
-                        return
-
-                    # Reset skip setting on successful manual install
-                    settings.set_setting("skip_updates", False)
-
-                    def _post_update():
-                        reopen_error = None
-                        try:
-                            _reopen_after_install()
-                        except Exception as error:
-                            reopen_error = error
-                            cmds.warning(
-                                "TheKeyMachine was updated but could not reopen: {}".format(error)
-                            )
-
-                        message = "You have successfully updated the tool!"
-                        if reopen_error is not None:
-                            message += (
-                                "<br><br>\nThe files were updated, but TheKeyMachine could not reopen automatically. "
-                                "Please restart Maya."
-                            )
-                        else:
-                            message += "<br><br>\nPlease restart Maya if you experience any issues."
-                        QFlatConfirmDialog.information(
-                            None,
-                            "Updated",
-                            title="Installed TheKeyMachine {}".format(latest_version),
-                            message=message,
-                            icon=icons.success,
-                            closeButton=True,
-                        )
-
-                    QtCore.QTimer.singleShot(100, _post_update)
-
-                elif result.get("name") == "Skip":
-                    settings.set_setting("skip_updates", True)
-        finally:
-            updates_result_dispatcher = None
-
-    delay = 0 if warning or force else 1000
-    updates_worker = UpdateCheckWorker(installed_version, force=force, delay=delay)
-    updates_result_dispatcher = UpdateResultDispatcher()
-    updates_result_dispatcher.result_ready.connect(handle_result)
-    updates_worker.result_ready.connect(
-        updates_result_dispatcher.emit_result, QtCore.Qt.QueuedConnection
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_total(2).set_status("Checking for Updates")
+    success, latest_version = operation.run_worker(
+        _check_update_payload,
+        installed_version,
+        operation,
     )
-    updates_worker.finished.connect(cleanup_worker)
-    updates_worker.start()
+
+    if not success:
+        if warning:
+            wutil.make_inViewMessage(latest_version)
+        return False
+    if latest_version is None:
+        if warning:
+            wutil.make_inViewMessage(
+                "<hl>" + installed_version + "</hl>\nYou are up-to-date."
+            )
+        return True
+
+    changelog = latest_version.get("changelog") or ""
+    latest_version = latest_version["version"].strip()
+    if anchor_widget and hasattr(anchor_widget, "setIcon"):
+        anchor_widget.setIcon(QtGui.QIcon(icons.tkm_main_update))
+    if not force and settings.get_setting("skip_updates", False):
+        return True
+
+    template = _update_template(latest_version, installed_version, changelog)
+    if anchor_widget:
+        result = QFlatTooltipConfirm.question(
+            anchor_widget,
+            title="Update available",
+            tooltip=template,
+            icon=icons.tkm_main_update,
+            buttons=_update_buttons(QFlatTooltipConfirm),
+            highlight="Install",
+        )
+    else:
+        result = QFlatConfirmDialog.question(
+            None,
+            "Update available",
+            title="",
+            message="",
+            tooltip=template,
+            icon=icons.tkm_main_update,
+            buttons=_update_buttons(QFlatConfirmDialog),
+            highlight="Install",
+        )
+
+    if result and result.get("positive"):
+        if result.get("name") == "Install":
+            # Let the command's check operation close before the download
+            # starts its own operation.
+            QtCore.QTimer.singleShot(
+                0,
+                lambda: trigger.execute_command("install_update", latest_version),
+            )
+        elif result.get("name") == "Skip":
+            settings.set_setting("skip_updates", True)
+    return True

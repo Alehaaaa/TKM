@@ -72,7 +72,25 @@ class TkmMenuToolObject(ToolObject):
         "toolbar_reload": {"type": "tool", "label": "Reload", "icon": "reload", "callback": api.reload_toolbar, "tooltip": TOOLTIPS["reload"]},
         "toolbar_unload": {"type": "tool", "label": "Unload", "icon": "close", "callback": api.unload_toolbar, "tooltip": TOOLTIPS["unload"]},
         "toolbar_uninstall": {"type": "tool", "label": "Uninstall", "icon": "remove", "callback": api.uninstall, "tooltip": TOOLTIPS["uninstall"]},
-        "check_for_updates": {"type": "tool", "label": "Check for Updates", "icon": "check_updates", "callback": api.check_for_updates, "available": api.updates_available, "tooltip": TOOLTIPS["updates"]},
+        "check_for_updates": {
+            "type": "tool", "label": "Check for Updates", "icon": "check_updates",
+            "callback": api.check_for_updates, "available": api.updates_available,
+            "tooltip": TOOLTIPS["updates"],
+            "operation": {
+                "undo": False,
+                "suspend_refresh": False,
+                "show_success_message": False,
+            },
+        },
+        "install_update": {
+            "type": "tool", "label": "Install Update", "icon": "check_updates",
+            "callback": api.install_update, "pinnable": False,
+            "operation": {
+                "undo": False,
+                "suspend_refresh": False,
+                "show_success_message": False,
+            },
+        },
         "main_preferences_menu": {"type": "menu", "label": "Preferences", "icon": "settings", "callback": partial(api.show_menu, "main_preferences_menu"), "tooltip": TOOLTIPS["preferences"]},
         "start_with_maya": {"type": "check", "label": "Start with Maya", "callback": api.set_start_with_maya, "get_checked": api.starts_with_maya, "set_checked": api.set_start_with_maya, "tooltip": TOOLTIPS["startup"]},
         "show_tooltips": {"type": "check", "label": "Show Tooltips", "callback": api.set_tooltips_enabled, "get_checked": api.tooltips_enabled, "set_checked": api.set_tooltips_enabled, "tooltip": TOOLTIPS["tooltips"]},

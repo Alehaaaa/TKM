@@ -69,6 +69,10 @@ def show(*_args, **kwargs):
     return widgets.show_dialog()
 
 
+def restore(path, tool_operation=None):
+    return controller.restore_recovery(path, tool_operation=tool_operation)
+
+
 def set_enabled(enabled):
     return controller.set_enabled(enabled)
 

@@ -3,7 +3,7 @@ from functools import partial
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.data import icons
-from TheKeyMachine.core import settings
+from TheKeyMachine.core import i18n, settings
 from TheKeyMachine.core import runtime
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.common import ToolbarWindowToggle
@@ -260,7 +260,7 @@ def _add_rotate_order_mode_actions(menu):
         __file__,
         "Normal Mode",
         description="Preserve world position and orientation by evaluating the scene at every keyframe.",
-        tooltip="Slower, but safe for every rig and every switchable attribute -- including animation layers, driven keys, expressions, and joints.",
+        tooltip="Slower, but safe for every rig and switchable attribute. This includes animation layers, driven keys, expressions, and joints.",
     )
     normal_action = menu.addAction(
         normal_label,
@@ -275,7 +275,7 @@ def _add_rotate_order_mode_actions(menu):
     group.addAction(normal_action)
 
     super_label, super_description, super_tooltip = i18n.localize_menu_action(
-        "rotate_order_lightning_mode",
+        "rotate_order_super_mode",
         __file__,
         "Super Mode",
         description="Skip per-frame evaluation with pure math wherever it's safe to do so.",
@@ -300,8 +300,8 @@ def build_attribute_switcher_context_menu(parent=None):
     menu = widgets.OpenMenuWidget(parent)
     menu.addAction(
         QtGui.QIcon(icons.reblock),
-        "Gimbal Fixer",
-        description="Open the Gimbal Fixer rotation-order analyzer.",
+        i18n.tr_text("Gimbal Fixer"),
+        description=i18n.tr_text("Open the Gimbal Fixer rotation-order analyzer."),
         callback=lambda *_: gimbalFixerApi.show_gimbal_fixer_window(),
     )
 

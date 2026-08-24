@@ -10,8 +10,9 @@ from maya.api import OpenMaya as om  # type: ignore
 from maya.api import OpenMayaAnim as oma  # type: ignore
 
 from TheKeyMachine.core import runtime, settings
-from TheKeyMachine.maya import maya_api
+from TheKeyMachine.maya import animation, maya_api
 from TheKeyMachine.maya import selection as maya_selection
+from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.ui.widgets import util as wutil
 
 
@@ -21,8 +22,6 @@ DRIVER_ATTR = "globalCurve"
 TAG_ATTR = "tkmGlobalCurve"
 CALLBACK_KEY = "global_curve:curve_edits"
 SCENE_CALLBACK_KEY = "global_curve:scene_changes"
-DISPLAY_ITEMS_CONNECTION = "TKM_GlobalCurveItems"
-DISPLAY_CONNECTION = "TKM_GlobalCurveDisplay"
 
 _TANGENT_MODE_SETTING = "global_curve_tangent_mode"
 _AFFECT_TIME_SETTING = "global_curve_affect_time"
@@ -104,9 +103,7 @@ def _captured_curves():
     def eligible(items):
         return [curve for curve in _unique(items) if _is_anim_curve(curve) and not _is_global_curve(curve)]
 
-    curves = eligible(maya_selection.get_graph_editor_explicitly_selected_curves())
-    if not curves:
-        curves = eligible(maya_selection.get_graph_editor_selected_curves())
+    curves = eligible(animation.current_selection_snapshot().graph_curves)
     if not curves:
         try:
             curves = eligible(cmds.animCurveEditor(
@@ -570,22 +567,6 @@ def _install_callback():
         manager.connect_signal(manager.selection_changed, _refresh_graph_display, key=SCENE_CALLBACK_KEY, unique=False)
 
 
-def _ui_exists(name):
-    try:
-        return bool(cmds.selectionConnection(name, exists=True))
-    except (RuntimeError, TypeError, ValueError, AttributeError):
-        return False
-
-
-def _delete_display_connection(name):
-    if not _ui_exists(name):
-        return
-    try:
-        cmds.deleteUI(name)
-    except (RuntimeError, TypeError, ValueError, AttributeError):
-        pass
-
-
 def _global_display_plugs():
     plugs = []
     for session in _SESSIONS:
@@ -610,42 +591,13 @@ def _update_graph_editor_connection():
     return maya_selection.refresh_graph_editor()
 
 
-def _repair_obsolete_display_connection(current=None):
-    """Recover editors left attached to a proxy used by older builds."""
-    if current is None:
-        current = _editor_main_connection()
-    try:
-        editor_exists = bool(
-            cmds.animCurveEditor(maya_selection.GRAPH_EDITOR, exists=True)
-        )
-    except (RuntimeError, TypeError, ValueError, AttributeError):
-        editor_exists = False
-    if editor_exists and (not current or current == DISPLAY_CONNECTION):
-        try:
-            cmds.animCurveEditor(
-                maya_selection.GRAPH_EDITOR,
-                edit=True,
-                forceMainConnection=maya_selection.GRAPH_EDITOR_OUTLINER,
-            )
-            _update_graph_editor_connection()
-            current = maya_selection.GRAPH_EDITOR_OUTLINER
-        except (RuntimeError, TypeError, ValueError, AttributeError):
-            return current
-
-    # Never delete a UI connection while the editor is still using it.
-    if current != DISPLAY_CONNECTION:
-        _delete_display_connection(DISPLAY_CONNECTION)
-        _delete_display_connection(DISPLAY_ITEMS_CONNECTION)
-    return current
-
-
 def _sync_display_items(*_args):
     global _DISPLAY_SOURCE_CONNECTION
     if not _SESSIONS:
         return False
 
-    current = _repair_obsolete_display_connection(_editor_main_connection())
-    if current and current != DISPLAY_CONNECTION:
+    current = _editor_main_connection()
+    if current:
         _DISPLAY_SOURCE_CONNECTION = current
     source = _DISPLAY_SOURCE_CONNECTION or maya_selection.GRAPH_EDITOR_OUTLINER
 
@@ -671,10 +623,9 @@ def _refresh_graph_display(*_args):
     if not _SESSIONS:
         return False
     current = _editor_main_connection()
-    current = _repair_obsolete_display_connection(current)
     if not current:
         return False
-    if current and current != DISPLAY_CONNECTION:
+    if current:
         _DISPLAY_SOURCE_CONNECTION = current
     if _sync_display_items():
         return True
@@ -684,11 +635,11 @@ def _refresh_graph_display(*_args):
 def _remove_graph_display():
     """Remove only Global Curve plugs, preserving the editor's native input."""
     global _DISPLAY_SOURCE_CONNECTION, _DISPLAY_TOUCHED_CONNECTIONS
-    current = _repair_obsolete_display_connection(_editor_main_connection())
+    current = _editor_main_connection()
     sources = set(_DISPLAY_TOUCHED_CONNECTIONS)
     if _DISPLAY_SOURCE_CONNECTION:
         sources.add(_DISPLAY_SOURCE_CONNECTION)
-    if current and current != DISPLAY_CONNECTION:
+    if current:
         sources.add(current)
     plugs = _global_display_plugs()
 
@@ -699,8 +650,6 @@ def _remove_graph_display():
             except (RuntimeError, TypeError, ValueError, AttributeError):
                 pass
     _update_graph_editor_connection()
-    _delete_display_connection(DISPLAY_CONNECTION)
-    _delete_display_connection(DISPLAY_ITEMS_CONNECTION)
     _DISPLAY_SOURCE_CONNECTION = None
     _DISPLAY_TOUCHED_CONNECTIONS = set()
 
@@ -1079,6 +1028,21 @@ def _on_curve_edited(*_args):
     _process_curve_edits(pending)
 
 
+def _commit_curve_edits(
+    affected_objects,
+    write_jobs,
+    affect_time,
+    tangent_mode,
+    tangent_jobs,
+):
+    with runtime.get_runtime_manager().coalesce_anim_curve_callbacks(
+        affected_objects
+    ):
+        _write_planned(write_jobs, affect_time, tangent_mode, tangent_jobs)
+        for job in tangent_jobs:
+            _restore_tangents(*job)
+
+
 def _process_curve_edits(pending):
     global _PROCESSING
     if _PROCESSING:
@@ -1114,48 +1078,34 @@ def _process_curve_edits(pending):
         # already-computed results -- nothing is read back mid-batch.
         _plan_session(session, current_guide, affect_time, snap, write_jobs)
     try:
-        cmds.refresh(suspend=True)
-    except (RuntimeError, TypeError, ValueError, AttributeError):
-        pass
-    try:
-        # One undo chunk for every curve in this batch: Maya (and anything
-        # downstream watching chunk boundaries rather than raw per-curve
-        # edits, which includes parts of the Graph Editor's own redraw
-        # logic) treats everything between open/close as a single atomic
-        # operation instead of N separate ones -- which is what "all curves
-        # at once" actually requires, on top of the writes already being
-        # planned and pushed as one uninterrupted pass.
-        cmds.undoInfo(openChunk=True)
-    except (RuntimeError, TypeError, ValueError, AttributeError):
-        pass
-    try:
-        with runtime.get_runtime_manager().coalesce_anim_curve_callbacks(
-            affected_objects
-        ):
-            # All curves move together here: one tight loop over every
-            # planned write, with nothing else interleaved between them, so
-            # Maya never has a chance to draw a half-updated in-between
-            # state the way it did when each curve was computed and written
-            # in its own turn.
-            _write_planned(write_jobs, affect_time, tangent_mode, tangent_jobs)
-            for job in tangent_jobs:
-                _restore_tangents(*job)
+        operation = toolCommon.current_tool_operation()
+        if operation is not None:
+            _commit_curve_edits(
+                affected_objects,
+                write_jobs,
+                affect_time,
+                tangent_mode,
+                tangent_jobs,
+            )
+        else:
+            with toolCommon.tool_operation(
+                tool_id="global_curve_edit",
+                label="Global Curve Edit",
+                progress=True,
+                undo=True,
+                suspend_refresh=True,
+                show_success_message=False,
+            ):
+                _commit_curve_edits(
+                    affected_objects,
+                    write_jobs,
+                    affect_time,
+                    tangent_mode,
+                    tangent_jobs,
+                )
         for session, signature, _current_guide in changed:
             session["signature"] = signature
-    except Exception:
-        pass
     finally:
-        try:
-            cmds.undoInfo(closeChunk=True)
-        except (RuntimeError, TypeError, ValueError, AttributeError):
-            pass
-        try:
-            # suspend=False alone is enough: it lets Maya's own next redraw
-            # (already due on this same event-loop tick) pick up the change,
-            # now that the whole batch has landed as one closed chunk.
-            cmds.refresh(suspend=False)
-        except (RuntimeError, TypeError, ValueError, AttributeError):
-            pass
         _PROCESSING = False
 
 

@@ -6,6 +6,7 @@ import os
 from maya import cmds
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
+from TheKeyMachine.core import trigger
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools.animation_recovery import controller
 from TheKeyMachine.ui.widgets import customDialogs
@@ -331,7 +332,7 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         if not path:
             return
         try:
-            if controller.restore_recovery(path):
+            if trigger.execute_command("animation_recovery_restore", path):
                 self.reload()
         except Exception as exc:
             from maya import cmds

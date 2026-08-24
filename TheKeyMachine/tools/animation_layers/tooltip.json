@@ -7,7 +7,7 @@
     "Use the window's own toolbar to create a layer from the current selection, create a group, merge, delete, or import/export layers."
   ],
   "smart_merge": [
-    "Smart Merge Selected -- bake the currently selected animation layers together into one, sampling only the frames where they actually have weight."
+    "Bake the selected animation layers into one. Smart Merge samples only the frames where those layers have weight."
   ],
   "export": [
     "Export the selected animation layers (and their animation) to a file."

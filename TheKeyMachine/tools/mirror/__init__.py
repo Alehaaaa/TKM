@@ -9,6 +9,7 @@ TOOLTIPS = load_tooltips(__file__)
 
 
 class MirrorToolObject(ToolObject):
+    OPERATION = {"capture_animation_context": True}
     ORDER = 390
     DOC_URL = "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/mirror"
 

@@ -1,0 +1,22 @@
+{
+  "pause_viewport": {
+    "en": {"label": "Pause Viewport", "tooltip": ["Pause viewport refresh to improve performance. Uncheck to resume normal viewport updates."]},
+    "es": {"label": "Pausar Visor", "tooltip": ["Pausa la actualización del visor para mejorar el rendimiento. Desmárcalo para reanudar las actualizaciones normales."]},
+    "fr": {"label": "Suspendre la Vue", "tooltip": ["Suspend l'actualisation de la vue pour améliorer les performances. Décochez pour reprendre les mises à jour normales."]},
+    "ca": {"label": "Pausar Visor", "tooltip": ["Pausa l'actualització del visor per millorar el rendiment. Desmarca-ho per reprendre les actualitzacions normals."]},
+    "zh": {"label": "暂停视口", "tooltip": ["暂停视口刷新以提高性能。取消选中可恢复正常刷新。"]},
+    "ja": {"label": "ビューポートを一時停止", "tooltip": ["パフォーマンス向上のためビューポート更新を停止します。チェックを外すと通常更新に戻ります。"]},
+    "ko": {"label": "뷰포트 일시 정지", "tooltip": ["성능 향상을 위해 뷰포트 새로고침을 중지합니다. 선택을 해제하면 정상 업데이트를 재개합니다."]},
+    "ar": {"label": "إيقاف منفذ العرض", "tooltip": ["أوقف تحديث منفذ العرض لتحسين الأداء. ألغِ التحديد لاستئناف التحديث العادي."]}
+  },
+  "auto_pause_viewport": {
+    "en": {"label": "Auto Pause Viewport", "tooltip": ["Automatically pause viewport refresh for performance while briefly refreshing after animation key changes."]},
+    "es": {"label": "Pausa Automática del Visor", "tooltip": ["Pausa automáticamente el visor para mejorar el rendimiento y lo actualiza brevemente tras cambios en las claves."]},
+    "fr": {"label": "Pause Automatique de la Vue", "tooltip": ["Suspend automatiquement la vue pour les performances et l'actualise brièvement après une modification de clés."]},
+    "ca": {"label": "Pausa Automàtica del Visor", "tooltip": ["Pausa automàticament el visor per millorar el rendiment i l'actualitza breument després de canvis de claus."]},
+    "zh": {"label": "自动暂停视口", "tooltip": ["自动暂停视口刷新以提高性能，并在动画关键帧更改后短暂刷新。"]},
+    "ja": {"label": "ビューポートの自動停止", "tooltip": ["パフォーマンス向上のため更新を自動停止し、アニメーションキー変更後に短時間だけ更新します。"]},
+    "ko": {"label": "뷰포트 자동 일시 정지", "tooltip": ["성능 향상을 위해 뷰포트 업데이트를 자동 중지하고 애니메이션 키 변경 후 잠시 새로고침합니다."]},
+    "ar": {"label": "إيقاف منفذ العرض تلقائيًا", "tooltip": ["أوقف تحديث منفذ العرض تلقائيًا لتحسين الأداء مع تحديث قصير بعد تغييرات مفاتيح الحركة."]}
+  }
+}

@@ -124,12 +124,16 @@ def select_all_animation_curves(*args):
     return controller.select_all_animation_curves(*args)
 
 
-def delete_keyframes_before_current_time(*args):
-    return controller.delete_keyframes_before_current_time(*args)
+def delete_keyframes_before_current_time(*args, tool_operation=None):
+    return controller.delete_keyframes_before_current_time(
+        *args, tool_operation=tool_operation
+    )
 
 
-def delete_keyframes_after_current_time(*args):
-    return controller.delete_keyframes_after_current_time(*args)
+def delete_keyframes_after_current_time(*args, tool_operation=None):
+    return controller.delete_keyframes_after_current_time(
+        *args, tool_operation=tool_operation
+    )
 
 
 def cleanup():

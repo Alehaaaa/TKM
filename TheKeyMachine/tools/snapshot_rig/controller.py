@@ -3,7 +3,7 @@
 from contextlib import nullcontext
 
 from TheKeyMachine.tools.snapshot_rig import rig_snapshot
-from TheKeyMachine.maya import selection
+from TheKeyMachine.maya import animation
 from TheKeyMachine.tools import common as toolCommon
 import TheKeyMachine.ui.widgets.util as wutil
 
@@ -29,7 +29,7 @@ def _confirmed_snapshot_kinds(kinds, groups, attrs_by_control, anchor_widget=Non
 def _snapshot_controls(
     kinds, tool_id, label, anchor_widget=None, confirm_default_pose=False,
 ):
-    selected_controls = selection.get_selected_objects(long=True)
+    selected_controls = list(animation.current_selection_snapshot().objects)
     if not selected_controls:
         return wutil.make_inViewMessage("Select at least one object")
 
@@ -97,80 +97,70 @@ def _snapshot_controls(
         total += default_total
     if "mirror" in kinds:
         total += mirror_total
-    with toolCommon.tool_operation(
-        tool_id=tool_id,
-        label=label,
-        progress=True,
-        progress_max=total,
-        undo=False,
-    ) as operation:
-        operation.start()
-        processor = operation.set_status(label)
-        probe_session = (
-            rig_snapshot.mirror_probe_session()
-            if "mirror" in kinds
-            else nullcontext()
-        )
-        with probe_session:
-            for rig_id, group in groups.items():
+    processor = toolCommon.require_tool_operation()
+    processor.set_total(total).set_status(label)
+    probe_session = (
+        rig_snapshot.mirror_probe_session()
+        if "mirror" in kinds
+        else nullcontext()
+    )
+    with probe_session:
+        for rig_id, group in groups.items():
+            if processor.cancelled:
+                break
+            opposite_entries = {}
+            default_entries = {}
+            mirror_entries = {}
+            for control in group["controls"]:
                 if processor.cancelled:
                     break
-                opposite_entries = {}
-                default_entries = {}
-                mirror_entries = {}
-                for control in group["controls"]:
+                shortname = rig_snapshot.control_key(control)
+                if "opposite" in kinds:
+                    opposite = opposites_by_control[control]
+                    opposite_entries[shortname] = (
+                        rig_snapshot.control_key(opposite) if opposite else None
+                    )
+                    processor.step()
+                if "default" in kinds:
+                    default_values = rig_snapshot.capture_default_values(
+                        control,
+                        attrs=attrs_by_control[control],
+                        processor=processor,
+                    )
                     if processor.cancelled:
                         break
-                    shortname = rig_snapshot.control_key(control)
-                    if "opposite" in kinds:
-                        opposite = opposites_by_control[control]
-                        opposite_entries[shortname] = (
-                            rig_snapshot.control_key(opposite) if opposite else None
-                        )
-                        processor.step()
-                    if "default" in kinds:
-                        default_values = rig_snapshot.capture_default_values(
-                            control,
-                            attrs=attrs_by_control[control],
-                            processor=processor,
-                        )
-                        if processor.cancelled:
-                            break
-                        default_entries[shortname] = default_values
-                if "mirror" in kinds and not processor.cancelled:
-                    for control, opposite in mirror_jobs.get(rig_id, ()):
-                        directions = rig_snapshot.capture_mirror_directions(
-                            control, attrs=attrs_by_control[control],
-                            processor=processor, opposite=opposite,
-                        )
-                        if processor.cancelled:
-                            break
-                        mirror_entries[rig_snapshot.control_key(control)] = directions
-                        if opposite:
-                            # Analyze the reverse transfer independently.  A
-                            # rig can expose different channel sensitivity or
-                            # orientation on each side; copying the first
-                            # result to both controls silently assumes perfect
-                            # symmetry and can mirror one direction wrongly.
-                            opposite_directions = rig_snapshot.capture_mirror_directions(
-                                opposite,
-                                attrs=rig_snapshot.snapshot_attrs(opposite),
-                                processor=processor,
-                                opposite=control,
-                            )
-                            if processor.cancelled:
-                                break
-                            mirror_entries[
-                                rig_snapshot.control_key(opposite)
-                            ] = opposite_directions
-                if opposite_entries:
-                    rig_snapshot.merge_control_entries(rig_id, "opposite", opposite_entries)
-                if default_entries:
-                    rig_snapshot.merge_control_entries(rig_id, "default", default_entries)
-                if mirror_entries:
-                    rig_snapshot.merge_control_entries(
-                        rig_id, "mirror", mirror_entries, replace=True,
+                    default_entries[shortname] = default_values
+            if "mirror" in kinds and not processor.cancelled:
+                for control, opposite in mirror_jobs.get(rig_id, ()):
+                    directions = rig_snapshot.capture_mirror_directions(
+                        control, attrs=attrs_by_control[control],
+                        processor=processor, opposite=opposite,
                     )
+                    if processor.cancelled:
+                        break
+                    mirror_entries[rig_snapshot.control_key(control)] = directions
+                    if opposite:
+                        # Analyze the reverse transfer independently. A rig can
+                        # expose different channel sensitivity on either side.
+                        opposite_directions = rig_snapshot.capture_mirror_directions(
+                            opposite,
+                            attrs=rig_snapshot.snapshot_attrs(opposite),
+                            processor=processor,
+                            opposite=control,
+                        )
+                        if processor.cancelled:
+                            break
+                        mirror_entries[
+                            rig_snapshot.control_key(opposite)
+                        ] = opposite_directions
+            if opposite_entries:
+                rig_snapshot.merge_control_entries(rig_id, "opposite", opposite_entries)
+            if default_entries:
+                rig_snapshot.merge_control_entries(rig_id, "default", default_entries)
+            if mirror_entries:
+                rig_snapshot.merge_control_entries(
+                    rig_id, "mirror", mirror_entries, replace=True,
+                )
 
     message = f"{label} cancelled" if processor.cancelled else f"{label} saved"
     wutil.make_inViewMessage(message)

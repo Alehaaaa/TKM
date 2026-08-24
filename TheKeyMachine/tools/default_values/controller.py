@@ -2,7 +2,6 @@ from maya import cmds
 
 from TheKeyMachine.maya import animation
 from TheKeyMachine.tools.snapshot_rig import rig_snapshot
-from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.ui.widgets import util as wutil
 
@@ -21,35 +20,38 @@ def _stored_default(node, attr):
     return fallback[0] if fallback else None
 
 
-def remove_selected():
-    selected = selection.get_selected_objects(long=True)
+def remove_selected(tool_operation=None):
+    selected = list(animation.current_selection_snapshot().objects)
     if not selected:
         return wutil.make_inViewMessage("Select at least one object")
     groups = rig_snapshot.group_controls_by_rig(selected)
     if not groups:
         return wutil.make_inViewMessage("Selected controls are not part of a recognizable rig")
 
-    operation = toolCommon.current_tool_operation()
-    if operation:
-        operation.set_total(len(selected))
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_total(len(selected))
     for rig_id, group in groups.items():
         entries = {}
         for node in group["controls"]:
-            if operation and operation.cancelled:
+            if operation.cancelled:
                 return
             entries[rig_snapshot.control_key(node)] = {}
-            if operation:
-                operation.step()
+            operation.step()
         rig_snapshot.merge_control_entries(rig_id, "default", entries)
     wutil.make_inViewMessage("Saved defaults removed for the selection")
 
 
-def clear_all():
+def clear_all(tool_operation=None):
     rig_ids = rig_snapshot.list_rig_ids()
     if not rig_ids:
         return wutil.make_inViewMessage("No saved default values found")
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_total(len(rig_ids))
     for rig_id in rig_ids:
+        if operation.cancelled:
+            return
         rig_snapshot.clear_section(rig_id, "default")
+        operation.step()
     wutil.make_inViewMessage("All saved default values cleared")
 
 
@@ -61,7 +63,7 @@ def _matches(attr, translations, rotations, scales):
             or (scales and attr in SCALE_ATTRS))
 
 
-def apply_defaults(translations=False, rotations=False, scales=False):
+def apply_defaults(translations=False, rotations=False, scales=False, tool_operation=None):
     tool_id = "default_trs" if all((translations, rotations, scales)) else (
         "default_translations" if translations else "default_rotations" if rotations else
         "default_scales" if scales else "default_object_values"
@@ -74,63 +76,64 @@ def apply_defaults(translations=False, rotations=False, scales=False):
     if not selected and not target_info.plugs:
         return wutil.make_inViewMessage("Select objects, channels, or Graph Editor keys")
 
-    with toolCommon.tool_operation(
-        tool_id=tool_id,
-        undo=True,
+    operation = toolCommon.require_tool_operation(tool_operation)
+    toolCommon.ensure_operation_tint(
+        operation,
         tint="context",
         default_mode="current_frame",
-    ) as operation:
-        if target_info.time.mode == "graph_editor_keys":
-            operation.set_total(len(target_info.selected_keys))
-            for curve, frame in target_info.selected_keys:
-                if operation.cancelled:
-                    return
-                destinations = cmds.listConnections(
-                    curve + ".output",
-                    plugs=True,
-                    source=False,
-                    destination=True,
-                ) or []
-                if not destinations or "." not in destinations[0]:
-                    operation.step()
-                    continue
-                node, attr = destinations[0].split(".", 1)
-                if not _matches(attr, translations, rotations, scales):
-                    operation.step()
-                    continue
-                value = _stored_default(node, attr)
-                if value is not None:
-                    try:
-                        cmds.keyframe(curve, edit=True, valueChange=value, time=(frame, frame))
-                    except RuntimeError:
-                        pass
-                operation.step()
-            return
-
-        operation.set_total(len(target_info.plugs))
-        for plug in target_info.plugs:
+        tint_key=tool_id,
+    )
+    if target_info.time.mode == "graph_editor_keys":
+        operation.set_total(len(target_info.selected_keys))
+        for curve, frame in target_info.selected_keys:
             if operation.cancelled:
                 return
-            if "." not in plug:
+            destinations = cmds.listConnections(
+                curve + ".output",
+                plugs=True,
+                source=False,
+                destination=True,
+            ) or []
+            if not destinations or "." not in destinations[0]:
                 operation.step()
                 continue
-            node, attr = plug.split(".", 1)
-            if not _matches(attr, translations, rotations, scales) or not cmds.getAttr(plug, settable=True):
+            node, attr = destinations[0].split(".", 1)
+            if not _matches(attr, translations, rotations, scales):
                 operation.step()
                 continue
             value = _stored_default(node, attr)
-            if value is None:
+            if value is not None:
+                try:
+                    cmds.keyframe(curve, edit=True, valueChange=value, time=(frame, frame))
+                except RuntimeError:
+                    pass
+            operation.step()
+        return
+
+    operation.set_total(len(target_info.plugs))
+    for plug in target_info.plugs:
+        if operation.cancelled:
+            return
+        if "." not in plug:
+            operation.step()
+            continue
+        node, attr = plug.split(".", 1)
+        if not _matches(attr, translations, rotations, scales) or not cmds.getAttr(plug, settable=True):
+            operation.step()
+            continue
+        value = _stored_default(node, attr)
+        if value is None:
+            operation.step()
+            continue
+        time_context = target_info.time
+        try:
+            if time_context.mode == "current_frame":
+                cmds.setAttr(plug, value)
                 operation.step()
                 continue
-            time_context = target_info.time
-            try:
-                if time_context.mode == "current_frame":
-                    cmds.setAttr(plug, value)
-                    operation.step()
-                    continue
-                frames = cmds.keyframe(plug, query=True, time=time_context.timerange) or []
-                if frames:
-                    cmds.setKeyframe(node, attribute=attr, time=frames, value=value)
-            except RuntimeError:
-                pass
-            operation.step()
+            frames = cmds.keyframe(plug, query=True, time=time_context.timerange) or []
+            if frames:
+                cmds.setKeyframe(node, attribute=attr, time=frames, value=value)
+        except RuntimeError:
+            pass
+        operation.step()

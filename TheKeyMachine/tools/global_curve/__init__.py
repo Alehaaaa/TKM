@@ -7,6 +7,7 @@ TOOLTIPS = load_tooltips(__file__)
 
 
 class GlobalCurveToolObject(ToolObject):
+    OPERATION = {"capture_animation_context": True}
     ORDER = 710
     TOOLS = {
         "global_curve": {

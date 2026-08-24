@@ -8,6 +8,7 @@ TOOLTIPS = load_tooltips(__file__)
 
 
 class CopyPasteToolObject(ToolObject):
+    OPERATION = {"capture_animation_context": True}
     ORDER = 450
     DOC_URL = "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-paste-animation"
 
@@ -15,6 +16,7 @@ class CopyPasteToolObject(ToolObject):
         "copy_pose": {
             "type": "tool", "label": "Copy Pose", "icon": "copy_pose",
             "callback": api.copy_pose, "tooltip": TOOLTIPS["copy_pose"],
+            "operation": {"undo": False},
             "menu": {
                 "label": "Copy Pose", "icon": "copy_pose",
                 "items": [
@@ -29,14 +31,22 @@ class CopyPasteToolObject(ToolObject):
         "paste_pose": {
             "type": "tool", "label": "Paste Pose", "icon": "paste_pose",
             "callback": api.paste_pose, "tooltip": TOOLTIPS["paste_pose"],
+            "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_mirror_pose": {
             "type": "tool", "label": "Paste Mirror Pose", "icon": "paste_opposite_animation",
             "callback": api.paste_mirror_pose, "tooltip": TOOLTIPS["paste_mirror_pose"],
+            "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_pose_to": {
             "type": "tool", "label": "Paste Pose To", "icon": "paste_pose",
             "callback": api.paste_pose_to, "tooltip": TOOLTIPS["paste_pose_to"],
+            "operation": {"progress": False, "undo": False},
+        },
+        "paste_pose_to_apply": {
+            "type": "tool", "label": "Paste Pose To", "icon": "paste_pose",
+            "callback": api.paste_pose_to_apply, "pinnable": False,
+            "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "export_pose_file": {
             "type": "tool", "label": "Export Pose", "icon": "export",
@@ -49,6 +59,7 @@ class CopyPasteToolObject(ToolObject):
         "copy_animation": {
             "type": "tool", "label": "Copy Animation", "icon": "copy_animation",
             "callback": api.copy_animation, "tooltip": TOOLTIPS["copy_animation"],
+            "operation": {"undo": False},
             "menu": {
                 "label": "Copy Animation", "icon": "copy_animation",
                 "items": [
@@ -66,18 +77,27 @@ class CopyPasteToolObject(ToolObject):
         "paste_animation": {
             "type": "tool", "label": "Paste Replace Animation", "icon": "paste_animation",
             "callback": api.paste_animation, "tooltip": TOOLTIPS["paste_animation"],
+            "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_insert_animation": {
             "type": "tool", "label": "Paste Insert Animation", "icon": "paste_insert_animation",
             "callback": api.paste_insert_animation, "tooltip": TOOLTIPS["paste_insert_animation"],
+            "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_opposite_animation": {
             "type": "tool", "label": "Paste Mirror Animation", "icon": "paste_opposite_animation",
             "callback": api.paste_opposite_animation, "tooltip": TOOLTIPS["paste_opposite_animation"],
+            "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "paste_animation_to": {
             "type": "tool", "label": "Paste Animation To", "icon": "paste_animation",
             "callback": api.paste_animation_to, "tooltip": TOOLTIPS["paste_animation_to"],
+            "operation": {"progress": False, "undo": False},
+        },
+        "paste_animation_to_apply": {
+            "type": "tool", "label": "Paste Animation To", "icon": "paste_animation",
+            "callback": api.paste_animation_to_apply, "pinnable": False,
+            "operation": {"rollback_on_cancel": True, "suspend_refresh": True},
         },
         "export_animation_file": {
             "type": "tool", "label": "Export Animation", "icon": "export",

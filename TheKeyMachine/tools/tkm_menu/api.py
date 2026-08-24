@@ -98,9 +98,20 @@ def uninstall(*_args):
     return general.uninstall()
 
 
-def check_for_updates(*_args):
+def check_for_updates(*_args, **kwargs):
     from TheKeyMachine.tools.update import controller as updates
-    return updates.check_for_updates(force=True)
+    return updates.check_for_updates(
+        force=True,
+        tool_operation=kwargs.pop("tool_operation", None),
+    )
+
+
+def install_update(latest_version, *_args, **kwargs):
+    from TheKeyMachine.tools.update import controller as updates
+    return updates.install_update(
+        latest_version,
+        tool_operation=kwargs.pop("tool_operation", None),
+    )
 
 
 def set_start_with_maya(enabled, *_args):

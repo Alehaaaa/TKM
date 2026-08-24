@@ -48,6 +48,8 @@ from TheKeyMachine.data.colors import COLORS
 
 
 _COMMAND_ERRORS = (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError)
+EXPORT_TYPE = "animation_layers"
+EXPORT_SCHEMA_VERSION = 1
 
 
 def _plug(layer_name, attribute):
@@ -1148,7 +1150,10 @@ def export_layers_data(layer_names):
         exported.append(_serialize_layer(node))
     if not exported:
         return None
-    return {"layers": exported}
+    return {
+        "meta": {"type": EXPORT_TYPE, "version": EXPORT_SCHEMA_VERSION},
+        "layers": exported,
+    }
 
 
 def _current_preferred_layer_name():
@@ -1165,8 +1170,9 @@ def _write_member_onto_layer(layer_name, plug, member):
     """Add *plug* to *layer_name* as a member and write its keyframe/static
     data onto it -- shared by ``_import_layer`` and ``extract_to_new_layer``.
     *member* is the ``{"keys": [...]}`` / ``{"value": ...}`` shape
-    ``_curve_keyframe_data``/export produce (a bare list of keys is also
-    accepted, for back-compat with older export files)."""
+    ``_curve_keyframe_data`` and export produce."""
+    if not isinstance(member, dict):
+        return False
     node_name = plug.split(".")[0]
     if not cmds.objExists(node_name):
         return False
@@ -1176,7 +1182,7 @@ def _write_member_onto_layer(layer_name, plug, member):
     # over-adding members the source data never actually included.
     if not anim_layers.add_plug_to_layer(layer_name, plug):
         return False
-    keys = member.get("keys") if isinstance(member, dict) else member
+    keys = member.get("keys")
     if keys:
         for key in keys:
             try:
@@ -1198,7 +1204,7 @@ def _write_member_onto_layer(layer_name, plug, member):
                     cmds.keyTangent(curve, time=(key["time"], key["time"]), inTangentType=key.get("itt", "auto"), outTangentType=key.get("ott", "auto"))
                 except _COMMAND_ERRORS:
                     pass
-    elif isinstance(member, dict) and "value" in member:
+    elif "value" in member:
         # A static override with no keys -- write it directly by making
         # this the preferred (edit-target) layer first, same targeting
         # ``select_layer()`` uses for keying.
@@ -1304,6 +1310,14 @@ def _import_layer(entry, parent=None):
 
 def import_layers_data(data):
     if not isinstance(data, dict):
+        return []
+    metadata = data.get("meta")
+    if not (
+        isinstance(metadata, dict)
+        and metadata.get("type") == EXPORT_TYPE
+        and metadata.get("version") == EXPORT_SCHEMA_VERSION
+        and isinstance(data.get("layers"), list)
+    ):
         return []
     # Writing a static-override value (above) has to make its layer
     # "preferred" to route the setAttr correctly, which otherwise silently

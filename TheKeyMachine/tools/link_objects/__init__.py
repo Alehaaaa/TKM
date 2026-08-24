@@ -19,6 +19,7 @@ class LinkObjectsToolObject(ToolObject):
             "icon": "link_relative",
             "callback": api.copy_relationship,
             "tooltip": TOOLTIPS["copy_relationship"],
+            "operation": {"undo": False},
         },
         "link_paste": {
             "type": "tool",
@@ -26,6 +27,7 @@ class LinkObjectsToolObject(ToolObject):
             "icon": "link_relative_paste",
             "callback": api.paste_relationship,
             "tooltip": TOOLTIPS["paste_relationship"],
+            "operation": {"suspend_refresh": True, "rollback_on_cancel": True},
         },
         "link_paste_range": {
             "type": "tool",
@@ -33,6 +35,7 @@ class LinkObjectsToolObject(ToolObject):
             "icon": "link_relative_paste",
             "callback": api.paste_relationship_to_range,
             "tooltip": TOOLTIPS["paste_range"],
+            "operation": {"suspend_refresh": True, "rollback_on_cancel": True},
         },
         "link_autolink": {
             "type": "check",

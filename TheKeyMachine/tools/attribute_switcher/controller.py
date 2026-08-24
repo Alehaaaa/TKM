@@ -6,7 +6,7 @@ from TheKeyMachine.core import runtime
 from TheKeyMachine.maya import runtime as maya_runtime
 from TheKeyMachine.maya import maya_api
 from TheKeyMachine.tools import registry
-from TheKeyMachine.maya import selection
+from TheKeyMachine.maya import animation, selection
 from TheKeyMachine.core import settings
 from TheKeyMachine.tools.gimbal_fixer.controller import GimbalAnalyzer
 from TheKeyMachine.tools import common as toolCommon
@@ -15,7 +15,7 @@ from TheKeyMachine.tools import common as toolCommon
 ATTRIBUTE_SWITCHER_SETTINGS_NAMESPACE = "attribute_switcher_window"
 ATTRIBUTE_SWITCHER_GEOMETRY_KEY = "attribute_switcher_geometry"
 ATTRIBUTE_SWITCHER_STAYS_ON_TOP_KEY = "attribute_switcher_stays_on_top"
-SUPER_MODE_KEY = "rotate_order_lightning_mode"
+SUPER_MODE_KEY = "rotate_order_super_mode"
 
 ROTATE_ORDER_OPTIONS = ("xyz", "yzx", "zxy", "xzy", "yxz", "zyx")
 APPLY_BATCH_SIZE = 8
@@ -580,7 +580,7 @@ class AttributeSwitcherController:
         already there; otherwise call it inline.
 
         Every helper below that's reachable from the worker thread
-        apply_switch/apply_switches dispatch onto (see run_on_worker_thread
+        apply_switch/apply_switches dispatch onto (see ToolOperation.run_worker
         in tools/common.py) must route its cmds/OpenMaya touches through
         this -- calling them directly off the main thread can crash Maya.
         ``operation.run_on_main`` already collapses to a plain inline call
@@ -597,6 +597,7 @@ class AttributeSwitcherController:
         all_frames_override=None,
         _manage_session=True,
         _prepared_frames=None,
+        tool_operation=None,
     ):
         all_frames = (
             all_frames_override
@@ -611,27 +612,11 @@ class AttributeSwitcherController:
         target_attributes = options[value]["attrs"]
         target_switch_nodes = options[value].get("switch_nodes", {})
         enum_index = options[value].get("index", value)
-        operation_manager = None
-        operation = None
+        operation = toolCommon.require_tool_operation(tool_operation)
+        if operation.selection_snapshot is None:
+            operation.selection_snapshot = animation.capture_selection_snapshot()
         temporary_keys = {}
         try:
-            # A tint isn't requested here (no timerange is known yet -- it
-            # depends on which frames actually need touching, worked out
-            # inside _apply_multiple_frames) -- but anchor_widget still
-            # matters: when this call is nested inside apply_switches'
-            # own tool_operation, tool_operation() merges into that parent
-            # instead of opening a second one, so whichever one actually
-            # owns the operation is what _apply_multiple_frames's later
-            # ensure_operation_tint() call attaches the tint to.
-            operation_manager = toolCommon.tool_operation(
-                tool_id="attribute_switcher",
-                label="Attribute Switcher",
-                progress=True,
-                undo=True,
-                anchor_widget=self.view,
-                rollback_on_cancel=True,
-            )
-            operation = operation_manager.__enter__()
             if _manage_session:
                 self.disconnect_runtime()
 
@@ -642,9 +627,9 @@ class AttributeSwitcherController:
             # Qt a chance to notice one until the loop itself pauses to
             # check. This call blocks until the worker finishes, without
             # blocking the event loop the way running it inline here
-            # would. See tools/common.py's run_on_worker_thread /
+            # would. See ToolOperation.run_worker() /
             # ToolOperation.run_on_main for the mechanics.
-            toolCommon.run_on_worker_thread(
+            operation.run_worker(
                 self._apply_switch_worker,
                 operation,
                 value,
@@ -666,11 +651,6 @@ class AttributeSwitcherController:
             if _manage_session:
                 self.connect_runtime()
                 self.view.refresh(force=True)
-            if operation_manager and operation is not None:
-                try:
-                    operation_manager.__exit__(None, None, None)
-                except Exception:
-                    pass
         if _manage_session:
             cmds.showWindow("MayaWindow")
 
@@ -688,7 +668,7 @@ class AttributeSwitcherController:
         prepared_frames,
         step_operation,
     ):
-        """Runs off the main thread -- see apply_switch's run_on_worker_thread
+        """Runs off the main thread -- see apply_switch's run_worker()
         call. Every Maya touch reachable from here (directly or through the
         helpers this calls) must go through operation.run_on_main()/
         self._on_main() rather than calling cmds/maya_api directly.
@@ -1167,18 +1147,9 @@ class AttributeSwitcherController:
         if not plans:
             return
 
-        # One tint for the whole staged operation, covering every frame any
-        # plan will actually scrub through -- passed straight to
-        # tool_operation() below so it's opened as part of entering the
-        # operation, before "Saving Positions" even starts, instead of
-        # flickering on/off once per switch as each is applied. Rotate-order
-        # plans fully handled by the pure-math Super mode path never move
-        # the playhead, so they're excluded here just like they are for a
-        # single switch. tool_operation()/ToolOperation already own the
-        # tint's lifecycle end-to-end (see _begin_operation_tint /
-        # ToolOperation teardown in tools/common.py) -- exactly what
-        # worldspace's copy/paste commands already lean on -- so there's no
-        # local tint object to track or finish by hand here.
+        # One tint covers every frame the dispatcher-owned operation will
+        # scrub through. Rotate-order plans handled entirely by the pure-math
+        # Super mode path never move the playhead, so they are excluded.
         tint_frames = [
             frame
             for plan in plans
@@ -1189,104 +1160,83 @@ class AttributeSwitcherController:
         if timerange and maya_runtime.supports_playback_selection():
             cmds.playbackOptions(sv=False)
 
-        with toolCommon.tool_operation(
-            tool_id="attribute_switcher_multi",
-            label="Switch Multiple Attributes",
-            progress=True,
-            progress_max=total_cost,
-            undo=True,
-            anchor_widget=self.view,
+        operation = toolCommon.require_tool_operation()
+        if operation.selection_snapshot is None:
+            operation.selection_snapshot = animation.capture_selection_snapshot()
+        operation.set_total(total_cost).set_status("Switch Multiple Attributes")
+        toolCommon.ensure_operation_tint(
+            operation,
             tint="range" if timerange else None,
             timerange=timerange,
             tint_key="attribute_switcher_range",
             tint_color=registry.get_tool_tint_color("attribute_switcher"),
-            rollback_on_cancel=True,
-        ) as operation:
-            self.disconnect_runtime()
-            try:
-                # Snapshot every frame-scoped request before the first scene
-                # edit. Fully fast rotate-order plans need no matrices.
-                # Besides avoiding repeated "Saving Positions" passes,
-                # this is essential when two staged switches affect the
-                # same target: each application restores the world
-                # matrix from the common pre-switch state rather than
-                # from the previous application.
-                scoped_plans = [plan for plan in plans if plan["needs_scope"]]
-                if scoped_plans:
-                    operation.set_status("Saving Positions")
-                    matrix_cache = {}
+        )
+        self.disconnect_runtime()
+        try:
+            scoped_plans = [plan for plan in plans if plan["needs_scope"]]
+            if scoped_plans:
+                operation.set_status("Saving Positions")
+                matrix_cache = {}
 
-                    def _save_all_positions():
-                        # Runs off the main thread (see run_on_worker_thread
-                        # below) so a Cancel press actually gets a chance to
-                        # register while this snapshots potentially many
-                        # frames -- _prepare_frame_scoped() itself routes every
-                        # Maya touch back through operation.run_on_main().
-                        for plan in scoped_plans:
-                            if operation.cancelled:
-                                break
-                            plan["frames"] = self._prepare_frame_scoped(
-                                plan["targets"],
-                                plan["all_frames"],
-                                matrix_cache=matrix_cache,
-                                keyframes=plan["keyframes"],
-                            )
-
-                    toolCommon.run_on_worker_thread(_save_all_positions)
-
-                if not operation.cancelled:
-                    operation.set_status("Applying Positions")
-
-                applied_targets = []
-
-                def _apply_all_plans():
-                    # Keep the whole apply phase on one worker. Calling
-                    # apply_switch() here used to create a fresh worker and
-                    # nested Qt event loop for every staged entry while the
-                    # shared operation was already active; with large target
-                    # sets Maya could stall indefinitely at "Applying
-                    # Positions". The worker implementation already accepts
-                    # prepared snapshots, so invoke it directly instead.
-                    for plan in plans:
+                def _save_all_positions():
+                    for plan in scoped_plans:
                         if operation.cancelled:
                             break
-                        temporary_keys = {}
-                        try:
-                            self._apply_switch_worker(
-                                operation,
-                                plan["value"],
-                                plan["attribute"],
-                                plan["targets"],
-                                plan["target_attributes"],
-                                plan["target_switch_nodes"],
-                                plan["enum_index"],
-                                plan["all_frames"],
-                                temporary_keys,
-                                plan["frames"],
-                                True,
-                            )
-                        finally:
-                            self._on_main(
-                                operation,
-                                self._remove_temporary_keys,
-                                temporary_keys,
-                            )
-                        if not operation.cancelled:
-                            applied_targets.extend(plan["targets"])
+                        plan["frames"] = self._prepare_frame_scoped(
+                            plan["targets"],
+                            plan["all_frames"],
+                            matrix_cache=matrix_cache,
+                            keyframes=plan["keyframes"],
+                        )
 
-                if not operation.cancelled:
-                    toolCommon.run_on_worker_thread(_apply_all_plans)
+                operation.run_worker(_save_all_positions)
 
-                if (
-                    not operation.cancelled
-                    and self.view.euler_filter
-                    and applied_targets
-                ):
-                    operation.set_status("Euler Filtering")
-                    self.apply_euler_filter(list(dict.fromkeys(applied_targets)))
-            finally:
-                self.connect_runtime()
-                self.view.refresh(force=True)
+            if not operation.cancelled:
+                operation.set_status("Applying Positions")
+
+            applied_targets = []
+
+            def _apply_all_plans():
+                for plan in plans:
+                    if operation.cancelled:
+                        break
+                    temporary_keys = {}
+                    try:
+                        self._apply_switch_worker(
+                            operation,
+                            plan["value"],
+                            plan["attribute"],
+                            plan["targets"],
+                            plan["target_attributes"],
+                            plan["target_switch_nodes"],
+                            plan["enum_index"],
+                            plan["all_frames"],
+                            temporary_keys,
+                            plan["frames"],
+                            True,
+                        )
+                    finally:
+                        self._on_main(
+                            operation,
+                            self._remove_temporary_keys,
+                            temporary_keys,
+                        )
+                    if not operation.cancelled:
+                        applied_targets.extend(plan["targets"])
+
+            if not operation.cancelled:
+                operation.run_worker(_apply_all_plans)
+
+            if (
+                not operation.cancelled
+                and self.view.euler_filter
+                and applied_targets
+            ):
+                operation.set_status("Euler Filtering")
+                self.apply_euler_filter(list(dict.fromkeys(applied_targets)))
+        finally:
+            self.connect_runtime()
+            self.view.refresh(force=True)
         cmds.showWindow("MayaWindow")
 
     @staticmethod
@@ -1750,6 +1700,12 @@ class AttributeSwitcherController:
 
     @staticmethod
     def apply_euler_filter(targets):
+        operation = toolCommon.current_tool_operation()
+        target_info = animation.resolve_context(
+            default_mode="all_animation",
+            include_channels=True,
+            include_shapes=False,
+        )
         curves = []
         for target in targets:
             plugs = [
@@ -1763,6 +1719,11 @@ class AttributeSwitcherController:
                     include_all_layers=True,
                 )
             )
-        curves = list(set(curves))
+        curves = list(dict.fromkeys(curves))
         if curves:
-            cmds.filterCurve(*curves)
+            with animation.preserve_key_selection():
+                animation.apply_smart_euler_filter(
+                    curves,
+                    target_info,
+                    operation=operation,
+                )

@@ -1,5 +1,6 @@
 """Checkable toggle to pause the Maya viewport refresh for performance."""
 
+from TheKeyMachine.core import i18n
 from TheKeyMachine.maya import viewport as maya_viewport
 from TheKeyMachine.tools.background_runners import api as background_runner_api
 from TheKeyMachine.tools.background_runners import service as background_runner_service
@@ -39,11 +40,11 @@ def build_pause_viewport_context_menu(menu, source_widget=None):
 
     action = menu.addAction(
         QtGui.QIcon(icons.auto_pause_viewport),
-        "Auto Pause Viewport",
+        i18n.tr_text("Auto Pause Viewport"),
         callback=set_auto_pause_enabled,
         command_id="auto_pause_viewport",
-        description="Automatically pause viewport refresh and briefly refresh after animation key changes.",
-        tooltip="Automatically pause viewport refresh and briefly refresh after animation key changes.",
+        description=i18n.tr_text("Automatically pause viewport refresh and briefly refresh after animation key changes."),
+        tooltip=i18n.tr_text("Automatically pause viewport refresh and briefly refresh after animation key changes."),
         open=True,
     )
     toolCommon.connect_checkable_action(

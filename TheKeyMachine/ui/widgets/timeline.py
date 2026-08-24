@@ -438,7 +438,7 @@ def _select_range_via_playback_double_click(start_frame, end_frame):
 
 @contextmanager
 def suspend_time_slider_updates():
-    """Prevent intermediate time-slider redraws and restore its prior state."""
+    """Pause Time Slider painting without hiding or relaying out the control."""
     global _TIME_SLIDER_UPDATE_DEPTH
     if _TIME_SLIDER_UPDATE_DEPTH:
         _TIME_SLIDER_UPDATE_DEPTH += 1
@@ -449,28 +449,19 @@ def suspend_time_slider_updates():
         return
 
     _TIME_SLIDER_UPDATE_DEPTH = 1
-    slider_name = None
-    was_managed = True
-    manage_changed = False
-    refresh_suspended = False
+    slider = TimelineTint.get_timeline_widget()
+    updates_were_enabled = True
     try:
-        slider_name = selection.get_playback_slider()
-        cmds.refresh(suspend=True)
-        refresh_suspended = True
-        queried_state = cmds.timeControl(slider_name, query=True, manage=True)
-        if queried_state is not None:
-            was_managed = bool(queried_state)
-        cmds.timeControl(slider_name, edit=True, manage=False)
-        manage_changed = True
+        if slider is not None and wutil.is_valid_widget(slider):
+            updates_were_enabled = slider.updatesEnabled()
+            slider.setUpdatesEnabled(False)
         yield
     finally:
-        try:
-            if manage_changed and slider_name:
-                cmds.timeControl(slider_name, edit=True, manage=was_managed)
-        finally:
-            if refresh_suspended:
-                cmds.refresh(suspend=False)
-            _TIME_SLIDER_UPDATE_DEPTH = 0
+        if slider is not None and wutil.is_valid_widget(slider):
+            slider.setUpdatesEnabled(updates_were_enabled)
+            if updates_were_enabled:
+                slider.update()
+        _TIME_SLIDER_UPDATE_DEPTH = 0
 
 
 def _restore_current_frame(current_frame, playback_start):

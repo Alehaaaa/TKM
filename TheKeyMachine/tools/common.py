@@ -1,3 +1,4 @@
+from collections import deque
 from contextlib import contextmanager
 from functools import lru_cache
 import inspect
@@ -14,7 +15,7 @@ from TheKeyMachine.core.Qt import QtCore, QtGui  # type: ignore
 from TheKeyMachine.data import icons
 from TheKeyMachine.maya import animation
 from TheKeyMachine.ui.widgets import util as wutil
-from TheKeyMachine.core import settings
+from TheKeyMachine.core import i18n, settings
 
 
 # Set TKM_DEBUG_TIMING=true in TheKeyMachine/.env (or the process
@@ -64,7 +65,8 @@ FLOATING_TOOL_ANCHOR_GAP = wutil.DPI(12)
 _ACTIVE_PROGRESS_STACK = []
 _TOOL_DURATION_ESTIMATES = {}
 _REFRESH_SUSPEND_DEPTH = 0
-_REFRESH_WAS_SUSPENDED = False
+_DEFERRED_TOOL_CALLBACKS = deque()
+_DEFERRED_TOOL_CALLBACK_DRAIN_SCHEDULED = False
 
 
 def finish_active_progress():
@@ -203,7 +205,7 @@ class _ProgressCancelFilter(QtCore.QObject):
 
     Maya's native progress bar exposes a Cancel button, but Esc does not
     reliably flip ``isCancelled`` for tool-owned operations. Installing this
-    while a progress session is alive gives threaded tools a cheap, shared
+    while a progress session is alive gives worker-coordinated tools a shared
     cancellation source that their existing ``operation.cancelled`` checks
     can see.
     """
@@ -299,6 +301,7 @@ class AdaptiveProgress(object):
         return self
 
     def set_status(self, status, exact=False):
+        status = i18n.tr_text(status)
         if status:
             if exact:
                 self._exact_status_text = status
@@ -523,28 +526,23 @@ class AdaptiveProgress(object):
 
 
 def _acquire_refresh_suspension():
-    """Suspend Maya refresh without disturbing suspension owned elsewhere."""
-    global _REFRESH_SUSPEND_DEPTH, _REFRESH_WAS_SUSPENDED
+    """Acquire the process-wide TKM refresh suspension."""
+    global _REFRESH_SUSPEND_DEPTH
     if _REFRESH_SUSPEND_DEPTH == 0:
         try:
-            _REFRESH_WAS_SUSPENDED = bool(cmds.refresh(query=True, suspend=True))
+            cmds.refresh(suspend=True)
         except Exception:
-            _REFRESH_WAS_SUSPENDED = False
-        if not _REFRESH_WAS_SUSPENDED:
-            try:
-                cmds.refresh(suspend=True)
-            except Exception:
-                return False
+            return False
     _REFRESH_SUSPEND_DEPTH += 1
     return True
 
 
 def _release_refresh_suspension(acquired):
-    global _REFRESH_SUSPEND_DEPTH, _REFRESH_WAS_SUSPENDED
+    global _REFRESH_SUSPEND_DEPTH
     if not acquired:
         return
     _REFRESH_SUSPEND_DEPTH = max(0, _REFRESH_SUSPEND_DEPTH - 1)
-    if _REFRESH_SUSPEND_DEPTH or _REFRESH_WAS_SUSPENDED:
+    if _REFRESH_SUSPEND_DEPTH:
         return
     try:
         cmds.refresh(suspend=False)
@@ -552,17 +550,7 @@ def _release_refresh_suspension(acquired):
         pass
 
 
-@contextmanager
-def suspend_maya_refresh(enabled=True):
-    """Nest-safe context for temporarily suspending Maya viewport refresh."""
-    acquired = _acquire_refresh_suspension() if enabled else False
-    try:
-        yield acquired
-    finally:
-        _release_refresh_suspension(acquired)
-
-
-# --- threaded tool operations -------------------------------------------------
+# --- worker-coordinated tool operations --------------------------------------
 #
 # A synchronous tool that loops over Maya cmds calls on the main thread never
 # gives Qt a chance to dispatch a queued Cancel click on the progress bar
@@ -574,12 +562,11 @@ def suspend_maya_refresh(enabled=True):
 # batches.
 #
 # Maya's cmds/OpenMaya API is not safe to call from a non-main thread, so a
-# threaded callback can't just keep calling cmds directly -- every actual
+# worker coordinator can't just keep calling cmds directly -- every actual
 # scene edit has to hop back onto the main thread via
-# ToolOperation.run_on_main(). This is opt-in per tool (see
-# core/trigger.py's OperationPolicy.threaded): a callback that hasn't been
-# routed through run_on_main() must not be marked
-# threaded, or it will call cmds off the main thread and can crash Maya.
+# ToolOperation.run_on_main(). Whole callbacks are never moved to a worker:
+# they resolve context and may call Maya directly. Only an explicit bounded
+# coordinator entered through ToolOperation.run_worker() runs off-thread.
 
 _MAIN_THREAD_MARSHAL = None
 
@@ -614,8 +601,7 @@ class _MainThreadMarshal(QtCore.QObject):
 
     def call(self, fn, *args, **kwargs):
         if QtCore.QThread.currentThread() is self.thread():
-            # Already on the main thread (e.g. a threaded=True tool whose
-            # callback also has a non-threaded code path) -- run inline,
+            # Already on the main thread -- run inline,
             # no round trip, no risk of deadlocking on our own event loop.
             return fn(*args, **kwargs)
 
@@ -656,7 +642,7 @@ class _ToolWorkerThread(QtCore.QThread):
         self.succeeded.emit(result)
 
 
-def run_on_worker_thread(fn, *args, **kwargs):
+def _run_worker_thread(fn, *args, **kwargs):
     """Run ``fn`` on a worker thread; block the caller without blocking Qt.
 
     From the caller's point of view this behaves like calling ``fn``
@@ -698,7 +684,16 @@ def run_on_worker_thread(fn, *args, **kwargs):
 
 # Tool progress stays invisible for quick actions and only opens once an
 # operation has run long enough for progress and ETA feedback to be useful.
-PROGRESS_SHOW_DELAY_MS = 150
+# Every actionable command participates in timing, but fast work should remain
+# visually silent. Once this threshold is crossed AdaptiveProgress opens the
+# shared status bar and uses either the command's declared work total or its
+# learned duration to show an ETA.
+PROGRESS_SHOW_DELAY_MS = 500
+# Starting a thread and marshalling back to Maya costs more than it saves for
+# tiny coordinators. Controllers may provide a work count; below this shared
+# cutoff the exact same coordinator runs inline. I/O and unknown workloads
+# omit the hint and remain threaded.
+WORKER_MIN_WORK_ITEMS = 8
 
 
 # Shared "is this taking too long" heuristic. Long operations use threading
@@ -748,7 +743,27 @@ class SlowOperationGuard(object):
 
 
 class ToolOperation(object):
-    def __init__(self, tool_id=None, label=None, progress=None, tint_session=None, anchor_widget=None):
+    """Runtime state for one user intention.
+
+    The dispatcher owns this object. Controllers may add runtime details such
+    as a discovered work total or affected range, but they never create a
+    second operation for the same invocation.
+    """
+
+    def __init__(
+        self,
+        tool_id=None,
+        label=None,
+        progress=None,
+        tint_session=None,
+        anchor_widget=None,
+        selection_snapshot=None,
+        rollback_on_cancel=False,
+        show_success_message=True,
+        tint_mode=None,
+        tint_key=None,
+        tint_color=None,
+    ):
         self.tool_id = tool_id
         self.label = label or humanize_tool_name(tool_id) or "Processing"
         self.progress = progress
@@ -760,10 +775,50 @@ class ToolOperation(object):
         self.success_message = None
         self.refresh_suspended = False
         self.preserved_time_selection = None
+        self.selection_snapshot = selection_snapshot
+        self.rollback_on_cancel = bool(rollback_on_cancel)
+        self.show_success_message = bool(show_success_message)
+        self.undo_length_before = None
+        self.tint_mode = tint_mode
+        self.tint_key = tint_key or tool_id
+        self.tint_color = tint_color
+        self._worker_wait_depth = 0
+
+    def succeed(self, message=None, timerange=None):
+        """Mark this invocation successful and optionally record its range."""
+        self.success = True
+        if message:
+            self.success_message = message
+        if timerange:
+            self.timerange = timerange
+        return self
+
+    def ensure_undo(self, undo_name=None):
+        """Open this invocation's single undo chunk if it does not own one."""
+        if self.rollback_on_cancel and self.undo_length_before is None:
+            try:
+                self.undo_length_before = cmds.undoInfo(query=True, length=True)
+            except Exception:
+                self.undo_length_before = None
+        if self.undo_chunk_opened or _current_undo_operation(exclude=self):
+            return self
+        self.undo_chunk_opened = bool(open_undo_chunk(
+            undo_name or make_undo_chunk_name(
+                tool_id=self.tool_id,
+                title=self.label,
+            )
+        ))
+        return self
+
+    def ensure_refresh_suspended(self):
+        """Acquire the shared refresh suspension once for this invocation."""
+        if not self.refresh_suspended:
+            self.refresh_suspended = _acquire_refresh_suspension()
+        return self
 
     @property
     def cancelled(self):
-        # A plain bool read -- safe from a threaded operation's worker
+        # A plain bool read -- safe from an operation's worker coordinator
         # thread without marshaling. It's kept current by AdaptiveProgress's
         # own main-thread timer/step polling regardless of which thread
         # this property is read from.
@@ -773,14 +828,87 @@ class ToolOperation(object):
     def run_on_main(self, fn, *args, **kwargs):
         """Run ``fn`` on the main thread and return its result.
 
-        A threaded tool's callback (see core/trigger.py's
-        OperationPolicy.threaded / common.run_on_worker_thread) must route
-        every Maya cmds/OpenMaya call through this -- Maya's API is not
+        A worker coordinator entered through ToolOperation.run_worker() must
+        route every Maya cmds/OpenMaya call through this -- Maya's API is not
         safe to call directly from the worker thread the callback runs on.
         Safe and cheap to call unconditionally: when already on the main
         thread it just calls ``fn`` inline, no round trip.
         """
         return _get_main_thread_marshal().call(fn, *args, **kwargs)
+
+    def run_worker(self, fn, *args, **kwargs):
+        """Run a coordinator using the shared adaptive worker strategy.
+
+        ``work_items`` is an operation hint consumed here, not forwarded to
+        ``fn``. Known-small scene coordinators run inline to avoid QThread and
+        signal round trips. Unknown workloads and I/O remain threaded.
+        """
+        work_items = kwargs.pop("work_items", None)
+        if work_items is not None:
+            try:
+                if int(work_items) < WORKER_MIN_WORK_ITEMS:
+                    return fn(*args, **kwargs)
+            except (TypeError, ValueError):
+                pass
+        self._worker_wait_depth += 1
+        try:
+            return _run_worker_thread(fn, *args, **kwargs)
+        finally:
+            self._worker_wait_depth = max(0, self._worker_wait_depth - 1)
+
+    @property
+    def accepts_deferred_commands(self):
+        """Whether Qt can currently deliver another user command."""
+        return self._worker_wait_depth > 0
+
+    def process(
+        self,
+        items,
+        edit_batch,
+        batch_size=100,
+        status=None,
+        reset_progress=False,
+        strategy="main",
+        advance_progress=True,
+        manage_progress=True,
+    ):
+        """Process items through one adaptive, cancellable Maya edit path.
+
+        The tool supplies domain data and one main-thread ``edit_batch``
+        function. This method owns materialization, workload sizing, chunking,
+        worker selection, main-thread marshalling, cancellation, and progress.
+        Batch results are returned in execution order.
+        """
+        items = tuple(items or ())
+        if not items:
+            return []
+        try:
+            batch_size = max(1, int(batch_size))
+        except (TypeError, ValueError):
+            batch_size = 100
+
+        if manage_progress:
+            self.set_total(len(items), reset=reset_progress)
+            if status:
+                self.set_status(status)
+
+        results = []
+
+        def _coordinator():
+            for start in range(0, len(items), batch_size):
+                if self.cancelled:
+                    break
+                batch = items[start : start + batch_size]
+                results.append(self.run_on_main(edit_batch, batch))
+                if advance_progress:
+                    self.step(len(batch))
+            return results
+
+        if strategy == "main":
+            return _coordinator()
+        if strategy == "worker":
+            return self.run_worker(_coordinator, work_items=len(items))
+        raise ValueError("Unknown operation processing strategy: {}".format(strategy))
 
     def step(self, amount=1, status=None, exact_status=None):
         if not self.progress:
@@ -812,7 +940,7 @@ class ToolOperation(object):
         Implemented here (rather than delegating to
         ``AdaptiveProgress.iterate()``) so every step goes through
         ``run_on_main``/``cancelled`` above and stays safe to drive from a
-        threaded operation's worker thread, not just the main thread.
+        operation's worker coordinator, not just the main thread.
         """
         if not self.progress:
             for item in iterable:
@@ -841,6 +969,83 @@ def current_tool_operation():
     if not _TOOL_OPERATION_STACK:
         return None
     return _TOOL_OPERATION_STACK[-1]
+
+
+def require_tool_operation(operation=None):
+    """Return the dispatcher-owned operation or reject an unscoped command.
+
+    Mutating tool callbacks must enter through ``core.trigger`` so timing,
+    cancellation, undo, selection context, and feedback all share one owner.
+    Controllers accept an injected operation for explicit call paths and fall
+    back to the active stack for nested controller helpers.
+    """
+    operation = operation or current_tool_operation()
+    if operation is None:
+        raise RuntimeError("Tool commands must execute through core.trigger")
+    return operation
+
+
+def defer_tool_callback(callback, *args, **kwargs):
+    """Queue a re-entrant UI command until the active operation is closed.
+
+    Worker-backed operations keep Maya's Qt event loop responsive. That also
+    means a second toolbar click can arrive while the first command still owns
+    its undo/progress lifecycle. Preserve the click as a separate invocation;
+    never merge it into the active operation or open a nested lifecycle.
+    """
+    if not callable(callback):
+        return None
+    queue_group = kwargs.pop("_tkm_queue_group", None)
+    queue_delta = int(kwargs.pop("_tkm_queue_delta", 0) or 0)
+    queue_argument = kwargs.pop("_tkm_queue_argument", None)
+    if queue_group and queue_delta and queue_argument:
+        if (
+            _DEFERRED_TOOL_CALLBACKS
+            and _DEFERRED_TOOL_CALLBACKS[-1]["group"] == queue_group
+        ):
+            queued = _DEFERRED_TOOL_CALLBACKS[-1]
+            queued["delta"] += queue_delta
+            if queued["delta"]:
+                queued["kwargs"][queue_argument] = queued["delta"]
+            else:
+                _DEFERRED_TOOL_CALLBACKS.pop()
+            return None
+        kwargs[queue_argument] = queue_delta
+
+    _DEFERRED_TOOL_CALLBACKS.append({
+        "callback": callback,
+        "args": args,
+        "kwargs": kwargs,
+        "group": queue_group,
+        "delta": queue_delta,
+    })
+    return None
+
+
+def _schedule_deferred_tool_callback():
+    global _DEFERRED_TOOL_CALLBACK_DRAIN_SCHEDULED
+    if (
+        _TOOL_OPERATION_STACK
+        or not _DEFERRED_TOOL_CALLBACKS
+        or _DEFERRED_TOOL_CALLBACK_DRAIN_SCHEDULED
+    ):
+        return
+    _DEFERRED_TOOL_CALLBACK_DRAIN_SCHEDULED = True
+    QtCore.QTimer.singleShot(0, _run_deferred_tool_callback)
+
+
+def _run_deferred_tool_callback():
+    global _DEFERRED_TOOL_CALLBACK_DRAIN_SCHEDULED
+    _DEFERRED_TOOL_CALLBACK_DRAIN_SCHEDULED = False
+    if _TOOL_OPERATION_STACK or not _DEFERRED_TOOL_CALLBACKS:
+        return
+    queued = _DEFERRED_TOOL_CALLBACKS.popleft()
+    try:
+        queued["callback"](*queued["args"], **queued["kwargs"])
+    except Exception:
+        print(traceback.format_exc())
+    finally:
+        _schedule_deferred_tool_callback()
 
 
 def _current_undo_operation(exclude=None):
@@ -887,10 +1092,20 @@ def ensure_operation_tint(operation, tint=None, timerange=None, default_mode="cu
     without duplicating ``tool_operation()``'s own tint-begin logic -- both
     paths route through the same ``_begin_operation_tint()``.
     """
-    if operation is None or operation.tint_session:
+    if operation is None:
         return
+    if tint:
+        operation.tint_mode = tint
+    if tint_key:
+        operation.tint_key = tint_key
+    if tint_color is not None:
+        operation.tint_color = tint_color
+    else:
+        tint_color = operation.tint_color
     if timerange:
         operation.timerange = timerange
+    if operation.tint_session:
+        return
     operation.tint_session = _begin_operation_tint(
         tint=tint,
         timerange=timerange,
@@ -920,32 +1135,26 @@ def tool_operation(
     suspend_refresh=True,
     preserve_time_selection=False,
     rollback_on_cancel=False,
+    selection_snapshot=None,
 ):
     _t_start = time.perf_counter() if _DEBUG_TIMING else None
 
     # tool_operation() only ever starts from the main thread (a UI action,
-    # hotkey, or shelf click) -- never from a threaded operation's own
-    # worker thread. Touching the marshal singleton here, this early,
+    # hotkey, or shelf click) -- never from a worker coordinator. Touching
+    # the marshal singleton here, this early,
     # guarantees it's constructed (and therefore thread-affined) on the
-    # main thread before a threaded=True operation could spawn a worker
+    # main thread before an operation could spawn a worker coordinator
     # that needs it.
     _get_main_thread_marshal()
 
-    # Several tools nest a second tool_operation() call inside their own
-    # callback as a helper (the "merge into parent" branch just below) --
-    # that's fine on the main thread, but unlike operation.step()/set_total()
-    # etc., tool_operation() itself (tint, undo chunk, refresh suspension)
-    # is not marshaled, so entering it from a threaded=True tool's worker
-    # thread would call Maya/Qt directly off the main thread. Fail loudly
-    # here instead of letting that corrupt Maya state or crash unpredictably
-    # later -- a threaded callback that needs a nested tool_operation() has
-    # to call it via operation.run_on_main() instead.
+    # Operation lifecycles are created only at UI/dispatch boundaries on the
+    # main thread. Worker coordinators reuse the injected operation.
     _app = QtCore.QCoreApplication.instance()
     if _app is not None and QtCore.QThread.currentThread() is not _app.thread():
         raise RuntimeError(
             "tool_operation() was entered from a non-main thread. A "
-            "threaded=True tool's callback must not call tool_operation() "
-            "(directly or via a helper) from its worker thread -- route "
+            "worker coordinator must not call tool_operation() (directly "
+            "or via a helper) -- route "
             "Maya/Qt work through operation.run_on_main() instead."
         )
 
@@ -968,42 +1177,11 @@ def tool_operation(
         except Exception:
             preserved_time_selection = None
 
-    parent_operation = current_tool_operation()
-    if parent_operation is not None:
-        # core/trigger.py's dispatcher already opened the one real operation
-        # for this user action (tool_id = the registered command name)
-        # before calling the callback. Every command implementation that
-        # opens tool_operation() again while that's live -- directly, or via
-        # a per-module helper like _run_key_command / _copy_paste_operation /
-        # tangents/api.py's _run() -- is re-wrapping itself, not composing a
-        # genuinely separate tool (audited: no dispatched command invokes a
-        # *different* registered command synchronously as a sub-step). Merge
-        # into the live operation instead of nesting a second one, so every
-        # command gets exactly one ToolOperation, one undo chunk, one tint
-        # session, and one TKM_DEBUG_TIMING line per click -- regardless of
-        # how many internal helpers it routes through.
-        if label:
-            parent_operation.set_status(label)
-        if progress_max and parent_operation.progress:
-            parent_operation.progress.set_total(progress_max, reset=True)
-        if timerange:
-            parent_operation.timerange = timerange
-        if (
-            preserve_time_selection
-            and preserved_time_selection
-            and not parent_operation.preserved_time_selection
-        ):
-            parent_operation.preserved_time_selection = preserved_time_selection
-        ensure_operation_tint(
-            parent_operation,
-            tint=tint,
-            timerange=timerange,
-            default_mode=default_mode,
-            tint_key=tint_key or tool_id,
-            tint_color=tint_color,
+    if current_tool_operation() is not None:
+        raise RuntimeError(
+            "Nested tool_operation() lifecycles are not supported; reuse "
+            "current_tool_operation() or require_tool_operation()"
         )
-        yield parent_operation
-        return
 
     progress_obj = None
     owns_progress = False
@@ -1035,34 +1213,26 @@ def tool_operation(
         progress=progress_obj,
         tint_session=tint_session,
         anchor_widget=anchor_widget,
+        selection_snapshot=selection_snapshot,
+        rollback_on_cancel=rollback_on_cancel,
+        show_success_message=show_success_message,
+        tint_mode=tint,
+        tint_key=tint_key,
+        tint_color=tint_color,
     )
     operation.preserved_time_selection = preserved_time_selection
     if timerange:
         operation.timerange = timerange
-    chunk_opened = False
     _TOOL_OPERATION_STACK.append(operation)
 
-    refresh_suspended = False
     operation_completed = False
     if suspend_refresh:
-        refresh_suspended = _acquire_refresh_suspension()
-        operation.refresh_suspended = refresh_suspended
+        operation.ensure_refresh_suspended()
     _t_refresh = time.perf_counter() if _DEBUG_TIMING else None
 
-    undo_length_before = None
     try:
         if undo:
-            existing_undo_operation = _current_undo_operation(exclude=operation)
-            if existing_undo_operation is None:
-                if rollback_on_cancel:
-                    try:
-                        undo_length_before = cmds.undoInfo(query=True, length=True)
-                    except Exception:
-                        undo_length_before = None
-                chunk_opened = open_undo_chunk(
-                    undo_name or make_undo_chunk_name(tool_id=tool_id, title=label)
-                )
-                operation.undo_chunk_opened = bool(chunk_opened)
+            operation.ensure_undo(undo_name=undo_name)
         _t_undo = time.perf_counter() if _DEBUG_TIMING else None
         with progress_obj if owns_progress else _null_context():
             if progress_obj:
@@ -1084,18 +1254,22 @@ def tool_operation(
         operation_completed = True
             
         if operation.success:
-            if tint == "range" and operation.timerange and not operation.tint_session:
+            if (
+                operation.tint_mode == "range"
+                and operation.timerange
+                and not operation.tint_session
+            ):
                 from TheKeyMachine.ui.widgets import timeline as timeline_widgets
                 try:
                     operation.tint_session = timeline_widgets.begin_timeline_tint(
                         timerange=operation.timerange,
-                        color=tint_color,
-                        owner=anchor_widget,
-                        key=tint_key or tool_id,
+                        color=operation.tint_color,
+                        owner=operation.anchor_widget,
+                        key=operation.tint_key,
                     )
                 except Exception:
                     pass
-            if show_success_message:
+            if operation.show_success_message:
                 try:
                     wutil.make_inViewMessage(operation.success_message or label or "Operation Successful")
                 except Exception:
@@ -1121,13 +1295,13 @@ def tool_operation(
                 operation.tint_session.finish()
             except Exception:
                 pass
-        _release_refresh_suspension(refresh_suspended)
-        close_undo_chunk(chunk_opened)
+        _release_refresh_suspension(operation.refresh_suspended)
+        close_undo_chunk(operation.undo_chunk_opened)
         if (
-            chunk_opened
-            and rollback_on_cancel
+            operation.undo_chunk_opened
+            and operation.rollback_on_cancel
             and operation.cancelled
-            and undo_length_before is not None
+            and operation.undo_length_before is not None
         ):
             # A Cancel press stops the loops early, but whatever they'd
             # already applied is still sitting in the chunk we just closed
@@ -1140,8 +1314,8 @@ def tool_operation(
             try:
                 undo_length_after = cmds.undoInfo(query=True, length=True)
             except Exception:
-                undo_length_after = undo_length_before
-            if undo_length_after > undo_length_before:
+                undo_length_after = operation.undo_length_before
+            if undo_length_after > operation.undo_length_before:
                 try:
                     cmds.undo()
                 except Exception:
@@ -1153,6 +1327,7 @@ def tool_operation(
                 )
             except Exception:
                 pass
+        _schedule_deferred_tool_callback()
 
 
 @contextmanager
@@ -1237,7 +1412,19 @@ def run_tool_callback(button, callback, *args, **kwargs):
         progress=(policy.progress if policy is not None else not non_tool_action),
         undo=(policy.undo if policy is not None else not non_tool_action),
         suspend_refresh=(policy.suspend_refresh if policy is not None else True),
+        preserve_time_selection=(
+            policy.preserve_time_selection if policy is not None else False
+        ),
+        rollback_on_cancel=(
+            policy.rollback_on_cancel if policy is not None else False
+        ),
+        interruptable=(policy.interruptable if policy is not None else True),
+        show_success_message=(
+            policy.show_success_message if policy is not None else True
+        ),
     ) as operation:
+        if policy is not None and policy.capture_animation_context:
+            operation.selection_snapshot = animation.capture_selection_snapshot()
         call_kwargs = dict(kwargs)
         call_kwargs.setdefault("anchor_widget", button)
         call_kwargs.setdefault("tool_operation", operation)
@@ -1246,8 +1433,6 @@ def run_tool_callback(button, callback, *args, **kwargs):
             call_kwargs,
             injected_keys=("anchor_widget", "tool_operation"),
         )
-        if policy is not None and policy.threaded:
-            return run_on_worker_thread(callback, *args, **call_kwargs)
         return callback(*args, **call_kwargs)
 
 def _split_lines(raw):
@@ -2138,6 +2323,9 @@ class ToolbarWindowToggle(QtCore.QObject):
         instead of being copy-pasted at every call site below.
         """
         import TheKeyMachine.tools.bug_report.controller as report
+
+        if current_tool_operation() is not None:
+            return report.safe_execute(fn, context=context)
 
         with tool_operation(
             tool_id=self._tool_id,

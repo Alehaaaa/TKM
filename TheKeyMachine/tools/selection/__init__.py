@@ -15,18 +15,22 @@ class SelectionToolObject(ToolObject):
         "selector": {
             "type": "tool", "label": "Selector", "icon": "selector",
             "callback": api.open_selector, "tooltip": TOOLTIPS["selector"],
+            "operation": {"progress": False, "undo": False},
         },
         "select_hierarchy": {
             "type": "tool", "label": "Select Hierarchy", "icon": "select_hierarchy",
             "callback": api.select_hierarchy, "tooltip": TOOLTIPS["hierarchy"],
+            "operation": {"undo": False},
         },
         "select_rig_controls": {
             "type": "tool", "label": "Select Rig Controls", "icon": "select_rig_controls",
             "callback": api.select_rig_controls, "tooltip": TOOLTIPS["rig_controls"],
+            "operation": {"undo": False},
         },
         "select_rig_controls_animated": {
             "type": "tool", "label": "Select Animated Rig Controls", "icon": "select_rig_controls_animated",
             "callback": api.select_rig_controls_animated, "tooltip": TOOLTIPS["animated_controls"],
+            "operation": {"undo": False},
         },
     }
 
