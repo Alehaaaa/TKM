@@ -41,6 +41,7 @@ class _OptionRow(QtWidgets.QWidget):
     """
 
     clicked = QtCore.Signal()
+    colorClicked = QtCore.Signal(object)
 
     BASE_COLORS = ("#2b2b2b", "#2e2e2e")
     SELECTED_COLOR = "#5f88a8"
@@ -66,20 +67,29 @@ class _OptionRow(QtWidgets.QWidget):
         layout.setContentsMargins(wutil.DPI(6), 0, wutil.DPI(6), 0)
         layout.setSpacing(wutil.DPI(6))
 
-        # Optional color swatch before the icon -- used by the Temp Controls
-        # Panel's rig list (option["swatch_color"], a "#rrggbb" string) to
-        # show each rig's control color; every other _OptionList caller
-        # (System/Position/Orientation here, the panel's control list) just
-        # omits it and gets the plain icon+label row it always has.
-        swatch_color = option.get("swatch_color")
-        if swatch_color:
-            swatch_size = wutil.DPI(10)
-            swatch = QtWidgets.QLabel(self)
-            swatch.setFixedSize(swatch_size, swatch_size)
-            swatch.setStyleSheet(
-                "background:%s;border-radius:%dpx;" % (swatch_color, swatch_size // 2)
+        # Optional color button before the icon -- used by the Temp Controls
+        # Panel's rig list. It is deliberately the exact rounded-square
+        # swatch used by both creation dialogs, rather than the old passive
+        # painted dot. The button owns its click, so choosing a color does
+        # not also select the row underneath it.
+        color_suffix = option.get("color_suffix")
+        if color_suffix:
+            color_label = option.get("color_label") or _t("Change Color")
+            button_size = max(1, int(round(wutil.DPI(30) * 0.7)))
+            icon_size = max(1, int(round(wutil.DPI(28) * 0.7)))
+            color_button = cw.create_tool_button_from_data(
+                {
+                    "key": "temporal_controls_rig_color{}".format(color_suffix),
+                    "label": color_label,
+                    "icon": icons.selection_set_color_icons.get(color_suffix),
+                    "tooltip": color_label,
+                },
+                callback=None,
             )
-            layout.addWidget(swatch)
+            color_button.setFixedSize(button_size, button_size)
+            color_button.setIconSize(QtCore.QSize(icon_size, icon_size))
+            color_button.clicked.connect(lambda *_args, button=color_button: self.colorClicked.emit(button))
+            layout.addWidget(color_button)
 
         icon_size = wutil.DPI(16)
         icon_label = QtWidgets.QLabel(self)
@@ -152,6 +162,7 @@ class _OptionList(QtWidgets.QListWidget):
     # columns don't need to (their creation dialog just reads
     # selected_id() at confirm time), so this is unused there.
     selectionChanged = QtCore.Signal(object)
+    colorRequested = QtCore.Signal(object, object)
 
     def __init__(self, options, parent=None, cap_to_content=False):
         super().__init__(parent)
@@ -222,6 +233,9 @@ class _OptionList(QtWidgets.QListWidget):
             option_id = option["id"]
             row = _OptionRow(option, row_index, parent=self)
             row.clicked.connect(lambda option_id=option_id: self.select_id(option_id))
+            row.colorClicked.connect(
+                lambda button, option_id=option_id: self.colorRequested.emit(option_id, button)
+            )
 
             self.setItemWidget(item, row)
             self._row_order.append(option_id)

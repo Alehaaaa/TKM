@@ -1,6 +1,6 @@
 """Viewport-level Maya helpers."""
 
-from maya import cmds
+from maya import cmds, utils
 
 from TheKeyMachine.core import runtime
 from TheKeyMachine.core import settings
@@ -22,6 +22,9 @@ _HUD_NAME = "TKM_PauseViewportButton"
 _VIEWPORT_SETTINGS_NAMESPACE = "viewport"
 _AUTO_PAUSE_SETTING = "auto_pause_enabled"
 _auto_pause_enabled = False
+_auto_refresh_active = False
+_auto_refresh_generation = 0
+_pending_auto_refresh_generation = None
 
 
 def _manager(start=True):
@@ -134,6 +137,7 @@ def set_auto_pause_enabled(enabled, *_args):
     """Enable callback-driven viewport suspend with edit-triggered refreshes."""
     global _auto_pause_enabled
     _auto_pause_enabled = bool(enabled)
+    _invalidate_pending_auto_refresh()
     settings.set_setting(
         _AUTO_PAUSE_SETTING, _auto_pause_enabled, namespace=_VIEWPORT_SETTINGS_NAMESPACE
     )
@@ -201,20 +205,53 @@ def _install_auto_pause_callbacks():
 
 
 def _suspend_if_auto():
-    if not _auto_pause_enabled or is_paused():
+    if not _auto_pause_enabled or _auto_refresh_active or is_paused():
         return
     _safe_refresh(suspend=True)
 
 
-def _open_auto_refresh_window(reinstall=False):
+def _invalidate_pending_auto_refresh():
+    global _auto_refresh_generation, _pending_auto_refresh_generation
+    _auto_refresh_generation += 1
+    _pending_auto_refresh_generation = None
+
+
+def _schedule_auto_refresh():
+    global _pending_auto_refresh_generation
     if not _auto_pause_enabled or is_paused():
         return
-    if reinstall:
-        _remove_callbacks()
-    _safe_refresh(suspend=False)
-    _force_viewport_update()
-    if reinstall:
-        _install_auto_pause_callbacks()
+    if _pending_auto_refresh_generation is not None:
+        return
+
+    generation = _auto_refresh_generation
+    _pending_auto_refresh_generation = generation
+    try:
+        utils.executeDeferred(
+            lambda generation=generation: _flush_auto_refresh(generation)
+        )
+    except _COMMAND_ERRORS:
+        if _pending_auto_refresh_generation == generation:
+            _pending_auto_refresh_generation = None
+
+
+def _flush_auto_refresh(generation):
+    global _auto_refresh_active, _pending_auto_refresh_generation
+    if _pending_auto_refresh_generation != generation:
+        return
+    _pending_auto_refresh_generation = None
+    if generation != _auto_refresh_generation:
+        return
+    if not _auto_pause_enabled or is_paused():
+        return
+
+    _auto_refresh_active = True
+    try:
+        _safe_refresh(suspend=False)
+        _force_viewport_update()
+    finally:
+        _auto_refresh_active = False
+        if _auto_pause_enabled and not is_paused():
+            _safe_refresh(suspend=True)
 
 
 def _on_pre_render(*_args):
@@ -226,12 +263,15 @@ def _on_anim_curve_edited(*_args):
 
 
 def _on_anim_keyframe_edited(*_args):
-    _open_auto_refresh_window(reinstall=True)
+    # MAnimMessage is still enumerating callbacks here. Defer all refresh work
+    # so viewport rendering cannot re-enter Maya's animation callback dispatch.
+    _schedule_auto_refresh()
 
 
 def cleanup():
     global _auto_pause_enabled
     _auto_pause_enabled = False
+    _invalidate_pending_auto_refresh()
     _remove_callbacks()
     _hide_pause_hud()
     _safe_refresh(suspend=False)

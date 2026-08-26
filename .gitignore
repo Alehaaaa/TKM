@@ -7,3 +7,4 @@ desktop.ini
 .gitignore
 .env
 /TheKeyMachine/core/debug/
+tests/

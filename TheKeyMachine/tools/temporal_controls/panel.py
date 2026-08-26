@@ -51,13 +51,22 @@ def _t(text):
 
 def _localized_options(options):
     return tuple(dict(option, label=_t(option.get("label", ""))) for option in options)
+
+
 from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.temporal_controls import api, shapes
 from TheKeyMachine.tools.temporal_controls.widgets import _OptionList
 from TheKeyMachine.ui.widgets import customDialogs, customWidgets as cw, util as wutil
 
-_STALE_WIDGET_ERRORS = (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError)
+_STALE_WIDGET_ERRORS = (
+    RuntimeError,
+    ValueError,
+    TypeError,
+    AttributeError,
+    KeyError,
+    IndexError,
+)
 
 
 def _short_name(node):
@@ -130,7 +139,16 @@ class _NudgeSlider(QtWidgets.QSlider):
     _HANDLE_COLOR = QtGui.QColor(COLORS.ui.gray.hex)
     _HANDLE_HOVER_COLOR = QtGui.QColor(COLORS.ui.light_gray.hex)
 
-    def __init__(self, label, icon, description="", spring_back=True, snap_size=None, value_range=(-100, 100), parent=None):
+    def __init__(
+        self,
+        label,
+        icon,
+        description="",
+        spring_back=True,
+        snap_size=None,
+        value_range=(-100, 100),
+        parent=None,
+    ):
         super().__init__(QtCore.Qt.Horizontal, parent)
         self._spring_back = spring_back
         self._snap_size = snap_size
@@ -244,10 +262,16 @@ class _NudgeSlider(QtWidgets.QSlider):
         painter.drawRoundedRect(track, self.TRACK_HEIGHT / 2.0, self.TRACK_HEIGHT / 2.0)
 
         handle = self._handle_rect()
-        painter.setBrush(self._HANDLE_HOVER_COLOR if (self._hover or self._dragging) else self._HANDLE_COLOR)
+        painter.setBrush(
+            self._HANDLE_HOVER_COLOR
+            if (self._hover or self._dragging)
+            else self._HANDLE_COLOR
+        )
         painter.drawEllipse(handle)
 
-        icon_pos = handle.center() - QtCore.QPointF(self.ICON_SIZE / 2.0, self.ICON_SIZE / 2.0)
+        icon_pos = handle.center() - QtCore.QPointF(
+            self.ICON_SIZE / 2.0, self.ICON_SIZE / 2.0
+        )
         painter.drawPixmap(icon_pos, self._icon_pixmap)
         painter.end()
 
@@ -331,7 +355,11 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
     ACTIONS = (
         {"id": "add_child", "icon": "add", "tooltip": "Add Child Control"},
         {"id": "add_parent", "icon": "new", "tooltip": "Add Parent Control"},
-        {"id": "remove", "icon": "remove", "tooltip": "Remove Control (extra controls only)"},
+        {
+            "id": "remove",
+            "icon": "remove",
+            "tooltip": "Remove Control (extra controls only)",
+        },
         {"id": "edit_pivot", "icon": "temp_pivot_edit", "tooltip": "Edit Pivot"},
         {"id": "reset_pivot", "icon": "temp_pivot_reset", "tooltip": "Reset Pivot"},
     )
@@ -408,13 +436,18 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # (see _build_space_column, cap_to_content=True) size to content.
         self.rig_list = _OptionList([])
         self.rig_list.setMinimumWidth(wutil.DPI(150))
-        self.rig_list.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        self.rig_list.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding
+        )
         self.rig_list.selectionChanged.connect(self._on_rig_selected)
+        self.rig_list.colorRequested.connect(self._show_rig_color_menu)
         body_layout.addWidget(self.rig_list, 1)
 
         self.control_list = _OptionList([])
         self.control_list.setMinimumWidth(wutil.DPI(150))
-        self.control_list.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        self.control_list.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding
+        )
         self.control_list.selectionChanged.connect(self._on_control_selected)
         body_layout.addWidget(self.control_list, 1)
 
@@ -434,9 +467,11 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # lists cap themselves to their content height (_OptionList's
         # setMaximumHeight, see _content_height), and this row just
         # follows them rather than stretching past that to fill the window.
-        spaces_row = QtWidgets.QWidget()
-        spaces_row.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
-        spaces_layout = QtWidgets.QHBoxLayout(spaces_row)
+        self.spaces_row = QtWidgets.QWidget()
+        self.spaces_row.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum
+        )
+        spaces_layout = QtWidgets.QHBoxLayout(self.spaces_row)
         spaces_layout.setContentsMargins(0, 0, 0, 0)
         spaces_layout.setSpacing(wutil.DPI(4))
 
@@ -465,18 +500,21 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # Simple native grey checked state -- no custom color, just enough
         # to read as "toggled" against the panel's own dark background.
         self.lock_button.setStyleSheet(
-            "QToolButton:checked { background-color: #5a5a5a; border-radius: %dpx; }" % wutil.DPI(3)
+            "QToolButton:checked { background-color: #5a5a5a; border-radius: %dpx; }"
+            % wutil.DPI(3)
         )
         self.lock_button.toggled.connect(self._on_lock_toggled)
         lock_col_layout.addWidget(self.lock_button)
         lock_col_layout.addStretch(1)
         spaces_layout.addWidget(lock_col, 0)
 
-        orientation_col, self.orientation_list = self._build_space_column(_t("Orientation"))
+        orientation_col, self.orientation_list = self._build_space_column(
+            _t("Orientation")
+        )
         self.orientation_list.selectionChanged.connect(self._on_orientation_selected)
         spaces_layout.addWidget(orientation_col, 1)
 
-        layout.addWidget(spaces_row)
+        layout.addWidget(self.spaces_row)
 
         anim_title = QtWidgets.QLabel(_t("Anim Controls"))
         anim_title.setAlignment(QtCore.Qt.AlignCenter)
@@ -487,7 +525,9 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         self.size_slider = _NudgeSlider(
             _t("Size"),
             icons.size,
-            description=_t("Drag to nudge the selected control's size. Releases back to center."),
+            description=_t(
+                "Drag to nudge the selected control's size. Releases back to center."
+            ),
             spring_back=True,
         )
         self.size_slider.liveValue.connect(self._on_size_live)
@@ -508,7 +548,9 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         self.rotation_slider = _NudgeSlider(
             _t("Rotation"),
             icons.refresh,
-            description=_t("Drag to snap the control to one of six fixed orientation poses."),
+            description=_t(
+                "Drag to snap the control to one of six fixed orientation poses."
+            ),
             spring_back=False,
             value_range=(0, len(api.ORIENTATIONS) - 1),
         )
@@ -523,9 +565,12 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
 
         actions_row = QtWidgets.QWidget()
         actions_layout = QtWidgets.QHBoxLayout(actions_row)
-        actions_layout.setContentsMargins(wutil.DPI(8), wutil.DPI(6), wutil.DPI(8), wutil.DPI(6))
+        actions_layout.setContentsMargins(
+            wutil.DPI(8), wutil.DPI(6), wutil.DPI(8), wutil.DPI(6)
+        )
         actions_layout.setSpacing(wutil.DPI(14))
         actions_layout.addStretch(1)
+        self.action_buttons = {}
         for action in self.ACTIONS:
             button = QtWidgets.QToolButton()
             button.setAutoRaise(True)
@@ -533,7 +578,12 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
             button.setIcon(QtGui.QIcon(icons.get(action["icon"])))
             button.setIconSize(QtCore.QSize(wutil.DPI(18), wutil.DPI(18)))
             button.setToolTip(action["tooltip"])
-            button.clicked.connect(lambda *_args, action_id=action["id"], btn=button: self._on_action(action_id, btn))
+            button.clicked.connect(
+                lambda *_args, action_id=action["id"], btn=button: self._on_action(
+                    action_id, btn
+                )
+            )
+            self.action_buttons[action["id"]] = button
             actions_layout.addWidget(button)
         actions_layout.addStretch(1)
         layout.addWidget(actions_row)
@@ -552,7 +602,9 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         self.export_button.clicked.connect(self._on_export)
         layout.addWidget(self.export_button)
 
-        self.bake_button = self._create_sidebar_button("Remove and Bake", icons.bake_animation_1)
+        self.bake_button = self._create_sidebar_button(
+            "Remove and Bake", icons.temporal_controls_bake
+        )
         self.bake_button.clicked.connect(self._on_remove_and_bake)
         layout.addWidget(self.bake_button)
 
@@ -575,7 +627,9 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # enough to separate it from the window without reading as enabled.
         # Appended after QFlatButton's own stylesheet, so this :disabled
         # rule -- and only this one -- wins the cascade over its default.
-        button.setStyleSheet(button.styleSheet() + "QPushButton:disabled{background-color:#4d4d4d;}")
+        button.setStyleSheet(
+            button.styleSheet() + "QPushButton:disabled{background-color:#4d4d4d;}"
+        )
         return button
 
     def _build_space_column(self, title):
@@ -583,7 +637,9 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # (see _OptionList._content_height), and this column just follows
         # it instead of stretching the list past that.
         column = QtWidgets.QWidget()
-        column.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
+        column.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum
+        )
         column_layout = QtWidgets.QVBoxLayout(column)
         column_layout.setContentsMargins(0, 0, 0, 0)
         column_layout.setSpacing(wutil.DPI(3))
@@ -596,11 +652,16 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # re-drive an already-built control into a different space (see
         # _on_position_selected/_on_orientation_selected), the same
         # operation the right-click menu's own Space submenu offers
-        # (_add_space_switch_actions), which already excludes Grab Release
+        # (the command-id list in temporal_controls.__init__), which already
+        # excludes Grab Release
         # for exactly this reason: it's documented as a one-shot
         # creation-time concept, not something to switch back into later.
-        option_list = _OptionList(list(_localized_options(api.SWITCHABLE_SPACES)), cap_to_content=True)
-        option_list.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
+        option_list = _OptionList(
+            list(_localized_options(api.SWITCHABLE_SPACES)), cap_to_content=True
+        )
+        option_list.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum
+        )
         column_layout.addWidget(option_list)
         return column, option_list
 
@@ -622,28 +683,74 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         the panel, or after Remove/Bake), lands on the first rig (which in
         turn lands on its first control, enabling the sidebar) rather than
         opening -- or resetting after an action -- to a blank panel."""
-        self._rigs_cache = api.list_rigs()
-        rig_options = [
-            {
-                "id": root_target,
-                "label": _short_name(root_target),
-                "icon": "temporal_controls",
-                "swatch_color": api.get_control_color(controls[0]) if controls else None,
-            }
-            for root_target, controls in sorted(self._rigs_cache.items(), key=lambda kv: _short_name(kv[0]).lower())
-        ]
+        self._rigs_cache = api.list_panel_rigs()
+        rig_options = []
+        for root_target, controls in sorted(
+            self._rigs_cache.items(), key=lambda kv: _short_name(kv[0]).lower()
+        ):
+            color = self._selection_color_for_hex(
+                api.get_control_color(controls[0]) if controls else None
+            )
+            rig_options.append(
+                {
+                    "id": root_target,
+                    "label": _short_name(root_target),
+                    "icon": "temporal_controls",
+                    "color_suffix": color.suffix,
+                    "color_label": _t("Change Color"),
+                }
+            )
         self.rig_list.refresh(rig_options)
         if preselect_control and self._select_control(preselect_control):
             return
         # Land on the first rig (which in turn lands _on_rig_selected on
         # its first control below) rather than opening to a blank panel.
-        self.rig_list.select_id(rig_options[0]["id"] if rig_options else None, required=False)
+        self.rig_list.select_id(
+            rig_options[0]["id"] if rig_options else None, required=False
+        )
+
+    @staticmethod
+    def _selection_color_for_hex(color_hex):
+        normalized = (color_hex or "").lower()
+        for color in COLORS.selection.all:
+            if color.hex.lower() == normalized:
+                return color
+        return COLORS.selection.default
+
+    def _show_rig_color_menu(self, rig_id, button):
+        if not rig_id:
+            return
+        menu = cw.MenuWidget(_t("Change Color"), self, tearoff=False)
+        menu.setIcon(QtGui.QIcon(icons.color))
+        for color in COLORS.selection.all:
+            menu.addAction(
+                QtGui.QIcon(icons.selection_set_color_icons.get(color.suffix, "")),
+                _t(color.label),
+                callback=lambda root=rig_id, value=color.hex: self._set_rig_color(
+                    root, value
+                ),
+            )
+        menu.exec_(QtGui.QCursor.pos())
+
+    def _set_rig_color(self, rig_id, color_hex):
+        selected_control = self._current_control
+        if api.set_rig_color(rig_id, color_hex):
+            self.refresh(preselect_control=selected_control)
 
     def _select_control(self, control):
         """Select *control* (and the rig it belongs to). Returns whether it
         was actually found in the current _rigs_cache -- refresh() uses
         this to fall back to landing on the first rig when it isn't."""
         root_target = api.root_target_for(control) if control else None
+        if not root_target:
+            root_target = next(
+                (
+                    rig_id
+                    for rig_id, controls in self._rigs_cache.items()
+                    if control in controls
+                ),
+                None,
+            )
         if not root_target or root_target not in self._rigs_cache:
             return False
         self.rig_list.select_id(root_target, required=False)
@@ -664,16 +771,26 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         self._current_rig = rig_id
         controls = self._rigs_cache.get(rig_id, []) if rig_id else []
         control_options = [
-            {"id": control, "label": self._control_label(control), "icon": "temporal_controls"}
+            {
+                "id": control,
+                "label": self._control_label(control),
+                "icon": "temporal_controls",
+            }
             for control in controls
         ]
         self.control_list.refresh(control_options)
         # Land on the rig's first control rather than requiring a second click.
-        self.control_list.select_id(control_options[0]["id"] if control_options else None, required=False)
+        self.control_list.select_id(
+            control_options[0]["id"] if control_options else None, required=False
+        )
 
     def _on_control_selected(self, control_id):
         self._current_control = control_id
+        is_tagged_control = bool(
+            control_id and api.TkmSceneNode(control_id).get_attr(api.TAG_ATTR)
+        )
         self.sidebar.setEnabled(bool(control_id))
+        self._set_control_capabilities(is_tagged_control)
         if not control_id:
             return
         try:
@@ -681,27 +798,48 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
                 cmds.select(control_id)
         except _STALE_WIDGET_ERRORS:
             pass
-        self._sync_sidebar(control_id)
+        self._sync_sidebar(control_id, sync_spaces=is_tagged_control)
 
-    def _sync_sidebar(self, control):
+    def _set_control_capabilities(self, has_temporal_metadata):
+        """Keep appearance controls available for every listed curve.
+
+        Position/orientation spaces, stacking, and direct removal depend on
+        TAG_ATTR's target/driver ownership and remain exclusive to tagged
+        Temporal Controls. Shape, size, visual rotation, and pivots operate
+        directly on curve CVs/transforms and are valid for secondary controls.
+        Bake resolves a secondary selection to its owning tagged control.
+        """
+        self.spaces_row.setEnabled(has_temporal_metadata)
+        for action_id in ("add_child", "add_parent", "remove"):
+            self.action_buttons[action_id].setEnabled(has_temporal_metadata)
+        self.bake_button.setEnabled(bool(self._current_control))
+
+    def _sync_sidebar(self, control, sync_spaces=True):
         """Reflect *control*'s current state into the sidebar widgets --
         signals are blocked throughout so this pure sync doesn't loop back
         into the space/lock click handlers below."""
-        locked = api.is_control_space_locked(control)
+        if sync_spaces:
+            locked = api.is_control_space_locked(control)
 
-        block = self.position_list.blockSignals(True)
-        self.position_list.select_id(api.get_control_position_space(control), required=False)
-        self.position_list.blockSignals(block)
+            block = self.position_list.blockSignals(True)
+            self.position_list.select_id(
+                api.get_control_position_space(control), required=False
+            )
+            self.position_list.blockSignals(block)
 
-        block = self.orientation_list.blockSignals(True)
-        self.orientation_list.select_id(api.get_control_orientation_space(control), required=False)
-        self.orientation_list.blockSignals(block)
-        self.orientation_list.setEnabled(not locked)
+            block = self.orientation_list.blockSignals(True)
+            self.orientation_list.select_id(
+                api.get_control_orientation_space(control), required=False
+            )
+            self.orientation_list.blockSignals(block)
+            self.orientation_list.setEnabled(not locked)
 
-        block = self.lock_button.blockSignals(True)
-        self.lock_button.setChecked(locked)
-        self.lock_button.blockSignals(block)
-        self.lock_button.setIcon(QtGui.QIcon(icons.lock if locked else icons.lock_open))
+            block = self.lock_button.blockSignals(True)
+            self.lock_button.setChecked(locked)
+            self.lock_button.blockSignals(block)
+            self.lock_button.setIcon(
+                QtGui.QIcon(icons.lock if locked else icons.lock_open)
+            )
 
         shape_id = api.get_control_shape_id(control)
         index = self.shape_combo.findData(shape_id)
@@ -713,7 +851,9 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         # so it needs resyncing to whichever of api.ORIENTATIONS' 6 poses
         # *control* is actually at -- Size's handle always starts back at
         # center, so it needs no equivalent sync.
-        self.rotation_slider.set_value(self._slider_value_for_orientation(api.get_control_orientation(control)))
+        self.rotation_slider.set_value(
+            self._slider_value_for_orientation(api.get_control_orientation(control))
+        )
 
     # ------------------------------------------------------------------
     # Sidebar actions -- every one of these edits the scene, so each goes
@@ -724,26 +864,53 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
     def _on_position_selected(self, space_id):
         if not self._current_control or not space_id:
             return
-        toolCommon.run_tool_callback(self.position_list, api.set_control_space, self._current_control, "translate", space_id)
+        toolCommon.run_tool_callback(
+            self.position_list,
+            api.set_control_space,
+            self._current_control,
+            "translate",
+            space_id,
+        )
         if api.is_control_space_locked(self._current_control):
             block = self.orientation_list.blockSignals(True)
-            self.orientation_list.select_id(api.get_control_orientation_space(self._current_control), required=False)
+            self.orientation_list.select_id(
+                api.get_control_orientation_space(self._current_control), required=False
+            )
             self.orientation_list.blockSignals(block)
 
     def _on_orientation_selected(self, space_id):
-        if not self._current_control or not space_id or api.is_control_space_locked(self._current_control):
+        if (
+            not self._current_control
+            or not space_id
+            or api.is_control_space_locked(self._current_control)
+        ):
             return
-        toolCommon.run_tool_callback(self.orientation_list, api.set_control_space, self._current_control, "rotate", space_id)
+        toolCommon.run_tool_callback(
+            self.orientation_list,
+            api.set_control_space,
+            self._current_control,
+            "rotate",
+            space_id,
+        )
 
     def _on_lock_toggled(self, checked):
         if not self._current_control:
             return
-        toolCommon.run_tool_callback(self.lock_button, api.set_control_space_locked, self._current_control, checked)
+        toolCommon.run_tool_callback(
+            self.lock_button,
+            api.set_control_space_locked,
+            self._current_control,
+            checked,
+        )
         self.orientation_list.setEnabled(not checked)
-        self.lock_button.setIcon(QtGui.QIcon(icons.lock if checked else icons.lock_open))
+        self.lock_button.setIcon(
+            QtGui.QIcon(icons.lock if checked else icons.lock_open)
+        )
         if checked:
             block = self.orientation_list.blockSignals(True)
-            self.orientation_list.select_id(api.get_control_orientation_space(self._current_control), required=False)
+            self.orientation_list.select_id(
+                api.get_control_orientation_space(self._current_control), required=False
+            )
             self.orientation_list.blockSignals(block)
 
     # Size applies continuously while dragging: each liveValue tick maps
@@ -765,10 +932,14 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         if not self._current_control:
             self._size_last_value = value
             return
-        factor = self._size_factor_for(value) / self._size_factor_for(self._size_last_value)
+        factor = self._size_factor_for(value) / self._size_factor_for(
+            self._size_last_value
+        )
         self._size_last_value = value
         if abs(factor - 1.0) > 1e-9:
-            toolCommon.run_tool_callback(self.size_slider, api.scale_control, self._current_control, factor)
+            toolCommon.run_tool_callback(
+                self.size_slider, api.scale_control, self._current_control, factor
+            )
 
     def _on_size_released(self):
         self._size_last_value = 0
@@ -798,24 +969,33 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
             return
         orientation_id = self._orientation_id_for(value)
         toolCommon.run_tool_callback(
-            self.rotation_slider, api.set_control_orientation, self._current_control, orientation_id
+            self.rotation_slider,
+            api.set_control_orientation,
+            self._current_control,
+            orientation_id,
         )
 
     def _on_shape_activated(self, index):
         if not self._current_control:
             return
         shape_id = self.shape_combo.itemData(index)
-        toolCommon.run_tool_callback(self.shape_combo, api.set_control_shape, self._current_control, shape_id)
+        toolCommon.run_tool_callback(
+            self.shape_combo, api.set_control_shape, self._current_control, shape_id
+        )
 
     def _on_action(self, action_id, button):
         control = self._current_control
         if not control:
             return
         if action_id == "add_child":
-            new_control = toolCommon.run_tool_callback(button, api.add_child_control, control)
+            new_control = toolCommon.run_tool_callback(
+                button, api.add_child_control, control
+            )
             self.refresh(preselect_control=new_control)
         elif action_id == "add_parent":
-            new_control = toolCommon.run_tool_callback(button, api.add_parent_control, control)
+            new_control = toolCommon.run_tool_callback(
+                button, api.add_parent_control, control
+            )
             self.refresh(preselect_control=new_control)
         elif action_id == "remove":
             toolCommon.run_tool_callback(button, api.remove_extra_control, control)
@@ -855,7 +1035,9 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
     def _connect_live_refresh(self):
         manager = runtime.get_runtime_manager()
         for event_name in ("Undo", "Redo"):
-            manager.add_scriptjob(event=event_name, key=self.REFRESH_KEY, callback=self._on_scene_changed)
+            manager.add_scriptjob(
+                event=event_name, key=self.REFRESH_KEY, callback=self._on_scene_changed
+            )
         # Not RuntimeManager-tracked (see REFRESH_KEY above) -- a direct Qt
         # connection to api.controls_bus, which create_controls_with_options
         # emits right after it actually builds new controls. Narrower than
@@ -941,7 +1123,9 @@ class TempControlsPanelWindow(customDialogs.QFlatToolBarDialog):
         if event.button() == QtCore.Qt.LeftButton and was_dragging:
             self._is_dragging = False
             global_position = wutil.event_global_pos(event)
-            if (global_position - drag_start).manhattanLength() > self.DRAG_PIN_DISTANCE:
+            if (
+                global_position - drag_start
+            ).manhattanLength() > self.DRAG_PIN_DISTANCE:
                 self._pin()
         customDialogs.QFlatDialog.mouseReleaseEvent(self, event)
 

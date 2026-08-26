@@ -362,6 +362,8 @@ def build_declared_menu(definition, parent_widget=None, owner_command_id=None):
                 description=tool.get("description", ""),
                 tooltip=tool.get("tooltip"),
                 checked=bool((tool.get("get_checked") or item.get("get_checked") or (lambda: False))()),
+                command_id=command_id,
+                command_icon=tool.get("icon"),
             )
             signal = tool.get("changed_signal") or item.get("changed_signal")
             if signal is not None:

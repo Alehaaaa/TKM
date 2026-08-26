@@ -1,6 +1,14 @@
 from TheKeyMachine.tools.nudge import controller
 
 
+def is_snap_collision_enabled():
+    return controller.is_snap_collision_enabled()
+
+
+def set_snap_collision_enabled(enabled=False, *_args, **_kwargs):
+    return controller.set_snap_collision_enabled(enabled)
+
+
 def _step(kwargs, default):
     try:
         return int(kwargs.pop("steps", default))

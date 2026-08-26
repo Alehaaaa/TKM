@@ -2,6 +2,30 @@
   "temporal_controls": [
     "Open Temporal Controls for the current selection. Choose a control system, position and orientation spaces, a label, and a color. Each object gets a matching control that carries its animation keys and drives it through the chosen spaces."
   ],
+  "temporal_controls_super_mode": [
+    "Speed up baking with Maya's faster math-based bake shortcut instead of evaluating the scene at every frame. Affects both Bake Frames and Bake Keys."
+  ],
+  "temporal_controls_world_space": [
+    "Re-drive the selected Temporal Controls through World Space instead of tearing them down and recreating them."
+  ],
+  "temporal_controls_object_space": [
+    "Re-drive the selected Temporal Controls through Object Space instead of tearing them down and recreating them."
+  ],
+  "temporal_controls_camera_space": [
+    "Re-drive the selected Temporal Controls through Camera Space instead of tearing them down and recreating them."
+  ],
+  "temporal_controls_relative_space": [
+    "Re-drive the selected Temporal Controls through Relative Space instead of tearing them down and recreating them."
+  ],
+  "temporal_controls_child_space": [
+    "Re-drive the selected Temporal Controls through Child Space instead of tearing them down and recreating them."
+  ],
+  "temporal_controls_mute_revert": [
+    "Disconnect the selected Temporal Controls and restore their objects, but keep the controls in the scene to drive again later."
+  ],
+  "temporal_controls_mute_bake": [
+    "Disconnect the selected Temporal Controls, leaving their objects wherever the drive left them, but keep the controls in the scene to drive again later."
+  ],
   "temporal_controls_bake": [
     "Extract the selected Temporal Controls' keyframes onto their original objects and remove the controls.",
     {"separator": true},
@@ -11,5 +35,8 @@
     "Remove the selected Temporal Controls and restore their original objects' animation and connections.",
     {"separator": true},
     "If nothing is selected, reverts every Temporal Control in the scene."
+  ],
+  "temporal_controls_panel": [
+    "Browse and manage every Temporal Control in the scene."
   ]
 }

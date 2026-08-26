@@ -1008,34 +1008,52 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
     # ------------------------------------------------------------ toolbar actions
 
-    def _create_layer_from_selection(self, *_args):
+    def _run_toolbar_action(self, callback, *args, tool_operation=None, tool_id=None, tool_label=None, **kwargs):
+        """Run a window action without opening a second ToolOperation.
+
+        ``connect_tool()`` already creates and injects an operation for toolbar
+        clicks.  The same handlers are also called directly by the row context
+        menu, where they still need to create their own operation.
+        """
+        if tool_operation is not None or toolCommon.current_tool_operation() is not None:
+            return callback(*args, **kwargs)
+        return toolCommon.run_tool_callback(
+            self, callback, *args,
+            _tkm_tool_id=tool_id,
+            _tkm_tool_label=tool_label,
+            **kwargs
+        )
+
+    def _create_layer_from_selection(self, *_args, tool_operation=None):
         try:
-            toolCommon.run_tool_callback(
-                self, controller.create_layer_from_selection,
-                _tkm_tool_id="animation_layers_new",
-                _tkm_tool_label="Create Animation Layer",
+            self._run_toolbar_action(
+                controller.create_layer_from_selection,
+                tool_operation=tool_operation,
+                tool_id="animation_layers_new",
+                tool_label="Create Animation Layer",
             )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
             return
         self.refresh()
 
-    def _create_group(self, *_args):
+    def _create_group(self, *_args, tool_operation=None):
         # Iterate self._rows (ordered) rather than the set, to preserve visible order.
         ordered_selected = [name for name in self._rows.keys() if name in self._selected_names]
         try:
-            toolCommon.run_tool_callback(
-                self, controller.create_group,
+            self._run_toolbar_action(
+                controller.create_group,
                 member_names=ordered_selected,
-                _tkm_tool_id="animation_layers_new_group",
-                _tkm_tool_label="Group Animation Layers",
+                tool_operation=tool_operation,
+                tool_id="animation_layers_new_group",
+                tool_label="Group Animation Layers",
             )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
             return
         self.refresh()
 
-    def _merge_selected(self, *_args):
+    def _merge_selected(self, *_args, tool_operation=None):
         selected = list(self._selected_names)
         if not selected:
             wutil.make_inViewMessage("Select one or more animation layers to merge")
@@ -1043,12 +1061,14 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         try:
             def _merge():
                 controller.smart_merge_layers(
-                    selected, operation=toolCommon.current_tool_operation()
+                    selected,
+                    operation=tool_operation or toolCommon.current_tool_operation(),
                 )
-            toolCommon.run_tool_callback(
-                self, _merge,
-                _tkm_tool_id="animation_layers_merge",
-                _tkm_tool_label="Smart Merge Animation Layers",
+            self._run_toolbar_action(
+                _merge,
+                tool_operation=tool_operation,
+                tool_id="animation_layers_merge",
+                tool_label="Smart Merge Animation Layers",
             )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
@@ -1056,7 +1076,7 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         self._selected_names = set()
         self.refresh()
 
-    def _delete_selected(self, *_args):
+    def _delete_selected(self, *_args, tool_operation=None):
         selected = list(self._selected_names)
         if not selected:
             wutil.make_inViewMessage("Select one or more layers to delete")
@@ -1072,16 +1092,17 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         )
         if clicked != customDialogs.QFlatConfirmDialog.Yes:
             return
-        toolCommon.run_tool_callback(
-            self, controller.delete_layers, selected, recursive=False,
-            _tkm_tool_id="animation_layers_delete",
-            _tkm_tool_label="Delete Animation Layers",
+        self._run_toolbar_action(
+            controller.delete_layers, selected, recursive=False,
+            tool_operation=tool_operation,
+            tool_id="animation_layers_delete",
+            tool_label="Delete Animation Layers",
         )
         self._selected_names = set()
         self._collapsed_groups -= set(selected)
         self.refresh()
 
-    def _export_selected(self, *_args):
+    def _export_selected(self, *_args, tool_operation=None):
         selected = list(self._selected_names)
         if not selected:
             wutil.make_inViewMessage("Select one or more layers to export")
@@ -1089,26 +1110,29 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         try:
             def _export():
                 controller.export_selected(
-                    selected, operation=toolCommon.current_tool_operation()
+                    selected,
+                    operation=tool_operation or toolCommon.current_tool_operation(),
                 )
-            toolCommon.run_tool_callback(
-                self, _export,
-                _tkm_tool_id="animation_layers_export",
-                _tkm_tool_label="Export Animation Layers",
+            self._run_toolbar_action(
+                _export,
+                tool_operation=tool_operation,
+                tool_id="animation_layers_export",
+                tool_label="Export Animation Layers",
             )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
 
-    def _import_layers(self, *_args):
+    def _import_layers(self, *_args, tool_operation=None):
         try:
             def _import():
                 controller.import_from_file(
-                    operation=toolCommon.current_tool_operation()
+                    operation=tool_operation or toolCommon.current_tool_operation(),
                 )
-            toolCommon.run_tool_callback(
-                self, _import,
-                _tkm_tool_id="animation_layers_import",
-                _tkm_tool_label="Import Animation Layers",
+            self._run_toolbar_action(
+                _import,
+                tool_operation=tool_operation,
+                tool_id="animation_layers_import",
+                tool_label="Import Animation Layers",
             )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
@@ -1196,30 +1220,30 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
 
     def _add_selected_to_layer(self, layer_name):
         try:
-            toolCommon.run_tool_callback(
-                self, controller.add_selected_to_layer, layer_name,
-                _tkm_tool_id="animation_layers_add_members",
-                _tkm_tool_label="Add To Animation Layer",
+            self._run_toolbar_action(
+                controller.add_selected_to_layer, layer_name,
+                tool_id="animation_layers_add_members",
+                tool_label="Add To Animation Layer",
             )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
 
     def _remove_selected_from_layer(self, layer_name):
         try:
-            toolCommon.run_tool_callback(
-                self, controller.remove_selected_from_layer, layer_name,
-                _tkm_tool_id="animation_layers_remove_members",
-                _tkm_tool_label="Remove From Animation Layer",
+            self._run_toolbar_action(
+                controller.remove_selected_from_layer, layer_name,
+                tool_id="animation_layers_remove_members",
+                tool_label="Remove From Animation Layer",
             )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
 
     def _extract_to_new_layer(self, layer_name):
         try:
-            toolCommon.run_tool_callback(
-                self, controller.extract_to_new_layer, layer_name,
-                _tkm_tool_id="animation_layers_extract",
-                _tkm_tool_label="Extract To New Animation Layer",
+            self._run_toolbar_action(
+                controller.extract_to_new_layer, layer_name,
+                tool_id="animation_layers_extract",
+                tool_label="Extract To New Animation Layer",
             )
         except RuntimeError as exc:
             wutil.make_inViewMessage(str(exc))
@@ -1230,10 +1254,10 @@ class AnimationLayersWindow(FloatingToolWindowMixin, customDialogs.QFlatPinnable
         def _ungroup():
             for name in list(self._selected_names):
                 controller.move_layer_to_parent(name, None)
-        toolCommon.run_tool_callback(
-            self, _ungroup,
-            _tkm_tool_id="animation_layers_ungroup",
-            _tkm_tool_label="Remove From Group",
+        self._run_toolbar_action(
+            _ungroup,
+            tool_id="animation_layers_ungroup",
+            tool_label="Remove From Group",
         )
         self.refresh()
 

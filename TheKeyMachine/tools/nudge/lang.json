@@ -549,6 +549,56 @@
             ]
         }
     },
+    "nudge_snap_collision": {
+        "en": {
+            "label": "Snap Collisions",
+            "tooltip": [
+                "Snap and merge keys when a nudge lands on an existing key."
+            ]
+        },
+        "es": {
+            "label": "Ajustar Colisiones",
+            "tooltip": [
+                "Ajusta y fusiona las claves cuando un empujón coincide con una clave existente."
+            ]
+        },
+        "fr": {
+            "label": "Aligner les Collisions",
+            "tooltip": [
+                "Aligne et fusionne les clés lorsqu'une pichenette atteint une clé existante."
+            ]
+        },
+        "ca": {
+            "label": "Ajustar Col·lisions",
+            "tooltip": [
+                "Ajusta i fusiona les claus quan una empenta coincideix amb una clau existent."
+            ]
+        },
+        "zh": {
+            "label": "吸附碰撞关键帧",
+            "tooltip": [
+                "微移到现有关键帧时，吸附并合并关键帧。"
+            ]
+        },
+        "ja": {
+            "label": "衝突キーをスナップ",
+            "tooltip": [
+                "微動先に既存のキーがある場合、キーをスナップして結合します。"
+            ]
+        },
+        "ko": {
+            "label": "충돌 키 스냅",
+            "tooltip": [
+                "미세 이동한 키가 기존 키에 닿으면 스냅하고 병합합니다."
+            ]
+        },
+        "ar": {
+            "label": "محاذاة المفاتيح المتصادمة",
+            "tooltip": [
+                "محاذاة المفاتيح ودمجها عندما تصل الإزاحة إلى مفتاح موجود."
+            ]
+        }
+    },
     "nudge_tools": {
         "en": {
             "label": "Nudge"

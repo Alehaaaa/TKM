@@ -1912,18 +1912,53 @@ def _validate_curve_tool_targets(
     return True
 
 
-def snap_keyframes(*_args, tool_operation=None, **_kwargs):
+def snap_keyframes(
+    *_args,
+    tool_operation=None,
+    timerange=None,
+    curves=None,
+    key_times=None,
+    notify=True,
+    **_kwargs
+):
     operation = toolCommon.require_tool_operation(tool_operation)
-    target_info = animation.resolve_context(
-        include_channels=True, include_shapes=True, resolve_curves=True
-    )
-    curves = target_info.curves
-    if not _validate_curve_tool_targets(target_info, curves, "snap"):
-        return None
+    target_info = None
+    explicit_key_times = None
+    if key_times is not None:
+        explicit_key_times = {
+            curve: list(times or ())
+            for curve, times in key_times.items()
+            if curve and times
+        }
+        curves = list(explicit_key_times)
+    if curves is None:
+        target_info = animation.resolve_context(
+            include_channels=True, include_shapes=True, resolve_curves=True
+        )
+        curves = target_info.curves
+        if not _validate_curve_tool_targets(target_info, curves, "snap"):
+            return None
+    else:
+        curves = list(dict.fromkeys(curves or ()))
+        if not curves:
+            return False
 
     curve_key_times = []
     for curve in curves:
-        target_times = target_info.key_times(curve)
+        if explicit_key_times is not None:
+            target_times = explicit_key_times.get(curve, ())
+        elif timerange is None:
+            target_times = target_info.key_times(curve)
+        else:
+            try:
+                target_times = cmds.keyframe(
+                    curve,
+                    query=True,
+                    time=timerange,
+                    timeChange=True,
+                ) or []
+            except _COMMAND_ERRORS:
+                target_times = []
         try:
             curve_times = cmds.keyframe(
                 curve,
@@ -1933,30 +1968,53 @@ def snap_keyframes(*_args, tool_operation=None, **_kwargs):
         except _COMMAND_ERRORS:
             curve_times = []
         buckets = {}
-        for key_time in target_times:
-            rounded_time = _nearest_whole_frame(key_time)
-            if math.isclose(
+        if explicit_key_times is not None or timerange is not None:
+            rounded_targets = {
+                _nearest_whole_frame(key_time) for key_time in target_times
+            }
+            for curve_time in curve_times:
+                rounded_time = _nearest_whole_frame(curve_time)
+                if rounded_time in rounded_targets:
+                    buckets.setdefault(rounded_time, []).append(curve_time)
+        else:
+            for key_time in target_times:
+                rounded_time = _nearest_whole_frame(key_time)
+                if math.isclose(
+                    float(rounded_time),
+                    float(key_time),
+                    rel_tol=0.0,
+                    abs_tol=1e-8,
+                ):
+                    continue
+                buckets.setdefault(rounded_time, []).append(key_time)
+
+        buckets = {
+            rounded_time: bucket_times
+            for rounded_time, bucket_times in buckets.items()
+            if len(bucket_times) > 1
+            or not math.isclose(
+                float(bucket_times[0]),
                 float(rounded_time),
-                float(key_time),
                 rel_tol=0.0,
                 abs_tol=1e-8,
-            ):
-                continue
-            buckets.setdefault(rounded_time, []).append(key_time)
+            )
+        }
 
         if not buckets:
             continue
 
         curve_fn = maya_api.anim_curve_fn(curve)
         snap_data = []
-        for rounded_time, key_times in sorted(buckets.items()):
+        for rounded_time, bucket_key_times in sorted(buckets.items()):
             target_value = _curve_value_at_time(
                 curve,
                 curve_fn,
                 rounded_time,
             )
             if target_value is not None:
-                snap_data.append((rounded_time, key_times, target_value))
+                snap_data.append(
+                    (rounded_time, bucket_key_times, target_value)
+                )
         if snap_data:
             curve_key_times.append((curve, curve_times, snap_data))
     work_items = sum(
@@ -1964,19 +2022,21 @@ def snap_keyframes(*_args, tool_operation=None, **_kwargs):
     )
 
     if not work_items:
-        return animation.notify_empty("keys", "snap")
+        if notify:
+            return animation.notify_empty("keys", "snap")
+        return False
 
     snapped = False
     operation.set_total(work_items)
     for curve, curve_times, snap_data in curve_key_times:
-        for rounded_time, key_times, target_value in snap_data:
+        for rounded_time, bucket_key_times, target_value in snap_data:
             if operation.cancelled:
                 return
             snapped = (
                 _snap_curve_keys(
                     curve,
                     rounded_time,
-                    key_times,
+                    bucket_key_times,
                     target_value,
                     curve_times,
                 )
@@ -1985,4 +2045,7 @@ def snap_keyframes(*_args, tool_operation=None, **_kwargs):
             operation.step()
 
     if not snapped:
-        return animation.notify_empty("keys", "snap")
+        if notify:
+            return animation.notify_empty("keys", "snap")
+        return False
+    return True

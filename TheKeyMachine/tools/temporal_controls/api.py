@@ -58,7 +58,7 @@ detect this the same way (``_nested_parent_for``) and reparent the nested
 control back out before removing the new one, baking its motion down onto
 its own channels first if Bake was used (``_bake_nested_control``).
 
-Right-click (``build_temporal_controls_context_menu``) gives:
+The command-backed right-click menu declared in ``__init__.py`` gives:
 
 - **Bake Mode**: Bake Keys or Bake Frames (``BAKE_MODES`` -- one setting,
   shared by every bake path in this tool). Both funnel through the same
@@ -106,11 +106,10 @@ instead of by name or hierarchy.
 
 import json
 import math
-from functools import partial
 
 from maya import cmds
 
-from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets  # type: ignore
+from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 from TheKeyMachine.core import i18n, trigger
 from TheKeyMachine.maya import selection
 from TheKeyMachine.maya.runtime import TkmSceneNode
@@ -147,6 +146,7 @@ CAMERA_ORIENTATION_GROUP_ATTR = "tkmTemporalCameraOrientationGroup"
 CAMERA_POSITION_SOURCE_ATTR = "tkmTemporalCameraPositionSource"
 CAMERA_ORIENTATION_SOURCE_ATTR = "tkmTemporalCameraOrientationSource"
 NESTED_PARENT_ATTR = "tkmTemporalNestedParent"
+NESTED_ROOT_ATTR = "tkmTemporalNestedRoot"
 MUTED_ATTR = "tkmTemporalMuted"
 # JSON list of extra (non translate/rotate) attribute names control got a
 # copy of at creation time from an already-animated obj -- see
@@ -191,7 +191,11 @@ SYSTEMS = (
     {"id": "simple", "label": "Simple Control", "icon": "temporal_controls_simple"},
     {"id": "group", "label": "Group Control", "icon": "temporal_controls_group"},
     {"id": "aim", "label": "Aim Control", "icon": "temporal_controls_aim"},
-    {"id": "fk_chain", "label": "FK Chain Control", "icon": "temporal_controls_fk_chain"},
+    {
+        "id": "fk_chain",
+        "label": "FK Chain Control",
+        "icon": "temporal_controls_fk_chain",
+    },
     {"id": "more", "label": "More to come...", "disabled": True},
 )
 
@@ -218,9 +222,9 @@ DEFAULT_SPACE = "object"
 DEFAULT_SIZE_MULT = 1.0
 # How much a full-throw Size slider drag scales a control by: the slider
 # maps its -100..100 range onto 2**(SIZE_NUDGE_STEP * value/100), so a full
-# drag to one edge doubles/halves the control (at the default 1.0) -- see
+# drag to one edge scales the control by about 2.38x/0.42x at 1.25 -- see
 # TempControlsPanelWindow._size_factor_for.
-SIZE_NUDGE_STEP = 1.0
+SIZE_NUDGE_STEP = 1.25
 
 # The Rotation slider isn't a free/cumulative nudge -- it has exactly 6
 # stops, one per fixed pose a control can be snapped into relative to
@@ -293,6 +297,7 @@ _temporal_controls_source_button = None
 # Entry point / dialog plumbing
 # ----------------------------------------------------------------------
 
+
 def create_controls(*_args):
     global _temporal_controls_source_button
     operation = toolCommon.current_tool_operation()
@@ -300,7 +305,8 @@ def create_controls(*_args):
         _temporal_controls_source_button = operation.anchor_widget
 
     selected = [
-        obj for obj in selection.get_selected_objects(long=True, ordered=True)
+        obj
+        for obj in selection.get_selected_objects(long=True, ordered=True)
         if cmds.ls(obj, type="transform")
     ]
     if not selected:
@@ -313,22 +319,30 @@ def _open_creation_dialog(objects):
     global _temporal_controls_dialog
     from TheKeyMachine.tools.temporal_controls.widgets import TemporalControlsDialog
 
-    if _temporal_controls_dialog is not None and wutil.is_valid_widget(_temporal_controls_dialog):
+    if _temporal_controls_dialog is not None and wutil.is_valid_widget(
+        _temporal_controls_dialog
+    ):
         _temporal_controls_dialog.close()
 
     parent = wutil.get_maya_qt(qt=QtWidgets.QWidget)
     source_button = _temporal_controls_source_button
 
     def _on_confirmed(system, position_space, orientation_space, label, color):
-        trigger.execute_command(
-            "temporal_controls_create_apply",
-            objects,
-            system=system,
-            position_space=position_space,
-            orientation_space=orientation_space,
-            label=label,
-            color=color,
-            _tkm_anchor_widget=source_button,
+        # A color swatch can confirm while its button-owned operation is
+        # active. Queue the edit so the registered apply command owns the
+        # one rollback/undo lifecycle after that UI operation closes.
+        QtCore.QTimer.singleShot(
+            0,
+            lambda: trigger.execute_command(
+                "temporal_controls_create_apply",
+                objects,
+                system=system,
+                position_space=position_space,
+                orientation_space=orientation_space,
+                label=label,
+                color=color,
+                _tkm_anchor_widget=source_button,
+            ),
         )
 
     dialog = TemporalControlsDialog(objects, parent=parent, on_confirmed=_on_confirmed)
@@ -346,6 +360,7 @@ def _open_creation_dialog(objects):
 
 def save_last_used_options(system, position_space, orientation_space, color_suffix):
     from TheKeyMachine.core import settings
+
     settings.set_settings(
         {
             "last_system": system,
@@ -359,6 +374,7 @@ def save_last_used_options(system, position_space, orientation_space, color_suff
 
 def clear_last_used_options():
     from TheKeyMachine.core import settings
+
     settings.set_settings(
         {
             "last_system": DEFAULT_SYSTEM,
@@ -372,32 +388,51 @@ def clear_last_used_options():
 
 def get_last_used_options():
     from TheKeyMachine.core import settings
+
     return {
-        "system": settings.get_setting("last_system", DEFAULT_SYSTEM, namespace=_SETTINGS_NAMESPACE),
-        "position_space": settings.get_setting("last_position_space", DEFAULT_SPACE, namespace=_SETTINGS_NAMESPACE),
-        "orientation_space": settings.get_setting("last_orientation_space", DEFAULT_SPACE, namespace=_SETTINGS_NAMESPACE),
-        "color": settings.get_setting("last_color", None, namespace=_SETTINGS_NAMESPACE),
+        "system": settings.get_setting(
+            "last_system", DEFAULT_SYSTEM, namespace=_SETTINGS_NAMESPACE
+        ),
+        "position_space": settings.get_setting(
+            "last_position_space", DEFAULT_SPACE, namespace=_SETTINGS_NAMESPACE
+        ),
+        "orientation_space": settings.get_setting(
+            "last_orientation_space", DEFAULT_SPACE, namespace=_SETTINGS_NAMESPACE
+        ),
+        "color": settings.get_setting(
+            "last_color", None, namespace=_SETTINGS_NAMESPACE
+        ),
     }
 
 
 def get_bake_mode():
     from TheKeyMachine.core import settings
-    return settings.get_setting("bake_mode", DEFAULT_BAKE_MODE, namespace=_SETTINGS_NAMESPACE)
+
+    return settings.get_setting(
+        "bake_mode", DEFAULT_BAKE_MODE, namespace=_SETTINGS_NAMESPACE
+    )
 
 
 def set_bake_mode(mode_id):
     from TheKeyMachine.core import settings
+
     settings.set_settings({"bake_mode": mode_id}, namespace=_SETTINGS_NAMESPACE)
 
 
 def is_super_mode_enabled():
     from TheKeyMachine.core import settings
-    return bool(settings.get_setting(SUPER_MODE_SETTING, False, namespace=_SETTINGS_NAMESPACE))
+
+    return bool(
+        settings.get_setting(SUPER_MODE_SETTING, False, namespace=_SETTINGS_NAMESPACE)
+    )
 
 
 def set_super_mode_enabled(enabled):
     from TheKeyMachine.core import settings
-    settings.set_settings({SUPER_MODE_SETTING: bool(enabled)}, namespace=_SETTINGS_NAMESPACE)
+
+    settings.set_settings(
+        {SUPER_MODE_SETTING: bool(enabled)}, namespace=_SETTINGS_NAMESPACE
+    )
 
 
 def _super_mode_simulation_flag():
@@ -409,6 +444,7 @@ def _super_mode_simulation_flag():
 # ----------------------------------------------------------------------
 # Create
 # ----------------------------------------------------------------------
+
 
 def create_controls_with_options(
     objects,
@@ -437,11 +473,17 @@ def create_controls_with_options(
     start, end = _time_range_for(objects)
     if start is not None:
         toolCommon.ensure_operation_tint(
-            operation, tint="range", timerange=(start, end), tint_key="temporal_controls",
+            operation,
+            tint="range",
+            timerange=(start, end),
+            tint_key="temporal_controls",
         )
     else:
         toolCommon.ensure_operation_tint(
-            operation, tint="current", default_mode="current_frame", tint_key="temporal_controls",
+            operation,
+            tint="current",
+            default_mode="current_frame",
+            tint_key="temporal_controls",
         )
     options = {
         "system": system,
@@ -452,16 +494,16 @@ def create_controls_with_options(
         "camera": camera,
     }
 
-        # Pre-scan every object that will actually get a new control (not
-        # already one -- _existing_control_for) for whatever pre-existing
-        # animation/attributes it's about to hand off to that control (see
-        # _gather_copyable_animation/_copy_source_keys_to_control): one
-        # build step per object below, plus one step per key time being
-        # copied -- all known up front, so the progress bar's own ETA
-        # reflects the real amount of work instead of just the object
-        # count. A heavily-keyed object (or one with several animated
-        # custom attributes) can take far longer to hand off than the
-        # control build itself.
+    # Pre-scan every object that will actually get a new control (not
+    # already one -- _existing_control_for) for whatever pre-existing
+    # animation/attributes it's about to hand off to that control (see
+    # _gather_copyable_animation/_copy_source_keys_to_control): one
+    # build step per object below, plus one step per key time being
+    # copied -- all known up front, so the progress bar's own ETA
+    # reflects the real amount of work instead of just the object
+    # count. A heavily-keyed object (or one with several animated
+    # custom attributes) can take far longer to hand off than the
+    # control build itself.
     pending = [obj for obj in objects if not _existing_control_for(obj)]
     animation_by_obj = {obj: _gather_copyable_animation(obj) for obj in pending}
     total_steps = len(objects) + sum(
@@ -481,8 +523,12 @@ def create_controls_with_options(
         if not _existing_control_for(obj):
             options["chain_parent"] = chain_parent if system == "fk_chain" else None
             control, chain_anchor = _create_control_for(
-                obj, group.name, options, locked_report=locked_report,
-                operation=operation, animation=animation_by_obj.get(obj),
+                obj,
+                group.name,
+                options,
+                locked_report=locked_report,
+                operation=operation,
+                animation=animation_by_obj.get(obj),
             )
             if control:
                 new_controls.append(control)
@@ -519,10 +565,14 @@ def _warn_locked_attributes(locked_plugs, anchor_widget=None):
             "<text>The following attributes are locked and were left "
             "unconnected:</text>{}"
         ).format(icons.warning, lines)
-        customDialogs.QFlatAutoHideMessage.show_message(tooltip, duration=5000, anchor_widget=anchor_widget)
+        customDialogs.QFlatAutoHideMessage.show_message(
+            tooltip, duration=5000, anchor_widget=anchor_widget
+        )
     except Exception:
         cmds.warning(
-            "Temporal Controls: couldn't connect locked attributes: {}".format(", ".join(short_plugs))
+            "Temporal Controls: couldn't connect locked attributes: {}".format(
+                ", ".join(short_plugs)
+            )
         )
 
 
@@ -562,9 +612,18 @@ def _debug_enabled():
         return False
 
 
-def _debug_log_creation_step(step, obj, options, control=None, delete_root=None, chain_anchor=None,
-                              translate_channels=None, rotate_channels=None, scale_channels=None,
-                              driver_nodes=None):
+def _debug_log_creation_step(
+    step,
+    obj,
+    options,
+    control=None,
+    delete_root=None,
+    chain_anchor=None,
+    translate_channels=None,
+    rotate_channels=None,
+    scale_channels=None,
+    driver_nodes=None,
+):
     """Trace every judgement/input that went into building one control --
     only when TKM_TOOL_DEBUG is on (_debug_enabled) -- so a placement or
     space-driving bug (an object landing at the wrong position/rotation,
@@ -578,39 +637,84 @@ def _debug_log_creation_step(step, obj, options, control=None, delete_root=None,
     lines = ["object: {}".format(obj), "step: {}".format(step)]
     lines.append(
         "options: system={} position_space={} orientation_space={} label={!r} color={}".format(
-            options.get("system"), options.get("position_space"),
-            options.get("orientation_space"), options.get("label"), options.get("color"),
+            options.get("system"),
+            options.get("position_space"),
+            options.get("orientation_space"),
+            options.get("label"),
+            options.get("color"),
         )
     )
     if control and cmds.objExists(control):
         try:
-            obj_pos = cmds.xform(obj, query=True, worldSpace=True, translation=True) if cmds.objExists(obj) else None
-            obj_rot = cmds.xform(obj, query=True, worldSpace=True, rotation=True) if cmds.objExists(obj) else None
-            ctrl_pos = cmds.xform(control, query=True, worldSpace=True, translation=True)
+            obj_pos = (
+                cmds.xform(obj, query=True, worldSpace=True, translation=True)
+                if cmds.objExists(obj)
+                else None
+            )
+            obj_rot = (
+                cmds.xform(obj, query=True, worldSpace=True, rotation=True)
+                if cmds.objExists(obj)
+                else None
+            )
+            ctrl_pos = cmds.xform(
+                control, query=True, worldSpace=True, translation=True
+            )
             ctrl_rot = cmds.xform(control, query=True, worldSpace=True, rotation=True)
         except Exception as exc:
-            obj_pos = obj_rot = ctrl_pos = ctrl_rot = "<xform query failed: {}>".format(exc)
-        lines.append("shape: {}  radius: {}".format(shapes.DEFAULT_SHAPE, _control_radius(obj) if cmds.objExists(obj) else "?"))
-        lines.append("control: {}  delete_root: {}  chain_anchor: {}".format(control, delete_root, chain_anchor))
+            obj_pos = obj_rot = ctrl_pos = ctrl_rot = "<xform query failed: {}>".format(
+                exc
+            )
+        lines.append(
+            "shape: {}  radius: {}".format(
+                shapes.DEFAULT_SHAPE,
+                _control_radius(obj) if cmds.objExists(obj) else "?",
+            )
+        )
+        lines.append(
+            "control: {}  delete_root: {}  chain_anchor: {}".format(
+                control, delete_root, chain_anchor
+            )
+        )
         lines.append("object world xform:   pos={} rot={}".format(obj_pos, obj_rot))
         lines.append("control world xform:  pos={} rot={}".format(ctrl_pos, ctrl_rot))
     if translate_channels is not None or rotate_channels is not None:
-        lines.append("translate_channels: {}  driven through: {}".format(translate_channels, options.get("position_space")))
-        lines.append("rotate_channels: {}  driven through: {}".format(rotate_channels, options.get("orientation_space")))
-        lines.append("scale_channels (present but not driven -- see _create_control_for): {}".format(scale_channels))
+        lines.append(
+            "translate_channels: {}  driven through: {}".format(
+                translate_channels, options.get("position_space")
+            )
+        )
+        lines.append(
+            "rotate_channels: {}  driven through: {}".format(
+                rotate_channels, options.get("orientation_space")
+            )
+        )
+        lines.append(
+            "scale_channels (present but not driven -- see _create_control_for): {}".format(
+                scale_channels
+            )
+        )
         lines.append("driver_nodes: {}".format(driver_nodes))
     print("[TKM Temporal Controls] {}".format(lines[0]))
     for line in lines[1:]:
         print("    {}".format(line))
 
 
-def _create_control_for(obj, group, options, locked_report=None, operation=None, animation=None):
+def _create_control_for(
+    obj, group, options, locked_report=None, operation=None, animation=None
+):
     control, delete_root, chain_anchor = _build_control_hierarchy(obj, group, options)
-    _debug_log_creation_step("built", obj, options, control=control, delete_root=delete_root, chain_anchor=chain_anchor)
+    _debug_log_creation_step(
+        "built",
+        obj,
+        options,
+        control=control,
+        delete_root=delete_root,
+        chain_anchor=chain_anchor,
+    )
 
     if options.get("color"):
         # Color the whole hierarchy this System built -- not just *control* --
-        # so a helper like the Aim system's aim-target control picks up the
+        # so a secondary control like Aim's target picks up the
         # chosen color too instead of being left at its unstyled default.
         _apply_control_color(delete_root, options["color"])
 
@@ -632,9 +736,14 @@ def _create_control_for(obj, group, options, locked_report=None, operation=None,
         # chain instead and came up empty, silently dropping control out
         # of every rig's list (and, transitively, anything nested on top
         # of it afterward, e.g. an Add Child control added to it later).
-        _parent_nested_control(control, obj)
+        obj = _parent_nested_control(control, obj)
         _tag_control(control, obj, delete_root)
-        _debug_log_creation_step("nested (parented directly, no channel-driving)", obj, options, control=control)
+        _debug_log_creation_step(
+            "nested (parented directly, no channel-driving)",
+            obj,
+            options,
+            control=control,
+        )
         return control, chain_anchor
 
     _tag_control(control, obj, delete_root)
@@ -647,9 +756,16 @@ def _create_control_for(obj, group, options, locked_report=None, operation=None,
     # constraint. *animation* lets create_controls_with_options pass in
     # what it already scanned obj for up front (to size its progress bar's
     # total correctly) instead of this scanning obj all over again.
-    translate_key_data, rotate_key_data, extra_attrs = animation or _gather_copyable_animation(obj)
+    translate_key_data, rotate_key_data, extra_attrs = (
+        animation or _gather_copyable_animation(obj)
+    )
     copied_attrs = _copy_source_keys_to_control(
-        control, obj, translate_key_data, rotate_key_data, extra_attrs, operation=operation,
+        control,
+        obj,
+        translate_key_data,
+        rotate_key_data,
+        extra_attrs,
+        operation=operation,
     )
     if copied_attrs:
         TkmSceneNode(control).set_attr(COPIED_ATTRS_ATTR, json.dumps(copied_attrs))
@@ -675,14 +791,24 @@ def _create_control_for(obj, group, options, locked_report=None, operation=None,
     node = TkmSceneNode(control)
     if translate_channels:
         driver_nodes["translate"] = _drive_group(
-            control, obj, translate_channels, options["position_space"], restore_map,
-            locked_report=locked_report, space_source=options.get("camera"),
+            control,
+            obj,
+            translate_channels,
+            options["position_space"],
+            restore_map,
+            locked_report=locked_report,
+            space_source=options.get("camera"),
         )
         node.set_attr(POSITION_SPACE_ATTR, options["position_space"])
     if rotate_channels:
         driver_nodes["rotate"] = _drive_group(
-            control, obj, rotate_channels, options["orientation_space"], restore_map,
-            locked_report=locked_report, space_source=options.get("camera"),
+            control,
+            obj,
+            rotate_channels,
+            options["orientation_space"],
+            restore_map,
+            locked_report=locked_report,
+            space_source=options.get("camera"),
         )
         node.set_attr(ORIENTATION_SPACE_ATTR, options["orientation_space"])
     # Scale connection is temporarily disabled -- scaleConstraint has been
@@ -701,26 +827,35 @@ def _create_control_for(obj, group, options, locked_report=None, operation=None,
     # as "locked" from the start rather than defaulting to unlocked --
     # matches how most controls get built in practice (one space picked for
     # both), and lets the panel show the lock already toggled for them.
-    if translate_channels and rotate_channels and options["position_space"] == options["orientation_space"]:
+    if (
+        translate_channels
+        and rotate_channels
+        and options["position_space"] == options["orientation_space"]
+    ):
         node.set_attr(LOCK_SPACE_ATTR, True, attributeType="bool")
 
     _debug_log_creation_step(
-        "driven", obj, options, control=control,
-        translate_channels=translate_channels, rotate_channels=rotate_channels,
-        scale_channels=scale_channels, driver_nodes=driver_nodes,
+        "driven",
+        obj,
+        options,
+        control=control,
+        translate_channels=translate_channels,
+        rotate_channels=rotate_channels,
+        scale_channels=scale_channels,
+        driver_nodes=driver_nodes,
     )
     return control, chain_anchor
 
 
 def _build_control_hierarchy(obj, group, options):
-    """Build the control (and, for some Systems, its helper nodes).
+    """Build the control (and, for some Systems, its secondary nodes).
 
     Returns ``(control, delete_root, chain_anchor)``:
 
     - *delete_root* is the node Bake/Revert should ``cmds.delete()`` to
       remove everything this System added (the control itself for Simple/FK
       Chain, or the offset buffer for Group/Aim, whose deletion cascades to
-      the control and any helper control/constraint parented under it).
+      the control and any secondary control/constraint parented under it).
     - *chain_anchor* is the node the *next* object's control should parent
       under when System is FK Chain (always the control itself, so each
       link visually carries the next -- never the buffer).
@@ -731,7 +866,9 @@ def _build_control_hierarchy(obj, group, options):
     short_name = obj.split("|")[-1].split(":")[-1]
     base_name = "{}_{}".format(label, short_name) if label else short_name
 
-    control = shapes.build(shapes.DEFAULT_SHAPE, "{}_temporalCtrl#".format(base_name), radius)
+    control = shapes.build(
+        shapes.DEFAULT_SHAPE, "{}_temporalCtrl#".format(base_name), radius
+    )
     cmds.matchTransform(control, obj, position=True, rotation=True, scale=False)
 
     top_node = control
@@ -753,13 +890,26 @@ def _add_aim_target(control, buffer_node, base_name, radius):
     # Built from shapes.SHAPES rather than cmds.spaceLocator -- a real curve
     # control instead of a raw Maya locator, so it picks up
     # _apply_control_color like every other control here.
+    target_radius = max(radius * 0.15, 0.5)
     aim_target = shapes.build(
-        AIM_TARGET_SHAPE, "{}_temporalAim#".format(base_name), max(radius * 0.15, 0.5),
+        AIM_TARGET_SHAPE,
+        "{}_temporalAim#".format(base_name),
+        target_radius,
     )
+    _initialize_control_visual_state(aim_target, target_radius, AIM_TARGET_SHAPE)
     cmds.matchTransform(aim_target, control, position=True, rotation=True)
-    cmds.setAttr(aim_target + ".translateZ", cmds.getAttr(aim_target + ".translateZ") + radius * 2.0)
+    cmds.setAttr(
+        aim_target + ".translateZ",
+        cmds.getAttr(aim_target + ".translateZ") + radius * 2.0,
+    )
     cmds.parent(aim_target, buffer_node)
-    cmds.aimConstraint(aim_target, control, worldUpType="scene", aimVector=(0, 0, 1), maintainOffset=False)
+    cmds.aimConstraint(
+        aim_target,
+        control,
+        worldUpType="scene",
+        aimVector=(0, 0, 1),
+        maintainOffset=False,
+    )
 
 
 def _control_radius(obj):
@@ -778,9 +928,9 @@ def _control_radius(obj):
 
 def _apply_control_color(root, color_hex):
     """Color *root* and everything under it -- not just *root*'s own shapes --
-    so a helper control parented alongside/under it (the Aim system's
+    so a secondary control parented alongside/under it (the Aim system's
     aim-target, the Group/Aim buffer) picks up the chosen color too, instead
-    of only the top control being styled while its helpers stay default."""
+    of only the top control being styled while secondary nodes stay default."""
     rgb = _hex_to_rgb01(color_hex)
     descendants = cmds.listRelatives(root, allDescendents=True, fullPath=True) or []
     for node in [root] + descendants:
@@ -796,7 +946,7 @@ def _hex_to_rgb01(color_hex):
     if len(color_hex) != 6:
         return (0.2, 0.6, 0.8)
     try:
-        return tuple(int(color_hex[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+        return tuple(int(color_hex[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
     except ValueError:
         return (0.2, 0.6, 0.8)
 
@@ -810,9 +960,9 @@ def _hex_to_rgb01(color_hex):
 # whatever shape is currently active, and the CVs themselves stay the only
 # source of truth (SIZE_MULT_ATTR/ORIENTATION_ATTR just track the
 # accumulated total so a later shape swap can rebuild at the same size/
-# orientation). Only control's own shape nodes are touched -- a System's
-# helper nodes (Aim's aim-target, Group/Aim's buffer) are a deliberate v1
-# scope cut, not part of this.
+# orientation). Only the selected control's own shape nodes are touched, so
+# main and secondary controls can be edited independently.
+
 
 def _control_shape_nodes(control):
     return cmds.listRelatives(control, shapes=True, fullPath=True) or []
@@ -821,9 +971,29 @@ def _control_shape_nodes(control):
 def _control_base_radius(control):
     stored = TkmSceneNode(control).get_attr(BASE_RADIUS_ATTR)
     try:
-        return float(stored) if stored is not None else DEFAULT_RADIUS
+        if stored is not None:
+            return float(stored)
     except (TypeError, ValueError):
-        return DEFAULT_RADIUS
+        pass
+    # Aim controls created before secondary controls received visual-state
+    # metadata still need shape swaps to preserve their current size.
+    try:
+        bbox = cmds.xform(control, query=True, boundingBox=True)
+    except RuntimeError:
+        bbox = None
+    if bbox and len(bbox) == 6:
+        span = max(bbox[3] - bbox[0], bbox[4] - bbox[1], bbox[5] - bbox[2])
+        if span > 1e-6:
+            return span * 0.5
+    return DEFAULT_RADIUS
+
+
+def _ensure_control_base_radius(control):
+    """Persist an inferred radius before editing a legacy secondary control."""
+    radius = _control_base_radius(control)
+    if not cmds.objExists(_plug(control, BASE_RADIUS_ATTR)):
+        TkmSceneNode(control).set_attr(BASE_RADIUS_ATTR, radius)
+    return radius
 
 
 def get_control_size_mult(control):
@@ -840,7 +1010,14 @@ def get_control_orientation(control):
 
 
 def get_control_shape_id(control):
-    return TkmSceneNode(control).get_attr(SHAPE_ATTR) or shapes.DEFAULT_SHAPE
+    stored = TkmSceneNode(control).get_attr(SHAPE_ATTR)
+    if stored:
+        return stored
+    # Backward compatibility for Aim target controls created before their
+    # visual state was recorded explicitly.
+    if "_temporalAim" in str(control).rsplit("|", 1)[-1]:
+        return AIM_TARGET_SHAPE
+    return shapes.DEFAULT_SHAPE
 
 
 def _shape_cv_selector(shape_nodes):
@@ -862,7 +1039,9 @@ def _shape_color(control):
     shape nodes (if any), so a shape swap (set_control_shape) can re-apply
     it to the new shape instead of resetting to Maya's default gray."""
     for shape_node in _control_shape_nodes(control):
-        if cmds.attributeQuery("overrideRGBColors", node=shape_node, exists=True) and cmds.getAttr(shape_node + ".overrideRGBColors"):
+        if cmds.attributeQuery(
+            "overrideRGBColors", node=shape_node, exists=True
+        ) and cmds.getAttr(shape_node + ".overrideRGBColors"):
             return tuple(cmds.getAttr(shape_node + ".overrideColorRGB")[0])
     return None
 
@@ -886,7 +1065,28 @@ def get_control_color(control):
     rgb = _shape_color(control)
     if not rgb:
         return None
-    return "#{:02x}{:02x}{:02x}".format(*(max(0, min(255, round(channel * 255))) for channel in rgb))
+    return "#{:02x}{:02x}{:02x}".format(
+        *(max(0, min(255, round(channel * 255))) for channel in rgb)
+    )
+
+
+def set_control_color(control, color_hex):
+    """Apply *color_hex* to an existing Temporal Control hierarchy."""
+    if not cmds.objExists(control) or not _is_temporal_control(control):
+        return False
+    delete_root = TkmSceneNode(control).get_attr(DELETE_ROOT_ATTR) or control
+    if not cmds.objExists(delete_root):
+        delete_root = control
+    _apply_control_color(delete_root, color_hex)
+    return True
+
+
+def set_rig_color(root_target, color_hex):
+    """Apply one color to every Temporal Control belonging to a panel rig."""
+    changed = False
+    for control in list_rigs().get(root_target, []):
+        changed = set_control_color(control, color_hex) or changed
+    return changed
 
 
 def scale_control(control, factor):
@@ -903,14 +1103,22 @@ def scale_control(control, factor):
     sitting away from the scene origin was visibly growing away from world
     (0, 0, 0) instead of from its own center every time this ran.
     """
-    if not cmds.objExists(control) or not factor or factor <= 0 or abs(factor - 1.0) < 1e-9:
+    if (
+        not cmds.objExists(control)
+        or not factor
+        or factor <= 0
+        or abs(factor - 1.0) < 1e-9
+    ):
         return False
     cvs = _shape_cv_selector(_control_shape_nodes(control))
     if not cvs:
         return False
+    _ensure_control_base_radius(control)
     for cv in cvs:
         x, y, z = cmds.xform(cv, query=True, translation=True, objectSpace=True)
-        cmds.xform(cv, translation=(x * factor, y * factor, z * factor), objectSpace=True)
+        cmds.xform(
+            cv, translation=(x * factor, y * factor, z * factor), objectSpace=True
+        )
     node = TkmSceneNode(control)
     node.set_attr(SIZE_MULT_ATTR, get_control_size_mult(control) * factor)
     return True
@@ -925,7 +1133,11 @@ def _rotate_point(x, y, z, axis, degrees):
         return x, y * cos_t - z * sin_t, y * sin_t + z * cos_t
     if axis == "z":
         return x * cos_t - y * sin_t, x * sin_t + y * cos_t, z
-    return x * cos_t + z * sin_t, y, -x * sin_t + z * cos_t  # "y", unused today but complete
+    return (
+        x * cos_t + z * sin_t,
+        y,
+        -x * sin_t + z * cos_t,
+    )  # "y", unused today but complete
 
 
 def _apply_orientation_transform(cvs, transform):
@@ -938,7 +1150,9 @@ def _apply_orientation_transform(cvs, transform):
     axis, degrees = transform
     for cv in cvs:
         x, y, z = cmds.xform(cv, query=True, translation=True, objectSpace=True)
-        cmds.xform(cv, translation=_rotate_point(x, y, z, axis, degrees), objectSpace=True)
+        cmds.xform(
+            cv, translation=_rotate_point(x, y, z, axis, degrees), objectSpace=True
+        )
 
 
 def set_control_orientation(control, orientation_id):
@@ -991,7 +1205,9 @@ def set_control_orientation(control, orientation_id):
                 x, y, z = _rotate_point(x, y, z, axis, degrees)
             cmds.xform(cv, translation=(x, y, z), objectSpace=True)
     except RuntimeError as exc:
-        cmds.warning("Temporal Controls Panel: couldn't orient {}: {}".format(control, exc))
+        cmds.warning(
+            "Temporal Controls Panel: couldn't orient {}: {}".format(control, exc)
+        )
         return False
     node = TkmSceneNode(control)
     node.set_attr(ORIENTATION_ATTR, orientation_id)
@@ -1009,7 +1225,7 @@ def set_control_shape(control, shape_id):
 
     color = _shape_color(control)
     old_shapes = _control_shape_nodes(control)
-    radius = _control_base_radius(control) * get_control_size_mult(control)
+    radius = _ensure_control_base_radius(control) * get_control_size_mult(control)
 
     short_name = control.split("|")[-1].split(":")[-1]
     temp = shapes.build(shape_id, "{}_shapeSwap#".format(short_name), radius)
@@ -1019,7 +1235,9 @@ def set_control_shape(control, shape_id):
         # control is currently in on top of that, same as set_control_orientation
         # does for an existing shape's CVs.
         orientation_id = get_control_orientation(control)
-        cvs = _shape_cv_selector(cmds.listRelatives(temp, shapes=True, fullPath=True) or [])
+        cvs = _shape_cv_selector(
+            cmds.listRelatives(temp, shapes=True, fullPath=True) or []
+        )
         _apply_orientation_transform(cvs, _ORIENTATION_TRANSFORMS.get(orientation_id))
 
         for shape_node in cmds.listRelatives(temp, shapes=True, fullPath=True) or []:
@@ -1058,11 +1276,22 @@ def _tag_control(control, obj, delete_root):
     written once real driving happens (_create_control_for), and both
     readers (_restore_map_for, _driver_nodes_for) already treat a plug that
     was never created as empty."""
+    target_matches = cmds.ls(obj, long=True) if obj else []
+    delete_root_matches = cmds.ls(delete_root, long=True)
+    if obj and not target_matches:
+        raise RuntimeError("Temporal Controls target no longer exists: {}".format(obj))
+    if not delete_root_matches:
+        raise RuntimeError(
+            "Temporal Controls hierarchy no longer exists: {}".format(delete_root)
+        )
+
     node = TkmSceneNode(control)
     node.set_attr(TAG_ATTR, True, attributeType="bool")
-    node.set_attr(TARGET_ATTR, cmds.ls(obj, long=True)[0] if obj else "")
-    node.set_attr(DELETE_ROOT_ATTR, cmds.ls(delete_root, long=True)[0])
-    node.set_attr(BASE_RADIUS_ATTR, _control_radius(obj) if obj else _control_radius(control))
+    node.set_attr(TARGET_ATTR, target_matches[0] if target_matches else "")
+    node.set_attr(DELETE_ROOT_ATTR, delete_root_matches[0])
+    node.set_attr(
+        BASE_RADIUS_ATTR, _control_radius(obj) if obj else _control_radius(control)
+    )
     for attr in (TAG_ATTR, TARGET_ATTR, DELETE_ROOT_ATTR, BASE_RADIUS_ATTR):
         cmds.setAttr(_plug(control, attr), lock=True)
     # Shape/size/orientation state -- left unlocked, the Temp Controls
@@ -1070,7 +1299,25 @@ def _tag_control(control, obj, delete_root):
     # scale_control, set_control_orientation). Every control starts life
     # built from shapes.DEFAULT_SHAPE (_build_control_hierarchy /
     # add_child_control), so that's the accurate starting tag here.
-    node.set_attr(SHAPE_ATTR, shapes.DEFAULT_SHAPE)
+    _initialize_control_visual_state(
+        control,
+        _control_radius(obj) if obj else _control_radius(control),
+        shapes.DEFAULT_SHAPE,
+    )
+
+
+def _initialize_control_visual_state(control, base_radius, shape_id):
+    """Record the panel-editable appearance of any curve control.
+
+    Secondary system controls intentionally remain outside TAG_ATTR so bake,
+    revert, and space-driving discovery keep their existing ownership. Their
+    shape, size, and orientation are nevertheless edited by the same panel
+    APIs as tagged controls, so those three pieces of state live on both.
+    """
+    node = TkmSceneNode(control)
+    if not cmds.objExists(_plug(control, BASE_RADIUS_ATTR)):
+        node.set_attr(BASE_RADIUS_ATTR, base_radius)
+    node.set_attr(SHAPE_ATTR, shape_id)
     node.set_attr(SIZE_MULT_ATTR, DEFAULT_SIZE_MULT)
     node.set_attr(ORIENTATION_ATTR, DEFAULT_ORIENTATION)
 
@@ -1191,13 +1438,25 @@ def _ensure_matching_attribute(control, obj, attr_name, enum_names):
         if attr_type == "enum":
             if not enum_names:
                 return False
-            cmds.addAttr(control, longName=attr_name, attributeType="enum", enumName=enum_names, keyable=True)
+            cmds.addAttr(
+                control,
+                longName=attr_name,
+                attributeType="enum",
+                enumName=enum_names,
+                keyable=True,
+            )
         elif attr_type == "bool":
-            cmds.addAttr(control, longName=attr_name, attributeType="bool", keyable=True)
+            cmds.addAttr(
+                control, longName=attr_name, attributeType="bool", keyable=True
+            )
         elif attr_type in ("long", "short", "byte"):
-            cmds.addAttr(control, longName=attr_name, attributeType="long", keyable=True)
+            cmds.addAttr(
+                control, longName=attr_name, attributeType="long", keyable=True
+            )
         elif attr_type in ("double", "float", "doubleLinear", "doubleAngle"):
-            cmds.addAttr(control, longName=attr_name, attributeType=attr_type, keyable=True)
+            cmds.addAttr(
+                control, longName=attr_name, attributeType=attr_type, keyable=True
+            )
         else:
             return False
     except RuntimeError:
@@ -1207,7 +1466,9 @@ def _ensure_matching_attribute(control, obj, attr_name, enum_names):
     return True
 
 
-def _copy_driven_channel_keys(sample_node, control, channel_key_data, cleanup, operation=None):
+def _copy_driven_channel_keys(
+    sample_node, control, channel_key_data, cleanup, operation=None
+):
     """Copy/Paste-style copy from a temporarily-driven sampling node.
 
     First sample ``frames``/``values`` per channel while the temporary
@@ -1262,7 +1523,9 @@ def _copy_driven_channel_keys(sample_node, control, channel_key_data, cleanup, o
                 operation.step()
 
 
-def _copy_source_keys_to_control(control, obj, translate_key_data, rotate_key_data, extra_attrs, operation=None):
+def _copy_source_keys_to_control(
+    control, obj, translate_key_data, rotate_key_data, extra_attrs, operation=None
+):
     """Give *control* a real copy of *obj*'s own pre-existing animation --
     translate/rotate (if keyed) and every entry in *extra_attrs* (enums
     included) -- before _capture_channel below disconnects any of it from
@@ -1332,28 +1595,29 @@ def _copy_source_keys_to_control(control, obj, translate_key_data, rotate_key_da
                 constraint_kwargs["skipTranslate"] = ("x", "y", "z")
             if not rotate_key_data:
                 constraint_kwargs["skipRotate"] = ("x", "y", "z")
-            constraint = cmds.parentConstraint(
-                obj, sampler, **constraint_kwargs
-            )[0]
+            constraint = cmds.parentConstraint(obj, sampler, **constraint_kwargs)[0]
 
             def _delete_sampler():
                 nodes = [
-                    node for node in (constraint, sampler)
+                    node
+                    for node in (constraint, sampler)
                     if node and cmds.objExists(node)
                 ]
                 if nodes:
                     cmds.delete(nodes)
 
             _copy_driven_channel_keys(
-                sampler, control, spatial_key_data, _delete_sampler,
+                sampler,
+                control,
+                spatial_key_data,
+                _delete_sampler,
                 operation=operation,
             )
         finally:
             # _copy_driven_channel_keys normally owns cleanup. This covers
             # failures while constructing the temporary constraint too.
             nodes = [
-                node for node in (constraint, sampler)
-                if node and cmds.objExists(node)
+                node for node in (constraint, sampler) if node and cmds.objExists(node)
             ]
             if nodes:
                 cmds.delete(nodes)
@@ -1378,6 +1642,7 @@ def _copy_source_keys_to_control(control, obj, translate_key_data, rotate_key_da
         copied_attrs.append(attr_name)
 
     if extra_key_data:
+
         def _disconnect_extra_attrs():
             for source_plug, destination_plug in extra_connections:
                 try:
@@ -1387,7 +1652,10 @@ def _copy_source_keys_to_control(control, obj, translate_key_data, rotate_key_da
                     pass
 
         _copy_driven_channel_keys(
-            control, control, extra_key_data, _disconnect_extra_attrs,
+            control,
+            control,
+            extra_key_data,
+            _disconnect_extra_attrs,
             operation=operation,
         )
 
@@ -1426,7 +1694,9 @@ def _capture_channel(control, obj, channel):
         return None
 
     base_value = cmds.getAttr(obj_plug)
-    connections = cmds.listConnections(obj_plug, source=True, destination=False, plugs=True) or []
+    connections = (
+        cmds.listConnections(obj_plug, source=True, destination=False, plugs=True) or []
+    )
     source_plug = connections[0] if connections else None
 
     if source_plug:
@@ -1435,7 +1705,11 @@ def _capture_channel(control, obj, channel):
             # Already driven by a constraint/expression/other setup -- leave it alone.
             return None
         cmds.disconnectAttr(source_plug, obj_plug)
-        return channel, {"mode": "curve", "source": source_plug, "base_value": base_value}
+        return channel, {
+            "mode": "curve",
+            "source": source_plug,
+            "base_value": base_value,
+        }
 
     if not cmds.getAttr(obj_plug, settable=True):
         return None
@@ -1446,6 +1720,7 @@ def _capture_channel(control, obj, channel):
 # ----------------------------------------------------------------------
 # Position / Orientation space driving
 # ----------------------------------------------------------------------
+
 
 def _active_viewport_camera():
     """Return the transform of the best available model-panel camera."""
@@ -1464,9 +1739,7 @@ def _active_viewport_camera():
             if not camera or not cmds.objExists(camera):
                 continue
             if cmds.nodeType(camera) == "camera":
-                parents = cmds.listRelatives(
-                    camera, parent=True, fullPath=True
-                ) or []
+                parents = cmds.listRelatives(camera, parent=True, fullPath=True) or []
                 camera = parents[0] if parents else None
             if camera and cmds.objExists(camera):
                 return (cmds.ls(camera, long=True) or [camera])[0]
@@ -1496,12 +1769,8 @@ def _set_locked_string_attr(node, attribute, value):
 def _ensure_camera_space_hierarchy(control):
     """Insert independent position/orientation anchors above a control."""
     control = (cmds.ls(control, long=False) or [control])[0]
-    position_group = _stored_space_group(
-        control, CAMERA_POSITION_GROUP_ATTR
-    )
-    orientation_group = _stored_space_group(
-        control, CAMERA_ORIENTATION_GROUP_ATTR
-    )
+    position_group = _stored_space_group(control, CAMERA_POSITION_GROUP_ATTR)
+    orientation_group = _stored_space_group(control, CAMERA_ORIENTATION_GROUP_ATTR)
     if position_group and orientation_group:
         return position_group, orientation_group
 
@@ -1512,21 +1781,15 @@ def _ensure_camera_space_hierarchy(control):
 
     delete_root = (cmds.ls(delete_root, long=True) or [delete_root])[0]
     parent = cmds.listRelatives(delete_root, parent=True, fullPath=True) or []
-    position = cmds.xform(
-        delete_root, query=True, worldSpace=True, translation=True
-    )
-    rotation = cmds.xform(
-        delete_root, query=True, worldSpace=True, rotation=True
-    )
+    position = cmds.xform(delete_root, query=True, worldSpace=True, translation=True)
+    rotation = cmds.xform(delete_root, query=True, worldSpace=True, rotation=True)
     short_name = control.rsplit("|", 1)[-1]
 
     position_group = cmds.createNode(
         "transform", name="{}_cameraPositionSpace#".format(short_name)
     )
     if parent:
-        position_group = cmds.parent(
-            position_group, parent[0], absolute=True
-        )[0]
+        position_group = cmds.parent(position_group, parent[0], absolute=True)[0]
     cmds.xform(position_group, worldSpace=True, translation=position)
 
     orientation_group = cmds.createNode(
@@ -1543,15 +1806,11 @@ def _ensure_camera_space_hierarchy(control):
     cmds.parent(delete_root, orientation_group, absolute=True)
 
     position_group = (cmds.ls(position_group, long=True) or [position_group])[0]
-    orientation_group = (
-        cmds.ls(orientation_group, long=True) or [orientation_group]
-    )[0]
-    _set_locked_string_attr(
-        control, CAMERA_POSITION_GROUP_ATTR, position_group
-    )
-    _set_locked_string_attr(
-        control, CAMERA_ORIENTATION_GROUP_ATTR, orientation_group
-    )
+    orientation_group = (cmds.ls(orientation_group, long=True) or [orientation_group])[
+        0
+    ]
+    _set_locked_string_attr(control, CAMERA_POSITION_GROUP_ATTR, position_group)
+    _set_locked_string_attr(control, CAMERA_ORIENTATION_GROUP_ATTR, orientation_group)
     _set_locked_string_attr(control, DELETE_ROOT_ATTR, position_group)
     return position_group, orientation_group
 
@@ -1561,9 +1820,7 @@ def _camera_space_driver(control, group_kind, camera):
     if not camera or not cmds.objExists(camera):
         raise RuntimeError("Camera Space requires an active viewport camera")
     position_group, orientation_group = _ensure_camera_space_hierarchy(control)
-    driven_group = (
-        position_group if group_kind == "translate" else orientation_group
-    )
+    driven_group = position_group if group_kind == "translate" else orientation_group
     if not driven_group:
         raise RuntimeError("Could not create the Camera Space hierarchy")
 
@@ -1586,12 +1843,9 @@ def _camera_space_driver(control, group_kind, camera):
         cmds.setAttr(_plug(marker, "hiddenInOutliner"), True)
 
     constrain = (
-        cmds.pointConstraint if group_kind == "translate"
-        else cmds.orientConstraint
+        cmds.pointConstraint if group_kind == "translate" else cmds.orientConstraint
     )
-    constraint = constrain(
-        marker, driven_group, maintainOffset=False
-    )[0]
+    constraint = constrain(marker, driven_group, maintainOffset=False)[0]
     control = (cmds.ls(control, long=False) or [control])[0]
     source_attribute = (
         CAMERA_POSITION_SOURCE_ATTR
@@ -1632,14 +1886,16 @@ def _drive_group(
     group_kind = "translate" if channels[0].startswith("translate") else "rotate"
 
     if space_mode in ("relative", "grab_release", "child"):
-        return _drive_with_constraint(control, obj, group_kind, maintain_offset=True, locked_report=locked_report)
+        return _drive_with_constraint(
+            control, obj, group_kind, maintain_offset=True, locked_report=locked_report
+        )
 
     if space_mode in ("object", "world"):
-        return _drive_with_constraint(control, obj, group_kind, maintain_offset=False, locked_report=locked_report)
-    if space_mode == "camera":
-        camera_nodes = _camera_space_driver(
-            control, group_kind, space_source
+        return _drive_with_constraint(
+            control, obj, group_kind, maintain_offset=False, locked_report=locked_report
         )
+    if space_mode == "camera":
+        camera_nodes = _camera_space_driver(control, group_kind, space_source)
         return camera_nodes + _drive_with_constraint(
             control,
             obj,
@@ -1663,7 +1919,9 @@ _CONSTRAINT_COMMANDS = {
 }
 
 
-def _drive_with_constraint(control, obj, group_kind, maintain_offset, locked_report=None):
+def _drive_with_constraint(
+    control, obj, group_kind, maintain_offset, locked_report=None
+):
     """Constrain *obj* to *control* with a real point/orient/scale
     constraint -- "parents" -- and prime a keyframe on *obj* first if it has
     none, so Maya wires in its automatic ``blendParent1``/pairBlend blend
@@ -1722,7 +1980,12 @@ def _drive_with_constraint(control, obj, group_kind, maintain_offset, locked_rep
                 cmds.setKeyframe(plug, value=cmds.getAttr(plug))
             except RuntimeError:
                 continue
-            primed_curves += cmds.listConnections(plug, source=True, destination=False, type="animCurve") or []
+            primed_curves += (
+                cmds.listConnections(
+                    plug, source=True, destination=False, type="animCurve"
+                )
+                or []
+            )
 
     if len(skip_axes) == len(channels):
         # Every channel in this group is locked -- nothing left to
@@ -1744,7 +2007,11 @@ def _drive_with_constraint(control, obj, group_kind, maintain_offset, locked_rep
         try:
             node = constrain(control, obj, **constrain_kwargs)[0]
         except RuntimeError as exc:
-            cmds.warning("Temporal Controls: couldn't drive {} on {}: {}".format(group_kind, obj, exc))
+            cmds.warning(
+                "Temporal Controls: couldn't drive {} on {}: {}".format(
+                    group_kind, obj, exc
+                )
+            )
             return []
 
     driver_nodes = [node]
@@ -1755,7 +2022,10 @@ def _drive_with_constraint(control, obj, group_kind, maintain_offset, locked_rep
         plug = _plug(obj, channel)
         if not cmds.objExists(plug):
             continue
-        pair_blends = cmds.listConnections(plug, source=True, destination=False, type="pairBlend") or []
+        pair_blends = (
+            cmds.listConnections(plug, source=True, destination=False, type="pairBlend")
+            or []
+        )
         for pair_blend in pair_blends:
             if pair_blend not in driver_nodes:
                 driver_nodes.append(pair_blend)
@@ -1766,6 +2036,7 @@ def _drive_with_constraint(control, obj, group_kind, maintain_offset, locked_rep
 # ----------------------------------------------------------------------
 # Bake / Revert
 # ----------------------------------------------------------------------
+
 
 def bake_control(control):
     """Bake -- and remove -- a single Temporal Control: extract its
@@ -1799,7 +2070,7 @@ def bake_control(control):
         # with (see _parent_nested_control), so the ordering makes no
         # difference for it, but there's no reason to special-case it.
         if nested_parent is not None:
-            _bake_nested_control(control, target, nested_parent)
+            target = _bake_nested_control(control, target, nested_parent)
         elif get_bake_mode() == "frames":
             _bake_frames_to_target(control, target)
         else:
@@ -1827,7 +2098,10 @@ def bake_controls(*_args, tool_operation=None):
     start, end = _time_range_for(controls)
     if start is not None:
         toolCommon.ensure_operation_tint(
-            operation, tint="range", timerange=(start, end), tint_key="temporal_controls_bake",
+            operation,
+            tint="range",
+            timerange=(start, end),
+            tint_key="temporal_controls_bake",
         )
     operation.set_total(len(controls)).set_status("Baking Temporal Controls")
 
@@ -1888,20 +2162,43 @@ def _camera_space_key_times(control, group_kind):
     if not camera:
         return []
     try:
-        return cmds.keyframe(
-            camera, query=True, timeChange=True, hierarchy="above"
-        ) or []
+        return (
+            cmds.keyframe(camera, query=True, timeChange=True, hierarchy="above") or []
+        )
     except (RuntimeError, TypeError, ValueError):
         return cmds.keyframe(camera, query=True, timeChange=True) or []
 
 
 def _control_motion_range(control):
-    times = list(
-        cmds.keyframe(control, query=True, timeChange=True) or []
-    )
+    times = list(cmds.keyframe(control, query=True, timeChange=True) or [])
     times.extend(_camera_space_key_times(control, "translate"))
     times.extend(_camera_space_key_times(control, "rotate"))
     return (min(times), max(times)) if times else (None, None)
+
+
+def _bakeable_target_channels(control, target, restore_map=None):
+    """Driven, unlocked channels that can be baked from *control* to *target*."""
+    return [
+        channel
+        for channel in (restore_map.keys() if restore_map else CHANNELS)
+        if cmds.objExists(_plug(control, channel))
+        and cmds.objExists(_plug(target, channel))
+        and not cmds.getAttr(_plug(target, channel), lock=True)
+    ]
+
+
+def _bake_current_pose_to_target(control, target, restore_map=None):
+    """Commit the live evaluated pose at the current frame.
+
+    A control with no keys still has a meaningful pose. Explicitly baking
+    that one frame before its driver nodes are removed avoids relying on a
+    constraint/pairBlend teardown to leave the target at its driven value.
+    """
+    channels = _bakeable_target_channels(control, target, restore_map)
+    if not channels:
+        return False
+    current = cmds.currentTime(query=True)
+    return _bake_range_to_target(target, channels, current, current)
 
 
 def _extract_keys_to_target(control, target, restore_map):
@@ -1911,10 +2208,9 @@ def _extract_keys_to_target(control, target, restore_map):
 
     This must run while *target* is still actually being driven by the
     live constraint (before ``_delete_driver_nodes`` -- see ``bake_control``,
-    which now calls this first). A channel control has no keys on needs
-    nothing done at all: target is already sitting at the right, live,
-    driven value, and it just stays there, frozen, the moment the driver
-    nodes come down right after this returns.
+    which now calls this first). When the control has no keys at all, its
+    current evaluated pose is baked as a single frame before the driver
+    nodes come down.
 
     For a keyed channel, this used to ``copyKey``/``pasteKey`` control's
     own curve directly onto target -- copying control's raw *local* number
@@ -1940,17 +2236,13 @@ def _extract_keys_to_target(control, target, restore_map):
     have that problem since it drives each frame's evaluation itself
     rather than writing keys as it goes.)
     """
-    channels = [
-        channel for channel in (restore_map.keys() if restore_map else CHANNELS)
-        if cmds.objExists(_plug(control, channel))
-        and cmds.objExists(_plug(target, channel))
-        and not cmds.getAttr(_plug(target, channel), lock=True)
-    ]
+    channels = _bakeable_target_channels(control, target, restore_map)
     if not channels:
         return
 
     keyed_channels = [
-        channel for channel in channels
+        channel
+        for channel in channels
         if cmds.keyframe(_plug(control, channel), query=True, keyframeCount=True)
     ]
     camera_key_times = {
@@ -1968,6 +2260,7 @@ def _extract_keys_to_target(control, target, restore_map):
         )
     bake_channels = list(dict.fromkeys(keyed_channels + camera_channels))
     if not bake_channels:
+        _bake_current_pose_to_target(control, target, restore_map)
         return
 
     key_times = set()
@@ -2011,14 +2304,18 @@ def _apply_copied_attrs_to_target(control, target, copied_attrs):
             continue
         if cmds.getAttr(target_plug, lock=True):
             continue
-        times = sorted(set(cmds.keyframe(control_plug, query=True, timeChange=True) or []))
+        times = sorted(
+            set(cmds.keyframe(control_plug, query=True, timeChange=True) or [])
+        )
         if not times:
             if cmds.getAttr(target_plug, settable=True):
                 cmds.setAttr(target_plug, cmds.getAttr(control_plug))
             continue
         for t in times:
             try:
-                cmds.setKeyframe(target_plug, time=(t, t), value=cmds.getAttr(control_plug, time=t))
+                cmds.setKeyframe(
+                    target_plug, time=(t, t), value=cmds.getAttr(control_plug, time=t)
+                )
             except RuntimeError:
                 pass
 
@@ -2034,8 +2331,10 @@ def _bake_range_to_target(target, channels, start, end):
     Returns whether the bake actually happened."""
     try:
         cmds.bakeResults(
-            target, simulation=_super_mode_simulation_flag(),
-            time=(start, end), attribute=list(channels),
+            target,
+            simulation=_super_mode_simulation_flag(),
+            time=(start, end),
+            attribute=list(channels),
         )
         return True
     except RuntimeError:
@@ -2057,21 +2356,71 @@ def _bake_frames_to_target(control, target):
 
 
 def _bake_nested_control(control, obj, original_parent):
-    """The nested-control counterpart to ``_extract_keys_to_target``: obj
-    was never channel-driven to begin with (see ``_parent_nested_control``
-    -- it's a real Maya child of control instead), so there are no keys on
-    control to copy over. Bake obj's motion under control down onto its own
-    channels instead (via _bake_range_to_target, the same bake mechanism
-    every other path in this tool uses), then hand it back to
-    *original_parent*."""
+    """Bake a wrapper's world motion onto the complete nested System root.
+
+    Baking ``nested_root`` while it is still parented below ``control`` only
+    records its local values and therefore misses the wrapper's animation.
+    Capture its evaluated world transform on a temporary transform living in
+    the original parent space, restore the complete hierarchy, then bake that
+    captured motion onto the restored root.
+    """
     if not cmds.objExists(obj):
-        return
-    start, end = _time_range_for([control, obj])
+        return obj
+    nested_root = _nested_root_for(control, obj)
+    if not nested_root or not cmds.objExists(nested_root):
+        return obj
+    hierarchy = [nested_root]
+    hierarchy.extend(
+        cmds.listRelatives(
+            nested_root, allDescendents=True, type="transform", fullPath=True
+        )
+        or []
+    )
+    start, end = _time_range_for([control] + hierarchy)
     if start is None:
         current = cmds.currentTime(query=True)
         start = end = current
-    _bake_range_to_target(obj, CHANNELS, start, end)
-    _restore_nested_parent(obj, original_parent)
+
+    capture = cmds.createNode("transform", name="TKM_nestedBakeCapture#")
+    if original_parent and cmds.objExists(original_parent):
+        parented = cmds.parent(capture, original_parent) or []
+        if parented:
+            capture = parented[0]
+    capture_matches = cmds.ls(capture, long=True) or [capture]
+    capture = capture_matches[0]
+
+    try:
+        capture_constraints = _constrain_nested_bake_transform(nested_root, capture)
+        _bake_range_to_target(capture, CHANNELS, start, end)
+        if capture_constraints:
+            cmds.delete(capture_constraints)
+
+        obj = _restore_nested_parent(control, obj, original_parent)
+        nested_root = _nested_root_for(control, obj)
+        if not nested_root or not cmds.objExists(nested_root):
+            return obj
+
+        apply_constraints = _constrain_nested_bake_transform(capture, nested_root)
+        _bake_range_to_target(nested_root, CHANNELS, start, end)
+        if apply_constraints:
+            cmds.delete(apply_constraints)
+        return obj
+    finally:
+        if cmds.objExists(capture):
+            cmds.delete(capture)
+
+
+def _constrain_nested_bake_transform(source, target):
+    """Constrain all transform groups used by nested world-space baking."""
+    nodes = []
+    nodes.extend(cmds.parentConstraint(source, target, maintainOffset=False) or [])
+    try:
+        nodes.extend(cmds.scaleConstraint(source, target, maintainOffset=False) or [])
+    except RuntimeError:
+        # Translate and rotate are the supported Temporal Control channels;
+        # scale remains best-effort until general scale driving is enabled.
+        pass
+    return nodes
 
 
 def revert_control(control):
@@ -2093,7 +2442,7 @@ def revert_control(control):
         # below, or obj -- still control's child at that point -- would get
         # deleted along with it.
         if nested_parent is not None:
-            _restore_nested_parent(target, nested_parent)
+            target = _restore_nested_parent(control, target, nested_parent)
         else:
             _restore_target_channels(target, restore_map)
 
@@ -2110,7 +2459,10 @@ def revert_controls(*_args, tool_operation=None):
     start, end = _time_range_for(controls)
     if start is not None:
         toolCommon.ensure_operation_tint(
-            operation, tint="range", timerange=(start, end), tint_key="temporal_controls_revert",
+            operation,
+            tint="range",
+            timerange=(start, end),
+            tint_key="temporal_controls_revert",
         )
     operation.set_total(len(controls)).set_status("Reverting Temporal Controls")
 
@@ -2178,7 +2530,11 @@ def mute_and_revert(*_args):
     Nested Temporal Controls (real-parented -- see _parent_nested_control)
     are skipped: muting isn't meaningful for them, since they were never
     driven through a constraint to begin with."""
-    controls = [control for control in _controls_to_process() if _nested_parent_for(control) is None]
+    controls = [
+        control
+        for control in _controls_to_process()
+        if _nested_parent_for(control) is None
+    ]
     if not controls:
         return wutil.make_inViewMessage("No Temporal Controls to mute")
 
@@ -2200,19 +2556,25 @@ def mute_and_revert(*_args):
 
 def mute_and_bake(*_args):
     """Mute Bake: disconnect selected Temporal Controls the same way Mute
-    Revert does, but *without* restoring the target's channels -- deleting
-    the constraint/pairBlend freezes the target at whatever value the drive
-    last produced, which is the point: the resulting motion stays applied
-    instead of snapping back, while the control -- which already carries
-    that same motion on its own channels, per this tool's usual "the
-    control's channels are the free, keyable source of truth" rule -- stays
-    in the scene, ready to drive again later."""
-    controls = [control for control in _controls_to_process() if _nested_parent_for(control) is None]
+    Revert does, but first explicitly bakes the target's current evaluated
+    pose. This works even when the control has no animation keys and avoids
+    relying on constraint/pairBlend deletion to freeze the driven result.
+    The control stays in the scene, ready to drive again later."""
+    controls = [
+        control
+        for control in _controls_to_process()
+        if _nested_parent_for(control) is None
+    ]
     if not controls:
         return wutil.make_inViewMessage("No Temporal Controls to mute")
 
     muted = []
     for control in controls:
+        target = _target_for(control)
+        if target:
+            _bake_current_pose_to_target(
+                control, target, _restore_map_for(control)
+            )
         _delete_driver_nodes(control)
         node = TkmSceneNode(control)
         node.set_attr(MUTED_ATTR, True, attributeType="bool")
@@ -2235,16 +2597,16 @@ def switch_controls_space(space_id, *_args):
     -- see _parent_nested_control), and so are muted ones (nothing to
     re-space until they're driving something again)."""
     controls = [
-        control for control in _controls_to_process()
-        if _nested_parent_for(control) is None and not TkmSceneNode(control).get_attr(MUTED_ATTR)
+        control
+        for control in _controls_to_process()
+        if _nested_parent_for(control) is None
+        and not TkmSceneNode(control).get_attr(MUTED_ATTR)
     ]
     if not controls:
         return wutil.make_inViewMessage("No Temporal Controls to switch")
     camera = _active_viewport_camera() if space_id == "camera" else None
     if space_id == "camera" and not camera:
-        return wutil.make_inViewMessage(
-            "Focus or show a viewport to use Camera Space"
-        )
+        return wutil.make_inViewMessage("Focus or show a viewport to use Camera Space")
 
     switched = []
     for control in controls:
@@ -2256,18 +2618,32 @@ def switch_controls_space(space_id, *_args):
         _delete_driver_nodes(control)
 
         driver_nodes = {}
-        translate_channels = [channel for channel in TRANSLATE_CHANNELS if channel in restore_map]
-        rotate_channels = [channel for channel in ROTATE_CHANNELS if channel in restore_map]
-        scale_channels = [channel for channel in SCALE_CHANNELS if channel in restore_map]
+        translate_channels = [
+            channel for channel in TRANSLATE_CHANNELS if channel in restore_map
+        ]
+        rotate_channels = [
+            channel for channel in ROTATE_CHANNELS if channel in restore_map
+        ]
+        scale_channels = [
+            channel for channel in SCALE_CHANNELS if channel in restore_map
+        ]
 
         if translate_channels:
             driver_nodes["translate"] = _drive_group(
-                control, target, translate_channels, space_id, restore_map,
+                control,
+                target,
+                translate_channels,
+                space_id,
+                restore_map,
                 space_source=camera,
             )
         if rotate_channels:
             driver_nodes["rotate"] = _drive_group(
-                control, target, rotate_channels, space_id, restore_map,
+                control,
+                target,
+                rotate_channels,
+                space_id,
+                restore_map,
                 space_source=camera,
             )
         # Scale connection is temporarily disabled -- see _create_control_for.
@@ -2286,6 +2662,26 @@ def switch_controls_space(space_id, *_args):
         cmds.select(switched)
         return switched
     return wutil.make_inViewMessage("Nothing to switch")
+
+
+def switch_controls_to_world_space(*_args):
+    return switch_controls_space("world")
+
+
+def switch_controls_to_object_space(*_args):
+    return switch_controls_space("object")
+
+
+def switch_controls_to_camera_space(*_args):
+    return switch_controls_space("camera")
+
+
+def switch_controls_to_relative_space(*_args):
+    return switch_controls_space("relative")
+
+
+def switch_controls_to_child_space(*_args):
+    return switch_controls_space("child")
 
 
 def get_control_position_space(control):
@@ -2326,16 +2722,16 @@ def set_control_space(control, group_kind, space_id):
     if not cmds.objExists(control):
         return False
     control = (cmds.ls(control, long=False) or [control])[0]
-    if _nested_parent_for(control) is not None or TkmSceneNode(control).get_attr(MUTED_ATTR):
+    if _nested_parent_for(control) is not None or TkmSceneNode(control).get_attr(
+        MUTED_ATTR
+    ):
         return False
     target = _target_for(control)
     if not target:
         return False
     camera = _active_viewport_camera() if space_id == "camera" else None
     if space_id == "camera" and not camera:
-        wutil.make_inViewMessage(
-            "Focus or show a viewport to use Camera Space"
-        )
+        wutil.make_inViewMessage("Focus or show a viewport to use Camera Space")
         return False
 
     restore_map = _restore_map_for(control)
@@ -2358,7 +2754,10 @@ def set_control_space(control, group_kind, space_id):
     nodes_map[group_kind] = new_nodes
     node = TkmSceneNode(control)
     node.set_attr(DRIVER_NODES_ATTR, json.dumps(nodes_map))
-    node.set_attr(POSITION_SPACE_ATTR if group_kind == "translate" else ORIENTATION_SPACE_ATTR, space_id)
+    node.set_attr(
+        POSITION_SPACE_ATTR if group_kind == "translate" else ORIENTATION_SPACE_ATTR,
+        space_id,
+    )
 
     if group_kind == "translate" and node.get_attr(LOCK_SPACE_ATTR):
         set_control_space(control, "rotate", space_id)
@@ -2373,6 +2772,7 @@ def set_control_space(control, group_kind, space_id):
 # on top afterward through Add Child/Add Parent below. The panel's left
 # list shows one row per rig; its right list shows that rig's controls.
 
+
 def list_rigs():
     """Every rig currently in the scene, as ``{root_target: [control, ...]}``
     -- see this section's docstring above. Controls whose root can't be
@@ -2384,6 +2784,56 @@ def list_rigs():
         if root_target:
             rigs.setdefault(root_target, []).append(control)
     return rigs
+
+
+def list_panel_rigs():
+    """Return rig rows with every visible curve control in each hierarchy.
+
+    ``list_rigs`` intentionally contains only tagged Temporal Controls,
+    because bake/revert and space switching operate on those nodes. Some
+    systems also build untagged, user-manipulable secondary controls -- Aim's
+    target sphere is the current example. The panel should show those too,
+    without making them eligible for tagged-control operations.
+    """
+    rigs = list_rigs()
+    panel_rigs = {}
+    for root_target, tagged_controls in rigs.items():
+        controls = list(tagged_controls)
+        seen = set()
+        for control in controls:
+            matches = cmds.ls(control, long=True) or [control]
+            seen.add(matches[0])
+
+        for control in tagged_controls:
+            delete_root = TkmSceneNode(control).get_attr(DELETE_ROOT_ATTR) or control
+            if not cmds.objExists(delete_root):
+                continue
+            candidates = [delete_root]
+            candidates.extend(
+                cmds.listRelatives(
+                    delete_root,
+                    allDescendents=True,
+                    type="transform",
+                    fullPath=True,
+                )
+                or []
+            )
+            for candidate in candidates:
+                matches = cmds.ls(candidate, long=True) or [candidate]
+                candidate = matches[0]
+                if candidate in seen:
+                    continue
+                shape_nodes = _control_shape_nodes(candidate)
+                if not any(
+                    cmds.nodeType(shape_node) == "nurbsCurve"
+                    for shape_node in shape_nodes
+                ):
+                    continue
+                seen.add(candidate)
+                controls.append(candidate)
+
+        panel_rigs[root_target] = controls
+    return panel_rigs
 
 
 def root_target_for(control):
@@ -2422,7 +2872,9 @@ def add_parent_control(control):
     The mirror of add_child_control below."""
     if not cmds.objExists(control):
         return None
-    new_controls = create_controls_with_options([control], color=get_control_color(control))
+    new_controls = create_controls_with_options(
+        [control], color=get_control_color(control)
+    )
     if not new_controls:
         return None
     parent_control = new_controls[0]
@@ -2445,10 +2897,19 @@ def add_child_control(parent_control):
     directly), so that coloring has to happen here instead."""
     if not cmds.objExists(parent_control):
         return None
-    radius = max(_control_base_radius(parent_control) * get_control_size_mult(parent_control) * 0.6, 0.5)
+    radius = max(
+        _control_base_radius(parent_control)
+        * get_control_size_mult(parent_control)
+        * 0.6,
+        0.5,
+    )
     short_name = parent_control.split("|")[-1].split(":")[-1]
-    child_control = shapes.build(shapes.DEFAULT_SHAPE, "{}_temporalChild#".format(short_name), radius)
-    cmds.matchTransform(child_control, parent_control, position=True, rotation=True, scale=False)
+    child_control = shapes.build(
+        shapes.DEFAULT_SHAPE, "{}_temporalChild#".format(short_name), radius
+    )
+    cmds.matchTransform(
+        child_control, parent_control, position=True, rotation=True, scale=False
+    )
     cmds.parent(child_control, parent_control)
 
     _tag_control(child_control, None, child_control)
@@ -2477,20 +2938,25 @@ def remove_extra_control(control):
     if not cmds.objExists(control) or not _is_temporal_control(control):
         return wutil.make_inViewMessage("Not a Temporal Control")
     if not TkmSceneNode(control).get_attr(EXTRA_ATTR):
-        return wutil.make_inViewMessage("Can't remove a System's main control here -- use Remove and Bake/Revert")
+        return wutil.make_inViewMessage(
+            "Can't remove a System's main control here -- use Remove and Bake/Revert"
+        )
 
     target = _target_for(control)
     nested_parent = _nested_parent_for(control)
     _delete_driver_nodes(control)
     if target and nested_parent is not None:
-        _restore_nested_parent(target, nested_parent)
+        _restore_nested_parent(control, target, nested_parent)
 
     # Any Temporal Control further stacked on top of this one (another Add
     # Child/Add Parent, or a nested Temporal Control) needs to be released
     # to world *before* this one is deleted, or it would get deleted along
     # with it -- Bake/Revert's own nested-control handling has the same
     # concern, just one level removed.
-    for child in cmds.listRelatives(control, children=True, type="transform", fullPath=True) or []:
+    for child in (
+        cmds.listRelatives(control, children=True, type="transform", fullPath=True)
+        or []
+    ):
         if cmds.objExists(child) and _is_temporal_control(child):
             cmds.parent(child, world=True)
 
@@ -2570,6 +3036,10 @@ def _controls_to_process():
     parents are included too, recursively, so baking/reverting a stacked
     setup can collapse the whole selected control chain in one action.
 
+    Selecting a secondary curve control belonging to a System hierarchy
+    resolves to that hierarchy's tagged control, so Aim targets can drive
+    the same Bake/Revert actions as selecting the main control.
+
     Falls back to every Temporal Control in the scene only when nothing at
     all is selected. Selecting something that isn't a Temporal Control or
     a Temporal Control's target means "nothing relevant is selected", not
@@ -2602,6 +3072,29 @@ def _controls_to_process():
         # re-normalize it through another cmds.ls round-trip here.
         target = _target_for(control)
         if target and target in selected:
+            picked.append(control)
+            picked_set.add(control)
+            continue
+
+        # Secondary curve controls intentionally do not carry TAG_ATTR, but
+        # DELETE_ROOT_ATTR on the owning tagged control identifies the whole
+        # System hierarchy. Treat a selected descendant (Aim target, etc.) as
+        # selecting that owner for bake/revert/mute purposes.
+        delete_root = TkmSceneNode(control).get_attr(DELETE_ROOT_ATTR) or control
+        delete_root_matches = cmds.ls(delete_root, long=True) or []
+        if not delete_root_matches:
+            continue
+        hierarchy = {delete_root_matches[0]}
+        hierarchy.update(
+            cmds.listRelatives(
+                delete_root_matches[0],
+                allDescendents=True,
+                type="transform",
+                fullPath=True,
+            )
+            or []
+        )
+        if selected.intersection(hierarchy):
             picked.append(control)
             picked_set.add(control)
 
@@ -2672,19 +3165,54 @@ def _is_temporal_control(node):
 
 
 def _parent_nested_control(control, obj):
-    """Make *control* a real Maya parent of *obj* instead of driving it
-    through a constraint -- used only when *obj* is itself another Temporal
-    Control's control (nesting one Temporal Control inside another). obj is
-    one of this tool's own nodes either way, so restructuring its hierarchy
-    is safe -- nothing outside this tool references it -- and it means the
-    nested control keeps moving/keying like any ordinary child transform:
-    no expression, no constraint, no connection at all for Bake/Revert to
-    unwind, just real parenting. Records obj's previous parent (possibly
-    none, i.e. world) so Bake/Revert can hand it back later."""
-    original_parent = cmds.listRelatives(obj, parent=True, fullPath=True) or []
-    TkmSceneNode(control).set_attr(NESTED_PARENT_ATTR, original_parent[0] if original_parent else "")
+    """Wrap *obj*'s complete Temporal System without dismantling it.
+
+    Group and Aim controls own a buffer plus secondary nodes. Reparenting
+    only the selected main curve separates those nodes and breaks the
+    System's constraint relationships, so the stored DELETE_ROOT hierarchy
+    is moved as one unit. The returned value is *obj*'s new full DAG path.
+    """
+    obj_matches = cmds.ls(obj, long=True) or []
+    if not obj_matches:
+        raise RuntimeError("Temporal Controls target no longer exists: {}".format(obj))
+    obj = obj_matches[0]
+
+    stored_root = TkmSceneNode(obj).get_attr(DELETE_ROOT_ATTR)
+    root_matches = cmds.ls(stored_root, long=True) if stored_root else []
+    nested_root = root_matches[0] if root_matches else obj
+    if obj != nested_root and not obj.startswith(nested_root + "|"):
+        nested_root = obj
+    target_suffix = obj[len(nested_root) :]
+
+    original_parent = cmds.listRelatives(nested_root, parent=True, fullPath=True) or []
+    node = TkmSceneNode(control)
+    node.set_attr(NESTED_PARENT_ATTR, original_parent[0] if original_parent else "")
     cmds.setAttr(_plug(control, NESTED_PARENT_ATTR), lock=True)
-    cmds.parent(obj, control)
+
+    old_root = nested_root
+    parented = cmds.parent(nested_root, control) or []
+    if not parented:
+        raise RuntimeError(
+            "Temporal Controls could not parent {} under {}".format(
+                nested_root, control
+            )
+        )
+    matches = cmds.ls(parented[0], long=True) or []
+    if not matches:
+        raise RuntimeError(
+            "Temporal Controls could not resolve {} after parenting".format(nested_root)
+        )
+    nested_root = matches[0]
+    _remap_temporal_dag_paths(old_root, nested_root)
+
+    node.set_attr(NESTED_ROOT_ATTR, nested_root)
+    cmds.setAttr(_plug(control, NESTED_ROOT_ATTR), lock=True)
+    target_matches = cmds.ls(nested_root + target_suffix, long=True) or []
+    if not target_matches:
+        raise RuntimeError(
+            "Temporal Controls could not resolve {} after parenting".format(obj)
+        )
+    return target_matches[0]
 
 
 def _nested_parent_for(control):
@@ -2698,13 +3226,76 @@ def _nested_parent_for(control):
     return TkmSceneNode(control).get_attr(NESTED_PARENT_ATTR)
 
 
-def _restore_nested_parent(obj, original_parent):
-    if not cmds.objExists(obj):
+def _nested_root_for(control, obj=None):
+    stored = TkmSceneNode(control).get_attr(NESTED_ROOT_ATTR)
+    matches = cmds.ls(stored, long=True) if stored else []
+    if matches:
+        return matches[0]
+    matches = cmds.ls(obj, long=True) if obj else []
+    return matches[0] if matches else None
+
+
+def _remap_temporal_dag_paths(old_root, new_root):
+    """Update absolute path metadata after moving a Temporal hierarchy."""
+    if not old_root or old_root == new_root:
         return
+    path_attrs = (
+        TARGET_ATTR,
+        DELETE_ROOT_ATTR,
+        CAMERA_POSITION_GROUP_ATTR,
+        CAMERA_ORIENTATION_GROUP_ATTR,
+        CAMERA_POSITION_SOURCE_ATTR,
+        CAMERA_ORIENTATION_SOURCE_ATTR,
+        NESTED_PARENT_ATTR,
+        NESTED_ROOT_ATTR,
+    )
+    for control in cmds.ls("*." + TAG_ATTR, objectsOnly=True, long=True) or []:
+        node = TkmSceneNode(control)
+        for attr in path_attrs:
+            plug = _plug(control, attr)
+            if not cmds.objExists(plug):
+                continue
+            value = node.get_attr(attr)
+            if not isinstance(value, str):
+                continue
+            if value == old_root:
+                remapped = new_root
+            elif value.startswith(old_root + "|"):
+                remapped = new_root + value[len(old_root) :]
+            else:
+                continue
+            locked = bool(cmds.getAttr(plug, lock=True))
+            if locked:
+                cmds.setAttr(plug, lock=False)
+            node.set_attr(attr, remapped)
+            if locked:
+                cmds.setAttr(plug, lock=True)
+
+
+def _restore_nested_parent(control, obj, original_parent):
+    nested_root = _nested_root_for(control, obj)
+    obj_matches = cmds.ls(obj, long=True) if obj else []
+    if not nested_root or not obj_matches:
+        return obj
+    obj = obj_matches[0]
+    if obj != nested_root and not obj.startswith(nested_root + "|"):
+        return obj
+    target_suffix = obj[len(nested_root) :]
+    old_root = nested_root
+
     if original_parent and cmds.objExists(original_parent):
-        cmds.parent(obj, original_parent)
-    elif cmds.listRelatives(obj, parent=True, fullPath=True):
-        cmds.parent(obj, world=True)
+        parented = cmds.parent(nested_root, original_parent) or []
+    elif cmds.listRelatives(nested_root, parent=True, fullPath=True):
+        parented = cmds.parent(nested_root, world=True) or []
+    else:
+        parented = [nested_root]
+    matches = cmds.ls(parented[0], long=True) if parented else []
+    if not matches:
+        return obj
+    nested_root = matches[0]
+    _remap_temporal_dag_paths(old_root, nested_root)
+    target_matches = cmds.ls(nested_root + target_suffix, long=True) or []
+    return target_matches[0] if target_matches else obj
 
 
 def _existing_control_for(obj):
@@ -2793,127 +3384,11 @@ def _delete_driver_nodes(control):
 
 def _delete_control_nodes(control):
     """Delete the control (and, for Group/Aim Systems, its offset buffer --
-    deleting the buffer cascades to the control and any helper it parents)."""
+    deleting the buffer cascades to the control and any secondary control it parents).
+    """
     stored = TkmSceneNode(control).get_attr(DELETE_ROOT_ATTR)
     delete_root = stored if stored and cmds.objExists(stored) else control
     if cmds.objExists(delete_root):
         cmds.delete(delete_root)
     elif cmds.objExists(control):
         cmds.delete(control)
-
-
-# ----------------------------------------------------------------------
-# Right-click context menu
-# ----------------------------------------------------------------------
-
-def build_temporal_controls_context_menu(menu, source_widget=None):
-    """Right-click menu for the Temporal Controls toolbar button.
-
-    Wired in through ``__init__.py``'s TOOLS entry as a callable ``"menu"``
-    rather than the declarative dict every other section item uses (see
-    ``ui/widgets/customWidgets.QFlatToolButton.attach_menu`` and
-    ``ui/widgets/toolbar_widgets.add_graph_tool_item``'s own callable-menu
-    override for the same pattern elsewhere) -- this menu needs an
-    exclusive Bake Mode group, a standalone Super Mode checkbox, and a
-    live Space-switch list, none of which the declarative "items" list of
-    plain command ids can express.
-    """
-    _add_bake_mode_actions(menu)
-    menu.addSeparator()
-    _add_space_switch_actions(menu)
-    menu.addSeparator()
-    # Everything below actually edits the scene, unlike the settings toggles
-    # above -- left un-marked so it goes through the normal undo-chunk/
-    # progress handling ``mark_non_tool_action`` exists to skip, the same as
-    # the existing Bake/Revert tool entries always have.
-    menu.addAction(
-        QtGui.QIcon(icons.eraser), i18n.tr_text("Mute and Revert"),
-        callback=mute_and_revert,
-        description=i18n.tr_text(
-            "Disconnect the selected Temporal Controls and restore their "
-            "objects, but keep the controls in the scene to drive again later."
-        ),
-    )
-    menu.addAction(
-        QtGui.QIcon(icons.eraser), i18n.tr_text("Mute and Bake"),
-        callback=mute_and_bake,
-        description=i18n.tr_text(
-            "Disconnect the selected Temporal Controls, leaving their "
-            "objects wherever the drive left them, but keep the controls "
-            "in the scene to drive again later."
-        ),
-    )
-    menu.addAction(
-        QtGui.QIcon(icons.refresh), i18n.tr_text("Remove and Revert"),
-        callback=revert_controls,
-        description=i18n.tr_text("Remove the selected Temporal Controls and restore their objects completely."),
-    )
-    menu.addAction(
-        QtGui.QIcon(icons.bake_animation_1), i18n.tr_text("Remove and Bake"),
-        callback=bake_controls,
-        description=i18n.tr_text("Extract the selected Temporal Controls' animation onto their objects and remove the controls."),
-    )
-    menu.addSeparator()
-    menu.addAction(
-        QtGui.QIcon(icons.temporal_controls), i18n.tr_text("Temporal Controls Panel"),
-        callback=open_temp_controls_panel,
-        description=i18n.tr_text("Browse and manage every Temporal Control in the scene."),
-    )
-    return menu
-
-
-def _add_bake_mode_actions(menu):
-    current_mode = get_bake_mode()
-    group = QtGui.QActionGroup(menu)
-    group.setExclusive(True)
-    for mode in BAKE_MODES:
-        description = i18n.tr_text(
-            "Bake copies only the control's existing keyframes onto its object."
-            if mode["id"] == "keys" else
-            "Bake samples every frame across the control's animated range onto its object."
-        )
-        action = menu.addAction(
-            i18n.tr_text(mode["label"]),
-            callback=toolCommon.mark_non_tool_action(partial(_set_bake_mode, mode_id=mode["id"])),
-            description=description,
-            open=True,
-        )
-        action.setCheckable(True)
-        action.setChecked(mode["id"] == current_mode)
-        group.addAction(action)
-
-    super_action = menu.addAction(
-        i18n.tr_text("Super Mode"),
-        callback=toolCommon.mark_non_tool_action(_set_super_mode),
-        description=i18n.tr_text(
-            "Speed up baking with Maya's faster math-based bake shortcut "
-            "instead of evaluating the scene at every frame. Affects both "
-            "Bake Frames and Bake Keys."
-        ),
-        open=True,
-    )
-    super_action.setCheckable(True)
-    super_action.setChecked(is_super_mode_enabled())
-
-
-def _set_bake_mode(checked, mode_id):
-    # Checkable actions in an exclusive QActionGroup both re-emit their
-    # toggle when the selection changes -- only act on the one being turned on.
-    if checked:
-        set_bake_mode(mode_id)
-
-
-def _set_super_mode(checked):
-    set_super_mode_enabled(checked)
-
-
-def _add_space_switch_actions(menu):
-    for space in SWITCHABLE_SPACES:
-        menu.addAction(
-            i18n.tr_text(space["label"]),
-            callback=partial(switch_controls_space, space["id"]),
-            description=(
-                "Re-drive the selected Temporal Controls through {} instead "
-                "of tearing them down and recreating them."
-            ).format(space["label"]),
-        )

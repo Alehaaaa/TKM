@@ -112,8 +112,13 @@ def set_smart_key_all_channels(*args):
     return controller.set_smart_key_all_channels(*args)
 
 
-def snap_keyframes(*args):
-    return controller.snap_keyframes(*args)
+def snap_keyframes(*args, **kwargs):
+    return controller.snap_keyframes(*args, **kwargs)
+
+
+def snap(selected_range=None, **kwargs):
+    """Snap keys in an explicit range, or use the active tool context."""
+    return controller.snap_keyframes(timerange=selected_range, **kwargs)
 
 
 def clear_selected_keys(*args):

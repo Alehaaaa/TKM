@@ -8,12 +8,18 @@
 # Rule: keep each version to 6 changes at most.
 # Rule: sort entries by main group in this order: polish, bugfix, new, changed.
 # Rule: keep descriptions short and efficient.
-# Rule: mention each tool only once per version.
 # Rule: focus on animation tool changes, visible workflow changes, and bugfixes.
 # Rule: do not include repo housekeeping, docs, funding, metadata, or asset-only changes.
 # Rule: avoid code technicalities such as modules, APIs, registries, packages, internal managers, or implementation refactors.
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
+
+0.1.50:
+  - polish: Temporal Controls Panel manages color, shape and size
+  - bugfix: Temporal Controls preserve nested hierarchies and understand secondary controls
+  - bugfix: Nudge will merge colliding keys with Snap by default with a setting under the Nudge right-click menu
+  - bugfix: Auto Pause Viewport refreshes safely after animation edits
+  - changed: Temporal Controls adds localizations, updated icons and menus
 
 0.1.49:
   - polish: Tools share consistent progress feedback, delayed time remaining, and animation selection targeting

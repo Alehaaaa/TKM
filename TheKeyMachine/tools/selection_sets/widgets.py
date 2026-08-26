@@ -268,20 +268,25 @@ class SelectionSetCreationDialog(
     def _create_set_from_selected_color(self):
         self._create_set(self._selected_color.suffix)
 
-    def _create_set(self, suffix):
+    def _create_set(self, suffix, tool_operation=None):
         if self.controller:
             set_name = self.name_field.text().strip()
             if not set_name:
                 self.name_field.setFocus(QtCore.Qt.ActiveWindowFocusReason)
                 return
-            created = toolCommon.run_tool_callback(
-                self,
-                self.controller.create_new_set_and_update_buttons,
-                suffix,
-                self.name_field,
-                _tkm_tool_id="selection_sets_create",
-                _tkm_tool_label="Create Selection Set",
-            )
+            if tool_operation is not None or toolCommon.current_tool_operation() is not None:
+                created = self.controller.create_new_set_and_update_buttons(
+                    suffix, self.name_field
+                )
+            else:
+                created = toolCommon.run_tool_callback(
+                    self,
+                    self.controller.create_new_set_and_update_buttons,
+                    suffix,
+                    self.name_field,
+                    _tkm_tool_id="selection_sets_create",
+                    _tkm_tool_label="Create Selection Set",
+                )
             if created:
                 self._completed = True
                 self.close()
@@ -306,7 +311,12 @@ class SelectionSetCreationDialog(
         )
         btn.setFixedSize(button_size, button_size)
         btn.setIconSize(QtCore.QSize(icon_size, icon_size))
-        btn.connect_tool(lambda *_args, c=color: self._create_set_from_color_click(c), checkable=True)
+        btn.connect_tool(
+            lambda *_args, c=color, tool_operation=None: self._create_set_from_color_click(
+                c, tool_operation=tool_operation
+            ),
+            checkable=True,
+        )
         self._color_buttons[color.suffix] = btn
         btn.setStyleSheet(btn.styleSheet() + " QToolButton:checked { background-color: #4a4a4a; color: #ffffff; }")
         if color.suffix == self._selected_color.suffix:
@@ -320,9 +330,9 @@ class SelectionSetCreationDialog(
             button.setChecked(key == color.suffix)
             button.blockSignals(block)
 
-    def _create_set_from_color_click(self, color):
+    def _create_set_from_color_click(self, color, tool_operation=None):
         self._set_selected_color(color)
-        self._create_set(color.suffix)
+        self._create_set(color.suffix, tool_operation=tool_operation)
 
 
 class SelectionSetMembersDialog(customDialogs.QFlatCloseableFloatingWidget):
@@ -529,12 +539,16 @@ class SelectionSetsWindow(FloatingToolWindowMixin, customDialogs.QFlatCloseableF
     def _export_sets(self):
         controller = self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller and self._has_exportable_sets(controller):
-            trigger.execute_command("selection_sets_export")
+            QtCore.QTimer.singleShot(
+                0, lambda: trigger.execute_command("selection_sets_export")
+            )
 
     def _import_sets(self):
         controller = self.controller or selectionSetsApi._resolve_toolbar_controller()
         if controller:
-            trigger.execute_command("selection_sets_import")
+            QtCore.QTimer.singleShot(
+                0, lambda: trigger.execute_command("selection_sets_import")
+            )
 
     def _has_exportable_sets(self, controller=None):
         controller = controller or self.controller or selectionSetsApi._resolve_toolbar_controller()

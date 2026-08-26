@@ -1,5 +1,3 @@
-from bisect import bisect_left
-
 from maya import cmds
 
 from TheKeyMachine.maya import animation
@@ -9,7 +7,7 @@ from TheKeyMachine.core import settings
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.ui.widgets import timeline as timelineWidgets
 from TheKeyMachine.ui.widgets import util as wutil
-from TheKeyMachine.tools.animation_tools import controller as animationToolsController
+from TheKeyMachine.tools.animation_tools import api as animationToolsApi
 
 
 _COMMAND_ERRORS = (
@@ -20,6 +18,19 @@ _COMMAND_ERRORS = (
     KeyError,
     IndexError,
 )
+
+SNAP_COLLISION_SETTING = "nudge_snap_collision"
+
+
+def is_snap_collision_enabled():
+    return bool(settings.get_setting(SNAP_COLLISION_SETTING, True))
+
+
+def set_snap_collision_enabled(enabled):
+    settings.set_setting(SNAP_COLLISION_SETTING, bool(enabled))
+    return bool(enabled)
+
+
 def nudge_value(default=1):
     try:
         return int(settings.get_setting("nudge_value", default))
@@ -184,135 +195,19 @@ def _edit_keyframe_batches(operation, items, batch_size=100, **kwargs):
     )
 
 
-def _snap_touched_collisions(operation, curve_targets):
-    """Run Snap Keys' merge behavior only around nudged destination frames."""
-    curve_targets = {
-        curve: sorted(set(float(time) for time in times))
-        for curve, times in (curve_targets or {}).items()
-        if curve and times
-    }
-    if not curve_targets:
+def _snap_nudged_keys(operation, selected_range=None, **targets):
+    if not is_snap_collision_enabled():
         return False
-
-    def _snap_curve(curve, target_times):
-        """Resolve and merge one curve without per-key thread crossings."""
-        try:
-            curve_times = cmds.keyframe(
-                curve, query=True, timeChange=True
-            ) or []
-        except _COMMAND_ERRORS:
-            return 0
-        if not curve_times:
-            return 0
-
-        rounded_targets = {
-            animationToolsController._nearest_whole_frame(target_time)
-            for target_time in target_times
-        }
-        buckets = {}
-        for curve_time in curve_times:
-            rounded_time = animationToolsController._nearest_whole_frame(
-                curve_time
-            )
-            if rounded_time in rounded_targets:
-                buckets.setdefault(rounded_time, []).append(curve_time)
-
-        curve_fn = maya_api.anim_curve_fn(curve)
-        snapped_count = 0
-        for rounded_time, key_times in sorted(buckets.items()):
-            target_value = animationToolsController._curve_value_at_time(
-                curve, curve_fn, rounded_time
-            )
-            if target_value is None:
-                continue
-            if animationToolsController._snap_curve_keys(
-                curve,
-                rounded_time,
-                key_times,
-                target_value,
-                curve_times,
-            ):
-                snapped_count += 1
-        return snapped_count
-
-    def _snap_batch(batch):
-        return sum(
-            _snap_curve(curve, target_times)
-            for curve, target_times in batch
-        )
-
-    snapped_count = sum(
-        operation.process(
-            curve_targets.items(),
-            _snap_batch,
-            batch_size=16,
-            strategy="main",
-            advance_progress=False,
-            manage_progress=False,
+    operation.set_status("Snapping Keys")
+    return bool(
+        operation.run_on_main(
+            animationToolsApi.snap,
+            selected_range,
+            tool_operation=operation,
+            notify=False,
+            **targets
         )
     )
-    if snapped_count:
-        operation.step(snapped_count)
-    return bool(snapped_count)
-
-
-def _contains_near(sorted_times, target, tolerance):
-    """Return whether a sorted time list contains target within tolerance."""
-    index = bisect_left(sorted_times, target - tolerance)
-    return (
-        index < len(sorted_times)
-        and sorted_times[index] <= target + tolerance
-    )
-
-
-def _collision_targets(curves, source_start, source_end, offset, tolerance=1e-6):
-    """Return target frames where nudged keys would land on existing keys."""
-    collisions = {}
-    try:
-        lower, upper = sorted((float(source_start), float(source_end)))
-        offset = float(offset)
-    except (TypeError, ValueError):
-        return collisions
-    for curve in curves or []:
-        try:
-            times = sorted(float(time) for time in (cmds.keyframe(curve, query=True, tc=True) or []))
-        except _COMMAND_ERRORS:
-            continue
-        source_times = [
-            time for time in times
-            if lower - tolerance <= time <= upper + tolerance
-        ]
-        if not source_times:
-            continue
-        target_times = [time + offset for time in source_times]
-        for target_time in target_times:
-            if (
-                _contains_near(times, target_time, tolerance)
-                and not _contains_near(source_times, target_time, tolerance)
-            ):
-                collisions.setdefault(curve, []).append(target_time)
-    return collisions
-
-
-def _collision_targets_for_times(curve_times, offset, tolerance=1e-6):
-    collisions = {}
-    try:
-        offset = float(offset)
-    except (TypeError, ValueError):
-        return collisions
-    for curve, source_times in (curve_times or {}).items():
-        try:
-            all_times = sorted(float(time) for time in (cmds.keyframe(curve, query=True, tc=True) or []))
-        except _COMMAND_ERRORS:
-            continue
-        source_times = sorted(set(float(time) for time in source_times))
-        for target_time in (time + offset for time in source_times):
-            if (
-                _contains_near(all_times, target_time, tolerance)
-                and not _contains_near(source_times, target_time, tolerance)
-            ):
-                collisions.setdefault(curve, []).append(target_time)
-    return collisions
 
 
 def _restore_nudged_time_range(timerange, offset):
@@ -505,11 +400,6 @@ def nudge_range(direction, tool_operation=None):
             }
             if not curve_times:
                 return
-            collisions = operation.run_on_main(
-                _collision_targets_for_times,
-                curve_times,
-                offset,
-            )
             operation.set_total(len(curve_times))
             edited_any = False
             if len(curve_times) == len(selected_curve_times):
@@ -542,13 +432,13 @@ def nudge_range(direction, tool_operation=None):
                         timeChange=offset,
                     ) or edited_any
             if edited_any:
-                if collisions:
-                    operation.set_status("Snapping Collisions")
-                    operation.set_total(
-                        len(curve_times)
-                        + sum(len(times) for times in collisions.values())
-                    )
-                    _snap_touched_collisions(operation, collisions)
+                _snap_nudged_keys(
+                    operation,
+                    key_times={
+                        curve: [time + offset for time in key_times]
+                        for curve, key_times in curve_times.items()
+                    },
+                )
                 operation.run_on_main(_move_current_time, offset)
             return
 
@@ -559,13 +449,6 @@ def nudge_range(direction, tool_operation=None):
             selected_timerange = context["selected_timerange"] or (
                 start_frame,
                 end_frame,
-            )
-            collisions = operation.run_on_main(
-                _collision_targets,
-                curves,
-                start_frame,
-                end_frame,
-                offset,
             )
             operation.set_total(len(curves))
 
@@ -595,13 +478,12 @@ def nudge_range(direction, tool_operation=None):
             edited, range_restored = operation.run_on_main(_move_range)
             if not edited:
                 return
-            if collisions:
-                operation.set_status("Snapping Collisions")
-                operation.set_total(
-                    len(curves)
-                    + sum(len(times) for times in collisions.values())
-                )
-                _snap_touched_collisions(operation, collisions)
+            if _snap_nudged_keys(
+                operation,
+                (start_frame + offset, end_frame + offset),
+                curves=curves,
+            ):
+                range_restored = False
             if not range_restored:
                 operation.run_on_main(
                     _restore_nudged_time_range,
@@ -660,11 +542,6 @@ def nudge_range(direction, tool_operation=None):
         edit_total = len(at_current) + sum(len(items) for items in grouped.values())
         operation.set_total(len(curves) + edit_total).set_status("Nudging Keys")
         if at_current:
-            collisions = operation.run_on_main(
-                _collision_targets_for_times,
-                {curve: [current_time] for curve in at_current},
-                offset,
-            )
             edited = _edit_keyframe_batches(
                 operation,
                 at_current,
@@ -674,14 +551,13 @@ def nudge_range(direction, tool_operation=None):
                 timeChange=offset,
             )
             if edited:
-                if collisions:
-                    operation.set_status("Snapping Collisions")
-                    operation.set_total(
-                        len(curves)
-                        + edit_total
-                        + sum(len(times) for times in collisions.values())
-                    )
-                    _snap_touched_collisions(operation, collisions)
+                _snap_nudged_keys(
+                    operation,
+                    key_times={
+                        curve: [current_time + offset]
+                        for curve in at_current
+                    },
+                )
                 operation.run_on_main(
                     cmds.currentTime,
                     current_time + offset,

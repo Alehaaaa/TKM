@@ -124,8 +124,8 @@ def sphere(name, size):
 
 def rhombus(name, size):
     """A Sims-style double-pointed diamond / plumbob outline."""
-    height = size * 1.35
-    mid = size * 0.55
+    height = size * 0.9
+    mid = size * 0.7
     top = (0, height, 0)
     bottom = (0, -height, 0)
     ring = (
@@ -332,4 +332,22 @@ DEFAULT_SHAPE = "rounded_square"
 
 
 def build(shape_id, name, size):
-    return SHAPES[shape_id](name, size)
+    control = SHAPES[shape_id](name, size)
+    # Builders describe silhouettes with intentionally different proportions,
+    # but ``size`` should mean the same overall footprint for every choice.
+    # Normalize the largest object-space dimension to 2 * size, then freeze
+    # that correction into the curve CVs so the returned transform stays at
+    # unit scale. No Shape has an empty/zero bounding box and is left alone.
+    bbox = cmds.xform(control, query=True, boundingBox=True, objectSpace=True)
+    if bbox and len(bbox) == 6:
+        max_span = max(
+            bbox[3] - bbox[0],
+            bbox[4] - bbox[1],
+            bbox[5] - bbox[2],
+        )
+        if max_span > 1e-9:
+            factor = (2.0 * size) / max_span
+            if abs(factor - 1.0) > 1e-9:
+                cmds.scale(factor, factor, factor, control, relative=True)
+                cmds.makeIdentity(control, apply=True, scale=True)
+    return control
