@@ -1,10 +1,36 @@
 {
-  "latest": "0.1.50",
+  "latest": "0.1.51",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.51",
+      "tag": "TKM-0.1.51",
+      "publishedAt": "2026-08-26T22:33:12Z",
+      "publishedLabel": "August 26, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.51",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.51/TKM-0.1.51.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Help menu adds a GitHub link"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Update checks run silently in the background"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Reload refreshes version and build information"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.50...TKM-0.1.51"
+    },
     {
       "version": "0.1.50",
       "tag": "TKM-0.1.50",
