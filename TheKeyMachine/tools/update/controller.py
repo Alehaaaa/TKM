@@ -530,21 +530,15 @@ def _update_template(latest_version, installed_version, raw_changelog):
     )
 
 
-def _check_update_payload(installed_version, operation):
-    """Fetch update metadata on an I/O worker and report two bounded phases."""
-    operation.set_total(2, reset=True)
-    operation.set_status("Checking for Updates")
+def _check_update_payload(installed_version):
+    """Fetch update metadata on an I/O worker."""
     success, latest_version = get_latest_version()
-    operation.step()
     if not success:
         return False, latest_version
     if compare_versions(latest_version, installed_version) <= 0:
-        operation.step()
         return True, None
 
-    operation.set_status("Loading Changelog")
     changelog_success, changelog = get_changelog()
-    operation.step()
     return True, {
         "version": latest_version,
         "changelog": changelog if changelog_success else "",
@@ -595,11 +589,9 @@ def check_for_updates(anchor_widget=None, warning=True, force=False, tool_operat
 
     installed_version = get_thekeymachine_version()
     operation = toolCommon.require_tool_operation(tool_operation)
-    operation.set_total(2).set_status("Checking for Updates")
     success, latest_version = operation.run_worker(
         _check_update_payload,
         installed_version,
-        operation,
     )
 
     if not success:

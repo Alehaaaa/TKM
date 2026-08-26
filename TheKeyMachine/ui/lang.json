@@ -612,6 +612,24 @@
         "ko": "툴바를 상단에 배치합니다.",
         "zh": "将工具栏放置在顶部。"
     },
+    "github": {
+        "ar": "GitHub",
+        "ca": "GitHub",
+        "es": "GitHub",
+        "fr": "GitHub",
+        "ja": "GitHub",
+        "ko": "GitHub",
+        "zh": "GitHub"
+    },
+    "github_desc": {
+        "ar": "افتح مشروع TheKeyMachine على GitHub.",
+        "ca": "Obre el projecte TheKeyMachine a GitHub.",
+        "es": "Abre el proyecto TheKeyMachine en GitHub.",
+        "fr": "Ouvrir le projet TheKeyMachine sur GitHub.",
+        "ja": "GitHubでTheKeyMachineプロジェクトを開きます。",
+        "ko": "GitHub에서 TheKeyMachine 프로젝트를 엽니다.",
+        "zh": "在 GitHub 上打开 TheKeyMachine 项目。"
+    },
     "documentation": {
         "ar": "التوثيق",
         "ca": "Documentació",

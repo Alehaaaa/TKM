@@ -7,6 +7,56 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ArchitectureInvariantTests(unittest.TestCase):
+    def test_help_menu_links_to_github_below_documentation(self):
+        menu = (
+            ROOT / "TheKeyMachine/tools/tkm_menu/__init__.py"
+        ).read_text(encoding="utf-8")
+        documentation = menu.index('"label": "Documentation"')
+        github = menu.index('"label": "GitHub"')
+        discord = menu.index('"label": "Discord"')
+
+        self.assertLess(documentation, github)
+        self.assertLess(github, discord)
+        self.assertIn('"icon": "github"', menu[github:discord])
+        self.assertIn("https://github.com/Alehaaaa/TKM", menu[github:discord])
+        self.assertTrue((ROOT / "TheKeyMachine/data/icons/github.svg").is_file())
+
+    def test_check_for_updates_is_threaded_without_progress_eta(self):
+        definitions = (
+            ROOT / "TheKeyMachine/tools/tkm_menu/__init__.py"
+        ).read_text(encoding="utf-8")
+        check_tool = definitions.split('"check_for_updates": {', 1)[1].split(
+            '"install_update": {', 1
+        )[0]
+        update = (
+            ROOT / "TheKeyMachine/tools/update/controller.py"
+        ).read_text(encoding="utf-8")
+        check = update.split("def check_for_updates(", 1)[1].split(
+            "\n\ndef ", 1
+        )[0]
+
+        self.assertIn('"progress": False', check_tool)
+        self.assertIn("operation.run_worker(", check)
+        self.assertNotIn("operation.set_total(", check)
+        self.assertNotIn("operation.set_status(", check)
+
+    def test_reload_refreshes_the_root_package_in_place(self):
+        source = (ROOT / "TheKeyMachine/__init__.py").read_text(encoding="utf-8")
+        reload_source = source.split("def reload():", 1)[1].split(
+            "\n\ndef unload", 1
+        )[0]
+
+        self.assertIn("package = sys.modules.get(__name__)", reload_source)
+        self.assertIn("importlib.reload(package)", reload_source)
+        self.assertNotIn("globals()", reload_source)
+
+        self.assertLess(
+            reload_source.index("importlib.reload(package)"),
+            reload_source.index(
+                'importlib.import_module("TheKeyMachine.ui.widgets.toolbar")'
+            ),
+        )
+
     def test_worker_implementation_is_private_to_tool_operation(self):
         for path in (ROOT / "TheKeyMachine").rglob("*.py"):
             if path.name == "common.py":
@@ -292,21 +342,58 @@ class ArchitectureInvariantTests(unittest.TestCase):
                     ),
                 )
 
-    def test_nudge_collision_snap_avoids_per_key_thread_crossings(self):
+    def test_nudge_delegates_snap_to_animation_curve_tools_api(self):
         source = (
             ROOT / "TheKeyMachine/tools/nudge/controller.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("def _contains_near(", source)
-        self.assertIn("def _snap_curve(curve, target_times):", source)
-        self.assertIn(
-            "operation.process(\n            curve_targets.items()",
-            source,
-        )
+        self.assertIn("def _snap_nudged_keys(", source)
+        self.assertIn("animationToolsApi.snap,", source)
+        self.assertNotIn("bisect_left", source)
+        self.assertNotIn("def _collision_targets(", source)
+        self.assertNotIn("def _snap_touched_collisions(", source)
         self.assertNotIn("def _on_main(", source)
         self.assertNotIn("def _run_threaded_nudge(", source)
         self.assertNotIn("threading.RLock", source)
         self.assertIn('animation="keys"', source)
         self.assertIn("def _move_active_keyset():", source)
+        snap_api = (
+            ROOT / "TheKeyMachine/tools/animation_tools/api.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("def snap(selected_range=None, **kwargs):", snap_api)
+
+    def test_nudge_snap_collision_toggle_is_shared_and_enabled_by_default(self):
+        definitions = (
+            ROOT / "TheKeyMachine/tools/nudge/__init__.py"
+        ).read_text(encoding="utf-8")
+        controller = (
+            ROOT / "TheKeyMachine/tools/nudge/controller.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(
+            definitions.count(
+                '{"type": "check", "command": "nudge_snap_collision"}'
+            ),
+            2,
+        )
+        self.assertIn('"state_key": "nudge_snap_collision"', definitions)
+        self.assertIn(
+            'settings.get_setting(SNAP_COLLISION_SETTING, True)',
+            controller,
+        )
+        self.assertEqual(controller.count("if not is_snap_collision_enabled():"), 1)
+
+    def test_explicit_snap_key_times_are_not_shadowed_between_curves(self):
+        source = (
+            ROOT / "TheKeyMachine/tools/animation_tools/controller.py"
+        ).read_text(encoding="utf-8")
+        snap = source.split("def snap_keyframes(", 1)[1].split(
+            "\n\ndef clear_selected_keys", 1
+        )[0]
+
+        self.assertIn("explicit_key_times = {", snap)
+        self.assertIn("explicit_key_times.get(curve, ())", snap)
+        self.assertIn("for rounded_time, bucket_key_times", snap)
+        self.assertNotIn("for rounded_time, key_times", snap)
 
     def test_time_slider_guard_does_not_release_operation_refresh(self):
         timeline = (
@@ -327,7 +414,57 @@ class ArchitectureInvariantTests(unittest.TestCase):
             "\n            if not edited:", 1
         )[0]
         self.assertIn("_restore_nudged_time_range(", move_range)
+        range_branch = nudge.split(
+            '        if time_context.mode == "time_slider_range":', 1
+        )[1].split("\n        curves = _unique(target_curves)", 1)[0]
+        collision_merge = range_branch.index("_snap_nudged_keys(")
+        final_restore = range_branch.index(
+            "range_restored = False", collision_merge
+        )
+        self.assertGreater(final_restore, collision_merge)
         self.assertGreaterEqual(nudge.count("update=False"), 4)
+
+    def test_auto_pause_defers_refresh_outside_animation_callback(self):
+        source = (
+            ROOT / "TheKeyMachine/maya/viewport.py"
+        ).read_text(encoding="utf-8")
+        callback = source.split(
+            "def _on_anim_keyframe_edited(*_args):", 1
+        )[1].split("\n\ndef cleanup", 1)[0]
+        flush = source.split(
+            "def _flush_auto_refresh(generation):", 1
+        )[1].split("\n\ndef _on_pre_render", 1)[0]
+
+        self.assertIn("utils.executeDeferred(", source)
+        self.assertIn("_schedule_auto_refresh()", callback)
+        self.assertNotIn("_remove_callbacks()", callback)
+        self.assertIn("_auto_refresh_active = True", flush)
+        self.assertIn("_safe_refresh(suspend=True)", flush)
+
+    def test_nested_temporal_control_uses_reparented_dag_path(self):
+        source = (
+            ROOT / "TheKeyMachine/tools/temporal_controls/api.py"
+        ).read_text(encoding="utf-8")
+        creation = source.split(
+            "def _create_control_for(", 1
+        )[1].split("\n\ndef _build_control_hierarchy", 1)[0]
+        parenting = source.split(
+            "def _parent_nested_control(", 1
+        )[1].split("\n\ndef _nested_parent_for", 1)[0]
+
+        self.assertIn("obj = _parent_nested_control(control, obj)", creation)
+        self.assertIn("stored_root = TkmSceneNode(obj).get_attr(DELETE_ROOT_ATTR)", parenting)
+        self.assertIn("parented = cmds.parent(nested_root, control) or []", parenting)
+        self.assertIn("matches = cmds.ls(parented[0], long=True) or []", parenting)
+        self.assertIn("_remap_temporal_dag_paths(old_root, nested_root)", parenting)
+        self.assertIn("return target_matches[0]", parenting)
+
+        nested_bake = source.split(
+            "def _bake_nested_control(", 1
+        )[1].split("\n\ndef _constrain_nested_bake_transform", 1)[0]
+        self.assertIn('cmds.createNode("transform", name="TKM_nestedBakeCapture#")', nested_bake)
+        self.assertIn("_restore_nested_parent(control, obj, original_parent)", nested_bake)
+        self.assertIn("_bake_range_to_target(nested_root, CHANNELS, start, end)", nested_bake)
 
     def test_selection_set_ui_mutations_use_shared_callback_dispatch(self):
         source = (

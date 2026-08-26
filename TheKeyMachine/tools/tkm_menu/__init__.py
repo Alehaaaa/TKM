@@ -53,6 +53,7 @@ class TkmMenuToolObject(ToolObject):
                     {"type": "menu", "command": "help_menu", "label": "Help", "icon": "help", "description": TOOLTIPS["help"][0], "items": [
                         "bug_report_window", "separator",
                         {"label": "Documentation", "icon": "help", "description": "Open TheKeyMachine documentation.", "i18n_key": "documentation", "callback": partial(api.open_url, "https://thekeymachine.gitbook.io/base")},
+                        {"label": "GitHub", "icon": "github", "description": "Open the TheKeyMachine project on GitHub.", "i18n_key": "github", "callback": partial(api.open_url, "https://github.com/Alehaaaa/TKM")},
                         {"label": "Discord", "icon": "discord", "description": "Open the TheKeyMachine Discord community.", "i18n_key": "discord", "callback": partial(api.open_url, "https://discord.gg/G2J5yyjz")},
                         {"label": "YouTube", "icon": "youtube", "description": "Open TheKeyMachine tutorials on YouTube.", "i18n_key": "youtube", "callback": partial(api.open_url, "https://www.youtube.com/@TheKeyMachineAnimationTools")},
                     ]},
@@ -77,6 +78,7 @@ class TkmMenuToolObject(ToolObject):
             "callback": api.check_for_updates, "available": api.updates_available,
             "tooltip": TOOLTIPS["updates"],
             "operation": {
+                "progress": False,
                 "undo": False,
                 "suspend_refresh": False,
                 "show_success_message": False,

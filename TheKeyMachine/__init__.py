@@ -16,9 +16,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.50"
+__version__ = "0.1.51"
 __stage__ = "beta"
-__build__ = "347"
+__build__ = "348"
 __codename__ = "Cortado"
 __website__ = "https://alehaaaa.github.io/TKM/"
 
@@ -27,6 +27,7 @@ def reload():
     import importlib
     import sys
 
+    package = sys.modules.get(__name__)
     try:
         from TheKeyMachine.core import runtime
 
@@ -38,7 +39,10 @@ def reload():
             if debug.is_enabled():
                 from maya import cmds
 
-                cmds.warning("TheKeyMachine.reload(): pre-reload cleanup raised; continuing anyway.")
+                cmds.warning(
+                    "TheKeyMachine.reload(): pre-reload cleanup raised; "
+                    "continuing anyway."
+                )
         except Exception:
             pass
 
@@ -47,10 +51,13 @@ def reload():
             sys.modules.pop(module_name, None)
 
     importlib.invalidate_caches()
+    if package is not None:
+        # Refresh in place so aliases such as ``import TheKeyMachine as tkm``
+        # receive the updated package metadata and entry points.
+        importlib.reload(package)
     toolbar = importlib.import_module("TheKeyMachine.ui.widgets.toolbar")
 
-    # Cleanup has already removed the old control and callbacks.
-    toolbar.show(cleanup_existing=False)
+    return toolbar.show(cleanup_existing=False)
 
 
 def unload():

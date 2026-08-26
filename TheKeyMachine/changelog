@@ -14,6 +14,11 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.51:
+  - polish: Update checks run silently in the background
+  - bugfix: Reload refreshes version and build information
+  - new: Help menu adds a GitHub link
+
 0.1.50:
   - polish: Temporal Controls Panel manages color, shape and size
   - bugfix: Temporal Controls preserve nested hierarchies and understand secondary controls
