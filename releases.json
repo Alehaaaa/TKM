@@ -1,10 +1,46 @@
 {
-  "latest": "0.1.49",
+  "latest": "0.1.50",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.50",
+      "tag": "TKM-0.1.50",
+      "publishedAt": "2026-08-26T22:14:31Z",
+      "publishedLabel": "August 26, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.50",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.50/TKM-0.1.50.zip",
+      "entries": [
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Temporal Controls adds localizations, updated icons and menus"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Temporal Controls Panel manages color, shape and size"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Temporal Controls preserve nested hierarchies and understand secondary controls"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Nudge will merge colliding keys with Snap by default with a setting under the Nudge right-click menu"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Auto Pause Viewport refreshes safely after animation edits"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.49...TKM-0.1.50"
+    },
     {
       "version": "0.1.49",
       "tag": "TKM-0.1.49",
