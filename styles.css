@@ -656,6 +656,21 @@ h3 {
   font-size: 28px;
 }
 
+.release-card h2 .is-disabled {
+  color: var(--muted);
+  font-size: 28px;
+  cursor: default;
+}
+
+.primary-button.is-disabled {
+  border-color: var(--panel-line);
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  cursor: default;
+  pointer-events: none;
+}
+
 .release-card ul {
   padding-left: 20px;
 }

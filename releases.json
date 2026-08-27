@@ -29,7 +29,8 @@
           "description": "Mute and Bake keeps the object's baked pose instead of occasionally dropping it"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.52...TKM-0.1.53"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.52...TKM-0.1.53",
+      "hasDownload": true
     },
     {
       "version": "0.1.52",
@@ -37,7 +38,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.52",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.52/TKM-0.1.52.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "polish",
@@ -55,7 +56,8 @@
           "description": "Space conversions keep working on Maya installs where matrix math needs a fallback"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.51...TKM-0.1.52"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.51...TKM-0.1.52",
+      "hasDownload": false
     },
     {
       "version": "0.1.51",
@@ -81,7 +83,8 @@
           "description": "Reload refreshes version and build information"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.50...TKM-0.1.51"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.50...TKM-0.1.51",
+      "hasDownload": true
     },
     {
       "version": "0.1.50",
@@ -117,7 +120,8 @@
           "description": "Auto Pause Viewport refreshes safely after animation edits"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.49...TKM-0.1.50"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.49...TKM-0.1.50",
+      "hasDownload": true
     },
     {
       "version": "0.1.49",
@@ -158,7 +162,8 @@
           "description": "Temporal Controls and Tracer create full-resolution results reliably and update in efficient batches"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.48...TKM-0.1.49"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.48...TKM-0.1.49",
+      "hasDownload": true
     },
     {
       "version": "0.1.48",
@@ -189,7 +194,8 @@
           "description": "Global Curve creates dense guide curves faster"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.47...TKM-0.1.48"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.47...TKM-0.1.48",
+      "hasDownload": true
     },
     {
       "version": "0.1.47",
@@ -205,7 +211,8 @@
           "description": "Toolbar reloads and tab restores avoid leftover callbacks and keep docked areas from stretching"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.46...TKM-0.1.47"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.46...TKM-0.1.47",
+      "hasDownload": true
     },
     {
       "version": "0.1.46",
@@ -226,7 +233,8 @@
           "description": "Update prompts show changelog details without errors"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.45...TKM-0.1.46"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.45...TKM-0.1.46",
+      "hasDownload": true
     },
     {
       "version": "0.1.45",
@@ -262,7 +270,8 @@
           "description": "Nudge snaps keys cleanly when a moved key lands on another key"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.44...TKM-0.1.45"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.44...TKM-0.1.45",
+      "hasDownload": true
     },
     {
       "version": "0.1.44",
@@ -283,7 +292,8 @@
           "description": "Reloading and unloading cleans up callbacks and leftover UI elements"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.43...TKM-0.1.44"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.43...TKM-0.1.44",
+      "hasDownload": true
     },
     {
       "version": "0.1.43",
@@ -309,7 +319,8 @@
           "description": "Manipulators, Micro Move, Tracer, Temp Pivot, Follow Cam, and Animation Layers trimmed from the Graph Editor toolbar"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.42...TKM-0.1.43"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.42...TKM-0.1.43",
+      "hasDownload": true
     },
     {
       "version": "0.1.42",
@@ -325,7 +336,8 @@
           "description": "Global Curve reshapes selected or visible Graph Editor curves together with live time and tangent controls"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.41...TKM-0.1.42"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.41...TKM-0.1.42",
+      "hasDownload": true
     },
     {
       "version": "0.1.41",
@@ -356,7 +368,8 @@
           "description": "Tooltips stay accurate and correctly localized across animation, selection, attribute, tangent, and tracer tools"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.40...TKM-0.1.41"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.40...TKM-0.1.41",
+      "hasDownload": true
     },
     {
       "version": "0.1.40",
@@ -372,7 +385,8 @@
           "description": "Toolbar alignment, pinning, and reloads stay responsive without clipped rows or menu errors"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.39...TKM-0.1.40"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.39...TKM-0.1.40",
+      "hasDownload": true
     },
     {
       "version": "0.1.39",
@@ -398,7 +412,8 @@
           "description": "Smart Key and other layer-aware tools read animation layers without errors"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.38...TKM-0.1.39"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.38...TKM-0.1.39",
+      "hasDownload": true
     },
     {
       "version": "0.1.38",
@@ -439,7 +454,8 @@
           "description": "Sliders now create keys on frames without existing keys"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.37...TKM-0.1.38"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.37...TKM-0.1.38",
+      "hasDownload": true
     },
     {
       "version": "0.1.37",
@@ -470,7 +486,8 @@
           "description": "Rig analysis resolves opposite controls across separate branches and safely skips malformed attributes"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.36...TKM-0.1.37"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.36...TKM-0.1.37",
+      "hasDownload": true
     },
     {
       "version": "0.1.36",
@@ -491,7 +508,8 @@
           "description": "Cancelling Animation Recovery, World Space, or Copy and Paste Pose and Animation mid-operation now reverts cleanly instead of leaving a partial result"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.35...TKM-0.1.36"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.35...TKM-0.1.36",
+      "hasDownload": true
     },
     {
       "version": "0.1.35",
@@ -532,7 +550,8 @@
           "description": "World Space frame pastes keep timeline feedback and cleanup reliable"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.34...TKM-0.1.35"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.34...TKM-0.1.35",
+      "hasDownload": true
     },
     {
       "version": "0.1.34",
@@ -558,7 +577,8 @@
           "description": "Windows like About, Donate, Hotkeys, and Workspaces refresh immediately when you switch languages instead of needing a restart"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.33...TKM-0.1.34"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.33...TKM-0.1.34",
+      "hasDownload": true
     },
     {
       "version": "0.1.33",
@@ -589,7 +609,8 @@
           "description": "Workspaces update correctly on toolbar right click menu"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.32...TKM-0.1.33"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.32...TKM-0.1.33",
+      "hasDownload": true
     },
     {
       "version": "0.1.32",
@@ -597,7 +618,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.32",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.32/TKM-0.1.32.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "new",
@@ -630,7 +651,8 @@
           "description": "Simplify and Bake sliders preserve the intended animation curve tendency"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.31...TKM-0.1.32"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.31...TKM-0.1.32",
+      "hasDownload": false
     },
     {
       "version": "0.1.31",
@@ -638,7 +660,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.31",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.31/TKM-0.1.31.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "changed",
@@ -671,7 +693,8 @@
           "description": "Auto Hide Static Curves refreshes already-open Graph Editors reliably"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.30...TKM-0.1.31"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.30...TKM-0.1.31",
+      "hasDownload": false
     },
     {
       "version": "0.1.30",
@@ -679,7 +702,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.30",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.30/TKM-0.1.30.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "new",
@@ -687,7 +710,8 @@
           "description": "Toolbar workspaces (Standard, Professional, Minimal) switch pinned tools from the right-click menu"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.29...TKM-0.1.30"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.29...TKM-0.1.30",
+      "hasDownload": false
     },
     {
       "version": "0.1.29",
@@ -695,7 +719,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.29",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.29/TKM-0.1.29.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "polish",
@@ -728,7 +752,8 @@
           "description": "Each Animation Offset gesture undoes in one step"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.28...TKM-0.1.29"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.28...TKM-0.1.29",
+      "hasDownload": false
     },
     {
       "version": "0.1.28",
@@ -736,7 +761,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.28",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.28/TKM-0.1.28.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "changed",
@@ -744,7 +769,8 @@
           "description": "Micro Move and Depth Mover now ship together across supported Maya versions and platforms with Shift/Control precision; Micro Move also keeps full-color cursors and reliable middle-button object drags"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.27...TKM-0.1.28"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.27...TKM-0.1.28",
+      "hasDownload": false
     },
     {
       "version": "0.1.27",
@@ -752,7 +778,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.27",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.27/TKM-0.1.27.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "new",
@@ -765,7 +791,8 @@
           "description": "Micro Move uses translate and rotate manipulators with Maya tool switching, cursor acceleration and modifiers"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.26...TKM-0.1.27"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.26...TKM-0.1.27",
+      "hasDownload": false
     },
     {
       "version": "0.1.26",
@@ -773,7 +800,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.26",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.26/TKM-0.1.26.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "new",
@@ -781,7 +808,8 @@
           "description": "Search finds and runs any TheKeyMachine tool"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.25...TKM-0.1.26"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.25...TKM-0.1.26",
+      "hasDownload": false
     },
     {
       "version": "0.1.25",
@@ -789,7 +817,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.25",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.25/TKM-0.1.25.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "changed",
@@ -822,7 +850,8 @@
           "description": "Static and redundant key cleanup stays scoped, and pin menus retain tool icons, hotkeys and shelf actions"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.24...TKM-0.1.25"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.24...TKM-0.1.25",
+      "hasDownload": false
     },
     {
       "version": "0.1.24",
@@ -830,7 +859,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.24",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.24/TKM-0.1.24.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "new",
@@ -863,7 +892,8 @@
           "description": "About and Follow Cam work reliably, and disabled online or Bug Report features stay hidden"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.23...TKM-0.1.24"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.23...TKM-0.1.24",
+      "hasDownload": false
     },
     {
       "version": "0.1.23",
@@ -871,7 +901,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.23",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.23/TKM-0.1.23.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "new",
@@ -904,7 +934,8 @@
           "description": "Slider previews, generated keys, timeline picking and Undo now finish reliably"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.22...TKM-0.1.23"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.22...TKM-0.1.23",
+      "hasDownload": false
     },
     {
       "version": "0.1.22",
@@ -912,7 +943,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.22",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.22/TKM-0.1.22.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "changed",
@@ -945,7 +976,8 @@
           "description": "Version metadata is synced across the package and installer"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.21...TKM-0.1.22"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.21...TKM-0.1.22",
+      "hasDownload": false
     },
     {
       "version": "0.1.21",
@@ -953,7 +985,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.21",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.21/TKM-0.1.21.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "new",
@@ -986,7 +1018,8 @@
           "description": "Paste Animation is faster on dense animation clips"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.20...TKM-0.1.21"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.20...TKM-0.1.21",
+      "hasDownload": false
     },
     {
       "version": "0.1.20",
@@ -994,7 +1027,7 @@
       "publishedAt": "",
       "publishedLabel": "Release date pending",
       "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.20",
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.20/TKM-0.1.20.zip",
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "polish",
@@ -1012,7 +1045,8 @@
           "description": "Fixed Animation Offset setting keys on timeChange in heavy scenes"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.20"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.20",
+      "hasDownload": false
     }
   ]
 }
