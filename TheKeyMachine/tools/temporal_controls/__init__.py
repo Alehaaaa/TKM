@@ -61,6 +61,7 @@ class TemporalControlsToolObject(ToolObject):
                     "temporal_controls_relative_space",
                     "temporal_controls_child_space",
                     "separator",
+                    "temporal_controls_toggle_rig",
                     "temporal_controls_mute_revert",
                     "temporal_controls_mute_bake",
                     "temporal_controls_revert",
@@ -132,6 +133,13 @@ class TemporalControlsToolObject(ToolObject):
             "icon": "temporal_controls_mute_revert",
             "callback": api.mute_and_revert,
             "tooltip": TOOLTIPS["temporal_controls_mute_revert"],
+        },
+        "temporal_controls_toggle_rig": {
+            "type": "tool",
+            "label": "Toggle Rig",
+            "icon": "temporal_controls",
+            "callback": api.toggle_temporal_control_rigs,
+            "tooltip": TOOLTIPS["temporal_controls_toggle_rig"],
         },
         "temporal_controls_mute_bake": {
             "type": "tool",

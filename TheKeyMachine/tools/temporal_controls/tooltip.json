@@ -23,6 +23,9 @@
   "temporal_controls_mute_revert": [
     "Disconnect the selected Temporal Controls and restore their objects, but keep the controls in the scene to drive again later."
   ],
+  "temporal_controls_toggle_rig": [
+    "Toggle selected Temporal Control rigs off or on. Off restores the source animation; on snapshots that live animation back into the control's current space and reconnects the rig."
+  ],
   "temporal_controls_mute_bake": [
     "Disconnect the selected Temporal Controls, leaving their objects wherever the drive left them, but keep the controls in the scene to drive again later."
   ],

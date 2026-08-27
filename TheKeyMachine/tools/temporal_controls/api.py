@@ -21,7 +21,14 @@ dialog (see ``widgets.TemporalControlsDialog``) offering:
   the object and control having different parents, so that network was
   redundant. Relative, Grab Release, and Child constrain with the offset
   preserved instead (Grab Release is the same offset-preserving constraint
-  as Relative -- a temporary "grab" that Revert cleanly lets go of). Scale
+  as Relative -- a temporary "grab" that Revert cleanly lets go of). When
+  both Position and Orientation use Relative Space with multiple objects
+  selected, the last-selected object is instead the reference: it receives no
+  control, every earlier selection's complete control hierarchy is parented
+  directly below it. Existing object keys are converted at those same key
+  times to keep their world-space poses; reference-parent keys never add
+  samples, and an unkeyed object stays unkeyed at its current pose. A single
+  selection still receives a normal control. Scale
   isn't offered a space choice and always passes straight through
   coincident, same as Object/World -- but, like every other channel
   group, through a real ``scaleConstraint`` rather than an expression.
@@ -31,13 +38,13 @@ Confirming the dialog calls ``create_controls_with_options()``, which
 builds one control per object: sized and positioned to match it, with a
 real copy of whatever animation it already had -- translate/rotate *and*
 every other keyframed custom attribute (enums included) -- copied onto
-the new control first if it was already animated
-(``_gather_copyable_animation``/``_copy_source_keys_to_control``: translate,
-rotate, and every extra attribute each copied as direct frame/value pairs
-at exactly *its own* key times, through a temporary reverse constraint for
-translate/rotate or a temporary connectAttr for everything else, in
-control's own space -- the same space-mismatch pitfall
-``_capture_channel``'s own docstring covers)
+the new control first if it was already animated. Every space uses one setup
+path: ``_gather_copyable_animation`` finds the object's own per-channel keys;
+``_TransformSpaceTransfer.capture`` reads its world matrices before any
+control hierarchy or driver is built; then the same object's ``apply`` method
+converts those exact keys into the completed destination space. Custom
+attributes use ``_copy_source_extra_keys_to_control`` because they have no
+spatial conversion
 -- so the object keeps showing its original motion/values, now via
 control, for the animator to key or nudge on top of instead of it just
 vanishing the moment control takes over, for then to be applied back onto
@@ -74,7 +81,13 @@ The command-backed right-click menu declared in ``__init__.py`` gives:
 - **Space**: re-drive the selected controls through a different Position/
   Orientation space live (``switch_controls_space``) -- everything
   ``SWITCHABLE_SPACES`` offers except Grab Release, which is a one-shot
-  "temporary grab" concept, not something to switch back into later.
+  "temporary grab" concept, not something to switch back into later. A
+  switch is one atomic OFF/snapshot/rebuild/ON transaction: restore the
+  target's untouched source curves, capture their original world animation,
+  convert it into the destination control space, then reconnect the rig.
+- **Toggle Rig** (``toggle_temporal_control_rigs``): turn a rig OFF to expose
+  its target's source animation, or ON to snapshot that currently-live source
+  back into the control's current space and reconnect it.
 - **Mute and Revert** / **Mute and Bake** (``mute_and_revert`` /
   ``mute_and_bake``): disconnect a control the same way Revert/Bake do,
   but leave the control node itself in the scene instead of deleting it,
@@ -111,7 +124,7 @@ from maya import cmds
 
 from TheKeyMachine.core.Qt import QtCore, QtWidgets  # type: ignore
 from TheKeyMachine.core import i18n, trigger
-from TheKeyMachine.maya import selection
+from TheKeyMachine.maya import animation, maya_api, selection
 from TheKeyMachine.maya.runtime import TkmSceneNode
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools import common as toolCommon
@@ -150,7 +163,7 @@ NESTED_ROOT_ATTR = "tkmTemporalNestedRoot"
 MUTED_ATTR = "tkmTemporalMuted"
 # JSON list of extra (non translate/rotate) attribute names control got a
 # copy of at creation time from an already-animated obj -- see
-# _gather_copyable_animation/_copy_source_keys_to_control. Read back by
+# _gather_copyable_animation/_copy_source_extra_keys_to_control. Read back by
 # _copied_attrs_for at Bake time (_apply_copied_attrs_to_target) to know
 # which of control's own attributes to reapply to target -- unlike
 # RESTORE_ATTR's channels, these were never kept live-connected back to
@@ -174,6 +187,10 @@ EXTRA_ATTR = "tkmTemporalExtra"
 POSITION_SPACE_ATTR = "tkmTemporalPositionSpace"
 ORIENTATION_SPACE_ATTR = "tkmTemporalOrientationSpace"
 LOCK_SPACE_ATTR = "tkmTemporalSpaceLocked"
+# Original selection-order reference for a physically-parented
+# Relative/Relative control. Kept even after switching away so returning to
+# Relative/Relative can reproducibly restore the same parent space.
+RELATIVE_SOURCE_ATTR = "tkmTemporalRelativeSource"
 
 TRANSLATE_CHANNELS = ("translateX", "translateY", "translateZ")
 ROTATE_CHANNELS = ("rotateX", "rotateY", "rotateZ")
@@ -457,19 +474,53 @@ def create_controls_with_options(
     tool_operation=None,
 ):
     objects = [obj for obj in objects if cmds.objExists(obj)]
+    _debug_log(
+        "creation requested",
+        objects=objects,
+        system=system,
+        position_space=position_space,
+        orientation_space=orientation_space,
+        label=label,
+        color=color,
+    )
     if not objects:
+        _debug_log("creation rejected", reason="no existing selected objects")
         return wutil.make_inViewMessage("Nothing left to control -- selection changed")
+
+    # Relative/Relative is a selection-order operation: the last object is
+    # the space reference and every object selected before it gets a control.
+    # Keep mixed Position/Orientation choices on the independent constraint
+    # path -- physically parenting a transform would make both channel groups
+    # inherit the reference, contradicting the non-relative choice.
+    relative_parent = None
+    if (
+        len(objects) > 1
+        and position_space == "relative"
+        and orientation_space == "relative"
+    ):
+        relative_parent = objects[-1]
+        objects = objects[:-1]
+    _debug_log(
+        "creation selection resolved",
+        controlled_objects=objects,
+        relative_reference=relative_parent,
+        reference_receives_control=False if relative_parent else None,
+    )
 
     operation = toolCommon.require_tool_operation(tool_operation)
     camera = None
     if "camera" in (position_space, orientation_space):
         camera = _active_viewport_camera()
+        _debug_log("camera space resolved", camera=camera)
         if not camera:
+            _debug_log("creation rejected", reason="no active viewport camera")
             return wutil.make_inViewMessage(
                 "Focus or show a viewport to use Camera Space"
             )
     group = TkmSceneNode.root().child(ROOT_GROUP, icon=icons.temporal_controls)
 
+    # The reference is a parent space, never an animation source. Timeline
+    # feedback and work estimates cover only objects receiving controls.
     start, end = _time_range_for(objects)
     if start is not None:
         toolCommon.ensure_operation_tint(
@@ -492,12 +543,13 @@ def create_controls_with_options(
         "label": (label or "").strip(),
         "color": color,
         "camera": camera,
+        "relative_parent": relative_parent,
     }
 
     # Pre-scan every object that will actually get a new control (not
     # already one -- _existing_control_for) for whatever pre-existing
     # animation/attributes it's about to hand off to that control (see
-    # _gather_copyable_animation/_copy_source_keys_to_control): one
+    # _gather_copyable_animation/_TransformSpaceTransfer): one
     # build step per object below, plus one step per key time being
     # copied -- all known up front, so the progress bar's own ETA
     # reflects the real amount of work instead of just the object
@@ -507,12 +559,16 @@ def create_controls_with_options(
     pending = [obj for obj in objects if not _existing_control_for(obj)]
     animation_by_obj = {obj: _gather_copyable_animation(obj) for obj in pending}
     total_steps = len(objects) + sum(
-        sum(len(times) for _channel, times in translate_key_data)
-        + sum(len(times) for _channel, times in rotate_key_data)
-        + sum(len(attr_key_times) for _name, _enum, attr_key_times in extra_attrs)
-        for translate_key_data, rotate_key_data, extra_attrs in animation_by_obj.values()
+        _creation_animation_work(animation)
+        for animation in animation_by_obj.values()
     )
     operation.set_total(total_steps).set_status("Creating Temporal Controls")
+    _debug_log(
+        "creation workload prepared",
+        pending_objects=pending,
+        total_steps=total_steps,
+        tint_range=(start, end) if start is not None else None,
+    )
 
     new_controls = []
     locked_report = []
@@ -541,7 +597,19 @@ def create_controls_with_options(
     if new_controls:
         cmds.select(new_controls)
         controls_bus.controlsCreated.emit()
+        _debug_log(
+            "creation completed",
+            controls=new_controls,
+            locked_channels=locked_report,
+            cancelled=operation.cancelled,
+        )
         return new_controls
+    _debug_log(
+        "creation completed",
+        controls=[],
+        locked_channels=locked_report,
+        cancelled=operation.cancelled,
+    )
     return wutil.make_inViewMessage("Selected objects already have Temporal Controls")
 
 
@@ -598,18 +666,36 @@ def _short_plug_name(plug):
     return _plug(short_obj, attr_part) if short_obj else plug
 
 
-def _debug_enabled():
+def _tool_debug_flag():
     """The same TKM_TOOL_DEBUG switch every other developer-only print in
-    the app already gates on (TheKeyMachine.core.debug.is_enabled()) --
-    off by default, on via that env var/.env entry. Wrapped in try/except
-    since this gets called on every control creation and a debug-module
-    import failure shouldn't be able to break actual control creation."""
+    the app already gates on (TheKeyMachine.core.debug.is_enabled())."""
     try:
         from TheKeyMachine.core import debug
 
         return debug.is_enabled()
     except Exception:
         return False
+
+
+_TOOL_DEBUG = _tool_debug_flag()
+
+
+def _debug_enabled():
+    """Cached module-level gate, matching other tool debug implementations."""
+    return _TOOL_DEBUG
+
+
+def _debug_log(event, **details):
+    """Print one structured Temporal Controls diagnostic when debug is on."""
+    if not _debug_enabled():
+        return
+    print("[TKM Temporal Controls] {}".format(event))
+    for name in sorted(details):
+        try:
+            value = repr(details[name])
+        except Exception as exc:
+            value = "<repr failed: {}>".format(exc)
+        print("    {}: {}".format(name, value))
 
 
 def _debug_log_creation_step(
@@ -632,18 +718,15 @@ def _debug_log_creation_step(
     _create_control_for rather than once at the end, so a build that fails
     partway through (an exception, or the early nested-control return)
     still leaves a trail up to wherever it stopped."""
-    if not _debug_enabled():
-        return
-    lines = ["object: {}".format(obj), "step: {}".format(step)]
-    lines.append(
-        "options: system={} position_space={} orientation_space={} label={!r} color={}".format(
-            options.get("system"),
-            options.get("position_space"),
-            options.get("orientation_space"),
-            options.get("label"),
-            options.get("color"),
-        )
-    )
+    details = {
+        "source": obj,
+        "system": options.get("system"),
+        "position_space": options.get("position_space"),
+        "orientation_space": options.get("orientation_space"),
+        "relative_parent": options.get("relative_parent"),
+        "label": options.get("label"),
+        "color": options.get("color"),
+    }
     if control and cmds.objExists(control):
         try:
             obj_pos = (
@@ -664,44 +747,60 @@ def _debug_log_creation_step(
             obj_pos = obj_rot = ctrl_pos = ctrl_rot = "<xform query failed: {}>".format(
                 exc
             )
-        lines.append(
-            "shape: {}  radius: {}".format(
-                shapes.DEFAULT_SHAPE,
-                _control_radius(obj) if cmds.objExists(obj) else "?",
-            )
+        details.update(
+            {
+                "shape": shapes.DEFAULT_SHAPE,
+                "radius": _control_radius(obj) if cmds.objExists(obj) else None,
+                "control": control,
+                "delete_root": delete_root,
+                "chain_anchor": chain_anchor,
+                "source_world_position": obj_pos,
+                "source_world_rotation": obj_rot,
+                "control_world_position": ctrl_pos,
+                "control_world_rotation": ctrl_rot,
+            }
         )
-        lines.append(
-            "control: {}  delete_root: {}  chain_anchor: {}".format(
-                control, delete_root, chain_anchor
-            )
-        )
-        lines.append("object world xform:   pos={} rot={}".format(obj_pos, obj_rot))
-        lines.append("control world xform:  pos={} rot={}".format(ctrl_pos, ctrl_rot))
     if translate_channels is not None or rotate_channels is not None:
-        lines.append(
-            "translate_channels: {}  driven through: {}".format(
-                translate_channels, options.get("position_space")
-            )
+        details.update(
+            {
+                "translate_channels": translate_channels,
+                "rotate_channels": rotate_channels,
+                "scale_channels": scale_channels,
+                "driver_nodes": driver_nodes,
+            }
         )
-        lines.append(
-            "rotate_channels: {}  driven through: {}".format(
-                rotate_channels, options.get("orientation_space")
-            )
-        )
-        lines.append(
-            "scale_channels (present but not driven -- see _create_control_for): {}".format(
-                scale_channels
-            )
-        )
-        lines.append("driver_nodes: {}".format(driver_nodes))
-    print("[TKM Temporal Controls] {}".format(lines[0]))
-    for line in lines[1:]:
-        print("    {}".format(line))
+    _debug_log("creation {}".format(step), **details)
 
 
 def _create_control_for(
     obj, group, options, locked_report=None, operation=None, animation=None
 ):
+    is_nested = _is_temporal_control(obj)
+    source_animation = animation or _gather_copyable_animation(obj)
+    transfer = None
+    if not is_nested:
+        # Always the first mutating workflow step, regardless of destination
+        # space. Nothing has been parented, constrained, or disconnected yet.
+        transfer = _TransformSpaceTransfer.from_animation(
+            obj, source_animation, operation
+        )
+        _debug_log(
+            "creation transfer prepared",
+            source=obj,
+            groups=[
+                {
+                    "kind": group_data.kind,
+                    "key_data": group_data.key_data,
+                    "sample_times": group_data.sample_times,
+                }
+                for group_data in transfer.groups
+            ],
+        )
+        if not transfer.capture():
+            _debug_log("creation aborted", source=obj, reason="world capture failed")
+            cmds.warning("Temporal Controls: could not capture source world animation")
+            return None, None
+
     control, delete_root, chain_anchor = _build_control_hierarchy(obj, group, options)
     _debug_log_creation_step(
         "built",
@@ -718,7 +817,7 @@ def _create_control_for(
         # chosen color too instead of being left at its unstyled default.
         _apply_control_color(delete_root, options["color"])
 
-    if _is_temporal_control(obj):
+    if is_nested:
         # obj is itself another Temporal Control's control -- nesting one
         # Temporal Control inside another. See _parent_nested_control: real
         # parenting instead of channel-driving, so there's nothing here for
@@ -746,26 +845,64 @@ def _create_control_for(
         )
         return control, chain_anchor
 
-    _tag_control(control, obj, delete_root)
+    relative_parent = options.get("relative_parent")
+    if relative_parent:
+        _debug_log(
+            "relative hierarchy decision",
+            control=control,
+            reference=relative_parent,
+            delete_root=delete_root,
+        )
+        control, delete_root = _parent_control_system(
+            control, delete_root, relative_parent
+        )
+        chain_anchor = control
 
-    # Must run before the _capture_channel loop below -- it reads obj's
-    # still-live, still-connected animCurves (see
-    # _copy_source_keys_to_control's own docstring) to give control a real
-    # copy of obj's existing motion/attribute values before _capture_channel
-    # disconnects translate/rotate's curves to make room for the forward
-    # constraint. *animation* lets create_controls_with_options pass in
-    # what it already scanned obj for up front (to size its progress bar's
-    # total correctly) instead of this scanning obj all over again.
-    translate_key_data, rotate_key_data, extra_attrs = (
-        animation or _gather_copyable_animation(obj)
-    )
-    copied_attrs = _copy_source_keys_to_control(
-        control,
-        obj,
-        translate_key_data,
-        rotate_key_data,
-        extra_attrs,
-        operation=operation,
+    _tag_control(control, obj, delete_root)
+    if relative_parent:
+        _set_locked_string_attr(
+            control,
+            RELATIVE_SOURCE_ATTR,
+            (cmds.ls(relative_parent, long=True) or [relative_parent])[0],
+        )
+
+    # Camera anchors are part of the destination parent space, so keyed groups
+    # need them live before captured world matrices are decomposed to locals.
+    creation_camera_nodes = {}
+    for group_data in transfer.groups:
+        group_kind = group_data.kind
+        space_mode = (
+            options["position_space"]
+            if group_kind == "translate"
+            else options["orientation_space"]
+        )
+        if space_mode == "camera":
+            creation_camera_nodes[group_kind] = _camera_space_driver(
+                control, group_kind, options.get("camera")
+            )
+
+    if not transfer.apply(control):
+        _debug_log(
+            "creation aborted",
+            source=obj,
+            control=control,
+            delete_root=delete_root,
+            reason="transform key application failed",
+        )
+        cmds.warning(
+            "Temporal Controls: could not copy source transform keys to {}".format(
+                control
+            )
+        )
+        if cmds.objExists(delete_root):
+            cmds.delete(delete_root)
+        return None, None
+
+    # Transform animation has already taken the universal world-matrix path.
+    # Reuse the established copier only for non-spatial custom attributes.
+    _translate_key_data, _rotate_key_data, extra_attrs = source_animation
+    copied_attrs = _copy_source_extra_keys_to_control(
+        control, obj, extra_attrs, operation=operation
     )
     if copied_attrs:
         TkmSceneNode(control).set_attr(COPIED_ATTRS_ATTR, json.dumps(copied_attrs))
@@ -790,26 +927,48 @@ def _create_control_for(
 
     node = TkmSceneNode(control)
     if translate_channels:
-        driver_nodes["translate"] = _drive_group(
-            control,
-            obj,
-            translate_channels,
-            options["position_space"],
-            restore_map,
-            locked_report=locked_report,
-            space_source=options.get("camera"),
-        )
+        if "translate" in creation_camera_nodes:
+            driver_nodes["translate"] = creation_camera_nodes[
+                "translate"
+            ] + _drive_constraint_for_space(
+                control,
+                obj,
+                "translate",
+                options["position_space"],
+                locked_report=locked_report,
+            )
+        else:
+            driver_nodes["translate"] = _drive_group(
+                control,
+                obj,
+                translate_channels,
+                options["position_space"],
+                restore_map,
+                locked_report=locked_report,
+                space_source=options.get("camera"),
+            )
         node.set_attr(POSITION_SPACE_ATTR, options["position_space"])
     if rotate_channels:
-        driver_nodes["rotate"] = _drive_group(
-            control,
-            obj,
-            rotate_channels,
-            options["orientation_space"],
-            restore_map,
-            locked_report=locked_report,
-            space_source=options.get("camera"),
-        )
+        if "rotate" in creation_camera_nodes:
+            driver_nodes["rotate"] = creation_camera_nodes[
+                "rotate"
+            ] + _drive_constraint_for_space(
+                control,
+                obj,
+                "rotate",
+                options["orientation_space"],
+                locked_report=locked_report,
+            )
+        else:
+            driver_nodes["rotate"] = _drive_group(
+                control,
+                obj,
+                rotate_channels,
+                options["orientation_space"],
+                restore_map,
+                locked_report=locked_report,
+                space_source=options.get("camera"),
+            )
         node.set_attr(ORIENTATION_SPACE_ATTR, options["orientation_space"])
     # Scale connection is temporarily disabled -- scaleConstraint has been
     # seen hard-crashing control creation on a locked/non-writable scale
@@ -878,12 +1037,80 @@ def _build_control_hierarchy(obj, group, options):
     if system == "aim":
         _add_aim_target(control, top_node, base_name, radius)
 
+    # Every System starts in the neutral Temporal Controls hierarchy. Space-
+    # specific parenting happens only after source world animation has been
+    # captured (see _create_control_for's single setup pipeline).
     parent_target = group
-    if system == "fk_chain" and options.get("chain_parent"):
+    if (
+        not options.get("relative_parent")
+        and system == "fk_chain"
+        and options.get("chain_parent")
+    ):
         parent_target = options["chain_parent"]
     cmds.parent(top_node, parent_target)
 
     return control, top_node, control
+
+
+def _reset_offset_parent_matrix(node):
+    """Zero out any world-preserving compensation ``cmds.parent`` wrote to
+    *node*'s ``offsetParentMatrix``.
+
+    Maya's ``parent`` command (2020+) keeps an object visually in place
+    across a reparent by writing the required compensation into
+    ``offsetParentMatrix`` whenever it can't touch translate/rotate directly
+    -- exactly the case here, since a control being re-spaced is still
+    carrying its previous space's keys at this point. Every caller
+    immediately recomputes this node's local translate/rotate from a
+    captured world matrix against its *new* parent (see
+    ``_TransformSpaceTransfer.apply``), and that math only accounts for the
+    parent's own world matrix (``parentInverseMatrix``) -- it knows nothing
+    about a node's own ``offsetParentMatrix``. Left in place, that leftover
+    compensation silently shifts the node a second time on top of the
+    freshly converted keys, which is what made a live space switch
+    occasionally leave the control sitting in the wrong pose (and, through
+    the maintainOffset constraint built from that wrong pose, the target
+    not matching it either). Clearing it here keeps the reparent itself
+    pose-neutral so the conversion math is the only thing that ever moves
+    the node.
+    """
+    plug = "{}.offsetParentMatrix".format(node)
+    if not cmds.objExists(plug) or not cmds.getAttr(plug, settable=True):
+        return
+    try:
+        cmds.setAttr(
+            plug,
+            [
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0,
+            ],
+            type="matrix",
+        )
+    except RuntimeError:
+        pass
+
+
+def _parent_control_system(control, delete_root, parent):
+    """Parent a complete System and return its resolved post-parent paths."""
+    root_matches = cmds.ls(delete_root, long=True) or []
+    control_matches = cmds.ls(control, long=True) or []
+    if not root_matches or not control_matches:
+        raise RuntimeError("Temporal Controls hierarchy could not be resolved")
+    old_root = root_matches[0]
+    control_suffix = control_matches[0][len(old_root) :]
+    parented = cmds.parent(old_root, parent, absolute=True) or []
+    new_roots = cmds.ls(parented[0], long=True) if parented else []
+    if not new_roots:
+        raise RuntimeError("Temporal Controls hierarchy could not be parented")
+    new_root = new_roots[0]
+    _reset_offset_parent_matrix(new_root)
+    new_controls = cmds.ls(new_root + control_suffix, long=True) or []
+    if not new_controls:
+        raise RuntimeError("Temporal Controls control could not be resolved")
+    _reset_offset_parent_matrix(new_controls[0])
+    return new_controls[0], new_root
 
 
 def _add_aim_target(control, buffer_node, base_name, radius):
@@ -1364,13 +1591,12 @@ def _key_times_by_channel(obj, channels):
 def _gather_copyable_animation(obj):
     """Everything create_controls_with_options/_create_control_for need in
     order to give a new control a real copy of *obj*'s own pre-existing
-    animation (see _copy_source_keys_to_control). Computed once, up
+    animation through the shared capture-first setup path. Computed once, up
     front, for two reasons: create_controls_with_options needs the total
     key-time count before it builds a single control, to size its
     progress bar's total correctly (see its own call site), and
-    _copy_source_keys_to_control itself needs the exact same data a
-    moment later -- scanning obj twice for the same thing would be
-    wasted work.
+    world-matrix/custom-attribute copy steps need the exact same data a moment
+    later -- scanning obj twice for the same thing would be wasted work.
 
     Returns ``(translate_key_data, rotate_key_data, extra_attrs)`` --
     translate/rotate data are ``(channel_name, key_times)`` tuples;
@@ -1388,9 +1614,8 @@ def _gather_copyable_animation(obj):
     on channels that never had one there in the original animation --
     e.g. a control whose translate was keyed at frames 1/10/20 and rotate
     at 5/15 would get translate keys stamped onto frames 5/15 too, values
-    that were never actually keyed there. _copy_source_keys_to_control
-    now bakes each of the three independently, exactly preserving each
-    one's own key times.
+    that were never actually keyed there. The shared world-matrix setup path
+    preserves those per-channel key times exactly.
 
     Scale is out of scope, same as the rest of control creation (see
     _create_control_for: scale isn't driven at all right now)."""
@@ -1414,12 +1639,20 @@ def _gather_copyable_animation(obj):
                 enum_names = None
         extra_attrs.append((attr_name, enum_names, _key_times_for(obj, attr_name)))
 
-    return translate_key_data, rotate_key_data, extra_attrs
+    result = (translate_key_data, rotate_key_data, extra_attrs)
+    _debug_log(
+        "source animation discovered",
+        source=obj,
+        translate_keys=translate_key_data,
+        rotate_keys=rotate_key_data,
+        extra_attributes=extra_attrs,
+    )
+    return result
 
 
 def _ensure_matching_attribute(control, obj, attr_name, enum_names):
     """Make sure *control* has an attribute matching obj's own *attr_name*
-    before _copy_source_keys_to_control connects/bakes it across -- an
+    before _copy_source_extra_keys_to_control connects/bakes it across -- an
     enum needs the same enumName list as obj's (Maya requires compatible
     enum fields on both ends of a connection), every other copyable type
     just needs to exist, unlocked and keyable. Returns whether control now
@@ -1523,104 +1756,15 @@ def _copy_driven_channel_keys(
                 operation.step()
 
 
-def _copy_source_keys_to_control(
-    control, obj, translate_key_data, rotate_key_data, extra_attrs, operation=None
-):
-    """Give *control* a real copy of *obj*'s own pre-existing animation --
-    translate/rotate (if keyed) and every entry in *extra_attrs* (enums
-    included) -- before _capture_channel below disconnects any of it from
-    obj and obj starts being driven by control instead. Without this,
-    obj's original motion/attribute values would simply vanish the moment
-    control took over -- _capture_channel only frees translate/rotate up
-    and stashes a revert reference, it was never meant to preserve the
-    *visible* result, just make room for the forward constraint; custom
-    attributes aren't touched by it at all. Copying it onto control here
-    means the animator keeps seeing -- and can keep keying/nudging on top
-    of -- obj's original motion/values, for then to be applied back onto
-    obj at Bake time (see _apply_copied_attrs_to_target for the extra-
-    attrs half of that; translate/rotate already flow back through the
-    normal live constraint + Bake/Revert path once control is driving obj).
+def _copy_source_extra_keys_to_control(control, obj, extra_attrs, operation=None):
+    """Copy keyed custom attributes after the shared transform setup path.
 
-    Translate, rotate, and every extra_attrs entry are copied as direct
-    frame/value arrays (_copy_driven_channel_keys), at exactly that
-    group/attribute's own key times -- not one shared set merged across
-    all of them. See _gather_copyable_animation's own docstring for why:
-    merging across unrelated channels/attributes was stamping keys onto a
-    channel at times it was never actually keyed at in the original
-    animation.
-
-    Translate/rotate are sampled through one temporary transform parented
-    beside control. The sampler, rather than control itself, receives the
-    reverse constraint: some systems legitimately already drive control
-    (Aim owns its rotation), and constraining that same destination again
-    raises Maya's "Object is already connected" error. A single sampler
-    also evaluates shared translate/rotate key times only once. Every other
-    attribute goes through a temporary direct connectAttr instead -- a plain
-    value, not a spatial transform, so there's no space to convert between;
-    see _ensure_matching_attribute for why an enum needs a matching attribute
-    built on control first for that connection to even be legal. All usable
-    custom attributes are connected together and sampled in one timeline
-    pass rather than rewinding the timeline once per attribute.
-
-    Reports progress through *operation* (the same ToolOperation
-    create_controls_with_options already has open for the whole batch),
-    one step per key time across all three passes -- create_controls_
-    with_options' own call site already added up exactly that many steps
-    to that operation's total up front, so the two stay in sync across
-    every object in the batch.
-
-    Returns the list of extra_attrs names actually copied (control got a
-    usable matching attribute for and a connection was made) -- what
-    create_controls_with_options stores on control as COPIED_ATTRS_ATTR
-    for Bake to read back later."""
+    Transform animation is always handled first through world-matrix capture
+    and conversion. Custom numeric/enum attributes have no spatial meaning,
+    so they retain the established direct-connect/sample/disconnect path and
+    their own exact key times. Returns the attributes successfully copied.
+    """
     copied_attrs = []
-
-    spatial_key_data = translate_key_data + rotate_key_data
-    if spatial_key_data:
-        parent = cmds.listRelatives(control, parent=True, fullPath=True) or []
-        sampler_kwargs = {
-            "name": "{}_animationSampler#".format(control.rsplit("|", 1)[-1]),
-        }
-        if parent:
-            sampler_kwargs["parent"] = parent[0]
-        sampler = cmds.createNode("transform", **sampler_kwargs)
-        constraint = None
-        try:
-            cmds.setAttr(
-                _plug(sampler, "rotateOrder"),
-                cmds.getAttr(_plug(control, "rotateOrder")),
-            )
-            constraint_kwargs = {"maintainOffset": False}
-            if not translate_key_data:
-                constraint_kwargs["skipTranslate"] = ("x", "y", "z")
-            if not rotate_key_data:
-                constraint_kwargs["skipRotate"] = ("x", "y", "z")
-            constraint = cmds.parentConstraint(obj, sampler, **constraint_kwargs)[0]
-
-            def _delete_sampler():
-                nodes = [
-                    node
-                    for node in (constraint, sampler)
-                    if node and cmds.objExists(node)
-                ]
-                if nodes:
-                    cmds.delete(nodes)
-
-            _copy_driven_channel_keys(
-                sampler,
-                control,
-                spatial_key_data,
-                _delete_sampler,
-                operation=operation,
-            )
-        finally:
-            # _copy_driven_channel_keys normally owns cleanup. This covers
-            # failures while constructing the temporary constraint too.
-            nodes = [
-                node for node in (constraint, sampler) if node and cmds.objExists(node)
-            ]
-            if nodes:
-                cmds.delete(nodes)
 
     extra_key_data = []
     extra_connections = []
@@ -1691,6 +1835,11 @@ def _capture_channel(control, obj, channel):
     """
     obj_plug = _plug(obj, channel)
     if not cmds.objExists(obj_plug) or cmds.getAttr(obj_plug, lock=True):
+        _debug_log(
+            "source channel capture skipped",
+            plug=obj_plug,
+            reason="missing or locked",
+        )
         return None
 
     base_value = cmds.getAttr(obj_plug)
@@ -1703,8 +1852,22 @@ def _capture_channel(control, obj, channel):
         source_node = source_plug.split(".")[0]
         if not cmds.nodeType(source_node).startswith("animCurve"):
             # Already driven by a constraint/expression/other setup -- leave it alone.
+            _debug_log(
+                "source channel capture skipped",
+                plug=obj_plug,
+                source_plug=source_plug,
+                source_type=cmds.nodeType(source_node),
+                reason="source is not a direct animCurve",
+            )
             return None
         cmds.disconnectAttr(source_plug, obj_plug)
+        _debug_log(
+            "source channel captured",
+            plug=obj_plug,
+            mode="curve",
+            source_plug=source_plug,
+            base_value=base_value,
+        )
         return channel, {
             "mode": "curve",
             "source": source_plug,
@@ -1712,8 +1875,19 @@ def _capture_channel(control, obj, channel):
         }
 
     if not cmds.getAttr(obj_plug, settable=True):
+        _debug_log(
+            "source channel capture skipped",
+            plug=obj_plug,
+            reason="not settable",
+        )
         return None
 
+    _debug_log(
+        "source channel captured",
+        plug=obj_plug,
+        mode="value",
+        base_value=base_value,
+    )
     return channel, {"mode": "value", "value": base_value, "base_value": base_value}
 
 
@@ -1756,6 +1930,11 @@ def _stored_space_group(control, attribute):
     if not matches:
         matches = cmds.ls(str(stored).rsplit("|", 1)[-1], long=True) or []
     return matches[0] if len(matches) == 1 else None
+
+
+def _stored_relative_source(control):
+    """Resolve the persistent Relative/Relative reference, if it still exists."""
+    return _stored_space_group(control, RELATIVE_SOURCE_ATTR)
 
 
 def _set_locked_string_attr(node, attribute, value):
@@ -1804,6 +1983,11 @@ def _ensure_camera_space_hierarchy(control):
         rotation=rotation,
     )
     cmds.parent(delete_root, orientation_group, absolute=True)
+    # delete_root can already be carrying the control's previous-space keys
+    # here (this hierarchy is inserted live when switching an existing
+    # control to Camera space, not only at creation) -- see
+    # _reset_offset_parent_matrix for why a keyed reparent needs this.
+    _reset_offset_parent_matrix(delete_root)
 
     position_group = (cmds.ls(position_group, long=True) or [position_group])[0]
     orientation_group = (cmds.ls(orientation_group, long=True) or [orientation_group])[
@@ -1885,25 +2069,63 @@ def _drive_group(
 
     group_kind = "translate" if channels[0].startswith("translate") else "rotate"
 
-    if space_mode in ("relative", "grab_release", "child"):
-        return _drive_with_constraint(
-            control, obj, group_kind, maintain_offset=True, locked_report=locked_report
-        )
-
-    if space_mode in ("object", "world"):
-        return _drive_with_constraint(
-            control, obj, group_kind, maintain_offset=False, locked_report=locked_report
-        )
     if space_mode == "camera":
         camera_nodes = _camera_space_driver(control, group_kind, space_source)
-        return camera_nodes + _drive_with_constraint(
-            control,
-            obj,
-            group_kind,
-            maintain_offset=False,
-            locked_report=locked_report,
+        return camera_nodes + _drive_constraint_for_space(
+            control, obj, group_kind, space_mode, locked_report=locked_report
         )
-    raise ValueError("Unknown Temporal Controls space: {}".format(space_mode))
+    return _drive_constraint_for_space(
+        control, obj, group_kind, space_mode, locked_report=locked_report
+    )
+
+
+def _drive_constraint_for_space(
+    control, obj, group_kind, space_mode, locked_report=None
+):
+    """Shared target-constraint half of creation and live space switching."""
+    if space_mode not in (
+        "relative",
+        "grab_release",
+        "child",
+        "object",
+        "world",
+        "camera",
+    ):
+        _debug_log(
+            "driver rejected",
+            control=control,
+            target=obj,
+            group=group_kind,
+            space=space_mode,
+            reason="unknown space",
+        )
+        raise ValueError("Unknown Temporal Controls space: {}".format(space_mode))
+    maintain_offset = space_mode in ("relative", "grab_release", "child")
+    _debug_log(
+        "driver requested",
+        control=control,
+        target=obj,
+        group=group_kind,
+        space=space_mode,
+        maintain_offset=maintain_offset,
+    )
+    nodes = _drive_with_constraint(
+        control,
+        obj,
+        group_kind,
+        maintain_offset=maintain_offset,
+        locked_report=locked_report,
+    )
+    _debug_log(
+        "driver completed",
+        control=control,
+        target=obj,
+        group=group_kind,
+        space=space_mode,
+        nodes=nodes,
+        success=bool(nodes),
+    )
+    return nodes
 
 
 _CONSTRAINT_CHANNELS = {
@@ -1991,6 +2213,14 @@ def _drive_with_constraint(
         # Every channel in this group is locked -- nothing left to
         # constrain, and calling the constraint command with all axes
         # skipped is a no-op at best. Already recorded above.
+        _debug_log(
+            "constraint rejected",
+            control=control,
+            target=obj,
+            group=group_kind,
+            reason="all destination axes are locked",
+            skip_axes=skip_axes,
+        )
         return []
 
     constrain = _CONSTRAINT_COMMANDS[group_kind]
@@ -1999,7 +2229,17 @@ def _drive_with_constraint(
         constrain_kwargs["skip"] = skip_axes
     try:
         node = constrain(control, obj, **constrain_kwargs)[0]
-    except RuntimeError:
+    except RuntimeError as first_error:
+        _debug_log(
+            "constraint retrying",
+            control=control,
+            target=obj,
+            group=group_kind,
+            reason="primed constraint failed",
+            error=first_error,
+            primed_curves=primed_curves,
+            kwargs=constrain_kwargs,
+        )
         for curve in primed_curves:
             if cmds.objExists(curve):
                 cmds.delete(curve)
@@ -2007,6 +2247,14 @@ def _drive_with_constraint(
         try:
             node = constrain(control, obj, **constrain_kwargs)[0]
         except RuntimeError as exc:
+            _debug_log(
+                "constraint failed",
+                control=control,
+                target=obj,
+                group=group_kind,
+                kwargs=constrain_kwargs,
+                error=exc,
+            )
             cmds.warning(
                 "Temporal Controls: couldn't drive {} on {}: {}".format(
                     group_kind, obj, exc
@@ -2030,6 +2278,16 @@ def _drive_with_constraint(
             if pair_blend not in driver_nodes:
                 driver_nodes.append(pair_blend)
 
+    _debug_log(
+        "constraint created",
+        control=control,
+        target=obj,
+        group=group_kind,
+        maintain_offset=maintain_offset,
+        skip_axes=skip_axes,
+        primed_curves=primed_curves,
+        driver_nodes=driver_nodes,
+    )
     return driver_nodes
 
 
@@ -2078,10 +2336,10 @@ def bake_control(control):
 
         # Same order every time: right after whichever of the above just
         # handled translate/rotate. Extra copied attributes (see
-        # COPIED_ATTRS_ATTR/_copy_source_keys_to_control) are a no-op here
+        # COPIED_ATTRS_ATTR/_copy_source_extra_keys_to_control) are a no-op here
         # for any control that was never given any -- every control built
         # before this existed, and nested/Add-Child controls, which never
-        # go through _copy_source_keys_to_control in the first place.
+        # go through _copy_source_extra_keys_to_control in the first place.
         _apply_copied_attrs_to_target(control, target, _copied_attrs_for(control))
 
     _delete_driver_nodes(control)
@@ -2279,13 +2537,13 @@ def _extract_keys_to_target(control, target, restore_map):
 
 def _apply_copied_attrs_to_target(control, target, copied_attrs):
     """Reapply control's own copy of obj's originally-keyed custom
-    attributes (see COPIED_ATTRS_ATTR/_copy_source_keys_to_control) back
+    attributes (see COPIED_ATTRS_ATTR/_copy_source_extra_keys_to_control) back
     onto target at Bake time -- the "for then to be reapplied" half of
-    what _copy_source_keys_to_control set up at creation.
+    what _copy_source_extra_keys_to_control set up at creation.
 
     Unlike translate/rotate (_extract_keys_to_target/_bake_frames_to_target),
     these were deliberately never kept live-connected from control back to
-    target during the tool's lifetime -- see _copy_source_keys_to_control's
+    target during the tool's lifetime -- see _copy_source_extra_keys_to_control's
     own docstring: just a one-shot copy at creation, matching "apply the
     changes to the source on bake", not a continuous drive. So there's no
     "target's own live, constraint-driven value" here for
@@ -2540,15 +2798,8 @@ def mute_and_revert(*_args):
 
     muted = []
     for control in controls:
-        target = _target_for(control)
-        restore_map = _restore_map_for(control)
-        _delete_driver_nodes(control)
-        if target:
-            _restore_target_channels(target, restore_map)
-        node = TkmSceneNode(control)
-        node.set_attr(MUTED_ATTR, True, attributeType="bool")
-        node.set_attr(DRIVER_NODES_ATTR, json.dumps({}))
-        muted.append(control)
+        if _TemporalControlRigToggle(control).turn_off(mark_muted=True):
+            muted.append(control)
 
     cmds.select(muted)
     return muted
@@ -2585,13 +2836,18 @@ def mute_and_bake(*_args):
     return muted
 
 
-def switch_controls_space(space_id, *_args):
+def switch_controls_space(space_id, *_args, tool_operation=None):
     """Re-drive every selected (or targeted) Temporal Control through
     *space_id* for both Position and Orientation -- a live version of the
     System/Space choice the creation dialog only offers up front. Tears
     down the control's current constraint/pairBlend/priming-curve driver
-    nodes and rebuilds them through the new space, exactly the way
-    _create_control_for originally built them.
+    nodes and rebuilds them through the new space. The rig is toggled OFF
+    first, restoring the untouched target animation; its world transform is
+    captured only at those original per-channel key times, converted into the
+    new control space, and the rig is toggled ON again. Parent/camera keys
+    never add samples, and unkeyed channels are adjusted at current time
+    without receiving a key. This is the same invariant used by the panel's
+    independent Position/Orientation switch.
 
     Nested Temporal Controls are skipped (real-parented, no space concept
     -- see _parent_nested_control), and so are muted ones (nothing to
@@ -2602,86 +2858,76 @@ def switch_controls_space(space_id, *_args):
         if _nested_parent_for(control) is None
         and not TkmSceneNode(control).get_attr(MUTED_ATTR)
     ]
+    _debug_log(
+        "menu space switch requested",
+        destination_space=space_id,
+        eligible_controls=controls,
+    )
     if not controls:
+        _debug_log("menu space switch rejected", reason="no eligible controls")
         return wutil.make_inViewMessage("No Temporal Controls to switch")
     camera = _active_viewport_camera() if space_id == "camera" else None
     if space_id == "camera" and not camera:
+        _debug_log("menu space switch rejected", reason="no active viewport camera")
         return wutil.make_inViewMessage("Focus or show a viewport to use Camera Space")
 
-    switched = []
+    operation = toolCommon.require_tool_operation(tool_operation)
+    switches = []
     for control in controls:
         control = (cmds.ls(control, long=False) or [control])[0]
-        target = _target_for(control)
-        if not target:
-            continue
-        restore_map = _restore_map_for(control)
-        _delete_driver_nodes(control)
+        switch = _ControlSpaceSwitch(
+            control,
+            ("translate", "rotate"),
+            space_id,
+            camera,
+            operation,
+        )
+        if switch.valid:
+            switches.append(switch)
 
-        driver_nodes = {}
-        translate_channels = [
-            channel for channel in TRANSLATE_CHANNELS if channel in restore_map
-        ]
-        rotate_channels = [
-            channel for channel in ROTATE_CHANNELS if channel in restore_map
-        ]
-        scale_channels = [
-            channel for channel in SCALE_CHANNELS if channel in restore_map
-        ]
+    if not switches:
+        _debug_log("menu space switch rejected", reason="no valid switch operations")
+        return wutil.make_inViewMessage("Nothing to switch")
+    _configure_space_switch_operation(operation, switches)
 
-        if translate_channels:
-            driver_nodes["translate"] = _drive_group(
-                control,
-                target,
-                translate_channels,
-                space_id,
-                restore_map,
-                space_source=camera,
-            )
-        if rotate_channels:
-            driver_nodes["rotate"] = _drive_group(
-                control,
-                target,
-                rotate_channels,
-                space_id,
-                restore_map,
-                space_source=camera,
-            )
-        # Scale connection is temporarily disabled -- see _create_control_for.
-        del scale_channels
-
-        node = TkmSceneNode(control)
-        node.set_attr(DRIVER_NODES_ATTR, json.dumps(driver_nodes))
-        # This right-click menu action always sets Position and Orientation
-        # together -- the panel's set_control_space is the one that can move
-        # them independently.
-        node.set_attr(POSITION_SPACE_ATTR, space_id)
-        node.set_attr(ORIENTATION_SPACE_ATTR, space_id)
-        switched.append(control)
+    switched = [
+        switch.control for switch in switches if switch.run()
+    ]
 
     if switched:
         cmds.select(switched)
+        _debug_log(
+            "menu space switch completed",
+            destination_space=space_id,
+            switched_controls=switched,
+        )
         return switched
+    _debug_log(
+        "menu space switch completed",
+        destination_space=space_id,
+        switched_controls=[],
+    )
     return wutil.make_inViewMessage("Nothing to switch")
 
 
-def switch_controls_to_world_space(*_args):
-    return switch_controls_space("world")
+def switch_controls_to_world_space(*_args, tool_operation=None):
+    return switch_controls_space("world", tool_operation=tool_operation)
 
 
-def switch_controls_to_object_space(*_args):
-    return switch_controls_space("object")
+def switch_controls_to_object_space(*_args, tool_operation=None):
+    return switch_controls_space("object", tool_operation=tool_operation)
 
 
-def switch_controls_to_camera_space(*_args):
-    return switch_controls_space("camera")
+def switch_controls_to_camera_space(*_args, tool_operation=None):
+    return switch_controls_space("camera", tool_operation=tool_operation)
 
 
-def switch_controls_to_relative_space(*_args):
-    return switch_controls_space("relative")
+def switch_controls_to_relative_space(*_args, tool_operation=None):
+    return switch_controls_space("relative", tool_operation=tool_operation)
 
 
-def switch_controls_to_child_space(*_args):
-    return switch_controls_space("child")
+def switch_controls_to_child_space(*_args, tool_operation=None):
+    return switch_controls_space("child", tool_operation=tool_operation)
 
 
 def get_control_position_space(control):
@@ -2707,61 +2953,879 @@ def set_control_space_locked(control, locked):
         set_control_space(control, "rotate", get_control_position_space(control))
 
 
-def set_control_space(control, group_kind, space_id):
+def _animation_transform_key_groups(animation):
+    """Both transform groups in the shared space-conversion shape.
+
+    Empty key data is intentional: the group still captures and applies its
+    current world pose, while ``_TransformSpaceTransfer`` creates no keys for
+    it. This keeps keyed and unkeyed creation on exactly the same path.
+    """
+    translate_key_data, rotate_key_data, _extra_attrs = animation
+    return [
+        (group_kind, key_data)
+        for group_kind, key_data in (
+            ("translate", translate_key_data),
+            ("rotate", rotate_key_data),
+        )
+    ]
+
+
+def _owned_space_sample_times(key_data, group_kind):
+    """Owned keys plus current pose when any group channel is unkeyed."""
+    key_times = sorted(
+        {
+            key_time
+            for _channel, channel_times in key_data
+            for key_time in channel_times
+        }
+    )
+    keyed_channels = {channel for channel, _channel_times in key_data}
+    if len(keyed_channels) < len(_CONSTRAINT_CHANNELS[group_kind]):
+        key_times.append(cmds.currentTime(query=True))
+    return sorted(set(key_times))
+
+
+def _space_conversion_work(key_data, group_kind):
+    """Capture + exact-key/static-channel work units for progress and ETA."""
+    channels = _CONSTRAINT_CHANNELS[group_kind]
+    keyed_channels = {channel for channel, _times in key_data}
+    apply_steps = sum(len(times) for _channel, times in key_data)
+    apply_steps += len(channels) - len(keyed_channels)
+    return len(_owned_space_sample_times(key_data, group_kind)) + apply_steps
+
+
+def _set_temporal_key(control, channel, key_time, value):
+    """Set and verify one converted key on a deterministic animation layer.
+
+    Maya can silently return zero from an otherwise valid ``setKeyframe``
+    when animation layers exist and no destination layer is specified. Match
+    the codebase's Copy/Paste behavior by explicitly targeting BaseAnimation
+    in that situation, then verify that the key really exists before the
+    source animation is disconnected.
+    """
+    kwargs = {
+        "time": (key_time,),
+        "attribute": channel,
+        "value": value,
+        "shape": False,
+    }
+    has_layers = animation.has_anim_layers()
+    root_layer = None
+    if has_layers:
+        root_layer = animation.root_layer_name()
+        if root_layer:
+            kwargs["animLayer"] = root_layer
+    _debug_log(
+        "key write requested",
+        control=control,
+        channel=channel,
+        time=key_time,
+        value=value,
+        has_animation_layers=has_layers,
+        destination_layer=root_layer,
+        kwargs=kwargs,
+    )
+    try:
+        result = cmds.setKeyframe(control, **kwargs)
+    except (RuntimeError, ValueError, TypeError) as exc:
+        _debug_log(
+            "key write failed",
+            control=control,
+            channel=channel,
+            time=key_time,
+            error=exc,
+        )
+        cmds.warning(
+            "Temporal Controls: could not set {}.{} at {}: {}".format(
+                control, channel, key_time, exc
+            )
+        )
+        return False
+
+    plug = _plug(control, channel)
+    try:
+        key_count = cmds.keyframe(
+            plug,
+            query=True,
+            time=(key_time, key_time),
+            keyframeCount=True,
+        )
+    except (RuntimeError, ValueError, TypeError):
+        key_count = 0
+    _debug_log(
+        "key write verified",
+        control=control,
+        plug=plug,
+        time=key_time,
+        set_keyframe_result=result,
+        verification_key_count=key_count,
+        destination_layer=root_layer,
+    )
+    if result or key_count:
+        return True
+    cmds.warning(
+        "Temporal Controls: Maya did not create {} at {}".format(plug, key_time)
+    )
+    return False
+
+
+def _creation_animation_work(animation):
+    """Universal capture-first creation workload for every space mode."""
+    _translate, _rotate, extra_attrs = animation
+    return sum(
+        _space_conversion_work(key_data, group_kind)
+        for group_kind, key_data in _animation_transform_key_groups(animation)
+    ) + sum(
+        len(attr_key_times)
+        for _name, _enum, attr_key_times in extra_attrs
+    )
+
+
+class _TransformKeyGroup(object):
+    """One translate/rotate group's owned keys and captured world matrices."""
+
+    def __init__(self, kind, key_data):
+        self.kind = kind
+        self.key_data = list(key_data or [])
+        self.sample_times = _owned_space_sample_times(self.key_data, kind)
+        self.world_values = {}
+
+    @property
+    def work(self):
+        return _space_conversion_work(self.key_data, self.kind)
+
+    @property
+    def owned_key_times(self):
+        return [
+            key_time
+            for _channel, channel_times in self.key_data
+            for key_time in channel_times
+        ]
+
+
+class _TransformSpaceTransfer(object):
+    """Capture-first, key-for-key world-space transfer shared by all spaces."""
+
+    def __init__(self, source, groups, operation):
+        self.source = source
+        self.groups = [
+            _TransformKeyGroup(kind, key_data) for kind, key_data in groups
+        ]
+        self.operation = operation
+
+    @classmethod
+    def from_animation(cls, source, animation, operation):
+        return cls(source, _animation_transform_key_groups(animation), operation)
+
+    @property
+    def work(self):
+        return sum(group.work for group in self.groups)
+
+    @property
+    def owned_key_times(self):
+        return [
+            key_time
+            for group in self.groups
+            for key_time in group.owned_key_times
+        ]
+
+    def capture(self):
+        """First pipeline stage: read world matrices before scene changes."""
+        self.operation.set_status("Capturing Temporal Control World Space")
+        for group in self.groups:
+            _debug_log(
+                "world capture group",
+                source=self.source,
+                group=group.kind,
+                owned_keys=group.key_data,
+                sample_times=group.sample_times,
+            )
+            for key_time in group.sample_times:
+                matrix = maya_api.world_matrix_at_time(
+                    self.source, key_time
+                )
+                group.world_values[key_time] = matrix
+                _debug_log(
+                    "world capture result",
+                    source=self.source,
+                    group=group.kind,
+                    time=key_time,
+                    matrix=matrix,
+                    success=matrix is not None,
+                )
+                self.operation.step()
+        success = all(
+            matrix is not None
+            for group in self.groups
+            for matrix in group.world_values.values()
+        )
+        _debug_log("world capture completed", source=self.source, success=success)
+        return success
+
+    def apply(self, control):
+        """Final pipeline stage: convert captured matrices into destination locals."""
+        self.operation.set_status("Converting Temporal Control Space")
+        rotate_order = cmds.getAttr(_plug(control, "rotateOrder"))
+        _debug_log(
+            "space conversion started",
+            source=self.source,
+            control=control,
+            rotate_order=rotate_order,
+            groups=[group.kind for group in self.groups],
+        )
+        for group in self.groups:
+            if not self._apply_group(control, group, rotate_order):
+                _debug_log(
+                    "space conversion failed",
+                    source=self.source,
+                    control=control,
+                    group=group.kind,
+                )
+                return False
+        _debug_log(
+            "space conversion completed",
+            source=self.source,
+            control=control,
+            success=True,
+        )
+        return True
+
+    def _apply_group(self, control, group, rotate_order):
+        channels = _CONSTRAINT_CHANNELS[group.kind]
+        local_values_by_time = {}
+        for key_time in group.sample_times:
+            parent_inverse = maya_api.parent_inverse_matrix_at_time(control, key_time)
+            local_matrix = maya_api.multiply_matrices(
+                group.world_values[key_time], parent_inverse
+            )
+            local_values = maya_api.decompose_local_matrix(local_matrix, rotate_order)
+            _debug_log(
+                "local conversion result",
+                control=control,
+                group=group.kind,
+                time=key_time,
+                parent_inverse=parent_inverse,
+                local_matrix=local_matrix,
+                local_values=local_values,
+                success=local_values is not None,
+            )
+            if local_values:
+                local_values_by_time[key_time] = dict(
+                    zip(channels, local_values[group.kind])
+                )
+
+        keyed_times = dict(group.key_data)
+        current_time = cmds.currentTime(query=True)
+        current_values = local_values_by_time.get(current_time)
+        if len(local_values_by_time) != len(group.sample_times):
+            _debug_log(
+                "local conversion rejected",
+                control=control,
+                group=group.kind,
+                expected_samples=len(group.sample_times),
+                converted_samples=len(local_values_by_time),
+            )
+            return False
+
+        for channel in channels:
+            channel_times = keyed_times.get(channel, [])
+            if channel_times:
+                try:
+                    cmds.cutKey(control, attribute=channel, clear=True)
+                except RuntimeError:
+                    pass
+                for key_time in channel_times:
+                    if not _set_temporal_key(
+                        control,
+                        channel,
+                        key_time,
+                        local_values_by_time[key_time][channel],
+                    ):
+                        _debug_log(
+                            "channel key application rejected",
+                            control=control,
+                            group=group.kind,
+                            channel=channel,
+                            time=key_time,
+                        )
+                        return False
+                    self.operation.step()
+            elif current_values is not None:
+                try:
+                    cmds.setAttr(_plug(control, channel), current_values[channel])
+                    _debug_log(
+                        "static channel applied",
+                        control=control,
+                        group=group.kind,
+                        channel=channel,
+                        time=current_time,
+                        value=current_values[channel],
+                    )
+                except RuntimeError as exc:
+                    _debug_log(
+                        "static channel application failed",
+                        control=control,
+                        group=group.kind,
+                        channel=channel,
+                        time=current_time,
+                        error=exc,
+                    )
+                self.operation.step()
+        return True
+
+
+def _configure_space_switch_operation(operation, switches):
+    """One tint/progress/ETA setup shared by panel and menu space switches."""
+    owned_key_times = [
+        key_time
+        for switch in switches
+        for key_time in switch.transfer.owned_key_times
+    ]
+    if owned_key_times:
+        toolCommon.ensure_operation_tint(
+            operation,
+            tint="range",
+            timerange=(min(owned_key_times), max(owned_key_times)),
+            tint_key="temporal_controls_space",
+        )
+    else:
+        toolCommon.ensure_operation_tint(
+            operation,
+            tint="current",
+            default_mode="current_frame",
+            tint_key="temporal_controls_space",
+        )
+    operation.set_total(
+        sum(switch.transfer.work for switch in switches),
+        reset=True,
+    )
+
+
+def _restore_key_data(restore_map, group_kind):
+    """Original per-channel keys held by a Temporal Control restore payload."""
+    key_data = []
+    for channel in _CONSTRAINT_CHANNELS[group_kind]:
+        payload = restore_map.get(channel) or {}
+        if payload.get("mode") != "curve":
+            continue
+        source = payload.get("source")
+        source_node = source.split(".")[0] if source else None
+        if not source_node or not cmds.objExists(source_node):
+            continue
+        try:
+            times = sorted(
+                set(cmds.keyframe(source_node, query=True, timeChange=True) or [])
+            )
+        except (RuntimeError, ValueError, TypeError):
+            times = []
+        if times:
+            key_data.append((channel, times))
+    return key_data
+
+
+def _stored_camera_source(control, group_kind):
+    attribute = (
+        CAMERA_POSITION_SOURCE_ATTR
+        if group_kind == "translate"
+        else CAMERA_ORIENTATION_SOURCE_ATTR
+    )
+    return _stored_space_group(control, attribute)
+
+
+class _TemporalControlRigToggle(object):
+    """Atomic OFF/ON lifecycle for a driven Temporal Control rig."""
+
+    def __init__(self, control):
+        self.control = control
+        self.target = _target_for(control)
+        self.restore_map = _restore_map_for(control)
+
+    @property
+    def valid(self):
+        return bool(self.target and self.restore_map)
+
+    def turn_off(self, mark_muted=False):
+        """Remove all drivers and reconnect the untouched source animation."""
+        if not self.valid:
+            return False
+        _debug_log(
+            "temporal rig turning off",
+            control=self.control,
+            target=self.target,
+            restore_channels=sorted(self.restore_map),
+        )
+        _delete_driver_nodes(self.control)
+        _restore_target_channels(self.target, self.restore_map)
+        node = TkmSceneNode(self.control)
+        node.set_attr(MUTED_ATTR, bool(mark_muted), attributeType="bool")
+        node.set_attr(DRIVER_NODES_ATTR, json.dumps({}))
+        _debug_log(
+            "temporal rig turned off",
+            control=self.control,
+            target=self.target,
+            muted=bool(mark_muted),
+        )
+        return True
+
+    def turn_on(self, spaces, camera_nodes=None, cameras=None):
+        """Recapture original target channels and reconnect both rig groups."""
+        if not self.target or not cmds.objExists(self.target):
+            return False
+        camera_nodes = camera_nodes or {}
+        cameras = cameras or {}
+        new_restore_map = {}
+        # Scale is deliberately not driven by Temporal Controls. If an older
+        # restore payload contains scale curves, turning OFF reconnects them
+        # and turning ON leaves them live on the target.
+        for channel in TRANSLATE_CHANNELS + ROTATE_CHANNELS:
+            captured = _capture_channel(self.control, self.target, channel)
+            if captured:
+                channel_name, payload = captured
+                new_restore_map[channel_name] = payload
+
+        node = TkmSceneNode(self.control)
+        node.set_attr(RESTORE_ATTR, json.dumps(new_restore_map))
+        driver_nodes = {}
+        for group_kind, channels in (
+            ("translate", TRANSLATE_CHANNELS),
+            ("rotate", ROTATE_CHANNELS),
+        ):
+            driven_channels = [
+                channel for channel in channels if channel in new_restore_map
+            ]
+            if not driven_channels:
+                continue
+            space_id = spaces[group_kind]
+            if group_kind in camera_nodes:
+                new_nodes = camera_nodes[group_kind] + _drive_constraint_for_space(
+                    self.control, self.target, group_kind, space_id
+                )
+            else:
+                new_nodes = _drive_group(
+                    self.control,
+                    self.target,
+                    driven_channels,
+                    space_id,
+                    new_restore_map,
+                    space_source=cameras.get(group_kind),
+                )
+            driver_nodes[group_kind] = new_nodes
+            node.set_attr(
+                POSITION_SPACE_ATTR
+                if group_kind == "translate"
+                else ORIENTATION_SPACE_ATTR,
+                space_id,
+            )
+        node.set_attr(DRIVER_NODES_ATTR, json.dumps(driver_nodes))
+        node.set_attr(MUTED_ATTR, False, attributeType="bool")
+        self.restore_map = new_restore_map
+        _debug_log(
+            "temporal rig turned on",
+            control=self.control,
+            target=self.target,
+            spaces=spaces,
+            restore_channels=sorted(new_restore_map),
+            driver_nodes=driver_nodes,
+        )
+        return bool(driver_nodes)
+
+
+def set_temporal_control_rig_enabled(control, enabled, tool_operation=None):
+    """Turn one Temporal Control rig OFF or ON without deleting its control.
+
+    OFF restores the target animation held by the restore payload. ON treats
+    the target's currently-live animation as the source, snapshots it at its
+    own key times, converts it into the control's current space hierarchy,
+    then captures/reconnects the target again.
+    """
+    if not cmds.objExists(control) or _nested_parent_for(control) is not None:
+        return False
+    control = (cmds.ls(control, long=False) or [control])[0]
+    rig = _TemporalControlRigToggle(control)
+    if not enabled:
+        return rig.turn_off(mark_muted=True)
+    if not TkmSceneNode(control).get_attr(MUTED_ATTR):
+        return True
+    if not rig.target or not cmds.objExists(rig.target):
+        return False
+
+    operation = toolCommon.require_tool_operation(tool_operation)
+    source_animation = _gather_copyable_animation(rig.target)
+    transfer = _TransformSpaceTransfer.from_animation(
+        rig.target, source_animation, operation
+    )
+    operation.set_total(transfer.work, reset=True)
+    if not transfer.capture():
+        return False
+
+    spaces = {
+        "translate": get_control_position_space(control),
+        "rotate": get_control_orientation_space(control),
+    }
+    cameras = {
+        group_kind: _stored_camera_source(control, group_kind)
+        for group_kind, space_id in spaces.items()
+        if space_id == "camera"
+    }
+    camera_nodes = {
+        group_kind: _camera_space_driver(
+            control, group_kind, cameras.get(group_kind)
+        )
+        for group_kind in cameras
+        if cameras.get(group_kind)
+    }
+    if not transfer.apply(control):
+        return False
+    return rig.turn_on(
+        spaces,
+        camera_nodes=camera_nodes,
+        cameras=cameras,
+    )
+
+
+def toggle_temporal_control_rigs(*_args, enabled=None, tool_operation=None):
+    """Toggle selected Temporal Control rigs, or force all to *enabled*."""
+    controls = [
+        control
+        for control in _controls_to_process()
+        if _nested_parent_for(control) is None
+    ]
+    if not controls:
+        return wutil.make_inViewMessage("No Temporal Controls to toggle")
+    changed = []
+    operation = toolCommon.require_tool_operation(tool_operation)
+    for control in controls:
+        desired = (
+            bool(TkmSceneNode(control).get_attr(MUTED_ATTR))
+            if enabled is None
+            else bool(enabled)
+        )
+        if set_temporal_control_rig_enabled(
+            control, desired, tool_operation=operation
+        ):
+            changed.append(control)
+    if changed:
+        cmds.select(changed)
+        return changed
+    return wutil.make_inViewMessage("Nothing toggled")
+
+
+def _resolve_reparented_node(previous_path, hierarchy_root):
+    """Resolve *previous_path* below a hierarchy after its DAG path changes."""
+    if not previous_path:
+        return None
+    short_name = str(previous_path).rsplit("|", 1)[-1]
+    matches = cmds.ls(short_name, long=True) or []
+    hierarchy_root = (cmds.ls(hierarchy_root, long=True) or [hierarchy_root])[0]
+    descendants = [
+        match
+        for match in matches
+        if match == hierarchy_root or match.startswith(hierarchy_root + "|")
+    ]
+    return descendants[0] if len(descendants) == 1 else None
+
+
+class _ControlSpaceHierarchy(object):
+    """Resolve and apply the physical DAG parent for one space transition.
+
+    Only Relative/Relative is a physically-parented mode. Mixed combinations
+    use the neutral Temporal Controls hierarchy, matching creation behavior;
+    their Position and Orientation differences are represented by their
+    independent drivers. Keeping this rule in one object prevents a UI label
+    from saying World while the control still inherits its old reference.
+    """
+
+    def __init__(self, control, destination_groups, destination_space):
+        self.control = control
+        self.current_spaces = {
+            "translate": get_control_position_space(control),
+            "rotate": get_control_orientation_space(control),
+        }
+        self.destination_spaces = dict(self.current_spaces)
+        for group_kind in destination_groups:
+            self.destination_spaces[group_kind] = destination_space
+        self.relative_source = _stored_relative_source(control)
+        self._remember_legacy_relative_source()
+
+    def _delete_root(self):
+        return _stored_space_group(self.control, DELETE_ROOT_ATTR) or self.control
+
+    def _remember_legacy_relative_source(self):
+        """Recover the reference for controls made before it was persisted."""
+        if self.relative_source or set(self.current_spaces.values()) != {"relative"}:
+            return
+        delete_root = self._delete_root()
+        parents = cmds.listRelatives(delete_root, parent=True, fullPath=True) or []
+        if not parents or parents[0].rsplit("|", 1)[-1] == ROOT_GROUP:
+            return
+        self.relative_source = parents[0]
+        _set_locked_string_attr(
+            self.control, RELATIVE_SOURCE_ATTR, self.relative_source
+        )
+        _debug_log(
+            "legacy relative reference recovered",
+            control=self.control,
+            relative_source=self.relative_source,
+        )
+
+    def _destination_parent(self):
+        if (
+            self.destination_spaces["translate"] == "relative"
+            and self.destination_spaces["rotate"] == "relative"
+            and self.relative_source
+        ):
+            return self.relative_source
+        return TkmSceneNode.root().child(
+            ROOT_GROUP, icon=icons.temporal_controls
+        ).name
+
+    def apply(self):
+        delete_root = self._delete_root()
+        desired_parent = self._destination_parent()
+        current_parent = cmds.listRelatives(
+            delete_root, parent=True, fullPath=True
+        ) or []
+        current_parent = current_parent[0] if current_parent else None
+        desired_parent = (cmds.ls(desired_parent, long=True) or [desired_parent])[0]
+        _debug_log(
+            "space hierarchy decision",
+            control=self.control,
+            current_spaces=self.current_spaces,
+            destination_spaces=self.destination_spaces,
+            relative_source=self.relative_source,
+            delete_root=delete_root,
+            current_parent=current_parent,
+            destination_parent=desired_parent,
+        )
+        if current_parent == desired_parent:
+            return self.control
+
+        position_group = _stored_space_group(
+            self.control, CAMERA_POSITION_GROUP_ATTR
+        )
+        orientation_group = _stored_space_group(
+            self.control, CAMERA_ORIENTATION_GROUP_ATTR
+        )
+        control, new_root = _parent_control_system(
+            self.control, delete_root, desired_parent
+        )
+        self.control = control
+        _set_locked_string_attr(control, DELETE_ROOT_ATTR, new_root)
+        for attribute, previous_path in (
+            (CAMERA_POSITION_GROUP_ATTR, position_group),
+            (CAMERA_ORIENTATION_GROUP_ATTR, orientation_group),
+        ):
+            resolved = _resolve_reparented_node(previous_path, new_root)
+            if resolved:
+                _set_locked_string_attr(control, attribute, resolved)
+        _debug_log(
+            "space hierarchy moved",
+            control=control,
+            delete_root=new_root,
+            destination_parent=desired_parent,
+        )
+        return control
+
+
+class _ControlSpaceSwitch(object):
+    """Rig OFF -> original snapshot -> hierarchy -> convert -> rig ON."""
+
+    def __init__(self, control, group_kinds, space_id, camera, operation):
+        self.control = control
+        self.target = _target_for(control)
+        self.space_id = space_id
+        self.camera = camera
+        self.operation = operation
+        self.rig = _TemporalControlRigToggle(control)
+        self.hierarchy = _ControlSpaceHierarchy(
+            control, group_kinds, space_id
+        )
+        self.transfer = _TransformSpaceTransfer(
+            self.target,
+            [
+                (
+                    group_kind,
+                    _restore_key_data(self.rig.restore_map, group_kind),
+                )
+                for group_kind in ("translate", "rotate")
+            ],
+            operation,
+        )
+        _debug_log(
+            "space switch prepared",
+            control=control,
+            target=self.target,
+            requested_groups=list(group_kinds),
+            original_key_groups=[
+                {"kind": group.kind, "key_data": group.key_data}
+                for group in self.transfer.groups
+            ],
+            destination_space=space_id,
+            camera=camera,
+            valid=self.valid,
+        )
+
+    @property
+    def valid(self):
+        return bool(self.rig.valid and self.transfer.groups)
+
+    def run(self):
+        if not self.valid:
+            _debug_log(
+                "space switch rejected",
+                control=self.control,
+                reason="missing target or transferable groups",
+            )
+            return False
+        if not self.rig.turn_off(mark_muted=False):
+            _debug_log(
+                "space switch rejected",
+                control=self.control,
+                reason="rig could not turn off",
+            )
+            return False
+        if not self.transfer.capture():
+            _debug_log(
+                "space switch rejected",
+                control=self.control,
+                reason="original target world capture failed",
+            )
+            self.rig.turn_on(self.hierarchy.current_spaces)
+            return False
+
+        self.control = self.hierarchy.apply()
+        self.rig.control = self.control
+        destination_spaces = self.hierarchy.destination_spaces
+        cameras = {}
+        for group_kind, destination in destination_spaces.items():
+            if destination != "camera":
+                continue
+            camera = (
+                self.camera
+                if self.space_id == "camera"
+                else _stored_camera_source(self.control, group_kind)
+            )
+            if camera:
+                cameras[group_kind] = camera
+        camera_nodes = {
+            group.kind: (
+                _camera_space_driver(
+                    self.control, group.kind, cameras.get(group.kind)
+                )
+                if destination_spaces[group.kind] == "camera"
+                else []
+            )
+            for group in self.transfer.groups
+        }
+        _debug_log(
+            "space switch destination hierarchy built",
+            control=self.control,
+            destination_space=self.space_id,
+            camera_nodes=camera_nodes,
+        )
+        if not self.transfer.apply(self.control):
+            _debug_log(
+                "space switch rejected",
+                control=self.control,
+                reason="transform key application failed",
+            )
+            self.rig.turn_on(
+                destination_spaces,
+                camera_nodes=camera_nodes,
+                cameras=cameras,
+            )
+            return False
+
+        if not self.rig.turn_on(
+            destination_spaces,
+            camera_nodes=camera_nodes,
+            cameras=cameras,
+        ):
+            _debug_log(
+                "space switch rejected",
+                control=self.control,
+                reason="rig could not turn on",
+            )
+            return False
+        _debug_log(
+            "space switch completed",
+            control=self.control,
+            target=self.target,
+            destination_spaces=destination_spaces,
+        )
+        return True
+
+
+def set_control_space(control, group_kind, space_id, tool_operation=None):
     """Re-drive just control's *group_kind* channel group ("translate" or
     "rotate") through *space_id*, leaving the other group's driving alone --
     the Temp Controls Panel's Position/Orientation columns can be set
     independently, unlike the right-click menu's switch_controls_space,
     which always moves both together. When Position changes and the panel's
-    lock is on, Orientation is re-driven to follow automatically.
+    lock is on, Orientation is re-driven to follow automatically. The
+    rig is first turned OFF so the target's untouched source curves are live;
+    that original animation is captured at its own per-channel key times and
+    converted into the new control space before the rig is turned ON again.
+    Parent/camera animation adds no samples, and an unkeyed channel is adjusted
+    at current time without receiving a key.
 
     Skips nested Temporal Controls (real-parented, no space concept) and
     muted ones (nothing to re-space until they're driving something again)
     the same way switch_controls_space does. Returns True if anything
     changed."""
+    _debug_log(
+        "panel space switch requested",
+        control=control,
+        requested_group=group_kind,
+        destination_space=space_id,
+    )
     if not cmds.objExists(control):
+        _debug_log("panel space switch rejected", control=control, reason="missing control")
         return False
     control = (cmds.ls(control, long=False) or [control])[0]
     if _nested_parent_for(control) is not None or TkmSceneNode(control).get_attr(
         MUTED_ATTR
     ):
+        _debug_log(
+            "panel space switch rejected",
+            control=control,
+            reason="nested or muted control",
+        )
         return False
     target = _target_for(control)
     if not target:
+        _debug_log("panel space switch rejected", control=control, reason="missing target")
         return False
     camera = _active_viewport_camera() if space_id == "camera" else None
     if space_id == "camera" and not camera:
+        _debug_log(
+            "panel space switch rejected",
+            control=control,
+            reason="no active viewport camera",
+        )
         wutil.make_inViewMessage("Focus or show a viewport to use Camera Space")
         return False
 
-    restore_map = _restore_map_for(control)
-    channels = TRANSLATE_CHANNELS if group_kind == "translate" else ROTATE_CHANNELS
-    relevant = [channel for channel in channels if channel in restore_map]
-    if not relevant:
-        return False
-
-    _delete_driver_nodes_for_group(control, group_kind)
-    new_nodes = _drive_group(
-        control,
-        target,
-        relevant,
-        space_id,
-        restore_map,
-        space_source=camera,
-    )
-
-    nodes_map = _driver_nodes_map_for(control)
-    nodes_map[group_kind] = new_nodes
+    operation = toolCommon.require_tool_operation(tool_operation)
     node = TkmSceneNode(control)
-    node.set_attr(DRIVER_NODES_ATTR, json.dumps(nodes_map))
-    node.set_attr(
-        POSITION_SPACE_ATTR if group_kind == "translate" else ORIENTATION_SPACE_ATTR,
-        space_id,
+    group_kinds = [group_kind]
+    if group_kind == "translate" and node.get_attr(LOCK_SPACE_ATTR):
+        group_kinds.append("rotate")
+    _debug_log(
+        "panel space groups resolved",
+        control=control,
+        requested_group=group_kind,
+        effective_groups=group_kinds,
+        spaces_locked=len(group_kinds) > 1,
     )
 
-    if group_kind == "translate" and node.get_attr(LOCK_SPACE_ATTR):
-        set_control_space(control, "rotate", space_id)
-    return True
+    switch = _ControlSpaceSwitch(
+        control, group_kinds, space_id, camera, operation
+    )
+    if not switch.valid:
+        return False
+    _configure_space_switch_operation(operation, [switch])
+    return switch.run()
 
 
 # ----------------------------------------------------------------------
@@ -3320,7 +4384,7 @@ def _restore_map_for(control):
 
 def _copied_attrs_for(control):
     """COPIED_ATTRS_ATTR as a plain list -- see its own declaration above
-    and _gather_copyable_animation/_copy_source_keys_to_control, which
+    and _gather_copyable_animation/_copy_source_extra_keys_to_control, which
     write it. Empty for any control that was never given a copy of an
     already-animated obj's extra attributes (including every control
     built before this existed)."""
@@ -3358,18 +4422,6 @@ def _driver_nodes_for(control):
             if node not in nodes:
                 nodes.append(node)
     return nodes
-
-
-def _delete_driver_nodes_for_group(control, group_kind):
-    """Delete and forget just *group_kind*'s ("translate"/"rotate") driver
-    nodes, leaving the other groups' driving intact -- the per-group
-    counterpart to _delete_driver_nodes' full teardown."""
-    nodes_map = _driver_nodes_map_for(control)
-    nodes = nodes_map.pop(group_kind, [])
-    existing = [node for node in nodes if cmds.objExists(node)]
-    if existing:
-        cmds.delete(existing)
-    TkmSceneNode(control).set_attr(DRIVER_NODES_ATTR, json.dumps(nodes_map))
 
 
 def _delete_driver_nodes(control):
