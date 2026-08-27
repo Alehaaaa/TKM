@@ -135,8 +135,10 @@ def build_release_records(repository, metadata_path, current_version):
             continue
         if changelog_module.compare_versions(version, current_version) > 0:
             continue
-        release = metadata.get(version) or {}
-        has_download = bool(find_release_asset(release, version))
+        release = metadata.get(version)
+        has_release = release is not None
+        release = release or {}
+        has_download = has_release and bool(find_release_asset(release, version))
         entries = [
             {
                 "kind": str(entry.get("kind", "")).strip().lower() or "changed",
@@ -154,7 +156,12 @@ def build_release_records(repository, metadata_path, current_version):
                 "publishedLabel": format_publish_date(
                     release.get("publishedAt") or release.get("published_at") or ""
                 ),
-                "url": release.get("html_url") or release.get("url") or release_url(repository, version),
+                # No GitHub release object at all -- the tag itself was never
+                # created (e.g. a version-bump run the workflow's
+                # concurrency group cancelled before it could publish), so
+                # there is no real page to link to.
+                "hasRelease": has_release,
+                "url": (release.get("html_url") or release.get("url")) if has_release else None,
                 # No verified release asset yet (not released, or the upload
                 # step failed) -- keep the version listed, but the template
                 # renders its download link/label disabled instead of dead.
@@ -165,15 +172,23 @@ def build_release_records(repository, metadata_path, current_version):
         )
 
     records.sort(key=lambda item: version_key(item["version"]), reverse=True)
-    for index, record in enumerate(records):
-        previous = records[index + 1]["version"] if index + 1 < len(records) else ""
-        record["compareUrl"] = (
-            "https://github.com/{}/compare/{}{}...{}{}".format(
-                repository, RELEASE_TAG_PREFIX, previous, RELEASE_TAG_PREFIX, record["version"]
+    # The nearest earlier version that actually has a real tag -- so a
+    # skipped/cancelled version in between never becomes a compare endpoint.
+    last_real_version = ""
+    for record in reversed(records):
+        if record["hasRelease"]:
+            record["compareUrl"] = (
+                "https://github.com/{}/compare/{}{}...{}{}".format(
+                    repository, RELEASE_TAG_PREFIX, last_real_version, RELEASE_TAG_PREFIX, record["version"]
+                )
+                if last_real_version
+                else record["url"]
             )
-            if previous
-            else record["url"]
-        )
+            last_real_version = record["version"]
+        else:
+            # No real tag for this version either -- neither end of a
+            # compare would resolve, so there is no changelog link to show.
+            record["compareUrl"] = None
     return records
 
 
@@ -244,19 +259,27 @@ def render_release_card(record):
             version=version
         )
 
+    compare_link = (
+        '<a class="release-compare" href="{compare}" target="_blank" rel="noopener">Full changelog</a>'.format(
+            compare=html.escape(record["compareUrl"], quote=True)
+        )
+        if record["compareUrl"]
+        else ""
+    )
+
     return """      <article class="release-card" id="release-{anchor}">
         <h2>{heading}</h2>
         <p class="release-date">{date}</p>
         <ul>
 {entries}
         </ul>
-        <a class="release-compare" href="{compare}" target="_blank" rel="noopener">Full changelog</a>
+        {compare_link}
       </article>""".format(
         heading=heading,
         anchor=html.escape(record["version"].replace(".", "-"), quote=True),
         date=html.escape(published_phrase(record)),
         entries=entries,
-        compare=html.escape(record["compareUrl"], quote=True),
+        compare_link=compare_link,
     )
 
 
