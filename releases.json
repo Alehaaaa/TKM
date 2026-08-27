@@ -1,10 +1,62 @@
 {
-  "latest": "0.1.51",
+  "latest": "0.1.53",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.53",
+      "tag": "TKM-0.1.53",
+      "publishedAt": "2026-08-27T22:13:48Z",
+      "publishedLabel": "August 27, 2026",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.53",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.53/TKM-0.1.53.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toggle Temporal Control menu entry renamed and grouped with its own separator"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Remove and Bake correctly bakes the temporal control's animation onto its object, at the same keys, without losing any"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Mute and Bake keeps the object's baked pose instead of occasionally dropping it"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.52...TKM-0.1.53"
+    },
+    {
+      "version": "0.1.52",
+      "tag": "TKM-0.1.52",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.52",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.52/TKM-0.1.52.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Temporal Controls uses one consistent color across all its actions"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Temporal Controls space switching keeps the driven object in sync, even after undo"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Space conversions keep working on Maya installs where matrix math needs a fallback"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.51...TKM-0.1.52"
+    },
     {
       "version": "0.1.51",
       "tag": "TKM-0.1.51",
