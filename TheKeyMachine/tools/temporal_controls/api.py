@@ -2292,548 +2292,14 @@ def _drive_with_constraint(
 
 
 # ----------------------------------------------------------------------
-# Bake / Revert
+# Position / Orientation space conversion & live switching
 # ----------------------------------------------------------------------
-
-
-def bake_control(control):
-    """Bake -- and remove -- a single Temporal Control: extract its
-    animation onto its target (or, for a nested control, bake the target's
-    motion under it and hand the target back to its original parent), then
-    delete the control. Returns the target node baked onto, or ``None`` if
-    *control* had no target to bake (a free "Add Child" extra control just
-    gets removed). The shared per-control step both the batch
-    ``bake_controls`` (right-click menu, whole selection) and the Temp
-    Controls Panel's single-control Remove and Bake button call -- the
-    panel scopes to whichever control is selected in its list, independent
-    of the scene's actual selection."""
-    if not cmds.objExists(control):
-        return None
-    target = _target_for(control)
-    restore_map = _restore_map_for(control)
-    nested_parent = _nested_parent_for(control)
-
-    if target:
-        # Reparent obj back out from under control *before* deleting control
-        # below, or obj -- still control's child at that point -- would get
-        # deleted along with it.
-        #
-        # Every path here has to run *before* _delete_driver_nodes: Bake
-        # Frames' cmds.bakeResults and Bake Keys' own per-key-time sampling
-        # (see _extract_keys_to_target) both read target's live, still-
-        # actually-driven value -- deleting the constraint first would
-        # leave target frozen at one static pose for either to just copy
-        # across every sampled frame/key, instead of its real motion. A
-        # nested control's obj was never driven by these nodes to begin
-        # with (see _parent_nested_control), so the ordering makes no
-        # difference for it, but there's no reason to special-case it.
-        if nested_parent is not None:
-            target = _bake_nested_control(control, target, nested_parent)
-        elif get_bake_mode() == "frames":
-            _bake_frames_to_target(control, target)
-        else:
-            _extract_keys_to_target(control, target, restore_map)
-
-        # Same order every time: right after whichever of the above just
-        # handled translate/rotate. Extra copied attributes (see
-        # COPIED_ATTRS_ATTR/_copy_source_extra_keys_to_control) are a no-op here
-        # for any control that was never given any -- every control built
-        # before this existed, and nested/Add-Child controls, which never
-        # go through _copy_source_extra_keys_to_control in the first place.
-        _apply_copied_attrs_to_target(control, target, _copied_attrs_for(control))
-
-    _delete_driver_nodes(control)
-    _delete_control_nodes(control)
-    return target
-
-
-def bake_controls(*_args, tool_operation=None):
-    operation = toolCommon.require_tool_operation(tool_operation)
-    controls = _controls_to_process()
-    if not controls:
-        return wutil.make_inViewMessage("No Temporal Controls to bake")
-
-    start, end = _time_range_for(controls)
-    if start is not None:
-        toolCommon.ensure_operation_tint(
-            operation,
-            tint="range",
-            timerange=(start, end),
-            tint_key="temporal_controls_bake",
-        )
-    operation.set_total(len(controls)).set_status("Baking Temporal Controls")
-
-    baked_targets = []
-    queued = list(controls)
-    processed = set()
-    while queued:
-        control = queued.pop(0)
-        if operation.cancelled:
-            break
-        if not cmds.objExists(control):
-            continue
-        control_long = cmds.ls(control, long=True)[0]
-        if control_long in processed:
-            continue
-        processed.add(control_long)
-        target = bake_control(control)
-        if target:
-            baked_targets.append(target)
-            if cmds.objExists(target) and _is_temporal_control(target):
-                target_long = cmds.ls(target, long=True)[0]
-                if target_long not in processed:
-                    queued.insert(0, target_long)
-        operation.step()
-
-    if baked_targets:
-        # Filter for existence right before selecting: baking a nested
-        # control whose target is itself another Temporal Control's
-        # control can, earlier in this same batch, delete a node another
-        # entry in baked_targets refers to.
-        existing = [node for node in baked_targets if cmds.objExists(node)]
-        if existing:
-            cmds.select(existing)
-        return baked_targets
-    return wutil.make_inViewMessage("Nothing baked")
-
-
-def _camera_space_key_times(control, group_kind):
-    space = (
-        get_control_position_space(control)
-        if group_kind == "translate"
-        else get_control_orientation_space(control)
-    )
-    if space != "camera":
-        return []
-    source_attribute = (
-        CAMERA_POSITION_SOURCE_ATTR
-        if group_kind == "translate"
-        else CAMERA_ORIENTATION_SOURCE_ATTR
-    )
-    camera = TkmSceneNode(control).get_attr(source_attribute)
-    if not camera:
-        return []
-    matches = cmds.ls(camera, long=True) or []
-    if not matches:
-        matches = cmds.ls(str(camera).rsplit("|", 1)[-1], long=True) or []
-    camera = matches[0] if len(matches) == 1 else None
-    if not camera:
-        return []
-    try:
-        return (
-            cmds.keyframe(camera, query=True, timeChange=True, hierarchy="above") or []
-        )
-    except (RuntimeError, TypeError, ValueError):
-        return cmds.keyframe(camera, query=True, timeChange=True) or []
-
-
-def _control_motion_range(control):
-    times = list(cmds.keyframe(control, query=True, timeChange=True) or [])
-    times.extend(_camera_space_key_times(control, "translate"))
-    times.extend(_camera_space_key_times(control, "rotate"))
-    return (min(times), max(times)) if times else (None, None)
-
-
-def _bakeable_target_channels(control, target, restore_map=None):
-    """Driven, unlocked channels that can be baked from *control* to *target*."""
-    return [
-        channel
-        for channel in (restore_map.keys() if restore_map else CHANNELS)
-        if cmds.objExists(_plug(control, channel))
-        and cmds.objExists(_plug(target, channel))
-        and not cmds.getAttr(_plug(target, channel), lock=True)
-    ]
-
-
-def _bake_current_pose_to_target(control, target, restore_map=None):
-    """Commit the live evaluated pose at the current frame.
-
-    A control with no keys still has a meaningful pose. Explicitly baking
-    that one frame before its driver nodes are removed avoids relying on a
-    constraint/pairBlend teardown to leave the target at its driven value.
-    """
-    channels = _bakeable_target_channels(control, target, restore_map)
-    if not channels:
-        return False
-    current = cmds.currentTime(query=True)
-    return _bake_range_to_target(target, channels, current, current)
-
-
-def _extract_keys_to_target(control, target, restore_map):
-    """Key *target*'s own channels at exactly the times control has keys --
-    not resampled every frame the way ``_bake_frames_to_target``/Bake
-    Frames mode is -- so it still reads "as keyed", just correctly.
-
-    This must run while *target* is still actually being driven by the
-    live constraint (before ``_delete_driver_nodes`` -- see ``bake_control``,
-    which now calls this first). When the control has no keys at all, its
-    current evaluated pose is baked as a single frame before the driver
-    nodes come down.
-
-    For a keyed channel, this used to ``copyKey``/``pasteKey`` control's
-    own curve directly onto target -- copying control's raw *local* number
-    onto target's own, differently-parented, local channel, exactly the
-    same space-mismatch bug ``_capture_channel`` used to have (control
-    lives under Temporal_Controls, target is wherever its own rig
-    hierarchy actually put it; their local values aren't interchangeable).
-    ``_bake_range_to_target`` -- the same call ``_bake_frames_to_target``/
-    Bake Frames mode uses, our one trusted bake mechanism, not a hand-
-    rolled substitute -- sidesteps that entirely by reading target's own
-    already-correctly-computed value instead of copying control's number.
-    Called once per control key time (a single-frame ``(t, t)`` range, not
-    the whole span) so the result still lands "as keyed", not resampled --
-    and each of those calls still goes through Super Mode's own
-    simulation-vs-math-shortcut trade-off (``_super_mode_simulation_flag``,
-    baked into ``_bake_range_to_target`` itself) exactly like Bake Frames'
-    single full-range call does, just one key at a time instead of one
-    continuous sweep. (A hand-rolled ``getAttr``-then-``setKeyframe`` per
-    time would also have to fight the pairBlend priming
-    ``_drive_with_constraint`` relies on to keep target nudgeable --
-    writing a key onto a primed channel can shift ``blendParent``'s own
-    weighting and throw off every *later* sample -- bakeResults doesn't
-    have that problem since it drives each frame's evaluation itself
-    rather than writing keys as it goes.)
-    """
-    channels = _bakeable_target_channels(control, target, restore_map)
-    if not channels:
-        return
-
-    keyed_channels = [
-        channel
-        for channel in channels
-        if cmds.keyframe(_plug(control, channel), query=True, keyframeCount=True)
-    ]
-    camera_key_times = {
-        "translate": _camera_space_key_times(control, "translate"),
-        "rotate": _camera_space_key_times(control, "rotate"),
-    }
-    camera_channels = []
-    if camera_key_times["translate"]:
-        camera_channels.extend(
-            channel for channel in channels if channel in TRANSLATE_CHANNELS
-        )
-    if camera_key_times["rotate"]:
-        camera_channels.extend(
-            channel for channel in channels if channel in ROTATE_CHANNELS
-        )
-    bake_channels = list(dict.fromkeys(keyed_channels + camera_channels))
-    if not bake_channels:
-        _bake_current_pose_to_target(control, target, restore_map)
-        return
-
-    key_times = set()
-    for channel in keyed_channels:
-        key_times.update(
-            cmds.keyframe(_plug(control, channel), query=True, timeChange=True) or []
-        )
-    key_times.update(camera_key_times["translate"])
-    key_times.update(camera_key_times["rotate"])
-    if not key_times:
-        return
-
-    for t in sorted(key_times):
-        _bake_range_to_target(target, bake_channels, t, t)
-
-
-def _apply_copied_attrs_to_target(control, target, copied_attrs):
-    """Reapply control's own copy of obj's originally-keyed custom
-    attributes (see COPIED_ATTRS_ATTR/_copy_source_extra_keys_to_control) back
-    onto target at Bake time -- the "for then to be reapplied" half of
-    what _copy_source_extra_keys_to_control set up at creation.
-
-    Unlike translate/rotate (_extract_keys_to_target/_bake_frames_to_target),
-    these were deliberately never kept live-connected from control back to
-    target during the tool's lifetime -- see _copy_source_extra_keys_to_control's
-    own docstring: just a one-shot copy at creation, matching "apply the
-    changes to the source on bake", not a continuous drive. So there's no
-    "target's own live, constraint-driven value" here for
-    _bake_range_to_target's technique to read the way the channel bake
-    above relies on -- target's own copy of these attributes was never
-    touched, still sitting on whatever it originally was the whole time
-    control existed. A plain value copy at control's own key times is
-    correct here in a way it never is for translate/rotate: a custom
-    attribute's value isn't parent-space-relative, so there's no space-
-    mismatch to sidestep -- control and target simply agree on what the
-    number means."""
-    for attr_name in copied_attrs:
-        control_plug = _plug(control, attr_name)
-        target_plug = _plug(target, attr_name)
-        if not cmds.objExists(control_plug) or not cmds.objExists(target_plug):
-            continue
-        if cmds.getAttr(target_plug, lock=True):
-            continue
-        times = sorted(
-            set(cmds.keyframe(control_plug, query=True, timeChange=True) or [])
-        )
-        if not times:
-            if cmds.getAttr(target_plug, settable=True):
-                cmds.setAttr(target_plug, cmds.getAttr(control_plug))
-            continue
-        for t in times:
-            try:
-                cmds.setKeyframe(
-                    target_plug, time=(t, t), value=cmds.getAttr(control_plug, time=t)
-                )
-            except RuntimeError:
-                pass
-
-
-def _bake_range_to_target(target, channels, start, end):
-    """The one ``cmds.bakeResults`` call every bake path in this tool
-    funnels through -- Bake Frames (``_bake_frames_to_target``) uses its
-    result as-is; Bake Keys (``_extract_keys_to_target``) prunes it down to
-    just control's own key times afterward. Centralizing this means both
-    modes share the exact same, single, guaranteed-correct-against-the-
-    live-driven-DG bake call instead of each hand-rolling their own.
-    Respects Super Mode (``_super_mode_simulation_flag``) either way.
-    Returns whether the bake actually happened."""
-    try:
-        cmds.bakeResults(
-            target,
-            simulation=_super_mode_simulation_flag(),
-            time=(start, end),
-            attribute=list(channels),
-        )
-        return True
-    except RuntimeError:
-        return False
-
-
-def _bake_frames_to_target(control, target):
-    """Bake Frames mode (see BAKE_MODES/get_bake_mode): sample *control*'s
-    motion onto *target* across its full animated range with
-    _bake_range_to_target, instead of copying the control's existing
-    keyframes as-is like _extract_keys_to_target (Bake Keys mode) does."""
-    if not cmds.objExists(target):
-        return
-    start, end = _control_motion_range(control)
-    if start is None:
-        current = cmds.currentTime(query=True)
-        start = end = current
-    _bake_range_to_target(target, CHANNELS, start, end)
-
-
-def _bake_nested_control(control, obj, original_parent):
-    """Bake a wrapper's world motion onto the complete nested System root.
-
-    Baking ``nested_root`` while it is still parented below ``control`` only
-    records its local values and therefore misses the wrapper's animation.
-    Capture its evaluated world transform on a temporary transform living in
-    the original parent space, restore the complete hierarchy, then bake that
-    captured motion onto the restored root.
-    """
-    if not cmds.objExists(obj):
-        return obj
-    nested_root = _nested_root_for(control, obj)
-    if not nested_root or not cmds.objExists(nested_root):
-        return obj
-    hierarchy = [nested_root]
-    hierarchy.extend(
-        cmds.listRelatives(
-            nested_root, allDescendents=True, type="transform", fullPath=True
-        )
-        or []
-    )
-    start, end = _time_range_for([control] + hierarchy)
-    if start is None:
-        current = cmds.currentTime(query=True)
-        start = end = current
-
-    capture = cmds.createNode("transform", name="TKM_nestedBakeCapture#")
-    if original_parent and cmds.objExists(original_parent):
-        parented = cmds.parent(capture, original_parent) or []
-        if parented:
-            capture = parented[0]
-    capture_matches = cmds.ls(capture, long=True) or [capture]
-    capture = capture_matches[0]
-
-    try:
-        capture_constraints = _constrain_nested_bake_transform(nested_root, capture)
-        _bake_range_to_target(capture, CHANNELS, start, end)
-        if capture_constraints:
-            cmds.delete(capture_constraints)
-
-        obj = _restore_nested_parent(control, obj, original_parent)
-        nested_root = _nested_root_for(control, obj)
-        if not nested_root or not cmds.objExists(nested_root):
-            return obj
-
-        apply_constraints = _constrain_nested_bake_transform(capture, nested_root)
-        _bake_range_to_target(nested_root, CHANNELS, start, end)
-        if apply_constraints:
-            cmds.delete(apply_constraints)
-        return obj
-    finally:
-        if cmds.objExists(capture):
-            cmds.delete(capture)
-
-
-def _constrain_nested_bake_transform(source, target):
-    """Constrain all transform groups used by nested world-space baking."""
-    nodes = []
-    nodes.extend(cmds.parentConstraint(source, target, maintainOffset=False) or [])
-    try:
-        nodes.extend(cmds.scaleConstraint(source, target, maintainOffset=False) or [])
-    except RuntimeError:
-        # Translate and rotate are the supported Temporal Control channels;
-        # scale remains best-effort until general scale driving is enabled.
-        pass
-    return nodes
-
-
-def revert_control(control):
-    """Revert -- and remove -- a single Temporal Control: restore its
-    target's original channels (or, for a nested control, hand the target
-    back to its original parent), then delete the control. Returns the
-    target restored, or ``None`` if *control* had no target (a free "Add
-    Child" extra control just gets removed). The single-control counterpart
-    to bake_control -- see its docstring."""
-    if not cmds.objExists(control):
-        return None
-    target = _target_for(control)
-    restore_map = _restore_map_for(control)
-    nested_parent = _nested_parent_for(control)
-    _delete_driver_nodes(control)
-
-    if target:
-        # Reparent obj back out from under control *before* deleting control
-        # below, or obj -- still control's child at that point -- would get
-        # deleted along with it.
-        if nested_parent is not None:
-            target = _restore_nested_parent(control, target, nested_parent)
-        else:
-            _restore_target_channels(target, restore_map)
-
-    _delete_control_nodes(control)
-    return target
-
-
-def revert_controls(*_args, tool_operation=None):
-    operation = toolCommon.require_tool_operation(tool_operation)
-    controls = _controls_to_process()
-    if not controls:
-        return wutil.make_inViewMessage("No Temporal Controls to revert")
-
-    start, end = _time_range_for(controls)
-    if start is not None:
-        toolCommon.ensure_operation_tint(
-            operation,
-            tint="range",
-            timerange=(start, end),
-            tint_key="temporal_controls_revert",
-        )
-    operation.set_total(len(controls)).set_status("Reverting Temporal Controls")
-
-    reverted_targets = []
-    queued = list(controls)
-    processed = set()
-    while queued:
-        control = queued.pop(0)
-        if operation.cancelled:
-            break
-        if not cmds.objExists(control):
-            continue
-        control_long = cmds.ls(control, long=True)[0]
-        if control_long in processed:
-            continue
-        processed.add(control_long)
-        target = revert_control(control)
-        if target:
-            reverted_targets.append(target)
-            if cmds.objExists(target) and _is_temporal_control(target):
-                target_long = cmds.ls(target, long=True)[0]
-                if target_long not in processed:
-                    queued.insert(0, target_long)
-        operation.step()
-
-    if reverted_targets:
-        # Filter for existence right before selecting -- same reasoning as
-        # bake_controls' equivalent filter above.
-        existing = [node for node in reverted_targets if cmds.objExists(node)]
-        if existing:
-            cmds.select(existing)
-        return reverted_targets
-    return wutil.make_inViewMessage("Nothing reverted")
-
-
-def _restore_target_channels(target, restore_map):
-    """Put *target*'s channels back to whatever ``restore_map`` (see
-    ``_capture_channel``) says they were connected to or set to before a
-    control took them over. Shared by ``revert_controls`` and
-    ``mute_and_revert`` -- the only difference between full Revert and Mute
-    Revert is whether the control itself gets deleted afterward."""
-    for channel, payload in restore_map.items():
-        obj_plug = _plug(target, channel)
-        if not cmds.objExists(obj_plug):
-            continue
-        mode = payload.get("mode")
-        try:
-            if mode == "curve":
-                source = payload.get("source")
-                source_node = source.split(".")[0] if source else None
-                if source_node and cmds.objExists(source_node):
-                    cmds.connectAttr(source, obj_plug, force=True)
-            elif mode == "value":
-                cmds.setAttr(obj_plug, payload.get("value"))
-        except RuntimeError:
-            pass
-
-
-def mute_and_revert(*_args):
-    """Mute Revert: disconnect selected Temporal Controls (same teardown as
-    Revert -- delete the constraint/pairBlend/priming-curve driver nodes,
-    then put the target's channels back the way they were) but leave the
-    control node itself in the scene instead of deleting it, so it can
-    drive the object again later without recreating it from scratch.
-    Nested Temporal Controls (real-parented -- see _parent_nested_control)
-    are skipped: muting isn't meaningful for them, since they were never
-    driven through a constraint to begin with."""
-    controls = [
-        control
-        for control in _controls_to_process()
-        if _nested_parent_for(control) is None
-    ]
-    if not controls:
-        return wutil.make_inViewMessage("No Temporal Controls to mute")
-
-    muted = []
-    for control in controls:
-        if _TemporalControlRigToggle(control).turn_off(mark_muted=True):
-            muted.append(control)
-
-    cmds.select(muted)
-    return muted
-
-
-def mute_and_bake(*_args):
-    """Mute Bake: disconnect selected Temporal Controls the same way Mute
-    Revert does, but first explicitly bakes the target's current evaluated
-    pose. This works even when the control has no animation keys and avoids
-    relying on constraint/pairBlend deletion to freeze the driven result.
-    The control stays in the scene, ready to drive again later."""
-    controls = [
-        control
-        for control in _controls_to_process()
-        if _nested_parent_for(control) is None
-    ]
-    if not controls:
-        return wutil.make_inViewMessage("No Temporal Controls to mute")
-
-    muted = []
-    for control in controls:
-        target = _target_for(control)
-        if target:
-            _bake_current_pose_to_target(
-                control, target, _restore_map_for(control)
-            )
-        _delete_driver_nodes(control)
-        node = TkmSceneNode(control)
-        node.set_attr(MUTED_ATTR, True, attributeType="bool")
-        node.set_attr(DRIVER_NODES_ATTR, json.dumps({}))
-        muted.append(control)
-
-    cmds.select(muted)
-    return muted
+# The world-matrix capture/convert engine here (_TransformSpaceTransfer and
+# its supporting functions) is shared with creation (_create_control_for,
+# above) -- this is where it lives because live switching and the Toggle
+# Rig command are its other two callers, and where _ControlSpaceHierarchy/
+# _ControlSpaceSwitch/_TemporalControlRigToggle -- the object-oriented
+# switch/toggle pipeline the menu and panel both call into -- are defined.
 
 
 def switch_controls_space(space_id, *_args, tool_operation=None):
@@ -3826,6 +3292,551 @@ def set_control_space(control, group_kind, space_id, tool_operation=None):
         return False
     _configure_space_switch_operation(operation, [switch])
     return switch.run()
+
+
+# ----------------------------------------------------------------------
+# Bake / Revert
+# ----------------------------------------------------------------------
+
+
+def bake_control(control):
+    """Bake -- and remove -- a single Temporal Control: extract its
+    animation onto its target (or, for a nested control, bake the target's
+    motion under it and hand the target back to its original parent), then
+    delete the control. Returns the target node baked onto, or ``None`` if
+    *control* had no target to bake (a free "Add Child" extra control just
+    gets removed). The shared per-control step both the batch
+    ``bake_controls`` (right-click menu, whole selection) and the Temp
+    Controls Panel's single-control Remove and Bake button call -- the
+    panel scopes to whichever control is selected in its list, independent
+    of the scene's actual selection."""
+    if not cmds.objExists(control):
+        return None
+    target = _target_for(control)
+    restore_map = _restore_map_for(control)
+    nested_parent = _nested_parent_for(control)
+
+    if target:
+        # Reparent obj back out from under control *before* deleting control
+        # below, or obj -- still control's child at that point -- would get
+        # deleted along with it.
+        #
+        # Every path here has to run *before* _delete_driver_nodes: Bake
+        # Frames' cmds.bakeResults and Bake Keys' own per-key-time sampling
+        # (see _extract_keys_to_target) both read target's live, still-
+        # actually-driven value -- deleting the constraint first would
+        # leave target frozen at one static pose for either to just copy
+        # across every sampled frame/key, instead of its real motion. A
+        # nested control's obj was never driven by these nodes to begin
+        # with (see _parent_nested_control), so the ordering makes no
+        # difference for it, but there's no reason to special-case it.
+        if nested_parent is not None:
+            target = _bake_nested_control(control, target, nested_parent)
+        elif get_bake_mode() == "frames":
+            _bake_frames_to_target(control, target)
+        else:
+            _extract_keys_to_target(control, target, restore_map)
+
+        # Same order every time: right after whichever of the above just
+        # handled translate/rotate. Extra copied attributes (see
+        # COPIED_ATTRS_ATTR/_copy_source_extra_keys_to_control) are a no-op here
+        # for any control that was never given any -- every control built
+        # before this existed, and nested/Add-Child controls, which never
+        # go through _copy_source_extra_keys_to_control in the first place.
+        _apply_copied_attrs_to_target(control, target, _copied_attrs_for(control))
+
+    _delete_driver_nodes(control)
+    _delete_control_nodes(control)
+    return target
+
+
+def bake_controls(*_args, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
+    controls = _controls_to_process()
+    if not controls:
+        return wutil.make_inViewMessage("No Temporal Controls to bake")
+
+    start, end = _time_range_for(controls)
+    if start is not None:
+        toolCommon.ensure_operation_tint(
+            operation,
+            tint="range",
+            timerange=(start, end),
+            tint_key="temporal_controls_bake",
+        )
+    operation.set_total(len(controls)).set_status("Baking Temporal Controls")
+
+    baked_targets = []
+    queued = list(controls)
+    processed = set()
+    while queued:
+        control = queued.pop(0)
+        if operation.cancelled:
+            break
+        if not cmds.objExists(control):
+            continue
+        control_long = cmds.ls(control, long=True)[0]
+        if control_long in processed:
+            continue
+        processed.add(control_long)
+        target = bake_control(control)
+        if target:
+            baked_targets.append(target)
+            if cmds.objExists(target) and _is_temporal_control(target):
+                target_long = cmds.ls(target, long=True)[0]
+                if target_long not in processed:
+                    queued.insert(0, target_long)
+        operation.step()
+
+    if baked_targets:
+        # Filter for existence right before selecting: baking a nested
+        # control whose target is itself another Temporal Control's
+        # control can, earlier in this same batch, delete a node another
+        # entry in baked_targets refers to.
+        existing = [node for node in baked_targets if cmds.objExists(node)]
+        if existing:
+            cmds.select(existing)
+        return baked_targets
+    return wutil.make_inViewMessage("Nothing baked")
+
+
+def _camera_space_key_times(control, group_kind):
+    space = (
+        get_control_position_space(control)
+        if group_kind == "translate"
+        else get_control_orientation_space(control)
+    )
+    if space != "camera":
+        return []
+    source_attribute = (
+        CAMERA_POSITION_SOURCE_ATTR
+        if group_kind == "translate"
+        else CAMERA_ORIENTATION_SOURCE_ATTR
+    )
+    camera = TkmSceneNode(control).get_attr(source_attribute)
+    if not camera:
+        return []
+    matches = cmds.ls(camera, long=True) or []
+    if not matches:
+        matches = cmds.ls(str(camera).rsplit("|", 1)[-1], long=True) or []
+    camera = matches[0] if len(matches) == 1 else None
+    if not camera:
+        return []
+    try:
+        return (
+            cmds.keyframe(camera, query=True, timeChange=True, hierarchy="above") or []
+        )
+    except (RuntimeError, TypeError, ValueError):
+        return cmds.keyframe(camera, query=True, timeChange=True) or []
+
+
+def _control_motion_range(control):
+    times = list(cmds.keyframe(control, query=True, timeChange=True) or [])
+    times.extend(_camera_space_key_times(control, "translate"))
+    times.extend(_camera_space_key_times(control, "rotate"))
+    return (min(times), max(times)) if times else (None, None)
+
+
+def _bakeable_target_channels(control, target, restore_map=None):
+    """Driven, unlocked channels that can be baked from *control* to *target*."""
+    return [
+        channel
+        for channel in (restore_map.keys() if restore_map else CHANNELS)
+        if cmds.objExists(_plug(control, channel))
+        and cmds.objExists(_plug(target, channel))
+        and not cmds.getAttr(_plug(target, channel), lock=True)
+    ]
+
+
+def _bake_current_pose_to_target(control, target, restore_map=None):
+    """Commit the live evaluated pose at the current frame.
+
+    A control with no keys still has a meaningful pose. Explicitly baking
+    that one frame before its driver nodes are removed avoids relying on a
+    constraint/pairBlend teardown to leave the target at its driven value.
+    """
+    channels = _bakeable_target_channels(control, target, restore_map)
+    if not channels:
+        return False
+    current = cmds.currentTime(query=True)
+    return _bake_range_to_target(target, channels, current, current)
+
+
+def _extract_keys_to_target(control, target, restore_map):
+    """Key *target*'s own channels at exactly the times control has keys --
+    not resampled every frame the way ``_bake_frames_to_target``/Bake
+    Frames mode is -- so it still reads "as keyed", just correctly.
+
+    This must run while *target* is still actually being driven by the
+    live constraint (before ``_delete_driver_nodes`` -- see ``bake_control``,
+    which now calls this first). When the control has no keys at all, its
+    current evaluated pose is baked as a single frame before the driver
+    nodes come down.
+
+    For a keyed channel, this used to ``copyKey``/``pasteKey`` control's
+    own curve directly onto target -- copying control's raw *local* number
+    onto target's own, differently-parented, local channel, exactly the
+    same space-mismatch bug ``_capture_channel`` used to have (control
+    lives under Temporal_Controls, target is wherever its own rig
+    hierarchy actually put it; their local values aren't interchangeable).
+    ``_bake_range_to_target`` -- the same call ``_bake_frames_to_target``/
+    Bake Frames mode uses, our one trusted bake mechanism, not a hand-
+    rolled substitute -- sidesteps that entirely by reading target's own
+    already-correctly-computed value instead of copying control's number.
+    Called once per control key time (a single-frame ``(t, t)`` range, not
+    the whole span) so the result still lands "as keyed", not resampled --
+    and each of those calls still goes through Super Mode's own
+    simulation-vs-math-shortcut trade-off (``_super_mode_simulation_flag``,
+    baked into ``_bake_range_to_target`` itself) exactly like Bake Frames'
+    single full-range call does, just one key at a time instead of one
+    continuous sweep. (A hand-rolled ``getAttr``-then-``setKeyframe`` per
+    time would also have to fight the pairBlend priming
+    ``_drive_with_constraint`` relies on to keep target nudgeable --
+    writing a key onto a primed channel can shift ``blendParent``'s own
+    weighting and throw off every *later* sample -- bakeResults doesn't
+    have that problem since it drives each frame's evaluation itself
+    rather than writing keys as it goes.)
+    """
+    channels = _bakeable_target_channels(control, target, restore_map)
+    if not channels:
+        return
+
+    keyed_channels = [
+        channel
+        for channel in channels
+        if cmds.keyframe(_plug(control, channel), query=True, keyframeCount=True)
+    ]
+    camera_key_times = {
+        "translate": _camera_space_key_times(control, "translate"),
+        "rotate": _camera_space_key_times(control, "rotate"),
+    }
+    camera_channels = []
+    if camera_key_times["translate"]:
+        camera_channels.extend(
+            channel for channel in channels if channel in TRANSLATE_CHANNELS
+        )
+    if camera_key_times["rotate"]:
+        camera_channels.extend(
+            channel for channel in channels if channel in ROTATE_CHANNELS
+        )
+    bake_channels = list(dict.fromkeys(keyed_channels + camera_channels))
+    if not bake_channels:
+        _bake_current_pose_to_target(control, target, restore_map)
+        return
+
+    key_times = set()
+    for channel in keyed_channels:
+        key_times.update(
+            cmds.keyframe(_plug(control, channel), query=True, timeChange=True) or []
+        )
+    key_times.update(camera_key_times["translate"])
+    key_times.update(camera_key_times["rotate"])
+    if not key_times:
+        return
+
+    for t in sorted(key_times):
+        _bake_range_to_target(target, bake_channels, t, t)
+
+
+def _apply_copied_attrs_to_target(control, target, copied_attrs):
+    """Reapply control's own copy of obj's originally-keyed custom
+    attributes (see COPIED_ATTRS_ATTR/_copy_source_extra_keys_to_control) back
+    onto target at Bake time -- the "for then to be reapplied" half of
+    what _copy_source_extra_keys_to_control set up at creation.
+
+    Unlike translate/rotate (_extract_keys_to_target/_bake_frames_to_target),
+    these were deliberately never kept live-connected from control back to
+    target during the tool's lifetime -- see _copy_source_extra_keys_to_control's
+    own docstring: just a one-shot copy at creation, matching "apply the
+    changes to the source on bake", not a continuous drive. So there's no
+    "target's own live, constraint-driven value" here for
+    _bake_range_to_target's technique to read the way the channel bake
+    above relies on -- target's own copy of these attributes was never
+    touched, still sitting on whatever it originally was the whole time
+    control existed. A plain value copy at control's own key times is
+    correct here in a way it never is for translate/rotate: a custom
+    attribute's value isn't parent-space-relative, so there's no space-
+    mismatch to sidestep -- control and target simply agree on what the
+    number means."""
+    for attr_name in copied_attrs:
+        control_plug = _plug(control, attr_name)
+        target_plug = _plug(target, attr_name)
+        if not cmds.objExists(control_plug) or not cmds.objExists(target_plug):
+            continue
+        if cmds.getAttr(target_plug, lock=True):
+            continue
+        times = sorted(
+            set(cmds.keyframe(control_plug, query=True, timeChange=True) or [])
+        )
+        if not times:
+            if cmds.getAttr(target_plug, settable=True):
+                cmds.setAttr(target_plug, cmds.getAttr(control_plug))
+            continue
+        for t in times:
+            try:
+                cmds.setKeyframe(
+                    target_plug, time=(t, t), value=cmds.getAttr(control_plug, time=t)
+                )
+            except RuntimeError:
+                pass
+
+
+def _bake_range_to_target(target, channels, start, end):
+    """The one ``cmds.bakeResults`` call every bake path in this tool
+    funnels through -- Bake Frames (``_bake_frames_to_target``) uses its
+    result as-is; Bake Keys (``_extract_keys_to_target``) prunes it down to
+    just control's own key times afterward. Centralizing this means both
+    modes share the exact same, single, guaranteed-correct-against-the-
+    live-driven-DG bake call instead of each hand-rolling their own.
+    Respects Super Mode (``_super_mode_simulation_flag``) either way.
+    Returns whether the bake actually happened."""
+    try:
+        cmds.bakeResults(
+            target,
+            simulation=_super_mode_simulation_flag(),
+            time=(start, end),
+            attribute=list(channels),
+        )
+        return True
+    except RuntimeError:
+        return False
+
+
+def _bake_frames_to_target(control, target):
+    """Bake Frames mode (see BAKE_MODES/get_bake_mode): sample *control*'s
+    motion onto *target* across its full animated range with
+    _bake_range_to_target, instead of copying the control's existing
+    keyframes as-is like _extract_keys_to_target (Bake Keys mode) does."""
+    if not cmds.objExists(target):
+        return
+    start, end = _control_motion_range(control)
+    if start is None:
+        current = cmds.currentTime(query=True)
+        start = end = current
+    _bake_range_to_target(target, CHANNELS, start, end)
+
+
+def _bake_nested_control(control, obj, original_parent):
+    """Bake a wrapper's world motion onto the complete nested System root.
+
+    Baking ``nested_root`` while it is still parented below ``control`` only
+    records its local values and therefore misses the wrapper's animation.
+    Capture its evaluated world transform on a temporary transform living in
+    the original parent space, restore the complete hierarchy, then bake that
+    captured motion onto the restored root.
+    """
+    if not cmds.objExists(obj):
+        return obj
+    nested_root = _nested_root_for(control, obj)
+    if not nested_root or not cmds.objExists(nested_root):
+        return obj
+    hierarchy = [nested_root]
+    hierarchy.extend(
+        cmds.listRelatives(
+            nested_root, allDescendents=True, type="transform", fullPath=True
+        )
+        or []
+    )
+    start, end = _time_range_for([control] + hierarchy)
+    if start is None:
+        current = cmds.currentTime(query=True)
+        start = end = current
+
+    capture = cmds.createNode("transform", name="TKM_nestedBakeCapture#")
+    if original_parent and cmds.objExists(original_parent):
+        parented = cmds.parent(capture, original_parent) or []
+        if parented:
+            capture = parented[0]
+    capture_matches = cmds.ls(capture, long=True) or [capture]
+    capture = capture_matches[0]
+
+    try:
+        capture_constraints = _constrain_nested_bake_transform(nested_root, capture)
+        _bake_range_to_target(capture, CHANNELS, start, end)
+        if capture_constraints:
+            cmds.delete(capture_constraints)
+
+        obj = _restore_nested_parent(control, obj, original_parent)
+        nested_root = _nested_root_for(control, obj)
+        if not nested_root or not cmds.objExists(nested_root):
+            return obj
+
+        apply_constraints = _constrain_nested_bake_transform(capture, nested_root)
+        _bake_range_to_target(nested_root, CHANNELS, start, end)
+        if apply_constraints:
+            cmds.delete(apply_constraints)
+        return obj
+    finally:
+        if cmds.objExists(capture):
+            cmds.delete(capture)
+
+
+def _constrain_nested_bake_transform(source, target):
+    """Constrain all transform groups used by nested world-space baking."""
+    nodes = []
+    nodes.extend(cmds.parentConstraint(source, target, maintainOffset=False) or [])
+    try:
+        nodes.extend(cmds.scaleConstraint(source, target, maintainOffset=False) or [])
+    except RuntimeError:
+        # Translate and rotate are the supported Temporal Control channels;
+        # scale remains best-effort until general scale driving is enabled.
+        pass
+    return nodes
+
+
+def revert_control(control):
+    """Revert -- and remove -- a single Temporal Control: restore its
+    target's original channels (or, for a nested control, hand the target
+    back to its original parent), then delete the control. Returns the
+    target restored, or ``None`` if *control* had no target (a free "Add
+    Child" extra control just gets removed). The single-control counterpart
+    to bake_control -- see its docstring."""
+    if not cmds.objExists(control):
+        return None
+    target = _target_for(control)
+    restore_map = _restore_map_for(control)
+    nested_parent = _nested_parent_for(control)
+    _delete_driver_nodes(control)
+
+    if target:
+        # Reparent obj back out from under control *before* deleting control
+        # below, or obj -- still control's child at that point -- would get
+        # deleted along with it.
+        if nested_parent is not None:
+            target = _restore_nested_parent(control, target, nested_parent)
+        else:
+            _restore_target_channels(target, restore_map)
+
+    _delete_control_nodes(control)
+    return target
+
+
+def revert_controls(*_args, tool_operation=None):
+    operation = toolCommon.require_tool_operation(tool_operation)
+    controls = _controls_to_process()
+    if not controls:
+        return wutil.make_inViewMessage("No Temporal Controls to revert")
+
+    start, end = _time_range_for(controls)
+    if start is not None:
+        toolCommon.ensure_operation_tint(
+            operation,
+            tint="range",
+            timerange=(start, end),
+            tint_key="temporal_controls_revert",
+        )
+    operation.set_total(len(controls)).set_status("Reverting Temporal Controls")
+
+    reverted_targets = []
+    queued = list(controls)
+    processed = set()
+    while queued:
+        control = queued.pop(0)
+        if operation.cancelled:
+            break
+        if not cmds.objExists(control):
+            continue
+        control_long = cmds.ls(control, long=True)[0]
+        if control_long in processed:
+            continue
+        processed.add(control_long)
+        target = revert_control(control)
+        if target:
+            reverted_targets.append(target)
+            if cmds.objExists(target) and _is_temporal_control(target):
+                target_long = cmds.ls(target, long=True)[0]
+                if target_long not in processed:
+                    queued.insert(0, target_long)
+        operation.step()
+
+    if reverted_targets:
+        # Filter for existence right before selecting -- same reasoning as
+        # bake_controls' equivalent filter above.
+        existing = [node for node in reverted_targets if cmds.objExists(node)]
+        if existing:
+            cmds.select(existing)
+        return reverted_targets
+    return wutil.make_inViewMessage("Nothing reverted")
+
+
+def _restore_target_channels(target, restore_map):
+    """Put *target*'s channels back to whatever ``restore_map`` (see
+    ``_capture_channel``) says they were connected to or set to before a
+    control took them over. Shared by ``revert_controls`` and
+    ``mute_and_revert`` -- the only difference between full Revert and Mute
+    Revert is whether the control itself gets deleted afterward."""
+    for channel, payload in restore_map.items():
+        obj_plug = _plug(target, channel)
+        if not cmds.objExists(obj_plug):
+            continue
+        mode = payload.get("mode")
+        try:
+            if mode == "curve":
+                source = payload.get("source")
+                source_node = source.split(".")[0] if source else None
+                if source_node and cmds.objExists(source_node):
+                    cmds.connectAttr(source, obj_plug, force=True)
+            elif mode == "value":
+                cmds.setAttr(obj_plug, payload.get("value"))
+        except RuntimeError:
+            pass
+
+
+def mute_and_revert(*_args):
+    """Mute Revert: disconnect selected Temporal Controls (same teardown as
+    Revert -- delete the constraint/pairBlend/priming-curve driver nodes,
+    then put the target's channels back the way they were) but leave the
+    control node itself in the scene instead of deleting it, so it can
+    drive the object again later without recreating it from scratch.
+    Nested Temporal Controls (real-parented -- see _parent_nested_control)
+    are skipped: muting isn't meaningful for them, since they were never
+    driven through a constraint to begin with."""
+    controls = [
+        control
+        for control in _controls_to_process()
+        if _nested_parent_for(control) is None
+    ]
+    if not controls:
+        return wutil.make_inViewMessage("No Temporal Controls to mute")
+
+    muted = []
+    for control in controls:
+        if _TemporalControlRigToggle(control).turn_off(mark_muted=True):
+            muted.append(control)
+
+    cmds.select(muted)
+    return muted
+
+
+def mute_and_bake(*_args):
+    """Mute Bake: disconnect selected Temporal Controls the same way Mute
+    Revert does, but first explicitly bakes the target's current evaluated
+    pose. This works even when the control has no animation keys and avoids
+    relying on constraint/pairBlend deletion to freeze the driven result.
+    The control stays in the scene, ready to drive again later."""
+    controls = [
+        control
+        for control in _controls_to_process()
+        if _nested_parent_for(control) is None
+    ]
+    if not controls:
+        return wutil.make_inViewMessage("No Temporal Controls to mute")
+
+    muted = []
+    for control in controls:
+        target = _target_for(control)
+        if target:
+            _bake_current_pose_to_target(
+                control, target, _restore_map_for(control)
+            )
+        _delete_driver_nodes(control)
+        node = TkmSceneNode(control)
+        node.set_attr(MUTED_ATTR, True, attributeType="bool")
+        node.set_attr(DRIVER_NODES_ATTR, json.dumps({}))
+        muted.append(control)
+
+    cmds.select(muted)
+    return muted
 
 
 # ----------------------------------------------------------------------
