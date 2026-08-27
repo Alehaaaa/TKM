@@ -95,8 +95,16 @@
     if (summary) {
       summary.textContent = `${publishedLabel(release)}. Supports Maya 2022 through 2027 on Windows, Linux and macOS.`;
     }
-    if (download && release.downloadUrl) {
-      download.href = release.downloadUrl;
+    if (download) {
+      if (release.downloadUrl) {
+        download.href = release.downloadUrl;
+        download.removeAttribute('aria-disabled');
+        download.classList.remove('is-disabled');
+      } else {
+        download.removeAttribute('href');
+        download.setAttribute('aria-disabled', 'true');
+        download.classList.add('is-disabled');
+      }
       download.textContent = `Download latest · ${release.version}`;
     }
     const changelog = panel.querySelector('.secondary-link');
@@ -109,10 +117,15 @@
     article.id = `release-${release.version.replace(/\./g, '-')}`;
 
     const heading = document.createElement('h2');
-    const titleLink = document.createElement('a');
-    titleLink.href = release.downloadUrl || release.url;
-    titleLink.textContent = release.version;
-    heading.append(titleLink);
+    const titleEl = document.createElement(release.downloadUrl ? 'a' : 'span');
+    if (release.downloadUrl) {
+      titleEl.href = release.downloadUrl;
+    } else {
+      titleEl.className = 'is-disabled';
+      titleEl.setAttribute('aria-disabled', 'true');
+    }
+    titleEl.textContent = release.version;
+    heading.append(titleEl);
 
     const date = document.createElement('p');
     date.className = 'release-date';
