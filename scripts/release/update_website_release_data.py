@@ -135,12 +135,8 @@ def build_release_records(repository, metadata_path, current_version):
             continue
         if changelog_module.compare_versions(version, current_version) > 0:
             continue
-        release = metadata.get(version)
-        if not release or not find_release_asset(release, version):
-            # Changelog carries an entry for this version but GitHub has no
-            # published release (or no uploaded zip) for it -- a failed or
-            # skipped release run shouldn't show up as a downloadable version.
-            continue
+        release = metadata.get(version) or {}
+        has_download = bool(find_release_asset(release, version))
         entries = [
             {
                 "kind": str(entry.get("kind", "")).strip().lower() or "changed",
@@ -159,7 +155,11 @@ def build_release_records(repository, metadata_path, current_version):
                     release.get("publishedAt") or release.get("published_at") or ""
                 ),
                 "url": release.get("html_url") or release.get("url") or release_url(repository, version),
-                "downloadUrl": asset_download_url(release, repository, version),
+                # No verified release asset yet (not released, or the upload
+                # step failed) -- keep the version listed, but the template
+                # renders its download link/label disabled instead of dead.
+                "hasDownload": has_download,
+                "downloadUrl": asset_download_url(release, repository, version) if has_download else None,
                 "entries": entries,
             }
         )
@@ -185,6 +185,18 @@ def replace_block(text, pattern, replacement, label):
 
 
 def render_latest_panel(latest):
+    version = html.escape(latest["version"])
+    if latest["hasDownload"]:
+        download_action = '<a class="primary-button" href="{download}">Download latest · {version}</a>'.format(
+            download=html.escape(latest["downloadUrl"], quote=True), version=version
+        )
+        context_note = "Universal package · ZIP"
+    else:
+        download_action = (
+            '<span class="primary-button is-disabled" aria-disabled="true">'
+            "Download latest · {version}</span>"
+        ).format(version=version)
+        context_note = "Build not uploaded yet"
     return """<section class="download-panel" aria-labelledby="latest-download">
       <div>
         <p class="section-kicker">Latest release</p>
@@ -192,14 +204,15 @@ def render_latest_panel(latest):
         <p>{published}. Supports Maya 2022 through 2027 on Windows, Linux and macOS.</p>
       </div>
       <div class="download-actions">
-        <a class="primary-button" href="{download}">Download latest · {version}</a>
-        <span class="download-context" data-platform-note>Universal package · ZIP</span>
+        {download_action}
+        <span class="download-context" data-platform-note>{context_note}</span>
         <a class="secondary-link" href="changelog/">View changelog</a>
       </div>
     </section>""".format(
-        version=html.escape(latest["version"]),
+        version=version,
         published=html.escape(published_phrase(latest)),
-        download=html.escape(latest["downloadUrl"], quote=True),
+        download_action=download_action,
+        context_note=context_note,
     )
 
 
@@ -221,16 +234,25 @@ def render_release_card(record):
     if not entries:
         entries = "          <li>No changelog entries recorded for this version.</li>"
 
+    version = html.escape(record["version"])
+    if record["hasDownload"]:
+        heading = '<a href="{download}">{version}</a>'.format(
+            download=html.escape(record["downloadUrl"], quote=True), version=version
+        )
+    else:
+        heading = '<span class="is-disabled" aria-disabled="true">{version}</span>'.format(
+            version=version
+        )
+
     return """      <article class="release-card" id="release-{anchor}">
-        <h2><a href="{download}">{version}</a></h2>
+        <h2>{heading}</h2>
         <p class="release-date">{date}</p>
         <ul>
 {entries}
         </ul>
         <a class="release-compare" href="{compare}" target="_blank" rel="noopener">Full changelog</a>
       </article>""".format(
-        download=html.escape(record["downloadUrl"], quote=True),
-        version=html.escape(record["version"]),
+        heading=heading,
         anchor=html.escape(record["version"].replace(".", "-"), quote=True),
         date=html.escape(published_phrase(record)),
         entries=entries,
