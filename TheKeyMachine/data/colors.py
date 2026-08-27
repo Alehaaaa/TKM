@@ -138,7 +138,7 @@ COLORS = ColorRegistry(
         red=Color("#DB7274"),
         purple=Color("#B172DB"),
         pink=Color("#DB72C7"),
-        turquoise=Color("#72DBDB"),
+        cyan=Color("#72DBDB"),
         blue=Color("#72CADB"),
         white=Color("#E0E0E0"),
     ),

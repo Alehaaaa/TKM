@@ -61,7 +61,7 @@ class AnimationLayersToolObject(ToolObject):
     SECTION = {
         "id": "animation_layer_tools", "i18n_key": "animation_layers",
         "label": "Animation Layers",
-        "color": COLORS.toolbar.turquoise.hex,
+        "color": COLORS.toolbar.cyan.hex,
         "items": [
             {"id": "animation_layers", "shortcuts": [
                 {"id": "animation_layers_smart_merge", "keys": [QtCore.Qt.Key_Control]},

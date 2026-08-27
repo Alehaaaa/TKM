@@ -1,18 +1,21 @@
 """Control curve shape library for Temporal Controls.
 
-Each entry in ``SHAPES`` builds one curve-control shape, centered on the
-origin and sized by *size*, returned as an unparented transform named
-*name*. The Aim system's aim-target ("pole") picks a shape explicitly (see
-``api._add_aim_target``); every System's main control starts out built from
-``DEFAULT_SHAPE`` in ``api._build_control_hierarchy``, and the Temp
-Controls Panel (``api.set_control_shape``) can swap a control's own shape
-for any entry here afterward.
+``SHAPES`` is the single id -> Shape mapping of available shapes, in panel
+display order. A Shape's ``builder`` builds one curve-control shape,
+centered on the origin and sized by *size*, returned as an unparented
+transform named *name*. The Aim system's aim-target ("pole") picks a shape
+explicitly (see ``controller.AIM_TARGET_SHAPE``); every System's main
+control starts out built from ``DEFAULT_SHAPE`` in
+``controller._build_control_hierarchy``, and the Temp Controls Panel
+(``controller.set_control_shape``) can swap a control's own shape for any
+entry here afterward.
 
-``SHAPE_LIST`` is the ordered, human-labeled version of this dictionary --
-what the panel's shape picker actually shows -- while ``SHAPES`` stays the
-plain id-to-builder lookup every other caller (``build``) uses.
+``SHAPES`` is the one structure both the picker and every builder caller
+need: ``build()`` looks entries up by id (``SHAPES[shape_id]``), and the
+panel iterates ``SHAPES.values()`` for the (id, label) pairs it shows.
 """
 
+import collections
 import math
 
 from maya import cmds
@@ -44,8 +47,7 @@ def _rounded_square_points(half, radius, segments_per_corner=6):
     counter-clockwise starting at the +X/-Z corner's arc."""
     radius = max(0.0, min(radius, half))
     inset = half - radius
-    # Each entry: the corner's arc center, and the start angle (degrees,
-    # standard math convention) its 90-degree outward sweep begins at.
+    # Each entry: the corner's arc center and the start angle its 90-degree outward sweep begins at.
     corners = (
         ((inset, -inset), -90.0),
         ((inset, inset), 0.0),
@@ -74,7 +76,8 @@ def rounded_square(name, size):
 def cross(name, size):
     """3-axis jack -- a small pole/target marker, not meant to read as a
     filled volume. Also what "Locator" in the panel's picker reuses (the
-    same silhouette a raw Maya locator draws), see ``SHAPES["locator"]``."""
+    same silhouette a raw Maya locator draws), see the "locator" entry in
+    ``SHAPES`` below."""
     axes = (
         [(-size, 0, 0), (size, 0, 0)],
         [(0, -size, 0), (0, size, 0)],
@@ -123,9 +126,15 @@ def sphere(name, size):
 
 
 def rhombus(name, size):
-    """A Sims-style double-pointed diamond / plumbob outline."""
-    height = size * 0.9
-    mid = size * 0.7
+    """A Sims-style double-pointed diamond / plumbob outline. Its widest
+    axis is the top-to-bottom span, so unlike the other builders' shapes
+    -- which all reach *size* on their widest axis directly -- height is
+    set to *size* itself (not a fraction of it), with mid kept at the
+    same 7:9 ratio to height the shape originally used, so every entry
+    in ``SHAPES`` produces a consistent 2 * size footprint the same way:
+    by construction, with no separate size-correction step."""
+    height = size
+    mid = size * (7.0 / 9.0)
     top = (0, height, 0)
     bottom = (0, -height, 0)
     ring = (
@@ -297,57 +306,46 @@ def _combine_curves(name, curves):
     return transform
 
 
-SHAPES = {
-    "none": no_shape,
-    "circle": circle,
-    "square": square,
-    "rounded_square": rounded_square,
-    "locator": cross,
-    "diamond": diamond,
-    "box": box,
-    "sphere": sphere,
-    "rhombus": rhombus,
-    "arrow_cross": arrow_cross,
-    "arrow_circle": arrow_circle,
-    "cog": cog,
-}
+Shape = collections.namedtuple("Shape", ("id", "label", "builder"))
 
-# Ordered, human-labeled shape list shown by the Temp Controls Panel.
-SHAPE_LIST = (
-    {"id": "none", "label": "No Shape"},
-    {"id": "rounded_square", "label": "Rounded Square"},
-    {"id": "square", "label": "Square"},
-    {"id": "circle", "label": "Circle"},
-    {"id": "locator", "label": "Locator"},
-    {"id": "diamond", "label": "Diamond"},
-    {"id": "box", "label": "Box"},
-    {"id": "sphere", "label": "Sphere"},
-    {"id": "rhombus", "label": "Rhombus"},
-    {"id": "arrow_cross", "label": "Arrow Cross"},
-    {"id": "arrow_circle", "label": "Arrow Circle"},
-    {"id": "cog", "label": "Cog"},
+
+def _shape_map(*shapes):
+    """Build the id -> Shape mapping from *shapes*, keeping the id in two
+    places on purpose: as the dict key (for ``build()``'s and the panel's
+    id lookups) and as ``Shape.id`` on the value itself (so a Shape pulled
+    out of the map, e.g. while iterating ``.values()``, still carries its
+    own id without needing the key it came from)."""
+    return collections.OrderedDict((shape.id, shape) for shape in shapes)
+
+
+# Single source of truth for available shapes -- id, panel label, and
+# builder function together, keyed and ordered by id (panel display
+# order, top to bottom). Both the picker (Temp Controls Panel) and
+# build() read this one structure.
+SHAPES = _shape_map(
+    Shape("none", "No Shape", no_shape),
+    Shape("rounded_square", "Rounded Square", rounded_square),
+    Shape("square", "Square", square),
+    Shape("circle", "Circle", circle),
+    Shape("locator", "Locator", cross),
+    Shape("diamond", "Diamond", diamond),
+    Shape("box", "Box", box),
+    Shape("sphere", "Sphere", sphere),
+    Shape("rhombus", "Rhombus", rhombus),
+    Shape("arrow_cross", "Arrow Cross", arrow_cross),
+    Shape("arrow_circle", "Arrow Circle", arrow_circle),
+    Shape("cog", "Cog", cog),
 )
 
 DEFAULT_SHAPE = "rounded_square"
 
 
 def build(shape_id, name, size):
-    control = SHAPES[shape_id](name, size)
-    # Builders describe silhouettes with intentionally different proportions,
-    # but ``size`` should mean the same overall footprint for every choice.
-    # Normalize the largest object-space dimension to 2 * size, then freeze
-    # that correction into the curve CVs so the returned transform stays at
-    # unit scale. No Shape has an empty/zero bounding box and is left alone.
-    bbox = cmds.xform(control, query=True, boundingBox=True, objectSpace=True)
-    if bbox and len(bbox) == 6:
-        max_span = max(
-            bbox[3] - bbox[0],
-            bbox[4] - bbox[1],
-            bbox[5] - bbox[2],
-        )
-        if max_span > 1e-9:
-            factor = (2.0 * size) / max_span
-            if abs(factor - 1.0) > 1e-9:
-                cmds.scale(factor, factor, factor, control, relative=True)
-                cmds.makeIdentity(control, apply=True, scale=True)
-    return control
+    """Build shape *shape_id* named *name* at *size*.
+
+    Every builder in ``SHAPES`` is written so its widest axis reaches
+    exactly *size* from the origin (a 2 * size overall footprint) by
+    construction -- so every shape comes out consistently sized the same
+    way, through the same plain call, with no separate size-correction
+    step or per-shape scale factor needed here."""
+    return SHAPES[shape_id].builder(name, size)

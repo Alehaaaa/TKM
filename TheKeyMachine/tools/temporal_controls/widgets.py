@@ -20,13 +20,10 @@ from TheKeyMachine.tools.temporal_controls import api
 from TheKeyMachine.ui.widgets import customDialogs, customWidgets as cw, util as wutil
 
 
-def _t(text):
-    return i18n.tr_text(text)
-
 
 def _localized_options(options):
     """Return display copies so language changes never mutate API constants."""
-    return tuple(dict(option, label=_t(option.get("label", ""))) for option in options)
+    return tuple(dict(option, label=i18n.tr_text(option.get("label", ""))) for option in options)
 
 
 class _OptionRow(QtWidgets.QWidget):
@@ -67,14 +64,10 @@ class _OptionRow(QtWidgets.QWidget):
         layout.setContentsMargins(wutil.DPI(6), 0, wutil.DPI(6), 0)
         layout.setSpacing(wutil.DPI(6))
 
-        # Optional color button before the icon -- used by the Temp Controls
-        # Panel's rig list. It is deliberately the exact rounded-square
-        # swatch used by both creation dialogs, rather than the old passive
-        # painted dot. The button owns its click, so choosing a color does
-        # not also select the row underneath it.
+        # Optional color button before the icon, the same rounded-square swatch both creation dialogs use; owns its own click.
         color_suffix = option.get("color_suffix")
         if color_suffix:
-            color_label = option.get("color_label") or _t("Change Color")
+            color_label = option.get("color_label") or i18n.tr_text("Change Color")
             button_size = max(1, int(round(wutil.DPI(30) * 0.7)))
             icon_size = max(1, int(round(wutil.DPI(28) * 0.7)))
             color_button = cw.create_tool_button_from_data(
@@ -98,7 +91,7 @@ class _OptionRow(QtWidgets.QWidget):
         icon_label.setPixmap(QtGui.QIcon(row_icon).pixmap(icon_size, icon_size))
         layout.addWidget(icon_label)
 
-        self.title_label = QtWidgets.QLabel(option["label"], self)
+        self.title_label = QtWidgets.QLabel(i18n.tr_text(option["label"]), self)
         self._text_color = "#cfcfcf" if self._enabled_option else "#6a6a6a"
         self.title_label.setStyleSheet("background:transparent;color:%s;" % self._text_color)
         layout.addWidget(self.title_label, 1)
@@ -121,12 +114,7 @@ class _OptionRow(QtWidgets.QWidget):
         self.update()
 
     def mousePressEvent(self, event):
-        # self.isEnabled() is the *effective* state (own + every ancestor,
-        # including the containing _OptionList) -- checked in addition to
-        # the per-option "disabled" flag so a whole disabled/locked list
-        # (see TempControlsPanelWindow's Orientation column) can't still be
-        # clicked into just because this row itself was never individually
-        # disabled.
+        # self.isEnabled() checks the effective state (including ancestors) so a disabled list can't be clicked into row by row.
         if self._enabled_option and self.isEnabled():
             self.clicked.emit()
         super().mousePressEvent(event)
@@ -156,36 +144,20 @@ class _OptionList(QtWidgets.QListWidget):
     """A compact single-select list of icon+label rows for one option column."""
 
     ROW_HEIGHT = wutil.DPI(28)
-    # Emits the newly selected option id (or None once a not-required list
-    # is explicitly cleared) -- the Temp Controls Panel's rig/control lists
-    # listen to this to react to selection; System/Position/Orientation's
-    # columns don't need to (their creation dialog just reads
-    # selected_id() at confirm time), so this is unused there.
+    # Emits the selected option id; only the rig/control lists listen, System/Position/Orientation read selected_id() at confirm time instead.
     selectionChanged = QtCore.Signal(object)
     colorRequested = QtCore.Signal(object, object)
 
     def __init__(self, options, parent=None, cap_to_content=False):
         super().__init__(parent)
-        # cap_to_content (Position/Orientation's columns only, see
-        # TempControlsPanelWindow._build_space_column) means this list caps
-        # its own height to exactly fit however many rows it has instead of
-        # stretching into any extra space a taller window gives it (see
-        # _content_height/refresh below). The rig/control lists -- and
-        # System/Position/Orientation in the original creation dialog --
-        # leave this off and just stretch/scroll normally, same as always.
+        # cap_to_content caps Position/Orientation's lists to their row count instead of stretching; rig/control lists stretch/scroll normally.
         self._cap_to_content = cap_to_content
         self.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
         self.setUniformItemSizes(True)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         if cap_to_content:
-            # Off, not just AsNeeded -- _content_height's own height cap is
-            # meant to fit every row exactly, so a vertical scrollbar should
-            # never be needed; forcing it off avoids one popping into a
-            # couple-px-short gap and clipping a row's own icon/swatch/
-            # selected-highlight color. Lists that don't cap (rig/control)
-            # keep the normal AsNeeded default -- they can genuinely have
-            # more rows than fit and need to scroll.
+            # Scrollbar off for capped lists (never needed, avoids clipping rows); rig/control lists keep the normal AsNeeded default.
             self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.setStyleSheet(
             """
@@ -245,12 +217,7 @@ class _OptionList(QtWidgets.QListWidget):
             self.setMaximumHeight(self._content_height())
 
     def _content_height(self):
-        # At least one row's worth even when empty, so the box doesn't
-        # collapse to a sliver -- +4 covers the stylesheet's 1px top/bottom
-        # border plus a little slack for QAbstractItemView's own internal
-        # frame/spacing this doesn't otherwise account for (scrollbar is
-        # forced off above regardless, so this only affects a possible
-        # couple px of empty space at the bottom, never a scrollbar/clip).
+        # At least one row's worth of height even when empty, plus a little slack for the stylesheet border and item-view framing.
         rows = max(1, len(self._row_order))
         return rows * self.ROW_HEIGHT + 4
 
@@ -302,10 +269,7 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         self._completed = False
         self._selected_color = None
         self._color_buttons = {}
-        # Tracks Position's own last value (independent of Orientation) so
-        # _on_position_space_changed can tell whether Orientation was
-        # "following" Position (selected_id() still equal to the value
-        # Position just moved away from) -- see that method.
+        # Tracks Position's last value so _on_position_space_changed can tell if Orientation was still following it.
         self._last_position_space = None
 
         self.setObjectName("temporal_controls_dialog")
@@ -330,9 +294,9 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         columns_layout.setContentsMargins(0, 0, 0, 0)
         columns_layout.setSpacing(wutil.DPI(6))
 
-        self.system_list = self._add_column(columns_layout, _t("System"), _localized_options(api.SYSTEMS))
-        self.position_list = self._add_column(columns_layout, _t("Position"), _localized_options(api.SPACES))
-        self.orientation_list = self._add_column(columns_layout, _t("Orientation"), _localized_options(api.SPACES))
+        self.system_list = self._add_column(columns_layout, i18n.tr_text("System"), _localized_options(api.SYSTEMS))
+        self.position_list = self._add_column(columns_layout, i18n.tr_text("Position"), _localized_options(api.SPACES))
+        self.orientation_list = self._add_column(columns_layout, i18n.tr_text("Orientation"), _localized_options(api.SPACES))
 
         self.mainLayout.addWidget(columns_row, 1)
 
@@ -356,7 +320,7 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         return option_list
 
     def _build_reset_row(self):
-        self.reset_checkbox = QtWidgets.QCheckBox(_t("Reset Properties"))
+        self.reset_checkbox = QtWidgets.QCheckBox(i18n.tr_text("Reset Properties"))
         self.reset_checkbox.setStyleSheet("color: #a8a8a8; font-size: %spx;" % wutil.DPI(11))
         self.reset_checkbox.toggled.connect(self._on_reset_toggled)
         self.mainLayout.addSpacing(wutil.DPI(4))
@@ -380,14 +344,14 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
                 border-radius: 7px;
             }
             """
-            % COLORS.toolbar.turquoise.hex
+            % COLORS.toolbar.cyan.hex
         )
         entry_layout = QtWidgets.QHBoxLayout(self.entry_frame)
         entry_layout.setContentsMargins(wutil.DPI(10), 0, wutil.DPI(10), 0)
         entry_layout.setSpacing(0)
 
         self.name_field = cw.PersistentPlaceholderLineEdit()
-        self.name_field.setPlaceholderText(_t("Optional Label"))
+        self.name_field.setPlaceholderText(i18n.tr_text("Optional Label"))
         self.name_field.setAlignment(QtCore.Qt.AlignCenter)
         self.name_field.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.name_field.setStyleSheet(
@@ -432,9 +396,7 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         self.mainLayout.addWidget(top_row)
 
     def _build_color_row(self):
-        # Matches selection_sets' own color row exactly (size policy, spacing,
-        # trailing stretch) -- see selection_sets/widgets.py's equivalent
-        # _build_color_row/_create_color_button, which this was modeled on.
+        # Matches selection_sets' color row exactly; modeled on its _build_color_row/_create_color_button.
         self.color_row = QtWidgets.QWidget()
         self.color_row.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         color_layout = QtWidgets.QHBoxLayout(self.color_row)
@@ -465,9 +427,7 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         )
         button.setFixedSize(button_size, button_size)
         button.setIconSize(QtCore.QSize(icon_size, icon_size))
-        # One click both picks the color and confirms -- "Apply with this
-        # color" -- the same behavior selection_sets' own color row uses for
-        # its creation dialog (_create_set_from_color_click).
+        # One click both picks the color and confirms, same as selection_sets' own color row.
         button.connect_tool(lambda *_args, c=color: self._apply_with_color(c), checkable=True)
         button.setStyleSheet(button.styleSheet() + " QToolButton:checked { background-color: #4a4a4a; color: #ffffff; }")
         self._color_buttons[color.suffix] = button
@@ -563,9 +523,7 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         label = self.name_field.text().strip()
         color = self._selected_color or COLORS.selection.default
 
-        # Persisted per-session (TheKeyMachine's settings store lives on disk
-        # under the current Maya user prefs, so it also survives a restart --
-        # a superset of "remember for this Maya instance").
+        # Persisted per-session via TheKeyMachine's settings store, which also survives a Maya restart.
         if self.reset_checkbox.isChecked():
             api.clear_last_used_options()
         else:
@@ -574,6 +532,5 @@ class TemporalControlsDialog(customDialogs.QFlatToolBarPopupDialog):
         self._completed = True
         self.close()
         if callable(self.on_confirmed):
-            # self.objects is the full selection captured when the dialog was
-            # opened -- every object gets a control, not just one.
+            # self.objects is the full selection captured when the dialog opened; every object gets a control.
             self.on_confirmed(system, position_space, orientation_space, label, color.hex)

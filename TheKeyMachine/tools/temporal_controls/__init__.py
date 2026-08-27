@@ -3,33 +3,54 @@ from TheKeyMachine.core import i18n
 
 from TheKeyMachine.tools.registry import ToolObject, load_tooltips
 from TheKeyMachine.data.colors import COLORS
+
+# User-facing choice lists and their defaults, colocated with the menu/
+# command definitions below that present them. Imported back by api.py
+# and controller.py -- keep this above the `from ... import api` import
+# a few lines down.
+SYSTEMS = (
+    {"id": "simple", "label": "Simple Control", "icon": "temporal_controls_simple"},
+    {"id": "group", "label": "Group Control", "icon": "temporal_controls_group"},
+    {"id": "aim", "label": "Aim Control", "icon": "temporal_controls_aim"},
+    {
+        "id": "fk_chain",
+        "label": "FK Chain Control",
+        "icon": "temporal_controls_fk_chain",
+    },
+    {"id": "more", "label": "More to come...", "disabled": True},
+)
+DEFAULT_SYSTEM = "simple"
+
+SPACES = (
+    {"id": "world", "label": "World Space"},
+    {"id": "object", "label": "Object Space"},
+    {"id": "camera", "label": "Camera Space"},
+    {"id": "relative", "label": "Relative Space"},
+    {"id": "child", "label": "Child Space"},
+    {"id": "grab_release", "label": "Grab Release Space"},
+)
+DEFAULT_SPACE = "world"
+# Live re-space menu list: every space except Grab Release, a one-shot concept not meant to switch back into.
+SWITCHABLE_SPACES = tuple(space for space in SPACES if space["id"] != "grab_release")
+
+DEFAULT_BAKE_MODE = "keys"
+
 from TheKeyMachine.tools.temporal_controls import api
 
 TOOLTIPS = load_tooltips(__file__)
 
 
 def _bake_mode_choices():
-    choices = (
-        (
-            "keys",
-            "Bake Keys",
-            "Bake copies only the control's existing keyframes onto its object.",
-        ),
-        (
-            "frames",
-            "Bake Frames",
-            "Bake samples every frame across the control's animated range onto its object.",
-        ),
+    modes = (
+        ("keys", "Bake Keys", "Bake copies only the control's existing keyframes onto its object."),
+        ("frames", "Bake Frames", "Bake samples every frame across the control's animated range onto its object."),
     )
     localized = []
-    for value, label, description in choices:
+    for mode_id, label, description in modes:
         label, description, _tooltip = i18n.localize_menu_action(
-            "temporal_controls_bake_mode_{}".format(value),
-            __file__,
-            label,
-            description=description,
+            "temporal_controls_bake_mode_{}".format(mode_id), __file__, label, description=description
         )
-        localized.append({"value": value, "label": label, "description": description})
+        localized.append({"value": mode_id, "label": label, "description": description})
     return localized
 
 
@@ -174,7 +195,7 @@ class TemporalControlsToolObject(ToolObject):
         "id": "temporal_controls_tools",
         "i18n_key": "temporal_controls",
         "label": "Temporal Controls",
-        "color": COLORS.toolbar.turquoise.hex,
+        "color": COLORS.toolbar.cyan.hex,
         "items": [
             {
                 "id": "temporal_controls",
@@ -195,5 +216,16 @@ class TemporalControlsToolObject(ToolObject):
                     },
                 ],
             },
+            # Plain entries so every command in this tool shares the section's
+            # tint instead of some falling back to the untinted default.
+            {"id": "temporal_controls_create_apply"},
+            {"id": "temporal_controls_super_mode"},
+            {"id": "temporal_controls_world_space"},
+            {"id": "temporal_controls_object_space"},
+            {"id": "temporal_controls_camera_space"},
+            {"id": "temporal_controls_relative_space"},
+            {"id": "temporal_controls_child_space"},
+            {"id": "temporal_controls_mute_revert"},
+            {"id": "temporal_controls_toggle_rig"},
         ],
     }
