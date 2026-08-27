@@ -68,16 +68,11 @@ its own channels first if Bake was used (``_bake_nested_control``).
 The command-backed right-click menu declared in ``__init__.py`` gives:
 
 - **Bake Mode**: Bake Keys or Bake Frames -- one setting, shared by every
-  bake path in this tool. Both funnel through the same
-  ``_bake_range_to_target`` (``cmds.bakeResults``) -- Bake Frames calls it
-  once across the target's full animated range; Bake Keys calls it once
-  per control key time instead (a single-frame ``(t, t)`` range each), so
-  the result lands "as keyed", not resampled. **Super Mode** is a
-  separate checkbox affecting either mode's underlying bake the same way:
-  it maps onto ``bakeResults``' own ``simulation`` flag, trading
-  guaranteed-correct per-frame evaluation for Maya's faster math-based
-  shortcut wherever it decides that's safe -- Bake Keys just applies that
-  trade-off once per key instead of once across a whole range.
+  bake path in this tool. Both key target from control's world matrix at a
+  set of times (``_key_target_from_control``/``_world_matrix_local_values``,
+  a pure matrix query, not ``cmds.bakeResults``): Bake Frames samples every
+  frame across the target's full animated range; Bake Keys samples only
+  control's own key times, so the result lands "as keyed", not resampled.
 - **Space**: re-drive the selected controls through a different Position/
   Orientation space live (``switch_controls_space``) -- everything
   ``SWITCHABLE_SPACES`` offers except Grab Release, which is a one-shot
@@ -205,7 +200,7 @@ ORIENTATIONS = (
 DEFAULT_ORIENTATION = ORIENTATIONS[0][0]
 _ORIENTATION_TRANSFORMS = dict(ORIENTATIONS)
 
-# Super Mode maps onto cmds.bakeResults' simulation flag: correct-but-slower vs Maya's faster shortcut.
+# Super Mode maps onto cmds.bakeResults' simulation flag for nested-control baking (the only remaining bakeResults path): correct-but-slower vs Maya's faster shortcut.
 SUPER_MODE_SETTING = "super_mode"
 
 _SETTINGS_NAMESPACE = "temporal_controls"
@@ -2903,26 +2898,33 @@ def bake_control(control):
     """Bake -- and remove -- a single Temporal Control: extract its
     animation onto its target, then delete the control. Returns the
     target baked onto, or ``None`` if there was none. Shared per-control
-    step for both ``bake_controls`` and the panel's Remove and Bake."""
+    step for both ``bake_controls`` and the panel's Remove and Bake.
+    Removal always happens, even if baking the target's animation fails
+    partway through -- a bake error should never leave a control stuck
+    undeletable in the scene."""
     if not cmds.objExists(control):
         return None
     target = _target_for(control)
     restore_map = _restore_map_for(control)
     nested_parent = _nested_parent_for(control)
 
-    if target:
-        # Reparent obj out before deleting control, and do it before _delete_driver_nodes so bake sampling reads live values.
-        if nested_parent is not None:
-            target = _bake_nested_control(control, target, nested_parent)
-        elif get_bake_mode() == "frames":
-            _bake_frames_to_target(control, target)
-        else:
-            _extract_keys_to_target(control, target, restore_map)
-
-        # Runs right after translate/rotate handling; a no-op for controls that were never given extra copied attributes.
-        _apply_copied_attrs_to_target(control, target, _copied_attrs_for(control))
-
+    # Delete driver nodes before keying target: while still connected, a key would land on the pairBlend's input curve, not target's plug, and get orphaned once it's torn down.
     _delete_driver_nodes(control)
+
+    if target:
+        try:
+            if nested_parent is not None:
+                target = _bake_nested_control(control, target, nested_parent)
+            elif get_bake_mode() == "frames":
+                _bake_frames_to_target(control, target)
+            else:
+                _extract_keys_to_target(control, target, restore_map)
+
+            # Runs right after translate/rotate handling; a no-op for controls that were never given extra copied attributes.
+            _apply_copied_attrs_to_target(control, target, _copied_attrs_for(control))
+        except RuntimeError:
+            _debug_log("bake failed, removing control anyway", control=control, target=target)
+
     _delete_control_nodes(control)
     return target
 
@@ -3022,8 +3024,66 @@ def _bakeable_target_channels(control, target, restore_map=None):
     ]
 
 
+def _world_matrix_local_values(source, destination, t, rotate_order):
+    """*destination*'s local translate/rotate that reproduce *source*'s
+    world matrix at time *t*, via a pure matrix query -- same mechanism
+    ``_apply_group`` uses in reverse to put source's animation onto a new
+    control at creation. Reads plug values at an explicit time context, no
+    ``cmds.currentTime`` scrubbing and no dependency on *destination*'s
+    live drive. Returns ``(translate_values, rotate_values)`` dicts keyed
+    by channel name, or ``(None, None)`` on failure."""
+    world_matrix = maya_api.world_matrix_at_time(source, t)
+    parent_inverse = maya_api.parent_inverse_matrix_at_time(destination, t)
+    local_matrix = (
+        maya_api.multiply_matrices(world_matrix, parent_inverse)
+        if world_matrix is not None and parent_inverse is not None
+        else None
+    )
+    local_values = (
+        maya_api.decompose_local_matrix(local_matrix, rotate_order)
+        if local_matrix is not None
+        else None
+    )
+    if not local_values:
+        return None, None
+    return (
+        dict(zip(TRANSLATE_CHANNELS, local_values["translate"])),
+        dict(zip(ROTATE_CHANNELS, local_values["rotate"])),
+    )
+
+
+def _key_target_from_control(control, target, t, channels, rotate_order):
+    """Key *target*'s *channels* at time *t* from control's world matrix
+    (translate/rotate) or control's own value directly (scale -- never
+    matrix-converted, see the tool docstring's "Scale ... always passes
+    straight through coincident"). Creates a key regardless of whether
+    target already had one there, so an originally-unkeyed target still
+    ends up animated. Returns whether anything got keyed."""
+    translate_channels = [c for c in TRANSLATE_CHANNELS if c in channels]
+    rotate_channels = [c for c in ROTATE_CHANNELS if c in channels]
+    scale_channels = [c for c in SCALE_CHANNELS if c in channels]
+
+    keyed = False
+    if translate_channels or rotate_channels:
+        translate_values, rotate_values = _world_matrix_local_values(
+            control, target, t, rotate_order
+        )
+        if translate_values is None:
+            _debug_log(
+                "matrix conversion failed", control=control, target=target, time=t
+            )
+        else:
+            for channel in translate_channels:
+                keyed = _set_temporal_key(target, channel, t, translate_values[channel]) or keyed
+            for channel in rotate_channels:
+                keyed = _set_temporal_key(target, channel, t, rotate_values[channel]) or keyed
+    for channel in scale_channels:
+        keyed = _set_temporal_key(target, channel, t, cmds.getAttr(_plug(control, channel), time=t)) or keyed
+    return keyed
+
+
 def _bake_current_pose_to_target(control, target, restore_map=None):
-    """Commit the live evaluated pose at the current frame.
+    """Commit control's current evaluated pose onto target as one key.
 
     A control with no keys still has a meaningful pose. Explicitly baking
     that one frame before its driver nodes are removed avoids relying on a
@@ -3033,16 +3093,15 @@ def _bake_current_pose_to_target(control, target, restore_map=None):
     if not channels:
         return False
     current = cmds.currentTime(query=True)
-    return _bake_range_to_target(target, channels, current, current)
+    rotate_order = cmds.getAttr(_plug(target, "rotateOrder"))
+    return _key_target_from_control(control, target, current, channels, rotate_order)
 
 
 def _extract_keys_to_target(control, target, restore_map):
     """Key *target* at exactly control's key times (Bake Keys mode), not
-    resampled every frame like ``_bake_frames_to_target``. Must run while
-    target is still driven by the live constraint, before
-    ``_delete_driver_nodes``. Uses ``_bake_range_to_target`` per key time
-    (single-frame range) rather than copying control's raw local keys,
-    since control and target aren't in the same parent space."""
+    resampled every frame like ``_bake_frames_to_target``. See
+    ``_world_matrix_local_values`` for why this reads control's world
+    matrix directly instead of sampling target's live-driven value."""
     channels = _bakeable_target_channels(control, target, restore_map)
     if not channels:
         return
@@ -3067,6 +3126,7 @@ def _extract_keys_to_target(control, target, restore_map):
         )
     bake_channels = list(dict.fromkeys(keyed_channels + camera_channels))
     if not bake_channels:
+        # Control has no keys of its own -- still commit its current pose.
         _bake_current_pose_to_target(control, target, restore_map)
         return
 
@@ -3080,8 +3140,9 @@ def _extract_keys_to_target(control, target, restore_map):
     if not key_times:
         return
 
+    rotate_order = cmds.getAttr(_plug(target, "rotateOrder"))
     for t in sorted(key_times):
-        _bake_range_to_target(target, bake_channels, t, t)
+        _key_target_from_control(control, target, t, bake_channels, rotate_order)
 
 
 def _apply_copied_attrs_to_target(control, target, copied_attrs):
@@ -3114,33 +3175,52 @@ def _apply_copied_attrs_to_target(control, target, copied_attrs):
 
 
 def _bake_range_to_target(target, channels, start, end):
-    """The one ``cmds.bakeResults`` call every bake path funnels through
-    (Bake Frames uses it as-is, Bake Keys prunes it to control's own key
-    times after). Respects Super Mode. Returns whether it happened."""
+    """``cmds.bakeResults`` over a continuous range -- used only by
+    ``_bake_nested_control``, onto a temporary node driven by a plain,
+    unprimed constraint (no pairBlend, so bakeResults is safe there; the
+    normal constraint+pairBlend drive isn't -- see ``_world_matrix_local_values``).
+    Respects Super Mode. Returns whether it happened; a failure is
+    surfaced via cmds.warning, not swallowed."""
+    _debug_log(
+        "bake range requested",
+        target=target,
+        channels=list(channels),
+        start=start,
+        end=end,
+        simulation=_super_mode_simulation_flag(),
+    )
     try:
         cmds.bakeResults(
             target,
             simulation=_super_mode_simulation_flag(),
             time=(start, end),
             attribute=list(channels),
+            preserveOutsideKeys=True,
+            disableImplicitControl=True,
         )
         return True
-    except RuntimeError:
+    except RuntimeError as exc:
+        cmds.warning("Temporal Controls: bake onto {} failed: {}".format(target, exc))
+        _debug_log("bake range failed", target=target, channels=list(channels), error=str(exc))
         return False
 
 
 def _bake_frames_to_target(control, target):
-    """Bake Frames mode (see get_bake_mode): sample *control*'s
-    motion onto *target* across its full animated range with
-    _bake_range_to_target, instead of copying the control's existing
-    keyframes as-is like _extract_keys_to_target (Bake Keys mode) does."""
+    """Bake Frames mode (see get_bake_mode): resample control's motion onto
+    target every frame across its full animated range, instead of copying
+    control's existing keyframes as-is like _extract_keys_to_target (Bake
+    Keys mode) does. Same per-frame matrix conversion as Bake Keys, just
+    called once per frame instead of once per control key time."""
     if not cmds.objExists(target):
         return
     start, end = _control_motion_range(control)
     if start is None:
-        current = cmds.currentTime(query=True)
-        start = end = current
-    _bake_range_to_target(target, CHANNELS, start, end)
+        start = end = cmds.currentTime(query=True)
+    rotate_order = cmds.getAttr(_plug(target, "rotateOrder"))
+    frame = start
+    while frame <= end + 1e-6:
+        _key_target_from_control(control, target, frame, CHANNELS, rotate_order)
+        frame += 1.0
 
 
 def _bake_nested_control(control, obj, original_parent):
@@ -3216,7 +3296,8 @@ def revert_control(control):
     back to its original parent), then delete the control. Returns the
     target restored, or ``None`` if *control* had no target (a free "Add
     Child" extra control just gets removed). The single-control counterpart
-    to bake_control -- see its docstring."""
+    to bake_control -- see its docstring, including why removal always
+    happens even if the restore step fails partway through."""
     if not cmds.objExists(control):
         return None
     target = _target_for(control)
@@ -3226,10 +3307,13 @@ def revert_control(control):
 
     if target:
         # Reparent obj out before deleting control, or it would get deleted along with it.
-        if nested_parent is not None:
-            target = _restore_nested_parent(control, target, nested_parent)
-        else:
-            _restore_target_channels(target, restore_map)
+        try:
+            if nested_parent is not None:
+                target = _restore_nested_parent(control, target, nested_parent)
+            else:
+                _restore_target_channels(target, restore_map)
+        except RuntimeError:
+            _debug_log("revert failed, removing control anyway", control=control, target=target)
 
     _delete_control_nodes(control)
     return target
@@ -3343,11 +3427,12 @@ def mute_and_bake(*_args):
     muted = []
     for control in controls:
         target = _target_for(control)
+        # Delete driver nodes before baking, not after -- same ordering as bake_control.
+        _delete_driver_nodes(control)
         if target:
             _bake_current_pose_to_target(
                 control, target, _restore_map_for(control)
             )
-        _delete_driver_nodes(control)
         node = TkmSceneNode(control)
         node.set_attr(MUTED_ATTR, True, attributeType="bool")
         node.set_attr(DRIVER_NODES_ATTR, json.dumps({}))
@@ -3748,6 +3833,7 @@ def _parent_nested_control(control, obj):
             "Temporal Controls could not resolve {} after parenting".format(nested_root)
         )
     nested_root = matches[0]
+    _reset_offset_parent_matrix(nested_root)
     _remap_temporal_dag_paths(old_root, nested_root)
 
     node.set_attr(NESTED_ROOT_ATTR, nested_root)
@@ -3818,6 +3904,16 @@ def _remap_temporal_dag_paths(old_root, new_root):
 
 
 def _restore_nested_parent(control, obj, original_parent):
+    """Hand a nested control's target back to its original parent.
+
+    ``cmds.parent(..., absolute=True)`` (the implicit mode here) can write
+    a compensating ``offsetParentMatrix`` onto a node whose translate/
+    rotate are keyed, to keep its world position unchanged across the
+    reparent -- see ``_reset_offset_parent_matrix``. Left in place, that
+    silently corrupts anything read via parentInverseMatrix afterward
+    (Bake's constrain-and-sample step, or just Revert leaving the object
+    visibly offset), so it's cleared right after every reparent here.
+    """
     nested_root = _nested_root_for(control, obj)
     obj_matches = cmds.ls(obj, long=True) if obj else []
     if not nested_root or not obj_matches:
@@ -3838,6 +3934,7 @@ def _restore_nested_parent(control, obj, original_parent):
     if not matches:
         return obj
     nested_root = matches[0]
+    _reset_offset_parent_matrix(nested_root)
     _remap_temporal_dag_paths(old_root, nested_root)
     target_matches = cmds.ls(nested_root + target_suffix, long=True) or []
     return target_matches[0] if target_matches else obj

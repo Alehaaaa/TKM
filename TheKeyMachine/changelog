@@ -14,6 +14,11 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.53:
+  - bugfix: Remove and Bake correctly bakes the temporal control's animation onto its object, at the same keys, without losing any
+  - bugfix: Mute and Bake keeps the object's baked pose instead of occasionally dropping it
+  - polish: Toggle Temporal Control menu entry renamed and grouped with its own separator
+
 0.1.52:
   - polish: Temporal Controls uses one consistent color across all its actions
   - bugfix: Temporal Controls space switching keeps the driven object in sync, even after undo
