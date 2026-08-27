@@ -78,14 +78,25 @@ def download_url(repository, version):
     )
 
 
-def asset_download_url(release, repository, version):
-    expected_name = "TKM-{}.zip".format(version)
+def expected_asset_name(version):
+    return "TKM-{}.zip".format(version)
+
+
+def find_release_asset(release, version):
+    expected_name = expected_asset_name(version)
     for asset in release.get("assets") or []:
         if asset.get("name") == expected_name:
-            if asset.get("browser_download_url"):
-                return asset["browser_download_url"]
-            if asset.get("url"):
-                return asset["url"]
+            return asset
+    return None
+
+
+def asset_download_url(release, repository, version):
+    asset = find_release_asset(release, version)
+    if asset:
+        if asset.get("browser_download_url"):
+            return asset["browser_download_url"]
+        if asset.get("url"):
+            return asset["url"]
     return download_url(repository, version)
 
 
@@ -124,7 +135,12 @@ def build_release_records(repository, metadata_path, current_version):
             continue
         if changelog_module.compare_versions(version, current_version) > 0:
             continue
-        release = metadata.get(version, {})
+        release = metadata.get(version)
+        if not release or not find_release_asset(release, version):
+            # Changelog carries an entry for this version but GitHub has no
+            # published release (or no uploaded zip) for it -- a failed or
+            # skipped release run shouldn't show up as a downloadable version.
+            continue
         entries = [
             {
                 "kind": str(entry.get("kind", "")).strip().lower() or "changed",
