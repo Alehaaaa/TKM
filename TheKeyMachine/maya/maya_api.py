@@ -539,13 +539,34 @@ def matrix_array_plug_at_time(node, attr, index=0, time=None):
 def multiply_matrices(a, b):
     """Multiply two flat 16-value matrices using Maya's row-vector
     convention (``a`` applied first): ``result = a * b``.
+
+    Prefer ``MMatrix`` when the runtime supports constructing it from flat
+    arrays. Some supported Maya/Python combinations expose API 2.0 but reject
+    that constructor/operator pairing; use the equivalent row-major scalar
+    multiplication there instead of silently returning ``None``.
     """
-    if om is None or a is None or b is None:
+    if a is None or b is None:
         return None
+    if om is not None:
+        try:
+            values = _matrix_values(om.MMatrix(a) * om.MMatrix(b))
+            if values is not None:
+                return values
+        except Exception:
+            pass
+
     try:
-        return _matrix_values(om.MMatrix(a) * om.MMatrix(b))
-    except Exception:
+        left = [float(value) for value in a]
+        right = [float(value) for value in b]
+    except (TypeError, ValueError):
         return None
+    if len(left) != 16 or len(right) != 16:
+        return None
+    return [
+        sum(left[row * 4 + offset] * right[offset * 4 + column] for offset in range(4))
+        for row in range(4)
+        for column in range(4)
+    ]
 
 
 def decompose_local_matrix(values, rotate_order):
