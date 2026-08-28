@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:i="http://ns.adobe.com/AdobeIllustrator/10.0/" version="1.1" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .st0 {
+        fill: #d86552;
+        stroke: #3c3c3c;
+        stroke-miterlimit: 10;
+        stroke-width: 2px;
+      }
+    </style>
+  </defs>
+  <path class="st0" d="M9.5,39.7c-1.01,0-1.92-.47-2.49-1.29-.96-1.4-.66-3.28.67-4.2l30.31-21.6c.41-.27,1.05-.61,1.71-.61,1.01,0,1.92.47,2.49,1.29.46.67.65,1.48.53,2.27-.12.79-.55,1.48-1.2,1.93l-30.31,21.6c-.41.27-1.05.61-1.71.61Z"/>
+</svg>

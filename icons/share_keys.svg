@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:i="http://ns.adobe.com/AdobeIllustrator/10.0/" version="1.1" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .st0 {
+        fill: #577e6e;
+      }
+
+      .st0, .st1 {
+        stroke: #3a3a3a;
+        stroke-miterlimit: 10;
+        stroke-width: 2px;
+      }
+
+      .st1, .st2 {
+        fill: #81bda4;
+      }
+    </style>
+  </defs>
+  <g>
+    <rect class="st2" x="5" y="31.65" width="40" height="3.5"/>
+    <rect class="st1" x="20.2" y="28.8" width="9.2" height="9.2"/>
+    <rect class="st0" x="32.5" y="28.8" width="9.2" height="9.2"/>
+    <rect class="st0" x="8" y="28.8" width="9.2" height="9.2"/>
+  </g>
+  <g>
+    <rect class="st2" x="5" y="15.65" width="40" height="3.5"/>
+    <rect class="st0" x="20.2" y="12.8" width="9.2" height="9.2"/>
+    <rect class="st1" x="32.5" y="12.8" width="9.2" height="9.2"/>
+    <rect class="st1" x="8" y="12.8" width="9.2" height="9.2"/>
+  </g>
+</svg>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:i="http://ns.adobe.com/AdobeIllustrator/10.0/" version="1.1" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .st0 {
+        fill: #b5b7ba;
+        stroke: #3c3c3c;
+        stroke-width: 2px;
+      }
+    </style>
+  </defs>
+  <g transform="translate(25 25) scale(0.95) translate(-25 -25)">
+    <path class="st0" d="M43.13,38.77l-8.2-8.2c1.45-2.28,2.31-4.98,2.31-7.88,0-8.11-6.59-14.7-14.7-14.7s-14.7,6.59-14.7,14.7,6.59,14.7,14.7,14.7c2.9,0,5.6-.86,7.88-2.31l8.2,8.2c.62.62,1.44.93,2.26.93s1.63-.31,2.26-.93c1.25-1.25,1.25-3.27,0-4.51ZM14.23,22.7c0-4.59,3.73-8.32,8.32-8.32s8.32,3.73,8.32,8.32-3.73,8.32-8.32,8.32-8.32-3.73-8.32-8.32Z"/>
+  </g>
+</svg>

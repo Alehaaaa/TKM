@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:i="http://ns.adobe.com/AdobeIllustrator/10.0/" version="1.1" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .st0 {
+        fill: #d6d6d6;
+      }
+
+      .st1 {
+        fill: #73a18e;
+      }
+
+      .st2 {
+        fill: #818284;
+      }
+
+      .st3 {
+        fill: none;
+        stroke: #3a3a3a;
+        stroke-miterlimit: 10;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <path class="st3" d="M14,12.2c-5.6,4.7-6.3,13.2-1.6,18.9l4.6,5.5,2.2,2.6,3.6,4.3,3.9-3.3-3.6-4.3-2.2-2.6h0l-4.6-5.5c-2.9-3.5-2.5-8.7,1-11.6s8.7-2.5,11.6,1l4.6,5.5h0l2.2,2.6,3.6,4.3,3.9-3.3-3.6-4.3-2.2-2.6-4.6-5.5c-4.8-5.7-13.2-6.5-18.8-1.7Z"/>
+  <g>
+    <path class="st2" d="M16.3,27.85c-2.9-3.5-2.5-8.7,1-11.6s8.7-2.5,11.6,1l4.6,5.5,3.9-3.3-4.6-5.5c-4.8-5.7-13.2-6.5-18.8-1.7s-6.3,13.2-1.6,18.9l4.6,5.5,3.9-3.3-4.6-5.5Z"/>
+    <rect class="st0" x="17.43" y="34.49" width="5.2" height="3.6" transform="translate(-18.64 21.36) rotate(-40)"/>
+    <rect class="st0" x="33.98" y="20.6" width="5.2" height="3.6" transform="translate(-5.84 28.76) rotate(-40)"/>
+    <rect class="st1" x="36.89" y="23.07" width="5.2" height="5.6" transform="translate(-7.39 31.44) rotate(-40)"/>
+    <rect class="st1" x="20.27" y="36.88" width="5.2" height="5.6" transform="translate(-20.16 23.99) rotate(-40)"/>
+  </g>
+</svg>

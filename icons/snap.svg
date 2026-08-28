@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:i="http://ns.adobe.com/AdobeIllustrator/10.0/" version="1.1" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .st0 {
+        fill: #eaeaea;
+      }
+
+      .st1 {
+        fill: #41646d;
+      }
+
+      .st2 {
+        fill: #cecece;
+      }
+
+      .st2, .st3 {
+        stroke-width: 2px;
+      }
+
+      .st2, .st3, .st4 {
+        stroke: #3a3a3a;
+        stroke-miterlimit: 10;
+      }
+
+      .st5, .st3 {
+        fill: #8aa8b2;
+      }
+
+      .st4 {
+        fill: none;
+        stroke-width: 4px;
+      }
+    </style>
+  </defs>
+  <rect class="st3" x="5" y="34.9" width="40" height="5"/>
+  <rect class="st2" x="20.4" y="32.8" width="9.2" height="9.2"/>
+  <g>
+    <path class="st4" d="M25,8.85c-6.76,0-12.25,5.49-12.25,12.35v12.64h4.7v-8.23h0v-4.41c0-4.21,3.43-7.55,7.55-7.55s7.55,3.43,7.55,7.55v4.41h0v8.23h4.7v-12.64c0-6.76-5.49-12.35-12.25-12.35Z"/>
+    <path class="st1" d="M17.45,21.2c0-4.21,3.43-7.55,7.55-7.55s7.55,3.43,7.55,7.55v4.41h4.7v-4.41c0-6.76-5.49-12.35-12.25-12.35s-12.25,5.49-12.25,12.35v4.41h4.7v-4.41Z"/>
+    <rect class="st0" x="12.75" y="25.61" width="4.7" height="3.14"/>
+    <rect class="st0" x="32.55" y="25.61" width="4.7" height="3.14"/>
+    <rect class="st5" x="32.55" y="28.75" width="4.7" height="5.1"/>
+    <rect class="st5" x="12.75" y="28.75" width="4.7" height="5.1"/>
+  </g>
+</svg>
