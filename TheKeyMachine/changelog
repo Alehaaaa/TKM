@@ -14,10 +14,13 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.54:
+  - new: Onion Skin compares nearby or held character poses as shaded, shape, or outline overlays in the viewport
+
 0.1.53:
+  - polish: Toggle Temporal Control menu entry renamed and grouped with its own separator
   - bugfix: Remove and Bake correctly bakes the temporal control's animation onto its object, at the same keys, without losing any
   - bugfix: Mute and Bake keeps the object's baked pose instead of occasionally dropping it
-  - polish: Toggle Temporal Control menu entry renamed and grouped with its own separator
 
 0.1.52:
   - polish: Temporal Controls uses one consistent color across all its actions

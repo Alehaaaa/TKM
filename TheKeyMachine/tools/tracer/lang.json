@@ -1,4 +1,30 @@
 {
+    "viewport_tools": {
+        "en": {
+            "label": "Viewport Tools"
+        },
+        "es": {
+            "label": "Herramientas del visor"
+        },
+        "fr": {
+            "label": "Outils de la vue"
+        },
+        "ca": {
+            "label": "Eines del visor"
+        },
+        "zh": {
+            "label": "视口工具"
+        },
+        "ja": {
+            "label": "ビューポートツール"
+        },
+        "ko": {
+            "label": "뷰포트 도구"
+        },
+        "ar": {
+            "label": "أدوات منفذ العرض"
+        }
+    },
     "create_tracer": {
         "en": {
             "label": "Tracer",

@@ -1,7 +1,5 @@
 """Tracer creation, display presets, and responsive auto refresh."""
 
-import threading
-import time
 import re
 from functools import partial
 
@@ -1052,69 +1050,14 @@ def toggle_tracer(*_args):
         )
 
 
-class _RefreshScheduler(QtCore.QThread):
-    """Coalesce edit bursts and plan progressive passes off the UI thread."""
-
-    refreshPass = QtCore.Signal(int, int)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._condition = threading.Condition()
-        self._generation = 0
-        self._request = None
-        self._stopping = False
-
-    def schedule(self, profile, immediate=False):
-        with self._condition:
-            self._generation += 1
-            generation = self._generation
-            delay = 0 if immediate else int(profile["debounce_ms"])
-            self._request = (
-                generation,
-                time.monotonic() + (delay / 1000.0),
-                tuple(profile["batch_radii"]),
-                int(profile["pass_gap_ms"]),
-            )
-            self._condition.notify_all()
-            return generation
-
-    def stop(self):
-        with self._condition:
-            self._stopping = True
-            self._request = None
-            self._condition.notify_all()
-
-    def cancel(self):
-        with self._condition:
-            self._generation += 1
-            self._request = None
-            self._condition.notify_all()
-            return self._generation
-
-    def run(self):
-        while True:
-            with self._condition:
-                while not self._stopping and self._request is None:
-                    self._condition.wait()
-                if self._stopping:
-                    return
-                generation, deadline, batch_radii, pass_gap_ms = self._request
-                remaining = deadline - time.monotonic()
-                if remaining > 0:
-                    self._condition.wait(remaining)
-                    continue
-                self._request = None
-
-            for index, batch_radius in enumerate(batch_radii):
-                with self._condition:
-                    if self._stopping:
-                        return
-                    if self._request is not None or generation != self._generation:
-                        break
-                self.refreshPass.emit(int(batch_radius), int(generation))
-                if index + 1 < len(batch_radii) and pass_gap_ms:
-                    with self._condition:
-                        self._condition.wait(pass_gap_ms / 1000.0)
+# The debounce/batch timing thread itself is shared with Onion Skin's
+# auto-update (see tools.common.DebouncedBatchScheduler) -- both tools need
+# the identical "wait, then reapply in a few small steps" shape, just with
+# different domain meaning for each step (a sample radius here, a capped
+# frame count there). Aliased under the old private name so the rest of this
+# file barely changed: only the signal name (now stepReady) and schedule()'s
+# now-explicit arguments below needed touching.
+_RefreshScheduler = toolCommon.DebouncedBatchScheduler
 
 
 class TracerUpdateController(QtCore.QObject):
@@ -1128,7 +1071,7 @@ class TracerUpdateController(QtCore.QObject):
         self._offset_tracers = {}
         self._pending_offset_refreshes = set()
         self._scheduler = _RefreshScheduler(self)
-        self._scheduler.refreshPass.connect(self._apply_refresh_pass, QtCore.Qt.QueuedConnection)
+        self._scheduler.stepReady.connect(self._apply_refresh_pass, QtCore.Qt.QueuedConnection)
 
     def is_enabled(self):
         return self._enabled
@@ -1224,7 +1167,9 @@ class TracerUpdateController(QtCore.QObject):
         if not self._enabled or not _has_tracer():
             return
         profile = PERFORMANCE_PROFILES[get_performance()]
-        self._generation = self._scheduler.schedule(profile, immediate=immediate)
+        self._generation = self._scheduler.schedule(
+            profile["debounce_ms"], profile["batch_radii"], profile["pass_gap_ms"], immediate=immediate
+        )
 
     def cancel_pending(self):
         self._generation = self._scheduler.cancel()

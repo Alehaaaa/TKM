@@ -111,7 +111,7 @@ def worldspace_copy_frame(*args, tool_operation=None, **_kwargs):
     """Copy world-space transforms. Copies the current frame when nothing
     is selected, or the selected time-slider range / graph editor keys."""
     return _worldspace_copy(
-        "current_frame", "ws_copy_frame", "World Space copied", tool_operation
+        "current_frame", "copy_worldspace", "World Space copied", tool_operation
     )
 
 

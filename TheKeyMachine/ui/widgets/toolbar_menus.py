@@ -319,8 +319,14 @@ def build_declared_menu(definition, parent_widget=None, owner_command_id=None):
                 )
             continue
         if item_type == "section":
+            # QMenu.addSection() is Qt 5.13+ only -- older Maya versions ship
+            # an earlier Qt/PySide2 where it doesn't render a labeled divider
+            # at all. addSeparator() + setText() is what addSection() does
+            # internally anyway, and it's been supported since Qt4, so it
+            # renders correctly across every Maya version TKM targets.
             label, _description = _declared_item_text(item, registry)
-            menu.addSection(label)
+            section_action = menu.addSeparator()
+            section_action.setText(label)
             continue
         if item_type == "dynamic_menu":
             builder = item.get("builder")

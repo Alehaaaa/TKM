@@ -2213,6 +2213,86 @@ def replace_tracked_connections(owner, attr_name, pairs, parent=None):
     return relays
 
 
+class DebouncedBatchScheduler(QtCore.QThread):
+    """Coalesce a burst of edits into one debounced, batched follow-up.
+
+    Shared by Tracer's live trail refresh and Onion Skin's auto-update: both
+    need the same shape of "wait a bit after the last edit, then reapply in
+    a few small steps so the first result lands fast and the rest catches
+    up shortly after" -- Tracer steps outward by curve-sample radius, Onion
+    Skin steps through a capped number of ghost frames to rebake per pass.
+    Rather than each tool owning its own copy of this timing/threading
+    logic, both schedule against one shared instance of this class and
+    react to its ``stepReady`` signal however their own domain needs to.
+
+    Runs its own wait loop off the GUI thread; the actual work always stays
+    on the caller's side (connect ``stepReady`` with a queued connection so
+    it runs back on the main/Maya thread).
+    """
+
+    stepReady = QtCore.Signal(int, int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._condition = threading.Condition()
+        self._generation = 0
+        self._request = None
+        self._stopping = False
+
+    def schedule(self, debounce_ms, steps, step_gap_ms, immediate=False):
+        """Debounce, then emit ``stepReady(step, generation)`` once per entry in *steps*."""
+        with self._condition:
+            self._generation += 1
+            generation = self._generation
+            delay = 0 if immediate else int(debounce_ms)
+            self._request = (
+                generation,
+                time.monotonic() + (delay / 1000.0),
+                tuple(steps),
+                int(step_gap_ms),
+            )
+            self._condition.notify_all()
+            return generation
+
+    def stop(self):
+        with self._condition:
+            self._stopping = True
+            self._request = None
+            self._condition.notify_all()
+
+    def cancel(self):
+        with self._condition:
+            self._generation += 1
+            self._request = None
+            self._condition.notify_all()
+            return self._generation
+
+    def run(self):
+        while True:
+            with self._condition:
+                while not self._stopping and self._request is None:
+                    self._condition.wait()
+                if self._stopping:
+                    return
+                generation, deadline, steps, step_gap_ms = self._request
+                remaining = deadline - time.monotonic()
+                if remaining > 0:
+                    self._condition.wait(remaining)
+                    continue
+                self._request = None
+
+            for index, step in enumerate(steps):
+                with self._condition:
+                    if self._stopping:
+                        return
+                    if self._request is not None or generation != self._generation:
+                        break
+                self.stepReady.emit(step, int(generation))
+                if index + 1 < len(steps) and step_gap_ms:
+                    with self._condition:
+                        self._condition.wait(step_gap_ms / 1000.0)
+
+
 class ToolbarWindowToggle(QtCore.QObject):
     """Keeps any number of controls in sync with one floating window.
 

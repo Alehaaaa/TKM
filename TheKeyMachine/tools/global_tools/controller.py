@@ -61,7 +61,7 @@ def toggle_graph_toolbar():
 
 def get_setting_spec(setting_id):
     manager = runtime.get_runtime_manager(start=False)
-    if setting_id == "attribute_switcher_euler_filter":
+    if setting_id == "smart_euler_filter":
         return {
             "get_checked": is_euler_filter_enabled,
             "set_checked": set_euler_filter_enabled,

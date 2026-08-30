@@ -1,5 +1,5 @@
 {
-    "ws_copy_frame": {
+    "copy_worldspace": {
         "en": {
             "label": "Copy World Space",
             "tooltip": [

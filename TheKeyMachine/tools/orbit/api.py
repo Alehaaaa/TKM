@@ -58,9 +58,9 @@ ORBIT_ACTIONS = (
     "copy_pose",
     "paste_pose",
     "select_hierarchy",
-    "link_copy",
+    "copy_link",
     "temp_pivot",
-    "ws_copy_frame",
+    "copy_worldspace",
     "ws_paste_frame",
 )
 ORBIT_ACTION_SET = set(ORBIT_ACTIONS)

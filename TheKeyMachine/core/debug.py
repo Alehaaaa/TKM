@@ -4,6 +4,7 @@ Set ``TKM_TOOL_DEBUG=true`` in ``TheKeyMachine/.env`` (or in the process
 environment) to show the menu. The committed fallback is always off.
 """
 
+import io
 import os
 import shutil
 from xml.etree import ElementTree
@@ -36,7 +37,7 @@ def _dotenv_value(name):
         os.path.join(os.path.dirname(__file__), os.pardir, ".env")
     )
     try:
-        with open(dotenv_path, "r", encoding="utf-8") as stream:
+        with io.open(dotenv_path, "r", encoding="utf-8") as stream:
             for raw_line in stream:
                 line = raw_line.strip()
                 if not line or line.startswith("#") or "=" not in line:
@@ -44,7 +45,7 @@ def _dotenv_value(name):
                 key, value = line.split("=", 1)
                 if key.strip() == name:
                     return value.strip().strip('"\'')
-    except OSError:
+    except (IOError, OSError):
         pass
     return None
 

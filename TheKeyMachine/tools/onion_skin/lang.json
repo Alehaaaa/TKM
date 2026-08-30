@@ -1,0 +1,15 @@
+{
+  "onion_skin": {
+    "en": {
+      "label": "Onion Skin",
+      "tooltip": [
+        "Open the manager when you want to compare a pose with nearby frames without leaving the camera view.",
+        "Add the character meshes, enable onion skins, then scrub through the poses you want to compare.",
+        "Right-click to choose the pose style, colors, sampling, and viewport behavior."
+      ]
+    }
+  },
+  "onion_skin_toggle": {
+    "en": {"label": "Enable Onion Skin", "tooltip": ["Show nearby poses while checking spacing, silhouettes, and arcs."]}
+  }
+}

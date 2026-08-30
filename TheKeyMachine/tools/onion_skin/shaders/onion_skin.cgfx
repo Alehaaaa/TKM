@@ -1,0 +1,48 @@
+#include "Common.cgh"
+
+texture gSourceTex : SourceTexture < string UIName = "Source Texture"; >;
+sampler2D gSourceSamp = sampler_state { Texture = <gSourceTex>; };
+texture gSourceTex2 : SourceTexture2 < string UIName = "Onion Texture"; >;
+sampler2D gSourceSamp2 = sampler_state { Texture = <gSourceTex2>; };
+texture gStencilTex : SourceTexture3 < string UIName = "Stencil Texture"; >;
+sampler2D gStencilSamp = sampler_state { Texture = <gStencilTex>; };
+float gBlendSrc = 0.5f;
+float4 gUVTransform : RelativeViewportDimensions;
+float2 gPixelTransform : ViewportPixelSize;
+float4 gTint = {1.0, 1.0, 1.0, 1.0};
+int gOutlineWidth = 3;
+int gType = 1;
+int gDrawBehind = 1;
+
+float4 PS_Blend(VS_TO_PS_ScreenQuad input) : COLOR0
+{
+    float2 uv = input.UV * gUVTransform.zw + gUVTransform.xy;
+    float4 scene = tex2D(gSourceSamp, uv);
+    float4 onion = tex2D(gSourceSamp2, uv);
+    float4 stencil = tex2D(gStencilSamp, uv);
+    float visible = lerp(1.0, 1.0 - stencil.a, gDrawBehind);
+    float4 layer = onion * gTint;
+    float alpha = onion.a;
+    if (gType == 1) {
+        layer = float4(gTint.rgb * 0.75, onion.a);
+    } else if (gType == 2) {
+        float2 px = float2(gOutlineWidth, gOutlineWidth) / gPixelTransform.xy;
+        float around = 0.0;
+        around += tex2D(gSourceSamp2, uv + float2(px.x, 0.0)).a;
+        around += tex2D(gSourceSamp2, uv - float2(px.x, 0.0)).a;
+        around += tex2D(gSourceSamp2, uv + float2(0.0, px.y)).a;
+        around += tex2D(gSourceSamp2, uv - float2(0.0, px.y)).a;
+        alpha = (1.0 - onion.a) * clamp(around, 0.0, 1.0);
+        layer = float4(gTint.rgb, alpha);
+    }
+    return lerp(scene, layer, gBlendSrc * alpha * visible);
+}
+
+technique Main
+{
+    pass p0
+    {
+        VertexShader = compile glslv VS_ScreenQuad();
+        PixelShader = compile glslf PS_Blend();
+    }
+}

@@ -49,13 +49,33 @@ def _string_body_lines(raw):
 separator = object()
 
 
+class TooltipLink:
+    """A body line rendered as plain text, except for ``label`` inside it,
+    which is a clickable link that opens ``url``.
+
+    ``text`` is the full sentence; ``label`` is the substring within it that
+    becomes the link (matched once, left-to-right). If ``label`` isn't found
+    in ``text`` (or ``text`` is omitted), the whole ``label`` is the link.
+    """
+
+    __slots__ = ("url", "label", "text")
+
+    def __init__(self, url, label=None, text=None):
+        self.url = str(url)
+        self.label = str(label) if label else self.url
+        self.text = str(text) if text else self.label
+
+    def __str__(self):
+        return self.text
+
+
 def tooltip_body(*paragraphs):
     lines = []
     def _append(paragraph):
         if paragraph is separator:
             lines.append(paragraph)
             return
-        if isinstance(paragraph, TooltipMedia):
+        if isinstance(paragraph, (TooltipMedia, TooltipLink)):
             lines.append(paragraph)
             return
         if isinstance(paragraph, (list, tuple)):
@@ -78,6 +98,8 @@ def _tooltip_from_body(body):
             text_lines.append("---")
         elif isinstance(item, TooltipMedia):
             text_lines.append(item.path)
+        elif isinstance(item, TooltipLink):
+            text_lines.append(item.text)
         else:
             text_lines.append(str(item))
     return Tooltip("\n\n".join(line for line in text_lines if line), title="", body_lines=body_lines, icon=None)
@@ -143,6 +165,7 @@ class QFlatTooltip(QtWidgets.QWidget):
     BG_COLOR = "#333333"
     HEADER_COLOR = "#282828"
     TEXT_COLOR = "#bbbbbb"
+    LINK_COLOR = "#6fb1e0"
     ARROW_W = 12
     ARROW_H = 8
     BORDER_RADIUS = 8
@@ -424,6 +447,48 @@ class QFlatTooltip(QtWidgets.QWidget):
         btn.clicked.connect(lambda _checked=False: callback())
         return btn
 
+    def _create_body_link_label(self, link):
+        # A normal body-text label (same font/color/wrap as every other
+        # paragraph) except the one substring named by ``link.label`` is
+        # wrapped in a colored, underlined <a> -- so the line reads exactly
+        # like the rest of the tooltip, with only that word clickable.
+        import html as html_lib
+
+        escaped_text = html_lib.escape(link.text)
+        escaped_label = html_lib.escape(link.label)
+        anchor = '<a href="{0}" style="color:{1}; text-decoration:underline;">{2}</a>'.format(
+            html_lib.escape(link.url, quote=True), self.LINK_COLOR, escaped_label
+        )
+        html_text = escaped_text.replace(escaped_label, anchor, 1) if escaped_label in escaped_text else anchor
+
+        lbl = QtWidgets.QLabel(html_text)
+        lbl.setObjectName("TooltipLinkLabel")
+        lbl.setWordWrap(True)
+        lbl.setTextFormat(QtCore.Qt.RichText)
+        lbl.setOpenExternalLinks(False)
+        lbl.setTextInteractionFlags(QtCore.Qt.LinksAccessibleByMouse)
+        lbl.setMaximumWidth(self._body_max_width())
+        lbl.setStyleSheet(
+            "color: {0}; background: transparent; font-size: {1}px; margin: 0; padding: 0;".format(
+                self.TEXT_COLOR, wutil.DPI(10.5)
+            )
+        )
+        lbl.linkActivated.connect(self._open_link)
+        return lbl
+
+    @staticmethod
+    def _open_link(url):
+        QFlatTooltipManager.hide()
+        opened = False
+        try:
+            opened = bool(QtGui.QDesktopServices.openUrl(QtCore.QUrl(url)))
+        except (RuntimeError, AttributeError, TypeError, ValueError):
+            opened = False
+        if not opened:
+            import webbrowser
+
+            webbrowser.open(url, new=2)
+
     def _open_hotkey_editor(self):
         if not self.command_id:
             return
@@ -661,6 +726,10 @@ class QFlatTooltip(QtWidgets.QWidget):
                 )
                 continue
 
+            if isinstance(item, TooltipLink):
+                layout.addWidget(self._create_body_link_label(item))
+                continue
+
             layout.addWidget(self._create_body_text_label(str(item)))
 
     def paintEvent(self, event):
@@ -791,20 +860,27 @@ class _TooltipMouseFilter(QtCore.QObject):
             self._pressed_button = None
             return False
 
-        button = self._tooltip_button_at(tooltip, global_pos)
+        target = self._tooltip_button_at(tooltip, global_pos)
         if event_type == QtCore.QEvent.MouseButtonPress:
-            self._pressed_button = button
-            if button:
-                button.setDown(True)
+            self._pressed_button = target
+            if isinstance(target, QtWidgets.QAbstractButton):
+                target.setDown(True)
             return True
 
         if event_type == QtCore.QEvent.MouseButtonRelease:
-            pressed_button = self._pressed_button
+            pressed = self._pressed_button
             self._pressed_button = None
-            if pressed_button:
-                pressed_button.setDown(False)
-                if pressed_button is button and pressed_button.isEnabled():
-                    pressed_button.click()
+            if isinstance(pressed, QtWidgets.QAbstractButton):
+                pressed.setDown(False)
+                if pressed is target and pressed.isEnabled():
+                    pressed.click()
+            elif pressed is not None and pressed is target:
+                # Not a button (e.g. a rich-text link label) -- replay a
+                # real press+release on it so Qt's own hit-testing (which
+                # anchor, if any, sits under the cursor) decides whether a
+                # link was actually clicked, instead of us reimplementing
+                # that here.
+                self._forward_mouse_click(pressed, event, global_pos)
             return True
 
         return True
@@ -819,10 +895,34 @@ class _TooltipMouseFilter(QtCore.QObject):
         return None
 
     @staticmethod
+    def _forward_mouse_click(widget, source_event, global_pos):
+        # Every real click on the tooltip is consumed above (return True)
+        # before Qt's normal per-widget dispatch ever runs, so a non-button
+        # interactive child (the link label) never gets its own mouse
+        # events. Deliver a synthetic press+release straight to the
+        # widget's own event() -- NOT QApplication.sendEvent(), which
+        # re-enters this same globally-installed filter and recurses
+        # infinitely -- to replay a normal click with no re-entrancy risk.
+        local_pos = widget.mapFromGlobal(global_pos)
+        button = source_event.button()
+        buttons = source_event.buttons()
+        modifiers = source_event.modifiers()
+        for event_type in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonRelease):
+            try:
+                forwarded = QtGui.QMouseEvent(
+                    event_type, QtCore.QPointF(local_pos), QtCore.QPointF(global_pos), button, buttons, modifiers
+                )
+            except TypeError:
+                forwarded = QtGui.QMouseEvent(event_type, local_pos, button, buttons, modifiers)
+            widget.event(forwarded)
+
+    @staticmethod
     def _tooltip_button_at(tooltip, global_pos):
         widget = tooltip.childAt(tooltip.mapFromGlobal(global_pos))
         while widget and widget is not tooltip:
-            if isinstance(widget, QtWidgets.QToolButton):
+            if isinstance(widget, QtWidgets.QAbstractButton):
+                return widget
+            if isinstance(widget, QtWidgets.QLabel) and bool(widget.textInteractionFlags() & QtCore.Qt.LinksAccessibleByMouse):
                 return widget
             widget = widget.parentWidget()
         return None

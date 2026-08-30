@@ -1,0 +1,51 @@
+#include "Common.ogsfh"
+
+uniform texture2D gSourceTex : SourceTexture;
+uniform sampler2D gSourceSamp = sampler_state { Texture = <gSourceTex>; };
+uniform texture2D gSourceTex2 : SourceTexture2;
+uniform sampler2D gSourceSamp2 = sampler_state { Texture = <gSourceTex2>; };
+uniform texture2D gStencilTex : SourceTexture3;
+uniform sampler2D gStencilSamp = sampler_state { Texture = <gStencilTex>; };
+uniform float gBlendSrc = 0.5f;
+uniform vec4 gUVTransform : RelativeViewportDimensions;
+uniform vec4 gPixelTransform : ViewportPixelSize;
+uniform vec4 gTint = {1.0, 1.0, 1.0, 1.0};
+uniform int gOutlineWidth = 3;
+uniform int gType = 1;
+uniform int gDrawBehind = 1;
+
+GLSLShader PS_Blend
+{
+    void main()
+    {
+        vec2 uv = VSUV * gUVTransform.zw + gUVTransform.xy;
+        vec4 scene = texture2D(gSourceSamp, uv);
+        vec4 onion = texture2D(gSourceSamp2, uv);
+        vec4 stencil = texture2D(gStencilSamp, uv);
+        float visible = mix(1.0, 1.0 - stencil.a, float(gDrawBehind));
+        vec4 layer = onion * gTint;
+        float alpha = onion.a;
+        if (gType == 1) {
+            layer = vec4(gTint.rgb * 0.75, onion.a);
+        } else if (gType == 2) {
+            vec2 px = vec2(float(gOutlineWidth)) / gPixelTransform.xy;
+            float around = 0.0;
+            around += texture2D(gSourceSamp2, uv + vec2(px.x, 0.0)).a;
+            around += texture2D(gSourceSamp2, uv - vec2(px.x, 0.0)).a;
+            around += texture2D(gSourceSamp2, uv + vec2(0.0, px.y)).a;
+            around += texture2D(gSourceSamp2, uv - vec2(0.0, px.y)).a;
+            alpha = (1.0 - onion.a) * clamp(around, 0.0, 1.0);
+            layer = vec4(gTint.rgb, alpha);
+        }
+        colorOut = mix(scene, layer, gBlendSrc * alpha * visible);
+    }
+}
+
+technique Main
+{
+    pass p0
+    {
+        VertexShader (in VS_INPUT_ScreenQuad, out VS_TO_PS_ScreenQuad) = VS_ScreenQuad;
+        PixelShader (in VS_TO_PS_ScreenQuad, out pixelOut) = PS_Blend;
+    }
+}

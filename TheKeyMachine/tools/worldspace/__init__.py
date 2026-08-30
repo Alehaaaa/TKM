@@ -15,7 +15,7 @@ class WorldspaceToolObject(ToolObject):
     DOC_URL = "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/copy-paste-animation#worldspace-tools"
 
     TOOLS = {
-        "ws_copy_frame": {
+        "copy_worldspace": {
             "type": "tool",
             "label": "Copy World Space",
             "icon": "worldspace_copy_frame",
@@ -66,7 +66,7 @@ class WorldspaceToolObject(ToolObject):
             "color": COLORS.toolbar.green.hex,
             "items": [
                 {
-                    "id": "ws_copy_frame",
+                    "id": "copy_worldspace",
                     "shortcuts": [
                         {"id": "ws_paste_frame", "keys": [QtCore.Qt.Key_Control]},
                         {"id": "ws_copy_range", "keys": [QtCore.Qt.Key_Shift]},

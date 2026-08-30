@@ -13,7 +13,7 @@ class LinkObjectsToolObject(ToolObject):
     ORDER = 480
     DOC_URL = "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/link-objects"
     TOOLS = {
-        "link_copy": {
+        "copy_link": {
             "type": "tool",
             "label": "Copy Relationship",
             "icon": "link_relative",
@@ -71,7 +71,7 @@ class LinkObjectsToolObject(ToolObject):
         "color": COLORS.toolbar.green.hex,
         "items": [
             {
-                "id": "link_copy",
+                "id": "copy_link",
                 "shortcuts": [
                     {"id": "link_paste", "keys": [QtCore.Qt.Key_Control]},
                     {"id": "link_paste_range", "keys": [QtCore.Qt.Key_Shift]},

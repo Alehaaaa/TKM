@@ -88,7 +88,7 @@ def load_tooltips(package_file):
         payload = json.load(stream)
 
     from TheKeyMachine.data.movies import TooltipMedia
-    from TheKeyMachine.ui.tooltips import separator
+    from TheKeyMachine.ui.tooltips import separator, TooltipLink
 
     def _resolve(value):
         if isinstance(value, list):
@@ -100,6 +100,8 @@ def load_tooltips(package_file):
                     raise TypeError("Tooltip platform variants must be a mapping")
                 selected = variants.get(sys.platform, variants.get("default"))
                 return _resolve(selected)
+            if "link" in value and set(value) <= {"link", "label", "text"}:
+                return TooltipLink(value["link"], value.get("label"), value.get("text"))
             if set(value) == {"movie"}:
                 filename = value["movie"]
                 if not os.path.splitext(filename)[1]:
@@ -143,7 +145,7 @@ TOOLBAR_SECTION_IDS = {
         "animation_offset_tools", "movers_tools",
         "temp_pivot_tools", "follow_cam_tools", "temporal_controls_tools",
         "link_tools",
-        "attribute_tools", "selection_set_tools", "orbit_tools", "tracer_tools", "pause_viewport_tools",
+        "attribute_tools", "selection_set_tools", "orbit_tools", "viewport_tools",
         "global_tools",
         "graph_tools", "animation_tools", "animation_layer_tools", "custom_tools_section", "snapshot_rig_tools", "background_runner_tools",
         "animation_recovery_tools", "search_tools",
@@ -155,7 +157,7 @@ TOOLBAR_SECTION_IDS = {
         "pose_animation_section", "tangents",
         "animation_offset_tools",
         "link_tools",
-        "attribute_tools", "selection_set_tools", "orbit_tools", "pause_viewport_tools",
+        "attribute_tools", "selection_set_tools", "orbit_tools", "viewport_tools",
         "global_curve_tools", "graph_tools", "animation_tools", "custom_tools_section", "snapshot_rig_tools",
     ),
 }

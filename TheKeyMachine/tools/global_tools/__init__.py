@@ -8,7 +8,7 @@ TOOLTIPS = load_tooltips(__file__)
 class GlobalToolsToolObject(ToolObject):
     ORDER = 940
     TOOLS = {
-        "attribute_switcher_euler_filter": {
+        "smart_euler_filter": {
             "type": "setting",
             "label": "Auto Euler Filter",
             "menu_label": "Auto Euler Filter",
@@ -40,7 +40,7 @@ class GlobalToolsToolObject(ToolObject):
         "id": "global_tools",
         "label": "Global Tools",
         "items": [
-            {"id": "attribute_switcher_euler_filter"},
+            {"id": "smart_euler_filter"},
             {"id": "overshoot_sliders"},
             {"id": "custom_graph"},
         ],

@@ -184,9 +184,9 @@ class OrbitWindowMixin(FloatingToolWindowMixin):
             registry.get_tool("copy_pose"),
             registry.get_tool("paste_pose"),
             registry.get_tool("select_hierarchy"),
-            registry.get_tool("link_copy"),
+            registry.get_tool("copy_link"),
             registry.get_tool("temp_pivot"),
-            registry.get_tool("ws_copy_frame", label="Copy World Space Animation"),
+            registry.get_tool("copy_worldspace", label="Copy World Space Animation"),
             registry.get_tool("ws_paste_frame", label="Paste World Space Current Frame"),
         ]
 

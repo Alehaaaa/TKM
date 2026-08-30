@@ -263,9 +263,9 @@ class TracerToolObject(ToolObject):
         },
     }
     SECTION = {
-        "id": "tracer_tools",
-        "i18n_key": "create_tracer",
-        "label": "Tracer",
+        "id": "viewport_tools",
+        "i18n_key": "viewport_tools",
+        "label": "Viewport Tools",
         "color": COLORS.toolbar.red.hex,
         "items": [
             {
@@ -307,5 +307,25 @@ class TracerToolObject(ToolObject):
             {"id": "tracer_blue"},
             "separator",
             {"id": "tracer_remove"},
+            "separator",
+            {
+                "id": "onion_skin",
+                "shortcuts": [
+                    {"id": "onion_skin_toggle", "keys": [QtCore.Qt.Key_Control]},
+                    {"id": "onion_skin_add_selection", "keys": [QtCore.Qt.Key_Shift]},
+                    {"id": "onion_skin_clear_buffer", "keys": [QtCore.Qt.Key_Alt]},
+                ],
+            },
+            {"id": "onion_skin_toggle"},
+            {"id": "onion_skin_add_selection"},
+            {"id": "onion_skin_clear_buffer"},
+            "separator",
+            {
+                "id": "pause_viewport",
+                "shortcuts": [
+                    {"id": "auto_pause_viewport", "keys": [QtCore.Qt.Key_Alt]},
+                ],
+            },
+            {"id": "auto_pause_viewport"},
         ],
     }

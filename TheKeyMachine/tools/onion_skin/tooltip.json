@@ -1,0 +1,25 @@
+{
+  "onion_skin": [
+    "Open the Onion Skin manager when you want to compare a pose with nearby frames without leaving the camera view.",
+    "Add the character meshes, enable onion skins, then scrub through the poses you want to compare.",
+    "Right-click for a quick change between shaded, shape, and outline views.",
+    {"separator": true},
+    {
+      "link": "https://github.com/Viele/onionSkinRenderer",
+      "label": "onionSkinRenderer",
+      "text": "Based on the original tool onionSkinRenderer by Christoph Lendenfeld."
+    }
+  ],
+  "toggle": ["Show onion skins in the viewport while checking spacing, silhouettes, and arcs."],
+  "add_selection": ["Add the selected character meshes or props to the onion skin view."],
+  "clear_buffer": ["Refresh the onion images after changing a pose, camera, material, or display setting."],
+  "draw_behind": ["Keep old and upcoming poses behind the current pose so the active silhouette stays easy to read."],
+  "auto_clear": ["Refresh stored onion images automatically after moving the camera."],
+  "stay_on_top": ["Keep the manager above Maya while comparing and adjusting poses."],
+  "neighbor_keys": ["Use keyed poses when checking timing during blocking and polish."],
+  "ghost_inbetweens": ["Add faint samples between the current pose and the nearest key ghosts, to check spacing without keying every frame."],
+  "auto_update": ["Automatically rebake ghosts after a pose changes instead of waiting for you to scrub back over that frame. See Performance for how eagerly it catches up."],
+  "past_color": ["Choose the color used for poses before the current frame."],
+  "future_color": ["Choose the color used for poses after the current frame."],
+  "held_color": ["Choose the color used for poses held at a specific frame."]
+}

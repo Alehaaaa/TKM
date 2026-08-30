@@ -1788,7 +1788,7 @@ class QFlatBugReportDialog(QFlatDialog):
         # Avoid adjustSize() here: it tends to make this dialog overly tall based on content hints.
         self.resize(DPI(680), DPI(500))
         parent = self.parentWidget() or get_maya_qt()
-        if parent:
+        if isinstance(parent, QtWidgets.QWidget) and hasattr(parent, "frameGeometry"):
             geo = parent.frameGeometry()
             x = geo.x() + (geo.width() - self.width()) / 2
             y = geo.y() + (geo.height() - self.height()) / 2

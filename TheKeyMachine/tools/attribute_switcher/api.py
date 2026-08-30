@@ -96,16 +96,16 @@ def is_euler_filter_enabled():
     )
 
 
-def emit_attribute_switcher_euler_filter_state():
+def emit_smart_euler_filter_state():
     state = is_euler_filter_enabled()
     try:
         runtime.get_runtime_manager().eulerFilterChanged.emit(state)
     except Exception:
         pass
-    runtime.get_runtime_manager().set_tool_state("attribute_switcher_euler_filter", state)
+    runtime.get_runtime_manager().set_tool_state("smart_euler_filter", state)
 
 
-def bind_attribute_switcher_euler_filter_toggle(widget):
+def bind_smart_euler_filter_toggle(widget):
     if widget is None:
         return
     def _sync(enabled):
@@ -118,7 +118,7 @@ def bind_attribute_switcher_euler_filter_toggle(widget):
     toolCommon.set_checked_safely(widget, is_euler_filter_enabled())
     toolCommon.replace_tracked_connection(
         widget,
-        "_tkm_attribute_switcher_euler_filter_sync_relay",
+        "_tkm_smart_euler_filter_sync_relay",
         runtime.get_runtime_manager().eulerFilterChanged,
         _sync,
         parent=widget,
@@ -135,7 +135,7 @@ def set_euler_filter_enabled(enabled):
             dlg.euler_filter = bool(enabled)
         except Exception:
             pass
-    emit_attribute_switcher_euler_filter_state()
+    emit_smart_euler_filter_state()
 
 
 def get_attribute_switcher_window():

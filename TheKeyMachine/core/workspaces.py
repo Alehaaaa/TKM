@@ -21,23 +21,23 @@ WORKSPACE_SETTING   = "toolbar_workspace"
 MODIFIED_SETTING    = "toolbar_workspace_modified"
 
 _STANDARD_MAIN = frozenset([
-    "attribute_switcher_euler_filter", "align_objects", "animation_offset", "animation_tools",
+    "smart_euler_filter", "align_objects", "animation_offset", "animation_tools",
     "animation_recovery",
     "attribute_switcher", "background_runners", "bake_animation_1", "blend_connect_neighbors",
-    "copy_animation", "copy_pose", "create_tracer", "default_object_values",
+    "copy_animation", "copy_pose", "create_tracer", "onion_skin", "default_object_values",
     "delete_all_animation", "depth_mover", "follow_cam", "gimbal", "graph_extra_tools",
-    "isolate_master", "link_copy", "micro_move", "mirror", "nudge_left", "nudge_right", "nudge_value",
+    "isolate_master", "copy_link", "micro_move", "mirror", "nudge_left", "nudge_right", "nudge_value",
     "orbit", "remove_redundant_keys", "search_window", "select_rig_controls", "selection_sets", "selector",
     "share_keys", "snap", "tangent_auto", "tangent_bouncy", "tangent_linear", "tangent_spline", "tangent_step",
-    "temp_pivot", "tween_tweener", "ws_copy_frame"
+    "temp_pivot", "tween_tweener", "copy_worldspace"
 ])
 
 _STANDARD_GRAPH = frozenset([
     "align_objects", "animation_offset", "attribute_switcher", "bake_animation_1",
     "global_curve", "copy_animation", "copy_pose", "create_tracer", "custom_graph", "default_object_values", "follow_cam", "graph_extra_tools",
-    "isolate_master", "link_copy", "mirror", "nudge_left", "nudge_right", "nudge_value", "orbit", "overshoot_sliders", "pause_viewport", "select_opposite",
+    "isolate_master", "copy_link", "mirror", "nudge_left", "nudge_right", "nudge_value", "orbit", "overshoot_sliders", "pause_viewport", "select_opposite",
     "select_rig_controls", "selection_sets", "selector", "share_keys", "snap", "tangent_auto", "tangent_bouncy", "tangent_linear",
-    "tangent_spline", "tangent_step", "temp_pivot", "ws_copy_frame"
+    "tangent_spline", "tangent_step", "temp_pivot", "copy_worldspace"
 ])
 
 _MINIMAL_MAIN = frozenset([
@@ -48,15 +48,15 @@ _MINIMAL_MAIN = frozenset([
     "selector", "selection_sets",
     "copy_animation", "copy_pose",
     "mirror", "align_objects",
-    "link_copy", "ws_copy_frame",
+    "copy_link", "copy_worldspace",
     "attribute_switcher",
     "temp_pivot",
     "micro_move",
     "animation_offset",
-    "create_tracer",
+    "create_tracer", "onion_skin",
     "animation_tools",
     "animation_recovery",
-    "attribute_switcher_euler_filter",
+    "smart_euler_filter",
     "select_rig_controls",
     "background_runners",
     "search_window"
@@ -68,10 +68,10 @@ _PROFESSIONAL_MAIN = frozenset([
     "tween_tweener",
     "selector",
     "copy_pose", "copy_animation",
-    "link_copy", "ws_copy_frame",
+    "copy_link", "copy_worldspace",
     "temp_pivot",
     "animation_offset",
-    "create_tracer",
+    "create_tracer", "onion_skin",
     "animation_tools",
     "animation_recovery"
 ])
