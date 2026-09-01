@@ -21,22 +21,22 @@ WORKSPACE_SETTING   = "toolbar_workspace"
 MODIFIED_SETTING    = "toolbar_workspace_modified"
 
 _STANDARD_MAIN = frozenset([
-    "smart_euler_filter", "align_objects", "animation_offset", "animation_tools",
+    "align_objects", "animation_offset",
     "animation_recovery",
     "attribute_switcher", "background_runners", "bake_animation_1", "blend_connect_neighbors",
-    "copy_animation", "copy_pose", "create_tracer", "onion_skin", "default_object_values",
-    "delete_all_animation", "depth_mover", "follow_cam", "gimbal", "graph_extra_tools",
+    "copy_animation", "copy_pose", "create_tracer", "onion_skin", "custom_tools", "default_object_values",
+    "delete_all_animation", "depth_mover", "follow_cam", "gimbal",
     "isolate_master", "copy_link", "micro_move", "mirror", "nudge_left", "nudge_right", "nudge_value",
-    "orbit", "remove_redundant_keys", "search_window", "select_rig_controls", "selection_sets", "selector",
-    "share_keys", "snap", "tangent_auto", "tangent_bouncy", "tangent_linear", "tangent_spline", "tangent_step",
-    "temp_pivot", "tween_tweener", "copy_worldspace"
+    "orbit", "pause_viewport", "remove_redundant_keys", "remove_static_anim_curves", "search_window", "select_rig_controls", "selection_sets", "selector",
+    "share_keys", "snap", "tangent_auto", "tangent_bouncy", "tangent_spline", "tangent_step",
+    "snapshot_rig", "temp_pivot", "tween_tweener", "copy_worldspace"
 ])
 
 _STANDARD_GRAPH = frozenset([
     "align_objects", "animation_offset", "attribute_switcher", "bake_animation_1",
-    "global_curve", "copy_animation", "copy_pose", "create_tracer", "custom_graph", "default_object_values", "follow_cam", "graph_extra_tools",
+    "global_curve", "copy_animation", "copy_pose", "create_tracer", "custom_graph", "default_object_values", "follow_cam",
     "isolate_master", "copy_link", "mirror", "nudge_left", "nudge_right", "nudge_value", "orbit", "overshoot_sliders", "pause_viewport", "select_opposite",
-    "select_rig_controls", "selection_sets", "selector", "share_keys", "snap", "tangent_auto", "tangent_bouncy", "tangent_linear",
+    "remove_static_anim_curves", "select_rig_controls", "selection_sets", "selector", "share_keys", "snap", "snapshot_rig", "tangent_auto", "tangent_bouncy",
     "tangent_spline", "tangent_step", "temp_pivot", "copy_worldspace"
 ])
 

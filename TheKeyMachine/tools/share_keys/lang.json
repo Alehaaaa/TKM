@@ -1,4 +1,14 @@
 {
+    "bake_animation_custom_apply": {
+        "en": {"label": "Bake Custom Interval", "tooltip": ["Bake using a custom positive frame interval."]},
+        "es": {"label": "Horneado con Intervalo Personalizado", "tooltip": ["Hornea usando un intervalo de fotogramas personalizado."]},
+        "fr": {"label": "Conversion avec Intervalle Personnalisé", "tooltip": ["Convertit avec un intervalle d'images personnalisé."]},
+        "ca": {"label": "Horneig amb Interval Personalitzat", "tooltip": ["Hornea usant un interval de fotogrames personalitzat"]},
+        "zh": {"label": "自定义间隔烘焙", "tooltip": ["使用自定义的正整数帧间隔进行烘焙"]},
+        "ja": {"label": "カスタム間隔でベイク", "tooltip": ["カスタムの正のフレーム間隔を使ってベイクします"]},
+        "ko": {"label": "사용자 지정 간격 베이크", "tooltip": ["사용자 지정 양의 프레임 간격을 사용하여 베이크합니다"]},
+        "ar": {"label": "خَبز بفاصل مخصص", "tooltip": ["الخبز باستخدام فاصل إطارات موجب مخصص"]}
+    },
     "share_keys": {
         "en": {
             "label": "Share Keys",

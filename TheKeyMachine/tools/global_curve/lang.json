@@ -1,4 +1,14 @@
 {
+  "global_curve_tools": {
+    "en": {"label": "Global Curve"},
+    "es": {"label": "Curva Global"},
+    "fr": {"label": "Courbe Globale"},
+    "ca": {"label": "Corba Global"},
+    "zh": {"label": "全局曲线"},
+    "ja": {"label": "グローバルカーブ"},
+    "ko": {"label": "글로벌 커브"},
+    "ar": {"label": "المنحنى العام"}
+  },
   "global_curve": {
     "en": {"label": "Global Curve", "tooltip": ["Create or remove a live Global Curve for selected or visible Graph Editor curves.", "Edit it to reshape every captured curve together."]},
     "es": {"label": "Curva Global", "tooltip": ["Crea o elimina una Curva Global activa para las curvas seleccionadas o visibles.", "Edítala para modificar juntas todas las curvas capturadas."]},

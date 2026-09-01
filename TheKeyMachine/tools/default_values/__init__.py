@@ -13,13 +13,24 @@ class DefaultValuesToolObject(ToolObject):
     OPERATION = {"capture_animation_context": True}
     DOC_URL = "https://thekeymachine.gitbook.io/base/the-toolbar/animation-tools/default-to-default"
     TOOLS = {
-        "default_object_values": {"type": "tool", "label": "Default Pose", "icon": "default", "callback": api.apply_all, "tooltip": TOOLTIPS["all"]},
+        "default_object_values": {
+            "type": "tool", "label": "Default Pose", "icon": "default",
+            "callback": api.apply_all, "tooltip": TOOLTIPS["all"],
+            "menu": {
+                "label": "Default Pose",
+                "icon": "default",
+                "items": [
+                    "default_translations", "default_rotations", "default_scales", "default_trs",
+                    "separator", "snapshot_default", "separator", "default_help",
+                ],
+            },
+        },
         "default_translations": {"type": "tool", "label": "Default Translations", "text": "RT", "icon": "default", "callback": api.apply_translations, "tooltip": TOOLTIPS["translations"]},
         "default_rotations": {"type": "tool", "label": "Default Rotations", "text": "RR", "icon": "default", "callback": api.apply_rotations, "tooltip": TOOLTIPS["rotations"]},
         "default_scales": {"type": "tool", "label": "Default Scales", "text": "RS", "icon": "default", "callback": api.apply_scales, "tooltip": TOOLTIPS["scales"]},
         "default_trs": {"type": "tool", "label": "Default Translation Rotation Scale", "text": "RTRS", "icon": "default", "callback": api.apply_trs, "tooltip": TOOLTIPS["trs"]},
-        "default_restore_defaults": {"type": "tool", "label": "Remove Saved Defaults for Selected", "icon": "default", "callback": api.remove_selected, "tooltip": TOOLTIPS["remove"]},
-        "default_clear_all": {"type": "tool", "label": "Clear All Saved Defaults", "icon": "default", "callback": api.clear_all, "tooltip": TOOLTIPS["clear"]},
+        "default_restore_defaults": {"type": "tool", "label": "Remove Saved Defaults for Selected", "icon": "default", "callback": api.remove_selected, "tooltip": TOOLTIPS["remove"], "pinnable": False},
+        "default_clear_all": {"type": "tool", "label": "Clear All Saved Defaults", "icon": "default", "callback": api.clear_all, "tooltip": TOOLTIPS["clear"], "pinnable": False},
         "default_help": {"type": "tool", "label": "Help", "icon": "help", "callback": lambda: general.open_url(DefaultValuesToolObject.DOC_URL), "tooltip": TOOLTIPS["help"], "pinnable": False},
     }
     SECTION = {
@@ -33,8 +44,6 @@ class DefaultValuesToolObject(ToolObject):
                 {"id": "snapshot_default", "keys": [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
             ]},
             {"id": "default_translations"}, {"id": "default_rotations"},
-            {"id": "default_scales"}, {"id": "default_trs"}, "separator",
-            {"id": "snapshot_default", "pinnable": False}, {"id": "default_restore_defaults"},
-            "separator", {"id": "default_clear_all"}, "separator", {"id": "default_help"},
+            {"id": "default_scales"}, {"id": "default_trs"},
         ],
     }

@@ -1,4 +1,14 @@
 {
+    "animation_recovery_restore": {
+        "en": {"label": "Recover Animation"},
+        "es": {"label": "Recuperar Animación"},
+        "fr": {"label": "Récupérer l'Animation"},
+        "ca": {"label": "Recuperar Animació"},
+        "zh": {"label": "恢复动画"},
+        "ja": {"label": "アニメーションを復元"},
+        "ko": {"label": "애니메이션 복구"},
+        "ar": {"label": "استعادة الحركة"}
+    },
     "animation_recovery": {
         "en": {
             "label": "Animation Recovery",

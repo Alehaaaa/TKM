@@ -17,6 +17,16 @@ class MirrorToolObject(ToolObject):
         "select_opposite": {
             "type": "tool", "label": "Select Opposite", "icon": "opposite_select",
             "callback": api.select_opposite, "tooltip": TOOLTIPS["select_opposite"],
+            "menu": {
+                "label": "Select Opposite",
+                "icon": "opposite_select",
+                "items": [
+                    "opposite_add",
+                    "opposite_copy",
+                    "separator",
+                    "snapshot_opposite",
+                ],
+            },
         },
         "opposite_add": {
             "type": "tool", "label": "Add Opposite", "icon": "opposite_add",
@@ -43,6 +53,8 @@ class MirrorToolObject(ToolObject):
                     "mirror_add_invert",
                     "mirror_add_keep",
                     "mirror_remove_exc",
+                    "separator",
+                    "snapshot_mirror",
                     "separator",
                     "mirror_help",
                 ],
@@ -85,11 +97,23 @@ class MirrorToolObject(ToolObject):
             "label": "Opposite",
             "color": COLORS.toolbar.green.hex,
             "items": [
-                {"id": "select_opposite"},
+                {
+                    "id": "select_opposite",
+                    "shortcuts": [
+                        {"id": "opposite_add", "keys": [QtCore.Qt.Key_Shift]},
+                        {"id": "opposite_copy", "keys": [QtCore.Qt.Key_Alt]},
+                        {
+                            "id": "snapshot_opposite",
+                            "keys": [
+                                QtCore.Qt.Key_Alt,
+                                QtCore.Qt.Key_Control,
+                                QtCore.Qt.Key_Shift,
+                            ],
+                        },
+                    ],
+                },
                 {"id": "opposite_add"},
                 {"id": "opposite_copy"},
-                "separator",
-                {"id": "snapshot_opposite", "pinnable": False},
             ],
         },
         {
@@ -103,6 +127,14 @@ class MirrorToolObject(ToolObject):
                         {"id": "mirror_add_invert", "keys": [QtCore.Qt.Key_Shift]},
                         {"id": "mirror_add_keep", "keys": [QtCore.Qt.Key_Control]},
                         {"id": "mirror_remove_exc", "keys": [QtCore.Qt.Key_Control, QtCore.Qt.Key_Shift]},
+                        {
+                            "id": "snapshot_mirror",
+                            "keys": [
+                                QtCore.Qt.Key_Alt,
+                                QtCore.Qt.Key_Control,
+                                QtCore.Qt.Key_Shift,
+                            ],
+                        },
                     ],
                 },
                 {"id": "mirror_to_right"},
@@ -112,10 +144,6 @@ class MirrorToolObject(ToolObject):
                 {"id": "mirror_add_invert"},
                 {"id": "mirror_add_keep"},
                 {"id": "mirror_remove_exc"},
-                "separator",
-                {"id": "snapshot_mirror", "pinnable": False},
-                "separator",
-                {"id": "mirror_help"},
             ],
         },
     )

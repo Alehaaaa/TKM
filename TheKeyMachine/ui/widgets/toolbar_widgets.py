@@ -197,12 +197,16 @@ def _refresh_connect_entry_section(section, kind):
         QtCore.QTimer.singleShot(0, parent._update_height)
 
 
-def add_connect_entries_section(new_section_fn, toolbar_id):
+def add_connect_entries_section(new_section_fn, toolbar_id, color=None):
     from TheKeyMachine.tools import registry
+
+    kwargs = {}
+    if color is not None:
+        kwargs["color"] = color
 
     for kind in connect_entries.SOURCES:
         spec = connect_entries.source_spec(kind)
-        section = new_section_fn()
+        section = new_section_fn(**kwargs)
         namespace = spec["namespace"]
         if toolbar_id != "main":
             namespace = "{}_{}".format(namespace, toolbar_id)
@@ -724,7 +728,7 @@ def _populate_toolbar_from_layout(
         sec_id = section_def["id"]
 
         if section_def.get("type") == "connect_entries":
-            add_connect_entries_section(new_section_fn, toolbar_id)
+            add_connect_entries_section(new_section_fn, toolbar_id, color=section_def.get("color"))
             continue
 
         if section_def.get("type") == "slider":

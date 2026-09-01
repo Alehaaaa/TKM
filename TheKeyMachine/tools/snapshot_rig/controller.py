@@ -186,3 +186,76 @@ def snapshot_opposite(*args):
 
 def snapshot_mirror(*args):
     return _snapshot_controls(("mirror",), tool_id="snapshot_mirror", label="Snapshot Mirror")
+
+
+def _remove_selected(kinds, completion_message, tool_operation=None):
+    selected_controls = list(animation.current_selection_snapshot().objects)
+    if not selected_controls:
+        return wutil.make_inViewMessage("Select at least one object")
+
+    groups = rig_snapshot.group_controls_by_rig(selected_controls)
+    if not groups:
+        return wutil.make_inViewMessage(
+            "Selected controls are not part of a recognizable rig"
+        )
+
+    operation = toolCommon.require_tool_operation(tool_operation)
+    control_count = sum(len(group["controls"]) for group in groups.values())
+    operation.set_total(control_count * len(kinds))
+    for rig_id, group in groups.items():
+        control_keys = [
+            rig_snapshot.control_key(control) for control in group["controls"]
+        ]
+        for kind in kinds:
+            if operation.cancelled:
+                return
+            rig_snapshot.remove_control_entries(rig_id, kind, control_keys)
+            for _control_key in control_keys:
+                operation.step()
+    wutil.make_inViewMessage(completion_message)
+
+
+def _clear_all(kinds, empty_message, completion_message, tool_operation=None):
+    rig_ids = rig_snapshot.list_rig_ids()
+    if not rig_ids:
+        return wutil.make_inViewMessage(empty_message)
+
+    operation = toolCommon.require_tool_operation(tool_operation)
+    operation.set_total(len(rig_ids) * len(kinds))
+    for rig_id in rig_ids:
+        for kind in kinds:
+            if operation.cancelled:
+                return
+            rig_snapshot.clear_section(rig_id, kind)
+            operation.step()
+    wutil.make_inViewMessage(completion_message)
+
+
+def remove_selected_opposites(*_args, tool_operation=None, **_kwargs):
+    return _remove_selected(
+        ("opposite",), "Opposite snapshots removed for the selection", tool_operation,
+    )
+
+
+def clear_all_opposites(*_args, tool_operation=None, **_kwargs):
+    return _clear_all(
+        ("opposite",),
+        "No saved opposite snapshots found",
+        "All saved opposite snapshots cleared",
+        tool_operation,
+    )
+
+
+def remove_selected_mirrors(*_args, tool_operation=None, **_kwargs):
+    return _remove_selected(
+        ("mirror",), "Mirror snapshots removed for the selection", tool_operation,
+    )
+
+
+def clear_all_mirrors(*_args, tool_operation=None, **_kwargs):
+    return _clear_all(
+        ("mirror",),
+        "No saved mirror snapshots found",
+        "All saved mirror snapshots cleared",
+        tool_operation,
+    )

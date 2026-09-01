@@ -342,7 +342,7 @@ def _iter_leaf_tools(items):
     """Flatten a resolved section's ``items`` down to actual tool dicts.
 
     Most sections list their tools flat. ``link_tools`` (labeled
-    "Relationships & Worldspace" on the toolbar) instead nests two whole
+    "Relationships and Worldspace" on the toolbar) instead nests two whole
     sub-sections via ``{"section": ...}`` refs, which ``registry.get_tool_section``
     resolves into ``{"type": "group", "items": [...]}`` wrappers -- the real
     tool dicts are one level deeper, under that wrapper's own ``"items"``.

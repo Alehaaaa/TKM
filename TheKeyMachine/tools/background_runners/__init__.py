@@ -1,4 +1,5 @@
 from TheKeyMachine.tools.registry import ToolObject, load_tooltips
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.background_runners import api
 
 
@@ -52,5 +53,6 @@ class BackgroundRunnersToolObject(ToolObject):
     SECTION = {
         "id": "background_runner_tools", "i18n_key": "background_runners",
         "label": "Background Runners",
+        "color": COLORS.toolbar.light_gray.hex,
         "items": [{"id": "background_runners"}],
     }

@@ -1,4 +1,14 @@
 {
+    "install_update": {
+        "en": {"label": "Install Update"},
+        "es": {"label": "Instalar Actualización"},
+        "fr": {"label": "Installer la Mise à Jour"},
+        "ca": {"label": "Instal·lar Actualització"},
+        "zh": {"label": "安装更新"},
+        "ja": {"label": "アップデートをインストール"},
+        "ko": {"label": "업데이트 설치"},
+        "ar": {"label": "تثبيت التحديث"}
+    },
     "TKM": {
         "en": {
             "label": "TheKeyMachine",

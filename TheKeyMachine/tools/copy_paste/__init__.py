@@ -111,8 +111,8 @@ class CopyPasteToolObject(ToolObject):
 
     SECTION = {
         "id": "pose_animation_section",
-        "label": "Pose & Animation",
-        "color": COLORS.toolbar.green.hex,
+        "label": "Pose and Animation",
+        "color": COLORS.toolbar.violet.hex,
         "items": [
             {
                 "id": "copy_pose",

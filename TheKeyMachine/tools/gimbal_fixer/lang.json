@@ -1,4 +1,14 @@
 {
+    "gimbal_convert_rotation_order": {
+        "en": {"label": "Convert Rotation Order"},
+        "es": {"label": "Convertir Orden de Rotación"},
+        "fr": {"label": "Convertir l'Ordre de Rotation"},
+        "ca": {"label": "Convertir Ordre de Rotació"},
+        "zh": {"label": "转换旋转顺序"},
+        "ja": {"label": "回転順序を変換"},
+        "ko": {"label": "회전 순서 변환"},
+        "ar": {"label": "تحويل ترتيب الدوران"}
+    },
     "gimbal": {
         "en": {
             "label": "Gimbal Fixer",

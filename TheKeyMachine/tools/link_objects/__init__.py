@@ -58,7 +58,7 @@ class LinkObjectsToolObject(ToolObject):
     }
     SECTION = {
         "id": "link_tools",
-        "label": "Relationships & Worldspace",
+        "label": "Relationships and Worldspace",
         "color": COLORS.toolbar.green.hex,
         "items": [
             {"section": "relationship_tools"},

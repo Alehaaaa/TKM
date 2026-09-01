@@ -3,13 +3,474 @@
     "en": {
       "label": "Onion Skin",
       "tooltip": [
-        "Open the manager when you want to compare a pose with nearby frames without leaving the camera view.",
+        "Open the Onion Skin manager when you want to compare a pose with nearby frames without leaving the camera view.",
         "Add the character meshes, enable onion skins, then scrub through the poses you want to compare.",
-        "Right-click to choose the pose style, colors, sampling, and viewport behavior."
+        "Right-click for a quick change between shaded, shape, and outline views."
+      ]
+    },
+    "es": {
+      "label": "Piel de Cebolla",
+      "tooltip": [
+        "Abre el gestor de Piel de Cebolla cuando quieras comparar una pose con fotogramas cercanos sin salir de la vista de cámara.",
+        "Añade las mallas del personaje, activa la piel de cebolla y recorre las poses que quieras comparar.",
+        "Haz clic derecho para cambiar rápidamente entre las vistas sombreada, de forma y de contorno."
+      ]
+    },
+    "fr": {
+      "label": "Pelure d'Oignon",
+      "tooltip": [
+        "Ouvrez le gestionnaire de Pelure d'Oignon pour comparer une pose avec les images voisines sans quitter la vue caméra.",
+        "Ajoutez les maillages du personnage, activez la pelure d'oignon, puis parcourez les poses à comparer.",
+        "Clic droit pour basculer rapidement entre les vues ombrée, silhouette et contour."
+      ]
+    },
+    "ca": {
+      "label": "Pell de Ceba",
+      "tooltip": [
+        "Obre el gestor de Pell de Ceba quan vulguis comparar una pose amb fotogrames propers sense sortir de la vista de càmera.",
+        "Afegeix les malles del personatge, activa la pell de ceba i recorre les poses que vulguis comparar.",
+        "Fes clic dret per canviar ràpidament entre les vistes ombrejada, de forma i de contorn."
+      ]
+    },
+    "zh": {
+      "label": "洋葱皮",
+      "tooltip": [
+        "需要在不离开摄影机视图的情况下，将某个姿态与邻近帧比较时，打开洋葱皮管理器。",
+        "添加角色网格、启用洋葱皮，然后拖动时间滑块浏览想要比较的姿态。",
+        "右键点击可在着色、形状和轮廓视图之间快速切换。"
+      ]
+    },
+    "ja": {
+      "label": "オニオンスキン",
+      "tooltip": [
+        "カメラビューを離れずに近くのフレームとポーズを比較したいときは、オニオンスキンマネージャーを開きます。",
+        "キャラクターのメッシュを追加してオニオンスキンを有効にし、比較したいポーズをスクラブして確認します。",
+        "右クリックでシェーディング表示、シェイプ表示、アウトライン表示をすばやく切り替えられます。"
+      ]
+    },
+    "ko": {
+      "label": "어니언 스킨",
+      "tooltip": [
+        "카메라 뷰를 벗어나지 않고 가까운 프레임과 포즈를 비교하고 싶을 때 어니언 스킨 매니저를 엽니다.",
+        "캐릭터 메시를 추가하고 어니언 스킨을 활성화한 다음, 비교하고 싶은 포즈를 스크러빙합니다.",
+        "우클릭하면 셰이딩, 셰이프, 아웃라인 보기를 빠르게 전환할 수 있습니다."
+      ]
+    },
+    "ar": {
+      "label": "طبقة البصل",
+      "tooltip": [
+        "افتح مدير طبقة البصل عندما تريد مقارنة وضعية بالإطارات القريبة دون مغادرة منظور الكاميرا.",
+        "أضف شبكات الشخصية، فعّل طبقة البصل، ثم تنقّل بين الوضعيات التي تريد مقارنتها.",
+        "انقر بزر الفأرة الأيمن للتبديل بسرعة بين العرض المظلل وعرض الشكل وعرض المخطط."
       ]
     }
   },
   "onion_skin_toggle": {
-    "en": {"label": "Enable Onion Skin", "tooltip": ["Show nearby poses while checking spacing, silhouettes, and arcs."]}
+    "en": {
+      "label": "Enable Onion Skin",
+      "tooltip": ["Show onion skins in the viewport while checking spacing, silhouettes, and arcs."]
+    },
+    "es": {
+      "label": "Activar Piel de Cebolla",
+      "tooltip": ["Muestra la piel de cebolla en el viewport al revisar el espaciado, las siluetas y los arcos."]
+    },
+    "fr": {
+      "label": "Activer la Pelure d'Oignon",
+      "tooltip": ["Affiche la pelure d'oignon dans la vue 3D pour vérifier l'espacement, les silhouettes et les arcs."]
+    },
+    "ca": {
+      "label": "Activar Pell de Ceba",
+      "tooltip": ["Mostra la pell de ceba al viewport en revisar l'espaiat, les siluetes i els arcs."]
+    },
+    "zh": {
+      "label": "启用洋葱皮",
+      "tooltip": ["在视口中显示洋葱皮，便于检查间距、轮廓和运动弧线。"]
+    },
+    "ja": {
+      "label": "オニオンスキンを有効化",
+      "tooltip": ["間隔、シルエット、アークを確認する際にビューポートにオニオンスキンを表示します。"]
+    },
+    "ko": {
+      "label": "어니언 스킨 활성화",
+      "tooltip": ["간격, 실루엣, 아크를 확인하는 동안 뷰포트에 어니언 스킨을 표시합니다."]
+    },
+    "ar": {
+      "label": "تفعيل طبقة البصل",
+      "tooltip": ["إظهار طبقة البصل في منظور العرض أثناء فحص التباعد والصور الظلية والأقواس."]
+    }
+  },
+  "onion_skin_add_selection": {
+    "en": {
+      "label": "Add Selected Objects",
+      "tooltip": ["Add the selected character meshes or props to the onion skin view."]
+    },
+    "es": {
+      "label": "Añadir Objetos Seleccionados",
+      "tooltip": ["Añade las mallas de personaje o props seleccionados a la vista de piel de cebolla."]
+    },
+    "fr": {
+      "label": "Ajouter les Objets Sélectionnés",
+      "tooltip": ["Ajoute les maillages de personnage ou accessoires sélectionnés à la vue de pelure d'oignon."]
+    },
+    "ca": {
+      "label": "Afegir Objectes Seleccionats",
+      "tooltip": ["Afegeix les malles de personatge o props seleccionats a la vista de pell de ceba."]
+    },
+    "zh": {
+      "label": "添加所选对象",
+      "tooltip": ["将所选的角色网格或道具添加到洋葱皮视图中。"]
+    },
+    "ja": {
+      "label": "選択したオブジェクトを追加",
+      "tooltip": ["選択したキャラクターメッシュまたはプロップをオニオンスキン表示に追加します。"]
+    },
+    "ko": {
+      "label": "선택한 오브젝트 추가",
+      "tooltip": ["선택한 캐릭터 메시 또는 소품을 어니언 스킨 뷰에 추가합니다."]
+    },
+    "ar": {
+      "label": "إضافة الكائنات المحددة",
+      "tooltip": ["إضافة شبكات الشخصية أو الأدوات المحددة إلى عرض طبقة البصل."]
+    }
+  },
+  "onion_skin_clear_buffer": {
+    "en": {
+      "label": "Clear Onion Buffer",
+      "tooltip": ["Refresh the onion images after changing a pose, camera, material, or display setting."]
+    },
+    "es": {
+      "label": "Limpiar Búfer de Piel de Cebolla",
+      "tooltip": ["Actualiza las imágenes de piel de cebolla tras cambiar una pose, la cámara, un material o un ajuste de visualización."]
+    },
+    "fr": {
+      "label": "Vider le Tampon d'Oignon",
+      "tooltip": ["Actualise les images de pelure d'oignon après un changement de pose, de caméra, de matériau ou d'affichage."]
+    },
+    "ca": {
+      "label": "Netejar Búfer de Pell de Ceba",
+      "tooltip": ["Actualitza les imatges de pell de ceba després de canviar una pose, la càmera, un material o un ajust de visualització."]
+    },
+    "zh": {
+      "label": "清空洋葱皮缓冲区",
+      "tooltip": ["在更改姿态、摄影机、材质或显示设置后刷新洋葱皮图像。"]
+    },
+    "ja": {
+      "label": "オニオンバッファをクリア",
+      "tooltip": ["ポーズ、カメラ、マテリアル、表示設定を変更した後にオニオン画像を更新します。"]
+    },
+    "ko": {
+      "label": "어니언 버퍼 지우기",
+      "tooltip": ["포즈, 카메라, 머티리얼 또는 표시 설정을 변경한 후 어니언 이미지를 새로고침합니다."]
+    },
+    "ar": {
+      "label": "مسح مخزن البصل المؤقت",
+      "tooltip": ["تحديث صور طبقة البصل بعد تغيير الوضعية أو الكاميرا أو المادة أو إعداد العرض."]
+    }
+  },
+  "onion_skin_draw_behind": {
+    "en": {
+      "label": "Draw Behind Current Pose",
+      "tooltip": ["Keep old and upcoming poses behind the current pose so the active silhouette stays easy to read."]
+    },
+    "es": {
+      "label": "Dibujar Detrás de la Pose Actual",
+      "tooltip": ["Mantiene las poses anteriores y siguientes detrás de la pose actual para que la silueta activa siga siendo fácil de leer."]
+    },
+    "fr": {
+      "label": "Dessiner Derrière la Pose Actuelle",
+      "tooltip": ["Garde les poses passées et à venir derrière la pose actuelle pour que la silhouette active reste facile à lire."]
+    },
+    "ca": {
+      "label": "Dibuixar Darrere de la Pose Actual",
+      "tooltip": ["Manté les poses anteriors i següents darrere de la pose actual perquè la silueta activa continuï sent fàcil de llegir."]
+    },
+    "zh": {
+      "label": "绘制在当前姿态之后",
+      "tooltip": ["将之前和之后的姿态绘制在当前姿态后面，使当前轮廓保持清晰易读。"]
+    },
+    "ja": {
+      "label": "現在のポーズの背後に描画",
+      "tooltip": ["過去と未来のポーズを現在のポーズの背後に表示し、現在のシルエットを見やすく保ちます。"]
+    },
+    "ko": {
+      "label": "현재 포즈 뒤에 그리기",
+      "tooltip": ["이전 포즈와 다음 포즈를 현재 포즈 뒤에 표시하여 현재 실루엣을 알아보기 쉽게 유지합니다."]
+    },
+    "ar": {
+      "label": "الرسم خلف الوضعية الحالية",
+      "tooltip": ["إبقاء الوضعيات السابقة واللاحقة خلف الوضعية الحالية حتى تبقى الصورة الظلية الحالية واضحة."]
+    }
+  },
+  "onion_skin_auto_clear": {
+    "en": {
+      "label": "Clear Buffer When Camera Moves",
+      "tooltip": ["Refresh stored onion images automatically after moving the camera."]
+    },
+    "es": {
+      "label": "Limpiar Búfer al Mover la Cámara",
+      "tooltip": ["Actualiza automáticamente las imágenes de piel de cebolla guardadas después de mover la cámara."]
+    },
+    "fr": {
+      "label": "Vider le Tampon au Déplacement de la Caméra",
+      "tooltip": ["Actualise automatiquement les images de pelure d'oignon enregistrées après un déplacement de la caméra."]
+    },
+    "ca": {
+      "label": "Netejar Búfer en Moure la Càmera",
+      "tooltip": ["Actualitza automàticament les imatges de pell de ceba desades després de moure la càmera."]
+    },
+    "zh": {
+      "label": "移动摄影机时清空缓冲区",
+      "tooltip": ["在移动摄影机后自动刷新已存储的洋葱皮图像。"]
+    },
+    "ja": {
+      "label": "カメラ移動時にバッファをクリア",
+      "tooltip": ["カメラを移動した後、保存されているオニオン画像を自動的に更新します。"]
+    },
+    "ko": {
+      "label": "카메라 이동 시 버퍼 지우기",
+      "tooltip": ["카메라를 이동한 후 저장된 어니언 이미지를 자동으로 새로고침합니다."]
+    },
+    "ar": {
+      "label": "مسح المخزن عند تحريك الكاميرا",
+      "tooltip": ["تحديث صور طبقة البصل المحفوظة تلقائيًا بعد تحريك الكاميرا."]
+    }
+  },
+  "onion_skin_stay_on_top": {
+    "en": {
+      "label": "Stay On Top",
+      "tooltip": ["Keep the manager above Maya while comparing and adjusting poses."]
+    },
+    "es": {
+      "label": "Mantener Siempre Visible",
+      "tooltip": ["Mantiene el gestor por encima de Maya mientras comparas y ajustas poses."]
+    },
+    "fr": {
+      "label": "Toujours au Premier Plan",
+      "tooltip": ["Garde le gestionnaire au-dessus de Maya pendant que vous comparez et ajustez les poses."]
+    },
+    "ca": {
+      "label": "Mantenir Sempre Visible",
+      "tooltip": ["Manté el gestor per sobre de Maya mentre compares i ajustes poses."]
+    },
+    "zh": {
+      "label": "始终置顶",
+      "tooltip": ["在比较和调整姿态时，让管理器始终显示在 Maya 上方。"]
+    },
+    "ja": {
+      "label": "常に最前面に表示",
+      "tooltip": ["ポーズの比較や調整を行う間、マネージャーをMayaより前面に保ちます。"]
+    },
+    "ko": {
+      "label": "항상 위에 표시",
+      "tooltip": ["포즈를 비교하고 조정하는 동안 매니저를 Maya 위에 유지합니다."]
+    },
+    "ar": {
+      "label": "البقاء في المقدمة",
+      "tooltip": ["إبقاء المدير فوق Maya أثناء مقارنة الوضعيات وضبطها."]
+    }
+  },
+  "onion_skin_neighbor_keys": {
+    "en": {
+      "label": "Use Neighboring Key Poses",
+      "tooltip": ["Use keyed poses when checking timing during blocking and polish."]
+    },
+    "es": {
+      "label": "Usar Poses Clave Vecinas",
+      "tooltip": ["Usa las poses clave al revisar el timing durante el blocking y el pulido."]
+    },
+    "fr": {
+      "label": "Utiliser les Poses Clés Voisines",
+      "tooltip": ["Utilise les poses clés lors de la vérification du timing pendant le blocking et le polish."]
+    },
+    "ca": {
+      "label": "Usar Poses Clau Veïnes",
+      "tooltip": ["Usa les poses clau en revisar el timing durant el blocking i el polit."]
+    },
+    "zh": {
+      "label": "使用相邻关键姿态",
+      "tooltip": ["在 blocking 和精修阶段检查节奏时，使用已设置关键帧的姿态。"]
+    },
+    "ja": {
+      "label": "隣接するキーポーズを使用",
+      "tooltip": ["ブロッキングやポリッシュの際にタイミングを確認するとき、キーが打たれたポーズを使用します。"]
+    },
+    "ko": {
+      "label": "인접한 키 포즈 사용",
+      "tooltip": ["블로킹과 폴리싱 단계에서 타이밍을 확인할 때 키가 설정된 포즈를 사용합니다."]
+    },
+    "ar": {
+      "label": "استخدام الوضعيات المفتاحية المجاورة",
+      "tooltip": ["استخدام الوضعيات المفتاحية عند فحص التوقيت أثناء البلوكينج والصقل."]
+    }
+  },
+  "onion_skin_ghost_inbetweens": {
+    "en": {
+      "label": "Ghost In-Betweens",
+      "tooltip": ["Add faint samples between the current pose and the nearest key ghosts, to check spacing without keying every frame."]
+    },
+    "es": {
+      "label": "Fantasmas de Intermedios",
+      "tooltip": ["Añade muestras tenues entre la pose actual y los fantasmas de las claves más cercanas, para revisar el espaciado sin animar cada fotograma."]
+    },
+    "fr": {
+      "label": "Fantômes des Intervalles",
+      "tooltip": ["Ajoute des échantillons discrets entre la pose actuelle et les fantômes des poses clés les plus proches, pour vérifier l'espacement sans animer chaque image."]
+    },
+    "ca": {
+      "label": "Fantasmes dels Intermedis",
+      "tooltip": ["Afegeix mostres tènues entre la pose actual i els fantasmes de les claus més properes, per revisar l'espaiat sense animar cada fotograma."]
+    },
+    "zh": {
+      "label": "显示中间帧重影",
+      "tooltip": ["在当前姿态与最近的关键帧重影之间添加淡淡的采样，无需为每一帧设置关键帧即可检查间距。"]
+    },
+    "ja": {
+      "label": "中割りのゴーストを表示",
+      "tooltip": ["現在のポーズと最も近いキーのゴーストの間に薄いサンプルを追加し、フレームごとにキーを打たずに間隔を確認できます。"]
+    },
+    "ko": {
+      "label": "인비트윈 고스트 표시",
+      "tooltip": ["현재 포즈와 가장 가까운 키 고스트 사이에 흐릿한 샘플을 추가하여, 모든 프레임에 키를 설정하지 않고도 간격을 확인할 수 있습니다."]
+    },
+    "ar": {
+      "label": "أشباح الوضعيات البينية",
+      "tooltip": ["إضافة عينات خافتة بين الوضعية الحالية وأقرب أشباح المفاتيح، لفحص التباعد دون وضع مفتاح لكل إطار."]
+    }
+  },
+  "onion_skin_auto_update": {
+    "en": {
+      "label": "Auto Update",
+      "tooltip": ["Automatically rebake ghosts after a pose changes instead of waiting for you to scrub back over that frame. See Performance for how eagerly it catches up."]
+    },
+    "es": {
+      "label": "Actualización Automática",
+      "tooltip": ["Recalcula los fantasmas automáticamente cuando cambia una pose, en lugar de esperar a que vuelvas a pasar por ese fotograma. Consulta Rendimiento para ajustar la rapidez con la que se actualiza."]
+    },
+    "fr": {
+      "label": "Mise à Jour Automatique",
+      "tooltip": ["Recalcule automatiquement les fantômes après un changement de pose, sans attendre que vous repassiez sur cette image. Voir Performance pour régler la rapidité de la mise à jour."]
+    },
+    "ca": {
+      "label": "Actualització Automàtica",
+      "tooltip": ["Recalcula els fantasmes automàticament quan canvia una pose, en lloc d'esperar que tornis a passar per aquell fotograma. Consulta Rendiment per ajustar la rapidesa de l'actualització."]
+    },
+    "zh": {
+      "label": "自动更新",
+      "tooltip": ["姿态发生变化后自动重新生成重影，而不必等待你再次拖回该帧。更新速度可在“性能”中调整。"]
+    },
+    "ja": {
+      "label": "自動更新",
+      "tooltip": ["そのフレームに戻ってスクラブするのを待たずに、ポーズが変更されると自動的にゴーストを再生成します。更新の追いつく速さは「パフォーマンス」で調整できます。"]
+    },
+    "ko": {
+      "label": "자동 업데이트",
+      "tooltip": ["해당 프레임으로 다시 스크러빙하기를 기다리지 않고, 포즈가 변경되면 고스트를 자동으로 다시 생성합니다. 업데이트 속도는 성능에서 조정할 수 있습니다."]
+    },
+    "ar": {
+      "label": "تحديث تلقائي",
+      "tooltip": ["إعادة إنشاء الأشباح تلقائيًا بعد تغيير الوضعية بدلًا من انتظار عودتك إلى ذلك الإطار. راجع الأداء لمعرفة مدى سرعة اللحاق بالتحديث."]
+    }
+  },
+  "onion_skin_past_color": {
+    "en": {
+      "label": "Past Pose Color",
+      "tooltip": ["Choose the color used for poses before the current frame."]
+    },
+    "es": {
+      "label": "Color de Poses Pasadas",
+      "tooltip": ["Elige el color usado para las poses anteriores al fotograma actual."]
+    },
+    "fr": {
+      "label": "Couleur des Poses Passées",
+      "tooltip": ["Choisissez la couleur utilisée pour les poses avant l'image actuelle."]
+    },
+    "ca": {
+      "label": "Color de Poses Passades",
+      "tooltip": ["Tria el color usat per a les poses anteriors al fotograma actual."]
+    },
+    "zh": {
+      "label": "过去姿态颜色",
+      "tooltip": ["选择当前帧之前姿态所使用的颜色。"]
+    },
+    "ja": {
+      "label": "過去ポーズの色",
+      "tooltip": ["現在のフレームより前のポーズに使用する色を選択します。"]
+    },
+    "ko": {
+      "label": "과거 포즈 색상",
+      "tooltip": ["현재 프레임 이전의 포즈에 사용할 색상을 선택합니다."]
+    },
+    "ar": {
+      "label": "لون الوضعيات السابقة",
+      "tooltip": ["اختيار اللون المستخدم للوضعيات السابقة للإطار الحالي."]
+    }
+  },
+  "onion_skin_future_color": {
+    "en": {
+      "label": "Future Pose Color",
+      "tooltip": ["Choose the color used for poses after the current frame."]
+    },
+    "es": {
+      "label": "Color de Poses Futuras",
+      "tooltip": ["Elige el color usado para las poses posteriores al fotograma actual."]
+    },
+    "fr": {
+      "label": "Couleur des Poses Futures",
+      "tooltip": ["Choisissez la couleur utilisée pour les poses après l'image actuelle."]
+    },
+    "ca": {
+      "label": "Color de Poses Futures",
+      "tooltip": ["Tria el color usat per a les poses posteriors al fotograma actual."]
+    },
+    "zh": {
+      "label": "未来姿态颜色",
+      "tooltip": ["选择当前帧之后姿态所使用的颜色。"]
+    },
+    "ja": {
+      "label": "未来ポーズの色",
+      "tooltip": ["現在のフレームより後のポーズに使用する色を選択します。"]
+    },
+    "ko": {
+      "label": "미래 포즈 색상",
+      "tooltip": ["현재 프레임 이후의 포즈에 사용할 색상을 선택합니다."]
+    },
+    "ar": {
+      "label": "لون الوضعيات القادمة",
+      "tooltip": ["اختيار اللون المستخدم للوضعيات التي تلي الإطار الحالي."]
+    }
+  },
+  "onion_skin_held_color": {
+    "en": {
+      "label": "Held Pose Color",
+      "tooltip": ["Choose the color used for poses held at a specific frame."]
+    },
+    "es": {
+      "label": "Color de Poses Mantenidas",
+      "tooltip": ["Elige el color usado para las poses mantenidas en un fotograma concreto."]
+    },
+    "fr": {
+      "label": "Couleur des Poses Tenues",
+      "tooltip": ["Choisissez la couleur utilisée pour les poses tenues à une image précise."]
+    },
+    "ca": {
+      "label": "Color de Poses Mantingudes",
+      "tooltip": ["Tria el color usat per a les poses mantingudes en un fotograma concret."]
+    },
+    "zh": {
+      "label": "定格姿态颜色",
+      "tooltip": ["选择在特定帧上保持不变的姿态所使用的颜色。"]
+    },
+    "ja": {
+      "label": "ホールドポーズの色",
+      "tooltip": ["特定のフレームで保持されるポーズに使用する色を選択します。"]
+    },
+    "ko": {
+      "label": "홀드 포즈 색상",
+      "tooltip": ["특정 프레임에서 유지되는 포즈에 사용할 색상을 선택합니다."]
+    },
+    "ar": {
+      "label": "لون الوضعية الثابتة",
+      "tooltip": ["اختيار اللون المستخدم للوضعيات الثابتة عند إطار معين."]
+    }
   }
 }

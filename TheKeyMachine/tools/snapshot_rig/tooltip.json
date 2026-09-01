@@ -15,6 +15,18 @@
     "Test the selected controls' mirror directions and world-space orientations.",
     "Only direction overrides required for correct mirroring are saved."
   ],
+  "remove_selected_opposite": [
+    "Remove saved opposite-control relationships for the selected controls."
+  ],
+  "clear_all_opposite": [
+    "Clear all saved opposite-control relationships for every rig."
+  ],
+  "remove_selected_mirror": [
+    "Remove saved mirror-direction data for the selected controls."
+  ],
+  "clear_all_mirror": [
+    "Clear all saved mirror-direction data for every rig."
+  ],
   "help": [
     "Open the Snapshot Rig documentation."
   ]

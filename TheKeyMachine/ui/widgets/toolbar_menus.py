@@ -15,7 +15,6 @@ import TheKeyMachine.ui.widgets.customWidgets as cw
 from TheKeyMachine.ui.widgets import util as wutil
 from TheKeyMachine.ui import toolbar_modes
 
-
 TOOLBAR_ALIGNMENTS = {
     name: toolbar_modes.alignment_value(name)
     for name in toolbar_modes.ALIGNMENT_NAMES
@@ -26,6 +25,8 @@ TOOLBAR_ALIGNMENT_NAMES = toolbar_modes.ALIGNMENT_NAMES
 
 def toolbar_alignment_value(alignment_name):
     return toolbar_modes.alignment_value(alignment_name)
+
+
 UNSET = object()
 
 
@@ -53,7 +54,9 @@ def _resolve_action_fields(command_id=None, tool_lookup=None, **overrides):
             fields.update(
                 {
                     "label": tool.get("menu_label") or tool.get("label") or command_id,
-                    "callback": None if tool.get("type") == "setting" else tool.get("callback"),
+                    "callback": (
+                        None if tool.get("type") == "setting" else tool.get("callback")
+                    ),
                     "icon": tool.get("icon"),
                     "description": tooltip if isinstance(tooltip, str) else "",
                     "tooltip": tooltip,
@@ -104,9 +107,15 @@ def _add_action(
         }.items()
         if value is not UNSET
     }
-    fields = _resolve_action_fields(command_id, registry.get_tool if command_id else None, **explicit)
+    fields = _resolve_action_fields(
+        command_id, registry.get_tool if command_id else None, **explicit
+    )
 
-    args = (_qicon(fields["icon"]), fields["label"]) if fields["icon"] is not None else (fields["label"],)
+    args = (
+        (_qicon(fields["icon"]), fields["label"])
+        if fields["icon"] is not None
+        else (fields["label"],)
+    )
     return menu.addAction(
         *args,
         callback=fields["callback"],
@@ -118,7 +127,9 @@ def _add_action(
     )
 
 
-def _add_checkable_action(menu, label=UNSET, callback=UNSET, checked=False, group=None, **kwargs):
+def _add_checkable_action(
+    menu, label=UNSET, callback=UNSET, checked=False, group=None, **kwargs
+):
     action = _add_action(menu, label, callback=callback, **kwargs)
     action.setCheckable(True)
     if group is not None:
@@ -175,7 +186,9 @@ def _register_menu_builder(command_id, builder):
         pass
 
 
-def _add_registered_menu(parent_menu, builder, *, command_id, command_icon=UNSET, description=UNSET):
+def _add_registered_menu(
+    parent_menu, builder, *, command_id, command_icon=UNSET, description=UNSET
+):
     _register_menu_builder(command_id, builder)
     from TheKeyMachine.tools import registry
 
@@ -223,7 +236,9 @@ def _declared_item_text(item, toolbox_module, fallback_command_id=None):
         tool = toolbox_module.get_tool(command_id)
         tooltip = tool.get("tooltip")
         label = tool.get("menu_label") or tool.get("label") or label
-        description = tool.get("description") or (tooltip if isinstance(tooltip, str) else description)
+        description = tool.get("description") or (
+            tooltip if isinstance(tooltip, str) else description
+        )
         return label, description
 
     i18n_key = item.get("i18n_key")
@@ -240,7 +255,9 @@ def build_declared_menu(definition, parent_widget=None, owner_command_id=None):
     """Build a package-declared menu without tool-specific core code."""
     from TheKeyMachine.tools import registry
 
-    menu_label, menu_description = _declared_item_text(definition, registry, fallback_command_id=owner_command_id)
+    menu_label, menu_description = _declared_item_text(
+        definition, registry, fallback_command_id=owner_command_id
+    )
     menu = cw.MenuWidget(
         QtGui.QIcon(definition.get("icon") or ""),
         menu_label,
@@ -296,7 +313,12 @@ def build_declared_menu(definition, parent_widget=None, owner_command_id=None):
                     menu,
                     choice.get("label", str(value)),
                     toolCommon.mark_non_tool_action(
-                        partial(registry.apply_choice_value, setter, value, state_key=choice_id)
+                        partial(
+                            registry.apply_choice_value,
+                            setter,
+                            value,
+                            state_key=choice_id,
+                        )
                     ),
                     checked=value == current_value,
                     group=group,
@@ -314,7 +336,11 @@ def build_declared_menu(definition, parent_widget=None, owner_command_id=None):
                     # tools.registry._iter_menu_choice_settings uses to decide
                     # a choice's owner), so it matches whatever icon that
                     # menu was opened with, e.g. Bake's or Preferences'.
-                    command_id=registry.choice_setting_command_name(choice_id, value) if choice_id else None,
+                    command_id=(
+                        registry.choice_setting_command_name(choice_id, value)
+                        if choice_id
+                        else None
+                    ),
                     icon=menu_icon,
                 )
             continue
@@ -351,7 +377,11 @@ def build_declared_menu(definition, parent_widget=None, owner_command_id=None):
             continue
 
         command_id = item.get("command") or item.get("id")
-        fields = {key: item[key] for key in ("label", "callback", "icon", "description", "tooltip") if key in item}
+        fields = {
+            key: item[key]
+            for key in ("label", "callback", "icon", "description", "tooltip")
+            if key in item
+        }
         if not command_id:
             label, description = _declared_item_text(item, registry)
             if "label" in fields:
@@ -367,7 +397,13 @@ def build_declared_menu(definition, parent_widget=None, owner_command_id=None):
                 icon=tool.get("icon"),
                 description=tool.get("description", ""),
                 tooltip=tool.get("tooltip"),
-                checked=bool((tool.get("get_checked") or item.get("get_checked") or (lambda: False))()),
+                checked=bool(
+                    (
+                        tool.get("get_checked")
+                        or item.get("get_checked")
+                        or (lambda: False)
+                    )()
+                ),
                 command_id=command_id,
                 command_icon=tool.get("icon"),
             )
@@ -402,13 +438,18 @@ def sync_main_dock_menu(toolbar):
             action.setChecked(is_current)
             action.setEnabled(not is_current)
             continue
-        layout = next((key for key, name in toolbar.docking_layouts.items() if name == action.text()), None)
+        layout = next(
+            (
+                key
+                for key, name in toolbar.docking_layouts.items()
+                if name == action.text()
+            ),
+            None,
+        )
         if layout:
             is_current = layout == toolbar.docking_position[0]
             action.setChecked(is_current)
-            action.setEnabled(
-                not is_current and wutil.check_visible_layout(layout)
-            )
+            action.setEnabled(not is_current and wutil.check_visible_layout(layout))
 
 
 def _dock_toolbar(toolbar, checked, **target):
@@ -422,7 +463,9 @@ def build_main_dock_menu(toolbar):
     toolbar.dock_menu = cw.MenuWidget(
         QtGui.QIcon(icons.dock),
         i18n.tr("dock_menu", "Dock"),
-        description=i18n.tr("dock_menu_desc", "Move the toolbar to a different Maya area."),
+        description=i18n.tr(
+            "dock_menu_desc", "Move the toolbar to a different Maya area."
+        ),
     )
 
     toolbar.pos_ac_group = QtGui.QActionGroup(toolbar)
@@ -490,18 +533,25 @@ def build_toolbar_pinning_menu(parent_widget, toolbar_widget):
     sections = getattr(toolbar_widget, "_tkm_sections", []) or []
     menu._tkm_section_menus = []
     for section in sections:
-        if not wutil.is_valid_widget(section) or not getattr(section, "has_pinnable_items", lambda: False)():
+        if (
+            not wutil.is_valid_widget(section)
+            or not getattr(section, "has_pinnable_items", lambda: False)()
+        ):
             continue
 
         icon_path = getattr(section, "menu_icon", lambda: None)()
         label = getattr(section, "menu_label", lambda: "Tools")().replace("&", "&&")
         section_menu = cw.OpenMenuWidget(QtGui.QIcon(icon_path or ""), label)
         section.populate_pinning_menu(section_menu)
-        menu.addMenu(section_menu, description=i18n.tr("pin_tools_in", "Pin tools in {}.").format(label))
+        menu.addMenu(
+            section_menu,
+            description=i18n.tr("pin_tools_in", "Pin tools in {}.").format(label),
+        )
         menu._tkm_section_menus.append((section, section_menu))
 
     if sections:
         from TheKeyMachine.core import workspaces
+
         def on_pins_changed(*args, **kwargs):
             is_deviating = workspaces.is_current_workspace_deviating(sections)
             workspaces.mark_workspace_modified(is_deviating)
@@ -599,7 +649,9 @@ def _refresh_toolbar_pinning_footer(menu, toolbar_widget):
 
     dock_actions = getattr(menu, "_tkm_dock_actions", None) or {}
     if dock_actions and wutil.is_valid_widget(toolbar_widget):
-        current_position = settings.get_setting(graph_toolbar.GRAPH_TOOLBAR_DOCK_SETTING, graph_toolbar.DOCK_DEFAULT)
+        current_position = settings.get_setting(
+            graph_toolbar.GRAPH_TOOLBAR_DOCK_SETTING, graph_toolbar.DOCK_DEFAULT
+        )
         for position, action in dock_actions.items():
             if not wutil.is_valid_widget(action):
                 continue
@@ -655,7 +707,8 @@ def show_toolbar_pinning_menu(toolbar_widget, global_pos):
 
     if (
         menu is not None
-        and getattr(menu, "_tkm_workspace_fingerprint", None) != _workspace_menu_fingerprint()
+        and getattr(menu, "_tkm_workspace_fingerprint", None)
+        != _workspace_menu_fingerprint()
     ):
         menu.deleteLater()
         menu = None
@@ -701,11 +754,21 @@ def _toolbar_alignment_context(toolbar_widget):
         if is_graph_toolbar:
             try:
                 graph_toolbar.apply_alignment(alignment_label)
-            except (ImportError, RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            except (
+                ImportError,
+                RuntimeError,
+                ValueError,
+                TypeError,
+                AttributeError,
+                KeyError,
+                IndexError,
+            ):
                 pass
             return
 
-        parent = toolbar_widget.parent() if wutil.is_valid_widget(toolbar_widget) else None
+        parent = (
+            toolbar_widget.parent() if wutil.is_valid_widget(toolbar_widget) else None
+        )
         while parent:
             if getattr(parent, "main_toolbar_widget", None) is toolbar_widget:
                 toolbar_widgets.set_main_toolbar_icon_alignment(
@@ -715,14 +778,18 @@ def _toolbar_alignment_context(toolbar_widget):
                 return
             parent = parent.parent()
 
-        layout = toolbar_widget.layout() if wutil.is_valid_widget(toolbar_widget) else None
+        layout = (
+            toolbar_widget.layout() if wutil.is_valid_widget(toolbar_widget) else None
+        )
         if layout:
             toolbar_modes.apply_to(toolbar_widget, alignment_label)
 
     return setting_key, _apply_alignment
 
 
-def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alignment_fn):
+def _restore_toolbar_pinning_defaults(
+    menu, toolbar_widget, sections, apply_alignment_fn
+):
     from TheKeyMachine.ui.widgets import customDialogs
     from TheKeyMachine.core import workspaces
 
@@ -743,7 +810,10 @@ def _restore_toolbar_pinning_defaults(menu, toolbar_widget, sections, apply_alig
         menu.parent(),
         "Restore Defaults",
         "Restore the '{}' workspace defaults?".format(ws_name),
-        buttons=[customDialogs.QFlatConfirmDialog.Yes, customDialogs.QFlatConfirmDialog.Cancel],
+        buttons=[
+            customDialogs.QFlatConfirmDialog.Yes,
+            customDialogs.QFlatConfirmDialog.Cancel,
+        ],
         highlight=customDialogs.QFlatConfirmDialog.Yes,
         title="Restore toolbar defaults?",
         icon=icons.warning,
@@ -769,6 +839,7 @@ def _add_alignment_actions(
     names=TOOLBAR_ALIGNMENT_NAMES,
 ):
     from TheKeyMachine.core import workspaces
+
     group = QtGui.QActionGroup(menu)
     group.setExclusive(True)
     # Retain the direct Python slots for as long as their QActionGroup lives.
@@ -784,7 +855,10 @@ def _add_alignment_actions(
             )
             workspaces.mark_workspace_modified(is_deviating)
 
-    translated = {value: (label, description) for value, label, description in toolbar_modes.translated_options()}
+    translated = {
+        value: (label, description)
+        for value, label, description in toolbar_modes.translated_options()
+    }
     for label in names:
         action_label, action_description = translated[label]
         action = _add_checkable_action(
@@ -807,7 +881,9 @@ def _add_alignment_actions(
     return group, actions
 
 
-def _add_dock_actions(menu, dock_options, dock_setting, default_dock_position, move_dock_fn):
+def _add_dock_actions(
+    menu, dock_options, dock_setting, default_dock_position, move_dock_fn
+):
     """Add one exclusive, checkable action per dock_options row to *menu*.
 
     Shared by the graph toolbar's standalone Dock submenu and the inline
@@ -887,6 +963,7 @@ def _add_workspace_actions(menu, sections, apply_alignment_fn):
         )
     return group, actions
 
+
 def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
     from TheKeyMachine.core import i18n
 
@@ -895,7 +972,9 @@ def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
     setting_key, apply_alignment_fn = _toolbar_alignment_context(toolbar_widget)
     menu._tkm_alignment_setting_key = setting_key
 
-    menu._tkm_workspace_group, menu._tkm_workspace_actions = _add_workspace_actions(menu, sections, apply_alignment_fn)
+    menu._tkm_workspace_group, menu._tkm_workspace_actions = _add_workspace_actions(
+        menu, sections, apply_alignment_fn
+    )
     menu._tkm_workspace_fingerprint = _workspace_menu_fingerprint()
 
     menu.addSeparator()
@@ -933,13 +1012,18 @@ def _add_toolbar_pinning_footer(menu, toolbar_widget, sections):
         QtGui.QIcon(icons.reload),
         i18n.tr("restore_defaults", "Restore Defaults"),
         restore_defaults_callback,
-        description=i18n.tr("restore_defaults_desc", "Restore toolbar pins and alignment defaults."),
+        description=i18n.tr(
+            "restore_defaults_desc", "Restore toolbar pins and alignment defaults."
+        ),
     )
 
     graph_toolbar_action = menu.addAction(
         QtGui.QIcon(icons.customGraph),
         i18n.tr("graph_editor_toolbar", "Graph Editor Toolbar"),
-        description=i18n.tr("graph_editor_toolbar_desc", "Show or hide the TKM toolbar inside the Graph Editor."),
+        description=i18n.tr(
+            "graph_editor_toolbar_desc",
+            "Show or hide the TKM toolbar inside the Graph Editor.",
+        ),
     )
     toolCommon.connect_checkable_action(
         graph_toolbar_action,
@@ -987,7 +1071,10 @@ def should_show_toolbar_pinning_menu(toolbar_widget, pos):
             continue
         if isinstance(widget, interactive_classes):
             return False
-        if widget.contextMenuPolicy() in (QtCore.Qt.CustomContextMenu, QtCore.Qt.ActionsContextMenu):
+        if widget.contextMenuPolicy() in (
+            QtCore.Qt.CustomContextMenu,
+            QtCore.Qt.ActionsContextMenu,
+        ):
             return False
         widget = widget.parentWidget()
 
@@ -1003,15 +1090,21 @@ def build_other_sources_help_menu():
         help_menu.addSeparator()
     links = (
         (
-            i18n.tr("discord", "Discord"), icons.discord, "https://discord.gg/G2J5yyjz",
+            i18n.tr("discord", "Discord"),
+            icons.discord,
+            "https://discord.gg/G2J5yyjz",
             i18n.tr("discord_desc", "Open the community server."),
         ),
         (
-            i18n.tr("documentation", "Documentation"), icons.help, "https://thekeymachine.gitbook.io/base",
+            i18n.tr("documentation", "Documentation"),
+            icons.help,
+            "https://thekeymachine.gitbook.io/base",
             i18n.tr("documentation_desc", "Open the docs."),
         ),
         (
-            i18n.tr("youtube", "YouTube"), icons.youtube, "https://www.youtube.com/@TheKeyMachineAnimationTools",
+            i18n.tr("youtube", "YouTube"),
+            icons.youtube,
+            "https://www.youtube.com/@TheKeyMachineAnimationTools",
             i18n.tr("youtube_desc", "Watch tutorials and demos."),
         ),
     )
@@ -1051,7 +1144,10 @@ def populate_languages_menu(menu):
     from TheKeyMachine.tools import registry
 
     menu.clear()
-    menu._tkm_language_fingerprint = (i18n.get_language(), i18n.get_translate_tool_names())
+    menu._tkm_language_fingerprint = (
+        i18n.get_language(),
+        i18n.get_translate_tool_names(),
+    )
 
     _add_checkable_action(
         menu,
@@ -1089,7 +1185,9 @@ def populate_languages_menu(menu):
 def build_languages_menu():
     from TheKeyMachine.core import i18n
 
-    menu = cw.MenuWidget(QtGui.QIcon(icons.globe), i18n.tr("languages_menu", "Languages"))
+    menu = cw.MenuWidget(
+        QtGui.QIcon(icons.globe), i18n.tr("languages_menu", "Languages")
+    )
     populate_languages_menu(menu)
     return menu
 
@@ -1097,7 +1195,9 @@ def build_languages_menu():
 def build_main_system_menu(toolbar):
     from TheKeyMachine.core import i18n
 
-    system_menu = cw.MenuWidget(QtGui.QIcon(icons.system), i18n.tr("system_menu", "System"))
+    system_menu = cw.MenuWidget(
+        QtGui.QIcon(icons.system), i18n.tr("system_menu", "System")
+    )
     _add_action_specs(
         system_menu,
         (
@@ -1134,7 +1234,9 @@ def build_main_preferences_menu(
 ):
     from TheKeyMachine.core import i18n
 
-    preferences_menu = cw.OpenMenuWidget(QtGui.QIcon(icons.settings), i18n.tr("preferences_menu", "Preferences"))
+    preferences_menu = cw.OpenMenuWidget(
+        QtGui.QIcon(icons.settings), i18n.tr("preferences_menu", "Preferences")
+    )
     preferences_menu.addSection(i18n.tr("startup_section", "Startup"))
     _add_action(
         preferences_menu,
@@ -1163,10 +1265,12 @@ def build_main_preferences_menu(
         )
     )
 
-    preferences_menu._tkm_alignment_group, preferences_menu._tkm_alignment_actions = _add_alignment_actions(
-        preferences_menu,
-        current_align,
-        update_toolbar_icon_alignment,
+    preferences_menu._tkm_alignment_group, preferences_menu._tkm_alignment_actions = (
+        _add_alignment_actions(
+            preferences_menu,
+            current_align,
+            update_toolbar_icon_alignment,
+        )
     )
 
     preferences_menu.addSection(i18n.tr("display_section", "Display"))
@@ -1211,7 +1315,9 @@ def _current_main_toolbar():
 def _main_menu_builders(toolbar):
     from TheKeyMachine.ui.widgets import toolbar_widgets
 
-    alignment_callback = partial(toolbar_widgets.set_main_toolbar_icon_alignment, toolbar)
+    alignment_callback = partial(
+        toolbar_widgets.set_main_toolbar_icon_alignment, toolbar
+    )
     common = {
         "show_tooltips": settings.get_setting("show_tooltips", True),
         "toolbar_alignment": toolbar_widgets.get_main_toolbar_icon_alignment(),
@@ -1223,9 +1329,11 @@ def _main_menu_builders(toolbar):
             toolbar,
             None,
             internet_connection=general.config.get("INTERNET_CONNECTION", True),
-            **common
+            **common,
         ),
-        "main_preferences_menu": partial(build_main_preferences_menu, toolbar, **common),
+        "main_preferences_menu": partial(
+            build_main_preferences_menu, toolbar, **common
+        ),
         "main_system_menu": partial(build_main_system_menu, toolbar),
         "main_dock_menu": partial(build_main_dock_menu, toolbar),
         "languages_menu": build_languages_menu,
@@ -1240,7 +1348,9 @@ def _graph_menu_builders():
         graph_toolbar.move_dock,
     )
     return {
-        "graph_settings_menu": partial(build_graph_settings_submenu, *dock_args, graph_toolbar.apply_alignment),
+        "graph_settings_menu": partial(
+            build_graph_settings_submenu, *dock_args, graph_toolbar.apply_alignment
+        ),
         "graph_dock_menu": partial(build_graph_dock_menu, *dock_args),
     }
 
@@ -1288,7 +1398,7 @@ def build_main_settings_menu(
     add_main_system_menu(toolbar, toolbar_menu)
     toolbar_menu.addSeparator()
     add_other_sources_help_menu(toolbar_menu)
-    
+
     _add_toolbox_actions(toolbar_menu, ("donate_window",))
     if internet_connection:
         _add_action(
@@ -1300,20 +1410,27 @@ def build_main_settings_menu(
     return toolbar_menu
 
 
-def build_graph_settings_submenu(dock_options, dock_setting, default_dock_position, move_dock_fn, apply_alignment_fn):
+def build_graph_settings_submenu(
+    dock_options, dock_setting, default_dock_position, move_dock_fn, apply_alignment_fn
+):
     from TheKeyMachine.core import i18n
 
     settings_menu = cw.MenuWidget(
         QtGui.QIcon(icons.settings),
         i18n.tr("settings_menu", "Settings"),
-        description=i18n.tr("settings_menu_desc", "Tool configuration and preferences."),
+        description=i18n.tr(
+            "settings_menu_desc", "Tool configuration and preferences."
+        ),
     )
 
     settings_menu.addSection(i18n.tr("graph_toolbar_section", "Graph toolbar"))
     graph_toolbar_action = settings_menu.addAction(
         QtGui.QIcon(icons.customGraph),
         i18n.tr("graph_editor_toolbar", "Graph Editor Toolbar"),
-        description=i18n.tr("graph_editor_toolbar_desc", "Show or hide the TKM toolbar inside the Graph Editor."),
+        description=i18n.tr(
+            "graph_editor_toolbar_desc",
+            "Show or hide the TKM toolbar inside the Graph Editor.",
+        ),
     )
     toolCommon.connect_checkable_action(
         graph_toolbar_action,
@@ -1322,17 +1439,21 @@ def build_graph_settings_submenu(dock_options, dock_setting, default_dock_positi
         signal=graph_toolbar.custom_graph_bus.graph_toolbar_enabled_changed,
     )
 
-    settings_menu.addSection(i18n.tr("toolbar_icons_alignment_section", "Toolbar's icons alignment"))
+    settings_menu.addSection(
+        i18n.tr("toolbar_icons_alignment_section", "Toolbar's icons alignment")
+    )
     current_align = toolbar_modes.normalize(
         settings.get_setting(
             toolbar_modes.GRAPH_ALIGNMENT_SETTING,
             toolbar_modes.DEFAULT_ALIGNMENT,
         )
     )
-    settings_menu._tkm_alignment_group, settings_menu._tkm_alignment_actions = _add_alignment_actions(
-        settings_menu,
-        current_align,
-        apply_alignment_fn,
+    settings_menu._tkm_alignment_group, settings_menu._tkm_alignment_actions = (
+        _add_alignment_actions(
+            settings_menu,
+            current_align,
+            apply_alignment_fn,
+        )
     )
 
     settings_menu.addSection(i18n.tr("toolbar_anchor_section", "Anchor"))
@@ -1353,12 +1474,17 @@ def build_graph_settings_submenu(dock_options, dock_setting, default_dock_positi
                 0, lambda: graph_toolbar.set_graph_toolbar_enabled(False)
             )
         ),
-        description=i18n.tr("close_graph_toolbar_desc", "Hide the TKM Graph Editor toolbar and keep it disabled."),
+        description=i18n.tr(
+            "close_graph_toolbar_desc",
+            "Hide the TKM Graph Editor toolbar and keep it disabled.",
+        ),
     )
     return settings_menu
 
 
-def build_graph_dock_menu(dock_options, dock_setting, default_dock_position, move_dock_fn):
+def build_graph_dock_menu(
+    dock_options, dock_setting, default_dock_position, move_dock_fn
+):
     from TheKeyMachine.core import i18n
 
     dock_menu = cw.MenuWidget(

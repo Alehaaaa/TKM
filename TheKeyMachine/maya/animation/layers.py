@@ -297,7 +297,7 @@ class LayerCache(object):
         self.unlocked_layers = []
         self.preferred = None
         self.root = AnimationLayer(root=True)
-        # Do NOT call reset() here – module-level instantiation happens at
+        # Do NOT call reset() here -- module-level instantiation happens at
         # import/reload time, when Maya may refuse cmds.animLayer queries with
         # "Unable to parse the argument list". Data is populated lazily on the
         # first real call to layer_cache.capture().

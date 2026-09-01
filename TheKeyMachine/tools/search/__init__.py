@@ -1,4 +1,5 @@
 from TheKeyMachine.tools.registry import ToolObject, load_tooltips
+from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.tools.search import api
 
 
@@ -23,6 +24,7 @@ class SearchToolObject(ToolObject):
     SECTION = {
         "id": "search_tools", "i18n_key": "search_window",
         "label": "Search",
+        "color": COLORS.toolbar.light_gray.hex,
         "hiddeable": True,
         "items": [{"id": "search_window"}],
     }

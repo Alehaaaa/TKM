@@ -392,6 +392,33 @@ def clear_section(rig_id, kind):
     save_rig_snapshot(rig_id, data, kind)
 
 
+def remove_control_entries(rig_id, kind, control_keys):
+    """Remove selected controls from one saved snapshot category."""
+    keys = set(control_keys or ())
+    if not keys:
+        return
+
+    data = copy.deepcopy(load_rig_snapshot(rig_id))
+    if kind == "opposite":
+        data["pairs"] = [
+            pair for pair in data.get("pairs", [])
+            if not keys.intersection(pair)
+        ]
+        data["centers"] = [
+            name for name in data.get("centers", [])
+            if name not in keys
+        ]
+    elif kind == "default":
+        for name in keys:
+            data.setdefault("defaults", {}).pop(name, None)
+    elif kind == "mirror":
+        for name in keys:
+            data.setdefault("mirror_directions", {}).pop(name, None)
+    else:
+        raise ValueError(f"Unknown snapshot kind: {kind}")
+    save_rig_snapshot(rig_id, data, kind)
+
+
 # ____________________________ Per-control read/write __________________________________
 
 

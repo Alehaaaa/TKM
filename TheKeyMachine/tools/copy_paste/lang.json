@@ -1,4 +1,24 @@
 {
+    "paste_pose_to_apply": {
+        "en": {"label": "Paste Pose To"},
+        "es": {"label": "Pegar Pose En"},
+        "fr": {"label": "Coller la Pose Sur"},
+        "ca": {"label": "Enganxar Pose A"},
+        "zh": {"label": "粘贴姿态到"},
+        "ja": {"label": "ポーズを貼り付け先"},
+        "ko": {"label": "포즈 붙여넣기 대상"},
+        "ar": {"label": "لصق الوضعية إلى"}
+    },
+    "paste_animation_to_apply": {
+        "en": {"label": "Paste Animation To"},
+        "es": {"label": "Pegar Animación En"},
+        "fr": {"label": "Coller l'Animation Sur"},
+        "ca": {"label": "Enganxar Animació A"},
+        "zh": {"label": "粘贴动画到"},
+        "ja": {"label": "アニメーションを貼り付け先"},
+        "ko": {"label": "애니메이션 붙여넣기 대상"},
+        "ar": {"label": "لصق الحركة إلى"}
+    },
     "copy_pose": {
         "en": {
             "label": "Copy Pose",
@@ -667,7 +687,7 @@
     },
     "pose_animation_section": {
         "en": {
-            "label": "Pose & Animation"
+            "label": "Pose and Animation"
         },
         "es": {
             "label": "Pose y Animación"

@@ -1,4 +1,14 @@
 {
+    "selection_sets_clear_all_apply": {
+        "en": {"label": "Clear All Selection Sets"},
+        "es": {"label": "Borrar Todos los Sets de Selección"},
+        "fr": {"label": "Effacer Tous les Ensembles de Sélection"},
+        "ca": {"label": "Esborrar Tots els Conjunts de Selecció"},
+        "zh": {"label": "清除所有选择集"},
+        "ja": {"label": "すべてのセレクションセットを消去"},
+        "ko": {"label": "모든 선택 세트 지우기"},
+        "ar": {"label": "مسح كل مجموعات التحديد"}
+    },
     "selection_sets": {
         "en": {
             "label": "Selection Sets",

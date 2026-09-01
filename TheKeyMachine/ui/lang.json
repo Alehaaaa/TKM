@@ -1521,6 +1521,66 @@
         "ko": "메인 툴바",
         "zh": "主工具栏"
     },
+    "opposite_snapshots_removed_for_selection": {
+        "ar": "تمت إزالة لقطات الجانب المقابل للتحديد",
+        "ca": "S'han eliminat les captures d'oposat de la selecció",
+        "en": "Opposite snapshots removed for the selection",
+        "es": "Capturas de opuesto eliminadas para la selección",
+        "fr": "Captures d'opposé supprimées pour la sélection",
+        "ja": "選択した反対側スナップショットを削除しました",
+        "ko": "선택 항목의 반대쪽 스냅샷을 제거했습니다",
+        "zh": "已移除所选对象的对侧快照"
+    },
+    "no_saved_opposite_snapshots_found": {
+        "ar": "لم يتم العثور على لقطات محفوظة للجانب المقابل",
+        "ca": "No s'han trobat captures d'oposat desades",
+        "en": "No saved opposite snapshots found",
+        "es": "No se encontraron capturas de opuesto guardadas",
+        "fr": "Aucune capture d'opposé enregistrée trouvée",
+        "ja": "保存済みの反対側スナップショットが見つかりません",
+        "ko": "저장된 반대쪽 스냅샷을 찾을 수 없습니다",
+        "zh": "未找到已保存的对侧快照"
+    },
+    "all_saved_opposite_snapshots_cleared": {
+        "ar": "تم مسح جميع لقطات الجانب المقابل المحفوظة",
+        "ca": "S'han esborrat totes les captures d'oposat desades",
+        "en": "All saved opposite snapshots cleared",
+        "es": "Se borraron todas las capturas de opuesto guardadas",
+        "fr": "Toutes les captures d'opposé enregistrées ont été effacées",
+        "ja": "保存済みの反対側スナップショットをすべて消去しました",
+        "ko": "저장된 모든 반대쪽 스냅샷을 지웠습니다",
+        "zh": "已清除所有已保存的对侧快照"
+    },
+    "mirror_snapshots_removed_for_selection": {
+        "ar": "تمت إزالة لقطات المرآة للتحديد",
+        "ca": "S'han eliminat les captures de mirall de la selecció",
+        "en": "Mirror snapshots removed for the selection",
+        "es": "Capturas de espejo eliminadas para la selección",
+        "fr": "Captures de miroir supprimées pour la sélection",
+        "ja": "選択したミラースナップショットを削除しました",
+        "ko": "선택 항목의 미러 스냅샷을 제거했습니다",
+        "zh": "已移除所选对象的镜像快照"
+    },
+    "no_saved_mirror_snapshots_found": {
+        "ar": "لم يتم العثور على لقطات مرآة محفوظة",
+        "ca": "No s'han trobat captures de mirall desades",
+        "en": "No saved mirror snapshots found",
+        "es": "No se encontraron capturas de espejo guardadas",
+        "fr": "Aucune capture de miroir enregistrée trouvée",
+        "ja": "保存済みのミラースナップショットが見つかりません",
+        "ko": "저장된 미러 스냅샷을 찾을 수 없습니다",
+        "zh": "未找到已保存的镜像快照"
+    },
+    "all_saved_mirror_snapshots_cleared": {
+        "ar": "تم مسح جميع لقطات المرآة المحفوظة",
+        "ca": "S'han esborrat totes les captures de mirall desades",
+        "en": "All saved mirror snapshots cleared",
+        "es": "Se borraron todas las capturas de espejo guardadas",
+        "fr": "Toutes les captures de miroir enregistrées ont été effacées",
+        "ja": "保存済みのミラースナップショットをすべて消去しました",
+        "ko": "저장된 모든 미러 스냅샷을 지웠습니다",
+        "zh": "已清除所有已保存的镜像快照"
+    },
     "youtube": {
         "ar": "YouTube",
         "ca": "YouTube",
@@ -1538,5 +1598,221 @@
         "ja": "YouTubeのTheKeyMachineチュートリアルを開きます。",
         "ko": "YouTube에서 TheKeyMachine 튜토리얼을 엽니다.",
         "zh": "打开 YouTube 上的 TheKeyMachine 教程。"
+    },
+    "debug_menu": {
+        "ar": "تصحيح الأخطاء",
+        "ca": "Depuració",
+        "es": "Depuración",
+        "fr": "Débogage",
+        "ja": "デバッグ",
+        "ko": "디버그",
+        "zh": "调试"
+    },
+    "debug_menu_desc": {
+        "ar": "أدوات تشخيص واختبار مخصصة للمطورين فقط.",
+        "ca": "Diagnòstics i accions de prova només per a desenvolupadors.",
+        "es": "Diagnósticos y acciones de prueba solo para desarrolladores.",
+        "fr": "Diagnostics et actions de test réservés aux développeurs.",
+        "ja": "開発者専用の診断およびテスト操作です。",
+        "ko": "개발자 전용 진단 및 테스트 작업입니다.",
+        "zh": "仅供开发者使用的诊断和测试操作。"
+    },
+    "onion_skin_sampling_menu": {
+        "ar": "أخذ العينات",
+        "ca": "Mostreig",
+        "es": "Muestreo",
+        "fr": "Échantillonnage",
+        "ja": "サンプリング",
+        "ko": "샘플링",
+        "zh": "采样"
+    },
+    "onion_skin_sampling_menu_desc": {
+        "ar": "اختر أي الوضعيات القريبة تُعرض كأشباح ومدى كثافة أخذ العينات منها.",
+        "ca": "Tria quines poses properes es mostren com a fantasmes i amb quina densitat se'n fa el mostreig.",
+        "es": "Elige qué poses cercanas se muestran como fantasmas y con qué densidad se muestrean.",
+        "fr": "Choisissez quelles poses voisines sont affichées en fantôme et avec quelle densité elles sont échantillonnées.",
+        "ja": "どの近くのポーズをゴースト表示するか、どのくらいの密度でサンプリングするかを選択します。",
+        "ko": "어떤 인접 포즈를 고스트로 표시할지, 얼마나 촘촘하게 샘플링할지 선택합니다.",
+        "zh": "选择哪些邻近姿态会显示为重影，以及采样的密度。"
+    },
+    "onion_skin_appearance_menu": {
+        "ar": "المظهر",
+        "ca": "Aparença",
+        "es": "Apariencia",
+        "fr": "Apparence",
+        "ja": "外観",
+        "ko": "모양",
+        "zh": "外观"
+    },
+    "onion_skin_appearance_menu_desc": {
+        "ar": "تحديد كيفية رسم الوضعيات الشبحية: النمط والشفافية وعرض المخطط واللون.",
+        "ca": "Defineix com es dibuixen les poses fantasma: estil, opacitat, amplada del contorn i color.",
+        "es": "Define cómo se dibujan las poses fantasma: estilo, opacidad, ancho de contorno y color.",
+        "fr": "Définit comment les poses fantômes sont dessinées : style, opacité, épaisseur du contour et couleur.",
+        "ja": "ゴーストポーズの描画方法（スタイル、不透明度、アウトラインの太さ、色）を設定します。",
+        "ko": "고스트 포즈가 그려지는 방식(스타일, 불투명도, 윤곽선 두께, 색상)을 설정합니다.",
+        "zh": "设置重影姿态的绘制方式：样式、不透明度、轮廓宽度和颜色。"
+    },
+    "onion_skin_performance_menu": {
+        "ar": "الأداء",
+        "ca": "Rendiment",
+        "es": "Rendimiento",
+        "fr": "Performance",
+        "ja": "パフォーマンス",
+        "ko": "성능",
+        "zh": "性能"
+    },
+    "onion_skin_performance_menu_desc": {
+        "ar": "الموازنة بين سرعة تحديث الأشباح وسلاسة منظور العرض، وإدارة مخزن البصل المؤقت.",
+        "ca": "Equilibra la rapidesa amb què s'actualitzen els fantasmes davant la fluïdesa del viewport, i gestiona el búfer de pell de ceba.",
+        "es": "Equilibra la rapidez con la que se actualizan los fantasmas frente a la fluidez del viewport, y gestiona el búfer de piel de cebolla.",
+        "fr": "Équilibre la rapidité de mise à jour des fantômes par rapport à la fluidité de la vue 3D, et gère le tampon d'oignon.",
+        "ja": "ゴーストの更新速度とビューポートの滑らかさのバランスを調整し、オニオンバッファを管理します。",
+        "ko": "고스트 업데이트 속도와 뷰포트 부드러움 사이의 균형을 조정하고, 어니언 버퍼를 관리합니다.",
+        "zh": "在重影更新速度与视口流畅度之间取得平衡，并管理洋葱皮缓冲区。"
+    },
+    "onion_skin_nearby_frames_menu": {
+        "ar": "الإطارات القريبة",
+        "ca": "Fotogrames Propers",
+        "es": "Fotogramas Cercanos",
+        "fr": "Images Voisines",
+        "ja": "近くのフレーム",
+        "ko": "인접 프레임",
+        "zh": "邻近帧"
+    },
+    "onion_skin_nearby_frames_menu_desc": {
+        "ar": "تفعيل أو تعطيل الإطارات الفردية قبل الإطار الحالي وبعده.",
+        "ca": "Activa o desactiva fotogrames individuals abans i després de l'actual.",
+        "es": "Activa o desactiva fotogramas individuales antes y después del actual.",
+        "fr": "Active ou désactive individuellement les images avant et après l'image actuelle.",
+        "ja": "現在のフレームの前後にある個々のフレームのオン・オフを切り替えます。",
+        "ko": "현재 프레임 앞뒤의 개별 프레임을 켜거나 끕니다.",
+        "zh": "单独开启或关闭当前帧前后的各个帧。"
+    },
+    "onion_skin_pose_style_section": {
+        "ar": "نمط الوضعية",
+        "ca": "Estil de Pose",
+        "es": "Estilo de Pose",
+        "fr": "Style de Pose",
+        "ja": "ポーズスタイル",
+        "ko": "포즈 스타일",
+        "zh": "姿态样式"
+    },
+    "onion_skin_pose_opacity_section": {
+        "ar": "شفافية الوضعية",
+        "ca": "Opacitat de Pose",
+        "es": "Opacidad de Pose",
+        "fr": "Opacité de la Pose",
+        "ja": "ポーズの不透明度",
+        "ko": "포즈 불투명도",
+        "zh": "姿态不透明度"
+    },
+    "onion_skin_outline_width_section": {
+        "ar": "عرض المخطط",
+        "ca": "Amplada del Contorn",
+        "es": "Ancho de Contorno",
+        "fr": "Épaisseur du Contour",
+        "ja": "アウトラインの太さ",
+        "ko": "윤곽선 두께",
+        "zh": "轮廓宽度"
+    },
+    "onion_skin_colors_section": {
+        "ar": "الألوان",
+        "ca": "Colors",
+        "es": "Colores",
+        "fr": "Couleurs",
+        "ja": "色",
+        "ko": "색상",
+        "zh": "颜色"
+    },
+    "onion_skin_update_speed_section": {
+        "ar": "سرعة التحديث",
+        "ca": "Velocitat d'Actualització",
+        "es": "Velocidad de Actualización",
+        "fr": "Vitesse de Mise à Jour",
+        "ja": "更新速度",
+        "ko": "업데이트 속도",
+        "zh": "更新速度"
+    },
+    "onion_skin_buffer_size_section": {
+        "ar": "حجم المخزن المؤقت",
+        "ca": "Mida del Búfer",
+        "es": "Tamaño del Búfer",
+        "fr": "Taille du Tampon",
+        "ja": "バッファサイズ",
+        "ko": "버퍼 크기",
+        "zh": "缓冲区大小"
+    },
+    "tracer_offset_menu": {
+        "ar": "الإزاحة",
+        "ca": "Desplaçament",
+        "es": "Desplazamiento",
+        "fr": "Décalage",
+        "ja": "オフセット",
+        "ko": "오프셋",
+        "zh": "偏移"
+    },
+    "tracer_style_menu": {
+        "ar": "النمط",
+        "ca": "Estil",
+        "es": "Estilo",
+        "fr": "Style",
+        "ja": "スタイル",
+        "ko": "스타일",
+        "zh": "样式"
+    },
+    "tracer_size_section": {
+        "ar": "الحجم",
+        "ca": "Mida",
+        "es": "Tamaño",
+        "fr": "Taille",
+        "ja": "サイズ",
+        "ko": "크기",
+        "zh": "大小"
+    },
+    "tracer_color_section": {
+        "ar": "اللون",
+        "ca": "Color",
+        "es": "Color",
+        "fr": "Couleur",
+        "ja": "色",
+        "ko": "색상",
+        "zh": "颜色"
+    },
+    "tracer_frames_before_after_menu": {
+        "ar": "الإطارات قبل وبعد",
+        "ca": "Fotogrames Abans i Després",
+        "es": "Fotogramas Antes y Después",
+        "fr": "Images Avant et Après",
+        "ja": "前後のフレーム",
+        "ko": "전후 프레임",
+        "zh": "前后帧数"
+    },
+    "tracer_direction_section": {
+        "ar": "الاتجاه",
+        "ca": "Direcció",
+        "es": "Dirección",
+        "fr": "Direction",
+        "ja": "方向",
+        "ko": "방향",
+        "zh": "方向"
+    },
+    "tracer_more_menu": {
+        "ar": "المزيد",
+        "ca": "Més",
+        "es": "Más",
+        "fr": "Plus",
+        "ja": "その他",
+        "ko": "더 보기",
+        "zh": "更多"
+    },
+    "tracer_performance_section": {
+        "ar": "الأداء",
+        "ca": "Rendiment",
+        "es": "Rendimiento",
+        "fr": "Performance",
+        "ja": "パフォーマンス",
+        "ko": "성능",
+        "zh": "性能"
     }
 }

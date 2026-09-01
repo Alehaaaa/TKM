@@ -231,6 +231,142 @@
             ]
         }
     },
+    "snapshot_opposite_remove_selected": {
+        "en": {
+            "label": "Remove Selected Opposite Snapshots",
+            "tooltip": ["Remove saved opposite-control relationships for the selected controls."]
+        },
+        "es": {
+            "label": "Eliminar Capturas de Opuesto de la Selección",
+            "tooltip": ["Elimina las relaciones de control opuesto guardadas para los controles seleccionados."]
+        },
+        "fr": {
+            "label": "Supprimer les Captures d'Opposé de la Sélection",
+            "tooltip": ["Supprime les relations de contrôleur opposé enregistrées pour les contrôleurs sélectionnés."]
+        },
+        "ca": {
+            "label": "Eliminar Captures d'Oposat de la Selecció",
+            "tooltip": ["Elimina les relacions de control oposat desades per als controls seleccionats."]
+        },
+        "zh": {
+            "label": "移除所选对象的对侧快照",
+            "tooltip": ["移除所选控制器已保存的对侧控制器关系。"]
+        },
+        "ja": {
+            "label": "選択した反対側スナップショットを削除",
+            "tooltip": ["選択したコントローラに保存されている反対側コントローラの関係を削除します。"]
+        },
+        "ko": {
+            "label": "선택한 반대쪽 스냅샷 제거",
+            "tooltip": ["선택한 컨트롤에 저장된 반대쪽 컨트롤 관계를 제거합니다."]
+        },
+        "ar": {
+            "label": "إزالة لقطات الجانب المقابل للتحديد",
+            "tooltip": ["إزالة علاقات المتحكم المقابل المحفوظة للمتحكمات المحددة."]
+        }
+    },
+    "snapshot_opposite_clear_all": {
+        "en": {
+            "label": "Clear All Opposite Snapshots",
+            "tooltip": ["Clear all saved opposite-control relationships for every rig."]
+        },
+        "es": {
+            "label": "Borrar Todas las Capturas de Opuesto",
+            "tooltip": ["Borra todas las relaciones de control opuesto guardadas para todos los rigs."]
+        },
+        "fr": {
+            "label": "Effacer Toutes les Captures d'Opposé",
+            "tooltip": ["Efface toutes les relations de contrôleur opposé enregistrées pour tous les rigs."]
+        },
+        "ca": {
+            "label": "Esborrar Totes les Captures d'Oposat",
+            "tooltip": ["Esborra totes les relacions de control oposat desades per a tots els rigs."]
+        },
+        "zh": {
+            "label": "清除所有对侧快照",
+            "tooltip": ["清除所有绑定已保存的对侧控制器关系。"]
+        },
+        "ja": {
+            "label": "反対側スナップショットをすべて消去",
+            "tooltip": ["すべてのリグに保存されている反対側コントローラの関係を消去します。"]
+        },
+        "ko": {
+            "label": "모든 반대쪽 스냅샷 지우기",
+            "tooltip": ["모든 리그에 저장된 반대쪽 컨트롤 관계를 지웁니다."]
+        },
+        "ar": {
+            "label": "مسح كل لقطات الجانب المقابل",
+            "tooltip": ["مسح جميع علاقات المتحكم المقابل المحفوظة لكل عناصر الريغ."]
+        }
+    },
+    "snapshot_mirror_remove_selected": {
+        "en": {
+            "label": "Remove Selected Mirror Snapshots",
+            "tooltip": ["Remove saved mirror-direction data for the selected controls."]
+        },
+        "es": {
+            "label": "Eliminar Capturas de Espejo de la Selección",
+            "tooltip": ["Elimina los datos de dirección de espejo guardados para los controles seleccionados."]
+        },
+        "fr": {
+            "label": "Supprimer les Captures de Miroir de la Sélection",
+            "tooltip": ["Supprime les données de direction de miroir enregistrées pour les contrôleurs sélectionnés."]
+        },
+        "ca": {
+            "label": "Eliminar Captures de Mirall de la Selecció",
+            "tooltip": ["Elimina les dades de direcció de mirall desades per als controls seleccionats."]
+        },
+        "zh": {
+            "label": "移除所选对象的镜像快照",
+            "tooltip": ["移除所选控制器已保存的镜像方向数据。"]
+        },
+        "ja": {
+            "label": "選択したミラースナップショットを削除",
+            "tooltip": ["選択したコントローラに保存されているミラー方向データを削除します。"]
+        },
+        "ko": {
+            "label": "선택한 미러 스냅샷 제거",
+            "tooltip": ["선택한 컨트롤에 저장된 미러 방향 데이터를 제거합니다."]
+        },
+        "ar": {
+            "label": "إزالة لقطات المرآة للتحديد",
+            "tooltip": ["إزالة بيانات اتجاه المرآة المحفوظة للمتحكمات المحددة."]
+        }
+    },
+    "snapshot_mirror_clear_all": {
+        "en": {
+            "label": "Clear All Mirror Snapshots",
+            "tooltip": ["Clear all saved mirror-direction data for every rig."]
+        },
+        "es": {
+            "label": "Borrar Todas las Capturas de Espejo",
+            "tooltip": ["Borra todos los datos de dirección de espejo guardados para todos los rigs."]
+        },
+        "fr": {
+            "label": "Effacer Toutes les Captures de Miroir",
+            "tooltip": ["Efface toutes les données de direction de miroir enregistrées pour tous les rigs."]
+        },
+        "ca": {
+            "label": "Esborrar Totes les Captures de Mirall",
+            "tooltip": ["Esborra totes les dades de direcció de mirall desades per a tots els rigs."]
+        },
+        "zh": {
+            "label": "清除所有镜像快照",
+            "tooltip": ["清除所有绑定已保存的镜像方向数据。"]
+        },
+        "ja": {
+            "label": "ミラースナップショットをすべて消去",
+            "tooltip": ["すべてのリグに保存されているミラー方向データを消去します。"]
+        },
+        "ko": {
+            "label": "모든 미러 스냅샷 지우기",
+            "tooltip": ["모든 리그에 저장된 미러 방향 데이터를 지웁니다."]
+        },
+        "ar": {
+            "label": "مسح كل لقطات المرآة",
+            "tooltip": ["مسح جميع بيانات اتجاه المرآة المحفوظة لكل عناصر الريغ."]
+        }
+    },
     "snapshot_help": {
         "en": {
             "label": "Help",

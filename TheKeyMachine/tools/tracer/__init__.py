@@ -38,6 +38,7 @@ class TracerToolObject(ToolObject):
                     {
                         "type": "dynamic_menu",
                         "label": "Offset",
+                        "i18n_key": "tracer_offset_menu",
                         "icon": "tracer_select_offset",
                         "builder": api.populate_tracer_offsets_menu,
                     },
@@ -45,6 +46,7 @@ class TracerToolObject(ToolObject):
                     {
                         "type": "menu",
                         "label": "Style",
+                        "i18n_key": "tracer_style_menu",
                         "icon": "tracer",
                         "items": [
                             {
@@ -55,7 +57,7 @@ class TracerToolObject(ToolObject):
                                 "items": api.tracer_style_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Size"},
+                            {"type": "section", "label": "Size", "i18n_key": "tracer_size_section"},
                             {
                                 "type": "choice",
                                 "id": "tracer_size",
@@ -64,7 +66,7 @@ class TracerToolObject(ToolObject):
                                 "items": api.tracer_size_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Color"},
+                            {"type": "section", "label": "Color", "i18n_key": "tracer_color_section"},
                             "tracer_grey",
                             "tracer_red",
                             "tracer_blue",
@@ -73,6 +75,7 @@ class TracerToolObject(ToolObject):
                     {
                         "type": "menu",
                         "label": "Frames Before and After",
+                        "i18n_key": "tracer_frames_before_after_menu",
                         "icon": "tracer",
                         "items": [
                             {
@@ -83,7 +86,7 @@ class TracerToolObject(ToolObject):
                                 "items": api.tracer_range_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Direction"},
+                            {"type": "section", "label": "Direction", "i18n_key": "tracer_direction_section"},
                             {
                                 "type": "choice",
                                 "id": "tracer_direction",
@@ -101,6 +104,7 @@ class TracerToolObject(ToolObject):
                     {
                         "type": "menu",
                         "label": "More",
+                        "i18n_key": "tracer_more_menu",
                         "icon": "tracer",
                         "items": [
                             "tracer_refresh",
@@ -108,7 +112,7 @@ class TracerToolObject(ToolObject):
                             "tracer_world_space",
                             {"type": "check", "command": "tracer_xray"},
                             "separator",
-                            {"type": "section", "label": "Performance"},
+                            {"type": "section", "label": "Performance", "i18n_key": "tracer_performance_section"},
                             {
                                 "type": "choice",
                                 "id": "tracer_performance",

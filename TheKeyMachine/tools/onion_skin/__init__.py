@@ -27,6 +27,7 @@ class OnionSkinToolObject(ToolObject):
                     {
                         "type": "menu",
                         "label": "Sampling",
+                        "i18n_key": "onion_skin_sampling_menu",
                         "icon": "onion_skin",
                         "description": "Choose which nearby poses are ghosted and how densely they're sampled.",
                         "items": [
@@ -42,6 +43,7 @@ class OnionSkinToolObject(ToolObject):
                             {
                                 "type": "dynamic_menu",
                                 "label": "Nearby Frames",
+                                "i18n_key": "onion_skin_nearby_frames_menu",
                                 "icon": "onion_skin",
                                 "description": "Turn individual frames before and after the current one on or off.",
                                 "builder": api.populate_nearby_frames_menu,
@@ -60,10 +62,11 @@ class OnionSkinToolObject(ToolObject):
                     {
                         "type": "menu",
                         "label": "Appearance",
+                        "i18n_key": "onion_skin_appearance_menu",
                         "icon": "onion_skin",
                         "description": "Set how ghosted poses are drawn: style, opacity, outline width, and color.",
                         "items": [
-                            {"type": "section", "label": "Pose Style"},
+                            {"type": "section", "label": "Pose Style", "i18n_key": "onion_skin_pose_style_section"},
                             {
                                 "type": "choice",
                                 "id": "onion_skin_display_style",
@@ -72,7 +75,7 @@ class OnionSkinToolObject(ToolObject):
                                 "items": controller.display_style_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Pose Opacity"},
+                            {"type": "section", "label": "Pose Opacity", "i18n_key": "onion_skin_pose_opacity_section"},
                             {
                                 "type": "choice",
                                 "id": "onion_skin_opacity",
@@ -81,7 +84,7 @@ class OnionSkinToolObject(ToolObject):
                                 "items": controller.opacity_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Outline Width"},
+                            {"type": "section", "label": "Outline Width", "i18n_key": "onion_skin_outline_width_section"},
                             {
                                 "type": "choice",
                                 "id": "onion_skin_outline_width",
@@ -90,7 +93,7 @@ class OnionSkinToolObject(ToolObject):
                                 "items": controller.outline_width_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Colors"},
+                            {"type": "section", "label": "Colors", "i18n_key": "onion_skin_colors_section"},
                             "onion_skin_past_color",
                             "onion_skin_future_color",
                             "onion_skin_held_color",
@@ -102,12 +105,13 @@ class OnionSkinToolObject(ToolObject):
                     {
                         "type": "menu",
                         "label": "Performance",
+                        "i18n_key": "onion_skin_performance_menu",
                         "icon": "refresh",
                         "description": "Balance how quickly ghosts catch up against viewport smoothness, and manage the onion buffer.",
                         "items": [
                             {"type": "check", "command": "onion_skin_auto_update"},
                             "separator",
-                            {"type": "section", "label": "Update Speed"},
+                            {"type": "section", "label": "Update Speed", "i18n_key": "onion_skin_update_speed_section"},
                             {
                                 "type": "choice",
                                 "id": "onion_skin_performance",
@@ -116,7 +120,7 @@ class OnionSkinToolObject(ToolObject):
                                 "items": api.performance_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Buffer Size"},
+                            {"type": "section", "label": "Buffer Size", "i18n_key": "onion_skin_buffer_size_section"},
                             {
                                 "type": "choice",
                                 "id": "onion_skin_buffer_size",
