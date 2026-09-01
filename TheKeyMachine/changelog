@@ -15,8 +15,8 @@
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
 0.1.55:
-  - polish: Standard workspace pins Custom Tools and Pause Viewport by default, and no longer pins Auto Euler Filter
-  - polish: Refreshed tint colors across several toolbar sections, including Pose and Animation, Animation Layers, Custom Tools, Snapshot, Background Runners, Animation Recovery, and Search
+  - polish: Refreshed tint colors across several toolbar sections, including Pose and Animation, Snapshot, and more
+  - polish: Standard workspace pins Custom Tools and Pause Viewport by default
   - bugfix: Custom Tools section shows its own toolbar color instead of always falling back to gray
   - new: Snapshot Opposite and Snapshot Mirror can remove the selected controls' snapshot data or clear it entirely, with their own shortcuts
   - changed: Default Pose, Select Opposite, and Mirror Add fold their Snapshot actions into each button's own right-click menu
