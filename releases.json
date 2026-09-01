@@ -1,10 +1,48 @@
 {
-  "latest": "0.1.54",
+  "latest": "0.1.55",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.55",
+      "tag": "TKM-0.1.55",
+      "publishedAt": "2026-09-01T23:13:17Z",
+      "publishedLabel": "September 1, 2026",
+      "hasRelease": true,
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.55",
+      "hasDownload": true,
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.55/TKM-0.1.55.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Snapshot Opposite and Snapshot Mirror can remove the selected controls' snapshot data or clear it entirely, with their own shortcuts"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Default Pose, Select Opposite, and Mirror Add fold their Snapshot actions into each button's own right-click menu"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Refreshed tint colors across several toolbar sections, including Pose and Animation, Snapshot, and more"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Standard workspace pins Custom Tools and Pause Viewport by default"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Custom Tools section shows its toolbar color instead of falling back to gray"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.54...TKM-0.1.55"
+    },
     {
       "version": "0.1.54",
       "tag": "TKM-0.1.54",
