@@ -92,13 +92,16 @@ jobs:
             --release-metadata release_metadata.json \
             --repository "$REPOSITORY"
 
+      - name: Sync Standard workspace tools to website
+        run: python3 scripts/release/update_website_tool_data.py website-branch
+
       - name: Commit website update
         working-directory: website-branch
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add index.html changelog/index.html releases.json
+            git add index.html changelog/index.html releases.json tools.json toolbar.js icons movies
             git commit -m "Update website for TKM-${{ steps.sync.outputs.version }}"
             git push origin HEAD:website
           fi
