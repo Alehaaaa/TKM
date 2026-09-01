@@ -9,7 +9,7 @@
   let standardToolbarToolMap = new Map();
 
   async function loadStandardToolbarData() {
-    const response = await fetch('tools.json');
+    const response = await fetch('tools.json?v=0.1.54');
     if (!response.ok) throw new Error(`Unable to load tools.json (${response.status})`);
     const payload = await response.json();
     standardToolbarTools = Array.isArray(payload.tools) ? payload.tools : [];
@@ -128,10 +128,17 @@
     tip.append(header, body);
     (tool.movies || []).forEach((movie) => {
       const media = document.createElement('img');
+      const movieData = typeof movie === 'string' ? { src: movie } : movie;
       media.className = 'standard-toolbar-tip-movie';
-      media.src = movie;
+      media.src = movieData.src;
       media.alt = '';
       media.loading = 'lazy';
+      media.decoding = 'async';
+      if (movieData.width && movieData.height) {
+        media.width = movieData.width;
+        media.height = movieData.height;
+        media.style.aspectRatio = `${movieData.width} / ${movieData.height}`;
+      }
       tip.append(media);
     });
     return tip;
