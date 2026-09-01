@@ -17,7 +17,7 @@
 0.1.55:
   - polish: Refreshed tint colors across several toolbar sections, including Pose and Animation, Snapshot, and more
   - polish: Standard workspace pins Custom Tools and Pause Viewport by default
-  - bugfix: Custom Tools section shows its own toolbar color instead of always falling back to gray
+  - bugfix: Custom Tools section shows its toolbar color instead of falling back to gray
   - new: Snapshot Opposite and Snapshot Mirror can remove the selected controls' snapshot data or clear it entirely, with their own shortcuts
   - changed: Default Pose, Select Opposite, and Mirror Add fold their Snapshot actions into each button's own right-click menu
 
