@@ -17,15 +17,22 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
+import hashlib
+import json
 import os
 import platform
+import re
+import ssl
 import sys
 import threading
 import time
 import traceback
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
 from datetime import datetime
-# import urllib.parse
-# import urllib.request
+from functools import partial
 
 from maya import cmds
 
@@ -34,7 +41,7 @@ import TheKeyMachine.core.application as general
 from TheKeyMachine.core.Qt import QtCore, QtWidgets
 
 from TheKeyMachine.tools import common as toolCommon
-from TheKeyMachine.ui.widgets import customDialogs
+from TheKeyMachine.tools.bug_report import widgets as bug_report_widgets
 
 
 _BUG_EXCEPTION_HANDLER_INSTALLED = False
@@ -47,6 +54,35 @@ _PREVIOUS_EXCEPTHOOK = None
 _PREVIOUS_THREADING_EXCEPTHOOK = None
 _TKM_EXCEPTHOOK_MARKER = "_tkm_bug_exception_hook"
 _TKM_PREVIOUS_HOOK_ATTR = "_tkm_previous_hook"
+_BUG_REPORT_ENDPOINT = "https://tkm-bug-relay.alehaaaa.workers.dev/report"
+_BUG_REPORT_STATUS_ENDPOINT = "https://tkm-bug-relay.alehaaaa.workers.dev/status"
+_BUG_REPORT_INSTALLATION_OPTION = "tkm_bug_report_installation_id"
+
+# Maya's bundled Python often has no (or a stale) system CA bundle, so a
+# plain urlopen() fails with CERTIFICATE_VERIFY_FAILED on some machines --
+# same issue and same fix TheKeyMachine.tools.update.controller already
+# uses for its own network calls.
+_UNVERIFIED_SSL_CONTEXT = ssl.create_default_context()
+_UNVERIFIED_SSL_CONTEXT.check_hostname = False
+_UNVERIFIED_SSL_CONTEXT.verify_mode = ssl.CERT_NONE
+
+# Reports this machine has actually sent, so the Help menu can list them and
+# let the artist check on one later (has the maintainer closed it yet?).
+# Kept client-side only -- the relay has no concept of "who sent this".
+_SENT_REPORTS_OPTION = "tkm_bug_report_sent_history"
+_SENT_REPORTS_MAX_ENTRIES = 30
+_SENT_REPORT_SUMMARY_CHARS = 70
+_PRUNE_WORKERS = []  # keeps QThreads alive while a background prune check runs
+
+# Local, cheap dedupe for auto-detected exceptions: mirrors the relay's own
+# fingerprint normalization so a recurring bug is recognized on-device,
+# without any network round trip, before we ever show a dialog or contact
+# the relay. This keeps repeat crashes from spamming the artist with the
+# same dialog and keeps the relay/GitHub API off the hot path for duplicates.
+_LOCAL_DEDUPE_OPTION = "tkm_bug_report_local_cache"
+_LOCAL_DEDUPE_COOLDOWN_SECONDS = 6 * 60 * 60
+_LOCAL_DEDUPE_MAX_ENTRIES = 200
+_PENDING_LOCAL_COUNTS = {}
 
 
 def _is_valid_dialog(dialog):
@@ -86,7 +122,7 @@ def _get_bug_report_dialog(include_hidden=False):
 
     for widget in QtWidgets.QApplication.topLevelWidgets():
         if (
-            isinstance(widget, customDialogs.QFlatBugReportDialog)
+            isinstance(widget, bug_report_widgets.QFlatBugReportDialog)
             and _is_valid_dialog(widget)
             and (include_hidden or widget.isVisible())
         ):
@@ -158,63 +194,406 @@ class BugReportSubmitWorker(QtCore.QThread):
 
     def run(self):
         try:
-            success = bool(self._submit_callback(**self._payload))
-            self.result_ready.emit(success, None)
+            result = self._submit_callback(**self._payload)
+            if isinstance(result, dict):
+                self.result_ready.emit(bool(result.get("success")), result)
+            else:
+                self.result_ready.emit(bool(result), None)
         except Exception as exc:
             self.result_ready.emit(False, exc)
 
 
+def _format_bug_report_payload(payload):
+    lines = [
+        "# TheKeyMachine Bug Report",
+        "",
+        "Generated: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        "",
+        "## Reporter",
+        payload.get("name", "") or "Anonymous",
+        "",
+        "## What happened",
+        payload.get("explanation", "") or "",
+        "",
+        "## Script error",
+        "```text",
+        payload.get("script_error", "") or "No script error supplied.",
+        "```",
+        "",
+        "## System details",
+    ]
+    for key in sorted(payload.get("system", {})):
+        lines.append("- **{}:** {}".format(key, payload["system"][key]))
+    return "\n".join(lines)
+
+
+def _redact_home_path(value):
+    text = _sanitize_payload_value(value)
+    home = os.path.expanduser("~")
+    if home and home != "~":
+        text = text.replace(home, "<home>")
+        text = text.replace(home.replace("\\", "/"), "<home>")
+        text = text.replace(home.replace("/", "\\"), "<home>")
+    return text
+
+
+def _installation_id():
+    try:
+        if cmds.optionVar(exists=_BUG_REPORT_INSTALLATION_OPTION):
+            value = str(cmds.optionVar(query=_BUG_REPORT_INSTALLATION_OPTION) or "")
+            if value:
+                return value
+        value = str(uuid.uuid4())
+        cmds.optionVar(stringValue=(_BUG_REPORT_INSTALLATION_OPTION, value))
+        return value
+    except Exception:
+        # Stable within this Maya process if optionVar storage is unavailable.
+        global _BUG_REPORT_SESSION_INSTALLATION_ID
+        try:
+            return _BUG_REPORT_SESSION_INSTALLATION_ID
+        except NameError:
+            _BUG_REPORT_SESSION_INSTALLATION_ID = str(uuid.uuid4())
+            return _BUG_REPORT_SESSION_INSTALLATION_ID
+
+
+def _local_fingerprint_source(value):
+    # Mirrors the relay worker's normalizeFingerprintSource() so the client
+    # can recognize the same bug locally without asking the server.
+    text = str(value or "unknown").lower()
+    text = re.sub(r"(?:[a-z]:)?[\\/](?:[^\s:\n]+[\\/])+[^\s:\n]+", "<path>", text)
+    text = re.sub(r"line \d+", "line <n>", text)
+    text = re.sub(r"0x[0-9a-f]+", "<address>", text)
+    text = re.sub(r"\b\d+\b", "<n>", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()[:8000]
+
+
+def _local_fingerprint(value):
+    return hashlib.sha256(_local_fingerprint_source(value).encode("utf-8")).hexdigest()
+
+
+def _load_local_dedupe_cache():
+    try:
+        if cmds.optionVar(exists=_LOCAL_DEDUPE_OPTION):
+            raw = cmds.optionVar(query=_LOCAL_DEDUPE_OPTION)
+            if raw:
+                data = json.loads(raw)
+                if isinstance(data, dict):
+                    return data
+    except Exception:
+        pass
+    return {}
+
+
+def _save_local_dedupe_cache(cache):
+    try:
+        if len(cache) > _LOCAL_DEDUPE_MAX_ENTRIES:
+            ordered = sorted(
+                cache.items(),
+                key=lambda item: item[1].get("last_seen", 0) if isinstance(item[1], dict) else 0,
+                reverse=True,
+            )
+            cache = dict(ordered[:_LOCAL_DEDUPE_MAX_ENTRIES])
+        cmds.optionVar(stringValue=(_LOCAL_DEDUPE_OPTION, json.dumps(cache)))
+    except Exception:
+        pass
+
+
+def _register_local_occurrence(fingerprint):
+    """Record a local sighting of `fingerprint`.
+
+    Returns ``(should_notify, occurrences_since_last_send)``. ``should_notify``
+    is False while the fingerprint is inside its cooldown window, letting
+    callers skip the dialog and the network call entirely for a bug that is
+    already known and being tracked. Once the cooldown lapses (or this is the
+    first sighting), the caller gets back how many times it happened locally
+    since the last real submission, so that count can ride along on the next
+    report instead of each occurrence costing its own round trip.
+    """
+    now = time.time()
+    cache = _load_local_dedupe_cache()
+    entry = cache.get(fingerprint) or {}
+    occurrences = int(entry.get("since_last_sent", 0)) + 1
+    last_sent = float(entry.get("last_sent", 0) or 0)
+    should_notify = (now - last_sent) >= _LOCAL_DEDUPE_COOLDOWN_SECONDS
+
+    entry["last_seen"] = now
+    entry["since_last_sent"] = 0 if should_notify else occurrences
+    if should_notify:
+        entry["last_sent"] = now
+    cache[fingerprint] = entry
+    _save_local_dedupe_cache(cache)
+    return should_notify, occurrences
+
+
+def _consume_pending_local_count(fingerprint):
+    return _PENDING_LOCAL_COUNTS.pop(fingerprint, 1)
+
+
 def prepare_bug_report_payload(name, explanation, script_error):
+    fingerprint = _local_fingerprint(script_error or explanation)
     payload = {
-        "name": name,
-        "explanation": explanation,
-        "script_error": script_error,
+        "installation_id": _installation_id(),
+        "name": _redact_home_path(name),
+        "explanation": _redact_home_path(explanation),
+        "script_error": _redact_home_path(script_error),
+        "local_count": _consume_pending_local_count(fingerprint),
     }
-    payload.update(_collect_debug_context())
+    payload["system"] = {
+        key: _redact_home_path(value)
+        for key, value in _collect_debug_context().items()
+    }
     return payload
 
 
-def write_bug_report_payload(**payload):
+def _write_bug_report_file(payload):
     try:
-        time.sleep(1.2)
-
         desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
         if not os.path.isdir(desktop_dir):
-            return False
+            return None
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         report_path = os.path.join(desktop_dir, "TKM_Bug Report_{}.txt".format(timestamp))
-
-        lines = [
-            "TheKeyMachine Bug Report",
-            "Generated: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            "",
-            "[User]",
-            "Name: {}".format(payload.get("name", "")),
-            "",
-            "[Explanation]",
-            payload.get("explanation", "") or "",
-            "",
-            "[Script Error]",
-            payload.get("script_error", "") or "",
-            "",
-            "[System Details]",
-        ]
-        for key in sorted(payload.keys()):
-            if key in ("name", "explanation", "script_error"):
-                continue
-            lines.append("{}: {}".format(key, payload[key]))
-
-        with open(report_path, "w") as report_file:
-            report_file.write("\n".join(lines))
+        with open(report_path, "w", encoding="utf-8") as report_file:
+            report_file.write(_format_bug_report_payload(payload))
     except Exception:
-        return False
+        return None
 
-    return True
+    return report_path
+
+
+def write_bug_report_payload(**payload):
+    return bool(_write_bug_report_file(payload))
+
+
+def _load_sent_reports():
+    try:
+        if cmds.optionVar(exists=_SENT_REPORTS_OPTION):
+            raw = cmds.optionVar(query=_SENT_REPORTS_OPTION)
+            if raw:
+                data = json.loads(raw)
+                if isinstance(data, list):
+                    return data
+    except Exception:
+        pass
+    return []
+
+
+def _save_sent_reports(entries):
+    try:
+        cmds.optionVar(
+            stringValue=(_SENT_REPORTS_OPTION, json.dumps(entries[:_SENT_REPORTS_MAX_ENTRIES]))
+        )
+    except Exception:
+        pass
+
+
+def _report_summary(payload):
+    text = (payload.get("explanation") or "").strip()
+    first_line = text.split("\n", 1)[0].strip() if text else ""
+    if not first_line:
+        return "Bug report"
+    if len(first_line) > _SENT_REPORT_SUMMARY_CHARS:
+        return first_line[: _SENT_REPORT_SUMMARY_CHARS - 1].rstrip() + "…"
+    return first_line
+
+
+def _record_sent_report(payload, result):
+    issue_number = result.get("issue_number") if isinstance(result, dict) else None
+    if not issue_number:
+        return
+    fingerprint = _local_fingerprint(payload.get("script_error") or payload.get("explanation"))
+    entry = {
+        "issue_number": issue_number,
+        "fingerprint": fingerprint,
+        "summary": _report_summary(payload),
+        "sent_at": time.time(),
+        "duplicate": bool(result.get("duplicate")),
+    }
+    # Newest first, one entry per fingerprint (a resend just refreshes it).
+    entries = [e for e in _load_sent_reports() if e.get("fingerprint") != fingerprint]
+    entries.insert(0, entry)
+    _save_sent_reports(entries)
+
+
+def list_sent_bug_reports():
+    """Newest-first list of reports this machine has actually sent."""
+    return _load_sent_reports()
+
+
+def _fetch_bug_report_status(fingerprint):
+    """Ask the relay whether `fingerprint` still has a live issue. Raises on failure."""
+    query = urllib.parse.urlencode({"fingerprint": fingerprint})
+    request = urllib.request.Request(
+        "{}?{}".format(_BUG_REPORT_STATUS_ENDPOINT, query),
+        headers={
+            "User-Agent": "TheKeyMachine/{}".format(general.get_thekeymachine_version()),
+        },
+        method="GET",
+    )
+    with urllib.request.urlopen(request, context=_UNVERIFIED_SSL_CONTEXT, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+class _BugReportPruneWorker(QtCore.QThread):
+    pruned_ready = QtCore.Signal(list)
+
+    def __init__(self, entries, parent=None):
+        QtCore.QThread.__init__(self, parent)
+        self._entries = entries
+
+    def run(self):
+        removed_fingerprints = []
+        for entry in self._entries:
+            fingerprint = entry.get("fingerprint")
+            if not fingerprint:
+                continue
+            try:
+                result = _fetch_bug_report_status(fingerprint)
+            except Exception:
+                # Network hiccup or rate limit -- don't prune on uncertainty,
+                # only on an explicit "not found" from the relay.
+                continue
+            if isinstance(result, dict) and result.get("found") is False:
+                removed_fingerprints.append(fingerprint)
+        self.pruned_ready.emit(removed_fingerprints)
+
+
+def _prune_deleted_sent_reports():
+    """Check sent reports against the relay in the background and drop any
+
+    whose GitHub issue is gone (deleted, or the relay no longer tracks it).
+    Fires and forgets: runs off the UI thread, and only affects what the
+    Bug Report menu shows the *next* time it's opened, never the one
+    currently on screen -- checking synchronously would make every menu
+    open pause on a network round trip per sent report.
+    """
+    entries = _load_sent_reports()
+    if not entries:
+        return None
+
+    worker = _BugReportPruneWorker(entries)
+    _PRUNE_WORKERS.append(worker)
+
+    def _on_pruned(removed_fingerprints):
+        try:
+            _PRUNE_WORKERS.remove(worker)
+        except ValueError:
+            pass
+        if not removed_fingerprints:
+            return
+        removed = set(removed_fingerprints)
+        current = _load_sent_reports()
+        remaining = [e for e in current if e.get("fingerprint") not in removed]
+        if len(remaining) != len(current):
+            _save_sent_reports(remaining)
+
+    worker.pruned_ready.connect(_on_pruned)
+    worker.finished.connect(worker.deleteLater)
+    worker.start()
+    return worker
+
+
+_BUG_REPORT_INBOX_REPO_URL = "https://github.com/Alehaaaa/TKM-bug-inbox"
+
+
+def open_sent_bug_report(entry, *_args):
+    """Open a previously sent report's GitHub issue in the browser.
+
+    Accepts and ignores any extra positional args -- menu actions built via
+    ``addAction(label, callback=...)`` may invoke this through a shared
+    runner that appends its own arguments (e.g. the QAction ``checked``
+    state) after the ones already bound by ``partial()``.
+    """
+    issue_number = entry.get("issue_number")
+    if not issue_number:
+        return
+    general.open_url("{}/issues/{}".format(_BUG_REPORT_INBOX_REPO_URL, issue_number))
+
+
+def _format_sent_report_label(entry):
+    issue_number = entry.get("issue_number")
+    summary = entry.get("summary") or "Bug report"
+    try:
+        when = datetime.fromtimestamp(float(entry.get("sent_at", 0))).strftime("%Y-%m-%d")
+    except Exception:
+        when = ""
+    prefix = "#{}".format(issue_number) if issue_number else "?"
+    return "{} · {}{}".format(prefix, summary, "  ({})".format(when) if when else "")
+
+
+def populate_bug_report_menu(menu):
+    """Rebuild the whole Bug Report menu in place.
+
+    Used both as a ``dynamic_menu`` builder (the TKM logo's Help submenu)
+    and as a pinned/shelf tool's own popup (the flat "bug_report_window"
+    tool's "menu" callable) -- one implementation, so the two surfaces can't
+    drift apart. Always starts with "Report a Bug"; previously sent reports
+    (if any) are listed flat underneath it, newest first, with no tooltip of
+    their own -- clicking one just opens that report on GitHub.
+    """
+    from TheKeyMachine.tools import registry
+
+    menu.clear()
+    dialog_tool = registry.get_tool("bug_report_open_dialog")
+    menu.addAction(
+        dialog_tool.get("label", "Report a Bug"),
+        callback=dialog_tool.get("callback"),
+        icon=dialog_tool.get("icon"),
+        command_id="bug_report_open_dialog",
+    )
+
+    entries = list_sent_bug_reports()
+    if not entries:
+        return menu
+
+    menu.addSeparator()
+    for entry in entries:
+        menu.addAction(
+            _format_sent_report_label(entry),
+            callback=partial(open_sent_bug_report, entry),
+            tooltip_enabled=False,
+        )
+
+    # Check in the background whether any of these were deleted on GitHub;
+    # this menu instance still shows everything, but a stale entry won't
+    # survive to the next time it's opened.
+    _prune_deleted_sent_reports()
+    return menu
+
+
+def submit_bug_report(**payload):
+    """Send a report through the credential-holding Cloudflare relay."""
+    try:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(
+            _BUG_REPORT_ENDPOINT,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "TheKeyMachine/{}".format(general.get_thekeymachine_version()),
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, context=_UNVERIFIED_SSL_CONTEXT, timeout=10) as response:
+            result = json.loads(response.read().decode("utf-8"))
+        if not result.get("success"):
+            raise RuntimeError(result.get("error") or "Relay rejected the report")
+        _record_sent_report(payload, result)
+        return result
+    except Exception as exc:
+        backup_path = _write_bug_report_file(payload)
+        return {
+            "success": False,
+            "fallback_saved": bool(backup_path),
+            "backup_path": backup_path,
+            "error": str(exc),
+        }
 
 
 def send_bug_report(name, explanation, script_error):
-    return write_bug_report_payload(**prepare_bug_report_payload(name, explanation, script_error))
+    payload = prepare_bug_report_payload(name, explanation, script_error)
+    return bool(submit_bug_report(**payload).get("success"))
 
 
 def _extract_exception_source_file(exc=None, tb=None):
@@ -258,10 +637,6 @@ def _traceback_has_thekeymachine_frame(tb):
     except Exception:
         return False
     return False
-
-
-def _format_detected_bug_name(source_file):
-    return "Error Detection on file {}".format(source_file or "unknown.py")
 
 
 def _default_detected_bug_explanation(context=None):
@@ -326,14 +701,36 @@ def report_detected_exception(exc=None, context=None, source_file=None, tracebac
 
     try:
         source_name = source_file or _extract_exception_source_file(exc=exc)
-        report_name = _format_detected_bug_name(source_name)
         report_traceback = traceback_text
         if not report_traceback:
             if exc is not None:
                 report_traceback = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
             else:
                 report_traceback = "".join(traceback.format_stack())
-        report_explanation = _default_detected_bug_explanation(context=context)
+    except Exception:
+        return
+
+    # Cheap, local, network-free gate: if this exact bug already notified the
+    # user recently, just tally the occurrence and stop -- no dialog, no
+    # relay call, no GitHub API cost.
+    fingerprint = _local_fingerprint(report_traceback)
+    should_notify, local_occurrences = _register_local_occurrence(fingerprint)
+    if not should_notify:
+        _mark_exception_reported(exc)
+        return
+    _PENDING_LOCAL_COUNTS[fingerprint] = local_occurrences
+
+    try:
+        recurrence_note = (
+            "\n\nSeen locally {} time(s) since this was last reported.".format(local_occurrences)
+            if local_occurrences > 1
+            else ""
+        )
+        report_explanation = "{}\n\nDetected source: {}{}".format(
+            _default_detected_bug_explanation(context=context),
+            source_name,
+            recurrence_note,
+        )
     except Exception:
         return
 
@@ -358,7 +755,7 @@ def report_detected_exception(exc=None, context=None, source_file=None, tracebac
         try:
             bug_report_window(
                 dialog_title=i18n.tr("bug_report_title_detected", "Sorry, you found a bug!"),
-                prefill_name=report_name,
+                prefill_name="",
                 prefill_explanation=report_explanation,
                 prefill_script_error=report_traceback,
             )
@@ -512,8 +909,8 @@ def bug_report_window(*args, dialog_title=None, prefill_name="", prefill_explana
             pass
         return existing_dialog
 
-    dlg = customDialogs.QFlatBugReportDialog(
-        submit_callback=write_bug_report_payload,
+    dlg = bug_report_widgets.QFlatBugReportDialog(
+        submit_callback=submit_bug_report,
         prepare_callback=prepare_bug_report_payload,
         worker_class=BugReportSubmitWorker,
         dialog_title=dialog_title,

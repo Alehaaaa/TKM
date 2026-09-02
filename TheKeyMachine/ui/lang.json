@@ -207,13 +207,13 @@
         "zh": "* 请描述发生的情况、您期望的结果以及重现该问题的步骤。"
     },
     "bug_report_name_placeholder": {
-        "ar": "* اسمك",
-        "ca": "* El teu nom",
-        "es": "* Tu nombre",
-        "fr": "* Votre nom",
-        "ja": "* お名前",
-        "ko": "* 이름",
-        "zh": "* 您的姓名"
+        "ar": "الاسم أو الاسم المستعار (اختياري)",
+        "ca": "Nom o àlies (opcional)",
+        "es": "Nombre o alias (opcional)",
+        "fr": "Nom ou pseudonyme (facultatif)",
+        "ja": "名前または別名（任意）",
+        "ko": "이름 또는 별칭(선택 사항)",
+        "zh": "姓名或别名（可选）"
     },
     "bug_report_script_error_placeholder": {
         "ar": "الصق آخر أسطر محرر البرمجة النصية هنا. أضف تتبع الخطأ (traceback) أو الخطأ الدقيق إن وُجد.",
@@ -226,12 +226,12 @@
     },
     "bug_report_send_button": {
         "ar": "إرسال الخطأ",
-        "ca": "Enviar error",
+        "ca": "Envia l'error",
         "es": "Enviar error",
         "fr": "Envoyer le bug",
         "ja": "バグを送信",
-        "ko": "버그 전송",
-        "zh": "发送报告"
+        "ko": "버그 보내기",
+        "zh": "发送错误"
     },
     "bug_report_status_failed": {
         "ar": "فشل إرسال التقرير. حاول مرة أخرى لاحقًا.",
@@ -265,8 +265,8 @@
         "ca": "Enviant l'informe d'error...",
         "es": "Enviando informe de error...",
         "fr": "Envoi du rapport de bug...",
-        "ja": "バグレポートを送信中...",
-        "ko": "버그 보고서 전송 중...",
+        "ja": "バグレポートを送信しています...",
+        "ko": "버그 보고서를 보내는 중...",
         "zh": "正在发送错误报告……"
     },
     "bug_report_status_sending_wait": {
@@ -279,13 +279,31 @@
         "zh": "正在发送错误报告，请稍候……"
     },
     "bug_report_status_success": {
-        "ar": "تم إرسال التقرير بنجاح. شكرًا لك!",
-        "ca": "Informe enviat correctament. Gràcies!",
-        "es": "¡Informe enviado correctamente. Gracias!",
-        "fr": "Rapport envoyé avec succès. Merci !",
-        "ja": "レポートが正常に送信されました。ありがとうございます！",
-        "ko": "보고서가 성공적으로 전송되었습니다. 감사합니다!",
-        "zh": "报告发送成功，谢谢！"
+        "ar": "تم إرسال تقرير الخطأ بشكل خاص. شكرًا لك!",
+        "ca": "L'informe d'error s'ha enviat de manera privada. Gràcies!",
+        "es": "El informe de error se envió de forma privada. ¡Gracias!",
+        "fr": "Le rapport de bug a été envoyé en privé. Merci !",
+        "ja": "バグレポートを非公開で送信しました。ありがとうございます！",
+        "ko": "버그 보고서를 비공개로 보냈습니다. 감사합니다!",
+        "zh": "错误报告已私密发送。谢谢！"
+    },
+    "bug_report_status_duplicate": {
+        "ar": "يتطابق هذا مع تقرير موجود، لذا تم تحديث عدد مرات حدوثه. شكرًا لك!",
+        "ca": "Coincideix amb un informe existent; n'hem actualitzat el nombre d'incidències. Gràcies!",
+        "es": "Coincide con un informe existente; se actualizó su número de ocurrencias. ¡Gracias!",
+        "fr": "Ce rapport correspond à un rapport existant ; son nombre d'occurrences a été mis à jour. Merci !",
+        "ja": "既存のレポートと一致したため、発生回数を更新しました。ありがとうございます！",
+        "ko": "기존 보고서와 일치하여 발생 횟수를 업데이트했습니다. 감사합니다!",
+        "zh": "此报告与现有报告重复，已更新其发生次数。谢谢！"
+    },
+    "bug_report_status_saved_fallback": {
+        "ar": "تعذر إرسال التقرير. تم حفظ نسخة محلية على سطح المكتب.",
+        "ca": "No s'ha pogut enviar l'informe. Se n'ha desat una còpia local a l'escriptori.",
+        "es": "No se pudo enviar el informe. Se guardó una copia local en el escritorio.",
+        "fr": "Impossible d'envoyer le rapport. Une copie locale a été enregistrée sur le bureau.",
+        "ja": "レポートを送信できませんでした。ローカルコピーをデスクトップに保存しました。",
+        "ko": "보고서를 보내지 못했습니다. 로컬 사본을 바탕 화면에 저장했습니다.",
+        "zh": "无法发送报告。本地副本已保存到桌面。"
     },
     "bug_report_status_unavailable": {
         "ar": "الإبلاغ عن الأخطاء غير متاح في الوقت الحالي.",
@@ -297,13 +315,13 @@
         "zh": "错误报告功能目前不可用。"
     },
     "bug_report_subtitle": {
-        "ar": "هل وجدت خطأً؟ يرجى ملء التقرير وسأبذل قصارى جهدي لإصلاحه في التحديث القادم.",
-        "ca": "Has trobat un error? Omple l'informe i faré tot el possible per solucionar-lo en la propera actualització.",
-        "es": "¿Has encontrado un error? Rellena el informe y haré todo lo posible por solucionarlo en la próxima actualización.",
-        "fr": "Vous avez trouvé un bug ? Remplissez le rapport et je ferai de mon mieux pour le corriger dans la prochaine mise à jour.",
-        "ja": "バグを見つけましたか？レポートにご記入いただければ、次回のアップデートで修正するよう最善を尽くします。",
-        "ko": "버그를 발견하셨나요? 보고서를 작성해 주시면 다음 업데이트에서 수정하도록 최선을 다하겠습니다.",
-        "zh": "发现了错误吗？请填写报告，我会尽力在下一次更新中修复它。"
+        "ar": "أرسل تقرير خطأ خاصًا. تساعد تفاصيل النظام في التشخيص، وتُزال مسارات المجلد الشخصي قبل الرفع.",
+        "ca": "Envia un informe d'error privat. Els detalls del sistema ajuden a diagnosticar-lo; les rutes personals s'eliminen abans de pujar-lo.",
+        "es": "Envía un informe de error privado. Los datos del sistema ayudan a diagnosticarlo; las rutas personales se eliminan antes de subirlo.",
+        "fr": "Envoyez un rapport de bug privé. Les détails système facilitent le diagnostic ; les chemins personnels sont supprimés avant l'envoi.",
+        "ja": "非公開のバグレポートを送信します。診断用のシステム情報に含まれる個人ホームパスは送信前に削除されます。",
+        "ko": "비공개 버그 보고서를 보냅니다. 진단용 시스템 정보에서 개인 홈 경로는 업로드 전에 제거됩니다.",
+        "zh": "发送私密错误报告。系统信息有助于诊断，上传前会移除个人主目录路径。"
     },
     "bug_report_title": {
         "ar": "الإبلاغ عن خطأ",

@@ -112,7 +112,15 @@ class TkmMenuToolObject(ToolObject):
                         "icon": "help",
                         "description": TOOLTIPS["help"][0],
                         "items": [
-                            "bug_report_window",
+                            {
+                                "type": "dynamic_menu",
+                                "command": "bug_report_window",
+                                "label": "Bug Report",
+                                "icon": "bug",
+                                "description": TOOLTIPS["bug_report"][0],
+                                "available": api.bug_reports_available,
+                                "builder": api.populate_bug_report_menu,
+                            },
                             "separator",
                             {
                                 "label": "Documentation",
@@ -318,11 +326,19 @@ class TkmMenuToolObject(ToolObject):
             "tooltip": TOOLTIPS["donate"],
         },
         "bug_report_window": {
-            "type": "tool",
+            "type": "menu",
             "label": "Bug Report",
             "icon": "bug",
-            "callback": api.show_bug_report,
+            "callback": partial(api.show_menu, "bug_report_window"),
             "available": api.bug_reports_available,
+            "tooltip": TOOLTIPS["bug_report"],
+            "menu": api.populate_bug_report_menu,
+        },
+        "bug_report_open_dialog": {
+            "type": "tool",
+            "label": "Report a Bug",
+            "icon": "bug",
+            "callback": api.show_bug_report,
             "tooltip": TOOLTIPS["bug_report"],
         },
     }
