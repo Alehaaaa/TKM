@@ -1,10 +1,28 @@
 {
-  "latest": "0.1.55",
+  "latest": "0.1.56",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.56",
+      "tag": "TKM-0.1.56",
+      "publishedAt": "2026-09-03T07:25:39Z",
+      "publishedLabel": "September 3, 2026",
+      "hasRelease": true,
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.56",
+      "hasDownload": true,
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.56/TKM-0.1.56.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Bug Report can also send suggestions with tailored prompts, then open the submitted ticket directly"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.55...TKM-0.1.56"
+    },
     {
       "version": "0.1.55",
       "tag": "TKM-0.1.55",
