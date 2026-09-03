@@ -103,6 +103,7 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.selection_sets_controller = selectionSetsApi.get_controller(owner=self)
 
         report.install_bug_exception_handler()
+        report.refresh_sent_bug_report_statuses_on_launch()
         graph_toolbar.sync_graph_toolbar_watch()
         self._runtime_manager.scene_opened.connect(self._on_scene_opened)
         self._runtime_manager.scene_new.connect(self._on_scene_opened)

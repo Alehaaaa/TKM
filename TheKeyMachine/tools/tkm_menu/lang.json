@@ -969,51 +969,101 @@
     },
     "bug_report_window": {
         "en": {
-            "label": "Bug Report",
+            "label": "Get in Touch",
             "tooltip": [
-                "Create a bug report with environment details and optional diagnostic attachments."
+                "Send bug reports and suggestions, and track the status of the ones you've already sent."
             ]
         },
         "es": {
-            "label": "Reportar un Error",
+            "label": "Contactar",
             "tooltip": [
-                "Crea un reporte de error con detalles del entorno y archivos de diagnóstico opcionales."
+                "Envía informes de error o sugerencias, y haz seguimiento del estado de los que ya has enviado."
             ]
         },
         "fr": {
-            "label": "Signaler un Bug",
+            "label": "Nous contacter",
             "tooltip": [
-                "Crée un rapport de bug avec les détails de l'environnement et des fichiers de diagnostic optionnels."
+                "Envoyez des rapports de bug ou des suggestions, et suivez l'état de ceux que vous avez déjà envoyés."
             ]
         },
         "ca": {
-            "label": "Informe d'Error",
+            "label": "Contacta",
             "tooltip": [
-                "Crea un informe d'error amb detalls de l'entorn i adjunts de diagnòstic opcionals"
+                "Envia informes d'error o suggeriments, i fes seguiment de l'estat dels que ja has enviat."
             ]
         },
         "zh": {
-            "label": "错误报告",
+            "label": "联系我们",
             "tooltip": [
-                "创建包含环境详情和可选诊断附件的错误报告"
+                "发送错误报告或建议，并跟踪已发送内容的处理状态。"
             ]
         },
         "ja": {
-            "label": "バグレポート",
+            "label": "連絡する",
             "tooltip": [
-                "環境の詳細とオプションの診断用添付ファイルを含むバグレポートを作成します"
+                "バグ報告や提案を送信し、送信済みの項目のステータスを追跡できます。"
             ]
         },
         "ko": {
-            "label": "버그 신고",
+            "label": "문의하기",
             "tooltip": [
-                "환경 세부정보와 선택적 진단 첨부 파일이 포함된 버그 신고를 작성합니다"
+                "버그 신고나 제안을 보내고, 이미 보낸 항목의 상태를 추적하세요."
             ]
         },
         "ar": {
-            "label": "الإبلاغ عن خلل",
+            "label": "تواصل معنا",
             "tooltip": [
-                "إنشاء تقرير خلل يتضمن تفاصيل البيئة ومرفقات تشخيصية اختيارية"
+                "أرسل تقارير الأخطاء أو الاقتراحات، وتتبّع حالة ما أرسلته سابقًا."
+            ]
+        }
+    },
+    "bug_report_open_dialog": {
+        "en": {
+            "label": "Send Feedback",
+            "tooltip": [
+                "Send a private bug report or suggestion with useful diagnostic details."
+            ]
+        },
+        "es": {
+            "label": "Enviar comentarios",
+            "tooltip": [
+                "Envía un informe privado de error o sugerencia con detalles de diagnóstico útiles."
+            ]
+        },
+        "fr": {
+            "label": "Envoyer un commentaire",
+            "tooltip": [
+                "Envoyez un rapport privé de bug ou une suggestion avec des détails de diagnostic utiles."
+            ]
+        },
+        "ca": {
+            "label": "Enviar comentaris",
+            "tooltip": [
+                "Envia un informe privat d'error o un suggeriment amb detalls de diagnòstic útils"
+            ]
+        },
+        "zh": {
+            "label": "发送反馈",
+            "tooltip": [
+                "私密发送错误报告或建议，并附上有用的诊断信息"
+            ]
+        },
+        "ja": {
+            "label": "フィードバックを送信",
+            "tooltip": [
+                "診断に役立つ情報を添えて、非公開のバグ報告または提案を送信します"
+            ]
+        },
+        "ko": {
+            "label": "피드백 보내기",
+            "tooltip": [
+                "유용한 진단 정보와 함께 비공개 버그 보고서 또는 제안을 보냅니다"
+            ]
+        },
+        "ar": {
+            "label": "إرسال ملاحظات",
+            "tooltip": [
+                "إرسال تقرير خطأ أو اقتراح بشكل خاص مع تفاصيل تشخيصية مفيدة"
             ]
         }
     },

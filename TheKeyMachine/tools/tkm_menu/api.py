@@ -293,7 +293,7 @@ def show_bug_report(*_args):
 
 
 def populate_bug_report_menu(menu, *_args):
-    """Populate (or repopulate) the Bug Report menu: "Report a Bug" plus
+    """Populate (or repopulate) the Get in Touch menu: composer plus
     any previously sent reports, listed flat underneath it."""
     from TheKeyMachine.tools.bug_report import controller as bug_reporting
     return bug_reporting.populate_bug_report_menu(menu)

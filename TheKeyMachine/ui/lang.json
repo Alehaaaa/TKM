@@ -387,13 +387,13 @@
         "zh": "私密发送错误报告或建议。系统信息有助于诊断错误，上传前会移除个人主目录路径。"
     },
     "bug_report_title": {
-        "ar": "الإبلاغ عن خطأ أو اقتراح",
-        "ca": "Informa d'un Error o Suggeriment",
-        "es": "Informar de un Error o Sugerencia",
-        "fr": "Signaler un Bug ou une Suggestion",
-        "ja": "バグまたは提案を報告",
-        "ko": "버그 또는 제안 보내기",
-        "zh": "报告错误或建议"
+        "ar": "تواصل معنا",
+        "ca": "Contacta",
+        "es": "Contactar",
+        "fr": "Nous contacter",
+        "ja": "連絡する",
+        "ko": "문의하기",
+        "zh": "联系我们"
     },
     "bug_report_title_detected": {
         "ar": "عذرًا، لقد وجدت خطأً!",

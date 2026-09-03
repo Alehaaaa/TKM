@@ -38,7 +38,7 @@ from maya import cmds
 
 import TheKeyMachine.core.application as general
 
-from TheKeyMachine.core.Qt import QtCore, QtWidgets
+from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.bug_report import widgets as bug_report_widgets
@@ -72,6 +72,7 @@ _UNVERIFIED_SSL_CONTEXT.verify_mode = ssl.CERT_NONE
 _SENT_REPORTS_OPTION = "tkm_bug_report_sent_history"
 _SENT_REPORTS_MAX_ENTRIES = 30
 _SENT_REPORT_SUMMARY_CHARS = 70
+_SENT_REPORT_STATUS_TTL_SECONDS = 24 * 60 * 60
 _PRUNE_WORKERS = []  # keeps QThreads alive while a background prune check runs
 
 # Local, cheap dedupe for auto-detected exceptions: mirrors the relay's own
@@ -423,6 +424,8 @@ def _record_sent_report(payload, result):
         "fingerprint": fingerprint,
         "summary": _report_summary(payload),
         "report_type": _normalize_report_type(payload.get("report_type")),
+        "status": "open",
+        "status_checked_at": time.time(),
         "sent_at": time.time(),
         "duplicate": bool(result.get("duplicate")),
     }
@@ -437,9 +440,14 @@ def list_sent_bug_reports():
     return _load_sent_reports()
 
 
-def _fetch_bug_report_status(fingerprint):
+def _fetch_bug_report_status(fingerprint, report_type="bug"):
     """Ask the relay whether `fingerprint` still has a live issue. Raises on failure."""
-    query = urllib.parse.urlencode({"fingerprint": fingerprint})
+    query = urllib.parse.urlencode(
+        {
+            "fingerprint": fingerprint,
+            "report_type": _normalize_report_type(report_type),
+        }
+    )
     request = urllib.request.Request(
         "{}?{}".format(_BUG_REPORT_STATUS_ENDPOINT, query),
         headers={
@@ -453,6 +461,7 @@ def _fetch_bug_report_status(fingerprint):
 
 class _BugReportPruneWorker(QtCore.QThread):
     pruned_ready = QtCore.Signal(list)
+    statuses_ready = QtCore.Signal(list)
 
     def __init__(self, entries, parent=None):
         QtCore.QThread.__init__(self, parent)
@@ -460,33 +469,63 @@ class _BugReportPruneWorker(QtCore.QThread):
 
     def run(self):
         removed_fingerprints = []
+        status_updates = []
         for entry in self._entries:
             fingerprint = entry.get("fingerprint")
             if not fingerprint:
                 continue
             try:
-                result = _fetch_bug_report_status(fingerprint)
+                result = _fetch_bug_report_status(
+                    fingerprint,
+                    report_type=entry.get("report_type"),
+                )
             except Exception:
                 # Network hiccup or rate limit -- don't prune on uncertainty,
                 # only on an explicit "not found" from the relay.
                 continue
             if isinstance(result, dict) and result.get("found") is False:
                 removed_fingerprints.append(fingerprint)
+            elif isinstance(result, dict) and result.get("found") is True:
+                status_updates.append(
+                    {
+                        "fingerprint": fingerprint,
+                        "issue_number": result.get("issue_number"),
+                        "state": result.get("state") or "open",
+                        "checked_at": time.time(),
+                    }
+                )
         self.pruned_ready.emit(removed_fingerprints)
+        self.statuses_ready.emit(status_updates)
 
 
-def _prune_deleted_sent_reports():
+def _entries_due_for_status_refresh(entries):
+    now = time.time()
+    due = []
+    for entry in entries:
+        try:
+            last_checked = float(entry.get("status_checked_at", 0) or 0)
+        except Exception:
+            last_checked = 0
+        if (now - last_checked) >= _SENT_REPORT_STATUS_TTL_SECONDS:
+            due.append(entry)
+    return due
+
+
+def refresh_sent_bug_report_statuses(force=False):
     """Check sent reports against the relay in the background and drop any
 
     whose GitHub issue is gone (deleted, or the relay no longer tracks it).
-    Fires and forgets: runs off the UI thread, and only affects what the
-    Bug Report menu shows the *next* time it's opened, never the one
-    currently on screen -- checking synchronously would make every menu
-    open pause on a network round trip per sent report.
+    This is deliberately cache-aware: normal users can open the menu every
+    session without causing a burst of GitHub calls, while deleted/closed
+    tickets still get cleaned up shortly after launch or the next menu open.
     """
     entries = _load_sent_reports()
     if not entries:
         return None
+    if not force:
+        entries = _entries_due_for_status_refresh(entries)
+        if not entries:
+            return None
 
     worker = _BugReportPruneWorker(entries)
     _PRUNE_WORKERS.append(worker)
@@ -504,10 +543,46 @@ def _prune_deleted_sent_reports():
         if len(remaining) != len(current):
             _save_sent_reports(remaining)
 
+    def _on_statuses(status_updates):
+        if not status_updates:
+            return
+        updates_by_fingerprint = {
+            update.get("fingerprint"): update
+            for update in status_updates
+            if update.get("fingerprint")
+        }
+        if not updates_by_fingerprint:
+            return
+        changed = False
+        current = _load_sent_reports()
+        for entry in current:
+            update = updates_by_fingerprint.get(entry.get("fingerprint"))
+            if not update:
+                continue
+            state = update.get("state") or "open"
+            checked_at = update.get("checked_at") or time.time()
+            issue_number = update.get("issue_number") or entry.get("issue_number")
+            if (
+                entry.get("status") != state
+                or entry.get("issue_number") != issue_number
+                or entry.get("status_checked_at") != checked_at
+            ):
+                entry["status"] = state
+                entry["status_checked_at"] = checked_at
+                entry["issue_number"] = issue_number
+                changed = True
+        if changed:
+            _save_sent_reports(current)
+
     worker.pruned_ready.connect(_on_pruned)
+    worker.statuses_ready.connect(_on_statuses)
     worker.finished.connect(worker.deleteLater)
     worker.start()
     return worker
+
+
+def refresh_sent_bug_report_statuses_on_launch():
+    return refresh_sent_bug_report_statuses(force=True)
 
 
 _BUG_REPORT_INBOX_REPO_URL = "https://github.com/Alehaaaa/TKM-bug-inbox"
@@ -551,23 +626,34 @@ def _format_sent_report_label(entry):
     except Exception:
         when = ""
     prefix = "#{}".format(issue_number) if issue_number else "?"
-    # Bug is the common case and stays unlabeled to match the existing look;
-    # suggestions get a short tag so the two don't blur together in the list.
-    type_tag = (
-        "[{}] ".format(i18n.tr("bug_report_type_suggestion", "Suggestion"))
+    type_tag = "[{}] ".format(
+        i18n.tr("bug_report_type_suggestion", "Suggestion")
         if entry.get("report_type") == "suggestion"
-        else ""
+        else i18n.tr("bug_report_type_bug", "Bug")
     )
-    return "{}{} · {}{}".format(type_tag, prefix, summary, "  ({})".format(when) if when else "")
+    state_tag = ""
+    if entry.get("status") == "closed":
+        state_tag = "[{}] ".format(i18n.tr("bug_report_status_closed_label", "Closed"))
+    return "{}{}{} · {}{}".format(state_tag, type_tag, prefix, summary, "  ({})".format(when) if when else "")
+
+
+def _sent_report_status_icon(entry):
+    from TheKeyMachine.data import icons
+
+    if entry.get("status") == "closed":
+        return icons.dot_gray
+    if entry.get("status") == "open":
+        return icons.dot_green
+    return icons.bug
 
 
 def populate_bug_report_menu(menu):
-    """Rebuild the whole Bug Report menu in place.
+    """Rebuild the whole Get in Touch menu in place.
 
-    Used both as a ``dynamic_menu`` builder (the TKM logo's Help submenu)
-    and as a pinned/shelf tool's own popup (the flat "bug_report_window"
+    Used both as a ``dynamic_menu`` builder (the TKM logo's contact submenu)
+    and as a pinned/shelf tool's own popup (the "bug_report_window"
     tool's "menu" callable) -- one implementation, so the two surfaces can't
-    drift apart. Always starts with "Report a Bug"; previously sent reports
+    drift apart. Always starts with "Get in Touch"; previously sent reports
     (if any) are listed flat underneath it, newest first, with no tooltip of
     their own -- clicking one just opens that report on GitHub.
     """
@@ -576,9 +662,9 @@ def populate_bug_report_menu(menu):
     menu.clear()
     dialog_tool = registry.get_tool("bug_report_open_dialog")
     menu.addAction(
-        dialog_tool.get("label", "Report a Bug"),
+        QtGui.QIcon(dialog_tool.get("icon")),
+        dialog_tool.get("label", "Get in Touch"),
         callback=dialog_tool.get("callback"),
-        icon=dialog_tool.get("icon"),
         command_id="bug_report_open_dialog",
     )
 
@@ -589,15 +675,13 @@ def populate_bug_report_menu(menu):
     menu.addSeparator()
     for entry in entries:
         menu.addAction(
+            QtGui.QIcon(_sent_report_status_icon(entry)),
             _format_sent_report_label(entry),
             callback=partial(open_sent_bug_report, entry),
             tooltip_enabled=False,
         )
 
-    # Check in the background whether any of these were deleted on GitHub;
-    # this menu instance still shows everything, but a stale entry won't
-    # survive to the next time it's opened.
-    _prune_deleted_sent_reports()
+    refresh_sent_bug_report_statuses()
     return menu
 
 
@@ -797,6 +881,8 @@ def report_detected_exception(exc=None, context=None, source_file=None, tracebac
                 prefill_name="",
                 prefill_explanation=report_explanation,
                 prefill_script_error=report_traceback,
+                report_type="bug",
+                show_report_type_buttons=False,
             )
         finally:
             _BUG_EXCEPTION_DIALOG_PENDING = False
@@ -924,13 +1010,21 @@ def install_bug_exception_handler():
     return True
 
 
-def bug_report_window(*args, dialog_title=None, prefill_name="", prefill_explanation="", prefill_script_error=""):
+def bug_report_window(
+    *args,
+    dialog_title=None,
+    prefill_name="",
+    prefill_explanation="",
+    prefill_script_error="",
+    report_type="bug",
+    show_report_type_buttons=True,
+):
     if not general.config.get("BUG_REPORT", True):
         return None
     if dialog_title is None:
         from TheKeyMachine.core import i18n
 
-        dialog_title = i18n.tr("bug_report_title", "Report a Bug or Suggestion")
+        dialog_title = i18n.tr("bug_report_title", "Get in Touch")
     existing_dialog = _get_bug_report_dialog(include_hidden=True)
     if existing_dialog:
         if hasattr(existing_dialog, "apply_prefill"):
@@ -939,6 +1033,8 @@ def bug_report_window(*args, dialog_title=None, prefill_name="", prefill_explana
                 name=prefill_name,
                 explanation=prefill_explanation,
                 script_error=prefill_script_error,
+                report_type=report_type,
+                show_report_type_buttons=show_report_type_buttons,
             )
         try:
             existing_dialog.show()
@@ -957,6 +1053,8 @@ def bug_report_window(*args, dialog_title=None, prefill_name="", prefill_explana
         prefill_name=prefill_name,
         prefill_explanation=prefill_explanation,
         prefill_script_error=prefill_script_error,
+        report_type=report_type,
+        show_report_type_buttons=show_report_type_buttons,
     )
     dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
     _set_bug_report_dialog(dlg)

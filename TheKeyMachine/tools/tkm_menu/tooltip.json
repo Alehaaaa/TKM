@@ -18,5 +18,6 @@
   "history": ["Review release notes and changes for installed TheKeyMachine versions."],
   "about": ["Show the installed version, credits, license, and project information."],
   "donate": ["Open the project support page in your browser."],
-  "bug_report": ["Create a bug report with environment details and optional diagnostic attachments."]
+  "bug_report": ["Send a private bug report or suggestion with useful diagnostic details."],
+  "bug_report_menu": ["Send bug reports and suggestions, and track the status of the ones you've already sent."]
 }

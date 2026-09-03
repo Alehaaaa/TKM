@@ -32,9 +32,6 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
     MAX_TEXT_CHARS = 1200
     MAX_SCRIPT_ERROR_CHARS = 12000
 
-    _BUG_ACCENT_COLOR = "#CA6161"
-    _SUGGESTION_ACCENT_COLOR = "#D9A441"
-
     def __init__(
         self,
         parent=None,
@@ -46,6 +43,8 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
         prefill_name="",
         prefill_explanation="",
         prefill_script_error="",
+        report_type="bug",
+        show_report_type_buttons=True,
     ):
         from TheKeyMachine.core import i18n
 
@@ -58,8 +57,10 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
         self._submitted_report_type = None
         self._last_issue_number = None
         self._send_button = None
+        self._fixed_report_type = "suggestion" if str(report_type).strip().lower() == "suggestion" else "bug"
+        self._show_report_type_buttons = bool(show_report_type_buttons)
         super().__init__(parent=parent)
-        self.setWindowTitle(dialog_title or i18n.tr("bug_report_title", "Report a Bug or Suggestion"))
+        self.setWindowTitle(dialog_title or i18n.tr("bug_report_title", "Get in Touch"))
         # More horizontal / less tall default footprint.
         self.setMinimumSize(DPI(600), DPI(450))
 
@@ -74,56 +75,69 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
 
         self.addWindowHeader(
             parentLayout=content_layout,
-            icon=icons.bug,
-            textColor="#CA6161",
+            icon=icons.bug if not self._show_report_type_buttons else icons.get_in_touch,
+            textColor="#9bbbca" if self._show_report_type_buttons else "#CA6161",
         )
 
-        subtitle = QtWidgets.QLabel(
-            i18n.tr(
-                "bug_report_subtitle",
-                "Send a private bug report or suggestion. System details help diagnose bugs; personal home paths are removed before upload.",
-            ),
-            content_widget,
-        )
-        subtitle.setAlignment(QtCore.Qt.AlignLeft)
-        subtitle.setWordWrap(True)
-        subtitle.setStyleSheet("color: #cccccc; font-size: %spx;" % DPI(11))
-        content_layout.addWidget(subtitle)
+        self._subtitle = QtWidgets.QLabel(content_widget)
+        self._subtitle.setAlignment(QtCore.Qt.AlignLeft)
+        self._subtitle.setWordWrap(True)
+        self._subtitle.setStyleSheet("color: #cccccc; font-size: %spx;" % DPI(11))
+        content_layout.addWidget(self._subtitle)
 
         self.type_group = QtWidgets.QButtonGroup(self)
         self.type_group.setExclusive(True)
-        self.type_bug_button = QtWidgets.QPushButton(
-            i18n.tr("bug_report_type_bug", "Bug"), content_widget
-        )
-        self.type_suggestion_button = QtWidgets.QPushButton(
-            i18n.tr("bug_report_type_suggestion", "Suggestion"), content_widget
-        )
-        self.type_bug_button.setStyleSheet(self._type_button_style(self._BUG_ACCENT_COLOR))
-        self.type_suggestion_button.setStyleSheet(self._type_button_style(self._SUGGESTION_ACCENT_COLOR))
+        self.type_bug_button = QtWidgets.QToolButton(content_widget)
+        self.type_bug_button.setObjectName("BugReportTypeBug")
+        self.type_bug_button.setText(i18n.tr("bug_report_type_bug", "Bug"))
+        self.type_bug_button.setIcon(QtGui.QIcon(icons.bug))
+        self.type_suggestion_button = QtWidgets.QToolButton(content_widget)
+        self.type_suggestion_button.setObjectName("BugReportTypeSuggestion")
+        self.type_suggestion_button.setText(i18n.tr("bug_report_type_suggestion", "Suggestion"))
+        self.type_suggestion_button.setIcon(QtGui.QIcon(icons.new))
         for button in (self.type_bug_button, self.type_suggestion_button):
             button.setCheckable(True)
             button.setCursor(QtCore.Qt.PointingHandCursor)
+            button.setAutoRaise(True)
+            button.setFocusPolicy(QtCore.Qt.NoFocus)
+            button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+            button.setIconSize(QtCore.QSize(DPI(16), DPI(16)))
+            button.setFixedSize(DPI(116), DPI(28))
             self.type_group.addButton(button)
-        self.type_bug_button.setChecked(True)
+        if self._fixed_report_type == "suggestion":
+            self.type_suggestion_button.setChecked(True)
+        else:
+            self.type_bug_button.setChecked(True)
         self.type_bug_button.toggled.connect(self._on_type_toggled)
         self.type_suggestion_button.toggled.connect(self._on_type_toggled)
 
-        type_row = QtWidgets.QWidget(content_widget)
-        type_row_layout = QtWidgets.QHBoxLayout(type_row)
+        self.type_row = QtWidgets.QWidget(content_widget)
+        type_row_layout = QtWidgets.QHBoxLayout(self.type_row)
         type_row_layout.setContentsMargins(0, 0, 0, 0)
-        type_row_layout.setSpacing(DPI(6))
+        type_row_layout.setSpacing(0)
         type_row_layout.addWidget(self.type_bug_button)
         type_row_layout.addWidget(self.type_suggestion_button)
         type_row_layout.addStretch(1)
-        content_layout.addWidget(type_row)
+        self.type_row.setStyleSheet(self._type_button_style())
+        self.type_row.setVisible(self._show_report_type_buttons)
+        content_layout.addWidget(self.type_row)
 
-        self.status_label = QtWidgets.QLabel(self._status_placeholder, content_widget)
-        self.status_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.status_row = QtWidgets.QWidget(content_widget)
+        status_layout = QtWidgets.QHBoxLayout(self.status_row)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.setSpacing(DPI(6))
+        self.status_dot = QtWidgets.QLabel(self.status_row)
+        self.status_dot.setFixedSize(DPI(7), DPI(7))
+        self.status_dot.setStyleSheet(self._status_dot_style(self._info_color))
+        self.status_label = QtWidgets.QLabel(self._status_placeholder, self.status_row)
+        self.status_label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.status_label.setWordWrap(True)
         self.status_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.status_label.setMinimumHeight(self._status_row_height())
-        self.status_label.setStyleSheet("color: %s;" % self._info_color)
-        self.status_label.setVisible(False)
+        self.status_label.setStyleSheet("color: #a8a8a8; font-size: %spx;" % DPI(12))
+        status_layout.addWidget(self.status_dot, 0, QtCore.Qt.AlignVCenter)
+        status_layout.addWidget(self.status_label, 1)
+        self.status_row.setVisible(False)
 
         self.name_input = QtWidgets.QLineEdit(content_widget)
         self.name_input.setPlaceholderText(i18n.tr("bug_report_name_placeholder", "Name or alias (optional)"))
@@ -196,7 +210,7 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
         self.details_splitter.setStretchFactor(0, 2)
         self.details_splitter.setStretchFactor(1, 1)
         content_layout.addWidget(self.details_splitter, 1)
-        content_layout.addWidget(self.status_label)
+        content_layout.addWidget(self.status_row)
 
         self.root_layout.addWidget(content_widget, 1)
 
@@ -206,6 +220,8 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
         send_cfg["callback"] = self._on_send_clicked
         self.setBottomBar([send_cfg], closeButton=True, highlight="Send bug")
         self._send_button = self._find_button("Send bug")
+        self._apply_subtitle()
+        self._apply_type_dependent_labels()
 
         # Keep a horizontal rectangle feel even with vertical fields.
         self.resize(DPI(680), DPI(500))
@@ -221,16 +237,48 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
             "QTextEdit {background-color: #2d2d2d;border: 1px solid #393939;border-radius: %spx;color: #cccccc;padding: %spx;font-size: %spx;}"
         ) % (DPI(4), DPI(6), DPI(11))
 
-    def _type_button_style(self, accent_color):
+    def _status_dot_style(self, color):
+        return "background-color: %s; border-radius: %spx;" % (color, DPI(3))
+
+    def _type_button_style(self):
         return (
-            "QPushButton {background-color: #2d2d2d;border: 1px solid #393939;border-radius: %spx;"
-            "color: #999999;padding: %spx %spx;font-size: %spx;}"
-            "QPushButton:checked {background-color: #3a3a3a;border: 1px solid %s;color: #ffffff;}"
-            "QPushButton:hover {color: #ffffff;}"
-        ) % (DPI(4), DPI(4), DPI(12), DPI(11), accent_color)
+            "QToolButton {background-color: transparent;border: 0px;border-radius: %spx;"
+            "color: #a8a8a8;padding: %spx %spx;font-size: %spx;}"
+            "QToolButton#BugReportTypeBug {border-top-right-radius: 0px;border-bottom-right-radius: 0px;}"
+            "QToolButton#BugReportTypeSuggestion {border-top-left-radius: 0px;border-bottom-left-radius: 0px;}"
+            "QToolButton:hover {background-color: #303030;color: #eeeeee;}"
+            "QToolButton:checked {background-color: #3a3a3a;color: #ffffff;}"
+        ) % (DPI(4), DPI(3), DPI(8), DPI(11))
+
+    def _apply_subtitle(self):
+        from TheKeyMachine.core import i18n
+
+        if self._show_report_type_buttons:
+            text = i18n.tr(
+                "bug_report_subtitle",
+                "Send a private note, bug report, or suggestion. System details help with troubleshooting; personal home paths are removed before upload.",
+            )
+        else:
+            text = i18n.tr(
+                "bug_report_detected_subtitle",
+                "Send this private bug report with the detected details. Personal home paths are removed before upload.",
+            )
+        self._subtitle.setText(text)
 
     def _report_type_value(self):
+        if not self._show_report_type_buttons:
+            return self._fixed_report_type
         return "suggestion" if self.type_suggestion_button.isChecked() else "bug"
+
+    def _set_report_type_mode(self, report_type="bug", show_buttons=True):
+        self._fixed_report_type = "suggestion" if str(report_type).strip().lower() == "suggestion" else "bug"
+        self._show_report_type_buttons = bool(show_buttons)
+        self.type_row.setVisible(self._show_report_type_buttons)
+        if self._fixed_report_type == "suggestion" and self._show_report_type_buttons:
+            self.type_suggestion_button.setChecked(True)
+        else:
+            self.type_bug_button.setChecked(True)
+        self._apply_subtitle()
 
     def _on_type_toggled(self, checked):
         if not checked:
@@ -272,7 +320,15 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
                 return btn
         return None
 
-    def apply_prefill(self, dialog_title=None, name="", explanation="", script_error="", report_type="bug"):
+    def apply_prefill(
+        self,
+        dialog_title=None,
+        name="",
+        explanation="",
+        script_error="",
+        report_type="bug",
+        show_report_type_buttons=True,
+    ):
         if self._submit_worker and self._submit_worker.isRunning():
             return
         if dialog_title:
@@ -283,10 +339,7 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
         self._submitted_successfully = False
         self._submitted_report_type = None
         self._last_issue_number = None
-        if str(report_type or "").strip().lower() == "suggestion":
-            self.type_suggestion_button.setChecked(True)
-        else:
-            self.type_bug_button.setChecked(True)
+        self._set_report_type_mode(report_type=report_type, show_buttons=show_report_type_buttons)
         # setChecked() above is a no-op (fires no toggled signal) when the
         # dialog is reused for another report of the *same* type -- refresh
         # the send button's label explicitly so it drops out of "Open ticket".
@@ -351,9 +404,10 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
 
     def _set_status(self, message, error=False):
         color = self._error_color if error else self._info_color
-        self.status_label.setStyleSheet("color: %s;" % color)
+        self.status_dot.setStyleSheet(self._status_dot_style(color))
+        self.status_label.setStyleSheet("color: #c8c8c8; font-size: %spx;" % DPI(12))
         self.status_label.setText(message or "")
-        self.status_label.setVisible(bool(message))
+        self.status_row.setVisible(bool(message))
 
     def _clear_status_message(self):
         if self._submitted_successfully:
@@ -361,7 +415,7 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
         if self._send_button and not self._send_button.isEnabled():
             return
         self.status_label.setText("")
-        self.status_label.setVisible(False)
+        self.status_row.setVisible(False)
 
     def _enforce_text_limit(self, widget, limit=None):
         limit = int(limit or self.MAX_TEXT_CHARS)

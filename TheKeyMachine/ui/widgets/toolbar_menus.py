@@ -1085,9 +1085,6 @@ def build_other_sources_help_menu():
     from TheKeyMachine.core import i18n
 
     help_menu = cw.MenuWidget(QtGui.QIcon(icons.help), i18n.tr("help_menu", "Help"))
-    if general.config.get("BUG_REPORT", True):
-        _add_toolbox_actions(help_menu, ("bug_report_window",))
-        help_menu.addSeparator()
     links = (
         (
             i18n.tr("discord", "Discord"),
