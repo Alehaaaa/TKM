@@ -84,6 +84,17 @@ _LOCAL_DEDUPE_COOLDOWN_SECONDS = 6 * 60 * 60
 _LOCAL_DEDUPE_MAX_ENTRIES = 200
 _PENDING_LOCAL_COUNTS = {}
 
+# Mirrors the relay's own REPORT_TYPES/normalizeReportType() so an invalid or
+# missing type never reaches the relay -- defense in depth, since the dialog
+# itself only ever offers these two choices.
+_REPORT_TYPES = ("bug", "suggestion")
+_DEFAULT_REPORT_TYPE = "bug"
+
+
+def _normalize_report_type(value):
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in _REPORT_TYPES else _DEFAULT_REPORT_TYPE
+
 
 def _is_valid_dialog(dialog):
     if dialog is None:
@@ -204,18 +215,20 @@ class BugReportSubmitWorker(QtCore.QThread):
 
 
 def _format_bug_report_payload(payload):
+    report_type = _normalize_report_type(payload.get("report_type"))
+    is_suggestion = report_type == "suggestion"
     lines = [
-        "# TheKeyMachine Bug Report",
+        "# TheKeyMachine {}".format("Suggestion" if is_suggestion else "Bug Report"),
         "",
         "Generated: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         "",
         "## Reporter",
         payload.get("name", "") or "Anonymous",
         "",
-        "## What happened",
+        "## Idea" if is_suggestion else "## What happened",
         payload.get("explanation", "") or "",
         "",
-        "## Script error",
+        "## Related context" if is_suggestion else "## Script error",
         "```text",
         payload.get("script_error", "") or "No script error supplied.",
         "```",
@@ -330,13 +343,14 @@ def _consume_pending_local_count(fingerprint):
     return _PENDING_LOCAL_COUNTS.pop(fingerprint, 1)
 
 
-def prepare_bug_report_payload(name, explanation, script_error):
+def prepare_bug_report_payload(name, explanation, script_error, report_type="bug"):
     fingerprint = _local_fingerprint(script_error or explanation)
     payload = {
         "installation_id": _installation_id(),
         "name": _redact_home_path(name),
         "explanation": _redact_home_path(explanation),
         "script_error": _redact_home_path(script_error),
+        "report_type": _normalize_report_type(report_type),
         "local_count": _consume_pending_local_count(fingerprint),
     }
     payload["system"] = {
@@ -353,7 +367,8 @@ def _write_bug_report_file(payload):
             return None
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        report_path = os.path.join(desktop_dir, "TKM_Bug Report_{}.txt".format(timestamp))
+        report_label = "Suggestion" if _normalize_report_type(payload.get("report_type")) == "suggestion" else "Bug Report"
+        report_path = os.path.join(desktop_dir, "TKM_{}_{}.txt".format(report_label, timestamp))
         with open(report_path, "w", encoding="utf-8") as report_file:
             report_file.write(_format_bug_report_payload(payload))
     except Exception:
@@ -407,6 +422,7 @@ def _record_sent_report(payload, result):
         "issue_number": issue_number,
         "fingerprint": fingerprint,
         "summary": _report_summary(payload),
+        "report_type": _normalize_report_type(payload.get("report_type")),
         "sent_at": time.time(),
         "duplicate": bool(result.get("duplicate")),
     }
@@ -497,6 +513,23 @@ def _prune_deleted_sent_reports():
 _BUG_REPORT_INBOX_REPO_URL = "https://github.com/Alehaaaa/TKM-bug-inbox"
 
 
+def open_issue(issue_number):
+    """Open a GitHub issue in this machine's default browser, given its number.
+
+    The single place that knows the inbox repo's URL -- both the sent-reports
+    menu (via ``open_sent_bug_report``) and the dialog's post-send "Open
+    ticket" button (via ``bug_report_window``'s ``open_issue_callback``) route
+    through here so the two never drift apart.
+    """
+    try:
+        issue_number = int(issue_number)
+    except (TypeError, ValueError):
+        return
+    if issue_number <= 0:
+        return
+    general.open_url("{}/issues/{}".format(_BUG_REPORT_INBOX_REPO_URL, issue_number))
+
+
 def open_sent_bug_report(entry, *_args):
     """Open a previously sent report's GitHub issue in the browser.
 
@@ -505,13 +538,12 @@ def open_sent_bug_report(entry, *_args):
     runner that appends its own arguments (e.g. the QAction ``checked``
     state) after the ones already bound by ``partial()``.
     """
-    issue_number = entry.get("issue_number")
-    if not issue_number:
-        return
-    general.open_url("{}/issues/{}".format(_BUG_REPORT_INBOX_REPO_URL, issue_number))
+    open_issue(entry.get("issue_number"))
 
 
 def _format_sent_report_label(entry):
+    from TheKeyMachine.core import i18n
+
     issue_number = entry.get("issue_number")
     summary = entry.get("summary") or "Bug report"
     try:
@@ -519,7 +551,14 @@ def _format_sent_report_label(entry):
     except Exception:
         when = ""
     prefix = "#{}".format(issue_number) if issue_number else "?"
-    return "{} · {}{}".format(prefix, summary, "  ({})".format(when) if when else "")
+    # Bug is the common case and stays unlabeled to match the existing look;
+    # suggestions get a short tag so the two don't blur together in the list.
+    type_tag = (
+        "[{}] ".format(i18n.tr("bug_report_type_suggestion", "Suggestion"))
+        if entry.get("report_type") == "suggestion"
+        else ""
+    )
+    return "{}{} · {}{}".format(type_tag, prefix, summary, "  ({})".format(when) if when else "")
 
 
 def populate_bug_report_menu(menu):
@@ -591,8 +630,8 @@ def submit_bug_report(**payload):
         }
 
 
-def send_bug_report(name, explanation, script_error):
-    payload = prepare_bug_report_payload(name, explanation, script_error)
+def send_bug_report(name, explanation, script_error, report_type="bug"):
+    payload = prepare_bug_report_payload(name, explanation, script_error, report_type=report_type)
     return bool(submit_bug_report(**payload).get("success"))
 
 
@@ -891,7 +930,7 @@ def bug_report_window(*args, dialog_title=None, prefill_name="", prefill_explana
     if dialog_title is None:
         from TheKeyMachine.core import i18n
 
-        dialog_title = i18n.tr("bug_report_title", "Report a Bug")
+        dialog_title = i18n.tr("bug_report_title", "Report a Bug or Suggestion")
     existing_dialog = _get_bug_report_dialog(include_hidden=True)
     if existing_dialog:
         if hasattr(existing_dialog, "apply_prefill"):
@@ -913,6 +952,7 @@ def bug_report_window(*args, dialog_title=None, prefill_name="", prefill_explana
         submit_callback=submit_bug_report,
         prepare_callback=prepare_bug_report_payload,
         worker_class=BugReportSubmitWorker,
+        open_issue_callback=open_issue,
         dialog_title=dialog_title,
         prefill_name=prefill_name,
         prefill_explanation=prefill_explanation,

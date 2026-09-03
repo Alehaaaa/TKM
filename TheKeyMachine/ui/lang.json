@@ -206,6 +206,15 @@
         "ko": "* 발생한 상황, 예상했던 결과, 재현 단계를 설명해 주세요.",
         "zh": "* 请描述发生的情况、您期望的结果以及重现该问题的步骤。"
     },
+    "bug_report_explanation_placeholder_suggestion": {
+        "ar": "* صف الفكرة والمشكلة التي ستحلها.",
+        "ca": "* Descriu la idea i quin problema resoldria.",
+        "es": "* Describe la idea y qué problema resolvería.",
+        "fr": "* Décrivez l'idée et le problème qu'elle résoudrait.",
+        "ja": "* アイデアの内容と、それがどんな問題を解決するかを記入してください。",
+        "ko": "* 아이디어와 그것이 해결할 문제를 설명해 주세요.",
+        "zh": "* 请描述这个想法以及它能解决的问题。"
+    },
     "bug_report_name_placeholder": {
         "ar": "الاسم أو الاسم المستعار (اختياري)",
         "ca": "Nom o àlies (opcional)",
@@ -214,6 +223,15 @@
         "ja": "名前または別名（任意）",
         "ko": "이름 또는 별칭(선택 사항)",
         "zh": "姓名或别名（可选）"
+    },
+    "bug_report_open_ticket_button": {
+        "ar": "فتح التذكرة",
+        "ca": "Obre el tiquet",
+        "es": "Abrir ticket",
+        "fr": "Ouvrir le ticket",
+        "ja": "チケットを開く",
+        "ko": "티켓 열기",
+        "zh": "打开工单"
     },
     "bug_report_script_error_placeholder": {
         "ar": "الصق آخر أسطر محرر البرمجة النصية هنا. أضف تتبع الخطأ (traceback) أو الخطأ الدقيق إن وُجد.",
@@ -224,6 +242,15 @@
         "ko": "스크립트 에디터의 마지막 줄을 여기에 붙여넣으세요. 트레이스백이나 정확한 오류가 있다면 포함해 주세요.",
         "zh": "在此粘贴脚本编辑器的最后几行。如有回溯信息或确切错误，请一并附上。"
     },
+    "bug_report_script_error_placeholder_suggestion": {
+        "ar": "اختياري: أي خطأ أو سياق ذي صلة.",
+        "ca": "Opcional: qualsevol error o context relacionat.",
+        "es": "Opcional: cualquier error o contexto relacionado.",
+        "fr": "Facultatif : toute erreur ou contexte associé.",
+        "ja": "任意：関連するエラーや状況があれば記入してください。",
+        "ko": "선택 사항: 관련된 오류나 상황이 있다면 적어 주세요.",
+        "zh": "可选：任何相关的错误或背景信息。"
+    },
     "bug_report_send_button": {
         "ar": "إرسال الخطأ",
         "ca": "Envia l'error",
@@ -232,6 +259,15 @@
         "ja": "バグを送信",
         "ko": "버그 보내기",
         "zh": "发送错误"
+    },
+    "bug_report_send_suggestion_button": {
+        "ar": "إرسال الاقتراح",
+        "ca": "Envia el suggeriment",
+        "es": "Enviar sugerencia",
+        "fr": "Envoyer la suggestion",
+        "ja": "提案を送信",
+        "ko": "제안 보내기",
+        "zh": "发送建议"
     },
     "bug_report_status_failed": {
         "ar": "فشل إرسال التقرير. حاول مرة أخرى لاحقًا.",
@@ -269,6 +305,15 @@
         "ko": "버그 보고서를 보내는 중...",
         "zh": "正在发送错误报告……"
     },
+    "bug_report_status_sending_suggestion": {
+        "ar": "جارٍ إرسال الاقتراح...",
+        "ca": "Enviant el suggeriment...",
+        "es": "Enviando sugerencia...",
+        "fr": "Envoi de la suggestion...",
+        "ja": "提案を送信しています...",
+        "ko": "제안을 보내는 중...",
+        "zh": "正在发送建议……"
+    },
     "bug_report_status_sending_wait": {
         "ar": "جارٍ إرسال تقرير الخطأ. يرجى الانتظار...",
         "ca": "Enviant l'informe d'error. Si us plau, espera...",
@@ -278,6 +323,15 @@
         "ko": "버그 보고서를 전송 중입니다. 잠시만 기다려 주세요...",
         "zh": "正在发送错误报告，请稍候……"
     },
+    "bug_report_status_sending_wait_suggestion": {
+        "ar": "جارٍ إرسال الاقتراح. يرجى الانتظار...",
+        "ca": "Enviant el suggeriment. Si us plau, espera...",
+        "es": "Enviando sugerencia. Por favor, espera...",
+        "fr": "Envoi de la suggestion en cours. Veuillez patienter...",
+        "ja": "提案を送信中です。お待ちください...",
+        "ko": "제안을 전송 중입니다. 잠시만 기다려 주세요...",
+        "zh": "正在发送建议，请稍候……"
+    },
     "bug_report_status_success": {
         "ar": "تم إرسال تقرير الخطأ بشكل خاص. شكرًا لك!",
         "ca": "L'informe d'error s'ha enviat de manera privada. Gràcies!",
@@ -286,6 +340,15 @@
         "ja": "バグレポートを非公開で送信しました。ありがとうございます！",
         "ko": "버그 보고서를 비공개로 보냈습니다. 감사합니다!",
         "zh": "错误报告已私密发送。谢谢！"
+    },
+    "bug_report_status_success_suggestion": {
+        "ar": "تم إرسال الاقتراح بشكل خاص. شكرًا لك!",
+        "ca": "El suggeriment s'ha enviat de manera privada. Gràcies!",
+        "es": "La sugerencia se envió de forma privada. ¡Gracias!",
+        "fr": "La suggestion a été envoyée en privé. Merci !",
+        "ja": "提案を非公開で送信しました。ありがとうございます！",
+        "ko": "제안을 비공개로 보냈습니다. 감사합니다!",
+        "zh": "建议已私密发送。谢谢！"
     },
     "bug_report_status_duplicate": {
         "ar": "يتطابق هذا مع تقرير موجود، لذا تم تحديث عدد مرات حدوثه. شكرًا لك!",
@@ -306,31 +369,31 @@
         "zh": "无法发送报告。本地副本已保存到桌面。"
     },
     "bug_report_status_unavailable": {
-        "ar": "الإبلاغ عن الأخطاء غير متاح في الوقت الحالي.",
-        "ca": "L'enviament d'errors no està disponible en aquest moment.",
-        "es": "El envío de errores no está disponible en este momento.",
-        "fr": "Le signalement de bugs n'est pas disponible pour le moment.",
-        "ja": "現在、バグ報告はご利用いただけません。",
-        "ko": "현재 버그 신고 기능을 사용할 수 없습니다.",
-        "zh": "错误报告功能目前不可用。"
+        "ar": "إرسال التقارير غير متاح في الوقت الحالي.",
+        "ca": "L'enviament d'informes no està disponible en aquest moment.",
+        "es": "El envío de informes no está disponible en este momento.",
+        "fr": "L'envoi de rapports n'est pas disponible pour le moment.",
+        "ja": "現在、レポートの送信はご利用いただけません。",
+        "ko": "현재 보고서 전송 기능을 사용할 수 없습니다.",
+        "zh": "报告提交功能目前不可用。"
     },
     "bug_report_subtitle": {
-        "ar": "أرسل تقرير خطأ خاصًا. تساعد تفاصيل النظام في التشخيص، وتُزال مسارات المجلد الشخصي قبل الرفع.",
-        "ca": "Envia un informe d'error privat. Els detalls del sistema ajuden a diagnosticar-lo; les rutes personals s'eliminen abans de pujar-lo.",
-        "es": "Envía un informe de error privado. Los datos del sistema ayudan a diagnosticarlo; las rutas personales se eliminan antes de subirlo.",
-        "fr": "Envoyez un rapport de bug privé. Les détails système facilitent le diagnostic ; les chemins personnels sont supprimés avant l'envoi.",
-        "ja": "非公開のバグレポートを送信します。診断用のシステム情報に含まれる個人ホームパスは送信前に削除されます。",
-        "ko": "비공개 버그 보고서를 보냅니다. 진단용 시스템 정보에서 개인 홈 경로는 업로드 전에 제거됩니다.",
-        "zh": "发送私密错误报告。系统信息有助于诊断，上传前会移除个人主目录路径。"
+        "ar": "أرسل تقرير خطأ أو اقتراحًا بشكل خاص. تساعد تفاصيل النظام في تشخيص الأخطاء، وتُزال مسارات المجلد الشخصي قبل الرفع.",
+        "ca": "Envia un informe d'error o un suggeriment privat. Els detalls del sistema ajuden a diagnosticar errors; les rutes personals s'eliminen abans de pujar-lo.",
+        "es": "Envía un informe de error o una sugerencia de forma privada. Los datos del sistema ayudan a diagnosticar errores; las rutas personales se eliminan antes de subirlo.",
+        "fr": "Envoyez un rapport de bug ou une suggestion en privé. Les détails système facilitent le diagnostic ; les chemins personnels sont supprimés avant l'envoi.",
+        "ja": "非公開のバグレポートまたは提案を送信します。診断用のシステム情報に含まれる個人ホームパスは送信前に削除されます。",
+        "ko": "비공개 버그 보고서 또는 제안을 보냅니다. 진단용 시스템 정보에서 개인 홈 경로는 업로드 전에 제거됩니다.",
+        "zh": "私密发送错误报告或建议。系统信息有助于诊断错误，上传前会移除个人主目录路径。"
     },
     "bug_report_title": {
-        "ar": "الإبلاغ عن خطأ",
-        "ca": "Informar d'un Error",
-        "es": "Informar de un Error",
-        "fr": "Signaler un Bug",
-        "ja": "バグを報告",
-        "ko": "버그 신고",
-        "zh": "报告错误"
+        "ar": "الإبلاغ عن خطأ أو اقتراح",
+        "ca": "Informa d'un Error o Suggeriment",
+        "es": "Informar de un Error o Sugerencia",
+        "fr": "Signaler un Bug ou une Suggestion",
+        "ja": "バグまたは提案を報告",
+        "ko": "버그 또는 제안 보내기",
+        "zh": "报告错误或建议"
     },
     "bug_report_title_detected": {
         "ar": "عذرًا، لقد وجدت خطأً!",
@@ -340,6 +403,24 @@
         "ja": "バグが見つかりました！",
         "ko": "이런, 버그를 발견하셨네요!",
         "zh": "抱歉，您发现了一个错误！"
+    },
+    "bug_report_type_bug": {
+        "ar": "خطأ",
+        "ca": "Error",
+        "es": "Error",
+        "fr": "Bug",
+        "ja": "バグ",
+        "ko": "버그",
+        "zh": "错误"
+    },
+    "bug_report_type_suggestion": {
+        "ar": "اقتراح",
+        "ca": "Suggeriment",
+        "es": "Sugerencia",
+        "fr": "Suggestion",
+        "ja": "提案",
+        "ko": "제안",
+        "zh": "建议"
     },
     "close": {
         "ar": "إغلاق",
