@@ -57,7 +57,11 @@ class TracerToolObject(ToolObject):
                                 "items": api.tracer_style_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Size", "i18n_key": "tracer_size_section"},
+                            {
+                                "type": "section",
+                                "label": "Size",
+                                "i18n_key": "tracer_size_section",
+                            },
                             {
                                 "type": "choice",
                                 "id": "tracer_size",
@@ -66,7 +70,11 @@ class TracerToolObject(ToolObject):
                                 "items": api.tracer_size_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Color", "i18n_key": "tracer_color_section"},
+                            {
+                                "type": "section",
+                                "label": "Color",
+                                "i18n_key": "tracer_color_section",
+                            },
                             "tracer_grey",
                             "tracer_red",
                             "tracer_blue",
@@ -86,7 +94,11 @@ class TracerToolObject(ToolObject):
                                 "items": api.tracer_range_choices,
                             },
                             "separator",
-                            {"type": "section", "label": "Direction", "i18n_key": "tracer_direction_section"},
+                            {
+                                "type": "section",
+                                "label": "Direction",
+                                "i18n_key": "tracer_direction_section",
+                            },
                             {
                                 "type": "choice",
                                 "id": "tracer_direction",
@@ -112,7 +124,11 @@ class TracerToolObject(ToolObject):
                             "tracer_world_space",
                             {"type": "check", "command": "tracer_xray"},
                             "separator",
-                            {"type": "section", "label": "Performance", "i18n_key": "tracer_performance_section"},
+                            {
+                                "type": "section",
+                                "label": "Performance",
+                                "i18n_key": "tracer_performance_section",
+                            },
                             {
                                 "type": "choice",
                                 "id": "tracer_performance",
@@ -327,9 +343,9 @@ class TracerToolObject(ToolObject):
             {
                 "id": "pause_viewport",
                 "shortcuts": [
-                    {"id": "auto_pause_viewport", "keys": [QtCore.Qt.Key_Alt]},
+                    {"id": "pause_viewport_auto", "keys": [QtCore.Qt.Key_Alt]},
                 ],
             },
-            {"id": "auto_pause_viewport"},
+            {"id": "pause_viewport_auto"},
         ],
     }

@@ -9,7 +9,7 @@
     "ko": {"label": "뷰포트 일시 정지", "tooltip": ["성능 향상을 위해 뷰포트 새로고침을 중지합니다. 선택을 해제하면 정상 업데이트를 재개합니다."]},
     "ar": {"label": "إيقاف منفذ العرض", "tooltip": ["أوقف تحديث منفذ العرض لتحسين الأداء. ألغِ التحديد لاستئناف التحديث العادي."]}
   },
-  "auto_pause_viewport": {
+  "pause_viewport_auto": {
     "en": {"label": "Auto Pause Viewport", "tooltip": ["Automatically pause viewport refresh for performance while briefly refreshing after animation key changes."]},
     "es": {"label": "Pausa Automática del Visor", "tooltip": ["Pausa automáticamente el visor para mejorar el rendimiento y lo actualiza brevemente tras cambios en las claves."]},
     "fr": {"label": "Pause Automatique de la Vue", "tooltip": ["Suspend automatiquement la vue pour les performances et l'actualise brièvement après une modification de clés."]},

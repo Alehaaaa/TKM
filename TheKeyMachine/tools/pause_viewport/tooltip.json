@@ -1,4 +1,4 @@
 {
   "pause_viewport": ["Pause the viewport refresh to improve performance. Uncheck to resume normal viewport updates."],
-  "auto_pause_viewport": ["Automatically pause viewport refresh for performance while briefly refreshing after animation key changes."]
+  "pause_viewport_auto": ["Automatically pause viewport refresh for performance while briefly refreshing after animation key changes."]
 }

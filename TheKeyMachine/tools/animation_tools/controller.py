@@ -265,31 +265,6 @@ def delete_keyframes_after_current_time(tool_operation=None):
         return animation.notify_empty("keys", "delete")
 
 
-def select_all_animation_curves(*args):
-    # Tipos de curvas de animación que quieres seleccionar
-    tipos_de_curvas = ["animCurveTL", "animCurveTA", "animCurveTT", "animCurveTU"]
-
-    # Lista para almacenar las curvas seleccionadas
-    curvas_seleccionadas = []
-
-    # Recorre todos los tipos de curvas y busca las que coinciden
-    for tipo in tipos_de_curvas:
-        curvas = cmds.ls(type=tipo)
-        if curvas:
-            curvas_seleccionadas.extend(curvas)
-
-    # Selecciona las curvas encontradas
-    if curvas_seleccionadas:
-        cmds.select(curvas_seleccionadas)
-        cmds.selectKey(add=True)
-    else:
-        animation.notify_empty()
-
-
-def clear_selected_keys(*args):
-    cmds.selectKey(clear=True)
-
-
 # For Hotkeys
 
 

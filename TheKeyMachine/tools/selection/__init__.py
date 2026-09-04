@@ -32,6 +32,16 @@ class SelectionToolObject(ToolObject):
             "callback": api.select_rig_controls_animated, "tooltip": TOOLTIPS["animated_controls"],
             "operation": {"undo": False},
         },
+        "select_scene_animation": {
+            "type": "tool", "label": "Select Scene Animation", "text": "s",
+            "callback": api.select_all_animation_curves, "tooltip": TOOLTIPS["select_scene"],
+            "operation": {"progress": False, "undo": False},
+        },
+        "clear_selected_keys": {
+            "type": "tool", "label": "Clear Key Selection", "text": "x",
+            "callback": api.clear_selected_keys, "tooltip": TOOLTIPS["clear_selected"],
+            "operation": {"progress": False, "undo": False},
+        },
     }
 
     SECTION = {
@@ -43,5 +53,8 @@ class SelectionToolObject(ToolObject):
                 {"id": "select_rig_controls_animated", "keys": [QtCore.Qt.Key_Control]},
             ]},
             {"id": "select_rig_controls_animated"},
+            "separator",
+            {"id": "select_scene_animation"},
+            {"id": "clear_selected_keys"},
         ],
     }

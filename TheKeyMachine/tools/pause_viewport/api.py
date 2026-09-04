@@ -23,7 +23,7 @@ def is_auto_pause_enabled():
 
 def set_auto_pause_enabled(enabled=False, *_args):
     """Automatically pause viewport refresh while letting key edits update."""
-    return background_runner_api.set_auto_pause_viewport(enabled)
+    return background_runner_api.set_pause_viewport_auto(enabled)
 
 
 def auto_pause_changed_signal():
@@ -39,12 +39,16 @@ def build_pause_viewport_context_menu(menu, source_widget=None):
     from TheKeyMachine.tools import common as toolCommon
 
     action = menu.addAction(
-        QtGui.QIcon(icons.auto_pause_viewport),
+        QtGui.QIcon(icons.pause_viewport_auto),
         i18n.tr_text("Auto Pause Viewport"),
         callback=set_auto_pause_enabled,
-        command_id="auto_pause_viewport",
-        description=i18n.tr_text("Automatically pause viewport refresh and briefly refresh after animation key changes."),
-        tooltip=i18n.tr_text("Automatically pause viewport refresh and briefly refresh after animation key changes."),
+        command_id="pause_viewport_auto",
+        description=i18n.tr_text(
+            "Automatically pause viewport refresh and briefly refresh after animation key changes."
+        ),
+        tooltip=i18n.tr_text(
+            "Automatically pause viewport refresh and briefly refresh after animation key changes."
+        ),
         open=True,
     )
     toolCommon.connect_checkable_action(

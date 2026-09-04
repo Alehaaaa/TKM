@@ -121,14 +121,6 @@ def snap(selected_range=None, **kwargs):
     return controller.snap_keyframes(timerange=selected_range, **kwargs)
 
 
-def clear_selected_keys(*args):
-    return controller.clear_selected_keys(*args)
-
-
-def select_all_animation_curves(*args):
-    return controller.select_all_animation_curves(*args)
-
-
 def delete_keyframes_before_current_time(*args, tool_operation=None):
     return controller.delete_keyframes_before_current_time(
         *args, tool_operation=tool_operation

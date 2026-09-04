@@ -32,7 +32,6 @@ from TheKeyMachine.data import icons
 from TheKeyMachine.ui.widgets import timeline as timelineWidgets
 from TheKeyMachine.ui.widgets import util as wutil
 
-
 RUNNER_SETTINGS_NAMESPACE = "background_runners"
 CHANNELBOX_HIGHLIGHT_ID = "channelbox_selection_highlight"
 CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID = "channelbox_clear_on_selection_change"
@@ -41,7 +40,7 @@ HIDE_STATIC_CURVES_ID = "hide_static_animation_curves"
 ANIMATION_RECOVERY_ID = "animation_recovery"
 ANIM_LAYER_WEIGHTS_ID = "anim_layer_weights"
 SELECTOR_TOOLBAR_PIN_ID = "selector_toolbar_pin"
-AUTO_PAUSE_VIEWPORT_ID = "auto_pause_viewport"
+AUTO_PAUSE_VIEWPORT_ID = "pause_viewport_auto"
 CHANNELBOX_TINT_KEY = "background_runner:channelbox_selection_highlight"
 ANIM_LAYER_WEIGHTS_TINT_KEY = "background_runner:anim_layer_weights"
 
@@ -58,7 +57,7 @@ RUNNER_COMMAND_IDS = {
     ANIMATION_RECOVERY_ID: "background_runner_animation_recovery",
     ANIM_LAYER_WEIGHTS_ID: "background_runner_anim_layer_weights",
     SELECTOR_TOOLBAR_PIN_ID: "background_runner_selector_toolbar_pin",
-    AUTO_PAUSE_VIEWPORT_ID: "auto_pause_viewport",
+    AUTO_PAUSE_VIEWPORT_ID: "pause_viewport_auto",
 }
 
 _CONTROLLER: Optional["BackgroundRunnerController"] = None
@@ -69,7 +68,11 @@ def _runner_setting_key(runner_id):
 
 
 def get_runner_enabled(runner_id, default=False):
-    return bool(settings.get_setting(_runner_setting_key(runner_id), default, namespace=RUNNER_SETTINGS_NAMESPACE))
+    return bool(
+        settings.get_setting(
+            _runner_setting_key(runner_id), default, namespace=RUNNER_SETTINGS_NAMESPACE
+        )
+    )
 
 
 def set_runner_enabled(runner_id, enabled):
@@ -130,7 +133,7 @@ def toggle_selector_toolbar_pin():
     return toggle_runner_enabled(SELECTOR_TOOLBAR_PIN_ID)
 
 
-def toggle_auto_pause_viewport():
+def toggle_pause_viewport_auto():
     return toggle_runner_enabled(AUTO_PAUSE_VIEWPORT_ID)
 
 
@@ -273,7 +276,10 @@ def _current_camera_nodes():
             transform = parents[0] if parents else None
         else:
             transform = camera
-            shapes = cmds.listRelatives(transform, shapes=True, fullPath=True, type="camera") or []
+            shapes = (
+                cmds.listRelatives(transform, shapes=True, fullPath=True, type="camera")
+                or []
+            )
             shape = shapes[0] if shapes else None
     except Exception:
         return None, None
@@ -334,7 +340,9 @@ def _selection_center():
     points = []
     for node in selection:
         try:
-            points.append(cmds.xform(node, query=True, worldSpace=True, rotatePivot=True))
+            points.append(
+                cmds.xform(node, query=True, worldSpace=True, rotatePivot=True)
+            )
         except Exception:
             pass
     if not points:
@@ -360,13 +368,18 @@ def _set_camera_orbit_point_to_selection():
 
     if camera_transform:
         try:
-            camera_position = cmds.xform(camera_transform, query=True, worldSpace=True, translation=True)
+            camera_position = cmds.xform(
+                camera_transform, query=True, worldSpace=True, translation=True
+            )
             distance = math.sqrt(
                 (camera_position[0] - center[0]) ** 2
                 + (camera_position[1] - center[1]) ** 2
                 + (camera_position[2] - center[2]) ** 2
             )
-            changed = maya_api.set_plug_double(camera_shape, "centerOfInterest", distance) or changed
+            changed = (
+                maya_api.set_plug_double(camera_shape, "centerOfInterest", distance)
+                or changed
+            )
         except Exception:
             pass
 
@@ -586,7 +599,9 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
             self._manager.selection_changed,
             self._manager.graph_editor_opened,
         ):
-            self._manager.connect_signal(signal, self._schedule_sync, key=self.RUNTIME_KEY, unique=False)
+            self._manager.connect_signal(
+                signal, self._schedule_sync, key=self.RUNTIME_KEY, unique=False
+            )
         # An already-open Graph Editor is ready to update immediately. Deferred
         # syncing remains useful only for subsequent Maya UI/selection events.
         self.sync()
@@ -651,7 +666,9 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
         lookup_nodes = list(nodes)
         for node in nodes:
             try:
-                lookup_nodes.extend(cmds.listRelatives(node, shapes=True, fullPath=True) or [])
+                lookup_nodes.extend(
+                    cmds.listRelatives(node, shapes=True, fullPath=True) or []
+                )
             except Exception:
                 pass
 
@@ -660,7 +677,9 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
         for node in lookup_nodes:
             try:
                 attributes = cmds.listAttr(node, keyable=True, scalar=True) or []
-                attributes.extend(cmds.listAttr(node, channelBox=True, scalar=True) or [])
+                attributes.extend(
+                    cmds.listAttr(node, channelBox=True, scalar=True) or []
+                )
             except Exception:
                 attributes = []
             for attribute in attributes:
@@ -691,13 +710,9 @@ class HideStaticAnimationCurvesRunner(QtCore.QObject):
                 seen.add(attribute)
 
         try:
-            if not cmds.selectionConnection(
-                self.OUTLINER_SELECTION, exists=True
-            ):
+            if not cmds.selectionConnection(self.OUTLINER_SELECTION, exists=True):
                 return
-            cmds.selectionConnection(
-                self.OUTLINER_SELECTION, edit=True, clear=True
-            )
+            cmds.selectionConnection(self.OUTLINER_SELECTION, edit=True, clear=True)
             for attribute in attributes:
                 cmds.selectionConnection(
                     self.OUTLINER_SELECTION, edit=True, select=attribute
@@ -756,7 +771,8 @@ def _evaluate_weight_curve(curve_name, key_times, start_frame, end_frame):
 
     frames = set(key_times)
     frames.update(
-        start_frame + (span * index) / (sample_count - 1) for index in range(sample_count)
+        start_frame + (span * index) / (sample_count - 1)
+        for index in range(sample_count)
     )
 
     samples = []
@@ -814,9 +830,12 @@ def _layer_weight_points(layer_name, start_frame, end_frame):
         return None
 
     try:
-        curves = cmds.listConnections(
-            weight_plug, source=True, destination=False, type="animCurve"
-        ) or []
+        curves = (
+            cmds.listConnections(
+                weight_plug, source=True, destination=False, type="animCurve"
+            )
+            or []
+        )
     except Exception:
         curves = []
 
@@ -837,7 +856,9 @@ def _layer_weight_points(layer_name, start_frame, end_frame):
 
     keys = sorted(zip(times, values))
 
-    sampled = _evaluate_weight_curve(curves[0], [t for t, _ in keys], start_frame, end_frame)
+    sampled = _evaluate_weight_curve(
+        curves[0], [t for t, _ in keys], start_frame, end_frame
+    )
     if sampled:
         return sampled
 
@@ -978,7 +999,9 @@ class AnimLayerWeightsTint(timelineWidgets.TimelineTint):
             # Every selected, active layer keeps the tag, including a layer
             # whose weight curve is completely flat.
             if layer_curve.get("selected") and not layer_curve.get("muted"):
-                self._paint_layer_label(painter, rect, layer_curve, start_frame, map_point)
+                self._paint_layer_label(
+                    painter, rect, layer_curve, start_frame, map_point
+                )
         painter.end()
 
     # Maya 2024 and later's redesigned time slider needs its plotting area
@@ -1022,9 +1045,7 @@ class AnimLayerWeightsTint(timelineWidgets.TimelineTint):
             # with the active curves -- same idea as the pen, just dashed
             # and dark instead of bright, so it still reads as "present but
             # off" rather than disappearing outright.
-            pen.setColor(
-                self._muted_color(selected=bool(layer_curve.get("selected")))
-            )
+            pen.setColor(self._muted_color(selected=bool(layer_curve.get("selected"))))
             pen.setStyle(QtCore.Qt.CustomDashLine)
             pen.setDashPattern(self.MUTED_DASH_PATTERN)
             pen.setWidthF(wutil.DPI(self.NORMAL_WIDTH))
@@ -1140,7 +1161,9 @@ class AnimLayerWeightsRunner(QtCore.QObject):
         self._structure_refresh_timer = QtCore.QTimer(self)
         self._structure_refresh_timer.setSingleShot(True)
         self._structure_refresh_timer.setInterval(0)
-        self._structure_refresh_timer.timeout.connect(self._apply_layer_structure_change)
+        self._structure_refresh_timer.timeout.connect(
+            self._apply_layer_structure_change
+        )
         self._curve_refresh_timer = QtCore.QTimer(self)
         self._curve_refresh_timer.setSingleShot(True)
         self._curve_refresh_timer.setInterval(8)
@@ -1154,7 +1177,8 @@ class AnimLayerWeightsRunner(QtCore.QObject):
                 callback=self._schedule_layer_structure_change,
             )
         self._manager.add_anim_curve_edited_callback(
-            self._on_curve_edited, key=self.CURVE_EDIT_KEY,
+            self._on_curve_edited,
+            key=self.CURVE_EDIT_KEY,
         )
         self._watch_layer_nodes()
         self._recompute(force=True)
@@ -1206,9 +1230,8 @@ class AnimLayerWeightsRunner(QtCore.QObject):
             )
             try:
                 self._weight_curve_names.update(
-                    cmds.keyframe(
-                        "{}.weight".format(layer_name), query=True, name=True
-                    ) or []
+                    cmds.keyframe("{}.weight".format(layer_name), query=True, name=True)
+                    or []
                 )
             except Exception:
                 pass
@@ -1270,10 +1293,16 @@ class BackgroundRunnerController(QtCore.QObject):
         super().__init__(manager)
         self._manager = manager
         self._services = {
-            CHANNELBOX_HIGHLIGHT_ID: ChannelBoxSelectionHighlightRunner(manager, parent=self),
-            CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID: ChannelBoxClearOnSelectionChangeRunner(manager, parent=self),
+            CHANNELBOX_HIGHLIGHT_ID: ChannelBoxSelectionHighlightRunner(
+                manager, parent=self
+            ),
+            CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID: ChannelBoxClearOnSelectionChangeRunner(
+                manager, parent=self
+            ),
             CAMERA_ORBIT_SELECTION_ID: CameraOrbitSelectionRunner(manager, parent=self),
-            HIDE_STATIC_CURVES_ID: HideStaticAnimationCurvesRunner(manager, parent=self),
+            HIDE_STATIC_CURVES_ID: HideStaticAnimationCurvesRunner(
+                manager, parent=self
+            ),
             ANIM_LAYER_WEIGHTS_ID: AnimLayerWeightsRunner(manager, parent=self),
         }
 
@@ -1311,7 +1340,11 @@ class BackgroundRunnerController(QtCore.QObject):
         if callable(setter):
             setter(enabled)
         else:
-            settings.set_setting(_runner_setting_key(runner_id), enabled, namespace=RUNNER_SETTINGS_NAMESPACE)
+            settings.set_setting(
+                _runner_setting_key(runner_id),
+                enabled,
+                namespace=RUNNER_SETTINGS_NAMESPACE,
+            )
 
         if enabled:
             self._start_service(runner_id)
@@ -1412,13 +1445,17 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
             "icon": icons.eraser,
             "description": "Clear selected Channel Box attributes when the Maya selection changes.",
             "default": False,
-            "get_enabled": lambda: get_runner_enabled(CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID, False),
+            "get_enabled": lambda: get_runner_enabled(
+                CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID, False
+            ),
             "set_enabled": lambda enabled: settings.set_setting(
                 _runner_setting_key(CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID),
                 bool(enabled),
                 namespace=RUNNER_SETTINGS_NAMESPACE,
             ),
-            "changed_signal": _background_runner_signal(CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID),
+            "changed_signal": _background_runner_signal(
+                CHANNELBOX_CLEAR_ON_SELECTION_CHANGE_ID
+            ),
         },
         CHANNELBOX_HIGHLIGHT_ID: {
             "id": CHANNELBOX_HIGHLIGHT_ID,
@@ -1475,7 +1512,7 @@ def get_runner_specs() -> Dict[str, Dict[str, object]]:
         AUTO_PAUSE_VIEWPORT_ID: {
             "id": AUTO_PAUSE_VIEWPORT_ID,
             "label": "Auto Pause Viewport",
-            "icon": icons.auto_pause_viewport,
+            "icon": icons.pause_viewport_auto,
             "description": "Automatically pause viewport refresh and briefly reopen it after animation key changes.",
             "default": False,
             "get_enabled": mayaViewport.is_auto_pause_enabled,

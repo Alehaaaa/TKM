@@ -12,7 +12,7 @@
       }
 
       .st2 {
-        fill: #d86552;
+        fill: #df6b58;
         stroke: #3a3a3a;
         stroke-miterlimit: 10;
         stroke-width: 2px;

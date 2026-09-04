@@ -103,7 +103,7 @@
         "en": {
             "label": "Select Rig Controls",
             "tooltip": [
-                "Select all curve and joint controls in the selected rig hierarchy."
+                "Select all NURBS curve controls in the selected rig hierarchy."
             ]
         },
         "es": {
@@ -153,7 +153,7 @@
         "en": {
             "label": "Select Animated Rig Controls",
             "tooltip": [
-                "Select only animated curve and joint controls in the selected rig hierarchy."
+                "Select only animated NURBS curve controls in the selected rig hierarchy."
             ]
         },
         "es": {
@@ -196,6 +196,106 @@
             "label": "تحديد متحكمات الريغ المتحركة",
             "tooltip": [
                 "تحديد متحكمات منحنى NURBS المتحركة فقط في التسلسل الهرمي المحدد للريغ"
+            ]
+        }
+    },
+    "select_scene_animation": {
+        "en": {
+            "label": "Select Scene Animation",
+            "tooltip": [
+                "Select every animation curve in the scene."
+            ]
+        },
+        "es": {
+            "label": "Seleccionar Animación de la Escena",
+            "tooltip": [
+                "Selecciona cada curva de animación de la escena."
+            ]
+        },
+        "fr": {
+            "label": "Sélectionner l'Animation de la Scène",
+            "tooltip": [
+                "Sélectionne chaque courbe d'animation de la scène."
+            ]
+        },
+        "ca": {
+            "label": "Seleccionar Animació de l'Escena",
+            "tooltip": [
+                "Selecciona totes les corbes d'animació de l'escena"
+            ]
+        },
+        "zh": {
+            "label": "选择场景动画",
+            "tooltip": [
+                "选择场景中的每条动画曲线"
+            ]
+        },
+        "ja": {
+            "label": "シーンアニメーションを選択",
+            "tooltip": [
+                "シーン内のすべてのアニメーションカーブを選択します"
+            ]
+        },
+        "ko": {
+            "label": "씬 애니메이션 선택",
+            "tooltip": [
+                "씬의 모든 애니메이션 커브를 선택합니다"
+            ]
+        },
+        "ar": {
+            "label": "تحديد حركة المشهد",
+            "tooltip": [
+                "تحديد كل منحنى حركة في المشهد"
+            ]
+        }
+    },
+    "clear_selected_keys": {
+        "en": {
+            "label": "Clear Key Selection",
+            "tooltip": [
+                "Clear the current Graph Editor key selection."
+            ]
+        },
+        "es": {
+            "label": "Borrar Selección de Claves",
+            "tooltip": [
+                "Borra la selección actual de claves del Graph Editor."
+            ]
+        },
+        "fr": {
+            "label": "Effacer la Sélection de Clés",
+            "tooltip": [
+                "Efface la sélection actuelle de clés du Graph Editor."
+            ]
+        },
+        "ca": {
+            "label": "Esborrar Selecció de Claus",
+            "tooltip": [
+                "Esborra la selecció actual de claus del Graph Editor"
+            ]
+        },
+        "zh": {
+            "label": "清除关键帧选择",
+            "tooltip": [
+                "清除当前 Graph Editor 关键帧选择"
+            ]
+        },
+        "ja": {
+            "label": "キー選択を消去",
+            "tooltip": [
+                "現在のGraph Editorのキー選択を消去します"
+            ]
+        },
+        "ko": {
+            "label": "키 선택 지우기",
+            "tooltip": [
+                "현재 Graph Editor 키 선택을 지웁니다"
+            ]
+        },
+        "ar": {
+            "label": "مسح تحديد المفاتيح",
+            "tooltip": [
+                "مسح تحديد مفاتيح Graph Editor الحالي"
             ]
         }
     },

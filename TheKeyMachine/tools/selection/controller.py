@@ -3,6 +3,7 @@
 from maya import cmds
 
 from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
+from TheKeyMachine.maya import animation
 from TheKeyMachine.maya import selection
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.ui.widgets import util as wutil
@@ -43,6 +44,7 @@ def set_selector_pinned(enabled):
 
 def _selected_roots():
     roots = []
+    seen = set()
     for node in selection.get_selected_objects(long=True):
         if node.startswith("|"):
             current = "|" + node.lstrip("|").split("|", 1)[0]
@@ -53,25 +55,17 @@ def _selected_roots():
                 if not parents:
                     break
                 current = parents[0]
-        if current not in roots:
+        if current not in seen:
+            seen.add(current)
             roots.append(current)
     return roots
 
 
-def _descendant_transforms(root):
-    nodes = [root]
-    nodes.extend(cmds.listRelatives(root, allDescendents=True, type="transform", fullPath=True) or [])
-    return list(dict.fromkeys(nodes))
-
-
-def _is_curve_control(node):
-    shapes = cmds.listRelatives(node, shapes=True, noIntermediate=True, fullPath=True) or []
-    return any(cmds.nodeType(shape) == "nurbsCurve" for shape in shapes)
-
-
 def _nurbs_curve_controls(roots):
     """Return control transforms below *roots* that own NURBS curve shapes."""
-    roots = list(dict.fromkeys(roots or ()))
+    if isinstance(roots, str):
+        roots = (roots,)
+    roots = tuple(dict.fromkeys(root for root in (roots or ()) if root))
     if not roots:
         return []
 
@@ -86,14 +80,23 @@ def _nurbs_curve_controls(roots):
         noIntermediate=True,
         long=True,
     ) or []
-    controls = cmds.listRelatives(curve_shapes, parent=True, fullPath=True) or []
-    return list(dict.fromkeys(controls))
+    # Every result is a full DAG path, so its parent transform is the path
+    # before the final separator. Deriving that locally avoids a second Maya
+    # command and still deduplicates controls that own multiple curve shapes.
+    return list(
+        dict.fromkeys(
+            shape.rsplit("|", 1)[0] for shape in curve_shapes if "|" in shape
+        )
+    )
 
 
 def _rig_controls(animated_only=False, operation=None):
     controls = _nurbs_curve_controls(_selected_roots())
     if not animated_only:
         return controls
+
+    operation = toolCommon.require_tool_operation(operation)
+
     def _filter_batch(batch):
         return [node for node in batch if selection.is_node_animated(node)]
 
@@ -134,12 +137,7 @@ def select_hierarchy(*args, tool_operation=None):
         return wutil.make_inViewMessage("Select at least one object")
 
     def _collect_batch(batch):
-        return [
-            descendant
-            for node in batch
-            for descendant in _descendant_transforms(node)
-            if _is_curve_control(descendant)
-        ]
+        return _nurbs_curve_controls(batch)
 
     controls = list(dict.fromkeys(
         control
@@ -173,3 +171,18 @@ def select_rig_controls_animated(*args, tool_operation=None):
         return wutil.make_inViewMessage("No animated rig controls found")
     cmds.select(controls, replace=True)
     return controls
+
+
+def select_all_animation_curves(*args):
+    curves = cmds.ls(
+        type=("animCurveTL", "animCurveTA", "animCurveTT", "animCurveTU")
+    ) or []
+    if curves:
+        cmds.select(curves)
+        cmds.selectKey(add=True)
+    else:
+        animation.notify_empty()
+
+
+def clear_selected_keys(*args):
+    cmds.selectKey(clear=True)

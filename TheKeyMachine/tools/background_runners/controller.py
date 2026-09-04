@@ -31,12 +31,14 @@ def toggle_selector_toolbar_pin(*_args):
     return background_runners.toggle_selector_toolbar_pin()
 
 
-def toggle_auto_pause_viewport(*_args):
-    return background_runners.toggle_auto_pause_viewport()
+def toggle_pause_viewport_auto(*_args):
+    return background_runners.toggle_pause_viewport_auto()
 
 
-def set_auto_pause_viewport(enabled, *_args):
-    return background_runners.set_runner_enabled(background_runners.AUTO_PAUSE_VIEWPORT_ID, enabled)
+def set_pause_viewport_auto(enabled, *_args):
+    return background_runners.set_runner_enabled(
+        background_runners.AUTO_PAUSE_VIEWPORT_ID, enabled
+    )
 
 
 def turn_all_off(*_args):

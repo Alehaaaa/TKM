@@ -139,6 +139,7 @@ COLORS = ColorRegistry(
         purple=Color("#B172DB"),
         violet=Color("#9072DB"),
         cyan=Color("#72DBDB"),
+        blue_teal=Color("#72C1DB"),
         light_gray=Color("#E0E0E0"),
     ),
     selection=SelectionColors(

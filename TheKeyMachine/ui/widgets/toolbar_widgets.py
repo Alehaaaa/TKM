@@ -32,7 +32,6 @@ from TheKeyMachine.ui import toolbar_modes
 
 from TheKeyMachine.core.Qt import QtCompat, QtCore, QtGui, QtWidgets  # type: ignore
 
-
 # Tool keys that get special handling (bound callbacks, custom widgets, ...)
 # instead of a plain toolbutton, on both the main toolbar and the Graph
 # Editor toolbar -- the two toolbars share one tool registry, so the set of
@@ -46,9 +45,12 @@ TOOLBAR_SPECIAL_TOOL_KEYS = {
     "TKM",
 }
 
+
 def _tooltip_description(data):
     tooltip = (data or {}).get("tooltip")
-    return (data or {}).get("description") or (tooltip if isinstance(tooltip, str) else "")
+    return (data or {}).get("description") or (
+        tooltip if isinstance(tooltip, str) else ""
+    )
 
 
 def setting_specs():
@@ -64,10 +66,20 @@ def setting_specs():
         api = importlib.import_module(package_name + ".api")
         resolver = getattr(api, "get_setting_spec", None)
         if not callable(resolver):
-            raise RuntimeError("{} must expose api.get_setting_spec()".format(package_name))
+            raise RuntimeError(
+                "{} must expose api.get_setting_spec()".format(package_name)
+            )
         behavior = resolver(tool_id)
-        if not isinstance(behavior, dict) or not callable(behavior.get("get_checked")) or not callable(behavior.get("set_checked")):
-            raise RuntimeError("{} returned an invalid setting spec for {!r}".format(package_name, tool_id))
+        if (
+            not isinstance(behavior, dict)
+            or not callable(behavior.get("get_checked"))
+            or not callable(behavior.get("set_checked"))
+        ):
+            raise RuntimeError(
+                "{} returned an invalid setting spec for {!r}".format(
+                    package_name, tool_id
+                )
+            )
         spec = {
             "id": tool_id,
             "label": tool.get("label", tool_id),
@@ -88,6 +100,7 @@ def bind_setting_toggle(widget, spec):
 
     signal = spec.get("changed_signal")
     if signal is not None:
+
         def _sync_setting_toggle(*_args, target=widget, toggle_spec=spec):
             sync_setting_toggle(target, toggle_spec)
 
@@ -95,7 +108,10 @@ def bind_setting_toggle(widget, spec):
         _retain_setting_toggle_slot(widget, _sync_setting_toggle)
         destroyed = getattr(widget, "destroyed", None)
         if destroyed is not None:
-            def _disconnect_sync(*_args, source_signal=signal, source_slot=_sync_setting_toggle):
+
+            def _disconnect_sync(
+                *_args, source_signal=signal, source_slot=_sync_setting_toggle
+            ):
                 _disconnect_setting_toggle_signal(source_signal, source_slot)
 
             destroyed.connect(_disconnect_sync)
@@ -281,7 +297,9 @@ def bind_background_runners_activity_button(btn):
             return
         timer.stop()
         sequence_len = random.randint(1, 2)
-        state["sequence"] = [random.choice(activity_icons) for _idx in range(sequence_len)]
+        state["sequence"] = [
+            random.choice(activity_icons) for _idx in range(sequence_len)
+        ]
         state["index"] = 0
         _advance_icon()
         timer.start()
@@ -307,7 +325,9 @@ def bind_pause_viewport_auto_icon(btn):
     from TheKeyMachine.tools.pause_viewport import api as pauseViewportApi
 
     shortcut_variants = list(getattr(btn, "_shortcut_variants", []) or [])
-    base_shortcuts = list((getattr(btn, "_base_state", {}) or {}).get("shortcuts", []) or [])
+    base_shortcuts = list(
+        (getattr(btn, "_base_state", {}) or {}).get("shortcuts", []) or []
+    )
 
     def _display_state(tool_id):
         tool = registry.get_tool(tool_id)
@@ -318,7 +338,11 @@ def bind_pause_viewport_auto_icon(btn):
     def _sync_icon(*_args, target=btn):
         if not wutil.is_valid_widget(target):
             return
-        tool_id = "auto_pause_viewport" if pauseViewportApi.is_auto_pause_enabled() else "pause_viewport"
+        tool_id = (
+            "pause_viewport_auto"
+            if pauseViewportApi.is_auto_pause_enabled()
+            else "pause_viewport"
+        )
         state = _display_state(tool_id)
         try:
             target._base_state.update(state)
@@ -345,7 +369,10 @@ def bind_pause_viewport_auto_icon(btn):
 def add_selector_button(section, item_data):
     from TheKeyMachine.tools import registry
 
-    selector_tool = registry.get_tool("selector", **{k: v for k, v in item_data.items() if k not in {"id", "shortcuts"}})
+    selector_tool = registry.get_tool(
+        "selector",
+        **{k: v for k, v in item_data.items() if k not in {"id", "shortcuts"}},
+    )
     btn = cw.QFlatSelectorButton(
         icon=selector_tool.get("icon"),
         tooltip=selector_tool.get("tooltip"),
@@ -394,7 +421,10 @@ def item_key(item_data):
 
 
 def is_widget_item(item_data):
-    return isinstance(item_data, dict) and item_data.get("type") in {"widget", "setting"}
+    return isinstance(item_data, dict) and item_data.get("type") in {
+        "widget",
+        "setting",
+    }
 
 
 def is_group_item(item_data):
@@ -432,7 +462,9 @@ def section_should_use_group_menu(section_def, items, *, special_keys=None):
     )
 
 
-def add_section_items(section, items, *, add_tool_item_fn, add_widget_item_fn, add_group_items_fn=None):
+def add_section_items(
+    section, items, *, add_tool_item_fn, add_widget_item_fn, add_group_items_fn=None
+):
     """Render a resolved registry item list in descriptor order."""
     group_renderer = add_group_items_fn or (
         lambda nested_section, nested_items: add_grouped_section_items(
@@ -457,7 +489,9 @@ def add_section_items(section, items, *, add_tool_item_fn, add_widget_item_fn, a
         add_tool_item_fn(section, item)
 
 
-def add_grouped_section_items(section, items, *, add_widget_item_fn, add_group_items_fn=None):
+def add_grouped_section_items(
+    section, items, *, add_widget_item_fn, add_group_items_fn=None
+):
     """
     Render a section as grouped action buttons while keeping widget descriptors in order.
 
@@ -520,7 +554,8 @@ def build_slider_section(
     default_keys = [
         f"{prefix}_{mode.key}"
         for mode in modes
-        if hasattr(mode, "key") and registry.is_pinned_by_default(toolbar_id, f"{prefix}_{mode.key}")
+        if hasattr(mode, "key")
+        and registry.is_pinned_by_default(toolbar_id, f"{prefix}_{mode.key}")
     ]
 
     # SliderMode instances carry their own label/tooltip instead of living in
@@ -654,7 +689,9 @@ def add_main_tool_item(section, item_data, owner):
     if key == "selector":
         return add_selector_button(section, item_data)
     if key == "orbit":
-        owner.orbit_button_widget = add_bound_tool_button(section, item_data, orbitApi.bind_orbit_toolbar_button)
+        owner.orbit_button_widget = add_bound_tool_button(
+            section, item_data, orbitApi.bind_orbit_toolbar_button
+        )
         return owner.orbit_button_widget
     if key == "selection_sets":
         return add_bound_tool_button(
@@ -666,11 +703,19 @@ def add_main_tool_item(section, item_data, owner):
             ),
         )
     if key == "animation_layers":
-        return add_bound_tool_button(section, item_data, animationLayersApi.bind_animation_layers_toolbar_button)
+        return add_bound_tool_button(
+            section, item_data, animationLayersApi.bind_animation_layers_toolbar_button
+        )
     if key == "attribute_switcher":
-        return add_bound_tool_button(section, item_data, attributeSwitcherApi.bind_attribute_switcher_toolbar_button)
+        return add_bound_tool_button(
+            section,
+            item_data,
+            attributeSwitcherApi.bind_attribute_switcher_toolbar_button,
+        )
     if key == "gimbal":
-        return add_bound_tool_button(section, item_data, gimbalFixerApi.bind_gimbal_fixer_toolbar_button)
+        return add_bound_tool_button(
+            section, item_data, gimbalFixerApi.bind_gimbal_fixer_toolbar_button
+        )
     return add_tool_button(section, item_data)
 
 
@@ -678,21 +723,30 @@ def add_main_group_items(section, items, owner):
     return add_grouped_section_items(
         section,
         items,
-        add_widget_item_fn=lambda nested_section, item: create_main_widget_from_data(nested_section, item, owner),
-        add_group_items_fn=lambda nested_section, group_items: add_main_group_items(nested_section, group_items, owner),
+        add_widget_item_fn=lambda nested_section, item: create_main_widget_from_data(
+            nested_section, item, owner
+        ),
+        add_group_items_fn=lambda nested_section, group_items: add_main_group_items(
+            nested_section, group_items, owner
+        ),
     )
 
 
-def add_slider_section_from_data(section_def, new_section_fn, *, namespace, object_prefix, color=None):
+def add_slider_section_from_data(
+    section_def, new_section_fn, *, namespace, object_prefix, color=None
+):
     kwargs = {}
     if color is not None:
         kwargs["color"] = color
     section = new_section_fn(**kwargs)
     factory = section_def.get("section_factory")
     if not callable(factory):
-        raise ValueError("Slider section {} has no section_factory".format(section_def.get("id")))
+        raise ValueError(
+            "Slider section {} has no section_factory".format(section_def.get("id"))
+        )
     return factory(
-        section, section_def,
+        section,
+        section_def,
         namespace=namespace,
         object_prefix=object_prefix,
     )
@@ -728,7 +782,9 @@ def _populate_toolbar_from_layout(
         sec_id = section_def["id"]
 
         if section_def.get("type") == "connect_entries":
-            add_connect_entries_section(new_section_fn, toolbar_id, color=section_def.get("color"))
+            add_connect_entries_section(
+                new_section_fn, toolbar_id, color=section_def.get("color")
+            )
             continue
 
         if section_def.get("type") == "slider":
@@ -759,7 +815,9 @@ def _populate_toolbar_from_layout(
         resolved_section = registry.get_tool_section(sec_id, toolbar_id=toolbar_id)
 
         if section_should_use_group_menu(
-            section_def, resolved_section["items"], special_keys=TOOLBAR_SPECIAL_TOOL_KEYS
+            section_def,
+            resolved_section["items"],
+            special_keys=TOOLBAR_SPECIAL_TOOL_KEYS,
         ):
             add_group_items_fn(section, resolved_section["items"])
             continue
@@ -772,7 +830,11 @@ def _populate_toolbar_from_layout(
             add_group_items_fn=add_group_items_fn,
         )
 
-    for section in getattr(animations_widget, "_tkm_sections", ()) if animations_widget is not None else ():
+    for section in (
+        getattr(animations_widget, "_tkm_sections", ())
+        if animations_widget is not None
+        else ()
+    ):
         section.enable_entry_animations()
 
     if animations_widget is not None:
@@ -832,9 +894,15 @@ def populate_main_toolbar_from_layout(layout_id, new_section_fn, owner):
         new_section_fn,
         slider_namespace="main_toolbar_sliders",
         slider_object_prefix="bar",
-        add_tool_item_fn=lambda nested_section, item: add_main_tool_item(nested_section, item, owner),
-        add_widget_item_fn=lambda nested_section, item: create_main_widget_from_data(nested_section, item, owner),
-        add_group_items_fn=lambda nested_section, group_items: add_main_group_items(nested_section, group_items, owner),
+        add_tool_item_fn=lambda nested_section, item: add_main_tool_item(
+            nested_section, item, owner
+        ),
+        add_widget_item_fn=lambda nested_section, item: create_main_widget_from_data(
+            nested_section, item, owner
+        ),
+        add_group_items_fn=lambda nested_section, group_items: add_main_group_items(
+            nested_section, group_items, owner
+        ),
         animations_widget=getattr(owner, "main_toolbar_widget", None),
     )
 
@@ -843,8 +911,12 @@ def show_welcome_shelf_prompt(anchor_button):
     if not wutil.is_valid_widget(anchor_button):
         return
 
-    add_button = customDialogs.QFlatConfirmDialog.CustomButton("Add to Shelf", positive=True, icon=icons.add_to_shelf)
-    no_button = customDialogs.QFlatConfirmDialog.CustomButton("No", positive=False, icon=icons.cancel)
+    add_button = customDialogs.QFlatConfirmDialog.CustomButton(
+        "Add to Shelf", positive=True, icon=icons.add_to_shelf
+    )
+    no_button = customDialogs.QFlatConfirmDialog.CustomButton(
+        "No", positive=False, icon=icons.cancel
+    )
     clicked = customDialogs.QFlatTooltipConfirm.question(
         anchor_button,
         title="Add TheKeyMachine to your shelf?",
@@ -881,7 +953,9 @@ def set_main_toolbar_icon_alignment(owner, alignment_name):
 def add_graph_tool_item(section, item_data, graph_settings_menu_fn):
     if item_key(item_data) == "selector":
         return add_selector_button(section, item_data)
-    overrides = {"menu": graph_settings_menu_fn} if item_key(item_data) == "TKM" else None
+    overrides = (
+        {"menu": graph_settings_menu_fn} if item_key(item_data) == "TKM" else None
+    )
     return add_tool_button(section, item_data, overrides=overrides)
 
 
@@ -889,7 +963,9 @@ def add_graph_group_items(section, items, graph_settings_menu_fn, toolbar_widget
     return add_grouped_section_items(
         section,
         items,
-        add_widget_item_fn=lambda nested_section, item: create_widget_from_data(nested_section, item, owner=toolbar_widget),
+        add_widget_item_fn=lambda nested_section, item: create_widget_from_data(
+            nested_section, item, owner=toolbar_widget
+        ),
         add_group_items_fn=lambda nested_section, group_items: add_graph_group_items(
             nested_section,
             group_items,
@@ -899,17 +975,26 @@ def add_graph_group_items(section, items, graph_settings_menu_fn, toolbar_widget
     )
 
 
-def populate_graph_toolbar_from_layout(new_section_fn, graph_settings_menu_fn, toolbar_widget=None):
+def populate_graph_toolbar_from_layout(
+    new_section_fn, graph_settings_menu_fn, toolbar_widget=None
+):
     _populate_toolbar_from_layout(
         "graph",
         "graph",
         new_section_fn,
         slider_namespace="graph_toolbar_sliders",
         slider_object_prefix="graph",
-        add_tool_item_fn=lambda nested_section, item: add_graph_tool_item(nested_section, item, graph_settings_menu_fn),
-        add_widget_item_fn=lambda nested_section, item: create_widget_from_data(nested_section, item, owner=toolbar_widget),
+        add_tool_item_fn=lambda nested_section, item: add_graph_tool_item(
+            nested_section, item, graph_settings_menu_fn
+        ),
+        add_widget_item_fn=lambda nested_section, item: create_widget_from_data(
+            nested_section, item, owner=toolbar_widget
+        ),
         add_group_items_fn=lambda nested_section, group_items: add_graph_group_items(
-            nested_section, group_items, graph_settings_menu_fn, toolbar_widget=toolbar_widget
+            nested_section,
+            group_items,
+            graph_settings_menu_fn,
+            toolbar_widget=toolbar_widget,
         ),
         animations_widget=toolbar_widget,
     )
@@ -969,7 +1054,9 @@ def bind_toolbar_pinning_context(toolbar_widget, parent_widget=None):
         def _on_toolbar_context_menu(pos, source=target):
             global_pos = source.mapToGlobal(pos)
             toolbar_pos = toolbar_widget.mapFromGlobal(global_pos)
-            if not toolbar_menus.should_show_toolbar_pinning_menu(toolbar_widget, toolbar_pos):
+            if not toolbar_menus.should_show_toolbar_pinning_menu(
+                toolbar_widget, toolbar_pos
+            ):
                 return
             toolbar_menus.show_toolbar_pinning_menu(toolbar_widget, global_pos)
 
