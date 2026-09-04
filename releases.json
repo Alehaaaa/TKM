@@ -1,10 +1,38 @@
 {
-  "latest": "0.1.56",
+  "latest": "0.1.57",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.57",
+      "tag": "TKM-0.1.57",
+      "publishedAt": "2026-09-04T21:54:07Z",
+      "publishedLabel": "September 4, 2026",
+      "hasRelease": true,
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.57",
+      "hasDownload": true,
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.57/TKM-0.1.57.zip",
+      "entries": [
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Select Scene Animation and Clear Key Selection now live with the Selection tools"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Anim Curve Tools, Tangents, and Pause Viewport have refreshed icons and more cohesive toolbar colors"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Select Hierarchy and rig-control selection scan large hierarchies more efficiently"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.56...TKM-0.1.57"
+    },
     {
       "version": "0.1.56",
       "tag": "TKM-0.1.56",
