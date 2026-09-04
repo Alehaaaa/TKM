@@ -14,6 +14,12 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.58:
+  - bugfix: Animation Recovery tracks undo, redo, curve creation, deletion, and connection changes more reliably
+  - bugfix: Recovered animation preserves tangent locks and driven-key tangents
+  - new: Maya startup opens Animation Recovery with newer animation or a recorded crash scene selected for loading
+  - changed: Animation Recovery stores compact checkpoints in the background and reduces repeated work during key edits
+
 0.1.57:
   - polish: Anim Curve Tools, Tangents, and Pause Viewport have refreshed icons and more cohesive toolbar colors
   - polish: Select Hierarchy and rig-control selection scan large hierarchies more efficiently

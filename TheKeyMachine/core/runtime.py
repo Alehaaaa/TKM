@@ -719,6 +719,17 @@ class RuntimeManager(QtCore.QObject):
             self._persist_state()
         return callback_ids
 
+    def add_node_lifecycle_callbacks(self, node_type, handler, *, key):
+        """Own DG creation/deletion callbacks, including non-DAG anim curves."""
+        if not om:
+            return []
+        result = []
+        for register in (om.MDGMessage.addNodeAddedCallback, om.MDGMessage.addNodeRemovedCallback):
+            callback_id = register(handler, node_type)
+            self._track_om(key, int(callback_id))
+            result.append(int(callback_id))
+        return result
+
     def add_dag_change_callback(self, handler: Callable[..., Any], *, key: str) -> Optional[int]:
         """Register one callback for DAG hierarchy changes and own its cleanup."""
         if not om:

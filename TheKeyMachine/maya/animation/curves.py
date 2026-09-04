@@ -272,6 +272,7 @@ def apply_key_tangent_snapshots(
     snapshots,
     apply_weighted=True,
     attribute=None,
+    unitless_input=False,
 ):
     """Restore many key tangents with grouped Maya commands.
 
@@ -292,7 +293,7 @@ def apply_key_tangent_snapshots(
             return
         kwargs = {
             "edit": True,
-            "time": [(time, time) for time in times],
+            ("float" if unitless_input else "time"): [(time, time) for time in times],
         }
         if attribute:
             kwargs["attribute"] = attribute

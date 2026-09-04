@@ -3,20 +3,21 @@
 from contextlib import contextmanager
 from datetime import datetime
 import io
-import json
 import os
 import struct
+import sys
 import time
 import uuid
-import zlib
 
 from maya import cmds
+from maya import OpenMaya as file_api
 
 try:
     from maya.api import OpenMaya as om
 except ImportError:
     om = None
 
+from TheKeyMachine.tools.animation_recovery import storage
 from TheKeyMachine.maya import animation
 from TheKeyMachine.tools import registry
 from TheKeyMachine.core.Qt import QtCore
@@ -47,7 +48,7 @@ SCENE_ID_ATTRIBUTE = "tkmAnimationRecoverySceneId"
 # needs no create/lock/unlock dance -- unlike a node attribute, it is exactly
 # the right weight for a value stamped on every single snapshot.
 CHECKPOINT_FILEINFO_KEY = "tkm_animationRecoveryLastCheckpoint"
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = storage.VERSION
 BASELINE_INTERVAL = 50
 MAX_BASELINE_GENERATIONS = 20
 SNAPSHOT_DELAY_MS = 350
@@ -65,6 +66,7 @@ REASON_CODES = {
 REASONS_BY_CODE = {code: reason for reason, code in REASON_CODES.items()}
 
 _SERVICE = None
+_LAUNCH_CHECKED = False
 
 
 def is_enabled():
@@ -109,239 +111,17 @@ def _filename_timestamp_value(path):
         return time.mktime(created.timetuple()) + (created.microsecond / 1000000.0)
 
 
-def _pack_endpoint(endpoint):
-    return [endpoint.get("plug"), endpoint.get("node_uuid")]
-
-
-def _unpack_endpoint(endpoint):
-    plug = endpoint[0]
-    node, attribute = _split_plug(plug)
-    return {
-        "plug": plug,
-        "node": node,
-        "node_uuid": endpoint[1],
-        "attribute": attribute,
-    }
-
-
-def _pack_layer_ref(layer_info):
-    if not layer_info:
-        return None
-    return [
-        layer_info.get("name"),
-        layer_info.get("uuid"),
-        layer_info.get("plug"),
-    ]
-
-
-def _unpack_layer_ref(layer_ref):
-    if not layer_ref:
-        return None
-    return {
-        "name": layer_ref[0],
-        "uuid": layer_ref[1],
-        "plug": layer_ref[2],
-    }
-
-
-def _pack_curve(curve):
-    tangents = curve.get("tangents") or {}
-    return [
-        curve.get("name"),
-        curve.get("uuid"),
-        curve.get("node_type"),
-        1 if curve.get("unitless_input") else 0,
-        curve.get("positions") or [],
-        curve.get("values") or [],
-        [tangents.get(key) or [] for key in ("itt", "ott", "ia", "oa", "iw", "ow")],
-        1 if curve.get("weighted_tangents") else 0,
-        curve.get("pre_infinity", 0),
-        curve.get("post_infinity", 0),
-        [_pack_endpoint(item) for item in curve.get("input_connections") or []],
-        [_pack_endpoint(item) for item in curve.get("output_connections") or []],
-        _pack_layer_ref(curve.get("layer")),
-    ]
-
-
-def _unpack_curve(curve):
-    tangent_values = curve[6]
-    tangent_keys = ("itt", "ott", "ia", "oa", "iw", "ow")
-    return {
-        "name": curve[0],
-        "uuid": curve[1],
-        "node_type": curve[2],
-        "unitless_input": bool(curve[3]),
-        "positions": curve[4],
-        "values": curve[5],
-        "tangents": {
-            key: tangent_values[index]
-            for index, key in enumerate(tangent_keys)
-        },
-        "weighted_tangents": bool(curve[7]),
-        "pre_infinity": curve[8],
-        "post_infinity": curve[9],
-        "input_connections": [_unpack_endpoint(item) for item in curve[10]],
-        "output_connections": [_unpack_endpoint(item) for item in curve[11]],
-        "layer": _unpack_layer_ref(curve[12]),
-    }
-
-
-def _pack_layer(layer):
-    return [
-        layer.get("name"),
-        layer.get("uuid"),
-        layer.get("parent"),
-        layer.get("weight", 1.0),
-        1 if layer.get("mute") else 0,
-        1 if layer.get("solo") else 0,
-        1 if layer.get("override") else 0,
-        1 if layer.get("passthrough") else 0,
-        1 if layer.get("lock") else 0,
-        layer.get("attributes") or [],
-        layer.get("rotation_accumulation_mode"),
-        layer.get("scale_accumulation_mode"),
-    ]
-
-
-def _unpack_layer(layer):
-    return {
-        "name": layer[0],
-        "uuid": layer[1],
-        "parent": layer[2],
-        "weight": layer[3],
-        "mute": bool(layer[4]),
-        "solo": bool(layer[5]),
-        "override": bool(layer[6]),
-        "passthrough": bool(layer[7]),
-        "lock": bool(layer[8]),
-        "attributes": list(layer[9] or []),
-        "rotation_accumulation_mode": layer[10],
-        "scale_accumulation_mode": layer[11],
-    }
-
-
-def _pack_payload(payload):
-    details = payload.get("meta") or {}
-    return [
-        [
-            details.get("source_file"),
-            details.get("location"),
-            details.get("current_frame"),
-            details.get("playback_range"),
-            details.get("animation_range"),
-            details.get("selected_objects"),
-            details.get("source_mtime"),
-            details.get("parent_checkpoint"),
-        ],
-        [_pack_curve(curve) for curve in payload.get("curves") or []],
-        [
-            [
-                item.get("name"),
-                item.get("uuid"),
-                [[name, value] for name, value in sorted((item.get("attributes") or {}).items())],
-            ]
-            for item in payload.get("objects") or []
-        ],
-        [
-            [
-                item.get("name"),
-                item.get("uuid"),
-                [_pack_endpoint(endpoint) for endpoint in item.get("output_connections") or []],
-            ]
-            for item in payload.get("removed_curves") or []
-        ],
-        [_pack_layer(layer) for layer in payload.get("layers") or []],
-    ]
-
-
-def _unpack_payload(payload, reason="animation", full_snapshot=False):
-    details, curves, objects, removed_curves, layers = payload
-    return {
-        "meta": {
-            "version": SCHEMA_VERSION,
-            "reason": reason,
-            "full_snapshot": bool(full_snapshot),
-            "source_file": details[0],
-            "location": details[1],
-            "current_frame": details[2],
-            "playback_range": details[3],
-            "animation_range": details[4],
-            "selected_objects": details[5],
-            "source_mtime": details[6],
-            "parent_checkpoint": details[7],
-        },
-        "curves": [_unpack_curve(curve) for curve in curves],
-        "objects": [
-            {
-                "name": item[0],
-                "uuid": item[1],
-                "attributes": dict(item[2]),
-            }
-            for item in objects
-        ],
-        "removed_curves": [
-            {
-                "name": item[0],
-                "uuid": item[1],
-                "output_connections": [
-                    _unpack_endpoint(endpoint)
-                    for endpoint in item[2]
-                ],
-            }
-            for item in removed_curves
-        ],
-        "layers": [_unpack_layer(layer) for layer in layers],
-    }
-
-
 def _write_recovery_atomic(path, payload):
-    folder = os.path.dirname(path)
-    if not os.path.isdir(folder):
-        try:
-            os.makedirs(folder)
-        except OSError:
-            if not os.path.isdir(folder):
-                raise
-    temporary = path + ".tmp"
-    packed = _pack_payload(payload)
-    serialized = json.dumps(packed, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     meta = payload.get("meta") or {}
-    reason = meta.get("reason") or "animation"
-    reason_byte = REASON_CODES.get(reason, 0)
+    reason_byte = REASON_CODES.get(meta.get("reason"), 0)
     if meta.get("full_snapshot"):
         reason_byte |= FULL_SNAPSHOT_FLAG
-    header = struct.pack("BB", SCHEMA_VERSION, reason_byte)
-    compiled = header + zlib.compress(serialized, 9)
-    try:
-        with io.open(temporary, "wb") as stream:
-            stream.write(compiled)
-            stream.flush()
-            os.fsync(stream.fileno())
-        replace = getattr(os, "replace", os.rename)
-        replace(temporary, path)
-    except Exception:
-        try:
-            if os.path.isfile(temporary):
-                os.remove(temporary)
-        except OSError:
-            pass
-        raise
+    storage.write(path, payload, reason_byte)
 
 
 def _load_recovery(path):
-    with io.open(path, "rb") as stream:
-        compiled = stream.read()
-    if len(compiled) < 3:
-        raise ValueError("Invalid Animation Recovery file")
-    version, reason_code = struct.unpack("BB", compiled[:2])
-    if version != SCHEMA_VERSION:
-        raise ValueError("Unsupported Animation Recovery version: {}".format(version))
-    serialized = zlib.decompress(compiled[2:]).decode("utf-8")
-    return _unpack_payload(
-        json.loads(serialized),
-        reason=REASONS_BY_CODE.get(reason_code & ~FULL_SNAPSHOT_FLAG, "animation"),
-        full_snapshot=bool(reason_code & FULL_SNAPSHOT_FLAG),
-    )
+    _recovery_header(path)
+    return storage.read(path)
 
 
 def _recovery_reason(path):
@@ -359,28 +139,11 @@ def _recovery_reason(path):
 
 
 def _recovery_source_file(path):
-    """Cheap peek at the filename a checkpoint recorded at capture time.
-
-    Every checkpoint -- not just full snapshots -- carries its own meta
-    block, so this only needs to decompress and read the leading "details"
-    entry of the packed payload. It skips ``_unpack_payload``'s curve/object/
-    layer reconstruction entirely, which is what actually makes a full
-    ``_load_recovery()`` call expensive on an animation-heavy scene, so
-    list_recoveries() can afford to call this once per row.
-    """
+    """Read scene identity without loading animation data dependencies."""
     try:
-        with io.open(path, "rb") as stream:
-            compiled = stream.read()
-        if len(compiled) < 3:
-            return None
-        version, _reason_code = struct.unpack("BB", compiled[:2])
-        if version != SCHEMA_VERSION:
-            return None
-        serialized = zlib.decompress(compiled[2:]).decode("utf-8")
-        packed = json.loads(serialized)
-        details = packed[0] if packed else []
-        return details[0] if len(details) > 0 else None
-    except Exception:
+        _recovery_header(path)
+        return storage.read_manifest(path)["meta"].get("source_file")
+    except (OSError, ValueError, KeyError):
         return None
 
 
@@ -398,7 +161,7 @@ def _recovery_header(path):
 
 def _maya_file_io_active():
     """Avoid DG inspection while Maya is reading or writing scene data."""
-    file_io = getattr(om, "MFileIO", None) if om is not None else None
+    file_io = file_api.MFileIO
     if file_io is None:
         return False
     for method_name in (
@@ -543,6 +306,8 @@ def _capture_curve(curve, layer_info=None):
         ("oa", "outAngle"),
         ("iw", "inWeight"),
         ("ow", "outWeight"),
+        ("lock", "lock"),
+        ("weightLock", "weightLock"),
     ):
         tangent_data[short_name] = _query_values(cmds.keyTangent, curve, query_name)
     weighted_values = _query_values(cmds.keyTangent, curve, "weightedTangents")
@@ -765,6 +530,16 @@ def _scene_node():
 
 
 def ensure_scene_id():
+    # Recovery bookkeeping alone must not turn a freshly opened scene dirty.
+    was_modified = cmds.file(query=True, modified=True)
+    try:
+        return _ensure_scene_id()
+    finally:
+        if not was_modified:
+            cmds.file(modified=False)
+
+
+def _ensure_scene_id():
     """Create animation recovery's own TKM child node and persist its scene ID."""
     node = TkmSceneNode.root().child(SCENE_NODE, lock_transform=True, icon=icons.animation_recovery).name
     plug = "{}.{}".format(node, SCENE_ID_ATTRIBUTE)
@@ -817,19 +592,7 @@ def current_scene_id(create=False):
 
 
 def set_last_saved_checkpoint(timestamp):
-    """Stamp the checkpoint timestamp current right now onto the scene.
-
-    Stored via fileInfo rather than a node attribute: fileInfo is scene-global
-    (no node/lock bookkeeping needed) and, per Maya's own documentation, is
-    explicitly NOT undoable -- unlike a plain setAttr, writing it on every
-    single snapshot (which happens constantly while animating) never pushes
-    an entry onto the user's undo queue. Its value is preserved when the
-    scene is saved exactly like a node attribute's would be, which is all
-    this needs: reopening the scene can compare it against the recovery
-    folder's newest checkpoint timestamp to know whether the saved scene
-    already reflects everything Animation Recovery knows about, independent
-    of filesystem timestamps.
-    """
+    """Stamp only at pre-save, so disk scenes identify their saved checkpoint."""
     try:
         timestamp = float(timestamp or 0.0)
     except (TypeError, ValueError):
@@ -942,48 +705,13 @@ def newer_recovery_for_current_scene(scene_id=None):
     paths = _recovery_paths(scene_id=scene_id)
     if not paths:
         return None
-    newest_path = paths[-1]
-
-    stamped_timestamp = last_saved_checkpoint()
-    if stamped_timestamp is not None:
-        # The scene node records the checkpoint timestamp that was current the
-        # last time this scene was actually saved (or, at minimum, live in
-        # memory). When no checkpoint on disk is newer than that, the opened
-        # scene already reflects everything Animation Recovery knows about --
-        # no need to fall back to fragile filesystem timestamps.
-        if _filename_timestamp_value(newest_path) <= stamped_timestamp:
-            return None
-        return newest_path
-
-    entries = list_recoveries(scene_id=scene_id)
-    if not entries:
+    newest_path = _newest_valid_recovery(paths, validate_values=False)
+    if not newest_path:
         return None
-    latest = entries[0]
-    try:
-        scene_mtime = os.path.getmtime(scene_path)
-        checkpoint_time = time.mktime(latest["created"].timetuple()) + (
-            latest["created"].microsecond / 1000000.0
-        )
-    except (KeyError, OSError, TypeError, ValueError, OverflowError):
-        return None
-    if checkpoint_time <= scene_mtime:
-        return None
-
-    try:
-        details = recovery_details(latest["path"])
-    except Exception:
-        details = {}
-    if latest.get("reason") == "scene_save":
-        source_file = details.get("source_file")
-        location = details.get("location")
-        saved_path = os.path.join(location, source_file) if location and source_file else ""
-        same_path = bool(saved_path) and os.path.normcase(os.path.realpath(saved_path)) == os.path.normcase(
-            os.path.realpath(scene_path)
-        )
-        saved_mtime = details.get("source_mtime")
-        if same_path and saved_mtime is not None and scene_mtime >= float(saved_mtime):
-            return None
-    return latest["path"]
+    saved_timestamp = last_saved_checkpoint()
+    if saved_timestamp is None:
+        saved_timestamp = os.path.getmtime(scene_path)
+    return newest_path if _filename_timestamp_value(newest_path) > saved_timestamp else None
 
 
 def _entity_matches(left, right):
@@ -1136,14 +864,26 @@ def _load_merged_recovery(path, operation=None, chain_paths=None):
     }
 
 
-def _newest_valid_recovery(paths):
-    """Return the newest checkpoint whose complete replay chain is readable."""
-    for checkpoint_path in reversed(paths or []):
+def _newest_valid_recovery(paths, validate_values=True):
+    """Use commit-only validation on the UI thread, full replay on the worker."""
+    for path in reversed(paths or []):
         try:
-            _load_merged_recovery(checkpoint_path)
+            if validate_values:
+                _load_merged_recovery(path)
+            else:
+                previous = None
+                for checkpoint in _recovery_chain_paths(path):
+                    meta = storage.read_manifest(checkpoint)["meta"]
+                    if not meta.get("full_snapshot") and (
+                        previous is None or meta.get("parent_checkpoint") != previous
+                    ):
+                        raise ValueError("Incomplete recovery chain")
+                    if not storage.dependencies_exist(checkpoint):
+                        raise ValueError("Missing recovery data")
+                    previous = os.path.basename(checkpoint)
+            return path
         except Exception:
             continue
-        return checkpoint_path
     return None
 
 
@@ -1169,6 +909,7 @@ def _prune_recovery_history(scene_id):
             removed += 1
         except OSError:
             continue
+    storage.prune_dependencies(scene_recovery_folder(scene_id), _recovery_paths(scene_id))
     return removed
 
 
@@ -1184,8 +925,7 @@ def delete_recovery(path):
 
 
 def recovery_details(path):
-    payload = _load_recovery(path)
-    meta = dict(payload.get("meta") or {})
+    meta = dict(storage.read_manifest(path).get("meta") or {})
     meta.setdefault("created", _parse_filename_timestamp(path))
     created_at = meta.get("created_at")
     if created_at:
@@ -1679,12 +1419,7 @@ def _set_curve_keys(curve, curve_data, operation=None):
         pass
     for index, (position, value) in enumerate(zip(positions, values)):
         key_argument = {"float": position} if unitless_input else {"time": position}
-        try:
-            cmds.setKeyframe(curve, value=value, **key_argument)
-        except Exception:
-            if operation:
-                operation.step()
-            continue
+        cmds.setKeyframe(curve, value=value, **key_argument)
 
         if operation and operation.step():
             return False
@@ -1694,10 +1429,7 @@ def _set_curve_keys(curve, curve_data, operation=None):
         if float(position) in saved_positions:
             continue
         cut_argument = {"float": (position, position)} if unitless_input else {"time": (position, position)}
-        try:
-            cmds.cutKey(curve, clear=True, **cut_argument)
-        except Exception:
-            pass
+        cmds.cutKey(curve, clear=True, **cut_argument)
         if operation and operation.step():
             return False
 
@@ -1710,31 +1442,22 @@ def _set_curve_keys(curve, curve_data, operation=None):
     except Exception:
         pass
 
-    for index in range(min(len(positions), len(values))):
-        type_arguments = {}
-        detail_arguments = {}
-        for short_name, edit_name in (
-            ("itt", "inTangentType"),
-            ("ott", "outTangentType"),
-            ("ia", "inAngle"),
-            ("oa", "outAngle"),
-            ("iw", "inWeight"),
-            ("ow", "outWeight"),
-        ):
-            values_for_field = tangents.get(short_name) or []
-            if index >= len(values_for_field) or values_for_field[index] is None:
-                continue
-            target = type_arguments if short_name in ("itt", "ott") else detail_arguments
-            target[edit_name] = values_for_field[index]
-        try:
-            if type_arguments:
-                cmds.keyTangent(curve, edit=True, index=(index, index), **type_arguments)
-            if detail_arguments:
-                cmds.keyTangent(curve, edit=True, index=(index, index), **detail_arguments)
-                if type_arguments:
-                    cmds.keyTangent(curve, edit=True, index=(index, index), **type_arguments)
-        except Exception:
-            pass
+    snapshots = []
+    for index in range(len(positions)):
+        snapshots.append({
+            flag: tangents[key][index]
+            for key, flag in (
+                ("itt", "inTangentType"), ("ott", "outTangentType"),
+                ("ia", "inAngle"), ("oa", "outAngle"),
+                ("iw", "inWeight"), ("ow", "outWeight"),
+                ("lock", "lock"), ("weightLock", "weightLock"),
+            )
+            if index < len(tangents.get(key) or []) and tangents[key][index] is not None
+        })
+    animation.apply_key_tangent_snapshots(
+        curve, positions, snapshots, apply_weighted=False,
+        unitless_input=unitless_input,
+    )
     return True
 
 
@@ -1919,10 +1642,11 @@ def _restore_recovery_worker(operation, path, chain_paths, scene_id):
     instead, so Cancel has many chances to land during a large restore
     instead of only before/after the whole thing.
     """
+    payload = _load_merged_recovery(path, operation=operation, chain_paths=chain_paths)
+    if payload is None:
+        return False
+
     def _setup():
-        payload = _load_merged_recovery(path, operation=operation, chain_paths=chain_paths)
-        if payload is None:
-            return None
         curves_data = payload.get("curves") or []
         objects_data = payload.get("objects") or []
         layers_data = payload.get("layers") or []
@@ -2104,7 +1828,7 @@ def _null_context():
 
 class _SnapshotWriterSignals(QtCore.QObject):
     saved = QtCore.Signal(str)
-    failed = QtCore.Signal(str)
+    failed = QtCore.Signal(str, str)
 
 
 class _SnapshotWriteTask(QtCore.QRunnable):
@@ -2128,6 +1852,10 @@ class _SnapshotWriteTask(QtCore.QRunnable):
                         )
                     )
             _write_recovery_atomic(self.path, self.payload)
+            storage.atomic_write(
+                os.path.join(os.path.dirname(os.path.dirname(self.path)), "last-checkpoint.json"),
+                storage._encode({"path": self.path}),
+            )
             scene_id = _recovery_scene_id(self.path)
             if scene_id and meta.get("full_snapshot"):
                 try:
@@ -2137,19 +1865,22 @@ class _SnapshotWriteTask(QtCore.QRunnable):
                     # must remain successful if old files cannot be removed.
                     pass
         except Exception as exc:
-            self.signals.failed.emit(str(exc))
+            self.signals.failed.emit(self.path, str(exc))
             return
         self.signals.saved.emit(self.path)
 
 
 class AnimationRecoveryService(QtCore.QObject):
     snapshotSaved = QtCore.Signal(str)
+    launchReady = QtCore.Signal(object)
 
     def __init__(self, manager):
         QtCore.QObject.__init__(self, manager)
         self.manager = manager
+        self.launchReady.connect(self._finish_launch_recovery)
         self.scene_id = None
         self._suspend_count = 0
+        self._launch_pending = not _LAUNCH_CHECKED
         self._pending_reason = None
         self._pending_curve_names = set()
         self._pending_object_names = set()
@@ -2157,6 +1888,8 @@ class AnimationRecoveryService(QtCore.QObject):
         self._full_refresh_pending = False
         self._curve_cache = None
         self._layer_cache = None
+        self._curve_layer_map = {}
+        self._layers_dirty = True
         self._object_cache = {}
         self._attribute_cache = {}
         self._last_snapshot_timestamp = 0.0
@@ -2203,6 +1936,13 @@ class AnimationRecoveryService(QtCore.QObject):
                 yield
             finally:
                 self.discard_pending()
+                # Subsequent edits must branch from the restored state, never
+                # compare against caches captured before recovery.
+                self._curve_cache = None
+                self._layer_cache = None
+                self._object_cache.clear()
+                self._rewatch_timer.start()
+                QtCore.QTimer.singleShot(0, self._watch_animation_layers)
 
     def _initialize_history_state(self):
         """Use only a checkpoint with a fully readable chain as the next parent."""
@@ -2216,7 +1956,7 @@ class AnimationRecoveryService(QtCore.QObject):
         if not paths:
             return
         self._last_snapshot_timestamp = _filename_timestamp_value(paths[-1])
-        valid_path = _newest_valid_recovery(paths)
+        valid_path = _newest_valid_recovery(paths, validate_values=False)
         if not valid_path:
             self._snapshots_since_baseline = BASELINE_INTERVAL
             return
@@ -2238,6 +1978,7 @@ class AnimationRecoveryService(QtCore.QObject):
         if self.scene_id:
             return self
         with self.suspended():
+            self._opened_scene_had_id = bool(current_scene_id())
             self.scene_id = ensure_scene_id()
         if not self.scene_id:
             return self
@@ -2256,6 +1997,13 @@ class AnimationRecoveryService(QtCore.QObject):
                 key=RUNTIME_LAYER_KEY,
                 callback=self._layer_structure_changed,
             )
+        self.manager.add_node_lifecycle_callbacks(
+            "animCurve", self._dag_changed, key=RUNTIME_ANIMATION_KEY + ":nodes",
+        )
+        for event in ("Undo", "Redo"):
+            self.manager.add_maya_event_callback(
+                event, self._animation_changed, key=RUNTIME_ANIMATION_KEY,
+            )
         self._watch_animation_layers()
         self.manager.connect_signal(
             self.manager.scene_opened,
@@ -2273,7 +2021,7 @@ class AnimationRecoveryService(QtCore.QObject):
             key=RUNTIME_SCENE_KEY + ":before_save",
         )
         self._watch_scene_objects()
-        QtCore.QTimer.singleShot(0, self._show_recovery_if_scene_is_older)
+        QtCore.QTimer.singleShot(650, self._offer_launch_recovery)
         return self
 
     def shutdown(self):
@@ -2283,6 +2031,8 @@ class AnimationRecoveryService(QtCore.QObject):
             self._thread_pool.waitForDone(-1)
         for key in (
             RUNTIME_ANIMATION_KEY,
+            RUNTIME_ANIMATION_KEY + ":attributes",
+            RUNTIME_ANIMATION_KEY + ":nodes",
             RUNTIME_DAG_KEY,
             RUNTIME_SCENE_KEY + ":open",
             RUNTIME_SCENE_KEY + ":new",
@@ -2310,9 +2060,13 @@ class AnimationRecoveryService(QtCore.QObject):
             self._layer_cache = None
             self._object_cache.clear()
             self._attribute_cache.clear()
+            self._opened_scene_had_id = bool(current_scene_id())
             self.scene_id = ensure_scene_id()
             self._initialize_history_state()
             self._last_prompted_checkpoint = None
+            if self._suspend_count > 1 and self._last_checkpoint_name:
+                self._last_prompted_checkpoint = os.path.join(
+                    scene_recovery_folder(self.scene_id), self._last_checkpoint_name)
         self._rewatch_timer.start()
         QtCore.QTimer.singleShot(0, self._watch_animation_layers)
 
@@ -2320,27 +2074,43 @@ class AnimationRecoveryService(QtCore.QObject):
         self._scene_changed()
         QtCore.QTimer.singleShot(0, self._show_recovery_if_scene_is_older)
 
-    def _show_recovery_if_scene_is_older(self):
-        if self._suspend_count or not self.scene_id:
+    def _offer_launch_recovery(self):
+        global _LAUNCH_CHECKED
+        if _LAUNCH_CHECKED or not self.scene_id:
+            self._launch_pending = False
             return
+        _LAUNCH_CHECKED = True
+        from TheKeyMachine.tools.animation_recovery import startup
         try:
-            if cmds.about(batch=True):
-                return
-        except Exception:
-            pass
+            startup.begin_launch_read(sys.modules[__name__], self)
+        except Exception as exc:
+            cmds.warning("Animation Recovery startup failed: {}".format(exc))
+            self._finish_launch_recovery(None)
+
+    def _finish_launch_recovery(self, result):
+        from TheKeyMachine.tools.animation_recovery import startup
+        try:
+            if result is not None and self.scene_id:
+                startup.show_launch(sys.modules[__name__], result)
+        except Exception as exc:
+            cmds.warning("Animation Recovery startup failed: {}".format(exc))
+        finally:
+            self._launch_pending = False
+            if self._pending_reason:
+                self._timer.start()
+
+    def _show_recovery_if_scene_is_older(self):
+        if self._launch_pending or self._suspend_count or not self.scene_id or cmds.about(batch=True):
+            return
         checkpoint = newer_recovery_for_current_scene(scene_id=self.scene_id)
         if not checkpoint or checkpoint == self._last_prompted_checkpoint:
             return
         self._last_prompted_checkpoint = checkpoint
         try:
             from TheKeyMachine.tools.animation_recovery import widgets
-
-            widgets.show_dialog()
+            widgets.show_dialog(selected_path=checkpoint)
         except Exception as exc:
-            try:
-                cmds.warning("Animation Recovery could not open: {}".format(exc))
-            except Exception:
-                pass
+            cmds.warning("Animation Recovery could not open: {}".format(exc))
 
     def _animation_changed(self, *args):
         if _maya_file_io_active():
@@ -2359,9 +2129,12 @@ class AnimationRecoveryService(QtCore.QObject):
         # save itself -- instead of a normal Python traceback, so failures
         # are made visible explicitly rather than left silent.
         try:
+            from TheKeyMachine.tools.animation_recovery import startup
+            if startup.record_crash_save(sys.modules[__name__]):
+                return  # An emergency save should do no animation capture work.
             if self._timer.isActive():
                 self.capture_now()
-            path = self.capture_now(reason="scene_save")
+            path = self.capture_now(reason="scene_save", full=True, all_objects=True)
             timestamp = _filename_timestamp_value(path) if path else self._last_snapshot_timestamp
             if not timestamp:
                 return
@@ -2442,6 +2215,11 @@ class AnimationRecoveryService(QtCore.QObject):
         if self._suspend_count or not self.scene_id:
             return
         self.manager.disconnect_callbacks(RUNTIME_TRANSFORM_KEY)
+        self.manager.disconnect_callbacks(RUNTIME_ANIMATION_KEY + ":attributes")
+        self.manager.add_node_attribute_changed_callbacks(
+            cmds.ls(type="animCurve") or [], self._curve_attribute_changed,
+            key=RUNTIME_ANIMATION_KEY + ":attributes",
+        )
         nodes = set(cmds.ls(type="transform", long=True) or [])
         nodes.update(cmds.ls(type="joint", long=True) or [])
         # Discover channels lazily on first edit. Registering callbacks is
@@ -2457,6 +2235,13 @@ class AnimationRecoveryService(QtCore.QObject):
             self._object_attribute_changed,
             key=RUNTIME_TRANSFORM_KEY,
         )
+
+    def _curve_attribute_changed(self, *args):
+        if self._suspend_count or not args or om is None or _maya_file_io_active():
+            return
+        if args[0] & (om.MNodeMessage.kAttributeSet |
+                      om.MNodeMessage.kConnectionMade | om.MNodeMessage.kConnectionBroken):
+            self.schedule_snapshot("animation", curve_names=[args[-1]])
 
     def _object_attribute_changed(self, *args):
         if self._suspend_count or om is None or len(args) < 2 or _maya_file_io_active():
@@ -2516,12 +2301,14 @@ class AnimationRecoveryService(QtCore.QObject):
         if self._suspend_count or not self.scene_id:
             return
         self._pending_reason = reason
+        self._layers_dirty = self._layers_dirty or reason == "layer"
         self._pending_curve_names.update(curve_names or [])
         self._pending_object_names.update(object_names or [])
         for node, attributes in (object_attributes or {}).items():
             self._pending_object_attributes.setdefault(node, set()).update(attributes or [])
         self._full_refresh_pending = self._full_refresh_pending or bool(full)
-        self._timer.start()
+        if not self._launch_pending and not self._timer.isActive():
+            self._timer.start()
 
     def _full_payload(self, reason, layers_data, curve_layer_map, force_baseline=False):
         payload, created = capture_scene_animation(
@@ -2558,16 +2345,10 @@ class AnimationRecoveryService(QtCore.QObject):
         return payload, created
 
     def _incremental_payload(self, reason, changed_names, layers_data, curve_layer_map):
-        current_names = set(cmds.ls(type="animCurve") or [])
         changed_curves = []
         removed_curves = []
-        for cached_name in list(self._curve_cache):
-            if cached_name not in current_names:
-                removed = self._curve_cache.pop(cached_name, None)
-                if removed:
-                    removed_curves.append(_curve_marker(removed, fallback_name=cached_name))
         for curve in changed_names:
-            if curve not in current_names:
+            if not cmds.objExists(curve):
                 removed = self._curve_cache.pop(curve, None)
                 if removed and not any(_curve_matches(removed, item) for item in removed_curves):
                     removed_curves.append(_curve_marker(removed, fallback_name=curve))
@@ -2662,9 +2443,14 @@ class AnimationRecoveryService(QtCore.QObject):
         self._pending_object_attributes.clear()
         self._full_refresh_pending = False
         with self.suspended():
-            layers_data, curve_layer_map = _animation_layers_snapshot()
-            layers_changed = self._layer_cache != layers_data
-            self._layer_cache = layers_data
+            layers_changed = False
+            if full or self._layers_dirty or self._layer_cache is None:
+                layers_data, self._curve_layer_map = _animation_layers_snapshot()
+                layers_changed = self._layer_cache != layers_data
+                self._layer_cache = layers_data
+                self._layers_dirty = False
+            layers_data = self._layer_cache
+            curve_layer_map = self._curve_layer_map
             if full:
                 payload, created = self._full_payload(
                     reason, layers_data, curve_layer_map, force_baseline=force_baseline
@@ -2681,7 +2467,7 @@ class AnimationRecoveryService(QtCore.QObject):
             payload["objects"] = self._captured_objects(
                 changed_names=changed_objects,
                 changed_attributes=changed_object_attributes,
-                all_objects=all_objects or complete_snapshot,
+                all_objects=all_objects or complete_snapshot or full,
                 complete_snapshot=complete_snapshot,
             )
             if (
@@ -2712,21 +2498,16 @@ class AnimationRecoveryService(QtCore.QObject):
         return path
 
     def _on_snapshot_saved(self, path):
-        # Keep the scene-node stamp current as of every checkpoint, not just
-        # the explicit pre-save one -- so whenever Maya does write the file
-        # (caught by our kBeforeSave hook or not), whatever is already on the
-        # node at that moment is the true latest checkpoint, not a stale one.
-        try:
-            set_last_saved_checkpoint(_filename_timestamp_value(path))
-        except Exception:
-            pass
         self.snapshotSaved.emit(path)
         try:
             self.manager.backgroundRunnerTriggered.emit("animation_recovery")
         except Exception:
             pass
 
-    def _on_snapshot_failed(self, message):
+    def _on_snapshot_failed(self, path, message):
+        if _recovery_scene_id(path) != self.scene_id:
+            cmds.warning("Animation Recovery write failed for {}: {}".format(path, message))
+            return
         # Any queued delta may depend on the failed point. Rebuild both caches
         # so the next real checkpoint is a self-contained baseline.
         self._curve_cache = None

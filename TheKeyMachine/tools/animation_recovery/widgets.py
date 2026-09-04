@@ -8,6 +8,7 @@ from maya import cmds
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
 from TheKeyMachine.core import trigger
 from TheKeyMachine.data import icons
+from TheKeyMachine.tools import registry
 from TheKeyMachine.tools.animation_recovery import controller
 from TheKeyMachine.ui.widgets import customDialogs
 from TheKeyMachine.ui.widgets import util as wutil
@@ -15,22 +16,27 @@ from TheKeyMachine.ui.widgets import util as wutil
 
 _dialog = None
 
-# Each recovery entry gets a status dot in column 0: a plain (white) change,
-# a file save still recoverable from disk (green), or a save superseded by a
-# later save to the same filename (muted green, irrecuperable). Every dot but
-# the newest (topmost) row also carries a full through-line so the column
-# reads as one continuous vertical timeline; the first row only connects
-# downward, since nothing newer sits above it.
+# Newest first: top connects down, middle connects both ways, bottom connects
+# up. A single checkpoint has no connector. The circle closes each endpoint.
 _STATUS_ICONS = {
-    "white": (icons.recovery_dot_white, icons.recovery_dot_white_first),
-    "green": (icons.recovery_dot_green, icons.recovery_dot_green_first),
-    "muted_green": (icons.recovery_dot_green_muted, icons.recovery_dot_green_muted_first),
+    "white": (icons.recovery_dot_white, icons.recovery_dot_white_first,
+              icons.recovery_dot_white_last, icons.recovery_dot_white_single),
+    "green": (icons.recovery_dot_green, icons.recovery_dot_green_first,
+              icons.recovery_dot_green_last, icons.recovery_dot_green_single),
+    "muted_green": (icons.recovery_dot_green_muted, icons.recovery_dot_green_muted_first,
+                    icons.recovery_dot_green_muted_last, icons.recovery_dot_green_muted_single),
 }
 
 
-def _status_icon(status, is_first):
-    through_icon, first_icon = _STATUS_ICONS.get(status, _STATUS_ICONS["white"])
-    return first_icon if is_first else through_icon
+def _status_icon(status, row_index, row_count):
+    through, top, bottom, single = _STATUS_ICONS.get(status, _STATUS_ICONS["white"])
+    if row_count == 1:
+        return single
+    if row_index == 0:
+        return top
+    if row_index == row_count - 1:
+        return bottom
+    return through
 
 
 def _display_date(value):
@@ -77,31 +83,46 @@ def _reason_text(value):
         "recovery": "Recovered Point",
         "transform": "Attribute Change",
         "layer": "Animation Layer Change",
+        "crash": "Crash Scene Save",
     }.get(value, "Animation Change")
 
 
 class AnimationRecoveryDialog(customDialogs.QFlatDialog):
     def __init__(self, parent=None):
-        customDialogs.QFlatDialog.__init__(self, parent=parent)
+        self.history_scene_id = None
+        self.startup_mode = False
+        self.extra_entries = []
+        self.requested_path = None
+        super().__init__(parent=parent)
         self.setObjectName("tkmAnimationRecoveryDialog")
         self.setWindowTitle("Animation Recovery")
         self.setMinimumSize(wutil.DPI(720), wutil.DPI(360))
         self.resize(wutil.DPI(820), wutil.DPI(470))
+        main = QtWidgets.QWidget(self)
+        main_layout = QtWidgets.QVBoxLayout(main)
+        main_layout.setSpacing(wutil.DPI(8))
         self.addWindowHeader(
-            self.root_layout,
-            text="Animation Recovery",
+            parentLayout=main_layout,
             icon=icons.animation_recovery,
+            text=registry.get_tool("animation_recovery").get("label") or "Animation Recovery",
+            textColor="#d8d8d8",
         )
+        main_layout.addLayout(self._build_content(main), 1)
+        self.root_layout.insertWidget(0, main, 1)
+        self._build_bottom_bar()
+        service = controller.get_service()
+        if service is not None:
+            service.snapshotSaved.connect(self._snapshot_saved)
+            manager = getattr(service, "manager", None)
+            if manager is not None:
+                manager.scene_opened.connect(self._scene_changed)
+                manager.scene_new.connect(self._scene_changed)
+        self.reload()
 
-        content = QtWidgets.QWidget(self)
-        layout = QtWidgets.QVBoxLayout(content)
-        layout.setContentsMargins(
-            wutil.DPI(12),
-            wutil.DPI(4),
-            wutil.DPI(12),
-            wutil.DPI(10),
-        )
-        layout.setSpacing(wutil.DPI(7))
+    def _build_content(self, content):
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(wutil.DPI(8))
 
         self.scene_label = QtWidgets.QLabel(content)
         self.scene_label.setStyleSheet(
@@ -134,7 +155,7 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         self.tree.setStyleSheet(
             """
             QTreeWidget#animationRecoveryTree {
-                border:1px solid #484848;
+                border:1px solid #3a3a3a;
                 color:#c8c8c8;
                 outline:0;
             }
@@ -154,7 +175,7 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         self.details_frame = QtWidgets.QFrame(content)
         self.details_frame.setObjectName("animationRecoveryDetails")
         self.details_frame.setStyleSheet(
-            "QFrame#animationRecoveryDetails { background:#383838; border:1px solid #484848; }"
+            "QFrame#animationRecoveryDetails { background:#2d2d2d; border:1px solid #3a3a3a; }"
             "QFrame#animationRecoveryDetails QLabel { background:transparent; border:0; color:#bdbdbd; }"
         )
         details_layout = QtWidgets.QVBoxLayout(self.details_frame)
@@ -162,10 +183,6 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
             wutil.DPI(14), wutil.DPI(12), wutil.DPI(14), wutil.DPI(12)
         )
         details_layout.setSpacing(wutil.DPI(8))
-        details_title = QtWidgets.QLabel("Details:", self.details_frame)
-        details_title.setStyleSheet("font-weight:bold; color:#e0e0e0; font-size:%spx;" % wutil.DPI(12))
-        details_layout.addWidget(details_title)
-
         details_grid = QtWidgets.QGridLayout()
         details_grid.setContentsMargins(0, 0, 0, 0)
         details_grid.setHorizontalSpacing(wutil.DPI(8))
@@ -194,23 +211,29 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         details_layout.addLayout(details_grid)
         details_layout.addStretch(1)
 
-        splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal, content)
-        splitter.setChildrenCollapsible(False)
-        splitter.addWidget(self.tree)
-        splitter.addWidget(self.details_frame)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
-        splitter.setSizes([wutil.DPI(430), wutil.DPI(330)])
-        layout.addWidget(splitter, 1)
-        self.root_layout.addWidget(content, 1)
+        sections = QtWidgets.QGridLayout()
+        sections.setContentsMargins(0, 0, 0, 0)
+        sections.setHorizontalSpacing(wutil.DPI(12))
+        sections.setVerticalSpacing(wutil.DPI(8))
+        sections.setColumnStretch(0, 3)
+        sections.setColumnStretch(1, 2)
+        sections.setRowStretch(1, 1)
+        for column, title in enumerate(("Checkpoints", "Details")):
+            label = QtWidgets.QLabel(title, content)
+            label.setStyleSheet("color:#bcbcbc;font-size:%spx;" % wutil.DPI(11))
+            sections.addWidget(label, 0, column)
+        sections.addWidget(self.tree, 1, 0)
+        sections.addWidget(self.details_frame, 1, 1)
+        layout.addLayout(sections, 1)
+        return layout
 
+    def _build_bottom_bar(self):
         self.setBottomBar(
             buttons=[
                 customDialogs.QFlatDialogButton(
                     "Recover",
                     callback=self.recover_selected,
                     icon=icons.apply,
-                    highlight=True,
                 ),
                 customDialogs.QFlatDialogButton(
                     "Delete",
@@ -225,20 +248,12 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         self.delete_button = self._button("Delete")
         if self.delete_button:
             self.delete_button.hide()
-        service = controller.get_service()
-        if service is not None:
-            service.snapshotSaved.connect(self._snapshot_saved)
-            manager = getattr(service, "manager", None)
-            if manager is not None:
-                manager.scene_opened.connect(self._scene_changed)
-                manager.scene_new.connect(self._scene_changed)
-        self.reload()
 
     def _button(self, text):
         if not self.bottomBar:
             return None
         for button in self.bottomBar.findChildren(QtWidgets.QPushButton):
-            if button.text() == text:
+            if button.property("tkm_dialog_button_name") == text:
                 return button
         return None
 
@@ -264,7 +279,9 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         details = {}
         if path:
             try:
-                details = controller.recovery_details(path)
+                details = next((entry for entry in self.extra_entries if entry["path"] == path), None)
+                if details is None:
+                    details = controller.recovery_details(path)
             except Exception:
                 details = {}
         self._set_detail("source_file", details.get("source_file") or "Unknown")
@@ -297,9 +314,19 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         self.scene_label.setText(scene_name)
         self.scene_label.setToolTip(scene_path or scene_name)
 
-        selected_path = self.selected_path()
+        selected_path = self.requested_path or self.selected_path()
+        self.requested_path = None
         self.tree.clear()
-        entries = controller.list_recoveries()
+        entries = controller.list_recoveries(scene_id=self.history_scene_id)
+        entries += self.extra_entries
+        entries.sort(key=lambda entry: entry["created"], reverse=True)
+        if self.startup_mode and entries:
+            detail_path = selected_path or entries[0]["path"]
+            details = next((entry for entry in self.extra_entries if entry["path"] == detail_path), None)
+            if details is None:
+                details = controller.recovery_details(detail_path)
+            self.scene_label.setText(details.get("source_file") or "Recovered Scene")
+            self.scene_label.setToolTip(details.get("location") or "")
         selected_item = None
         for row_index, entry in enumerate(entries):
             item = QtWidgets.QTreeWidgetItem([
@@ -308,7 +335,7 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
             ])
             item.setData(0, QtCore.Qt.UserRole, entry["path"])
             item.setTextAlignment(0, QtCore.Qt.AlignCenter)
-            item.setIcon(0, QtGui.QIcon(_status_icon(entry.get("status"), row_index == 0)))
+            item.setIcon(0, QtGui.QIcon(_status_icon(entry.get("status"), row_index, len(entries))))
             item.setToolTip(0, "Change {}".format(entry["change"]))
             if entry.get("reason") == "scene_save":
                 scene_save_brush = QtGui.QBrush(QtGui.QColor("#3f4a42"))
@@ -332,7 +359,16 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         if not path:
             return
         try:
-            if trigger.execute_command("animation_recovery_restore", path):
+            if self.startup_mode:
+                from TheKeyMachine.tools.animation_recovery import startup
+                result = startup.load_selected(
+                    controller, path, crash=any(entry["path"] == path for entry in self.extra_entries))
+            else:
+                result = trigger.execute_command("animation_recovery_restore", path)
+            if result:
+                self.startup_mode = False
+                self.history_scene_id = None
+                self.extra_entries = []
                 self.reload()
         except Exception as exc:
             from maya import cmds
@@ -358,16 +394,16 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
             self.reload()
 
 
-def show_dialog():
+def show_dialog(scene_id=None, selected_path=None, startup=False, extra_entries=None):
     global _dialog
-    if _dialog is not None and wutil.is_valid_widget(_dialog):
-        _dialog.reload()
-        _dialog.show()
-        _dialog.raise_()
-        _dialog.activateWindow()
-        return _dialog
-    _dialog = AnimationRecoveryDialog()
-    _dialog.destroyed.connect(_clear_dialog)
+    if _dialog is None or not wutil.is_valid_widget(_dialog):
+        _dialog = AnimationRecoveryDialog()
+        _dialog.destroyed.connect(_clear_dialog)
+    _dialog.history_scene_id = scene_id
+    _dialog.startup_mode = startup
+    _dialog.extra_entries = list(extra_entries or [])
+    _dialog.requested_path = selected_path
+    _dialog.reload()
     _dialog.show()
     _dialog.raise_()
     _dialog.activateWindow()
