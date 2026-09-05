@@ -16,10 +16,9 @@
 
 0.1.59:
   - polish: Animation Recovery keeps list selection and scroll position, with clearer empty states and scrollable details
-  - bugfix: Loading recovery keeps the browsed scene history visible and handles checkpoints from untitled scenes
   - new: Animation Recovery browses other scenes with modification dates and highlights the current scene
   - new: Smart Merge keeps key recovery points, while Delete All removes a scene's recovery history after confirmation
-  - changed: Animation from other scenes can be recovered onto matching objects without opening the source scene
+  - changed: Animation from other scenes can be recovered onto matching objects
 
 0.1.58:
   - bugfix: Animation Recovery tracks undo, redo, curve creation, deletion, and connection changes more reliably
