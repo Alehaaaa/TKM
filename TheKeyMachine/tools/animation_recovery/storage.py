@@ -6,6 +6,7 @@ so an interrupted write never exposes a partially committed checkpoint.
 import hashlib
 import json
 import os
+import threading
 import zlib
 
 VERSION = 8
@@ -143,3 +144,30 @@ def dependencies_exist(path):
             if not os.path.isfile(os.path.join(folder, "metadata", name.split(".")[0] + ".jsonz")):
                 return False
     return True
+
+
+_STATE_LOCK = threading.RLock()
+
+
+def recovery_state(root):
+    """Small shared state for the latest tracked event and dismissed offers."""
+    with _STATE_LOCK:
+        try:
+            with open(os.path.join(root, "recovery-state.json"), "rb") as stream:
+                state = json.load(stream)
+                return state if isinstance(state, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+
+def update_recovery_state(root, event=None, dismissed=()):
+    # Serialize worker checkpoint commits and main-thread close/crash callbacks.
+    # Event time, rather than write completion order, determines what is latest.
+    with _STATE_LOCK:
+        state = recovery_state(root)
+        latest = state.get("latest") or {}
+        if event and event["timestamp"] >= latest.get("timestamp", 0):
+            state["latest"] = event
+        if dismissed:
+            state["dismissed"] = sorted(set(state.get("dismissed", [])) | set(dismissed))
+        atomic_write(os.path.join(root, "recovery-state.json"), _encode(state))

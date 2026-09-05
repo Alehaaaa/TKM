@@ -16,9 +16,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.58"
+__version__ = "0.1.59"
 __stage__ = "beta"
-__build__ = "354"
+__build__ = "355"
 __codename__ = "Cortado"
 __website__ = "https://alehaaaa.github.io/TKM/"
 

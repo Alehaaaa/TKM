@@ -5,6 +5,7 @@ from datetime import datetime
 import io
 import os
 import struct
+import shutil
 import sys
 import time
 import uuid
@@ -664,6 +665,33 @@ def _recovery_scene_id(path):
     return os.path.basename(folder) or None
 
 
+def list_recovery_scenes():
+    """List recorded scene histories using metadata only; safe on a worker."""
+    root = recovery_root()
+    if not os.path.isdir(root):
+        return []
+    scenes = []
+    for scene_id in os.listdir(root):
+        if not os.path.isdir(os.path.join(root, scene_id)):
+            continue
+        paths = _recovery_paths(scene_id)
+        if not paths:
+            continue
+        try:
+            meta = storage.read_manifest(paths[-1])["meta"]
+            source = os.path.join(meta.get("location") or "", meta.get("source_file") or "")
+            scenes.append({
+                "scene_id": scene_id, "source": source,
+                "name": meta.get("source_file") or "Untitled Scene",
+                "modified": _filename_timestamp_value(paths[-1]),
+                "saved": os.path.getmtime(source) if os.path.isfile(source) else None,
+                "checkpoint_count": len(paths), "latest": paths[-1],
+            })
+        except (OSError, ValueError, KeyError):
+            continue
+    return sorted(scenes, key=lambda scene: scene["modified"], reverse=True)
+
+
 def list_recoveries(scene_id=None):
     paths = _recovery_paths(scene_id=scene_id)
     entries = []
@@ -911,6 +939,41 @@ def _prune_recovery_history(scene_id):
             continue
     storage.prune_dependencies(scene_recovery_folder(scene_id), _recovery_paths(scene_id))
     return removed
+
+
+def maintain_scene_history(scene_id, action):
+    """Run on the serialized recovery writer, never alongside a checkpoint write."""
+    if not scene_id or os.path.basename(scene_id) != scene_id:
+        raise ValueError("Invalid scene history")
+    folder = scene_recovery_folder(scene_id)
+    if os.path.dirname(os.path.realpath(folder)) != os.path.realpath(recovery_root()):
+        raise ValueError("Scene history is outside the recovery folder")
+    if action not in ("merge", "delete"):
+        raise ValueError("Unknown recovery maintenance action")
+    if action == "delete":
+        if os.path.isdir(folder):
+            shutil.rmtree(folder)
+        return
+    paths = _recovery_paths(scene_id)
+    if not paths:
+        return
+    retained = set()
+    if action == "merge":
+        retained = {paths[0], paths[-1]}
+        retained.update(path for path in paths if _recovery_reason(path) == "scene_save")
+        # Publish complete baselines before removing any intermediate records.
+        # An interrupted merge still leaves every original point replayable.
+        for path in paths:
+            if path not in retained:
+                continue
+            payload = _load_merged_recovery(path)
+            payload["meta"]["full_snapshot"] = True
+            payload["meta"]["parent_checkpoint"] = None
+            _write_recovery_atomic(path, payload)
+    for path in paths:
+        if path not in retained:
+            os.remove(path)
+    storage.prune_dependencies(folder, sorted(retained))
 
 
 def delete_recovery(path):
@@ -1597,13 +1660,84 @@ def _curves_timerange(curves_data):
     return (min(frames), max(frames))
 
 
+def _match_recovery_objects(curves, objects, layers):
+    """Remap another scene's data to unambiguous existing object names."""
+    lookup = _uuid_lookup()
+
+    def match(name, node_uuid=None):
+        if node_uuid in lookup:
+            return lookup[node_uuid]
+        for candidate in (name, name.rsplit("|", 1)[-1] if name else None):
+            matches = cmds.ls(candidate, long=True) or [] if candidate else []
+            if len(matches) == 1:
+                return matches[0]
+        return None
+
+    def endpoint(data):
+        node = match(data.get("node"), data.get("node_uuid"))
+        plug = "{}.{}".format(node, data.get("attribute")) if node else None
+        return _endpoint_data(plug) if plug and cmds.objExists(plug) else None
+
+    mapped_objects = []
+    for item in objects:
+        node = match(item.get("name"), item.get("uuid"))
+        if node:
+            mapped_objects.append(dict(item, name=node, uuid=_node_uuid(node)))
+    mapped_curves = []
+    for item in curves:
+        outputs = [resolved for resolved in (endpoint(e) for e in item.get("output_connections") or []) if resolved]
+        layer = dict(item.get("layer") or {})
+        plug = layer.get("plug")
+        if plug:
+            node, attribute = _split_plug(plug)
+            target = match(node)
+            plug = "{}.{}".format(target, attribute) if target else None
+            if plug and cmds.objExists(plug):
+                layer["plug"] = plug
+            else:
+                continue
+        if not outputs and not plug:
+            continue
+        # Never reuse an unrelated curve merely because its name matches.
+        curve = dict(item, uuid="foreign:" + str(item.get("uuid") or item.get("name")),
+                     output_connections=outputs,
+                     input_connections=[resolved for resolved in (endpoint(e) for e in item.get("input_connections") or []) if resolved],
+                     layer=layer or None)
+        if item.get("unitless_input") and not curve["input_connections"]:
+            continue
+        mapped_curves.append(curve)
+    # Imported layers get distinct names so their settings cannot alter
+    # animation already using the destination scene's layers.
+    mapped_layers = []
+    names = {}
+    for layer in _layers_for_curves(layers, mapped_curves):
+        name = layer.get("name")
+        if name == "BaseAnimation":
+            continue
+        target = name + "_Recovery"
+        while cmds.objExists(target) or target in names.values():
+            target += "_Recovery"
+        names[name] = target
+        mapped_layers.append(dict(layer, name=target, uuid=None))
+    for layer in mapped_layers:
+        layer["parent"] = names.get(layer.get("parent"), layer.get("parent"))
+        layer["attributes"] = []
+    for curve in mapped_curves:
+        layer = curve.get("layer")
+        if layer and layer.get("name") in names:
+            layer["name"] = names[layer["name"]]
+            layer["uuid"] = None
+            for entry in mapped_layers:
+                if entry["name"] == layer["name"] and layer.get("plug"):
+                    entry["attributes"].append(layer["plug"])
+    return mapped_curves, mapped_objects, mapped_layers
+
+
 def restore_recovery(path, tool_operation=None):
     checkpoint_scene_id = _recovery_scene_id(path)
     scene_id = current_scene_id(create=False)
     if not checkpoint_scene_id:
         raise ValueError("Recovery checkpoint is outside the Animation Recovery folder")
-    if not scene_id or checkpoint_scene_id != scene_id:
-        raise ValueError("This recovery belongs to another Maya scene")
     chain_paths = _recovery_chain_paths(path)
     service = get_service()
     operation = toolCommon.require_tool_operation(tool_operation)
@@ -1653,8 +1787,11 @@ def _restore_recovery_worker(operation, path, chain_paths, scene_id):
         meta = payload.get("meta") or {}
         if meta.get("type") not in (None, "animation_recovery"):
             raise ValueError("Not an Animation Recovery file")
-        if meta.get("scene_id") and scene_id and meta.get("scene_id") != scene_id:
-            raise ValueError("This recovery belongs to another Maya scene")
+        foreign_scene = _recovery_scene_id(path) != scene_id
+        if foreign_scene:
+            curves_data, objects_data, layers_data = _match_recovery_objects(curves_data, objects_data, layers_data)
+            if not curves_data and not objects_data:
+                return {"empty": True}
 
         selection_scoped = _has_active_selection()
         selected_nodes = _selected_transform_nodes()
@@ -1681,7 +1818,12 @@ def _restore_recovery_worker(operation, path, chain_paths, scene_id):
                 layers_data,
                 curves_data,
             )
-        current_curves = _curve_maps(scoped_curves)[0]
+        if foreign_scene:
+            selection_scoped = True
+            allowed_layer_plugs = {curve["layer"]["plug"] for curve in curves_data
+                                   if curve.get("layer") and curve["layer"].get("plug")}
+            restore_layers_data = _layers_for_curves(layers_data, curves_data)
+        current_curves = [] if foreign_scene else _curve_maps(scoped_curves)[0]
         _all_curves, by_name, by_uuid = _curve_maps()
         saved_uuids = set(item.get("uuid") for item in curves_data if item.get("uuid"))
         extra_curves = [
@@ -1744,7 +1886,7 @@ def _restore_recovery_worker(operation, path, chain_paths, scene_id):
     if setup is None:
         return False
     if setup.get("empty"):
-        operation.run_on_main(wutil.make_inViewMessage, "No recovery data for the selected objects")
+        operation.run_on_main(wutil.make_inViewMessage, "No matching objects in the recovery data")
         return False
 
     curves_data = setup["curves_data"]
@@ -1852,10 +1994,11 @@ class _SnapshotWriteTask(QtCore.QRunnable):
                         )
                     )
             _write_recovery_atomic(self.path, self.payload)
-            storage.atomic_write(
-                os.path.join(os.path.dirname(os.path.dirname(self.path)), "last-checkpoint.json"),
-                storage._encode({"path": self.path}),
-            )
+            storage.update_recovery_state(recovery_root(), event={
+                "kind": "animation", "path": self.path,
+                "scene_id": _recovery_scene_id(self.path),
+                "timestamp": _filename_timestamp_value(self.path), "token": self.path,
+            })
             scene_id = _recovery_scene_id(self.path)
             if scene_id and meta.get("full_snapshot"):
                 try:
@@ -1870,14 +2013,31 @@ class _SnapshotWriteTask(QtCore.QRunnable):
         self.signals.saved.emit(self.path)
 
 
+class _HistoryMaintenanceTask(QtCore.QRunnable):
+    def __init__(self, scene_id, action, finished):
+        super().__init__()
+        self.scene_id, self.action, self.finished = scene_id, action, finished
+
+    def run(self):
+        error = ""
+        try:
+            maintain_scene_history(self.scene_id, self.action)
+        except Exception as exc:
+            error = str(exc)
+        self.finished.emit(self.scene_id, error)
+
+
 class AnimationRecoveryService(QtCore.QObject):
     snapshotSaved = QtCore.Signal(str)
     launchReady = QtCore.Signal(object)
+    historyMaintained = QtCore.Signal(str, str)
 
     def __init__(self, manager):
         QtCore.QObject.__init__(self, manager)
         self.manager = manager
         self.launchReady.connect(self._finish_launch_recovery)
+        self.historyMaintained.connect(self._history_maintenance_finished)
+        self._history_busy = False
         self.scene_id = None
         self._suspend_count = 0
         self._launch_pending = not _LAUNCH_CHECKED
@@ -2105,10 +2265,9 @@ class AnimationRecoveryService(QtCore.QObject):
         checkpoint = newer_recovery_for_current_scene(scene_id=self.scene_id)
         if not checkpoint or checkpoint == self._last_prompted_checkpoint:
             return
-        self._last_prompted_checkpoint = checkpoint
+        from TheKeyMachine.tools.animation_recovery import startup
         try:
-            from TheKeyMachine.tools.animation_recovery import widgets
-            widgets.show_dialog(selected_path=checkpoint)
+            startup.show_recovery(sys.modules[__name__], checkpoint=checkpoint)
         except Exception as exc:
             cmds.warning("Animation Recovery could not open: {}".format(exc))
 
@@ -2307,7 +2466,7 @@ class AnimationRecoveryService(QtCore.QObject):
         for node, attributes in (object_attributes or {}).items():
             self._pending_object_attributes.setdefault(node, set()).update(attributes or [])
         self._full_refresh_pending = self._full_refresh_pending or bool(full)
-        if not self._launch_pending and not self._timer.isActive():
+        if not self._launch_pending and not self._history_busy and not self._timer.isActive():
             self._timer.start()
 
     def _full_payload(self, reason, layers_data, curve_layer_map, force_baseline=False):
@@ -2425,6 +2584,8 @@ class AnimationRecoveryService(QtCore.QObject):
         return changed_objects
 
     def capture_now(self, reason=None, full=False, all_objects=False):
+        if self._history_busy:
+            return None
         if self._suspend_count or not self.scene_id:
             return None
         self._timer.stop()
@@ -2496,6 +2657,26 @@ class AnimationRecoveryService(QtCore.QObject):
                 self._snapshots_since_baseline += 1
         self._thread_pool.start(_SnapshotWriteTask(path, payload, self._writer_signals))
         return path
+
+    def maintain_history(self, scene_id, action):
+        if self._history_busy or not scene_id:
+            return False
+        if self._pending_reason:
+            self.capture_now()
+        self._timer.stop()
+        self._history_busy = True
+        self._thread_pool.start(_HistoryMaintenanceTask(scene_id, action, self.historyMaintained))
+        return True
+
+    def _history_maintenance_finished(self, scene_id, error):
+        self._history_busy = False
+        if scene_id == self.scene_id:
+            self._curve_cache = None
+            self._layer_cache = None
+            self._object_cache.clear()
+            self._initialize_history_state()
+        if self._pending_reason:
+            self._timer.start()
 
     def _on_snapshot_saved(self, path):
         self.snapshotSaved.emit(path)

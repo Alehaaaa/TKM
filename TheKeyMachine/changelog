@@ -14,6 +14,13 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.59:
+  - polish: Animation Recovery keeps list selection and scroll position, with clearer empty states and scrollable details
+  - bugfix: Loading recovery keeps the browsed scene history visible and handles checkpoints from untitled scenes
+  - new: Animation Recovery browses other scenes with modification dates and highlights the current scene
+  - new: Smart Merge keeps key recovery points, while Delete All removes a scene's recovery history after confirmation
+  - changed: Animation from other scenes can be recovered onto matching objects without opening the source scene
+
 0.1.58:
   - bugfix: Animation Recovery tracks undo, redo, curve creation, deletion, and connection changes more reliably
   - bugfix: Recovered animation preserves tangent locks and driven-key tangents

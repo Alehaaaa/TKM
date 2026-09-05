@@ -66,7 +66,7 @@ def show(*_args, **kwargs):
         return None
     from TheKeyMachine.tools.animation_recovery import widgets
 
-    return widgets.show_dialog()
+    return widgets.show_dialog(browse_scenes=True)
 
 
 def restore(path, tool_operation=None):
