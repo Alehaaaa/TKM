@@ -1,10 +1,43 @@
 {
-  "latest": "0.1.58",
+  "latest": "0.1.59",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.59",
+      "tag": "TKM-0.1.59",
+      "publishedAt": "2026-09-05T10:51:56Z",
+      "publishedLabel": "September 5, 2026",
+      "hasRelease": true,
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.59",
+      "hasDownload": true,
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.59/TKM-0.1.59.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Animation Recovery browses other scenes with modification dates and highlights the current scene"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Smart Merge keeps key recovery points, while Delete All removes a scene's recovery history after confirmation"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Animation from other scenes can be recovered onto matching objects"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Animation Recovery keeps list selection and scroll position, with clearer empty states and scrollable details"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.58...TKM-0.1.59"
+    },
     {
       "version": "0.1.58",
       "tag": "TKM-0.1.58",
