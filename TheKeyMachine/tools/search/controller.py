@@ -3,7 +3,7 @@
 import re
 
 from TheKeyMachine.core.Qt import QtWidgets  # type: ignore
-from TheKeyMachine.ui.widgets.util import BackgroundCallThread
+from TheKeyMachine.core.workers import BackgroundCallThread
 
 
 SEARCH_WINDOW_KEY = "tkm_search_window"

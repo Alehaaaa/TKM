@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 import importlib
 import inspect
 from dataclasses import dataclass
@@ -201,6 +203,7 @@ def register_command(
     return dispatch
 
 
+@on_shutdown(phase=ShutdownPhase.CACHES)
 def reset_registry() -> None:
     """Discard discovered commands and package-backed executors for reload."""
     global _DISCOVERY_COMPLETE, _DISCOVERY_IN_PROGRESS

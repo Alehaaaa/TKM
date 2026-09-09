@@ -90,31 +90,6 @@ def check_visible_layout(layout):
 
 
 
-class BackgroundCallThread(QtCore.QThread):
-    """Run a zero-arg callable off the Qt main thread and emit its result.
-
-    Some data a window needs to open (Search and the Hotkeys editor both
-    build a catalog of every declared tool, shortcut, and setting) is pure
-    Python with no Maya API calls, but walking the whole registry is
-    perceptible enough that building it synchronously on Maya's main thread
-    would visibly hang the UI. Pass the build function in and run it here
-    instead of hand-rolling another one-off QThread subclass per caller.
-    """
-
-    loaded = QtCore.Signal(object)
-    failed = QtCore.Signal(str)
-
-    def __init__(self, func, parent=None):
-        super().__init__(parent)
-        self._func = func
-
-    def run(self):
-        try:
-            self.loaded.emit(self._func())
-        except Exception as exc:
-            self.failed.emit(str(exc))
-
-
 def sync_choice_group_button(registry, group_id, button, parent=None):
     """Put *button* in the exclusive button group for *group_id*, in *registry*.
 

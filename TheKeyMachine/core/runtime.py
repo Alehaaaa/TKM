@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from maya import cmds
 
+from TheKeyMachine.core import lifecycle
 from TheKeyMachine.core.Qt import QtCompat, QtCore, QtWidgets  # type: ignore
 from TheKeyMachine.maya import maya_api
 
@@ -51,6 +52,7 @@ _OPTIONVAR_NAME = "TKM_RuntimeManager"
 _APP_RUNTIME_ATTRIBUTE = "_tkm_runtime_manager"
 _TRANSIENT_WIDGET_PROPERTY = "tkm_managed_transient"
 _MANAGER: Optional["RuntimeManager"] = None
+_CLEANING_UP = False
 _TKM_FLOATING_WIDGET_PROPERTY = "tkm_floating_widget"
 _TKM_WORKSPACE_CONTROLS = ("kWorkspaceControl",)
 
@@ -60,7 +62,14 @@ def _load_state() -> Dict[str, Any]:
         if cmds.optionVar(exists=_OPTIONVAR_NAME):
             raw = cmds.optionVar(q=_OPTIONVAR_NAME)
             if isinstance(raw, str) and raw:
-                return json.loads(raw)
+                state = json.loads(raw)
+                if isinstance(state, dict):
+                    return {
+                        key: [value for value in state.get(key, [])
+                              if isinstance(value, int) and not isinstance(value, bool) and value > 0]
+                        if isinstance(state.get(key), list) else []
+                        for key in ("om", "scriptjob")
+                    }
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
     return {"om": [], "scriptjob": []}
@@ -166,10 +175,8 @@ def cleanup_previous_runtime(current=None) -> None:
     if previous is None or previous is current:
         return
     if QtCompat.isValid(previous):
-        try:
-            previous.shutdown()
-        except Exception:
-            pass
+        # Do not destroy a retained runtime whose cleanup was vetoed.
+        previous.shutdown()
         try:
             previous.deleteLater()
         except Exception:
@@ -193,9 +200,9 @@ def _safe_process_events() -> None:
     if app is None:
         return
     try:
-        app.processEvents()
+        # Drain destruction only: general events can run old timers/commands
+        # while their runtime and widgets are being dismantled.
         app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
-        app.processEvents()
     except Exception:
         pass
 
@@ -294,64 +301,35 @@ def cleanup_workspace_controls(process_events=True) -> None:
         _safe_process_events()
 
 
-def shutdown_tool_modules() -> None:
-    """Stop module-level workers, dialogs, native contexts, and exception hooks."""
-    module_cleanups = (
-        ("TheKeyMachine.tools.bug_report.controller", "uninstall_bug_exception_handler"),
-        ("TheKeyMachine.maya.shelf", "cleanup_open_menus"),
-        ("TheKeyMachine.tools.common", "finish_active_progress"),
-        ("TheKeyMachine.tools.graph_toolbar.controller", "shutdown_graph_toolbar_runtime"),
-        ("TheKeyMachine.ui.tooltips", "shutdown"),
-        ("TheKeyMachine.ui.widgets.timeline", "shutdown"),
-        ("TheKeyMachine.maya.runtime", "shutdown_all"),
-    )
-    for module_name, attr_name in module_cleanups:
-        module = sys.modules.get(module_name)
-        if module is None:
-            continue
-        cleanup = getattr(module, attr_name, None)
-        if not callable(cleanup):
-            continue
-        try:
-            cleanup()
-        except Exception:
-            pass
-
-    api_modules = [
-        module
-        for name, module in tuple(sys.modules.items())
-        if name.startswith("TheKeyMachine.tools.") and name.endswith(".api") and module is not None
-    ]
-    for module in api_modules:
-        for attr_name in ("cleanup", "shutdown"):
-            cleanup = getattr(module, attr_name, None)
-            if callable(cleanup):
-                try:
-                    cleanup()
-                except Exception:
-                    pass
-                break
-
-    registry_module = sys.modules.get("TheKeyMachine.tools.registry")
-    reset_cache = getattr(registry_module, "reset_package_cache", None)
-    if callable(reset_cache):
-        reset_cache()
-
-    trigger_module = sys.modules.get("TheKeyMachine.core.trigger")
-    reset_registry = getattr(trigger_module, "reset_registry", None)
-    if callable(reset_registry):
-        reset_registry()
-
-
 def cleanup_for_reload(delete_workspace=True, process_events=True) -> None:
     """Best-effort full cleanup before unloading, reloading, or replacing TKM files."""
-    shutdown_tool_modules()
-    shutdown_runtime_manager(cleanup_widgets=False)
-    cleanup_tkm_widgets(process_events=False)
-    if delete_workspace:
-        cleanup_workspace_controls(process_events=False)
-    if process_events:
-        _safe_process_events()
+    global _CLEANING_UP
+    if _CLEANING_UP:
+        return
+    _CLEANING_UP = True
+    try:
+        # Busy readers must finish before any owner or cache is torn down.
+        failures = list(lifecycle.shutdown())
+        steps = [
+            lambda: shutdown_runtime_manager(cleanup_widgets=False),
+            lambda: cleanup_tkm_widgets(process_events=False),
+        ]
+        if delete_workspace:
+            steps.append(lambda: cleanup_workspace_controls(process_events=False))
+        if process_events:
+            steps.append(_safe_process_events)
+        for cleanup in steps:
+            try:
+                cleanup()
+            except Exception:
+                # One broken tool must not skip native callback/UI cleanup.
+                import traceback
+                traceback.print_exc()
+                failures.append(str(cleanup))
+        if failures:
+            raise RuntimeError("TheKeyMachine cleanup incomplete: " + ", ".join(failures))
+    finally:
+        _CLEANING_UP = False
 
 
 def _qt_modifiers_to_mask(modifiers) -> int:
@@ -435,6 +413,7 @@ class RuntimeManager(QtCore.QObject):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self._started = False
+        self._shutting_down = False
         self._om_callbacks: Dict[str, List[int]] = {}
         self._scriptjobs: Dict[str, List[int]] = {}
         self._signal_connections: Dict[str, List[tuple]] = {}
@@ -472,7 +451,7 @@ class RuntimeManager(QtCore.QObject):
     # Lifecycle
     # ----------------------------
     def start(self) -> None:
-        if self._started:
+        if self._started or self._shutting_down:
             return
 
         cleanup_previous_runtime(current=self)
@@ -510,59 +489,27 @@ class RuntimeManager(QtCore.QObject):
         self._background_start_timer.start(0)
 
     def shutdown(self, cleanup_widgets: bool = True) -> None:
-        self._shutdown_background_runners()
+        if self._shutting_down:
+            return
+        # A busy-reader veto must leave this manager alive and retryable.
+        if not _CLEANING_UP:
+            failures = lifecycle.shutdown()
+            if failures:
+                raise RuntimeError("TheKeyMachine cleanup incomplete: " + ", ".join(failures))
+        self._shutting_down = True
+        self._started = False
+        self._background_start_timer.stop()
+        self._background_runner_controller = None
         self._remove_event_filter()
-        self._shutdown_tool_controllers()
         self._clear_managed_widgets()
         if cleanup_widgets:
             cleanup_orphaned_widgets()
-        # Native tool contexts must be removed before their plug-ins unload.
-        try:
-            from TheKeyMachine.maya import runtime as maya_runtime
-            maya_runtime.shutdown_all()
-        except Exception:
-            pass
         self._remove_all()
-        self._started = False
         _clear_state()
         app = QtWidgets.QApplication.instance()
         if app is not None and getattr(app, _APP_RUNTIME_ATTRIBUTE, None) is self:
             try:
                 delattr(app, _APP_RUNTIME_ATTRIBUTE)
-            except Exception:
-                pass
-
-    def _shutdown_tool_controllers(self) -> None:
-        cleanups = []
-        try:
-            from TheKeyMachine.tools.animation_offset import api as animationOffsetApi
-            cleanups.append(animationOffsetApi.cleanup)
-        except Exception:
-            pass
-        try:
-            from TheKeyMachine.tools.micro_move import api as microMoveApi
-            cleanups.append(microMoveApi.cleanup)
-        except Exception:
-            pass
-        try:
-            from TheKeyMachine.tools.depth_mover import api as depthMoverApi
-            cleanups.append(depthMoverApi.cleanup)
-        except Exception:
-            pass
-        try:
-            from TheKeyMachine.tools.animation_tools import api as animationToolsApi
-            cleanups.append(animationToolsApi.cleanup)
-        except Exception:
-            pass
-        try:
-            from TheKeyMachine.maya import viewport as viewportApi
-            cleanups.append(viewportApi.cleanup)
-        except Exception:
-            pass
-
-        for cleanup in cleanups:
-            try:
-                cleanup()
             except Exception:
                 pass
 
@@ -1129,25 +1076,6 @@ class RuntimeManager(QtCore.QObject):
         except Exception:
             pass
 
-    def _shutdown_background_runners(self) -> None:
-        try:
-            self._background_start_timer.stop()
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-        background_runners = sys.modules.get("TheKeyMachine.tools.background_runners.service")
-        shutdown_controller = getattr(background_runners, "shutdown_controller", None)
-        if callable(shutdown_controller):
-            try:
-                shutdown_controller()
-            except Exception:
-                pass
-        elif self._background_runner_controller is not None:
-            try:
-                self._background_runner_controller.shutdown()
-            except Exception:
-                pass
-        self._background_runner_controller = None
-
     def _install_event_filter(self) -> None:
         if self._event_filter_installed:
             return
@@ -1196,7 +1124,9 @@ class RuntimeManager(QtCore.QObject):
             self._remove_event_filter()
 
     def _should_install_event_filter(self) -> bool:
-        return bool(self._graph_editor_watch_enabled or self._modifier_watch_enabled or self._event_filter_watchers)
+        return not self._shutting_down and bool(
+            self._graph_editor_watch_enabled or self._modifier_watch_enabled or self._event_filter_watchers
+        )
 
     def add_event_filter_watcher(self, key: str, callback: Callable[..., Any]) -> bool:
         """Delegate an app-level ``QApplication.installEventFilter()`` to the
@@ -1408,6 +1338,11 @@ class RuntimeManager(QtCore.QObject):
                 except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
                     pass
         self._signal_connections.clear()
+        self._event_filter_watchers.clear()
+        self._anim_curve_coalesced.clear()
+        self._anim_curve_coalesce_preset = None
+        self._tool_states.clear()
+        self._control_states.clear()
 
         self._persist_state()
 
@@ -1424,6 +1359,10 @@ def get_runtime_manager(start: bool = True) -> RuntimeManager:
     global _MANAGER
     if _MANAGER is not None and not QtCompat.isValid(_MANAGER):
         _MANAGER = None
+    if _CLEANING_UP:
+        if _MANAGER is not None:
+            return _MANAGER
+        raise RuntimeError("TheKeyMachine runtime is shutting down")
     if _MANAGER is None:
         _MANAGER = RuntimeManager()
     if start:
@@ -1442,10 +1381,8 @@ def shutdown_runtime_manager(cleanup_widgets: bool = True) -> None:
     global _MANAGER
     if _MANAGER is not None:
         if QtCompat.isValid(_MANAGER):
-            try:
-                _MANAGER.shutdown(cleanup_widgets=cleanup_widgets)
-            except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-                pass
+            # Keep the manager retained if shutdown is blocked or incomplete.
+            _MANAGER.shutdown(cleanup_widgets=False)
             try:
                 _MANAGER.deleteLater()
             except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):

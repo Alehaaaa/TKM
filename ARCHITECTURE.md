@@ -116,3 +116,50 @@ current schema. Readers do not carry transitional layouts or silently migrate
 old files. Cross-tool conversion that remains a product feature is explicit;
 Selection Sets' animBot conversion is a named import path, not a general
 legacy-data fallback.
+
+## Startup and shutdown
+
+Resource owners register a zero-argument cleanup function with
+`@on_shutdown()` from `core.lifecycle`. Registration keeps the original
+function callable and replaces an earlier registration of the same module and
+qualified function name. Hooks must tolerate repeated cleanup and partially
+initialized resources. No central module list or module scan is needed.
+
+Use `ShutdownPhase` when an owner has ordering requirements: `QUIESCE`, `UI`,
+`OPERATIONS`, `BACKGROUND`, `TOOLS` (the default), `NATIVE`, then `CACHES`.
+Equal phases run in module/function-name order. Shutdown takes a stable
+snapshot of registered hooks; new registrations apply to the next pass.
+Failures are logged with the owner and traceback and returned to the caller,
+without skipping other hooks. Full cleanup reports incomplete teardown and
+prevents module purge. A `ShutdownBlocked` exception from the `QUIESCE` phase
+stops before resource teardown, allowing a later retry. Nested shutdown calls
+are ignored.
+
+The registry has no Maya or Qt dependency. Registration takes constant time;
+shutdown sorts only the registered hooks. Registrations survive unload/reopen
+and are discarded with the other TKM modules during a full package reload.
+Maya and Qt cleanup must run on Maya's main thread.
+
+Toolbar startup reuses a live instance, or performs one cleanup before replacing
+stale UI. Reload and unload use the same guarded cleanup pipeline, and only Qt
+deferred deletion events are drained during teardown.
+
+Resource cleanup belongs on the controller or service that allocates the
+resource, rather than an API forwarding function. This keeps direct controller
+use covered. API wrappers can still expose manual cleanup without registering
+a second hook for the same resource. Widget destruction callbacks clear cached
+singletons only when the destroyed widget still owns that cache entry.
+
+`core.workers` owns background read/network thread lifetimes. UI consumers pass
+an owner for cancellation, but threads are parented to the application and
+retained until completion. Cancellation disconnects result signals and requests
+cooperative interruption; it never terminates a thread or destroys a running
+one. An in-flight network call can finish after unload. Catalog/read workers that
+can touch package modules use a shared 200 ms join budget; if still busy, they
+block teardown before any module is purged and reload can be retried. Scene-edit workers
+remain under the operation coordinator in `tools.common`, and recovery snapshot
+writes retain their completion barrier before service destruction.
+
+Active slider sessions and temporary-pivot sessions register cleanup with the
+lifecycle so gestures cannot leave undo contexts or session callbacks behind
+when their UI is removed.

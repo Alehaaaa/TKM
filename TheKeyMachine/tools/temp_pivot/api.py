@@ -1,3 +1,4 @@
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 import json
 import os
 
@@ -435,7 +436,9 @@ def _reset_session_state(selection=None):
 def _end_session(restore_selection=True):
     _save_session_offset()
     try:
-        runtime.get_runtime_manager().disconnect_callbacks(RUNTIME_KEY)
+        manager = runtime.get_existing_runtime_manager()
+        if manager is not None:
+            manager.disconnect_callbacks(RUNTIME_KEY)
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
         pass
     _clear_time_slider_connection()
@@ -684,3 +687,10 @@ def bind_temp_pivot_toolbar_button(widget):
         _sync_from_runtime,
         parent=widget,
     )
+
+
+@on_shutdown(phase=ShutdownPhase.TOOLS)
+def shutdown():
+    if _session.get("active"):
+        _end_session(restore_selection=True)
+    _session_offsets.clear()

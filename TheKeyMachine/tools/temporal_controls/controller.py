@@ -264,7 +264,8 @@ def _open_creation_dialog(objects):
 
     def _clear_reference(*_args):
         global _temporal_controls_dialog
-        _temporal_controls_dialog = None
+        if _temporal_controls_dialog is dialog:
+            _temporal_controls_dialog = None
 
     dialog.destroyed.connect(_clear_reference)
     dialog.show()
@@ -3657,7 +3658,8 @@ def open_temp_controls_panel(*_args):
 
     def _clear_reference(*_args):
         global _temp_controls_panel
-        _temp_controls_panel = None
+        if _temp_controls_panel is panel:
+            _temp_controls_panel = None
 
     panel.destroyed.connect(_clear_reference)
     panel.place_near_cursor()

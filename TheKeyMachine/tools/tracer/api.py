@@ -1,5 +1,7 @@
 """Tracer creation, display presets, and responsive auto refresh."""
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 import re
 from functools import partial
 
@@ -1191,6 +1193,7 @@ def get_controller(create=True):
     return _CONTROLLER
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def cleanup():
     global _CONTROLLER
     controller = _CONTROLLER

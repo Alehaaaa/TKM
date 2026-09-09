@@ -14,6 +14,10 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
+0.1.60:
+  - polish: Toolbar no longer flashes an oversized height before settling into its docked size
+  - polish: Reload and unload were rebuilt end-to-end, fixing crashes and leftovers
+
 0.1.59:
   - polish: Animation Recovery keeps list selection and scroll position, with clearer empty states and scrollable details
   - new: Animation Recovery browses other scenes with modification dates and highlights the current scene

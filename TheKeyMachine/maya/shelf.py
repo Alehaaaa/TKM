@@ -4,6 +4,8 @@ Shelf helpers for creating persistent TheKeyMachine shelf buttons.
 
 from __future__ import annotations
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 import os
 import weakref
 
@@ -141,6 +143,7 @@ def _keep_menu_alive(menu):
         pass
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def cleanup_open_menus():
     """Close temporary shelf menus that may otherwise keep stale callbacks alive."""
     for menu in list(_OPEN_SHELF_MENUS):

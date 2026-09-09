@@ -40,7 +40,8 @@ def show_workspaces_window(*_args, parent=None):
 
     def _clear_ref():
         global _workspaces_window
-        _workspaces_window = None
+        if _workspaces_window is dlg:
+            _workspaces_window = None
 
     toolCommon.invalidate_cached_window_on_language_change(dlg, _clear_ref)
     _workspaces_window = dlg

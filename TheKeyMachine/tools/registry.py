@@ -1,3 +1,5 @@
+
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 import importlib
 import json
 import os
@@ -553,6 +555,7 @@ def _collect_package_definitions():
     return tools, sections
 
 
+@on_shutdown(phase=ShutdownPhase.CACHES)
 def reset_package_cache():
     """Force package metadata to be rediscovered after an in-process reload."""
     global _PACKAGE_TOOL_DEFINITIONS, _PACKAGE_SECTION_DEFINITIONS, _CHOICE_SETTINGS_BY_OWNER

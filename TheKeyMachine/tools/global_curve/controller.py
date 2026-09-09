@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 import bisect
 import math
 
@@ -1109,6 +1111,7 @@ def _process_curve_edits(pending):
         _PROCESSING = False
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def cleanup():
     """Runtime shutdown hook: delete transient guides and detach every callback."""
     return remove_all()

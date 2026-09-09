@@ -2,6 +2,8 @@
 
 from __future__ import absolute_import
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 from functools import partial
 
 from maya import cmds  # type: ignore
@@ -73,7 +75,12 @@ def _emit_window_state(is_open):
         window_bus.stateChanged.emit(state)
     except Exception:
         pass
-    runtime.get_runtime_manager().set_tool_state("onion_skin", state)
+    try:
+        # Best-effort: during teardown the runtime manager may already be
+        # gone, and this state is purely cosmetic (UI restore on next show).
+        runtime.get_runtime_manager().set_tool_state("onion_skin", state)
+    except Exception:
+        pass
 
 
 def is_stay_on_top():
@@ -451,9 +458,16 @@ def get_update_controller(create=True):
     return _UPDATE_CONTROLLER
 
 
-def cleanup():
-    close_window()
-    controller.shutdown_renderer()
-    existing = get_update_controller(create=False)
+@on_shutdown(phase=ShutdownPhase.TOOLS)
+def _shutdown_runtime():
+    global _UPDATE_CONTROLLER
+    existing, _UPDATE_CONTROLLER = _UPDATE_CONTROLLER, None
     if existing is not None:
         existing.shutdown()
+        existing.deleteLater()
+    close_window()
+
+
+def cleanup():
+    _shutdown_runtime()
+    controller.shutdown_renderer()

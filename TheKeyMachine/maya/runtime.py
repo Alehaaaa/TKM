@@ -7,6 +7,8 @@ because they intentionally support capability checks outside Maya.
 
 from __future__ import annotations
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 
 # Maya version capabilities
 import functools
@@ -349,6 +351,7 @@ def ensure_contexts(spec, context_commands, configure_command=None, configure_ar
     return tuple(created)
 
 
+@on_shutdown(phase=ShutdownPhase.NATIVE)
 def shutdown_all():
     for spec in reversed(tuple(_PLUGIN_SPECS.values())):
         try:

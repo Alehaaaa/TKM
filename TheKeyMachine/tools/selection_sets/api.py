@@ -434,7 +434,8 @@ def open_selection_set_creation_dialog(controller=None, parent=None, on_created=
 
     def _clear_reference(*_):
         global _selection_set_creation_dialog
-        _selection_set_creation_dialog = None
+        if _selection_set_creation_dialog is dialog:
+            _selection_set_creation_dialog = None
 
     dialog.destroyed.connect(_clear_reference)
     dialog.show()

@@ -1,5 +1,9 @@
 """Animation Recovery history window."""
 
+from TheKeyMachine.core.workers import BackgroundCallThread
+
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 from datetime import datetime, timedelta
 import os
 
@@ -349,13 +353,11 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         if self._scene_reader is not None and self._scene_reader.isRunning():
             return
         self.refresh_scenes_button.setEnabled(False)
-        # Reuse the Hotkeys background reader. Parent to the service so closing
-        # the window cannot destroy a running thread.
-        reader = wutil.BackgroundCallThread(controller.list_recovery_scenes, controller.get_service())
+        # The shared reader outlives its owner safely and cancels delivery on close.
+        reader = BackgroundCallThread(controller.list_recovery_scenes, self)
         self._scene_reader = reader
         reader.loaded.connect(self._scenes_loaded)
         reader.failed.connect(self._scenes_failed)
-        reader.finished.connect(reader.deleteLater)
         reader.finished.connect(self._scene_read_finished)
         reader.start()
 
@@ -506,7 +508,7 @@ class AnimationRecoveryDialog(customDialogs.QFlatDialog):
         details = {}
         if not path:
             for key in self._details_labels:
-                self._set_detail(key, "—")
+                self._set_detail(key, "-")
             return
         if path:
             try:
@@ -643,7 +645,7 @@ def show_dialog(scene_id=None, selected_path=None, startup=False, extra_entries=
     global _dialog
     if _dialog is None or not wutil.is_valid_widget(_dialog):
         _dialog = AnimationRecoveryDialog()
-        _dialog.destroyed.connect(_clear_dialog)
+        _dialog.destroyed.connect(lambda *_, dialog=_dialog: _clear_dialog(dialog))
     # Reopening the visible window must retain any offer it already displayed.
     _dialog.dismissal_tokens = sorted(set(_dialog.dismissal_tokens) | set(dismissal_tokens or []))
     _dialog.browse_scenes = browse_scenes
@@ -663,11 +665,13 @@ def show_dialog(scene_id=None, selected_path=None, startup=False, extra_entries=
     return _dialog
 
 
-def _clear_dialog(*_args):
+def _clear_dialog(dialog):
     global _dialog
-    _dialog = None
+    if _dialog is dialog:
+        _dialog = None
 
 
+@on_shutdown(phase=ShutdownPhase.UI)
 def close_dialog():
     global _dialog
     if _dialog is not None and wutil.is_valid_widget(_dialog):

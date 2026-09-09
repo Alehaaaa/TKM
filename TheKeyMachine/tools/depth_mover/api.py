@@ -1,5 +1,7 @@
 """Native Depth Mover context lifecycle."""
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 import os
 
 from maya.api import OpenMaya as om
@@ -48,6 +50,7 @@ def _ensure_context():
     )
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def cleanup():
     global _CONTROLLER
     controller = get_controller(create=False)

@@ -1,5 +1,7 @@
 """Copy Relationship behavior and runtime callbacks."""
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 from maya import cmds
 from maya.api import OpenMaya as om
 
@@ -402,8 +404,11 @@ def enable_auto_link():
     return True
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def disable_auto_link():
-    runtime.get_runtime_manager(start=False).disconnect_callbacks(RUNTIME_KEY)
+    manager = runtime.get_existing_runtime_manager()
+    if manager is not None:
+        manager.disconnect_callbacks(RUNTIME_KEY)
 
 
 def is_auto_link_enabled():

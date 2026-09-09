@@ -1,3 +1,5 @@
+
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 import sys
 from TheKeyMachine.tools import common as toolCommon
 
@@ -1192,15 +1194,9 @@ class QFlatTooltipManager(object):
         cls._timer.start()
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def shutdown():
-    """Module-level hook for ``runtime.shutdown_tool_modules()``'s reload sweep.
-
-    That sweep resolves cleanups as ``(module_name, attr_name)`` pairs and
-    calls ``getattr(module, attr_name)`` directly -- it has no notion of a
-    class nested inside the module, so this thin wrapper is what actually
-    gets found and called; see ``QFlatTooltipManager.shutdown()`` for what
-    it tears down.
-    """
+    """Release tooltip timers, windows, and the application event filter."""
     QFlatTooltipManager.shutdown()
 
 

@@ -1,5 +1,9 @@
 """Interaction state shared by all slider tools."""
 
+from weakref import WeakSet
+
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -14,6 +18,20 @@ from TheKeyMachine.data.colors import COLORS
 from TheKeyMachine.maya import animation
 from TheKeyMachine.tools import common as tool_common
 from TheKeyMachine.ui.widgets import timeline
+
+
+_LIVE_SESSIONS = WeakSet()
+
+
+@on_shutdown(phase=ShutdownPhase.OPERATIONS)
+def finish_sessions():
+    """Finish active gestures before their widgets and runtime are deleted."""
+    for session in tuple(_LIVE_SESSIONS):
+        try:
+            session.finish()
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Could not finish slider session")
 
 
 @dataclass
@@ -83,6 +101,7 @@ class SliderSession:
         self._operation = None
         self._tint_key = "slider_{}_range".format(self.mode)
         self._tint_range = None
+        _LIVE_SESSIONS.add(self)
 
     def begin_preview(self):
         self.preview = True
@@ -239,3 +258,4 @@ class SliderSession:
         self.command_preview = False
         self.targets.clear()
         self.cache.clear()
+        _LIVE_SESSIONS.discard(self)

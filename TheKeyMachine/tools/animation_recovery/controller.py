@@ -1,5 +1,7 @@
 """Persistent, scene-scoped animation recovery snapshots."""
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 from contextlib import contextmanager
 from datetime import datetime
 import io
@@ -2743,6 +2745,7 @@ def set_persisted_enabled(enabled):
     return enabled
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def shutdown():
     global _SERVICE
     if _SERVICE is not None:

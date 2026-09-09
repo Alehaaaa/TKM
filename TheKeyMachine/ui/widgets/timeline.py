@@ -1,3 +1,5 @@
+
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 from contextlib import contextmanager
 from dataclasses import dataclass
 import math
@@ -248,6 +250,7 @@ class TimelineFramePicker(QtCore.QObject):
         return False
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def shutdown():
     """Cancel any in-flight frame picker before an in-process module reload.
 

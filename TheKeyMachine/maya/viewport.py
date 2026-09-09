@@ -1,5 +1,7 @@
 """Viewport-level Maya helpers."""
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 from maya import cmds, utils
 
 from TheKeyMachine.core import runtime
@@ -268,6 +270,7 @@ def _on_anim_keyframe_edited(*_args):
     _schedule_auto_refresh()
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def cleanup():
     global _auto_pause_enabled
     _auto_pause_enabled = False

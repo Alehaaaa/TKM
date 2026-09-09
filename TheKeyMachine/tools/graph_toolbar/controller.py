@@ -1,3 +1,5 @@
+
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 from TheKeyMachine.core.Qt import QtCore
 
 from TheKeyMachine.core import settings
@@ -150,6 +152,7 @@ def set_graph_toolbar_enabled(enabled: bool, *, apply: bool = True) -> None:
         _apply_enabled_state()
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def shutdown_graph_toolbar_runtime() -> None:
     """Remove the live Graph Editor toolbar without changing the saved preference."""
     _dispose_apply_timer()

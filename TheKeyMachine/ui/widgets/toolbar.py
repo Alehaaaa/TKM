@@ -17,6 +17,8 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 # Maya related imports
 from maya import cmds, mel, OpenMayaUI as mui
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin  # type: ignore
@@ -254,13 +256,33 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
+    @staticmethod
+    def _noop_visible_change_command(*_args):
+        pass
+
     def _clear_workspace_visible_change(self):
         try:
             if cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True):
+                # Replace with a no-op Python callable rather than an empty
+                # MEL string. visibleChangeCommand was bound as a Python
+                # callable (self.visible_change_command); Maya's workspace
+                # control keeps a live reference to it and can still invoke
+                # it once more as the control goes invisible/is torn down
+                # during unload. Swapping a callable-typed callback for an
+                # empty MEL string is a representation mismatch - Maya's
+                # native side apparently still tries to run "something" for
+                # the previously-registered callback and chokes on it,
+                # which is what surfaces in the Script Editor as a bare
+                # "invalid syntax" / "Invalid Code Fragment" error with no
+                # Python traceback (it never passes through mel.eval,
+                # cmds.evalDeferred, or compile() - confirmed by
+                # instrumenting all three and seeing none of them fire).
+                # A harmless no-op callable keeps the same representation
+                # and gives Maya something valid (but inert) to call.
                 cmds.workspaceControl(
                     WORKSPACE_CONTROL_NAME,
                     edit=True,
-                    visibleChangeCommand="",
+                    visibleChangeCommand=self._noop_visible_change_command,
                 )
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
@@ -692,12 +714,10 @@ class toolbar(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         """
         global _toolbar_instance
         self._begin_shutdown()
-        _toolbar_instance = None
-
-        try:
-            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
+        if _toolbar_instance is not self:
+            runtime.delete_widget(self)
+            return
+        return unload()
 
     def buildUI(self):
         ### ______________________________________________________ TOOLBAR LAYOUT _____________________________________________________________________###
@@ -803,53 +823,42 @@ def show(cleanup_existing=True):
 
     existing = get_toolbar()
     if existing is not None:
-        if existing.isVisible():
-            return
         try:
-            if existing.showWindow():
-                return
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-        if _toolbar_instance is existing:
-            _toolbar_instance = None
-        try:
-            existing._begin_shutdown()
-            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
-        except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
-            pass
-        else:
-            cleanup_existing = False
-
-    if cleanup_existing and _needs_pre_show_cleanup():
-        try:
-            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
+            if existing.isVisible() or existing.showWindow():
+                return existing
         except (RuntimeError, ValueError, TypeError, AttributeError, KeyError, IndexError):
             pass
 
-    instance = None
+    if existing is not None or (cleanup_existing and _needs_pre_show_cleanup()):
+        runtime.cleanup_for_reload()
+
     try:
-        instance = toolbar()
-        _toolbar_instance = instance
-        instance.showWindow()
+        _toolbar_instance = toolbar()
+        if not _toolbar_instance.showWindow():
+            raise RuntimeError("TheKeyMachine toolbar could not be shown")
+        return _toolbar_instance
     except Exception:
-        if _toolbar_instance is instance:
-            _toolbar_instance = None
         try:
-            if instance is not None:
-                instance._begin_shutdown()
-                instance.close()
-                instance.deleteLater()
-            runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
+            runtime.cleanup_for_reload()
         except Exception:
-            pass
+            import logging
+            logging.getLogger(__name__).exception("Toolbar startup cleanup failed")
         raise
 
 
 def unload(*_args):
-    toolbar_instance = get_toolbar()
-    if toolbar_instance is not None:
-        return toolbar_instance.unload()
-    return runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
+    return runtime.cleanup_for_reload()
+
+
+@on_shutdown(phase=ShutdownPhase.UI)
+def _shutdown_toolbar():
+    """Retire the singleton before destroying widgets or shutting down tools."""
+    global _toolbar_instance
+    instance, _toolbar_instance = _toolbar_instance, None
+    if instance is not None and QtCompat.isValid(instance):
+        instance._begin_shutdown()
+
+
 
 
 def toggle():

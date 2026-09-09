@@ -16,9 +16,9 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "0.1.59"
+__version__ = "0.1.60"
 __stage__ = "beta"
-__build__ = "355"
+__build__ = "356"
 __codename__ = "Cortado"
 __website__ = "https://alehaaaa.github.io/TKM/"
 
@@ -28,41 +28,35 @@ def reload():
     import sys
 
     package = sys.modules.get(__name__)
+    if getattr(package, "_reload_in_progress", False):
+        return
+    package._reload_in_progress = True
     try:
         from TheKeyMachine.core import runtime
 
+        if getattr(runtime, "_CLEANING_UP", False):
+            return
         runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
-    except Exception:
-        try:
-            from TheKeyMachine.core import debug
+        for module_name in tuple(sys.modules):
+            if module_name.startswith("TheKeyMachine."):
+                module = sys.modules.pop(module_name, None)
+                
+                parent_name, _, child = module_name.rpartition(".")
+                if parent_name == __name__ and getattr(package, child, None) is module:
+                    delattr(package, child)
 
-            if debug.is_enabled():
-                from maya import cmds
-
-                cmds.warning(
-                    "TheKeyMachine.reload(): pre-reload cleanup raised; "
-                    "continuing anyway."
-                )
-        except Exception:
-            pass
-
-    for module_name in tuple(sys.modules):
-        if module_name.startswith("TheKeyMachine."):
-            sys.modules.pop(module_name, None)
-
-    importlib.invalidate_caches()
-    if package is not None:
-        # Refresh in place so aliases such as ``import TheKeyMachine as tkm``
-        # receive the updated package metadata and entry points.
+        importlib.invalidate_caches()
         importlib.reload(package)
-    toolbar = importlib.import_module("TheKeyMachine.ui.widgets.toolbar")
+        
+        toolbar = importlib.import_module("TheKeyMachine.ui.widgets.toolbar")
+        toolbar.show(cleanup_existing=False)
 
-    return toolbar.show(cleanup_existing=False)
+    finally:
+        package._reload_in_progress = False
 
 
 def unload():
     from TheKeyMachine.core import runtime
-
     return runtime.cleanup_for_reload(delete_workspace=True, process_events=True)
 
 
@@ -77,5 +71,4 @@ def toggle():
 
 def welcome():
     from TheKeyMachine.ui.widgets import toolbar as t
-
     t.welcome()

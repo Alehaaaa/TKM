@@ -6,6 +6,8 @@ owned by the RuntimeManager rather than individual toolbar widgets.
 
 from __future__ import annotations
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 import math
 from typing import Dict, Optional
 
@@ -1387,6 +1389,7 @@ def get_controller(manager=None):
     return _CONTROLLER
 
 
+@on_shutdown(phase=ShutdownPhase.BACKGROUND)
 def shutdown_controller():
     global _CONTROLLER
     if _CONTROLLER is not None:

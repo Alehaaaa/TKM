@@ -17,6 +17,8 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 import hashlib
 import json
 import os
@@ -39,6 +41,7 @@ from maya import cmds
 import TheKeyMachine.core.application as general
 
 from TheKeyMachine.core.Qt import QtCore, QtGui, QtWidgets
+from TheKeyMachine.core.workers import BackgroundThread
 
 from TheKeyMachine.tools import common as toolCommon
 from TheKeyMachine.tools.bug_report import widgets as bug_report_widgets
@@ -73,7 +76,6 @@ _SENT_REPORTS_OPTION = "tkm_bug_report_sent_history"
 _SENT_REPORTS_MAX_ENTRIES = 30
 _SENT_REPORT_SUMMARY_CHARS = 70
 _SENT_REPORT_STATUS_TTL_SECONDS = 24 * 60 * 60
-_PRUNE_WORKERS = []  # keeps QThreads alive while a background prune check runs
 
 # Local, cheap dedupe for auto-detected exceptions: mirrors the relay's own
 # fingerprint normalization so a recurring bug is recognized on-device,
@@ -114,9 +116,10 @@ def _set_bug_report_dialog(dialog):
     _BUG_REPORT_DIALOG = dialog
 
 
-def _clear_bug_report_dialog(*_):
+def _clear_bug_report_dialog(dialog):
     global _BUG_REPORT_DIALOG
-    _BUG_REPORT_DIALOG = None
+    if _BUG_REPORT_DIALOG is dialog:
+        _BUG_REPORT_DIALOG = None
 
 
 def _get_bug_report_dialog(include_hidden=False):
@@ -130,7 +133,7 @@ def _get_bug_report_dialog(include_hidden=False):
             pass
         if not include_hidden:
             return None
-        _clear_bug_report_dialog()
+        _clear_bug_report_dialog(_BUG_REPORT_DIALOG)
 
     for widget in QtWidgets.QApplication.topLevelWidgets():
         if (
@@ -196,23 +199,29 @@ def _collect_debug_context():
     return {key: _sanitize_payload_value(value) for key, value in info.items()}
 
 
-class BugReportSubmitWorker(QtCore.QThread):
+class BugReportSubmitWorker(BackgroundThread):
+    result_signals = ("result_ready",)
     result_ready = QtCore.Signal(bool, object)
 
     def __init__(self, submit_callback, payload, parent=None):
-        QtCore.QThread.__init__(self, parent)
+        super().__init__(parent)
         self._submit_callback = submit_callback
         self._payload = dict(payload or {})
 
     def run(self):
+        if self._cancelled:
+            return
         try:
             result = self._submit_callback(**self._payload)
+            if self._cancelled:
+                return
             if isinstance(result, dict):
                 self.result_ready.emit(bool(result.get("success")), result)
             else:
                 self.result_ready.emit(bool(result), None)
         except Exception as exc:
-            self.result_ready.emit(False, exc)
+            if not self._cancelled:
+                self.result_ready.emit(False, exc)
 
 
 def _format_bug_report_payload(payload):
@@ -459,18 +468,21 @@ def _fetch_bug_report_status(fingerprint, report_type="bug"):
         return json.loads(response.read().decode("utf-8"))
 
 
-class _BugReportPruneWorker(QtCore.QThread):
+class _BugReportPruneWorker(BackgroundThread):
+    result_signals = ("pruned_ready", "statuses_ready")
     pruned_ready = QtCore.Signal(list)
     statuses_ready = QtCore.Signal(list)
 
     def __init__(self, entries, parent=None):
-        QtCore.QThread.__init__(self, parent)
+        super().__init__(parent)
         self._entries = entries
 
     def run(self):
         removed_fingerprints = []
         status_updates = []
         for entry in self._entries:
+            if self._cancelled or self.isInterruptionRequested():
+                break
             fingerprint = entry.get("fingerprint")
             if not fingerprint:
                 continue
@@ -494,8 +506,9 @@ class _BugReportPruneWorker(QtCore.QThread):
                         "checked_at": time.time(),
                     }
                 )
-        self.pruned_ready.emit(removed_fingerprints)
-        self.statuses_ready.emit(status_updates)
+        if not self._cancelled:
+            self.pruned_ready.emit(removed_fingerprints)
+            self.statuses_ready.emit(status_updates)
 
 
 def _entries_due_for_status_refresh(entries):
@@ -528,14 +541,9 @@ def refresh_sent_bug_report_statuses(force=False):
             return None
 
     worker = _BugReportPruneWorker(entries)
-    _PRUNE_WORKERS.append(worker)
 
     def _on_pruned(removed_fingerprints):
-        try:
-            _PRUNE_WORKERS.remove(worker)
-        except ValueError:
-            pass
-        if not removed_fingerprints:
+        if worker._cancelled or not removed_fingerprints:
             return
         removed = set(removed_fingerprints)
         current = _load_sent_reports()
@@ -544,7 +552,7 @@ def refresh_sent_bug_report_statuses(force=False):
             _save_sent_reports(remaining)
 
     def _on_statuses(status_updates):
-        if not status_updates:
+        if worker._cancelled or not status_updates:
             return
         updates_by_fingerprint = {
             update.get("fingerprint"): update
@@ -576,7 +584,6 @@ def refresh_sent_bug_report_statuses(force=False):
 
     worker.pruned_ready.connect(_on_pruned)
     worker.statuses_ready.connect(_on_statuses)
-    worker.finished.connect(worker.deleteLater)
     worker.start()
     return worker
 
@@ -939,6 +946,7 @@ def _restore_previous_hook(owner, hook_name):
             return restored
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def uninstall_bug_exception_handler():
     global _BUG_EXCEPTION_HANDLER_INSTALLED, _PREVIOUS_EXCEPTHOOK, _PREVIOUS_THREADING_EXCEPTHOOK
 
@@ -1058,7 +1066,7 @@ def bug_report_window(
     )
     dlg.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
     _set_bug_report_dialog(dlg)
-    dlg.destroyed.connect(_clear_bug_report_dialog)
-    toolCommon.invalidate_cached_window_on_language_change(dlg, _clear_bug_report_dialog)
+    dlg.destroyed.connect(lambda *_: _clear_bug_report_dialog(dlg))
+    toolCommon.invalidate_cached_window_on_language_change(dlg, lambda: _clear_bug_report_dialog(dlg))
     dlg.show_centered()
     return dlg

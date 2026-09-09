@@ -184,9 +184,12 @@ def show_donate(parent=None):
     _donate_dialog.message_label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
     _donate_dialog.message_label.setOpenExternalLinks(True)
 
+    created_dialog = _donate_dialog
+
     def _clear_donate_ref():
         global _donate_dialog
-        _donate_dialog = None
+        if _donate_dialog is created_dialog:
+            _donate_dialog = None
 
     toolCommon.invalidate_cached_window_on_language_change(_donate_dialog, _clear_donate_ref)
     return _present_window(_donate_dialog)
@@ -314,9 +317,12 @@ def show_about(parent=None):
     _about_dialog = TKMAboutDialog(parent=parent)
     _about_dialog.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
 
+    created_dialog = _about_dialog
+
     def _clear_about_ref():
         global _about_dialog
-        _about_dialog = None
+        if _about_dialog is created_dialog:
+            _about_dialog = None
 
     toolCommon.invalidate_cached_window_on_language_change(_about_dialog, _clear_about_ref)
     return _present_window(_about_dialog)
@@ -336,7 +342,8 @@ def show_version_history_dialog(parent=None):
 
     def _clear_ref():
         global _version_history_dialog
-        _version_history_dialog = None
+        if _version_history_dialog is dlg:
+            _version_history_dialog = None
 
     toolCommon.invalidate_cached_window_on_language_change(dlg, _clear_ref)
     _version_history_dialog = dlg

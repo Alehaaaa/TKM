@@ -1,3 +1,5 @@
+
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 from collections import deque
 from contextlib import contextmanager
 from functools import lru_cache
@@ -69,8 +71,12 @@ _DEFERRED_TOOL_CALLBACKS = deque()
 _DEFERRED_TOOL_CALLBACK_DRAIN_SCHEDULED = False
 
 
+@on_shutdown(phase=ShutdownPhase.OPERATIONS)
 def finish_active_progress():
     """Stop every TKM-owned progress display and cancel its delayed timers."""
+    global _DEFERRED_TOOL_CALLBACK_DRAIN_SCHEDULED
+    _DEFERRED_TOOL_CALLBACKS.clear()
+    _DEFERRED_TOOL_CALLBACK_DRAIN_SCHEDULED = False
     active = list(_ACTIVE_PROGRESS_STACK)
     _ACTIVE_PROGRESS_STACK[:] = []
     for progress in reversed(active):

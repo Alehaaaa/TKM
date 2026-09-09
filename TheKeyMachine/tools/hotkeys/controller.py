@@ -4,6 +4,8 @@ Managed hotkey UI and hotkey helpers for TheKeyMachine trigger commands.
 
 from __future__ import annotations
 
+from TheKeyMachine.core.workers import BackgroundCallThread
+
 import json
 import os
 from functools import partial
@@ -1116,6 +1118,8 @@ def _build_command_catalog():
     sections = []
 
     for section_id, section_data in _iter_hotkey_tool_sections():
+        if QtCore.QThread.currentThread().isInterruptionRequested():
+            return [], {}, {}
         if section_data.get("type") == "slider":
             section = _build_slider_hotkey_section(section_id, section_data)
         else:
@@ -1669,7 +1673,7 @@ class TriggerHotkeysDialog(cd.QFlatDialog):
         background build reports back.
         """
         self._set_content_enabled(False)
-        self._catalog_thread = wutil.BackgroundCallThread(_build_command_catalog, self)
+        self._catalog_thread = BackgroundCallThread(_build_command_catalog, self)
         self._catalog_thread.loaded.connect(self._on_catalog_loaded)
         self._catalog_thread.failed.connect(self._on_catalog_failed)
         self._catalog_thread.start()
@@ -2199,7 +2203,8 @@ def show_hotkeys_window(*_args):
     manager.register_managed_widget(dialog, key=HOTKEYS_WINDOW_KEY)
 
     def _clear_hotkeys_ref(manager=manager):
-        manager.clear_managed_widget(HOTKEYS_WINDOW_KEY)
+        if manager._managed_widgets.get(HOTKEYS_WINDOW_KEY) is dialog:
+            manager.clear_managed_widget(HOTKEYS_WINDOW_KEY)
 
     toolCommon.invalidate_cached_window_on_language_change(dialog, _clear_hotkeys_ref)
     dialog.show()

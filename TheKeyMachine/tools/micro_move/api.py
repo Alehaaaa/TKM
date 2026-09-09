@@ -1,3 +1,5 @@
+
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 import os
 
 from maya.api import OpenMaya as om
@@ -439,6 +441,7 @@ def toggle(checked=None, *_args):
     return get_controller().toggle(checked)
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def cleanup():
     global _CONTROLLER
     controller = get_controller(create=False)

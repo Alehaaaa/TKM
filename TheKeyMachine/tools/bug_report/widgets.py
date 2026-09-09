@@ -492,7 +492,6 @@ class QFlatBugReportDialog(customDialogs.QFlatDialog):
 
         self._submit_worker = self._worker_class(self._submit_callback, payload, parent=self)
         self._submit_worker.result_ready.connect(self._on_submit_finished)
-        self._submit_worker.finished.connect(self._submit_worker.deleteLater)
         self._submit_worker.start()
 
     def _on_submit_finished(self, success, error):

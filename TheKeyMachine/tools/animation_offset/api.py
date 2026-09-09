@@ -1,3 +1,5 @@
+
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 from maya import cmds
 
 from TheKeyMachine.core.Qt import QtCompat, QtCore, QtWidgets
@@ -675,6 +677,7 @@ def toggle(checked=None, *_args):
     return get_controller().toggle(checked)
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def cleanup():
     global _CONTROLLER
     controller = get_controller(create=False)

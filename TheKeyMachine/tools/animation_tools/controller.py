@@ -1,5 +1,7 @@
 """Animation curve editing, cleanup, smart-key, and snapping behavior."""
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 from contextlib import contextmanager
 import math
 
@@ -168,6 +170,7 @@ def cancel_pending_navigation():
     _nav_flush_scheduled = False
 
 
+@on_shutdown(phase=ShutdownPhase.TOOLS)
 def cleanup():
     """Release runtime resources held by this tool. Called on TKM shutdown."""
     cancel_pending_navigation()

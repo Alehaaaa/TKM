@@ -2,6 +2,8 @@
 
 from __future__ import absolute_import
 
+from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
+
 from maya import cmds  # type: ignore
 
 from TheKeyMachine.core import runtime, settings
@@ -197,6 +199,7 @@ def initialize_renderer():
     return renderer
 
 
+@on_shutdown(phase=ShutdownPhase.NATIVE)
 def shutdown_renderer():
     global _renderer
     set_enabled(False)
@@ -278,7 +281,12 @@ def set_enabled(enabled, *_args, **_kwargs):
                 diagnostics.log("viewport override removed", panel=panel)
             except Exception as exc:
                 diagnostics.log_error("viewport override removal failed", exc, panel=panel)
-    runtime.get_runtime_manager().set_control_state("onion_skin_toggle", is_enabled())
+    try:
+        # Best-effort: during teardown the runtime manager may already be
+        # gone, and this state is purely cosmetic (UI restore on next show).
+        runtime.get_runtime_manager().set_control_state("onion_skin_toggle", is_enabled())
+    except Exception:
+        pass
     _refresh_window()
     _sync_auto_update()
     return is_enabled()

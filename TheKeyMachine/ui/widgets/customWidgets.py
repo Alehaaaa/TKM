@@ -1954,6 +1954,11 @@ class QFlatToolbar(QtWidgets.QScrollArea):
 
     heightChanged = QtCore.Signal(int)
 
+    # Typical docked width, matching the resizeWidth toolbar.py already
+    # assumes when re-docking. Used only to seed a close-enough height
+    # before Maya has given this widget real dock geometry to measure.
+    _STARTUP_WIDTH_ESTIMATE = 900
+
     def __init__(
         self,
         parent=None,
@@ -2072,6 +2077,18 @@ class QFlatToolbar(QtWidgets.QScrollArea):
                 content_width = max(1, layout.sizeHint().width())
                 content_height = max(1, layout.heightForWidth(content_width))
                 self._flow_container.setFixedSize(content_width, content_height)
+            elif not self.isVisible():
+                # Not attached to real dock geometry yet (e.g. during
+                # initial construction, before Maya has ever shown/docked
+                # this widget). self.viewport().width() is meaningless
+                # here - trusting it wraps every section onto its own row
+                # and locks in a wildly oversized height. Estimate against
+                # a typical docked width instead, so the seeded height
+                # lands close to the real one - a small correction once
+                # real geometry lands, not a big jump either way.
+                content_width = self._STARTUP_WIDTH_ESTIMATE
+                content_height = max(1, layout.heightForWidth(content_width))
+                self._flow_container.setFixedHeight(content_height)
             else:
                 self._flow_container.setMinimumWidth(0)
                 self._flow_container.setMaximumWidth(16777215)
