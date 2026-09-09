@@ -1,10 +1,99 @@
 {
-  "latest": "0.1.59",
+  "latest": "0.1.60",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "0.1.60",
+      "tag": "TKM-0.1.60",
+      "publishedAt": "2026-09-09T22:09:08Z",
+      "publishedLabel": "September 9, 2026",
+      "hasRelease": true,
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.60",
+      "hasDownload": true,
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.60/TKM-0.1.60.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar no longer flashes an oversized height before settling into its docked size"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Reload and unload were rebuilt end-to-end, fixing crashes and leftovers"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.60...TKM-0.1.60"
+    },
+    {
+      "version": "0.1.60",
+      "tag": "TKM-0.1.60",
+      "publishedAt": "2026-09-09T22:09:08Z",
+      "publishedLabel": "September 9, 2026",
+      "hasRelease": true,
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.60",
+      "hasDownload": true,
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.60/TKM-0.1.60.zip",
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Link Objects tool"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Custom toolbar UI"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Rich tooltips and enhanced menus"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Layout, settings and window logic refactored"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.59...TKM-0.1.60"
+    },
+    {
+      "version": "pre-0.1.60",
+      "tag": "TKM-pre-0.1.60",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Initial TheKeyMachine animation toolset"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Add Select Opposite shortcut"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Slider look and logic updated"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Colors and error handling refactored"
+        }
+      ],
+      "compareUrl": null
+    },
     {
       "version": "0.1.59",
       "tag": "TKM-0.1.59",
