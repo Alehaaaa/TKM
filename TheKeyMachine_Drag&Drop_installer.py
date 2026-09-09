@@ -27,9 +27,9 @@ except Exception:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets, QtCore, QtGui
 
-__version__ = "0.1.59"
+__version__ = "0.1.60"
 __stage__ = "beta"
-__build__ = "355"
+__build__ = "356"
 __codename__ = "Cortado"
 
 WINDOW_NAME = "TheKeyMachineInstaller"
