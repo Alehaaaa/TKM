@@ -14,7 +14,7 @@
 # Rule: rephrase technical changes into animator-facing behavior when there is a visible effect.
 # Rule: keep entries broad and concise; include specifics only when needed to explain a bug.
 
-0.1.60:
+1.0.0:
   - polish: Toolbar no longer flashes an oversized height before settling into its docked size
   - polish: Reload and unload were rebuilt end-to-end, fixing crashes and leftovers
 
@@ -412,12 +412,6 @@
   - new: Toolbar context menu
   - changed: Toolbar config section relocated
   - bugfix: Multiple slider modes display
-
-0.1.60:
-  - new: Link Objects tool
-  - new: Custom toolbar UI
-  - new: Rich tooltips and enhanced menus
-  - changed: Layout, settings and window logic refactored
 
 pre-0.1.60:
   - new: Initial TheKeyMachine animation toolset
