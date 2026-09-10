@@ -1,19 +1,19 @@
 {
-  "latest": "0.1.60",
+  "latest": "1.0.0",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
     {
-      "version": "0.1.60",
-      "tag": "TKM-0.1.60",
-      "publishedAt": "2026-09-09T22:09:08Z",
-      "publishedLabel": "September 9, 2026",
+      "version": "1.0.0",
+      "tag": "TKM-1.0.0",
+      "publishedAt": "2026-09-10T06:31:49Z",
+      "publishedLabel": "September 10, 2026",
       "hasRelease": true,
-      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.60",
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-1.0.0",
       "hasDownload": true,
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.60/TKM-0.1.60.zip",
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-1.0.0/TKM-1.0.0.zip",
       "entries": [
         {
           "kind": "polish",
@@ -26,40 +26,935 @@
           "description": "Reload and unload were rebuilt end-to-end, fixing crashes and leftovers"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.60...TKM-0.1.60"
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.59...TKM-1.0.0"
     },
     {
-      "version": "0.1.60",
-      "tag": "TKM-0.1.60",
-      "publishedAt": "2026-09-09T22:09:08Z",
-      "publishedLabel": "September 9, 2026",
-      "hasRelease": true,
-      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-0.1.60",
-      "hasDownload": true,
-      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-0.1.60/TKM-0.1.60.zip",
+      "version": "0.1.99",
+      "tag": "TKM-0.1.99",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Tooltips use current tool names and icons"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Torn-off menu tooltips keep their full rich content"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Temp Pivot modes have clearer dedicated icons"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Nudge, Inbetween, Bake, Tangent, World Space, Link and Follow Cam icons refreshed"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Menu action hover help no longer loses video or multi-line content"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.98",
+      "tag": "TKM-0.1.98",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
       "entries": [
         {
           "kind": "new",
           "label": "New",
-          "description": "Link Objects tool"
+          "description": "Copy Animation/Pose can paste to remapped scene assets"
         },
         {
-          "kind": "new",
-          "label": "New",
-          "description": "Custom toolbar UI"
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Paste Animation/Pose set an Undo Chunk and work with namespaces"
         },
         {
-          "kind": "new",
-          "label": "New",
-          "description": "Rich tooltips and enhanced menus"
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Sliders do not break the Undo Stack, they now set values as intended"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Rotation Around Selection Background Runner will not move the camera"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Delete Keys, Smart Key and Smart Key All Channels fixed to work with all selection contexts"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Menus set as shelf buttons now stay open when torn off"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.97",
+      "tag": "TKM-0.1.97",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "TheKeyMachine menu button now starts the toolbar"
         },
         {
           "kind": "changed",
           "label": "Changed",
-          "description": "Layout, settings and window logic refactored"
+          "description": "Camera orbit runner is quieter while animating"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Background Runners button shows activity pulses"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "TheKeyMachine shelf and update icons refreshed"
         }
       ],
-      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-0.1.59...TKM-0.1.60"
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.96",
+      "tag": "TKM-0.1.96",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Menu tooltips can add submenu shelf buttons"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Tooltip hover delay is calmer"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar section green is warmer"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Header-only tooltips keep rounded corners"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Tooltip header buttons are easier to click over menus"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Torn-off menu tooltips and logo display correctly"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.95",
+      "tag": "TKM-0.1.95",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Tooltip actions for editing hotkeys and adding shelf buttons"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Update prompt shows all changes since the installed version"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Update changelog is scrollable and grouped by change type"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Version History groups changes with one icon per type"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Tooltip header and button styling refined"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Menu tooltip actions keep their correct trigger behavior"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.94",
+      "tag": "TKM-0.1.94",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Version history window from the About dialog"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Bug Report window spacing and field layout"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Sending bug reports keeps Maya responsive"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Disabled dialog buttons are easier to read"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Bug Report action opens the report window again"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Menu tooltips stay visible while hovering actions"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.93",
+      "tag": "TKM-0.1.93",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Background Runners menu"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Highlight Channel Box Selection runner"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Clear Channel Box Selection runner"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Camera orbit-around-selection runner"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Overshoot Sliders background toggle"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar and slider colors rebalanced"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.92",
+      "tag": "TKM-0.1.92",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Gimbal Fixer tool"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Animation curve tools"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "iBookmarks renamed to Isolate Bookmarks"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Attribute Switcher target handling refined"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Orbit window workflow"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.91",
+      "tag": "TKM-0.1.91",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "animBot selection set conversion"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Temp Pivot modes, time sync and persistence"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Nudge, Bake and Share Keys tools"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Relative transform tools use driven selection"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Hotkeys and slider auto-keying"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar alignment and tool menus"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.89",
+      "tag": "TKM-0.1.89",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar pinning workflow"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Slider behavior"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Slider overlap issue"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.88",
+      "tag": "TKM-0.1.88",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Startup import issue"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.87",
+      "tag": "TKM-0.1.87",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Tangent slider operations"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Time slider operations"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Slider session behavior refined"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Slider reset behavior streamlined"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar and Graph Editor UI"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.86",
+      "tag": "TKM-0.1.86",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Auto Euler Filter option"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Overshoot Sliders option"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar setting sync"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Window dialogs"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.85",
+      "tag": "TKM-0.1.85",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Graph Editor toolbar toggle"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Tooltip video timeline"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Time slider range preservation"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Keyframe targeting improved during sliders"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Hotkey tooltip status"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Sliders with keys on one side"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.84",
+      "tag": "TKM-0.1.84",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Hotkeys workflow refined"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Selection sets workflow updated"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Floating windows refined"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Bug reporting workflow"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.83",
+      "tag": "TKM-0.1.83",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Tangent tool presets"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Toolbar and Graph Editor tools reorganized"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Key baking"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Tint color handling"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.82",
+      "tag": "TKM-0.1.82",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Frame-button support"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar UI and reporting"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Selection set buttons"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "TimelineTint resizing"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.81",
+      "tag": "TKM-0.1.81",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Orbit floating tool"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Selection Sets floating tool"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Selection set color controls"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Selection set delete controls"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.80",
+      "tag": "TKM-0.1.80",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Floating tools"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Shortcuts workflow"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Selection sets workflow"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Report window size"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Tools saving undo checkpoints"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.76",
+      "tag": "TKM-0.1.76",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Checkable toolbar buttons"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Orbit window"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Selection set windows"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.75",
+      "tag": "TKM-0.1.75",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Baking tools"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Nudge insert and remove inbetween"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar refresh alignment"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "No-internet compatibility"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Missing flat button style"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.74",
+      "tag": "TKM-0.1.74",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "In-view messages"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Isolate select panel handling"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Menu item properties updated"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Tooltip DPI scaling"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Layout existence checks"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.73",
+      "tag": "TKM-0.1.73",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Worldspace copy and paste tools"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Link Relative copy and paste tools"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar tool grouping"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.72",
+      "tag": "TKM-0.1.72",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Checked button styling"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Tooltip text handling"
+        },
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Toolbar button consistency"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.71",
+      "tag": "TKM-0.1.71",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Relative transform linking"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Animation toolset utilities"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Key tools updated"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "WorldSpace slider globe display"
+        }
+      ],
+      "compareUrl": null
+    },
+    {
+      "version": "0.1.70",
+      "tag": "TKM-0.1.70",
+      "publishedAt": "",
+      "publishedLabel": "Release date pending",
+      "hasRelease": false,
+      "url": null,
+      "hasDownload": false,
+      "downloadUrl": null,
+      "entries": [
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Update checking and installation"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Update status feedback"
+        },
+        {
+          "kind": "new",
+          "label": "New",
+          "description": "Toolbar context menu"
+        },
+        {
+          "kind": "changed",
+          "label": "Changed",
+          "description": "Toolbar config section relocated"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Multiple slider modes display"
+        }
+      ],
+      "compareUrl": null
     },
     {
       "version": "pre-0.1.60",
