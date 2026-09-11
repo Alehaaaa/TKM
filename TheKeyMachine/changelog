@@ -243,14 +243,14 @@
   - bugfix: Fixed sliders messing with rotations and not saving Undo Chunks
   - bugfix: Fixed Animation Offset setting keys on timeChange in heavy scenes
 
-0.1.99:
+0.0.99:
   - polish: Tooltips use current tool names and icons
   - polish: Torn-off menu tooltips keep their full rich content
   - polish: Temp Pivot modes have clearer dedicated icons
   - polish: Nudge, Inbetween, Bake, Tangent, World Space, Link and Follow Cam icons refreshed
   - bugfix: Menu action hover help no longer loses video or multi-line content
 
-0.1.98:
+0.0.98:
   - new: Copy Animation/Pose can paste to remapped scene assets
   - polish: Paste Animation/Pose set an Undo Chunk and work with namespaces
   - bugfix: Sliders do not break the Undo Stack, they now set values as intended
@@ -258,13 +258,13 @@
   - bugfix: Delete Keys, Smart Key and Smart Key All Channels fixed to work with all selection contexts
   - bugfix: Menus set as shelf buttons now stay open when torn off
 
-0.1.97:
+0.0.97:
   - changed: TheKeyMachine menu button now starts the toolbar
   - changed: Camera orbit runner is quieter while animating
   - polish: Background Runners button shows activity pulses
   - polish: TheKeyMachine shelf and update icons refreshed
 
-0.1.96:
+0.0.96:
   - new: Menu tooltips can add submenu shelf buttons
   - changed: Tooltip hover delay is calmer
   - polish: Toolbar section green is warmer
@@ -272,7 +272,7 @@
   - bugfix: Tooltip header buttons are easier to click over menus
   - bugfix: Torn-off menu tooltips and logo display correctly
 
-0.1.95:
+0.0.95:
   - new: Tooltip actions for editing hotkeys and adding shelf buttons
   - changed: Update prompt shows all changes since the installed version
   - polish: Update changelog is scrollable and grouped by change type
@@ -280,7 +280,7 @@
   - polish: Tooltip header and button styling refined
   - bugfix: Menu tooltip actions keep their correct trigger behavior
 
-0.1.94:
+0.0.94:
   - new: Version history window from the About dialog
   - polish: Bug Report window spacing and field layout
   - polish: Sending bug reports keeps Maya responsive
@@ -288,7 +288,7 @@
   - bugfix: Bug Report action opens the report window again
   - bugfix: Menu tooltips stay visible while hovering actions
 
-0.1.93:
+0.0.93:
   - new: Background Runners menu
   - new: Highlight Channel Box Selection runner
   - new: Clear Channel Box Selection runner
@@ -296,14 +296,14 @@
   - new: Overshoot Sliders background toggle
   - polish: Toolbar and slider colors rebalanced
 
-0.1.92:
+0.0.92:
   - new: Gimbal Fixer tool
   - new: Animation curve tools
   - changed: iBookmarks renamed to Isolate Bookmarks
   - changed: Attribute Switcher target handling refined
   - polish: Orbit window workflow
 
-0.1.91:
+0.0.91:
   - new: animBot selection set conversion
   - new: Temp Pivot modes, time sync and persistence
   - new: Nudge, Bake and Share Keys tools
@@ -311,28 +311,28 @@
   - polish: Hotkeys and slider auto-keying
   - polish: Toolbar alignment and tool menus
 
-0.1.89:
+0.0.89:
   - polish: Toolbar pinning workflow
   - polish: Slider behavior
   - bugfix: Slider overlap issue
 
-0.1.88:
+0.0.88:
   - bugfix: Startup import issue
 
-0.1.87:
+0.0.87:
   - new: Tangent slider operations
   - new: Time slider operations
   - changed: Slider session behavior refined
   - changed: Slider reset behavior streamlined
   - polish: Toolbar and Graph Editor UI
 
-0.1.86:
+0.0.86:
   - new: Auto Euler Filter option
   - new: Overshoot Sliders option
   - polish: Toolbar setting sync
   - polish: Window dialogs
 
-0.1.85:
+0.0.85:
   - new: Graph Editor toolbar toggle
   - new: Tooltip video timeline
   - changed: Time slider range preservation
@@ -340,80 +340,80 @@
   - polish: Hotkey tooltip status
   - bugfix: Sliders with keys on one side
 
-0.1.84:
+0.0.84:
   - changed: Hotkeys workflow refined
   - changed: Selection sets workflow updated
   - polish: Floating windows refined
   - polish: Bug reporting workflow
 
-0.1.83:
+0.0.83:
   - new: Tangent tool presets
   - changed: Toolbar and Graph Editor tools reorganized
   - polish: Key baking
   - polish: Tint color handling
 
-0.1.82:
+0.0.82:
   - new: Frame-button support
   - polish: Toolbar UI and reporting
   - polish: Selection set buttons
   - bugfix: TimelineTint resizing
 
-0.1.81:
+0.0.81:
   - new: Orbit floating tool
   - new: Selection Sets floating tool
   - polish: Selection set color controls
   - polish: Selection set delete controls
 
-0.1.80:
+0.0.80:
   - polish: Floating tools
   - polish: Shortcuts workflow
   - polish: Selection sets workflow
   - bugfix: Report window size
   - bugfix: Tools saving undo checkpoints
 
-0.1.76:
+0.0.76:
   - new: Checkable toolbar buttons
   - polish: Orbit window
   - polish: Selection set windows
 
-0.1.75:
+0.0.75:
   - new: Baking tools
   - new: Nudge insert and remove inbetween
   - polish: Toolbar refresh alignment
   - bugfix: No-internet compatibility
   - bugfix: Missing flat button style
 
-0.1.74:
+0.0.74:
   - new: In-view messages
   - changed: Isolate select panel handling
   - changed: Menu item properties updated
   - bugfix: Tooltip DPI scaling
   - bugfix: Layout existence checks
 
-0.1.73:
+0.0.73:
   - new: Worldspace copy and paste tools
   - new: Link Relative copy and paste tools
   - polish: Toolbar tool grouping
 
-0.1.72:
+0.0.72:
   - new: Checked button styling
   - polish: Tooltip text handling
   - polish: Toolbar button consistency
 
-0.1.71:
+0.0.71:
   - new: Relative transform linking
   - new: Animation toolset utilities
   - changed: Key tools updated
   - bugfix: WorldSpace slider globe display
 
-0.1.70:
+0.0.70:
   - new: Update checking and installation
   - new: Update status feedback
   - new: Toolbar context menu
   - changed: Toolbar config section relocated
   - bugfix: Multiple slider modes display
 
-pre-0.1.60:
+pre-0.0.60:
   - new: Initial TheKeyMachine animation toolset
   - new: Add Select Opposite shortcut
   - changed: Slider look and logic updated
