@@ -23,6 +23,145 @@ SHORTCUT_KEY_MAP = {
 SHORTCUT_KEY_ORDER = [QtCore.Qt.Key_Control, QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift, QtCore.Qt.MiddleButton]
 
 
+class TooltipStackManager(object):
+    """Arrange tooltip-like windows in independent per-anchor stacks."""
+
+    GAP = 6
+    EDGE_PADDING = 5
+    _entries = []
+
+    @classmethod
+    def _valid_entries(cls):
+        live = []
+        for window in cls._entries:
+            try:
+                if wutil.is_valid_widget(window):
+                    live.append(window)
+            except (RuntimeError, TypeError):
+                pass
+        cls._entries = live
+        return live
+
+    @classmethod
+    def register(cls, window, anchor_widget, anchor_rect, target_x=None):
+        cls.unregister(window, reflow=False)
+        window._stack_anchor_widget = anchor_widget
+        window._stack_anchor_rect = QtCore.QRect(anchor_rect)
+        window._stack_target_x = target_x if target_x is not None else anchor_rect.center().x()
+        cls._entries.append(window)
+        cls.reflow(anchor_widget)
+
+    @classmethod
+    def unregister(cls, window, reflow=True):
+        anchor = getattr(window, "_stack_anchor_widget", None)
+        cls._entries = [item for item in cls._valid_entries() if item is not window]
+        if reflow and anchor is not None:
+            cls.reflow(anchor)
+
+    @classmethod
+    def reflow(cls, anchor_widget):
+        group = [item for item in cls._valid_entries()
+                 if getattr(item, "_stack_anchor_widget", None) is anchor_widget]
+        if not group:
+            return
+        group.reverse()
+        newest = group[0]
+        anchor_rect = getattr(newest, "_stack_anchor_rect", None)
+        if anchor_rect is None:
+            return
+        target_x = getattr(newest, "_stack_target_x", anchor_rect.center().x())
+        screen = QtGui.QGuiApplication.screenAt(anchor_rect.center()) or QtGui.QGuiApplication.primaryScreen()
+        geo = screen.availableGeometry()
+        gap = wutil.DPI(cls.GAP)
+        edge = wutil.DPI(cls.EDGE_PADDING)
+        total_height = gap * max(0, len(group) - 1)
+        for index, window in enumerate(group):
+            window._set_stack_tail(index == 0, "bottom")
+            window.adjustSize()
+            total_height += window.height()
+        room_above = anchor_rect.top() - geo.top() - gap
+        room_below = geo.bottom() - anchor_rect.bottom() - gap
+        side = "bottom" if total_height <= room_above or room_above >= room_below else "top"
+        available_height = max(1, room_above if side == "bottom" else room_below)
+
+        # Fill the anchor column first, then wrap older tooltips into columns
+        # to its right whenever the available vertical space is exhausted.
+        columns = []
+        column = []
+        column_height = 0
+        for index, window in enumerate(group):
+            window._set_stack_tail(index == 0, side)
+            window.adjustSize()
+            height = window.height()
+            required = height + (gap if column else 0)
+            if column and column_height + required > available_height:
+                columns.append(column)
+                column = []
+                column_height = 0
+                required = height
+            column.append(window)
+            column_height += required
+        if column:
+            columns.append(column)
+
+        column_widths = [max(item.width() for item in items) for items in columns]
+        block_width = sum(column_widths) + gap * max(0, len(columns) - 1)
+        block_left = target_x - block_width // 2
+        block_left = max(geo.left() + edge, min(block_left, geo.right() - block_width - edge))
+
+        column_x = block_left
+        for column_index, items in enumerate(columns):
+            column_width = column_widths[column_index]
+            cursor_y = anchor_rect.top() - gap if side == "bottom" else anchor_rect.bottom() + 1 + gap
+            for window in items:
+                width, height = window.width(), window.height()
+                x = column_x + (column_width - width) // 2
+                if side == "bottom":
+                    y = cursor_y - height
+                    cursor_y = y - gap
+                else:
+                    y = cursor_y
+                    cursor_y = y + height + gap
+                window.move(x, y)
+                window.side = side
+                aw = wutil.DPI(getattr(window, "ARROW_W", 12))
+                window.arrow_x = max(
+                    aw / 2,
+                    min(target_x - x, width - aw / 2),
+                )
+                window.update()
+            column_x += column_width + gap
+
+    @classmethod
+    def clear(cls):
+        cls._entries = []
+
+    @classmethod
+    def close_all(cls, delete=False):
+        windows = list(cls._valid_entries())
+        cls._entries = []
+        app = QtWidgets.QApplication.instance() if delete else None
+        for window in windows:
+            try:
+                for timer_name in ("_auto_close_timer", "_tick_timer"):
+                    timer = getattr(window, timer_name, None)
+                    if timer is not None:
+                        timer.stop()
+                window.close()
+                if delete:
+                    # Tool windows parented to the toolbar must not survive
+                    # until Maya destroys its workspace control. Detach them
+                    # first, then flush their deferred deletion while their
+                    # Python classes and Qt parents are still valid.
+                    window.hide()
+                    window.setParent(None)
+                    window.deleteLater()
+                    if app is not None:
+                        QtWidgets.QApplication.sendPostedEvents(window, QtCore.QEvent.DeferredDelete)
+            except (RuntimeError, TypeError, AttributeError):
+                pass
+
+
 class Tooltip(str):
     def __new__(cls, text, title="", body_lines=(), icon=None):
         obj = str.__new__(cls, text)
@@ -210,6 +349,9 @@ class QFlatTooltip(QtWidgets.QWidget):
         self.command_id = command_id
         self.command_label = command_label
         self.command_icon = command_icon
+        # Hover/menu cleanup owns manager-created tooltips. Persistent callers
+        # (notably the debug stack) can opt out without changing stack layout.
+        self._managed_by_tooltip_manager = True
         self.text = text
         self.description = description
         self.icon = icon  # Store for reference
@@ -225,8 +367,20 @@ class QFlatTooltip(QtWidgets.QWidget):
         self._auto_close_timer = QtCore.QTimer(self)
         self._auto_close_timer.setInterval(200)
         self._auto_close_timer.timeout.connect(self._check_auto_close)
+        self._stack_tail_visible = True
 
         self._setup_ui()
+
+    def _set_stack_tail(self, visible, side):
+        self._stack_tail_visible = bool(visible)
+        ah = wutil.DPI(self.ARROW_H) if visible else 0
+        self.main_layout.setContentsMargins(0, ah if side == "top" else 0, 0, ah if side == "bottom" else 0)
+        self.main_layout.activate()
+
+    def closeEvent(self, event):
+        self._auto_close_timer.stop()
+        TooltipStackManager.unregister(self)
+        QtWidgets.QWidget.closeEvent(self, event)
 
     def _check_auto_close(self):
         """Strictly manages tooltip visibility based on cursor location."""
@@ -737,6 +891,8 @@ class QFlatTooltip(QtWidgets.QWidget):
     def paintEvent(self, event):
         if self.embedded:
             return QtWidgets.QWidget.paintEvent(self, event)
+        if not self._stack_tail_visible:
+            return
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtCore.Qt.NoPen)
@@ -761,8 +917,6 @@ class QFlatTooltip(QtWidgets.QWidget):
         self.action_rect = action_rect
         self.target_rect = target_rect
         self.anchor_widget = widget
-
-        ah = wutil.DPI(self.ARROW_H)
 
         if target_rect:
             self._global_anc = target_rect
@@ -792,40 +946,8 @@ class QFlatTooltip(QtWidgets.QWidget):
             tx = self._global_anc.right()
         target_x = tx
 
-        # Default to placing tooltip ON TOP (above) the widget (arrow on bottom)
-        self.side = "bottom"
-        self.main_layout.setContentsMargins(0, 0, 0, ah)
-        self.main_layout.activate()
         self.adjustSize()
-        w, h = self.width(), self.height()
-
-        gap = wutil.DPI(2)
-        edge_padding = wutil.DPI(5)
-        pos = QtCore.QPoint(target_x - w // 2, self._global_anc.top() - h - gap)
-
-        screen = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
-        geo = screen.availableGeometry()
-        available_top = self._global_anc.top() - geo.top() - gap
-        available_bottom = geo.bottom() - self._global_anc.bottom() - gap
-
-        if pos.y() < geo.top() + edge_padding and available_bottom > available_top:
-            # If the tooltip does not fit above, only flip below when there is more room there.
-            self.side = "top"
-            self.main_layout.setContentsMargins(0, ah, 0, 0)
-            self.main_layout.activate()
-            self.adjustSize()
-            w, h = self.width(), self.height()
-            pos.setY(self._global_anc.bottom() + 1 + gap)
-
-        final_x = max(geo.left() + edge_padding, min(pos.x(), geo.right() - w - edge_padding))
-        pos.setX(final_x)
-        self.move(pos)
-
-        arrow_x = target_x - final_x
-        aw = wutil.DPI(self.ARROW_W)
-        self.arrow_x = max(wutil.DPI(6) + aw / 2, min(arrow_x, w - wutil.DPI(6) - aw / 2))
-        self.update()
-
+        TooltipStackManager.register(self, widget, self._global_anc, target_x=target_x)
         self._auto_close_timer.start()
         self.show()
 
@@ -946,7 +1068,11 @@ class QFlatTooltipManager(object):
 
     @classmethod
     def is_active(cls):
-        return (cls._current_tooltip and cls._current_tooltip.isVisible()) or (cls._timer and cls._timer.isActive())
+        visible = any(
+            isinstance(window, QFlatTooltip) and window.isVisible()
+            for window in TooltipStackManager._valid_entries()
+        )
+        return visible or (cls._timer and cls._timer.isActive())
 
     @classmethod
     def is_current_source(cls, source_key):
@@ -1056,15 +1182,25 @@ class QFlatTooltipManager(object):
             cls._current_source_key = None
 
     @classmethod
-    def hide(cls):
-        cls.cancel_timer()
-        if cls._current_tooltip:
+    def _close_managed_tooltips(cls):
+        """Close only hover tooltips, leaving intentional stack items alone."""
+        tooltips = [
+            window for window in TooltipStackManager._valid_entries()
+            if isinstance(window, QFlatTooltip)
+            and getattr(window, "_managed_by_tooltip_manager", True)
+        ]
+        for tooltip in tooltips:
             try:
-                cls._current_tooltip.close()
+                tooltip.close()
             except Exception:
                 pass
-            cls._current_tooltip = None
+        cls._current_tooltip = None
         cls._current_source_key = None
+
+    @classmethod
+    def hide(cls):
+        cls.cancel_timer()
+        cls._close_managed_tooltips()
 
     @classmethod
     def shutdown(cls):
@@ -1081,7 +1217,7 @@ class QFlatTooltipManager(object):
         time a tooltip is shown -- one extra permanently-running filter
         per reload, each still doing real per-event work.
         """
-        cls.hide()
+        cls.cancel_timer()
         if cls._timer is not None:
             try:
                 cls._timer.stop()
@@ -1095,8 +1231,10 @@ class QFlatTooltipManager(object):
             except Exception:
                 pass
         cls._mouse_filter = None
+        cls._current_tooltip = None
         cls._current_source_key = None
         cls._clear_pending()
+        TooltipStackManager.close_all(delete=True)
 
     @classmethod
     def show(
@@ -1126,6 +1264,11 @@ class QFlatTooltipManager(object):
             return
 
         cls._ensure_mouse_filter()
+        # ``show`` is the final ownership boundary. Defensively close any
+        # previous managed hover tooltip so direct callers cannot orphan a
+        # visible window in TooltipStackManager when replacing the manager's
+        # current pointer.
+        cls._close_managed_tooltips()
 
         if not icon and command_icon:
             icon = command_icon
@@ -1136,7 +1279,6 @@ class QFlatTooltipManager(object):
         if callable(target_pos):
             target_pos = target_pos()
 
-        cls.hide()
         cls._current_source_key = source_key
         cls._current_tooltip = QFlatTooltip(
             text=text,
@@ -1162,6 +1304,11 @@ class QFlatTooltipManager(object):
         if cls.is_current_source(source_key):
             return
         cls.cancel_timer()
+        # Match tool-button handoff semantics: as soon as a different source
+        # is hovered, its predecessor is gone. The new tooltip may still honor
+        # the normal delay, but it must never stack on the old hover tooltip.
+        if source_key != cls._current_source_key:
+            cls._close_managed_tooltips()
 
         if not cls._timer:
             cls._timer = QtCore.QTimer()
@@ -1194,7 +1341,7 @@ class QFlatTooltipManager(object):
         cls._timer.start()
 
 
-@on_shutdown(phase=ShutdownPhase.TOOLS)
+@on_shutdown(phase=ShutdownPhase.UI)
 def shutdown():
     """Release tooltip timers, windows, and the application event filter."""
     QFlatTooltipManager.shutdown()

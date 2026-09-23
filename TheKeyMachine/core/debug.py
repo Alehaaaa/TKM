@@ -1,6 +1,6 @@
 """Developer-only actions exposed by the TKM Debug menu.
 
-Set ``TKM_TOOL_DEBUG=true`` in ``TheKeyMachine/.env`` (or in the process
+Set ``TKM_DEBUG=true`` in ``TheKeyMachine/.env`` (or in the process
 environment) to show the menu. The committed fallback is always off.
 """
 
@@ -13,7 +13,7 @@ from TheKeyMachine.data.colors import COLORS
 
 
 TOOL_DEBUG = False
-_ENV_NAME = "TKM_TOOL_DEBUG"
+_ENV_NAME = "TKM_DEBUG"
 _TRUE_VALUES = frozenset(("1", "true", "yes", "on"))
 _SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 _FONT_PATH = os.path.join(os.path.dirname(__file__), "debug", "Stockholm_Mono.ttf")
@@ -595,12 +595,89 @@ DEBUG_ACTIONS = {
 }
 
 
+def _tooltip_test_anchor(menu):
+    """Return the visible Copy Animation toolbutton used by every test."""
+    try:
+        from TheKeyMachine.core.Qt import QtWidgets
+        from TheKeyMachine.ui.widgets import toolbar
+
+        instance = toolbar.get_toolbar()
+        if instance is not None:
+            candidates = [instance] + list(instance.findChildren(QtWidgets.QWidget))
+            for widget in candidates:
+                data = getattr(widget, "_toolTipData", None) or {}
+                if data.get("command_id") == "copy_animation" and widget.isVisible():
+                    return widget
+                getter = getattr(widget, "get_base_tooltip_data", None)
+                if callable(getter):
+                    base_data = getter() or {}
+                    if base_data.get("command_id") == "copy_animation" and widget.isVisible():
+                        return widget
+    except Exception:
+        pass
+    parent = menu.parentWidget() if hasattr(menu, "parentWidget") else None
+    return parent or menu
+
+
+def _test_continuous_tooltip(anchor):
+    from TheKeyMachine.ui.tooltips import QFlatTooltip
+
+    tooltip = QFlatTooltip(
+        text="Continuous tooltip",
+        description="This tooltip remains until the test stack is cleared.",
+        anchor_widget=anchor,
+    )
+    tooltip._managed_by_tooltip_manager = False
+    tooltip.show_around(anchor)
+    tooltip._auto_close_timer.stop()
+
+
+def _test_timed_tooltip(anchor):
+    from TheKeyMachine.ui.widgets.customDialogs import QFlatAutoHideMessage
+
+    QFlatAutoHideMessage.show_message(
+        "<title>Timed tooltip</title><text>This tooltip has a five-second progress bar.</text>",
+        duration=5000,
+        anchor_widget=anchor,
+    )
+
+
+def _test_confirm_tooltip(anchor):
+    from TheKeyMachine.ui.widgets.customDialogs import QFlatTooltipConfirm
+
+    QFlatTooltipConfirm.question(
+        anchor,
+        title="Confirmation tooltip",
+        message="Confirm dialogs join the same stack and keep their buttons.",
+    )
+
+
+def _clear_tooltip_tests():
+    from TheKeyMachine.ui.tooltips import QFlatTooltipManager, TooltipStackManager
+
+    QFlatTooltipManager.hide()
+    for window in list(TooltipStackManager._valid_entries()):
+        window.close()
+
+
 def populate_menu(menu):
     """Rebuild ``menu`` from the current action routing dictionary."""
     menu.clear()
     for label, callback in DEBUG_ACTIONS.items():
         if callable(callback):
             menu.addAction(label, callback=callback)
+    tooltip_menu = menu.addMenu("Tooltip Testing")
+    tooltip_menu.setTearOffEnabled(True)
+    anchor = _tooltip_test_anchor(menu)
+    continuous = tooltip_menu.addAction("Create Continuous Tooltip")
+    continuous.triggered.connect(lambda *_: _test_continuous_tooltip(anchor))
+    timed = tooltip_menu.addAction("Create Timed Tooltip")
+    timed.triggered.connect(lambda *_: _test_timed_tooltip(anchor))
+    confirm = tooltip_menu.addAction("Create Confirm Dialog")
+    confirm.triggered.connect(lambda *_: _test_confirm_tooltip(anchor))
+    tooltip_menu.addSeparator()
+    clear = tooltip_menu.addAction("Clear Tooltip Stack")
+    clear.triggered.connect(lambda *_: _clear_tooltip_tests())
     if not menu.actions():
         action = menu.addAction("No debug actions")
         action.setEnabled(False)

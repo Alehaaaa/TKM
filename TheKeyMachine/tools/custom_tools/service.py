@@ -13,7 +13,9 @@ from TheKeyMachine.data import icons
 import TheKeyMachine.core.application as general
 
 
-PACKAGE_ROOT = os.path.dirname(os.path.dirname(__file__))
+# ``service.py`` lives in TheKeyMachine/tools/custom_tools. Templates live at
+# TheKeyMachine/connect, so resolve the package root rather than the tools root.
+PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 USER_DATA_PACKAGE = "TheKeyMachine_user_data"
 USER_CONNECT_PACKAGE = USER_DATA_PACKAGE + ".connect"
 CALLABLE_REFERENCE = re.compile(r"^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$")

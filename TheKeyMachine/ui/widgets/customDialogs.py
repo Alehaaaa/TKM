@@ -13,7 +13,7 @@ PYSIDE_VERSION = 6 if (IsPySide6 or IsPyQt6) else 2
 
 from TheKeyMachine.maya.selection import get_valid_selected_objects
 from TheKeyMachine.ui.widgets.util import DPI, event_global_pos, get_maya_qt, is_valid_widget
-from TheKeyMachine.ui.tooltips import QFlatTooltipManager
+from TheKeyMachine.ui.tooltips import QFlatTooltipManager, TooltipStackManager
 
 from TheKeyMachine.data import icons
 from TheKeyMachine.tools.update import changelog
@@ -700,10 +700,16 @@ class QFlatTooltipConfirm(QFlatDialog):
         tooltip = tooltip
         QFlatDialog.__init__(self, parent=parent, buttons=buttons, highlight=highlight, **kwargs)
 
-        # Tooltip-like window setup
-        self.setWindowFlags(QtCore.Qt.ToolTip | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
+        # Confirmation tooltips must remain until answered or explicitly
+        # cleared. Qt.ToolTip windows can be dismissed when another popup
+        # closes or the user clicks elsewhere, so use a non-activating tool
+        # window while retaining the same frameless tooltip appearance.
+        self.setWindowFlags(QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating)
+        self.setAttribute(QtCore.Qt.WA_NoMouseReplay)
         self.clicked_button = None
+        self._stack_tail_visible = True
 
         # Build tooltip if not provided (compatibility with standard title/message/icon)
         if tooltip is None:
@@ -768,6 +774,8 @@ class QFlatTooltipConfirm(QFlatDialog):
             self.reject()
 
     def paintEvent(self, event):
+        if not self._stack_tail_visible:
+            return
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtCore.Qt.NoPen)
@@ -791,8 +799,17 @@ class QFlatTooltipConfirm(QFlatDialog):
             )
             painter.drawPolygon(poly)
 
+    def _set_stack_tail(self, visible, side):
+        self._stack_tail_visible = bool(visible)
+        ah = DPI(self.ARROW_H) if visible else 0
+        self.root_layout.setContentsMargins(0, ah if side == "top" else 0, 0, ah if side == "bottom" else 0)
+        self.root_layout.activate()
+
+    def closeEvent(self, event):
+        TooltipStackManager.unregister(self)
+        QFlatDialog.closeEvent(self, event)
+
     def _show_around(self, widget, target_rect=None):
-        ah = DPI(self.ARROW_H)
         cursor_pos = QtGui.QCursor.pos()
 
         if target_rect:
@@ -828,36 +845,9 @@ class QFlatTooltipConfirm(QFlatDialog):
             # Final fallback: point to cursor if widget is dead
             self._global_anc = QtCore.QRect(cursor_pos, QtCore.QSize(0, 0))
 
-        self.side = "bottom"
-        self.root_layout.setContentsMargins(0, 0, 0, ah)
-        self.root_layout.activate()
         self.adjustSize()
-        w, h = self.width(), self.height()
-
         target_x = self._global_anc.left()
-        pos = QtCore.QPoint(target_x - w // 2, self._global_anc.top() - h - DPI(2))
-
-        screen = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
-        geo = screen.availableGeometry()
-
-        if pos.y() < geo.top():
-            self.side = "top"
-            self.root_layout.setContentsMargins(0, ah, 0, 0)
-            self.root_layout.activate()
-            self.adjustSize()
-            w, h = self.width(), self.height()
-            pos.setY(self._global_anc.bottom() + DPI(2))
-
-        # Horizontal screen safety (keep it within screen bounds while trying to stay centered on target_x)
-        final_x = max(geo.left() + DPI(5), min(pos.x(), geo.right() - w - DPI(5)))
-        pos.setX(final_x)
-        self.move(pos)
-
-        # Arrow points exactly to the widget's left corner (clamped to tooltip edges)
-        arrow_x = target_x - final_x
-        aw = DPI(self.ARROW_W)
-        self.arrow_x = max(DPI(6) + aw / 2, min(arrow_x, w - DPI(6) - aw / 2))
-        self.update()
+        TooltipStackManager.register(self, widget, self._global_anc, target_x=target_x)
         self.show()
 
     @classmethod
@@ -867,9 +857,6 @@ class QFlatTooltipConfirm(QFlatDialog):
         if not is_valid_widget(anchor_widget):
             anchor_widget = get_maya_qt()
 
-        # Close existing tooltips/confirmations
-        QFlatTooltipManager.hide()
-
         parent = kwargs.pop("parent", None) or anchor_widget.window()
         dlg = cls(parent=parent, **kwargs)
 
@@ -878,6 +865,7 @@ class QFlatTooltipConfirm(QFlatDialog):
             dlg.exec_()
             return dlg.clicked_button
         finally:
+            TooltipStackManager.unregister(dlg)
             dlg.setParent(None)
             dlg.deleteLater()
             app = QtWidgets.QApplication.instance()
@@ -922,8 +910,13 @@ class QFlatAutoHideMessage(QFlatDialog):
     def __init__(self, tooltip="", duration=5000, parent=None):
         QFlatDialog.__init__(self, parent=parent)
 
-        self.setWindowFlags(QtCore.Qt.ToolTip | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
+        # A timed message is persistent for the duration of its countdown.
+        # Qt.ToolTip windows may be dismissed by Qt when another popup closes
+        # or the user clicks elsewhere, which would bypass that contract.
+        self.setWindowFlags(QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating)
+        self.setAttribute(QtCore.Qt.WA_NoMouseReplay)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
 
         # None until show_message anchors this to a real widget -- no
@@ -931,6 +924,7 @@ class QFlatAutoHideMessage(QFlatDialog):
         # since there's nothing for it to point at there.
         self.side = None
         self.arrow_x = None
+        self._stack_tail_visible = True
 
         self.setStyleSheet(
             "QFlatAutoHideMessage > QFrame#BgFrame {{ background-color: {}; border-radius: {}px; }}".format(
@@ -948,7 +942,7 @@ class QFlatAutoHideMessage(QFlatDialog):
         self.root_layout.addWidget(self.bg_frame)
 
         self.bg_layout.addWidget(QFlatTooltipContent(tooltip, parent=self.bg_frame))
-        self.bg_layout.addSpacing(DPI(8))
+        self.bg_layout.addSpacing(DPI(12))
 
         radius = DPI(self.BORDER_RADIUS)
         self.progress_bar = QtWidgets.QProgressBar(self.bg_frame)
@@ -969,6 +963,7 @@ class QFlatAutoHideMessage(QFlatDialog):
             "border-bottom-right-radius: {r}px; }}".format(r=radius)
         )
         self.bg_layout.addWidget(self.progress_bar)
+        self.bg_layout.addSpacing(DPI(6))
 
         self._remaining_ms = duration
         self._tick_timer = QtCore.QTimer(self)
@@ -984,9 +979,17 @@ class QFlatAutoHideMessage(QFlatDialog):
 
     def closeEvent(self, event):
         self._tick_timer.stop()
+        TooltipStackManager.unregister(self)
         if self in QFlatAutoHideMessage._live_instances:
             QFlatAutoHideMessage._live_instances.remove(self)
         QFlatDialog.closeEvent(self, event)
+
+    def _set_stack_tail(self, visible, side):
+        self._stack_tail_visible = bool(visible)
+        self.side = side
+        ah = DPI(self.ARROW_H) if visible else 0
+        self.root_layout.setContentsMargins(0, ah if side == "top" else 0, 0, ah if side == "bottom" else 0)
+        self.root_layout.activate()
 
     def paintEvent(self, event):
         # Same arrow-triangle painting QFlatTooltipConfirm.paintEvent does --
@@ -994,7 +997,7 @@ class QFlatAutoHideMessage(QFlatDialog):
         # stylesheet, this just adds the little pointer in the margin
         # root_layout reserved for it (see show_message). No anchor ->
         # self.side is None -> nothing to draw, no arrow.
-        if not self.side:
+        if not self.side or not self._stack_tail_visible:
             return
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
@@ -1032,34 +1035,13 @@ class QFlatAutoHideMessage(QFlatDialog):
         msg = cls(tooltip=tooltip, duration=duration, parent=parent)
         cls._live_instances.append(msg)
 
-        ah = DPI(cls.ARROW_H)
-        aw = DPI(cls.ARROW_W)
-
         if anchor_widget is not None and is_valid_widget(anchor_widget) and anchor_widget.isVisible():
             anchor_rect = QtCore.QRect(anchor_widget.mapToGlobal(QtCore.QPoint(0, 0)), anchor_widget.size())
             screen = QtGui.QGuiApplication.screenAt(anchor_rect.center()) or QtGui.QGuiApplication.primaryScreen()
             geo = screen.availableGeometry()
 
-            # Box below the anchor: the arrow sits on the box's *top* edge,
-            # pointing up at the anchor above it -- that's paintEvent's
-            # "top" branch (apex at y=0), so self.side is "top" here even
-            # though the box itself is below the anchor. Margin reserves
-            # room for it the same way QFlatTooltipConfirm._show_around does.
-            msg.side = "top"
-            msg.root_layout.setContentsMargins(0, ah, 0, 0)
-            msg.root_layout.activate()
             msg.adjustSize()
-
-            x = anchor_rect.center().x() - msg.width() // 2
-            y = anchor_rect.bottom() + DPI(2)
-            if y + msg.height() > geo.bottom():
-                # Flipped above the anchor instead: arrow moves to the
-                # box's *bottom* edge, pointing down at the anchor below it.
-                msg.side = "bottom"
-                msg.root_layout.setContentsMargins(0, 0, 0, ah)
-                msg.root_layout.activate()
-                msg.adjustSize()
-                y = anchor_rect.top() - msg.height() - DPI(2)
+            TooltipStackManager.register(msg, anchor_widget, anchor_rect, target_x=anchor_rect.center().x())
         else:
             msg.adjustSize()
             cursor_pos = QtGui.QCursor.pos()
@@ -1068,13 +1050,10 @@ class QFlatAutoHideMessage(QFlatDialog):
             x = geo.center().x() - msg.width() // 2
             y = geo.top() + DPI(60)
 
-        final_x = max(geo.left() + DPI(5), min(x, geo.right() - msg.width() - DPI(5)))
-        final_y = max(geo.top() + DPI(5), min(y, geo.bottom() - msg.height() - DPI(5)))
-        msg.move(final_x, final_y)
-
-        if msg.side:
-            arrow_x = anchor_rect.center().x() - final_x
-            msg.arrow_x = max(DPI(6) + aw / 2, min(arrow_x, msg.width() - DPI(6) - aw / 2))
+        if not msg.side:
+            final_x = max(geo.left() + DPI(5), min(x, geo.right() - msg.width() - DPI(5)))
+            final_y = max(geo.top() + DPI(5), min(y, geo.bottom() - msg.height() - DPI(5)))
+            msg.move(final_x, final_y)
 
         msg.show()
         msg.raise_()
@@ -1465,4 +1444,3 @@ class QFlatPinnableToolBarPopupDialog(QFlatToolBarPopupDialog):
             QFlatToolBarDialog.changeEvent(self, event)
             return
         super().changeEvent(event)
-

@@ -14,6 +14,7 @@ class PauseViewportToolObject(ToolObject):
             "callback": api.set_viewport_paused,
             "get_checked": api.is_viewport_paused,
             "set_checked": api.set_viewport_paused,
+            "changed_signal": api.viewport_paused_changed_signal(),
             "tooltip": TOOLTIPS["pause_viewport"],
             "menu": api.build_pause_viewport_context_menu,
         },

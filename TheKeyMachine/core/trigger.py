@@ -46,6 +46,7 @@ _SLIDER_EXECUTORS: Dict[str, Callable] = {}
 _DISCOVERY_COMPLETE = False
 _DISCOVERY_IN_PROGRESS = False
 _SLIDER_POLICY = OperationPolicy(progress=False, undo=False)
+_COMMAND_NOT_FOUND = object()
 
 
 def _policy_from_definition(
@@ -307,18 +308,64 @@ def operation_policy(name: str) -> OperationPolicy:
     )
 
 
-def execute_command(name: str, *args, **kwargs):
-    """Execute a discovered command through its standardized operation."""
+def _execute_known_command(name: str, *args, **kwargs):
+    """Execute *name* or return the private not-found sentinel."""
     _discover_commands()
     command = _COMMANDS.get(name)
-    if command:
+    if command is not None:
         return command.dispatch(*args, **kwargs)
 
     from TheKeyMachine.tools.custom_tools import service as connect_entries
 
+    # Discovery registers every current custom entry above. This cheap prefix
+    # fallback exists only for shelf buttons whose entry was added after the
+    # registry snapshot, avoiding a manifest scan for ordinary missing names.
     if connect_entries.is_entry_command(name):
         return connect_entries.execute_entry_command(name)
+    return _COMMAND_NOT_FOUND
+
+
+def _show_unknown_command(name: str):
+    """Report a stale or mistyped UI command through TKM feedback."""
+    from TheKeyMachine.ui.widgets import util as wutil
+
+    return wutil.make_inViewMessage(
+        "TKM command '{}' was not found".format(name)
+    )
+
+
+def execute_command(name: str, *args, **kwargs):
+    """Execute a discovered command through its standardized operation."""
+    result = _execute_known_command(name, *args, **kwargs)
+    if result is not _COMMAND_NOT_FOUND:
+        return result
     raise AttributeError("Unknown TheKeyMachine trigger command: {}".format(name))
+
+
+def _execute_attribute_command(name: str):
+    """Execute an attribute-style UI command without echoing its result."""
+    result = _execute_known_command(name)
+    if result is _COMMAND_NOT_FOUND:
+        _show_unknown_command(name)
+    # Attribute-style commands are intended for Maya shelf scripts. Returning
+    # tool/session objects makes Maya echo them into the Script Editor; callers
+    # that need a result use execute_command() directly instead.
+    return None
+
+
+def __getattr__(name: str):
+    """Run public commands as attributes, e.g. ``trigger.hotkeys_window``."""
+    if not isinstance(name, str) or name.startswith("_"):
+        raise AttributeError(
+            "module {!r} has no attribute {!r}".format(__name__, name)
+        )
+    return _execute_attribute_command(name)
+
+
+def __dir__():
+    """Expose discovered commands to interactive completion and inspection."""
+    _discover_commands()
+    return sorted(set(globals()).union(_COMMANDS))
 
 
 def command_name_for_callback(callback: Callable) -> Optional[str]:
@@ -352,6 +399,8 @@ def command_string(name: str, *args) -> str:
     """Return a Maya-friendly Python command string."""
     if not isinstance(name, str) or not name:
         raise ValueError("Trigger commands require a non-empty string name")
+    if not args and name.isidentifier() and not name.startswith("_"):
+        return "from TheKeyMachine.core import trigger; trigger.{}".format(name)
     serialized_args = ", ".join(repr(arg) for arg in args)
     return (
         "from TheKeyMachine.core import trigger; "

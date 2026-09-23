@@ -211,7 +211,7 @@ def _declared_item_text(item, toolbox_module, fallback_command_id=None):
 
     Menu/dynamic_menu/section headers are declared once as plain Python
     dicts at package-import time, then reused (the same dict object) on
-    every rebuild -- so a bare ``"label": "Preferences"`` string never
+    every rebuild -- so a bare submenu label string never
     picks up a language switch on its own, unlike leaf command items, which
     already re-resolve through ``registry.get_tool()`` on every rebuild.
 
@@ -219,8 +219,7 @@ def _declared_item_text(item, toolbox_module, fallback_command_id=None):
     per-package special-casing:
     - ``"command"``/``"id"``: reuse an existing registered tool's own
       label/description (its ``lang.json`` entry), for items that mirror a
-      real tool one-to-one (e.g. the "Preferences" submenu mirrors the
-      standalone ``main_preferences_menu`` tool).
+      real tool one-to-one.
     - ``"i18n_key"``: look up a shared chrome string (one with no tool id of
       its own, like a plain section header) in ``ui/lang.json`` via
       ``i18n.tr()``.
@@ -1193,8 +1192,31 @@ def build_main_system_menu(toolbar):
     from TheKeyMachine.core import i18n
 
     system_menu = cw.MenuWidget(
-        QtGui.QIcon(icons.system), i18n.tr("system_menu", "System")
+        QtGui.QIcon(icons.settings), i18n.tr("system_menu", "System")
     )
+    _add_action(
+        system_menu,
+        i18n.tr("create_shelf_button", "Create a Shelf Button"),
+        shelf.create_main_shelf_button,
+        command_id="toolbar_add_shelf_button",
+    )
+    _add_checkable_action(
+        system_menu,
+        command_id="start_with_maya",
+        checked=general.check_userSetup(),
+    )
+    _add_checkable_action(
+        system_menu,
+        command_id="show_tooltips",
+        checked=settings.get_setting("show_tooltips", True),
+    )
+    system_menu.addSeparator()
+    _add_registered_menu(
+        system_menu,
+        partial(build_main_dock_menu, toolbar),
+        command_id="main_dock_menu",
+    )
+    system_menu.addSeparator()
     _add_action_specs(
         system_menu,
         (
@@ -1220,83 +1242,6 @@ def add_main_system_menu(toolbar, parent_menu):
         parent_menu,
         partial(build_main_system_menu, toolbar),
         command_id="main_system_menu",
-    )
-
-
-def build_main_preferences_menu(
-    toolbar,
-    show_tooltips,
-    toolbar_alignment,
-    update_toolbar_icon_alignment,
-):
-    from TheKeyMachine.core import i18n
-
-    preferences_menu = cw.OpenMenuWidget(
-        QtGui.QIcon(icons.settings), i18n.tr("preferences_menu", "Preferences")
-    )
-    preferences_menu.addSection(i18n.tr("startup_section", "Startup"))
-    _add_action(
-        preferences_menu,
-        i18n.tr("create_shelf_button", "Create a Shelf Button"),
-        shelf.create_main_shelf_button,
-        command_id="toolbar_add_shelf_button",
-    )
-
-    _add_checkable_action(
-        preferences_menu,
-        command_id="start_with_maya",
-        checked=general.check_userSetup(),
-    )
-
-    _add_checkable_action(
-        preferences_menu,
-        command_id="show_tooltips",
-        checked=show_tooltips,
-    )
-
-    preferences_menu.addSection(i18n.tr("alignment_section", "Alignment"))
-    current_align = toolbar_modes.normalize(
-        settings.get_setting(
-            toolbar_modes.MAIN_ALIGNMENT_SETTING,
-            toolbar_modes.DEFAULT_ALIGNMENT,
-        )
-    )
-
-    preferences_menu._tkm_alignment_group, preferences_menu._tkm_alignment_actions = (
-        _add_alignment_actions(
-            preferences_menu,
-            current_align,
-            update_toolbar_icon_alignment,
-        )
-    )
-
-    preferences_menu.addSection(i18n.tr("display_section", "Display"))
-    return preferences_menu
-
-
-def add_main_preferences_menu(
-    toolbar,
-    parent_menu,
-    show_tooltips,
-    toolbar_alignment,
-    update_toolbar_icon_alignment,
-):
-    from TheKeyMachine.ui.widgets import toolbar_widgets
-
-    # Registered menu builders can outlive the menu that registered them.
-    # Resolve mutable preferences when the builder is invoked, not here.
-    def builder():
-        return build_main_preferences_menu(
-            toolbar,
-            show_tooltips=settings.get_setting("show_tooltips", True),
-            toolbar_alignment=toolbar_widgets.get_main_toolbar_icon_alignment(),
-            update_toolbar_icon_alignment=update_toolbar_icon_alignment,
-        )
-
-    return _add_registered_menu(
-        parent_menu,
-        builder,
-        command_id="main_preferences_menu",
     )
 
 
@@ -1327,9 +1272,6 @@ def _main_menu_builders(toolbar):
             None,
             internet_connection=general.config.get("INTERNET_CONNECTION", True),
             **common,
-        ),
-        "main_preferences_menu": partial(
-            build_main_preferences_menu, toolbar, **common
         ),
         "main_system_menu": partial(build_main_system_menu, toolbar),
         "main_dock_menu": partial(build_main_dock_menu, toolbar),
@@ -1378,20 +1320,8 @@ def build_main_settings_menu(
     from TheKeyMachine.tools.tkm_menu import api as tkmMenuApi
 
     toolbar_menu.addAction(tkmMenuApi.create_logo_action(toolbar_menu))
-    add_main_preferences_menu(
-        toolbar,
-        toolbar_menu,
-        show_tooltips=show_tooltips,
-        toolbar_alignment=toolbar_alignment,
-        update_toolbar_icon_alignment=update_toolbar_icon_alignment,
-    )
     _add_action(toolbar_menu, command_id="hotkeys_window")
     _add_action(toolbar_menu, command_id="workspaces_window")
-    _add_registered_menu(
-        toolbar_menu,
-        partial(build_main_dock_menu, toolbar),
-        command_id="main_dock_menu",
-    )
     add_main_system_menu(toolbar, toolbar_menu)
     toolbar_menu.addSeparator()
     add_other_sources_help_menu(toolbar_menu)

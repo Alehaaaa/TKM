@@ -321,14 +321,9 @@ def _iter_menu_choice_settings(owner_id, items):
     same nearest-declared-identity rule ``widgets.toolbar_menus._declared_item_text``
     already uses for a submenu's own label/description -- falling back to
     the caller's *owner_id* when a choice sits directly in a menu with no
-    nested submenu in between. That single rule is what lets a choice
-    declared deep inside one tool's menu (the alignment picker nested in
-    the "TKM" logo's own Preferences submenu) surface under the
-    *standalone* tool that actually represents it on the section graph
-    (the "Preferences" toolbar button, ``main_preferences_menu``) with no
-    caller ever special-casing that nesting: this one walk is reused by
-    both package validation and ``tool_choice_settings()`` below, so there
-    is exactly one place that knows how ownership is resolved.
+    nested submenu in between. This walk is reused by both package
+    validation and ``tool_choice_settings()`` below, so there is exactly one
+    place that knows how ownership is resolved.
     """
     for item in items or ():
         if not isinstance(item, dict):

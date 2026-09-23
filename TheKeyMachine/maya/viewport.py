@@ -4,6 +4,7 @@ from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 
 from maya import cmds, utils
 
+from TheKeyMachine.core.Qt import QtCore
 from TheKeyMachine.core import runtime
 from TheKeyMachine.core import settings
 
@@ -17,16 +18,28 @@ _COMMAND_ERRORS = (
     IndexError,
 )
 _CALLBACK_KEY = "viewport:auto_pause"
-_HUD_NAME = "TKM_PauseViewportButton"
 # Persisted in the shared TKM preferences store (see core/settings.py)
 # instead of a dedicated Maya optionVar, so it syncs with the rest of TKM's
 # state instead of living separately in userPrefs.mel.
 _VIEWPORT_SETTINGS_NAMESPACE = "viewport"
 _AUTO_PAUSE_SETTING = "auto_pause_enabled"
+_manual_pause_enabled = False
 _auto_pause_enabled = False
 _auto_refresh_active = False
 _auto_refresh_generation = 0
 _pending_auto_refresh_generation = None
+
+
+class _ViewportStateSignals(QtCore.QObject):
+    pausedChanged = QtCore.Signal(bool)
+
+
+_state_signals = _ViewportStateSignals()
+
+
+def paused_changed_signal():
+    """Signal emitted whenever the manual viewport-pause state changes."""
+    return _state_signals.pausedChanged
 
 
 def _manager(start=True):
@@ -61,61 +74,29 @@ def _force_viewport_update():
     _safe_refresh(force=True)
 
 
-def _hud_exists():
-    try:
-        return bool(cmds.headsUpDisplay(_HUD_NAME, exists=True))
-    except _COMMAND_ERRORS:
-        return False
-
-
-def _show_pause_hud():
-    if _hud_exists():
-        return
-    try:
-        cmds.hudButton(
-            _HUD_NAME,
-            allowOverlap=True,
-            section=7,
-            block=5,
-            blockSize="large",
-            visible=True,
-            label="Viewport Suspended (Click Here to Unlock)",
-            buttonWidth=300,
-            buttonShape="roundRectangle",
-            releaseCommand=lambda *_args: set_paused(False),
-        )
-    except _COMMAND_ERRORS:
-        pass
-
-
-def _hide_pause_hud():
-    if not _hud_exists():
-        return
-    try:
-        cmds.headsUpDisplay(_HUD_NAME, remove=True)
-    except _COMMAND_ERRORS:
-        pass
-
-
 def is_paused():
     """Return whether TKM's manual viewport suspend is currently enabled."""
-    return _hud_exists()
+    return bool(_manual_pause_enabled)
 
 
 def set_paused(paused, *_args):
     """Manually suspend or resume viewport refresh."""
+    global _manual_pause_enabled
     paused = bool(paused)
+    was_paused = is_paused()
+    _manual_pause_enabled = paused
     if paused:
-        _show_pause_hud()
         _safe_refresh(suspend=True)
-        return True
+    else:
+        _safe_refresh(suspend=False)
+        _force_viewport_update()
+        if _auto_pause_enabled:
+            _install_auto_pause_callbacks()
 
-    _hide_pause_hud()
-    _safe_refresh(suspend=False)
-    _force_viewport_update()
-    if _auto_pause_enabled:
-        _install_auto_pause_callbacks()
-    return False
+    current_state = is_paused()
+    if current_state != was_paused:
+        _state_signals.pausedChanged.emit(current_state)
+    return current_state
 
 
 def toggle_paused(*_args):
@@ -272,9 +253,9 @@ def _on_anim_keyframe_edited(*_args):
 
 @on_shutdown(phase=ShutdownPhase.TOOLS)
 def cleanup():
-    global _auto_pause_enabled
+    global _manual_pause_enabled, _auto_pause_enabled
+    _manual_pause_enabled = False
     _auto_pause_enabled = False
     _invalidate_pending_auto_refresh()
     _remove_callbacks()
-    _hide_pause_hud()
     _safe_refresh(suspend=False)

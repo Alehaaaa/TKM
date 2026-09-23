@@ -121,17 +121,30 @@ class SliderSession:
         """Lazily enter the shared operation on the first committed edit."""
         if self._is_open:
             return
+        undo_name = tool_common.make_undo_chunk_name(
+            tool_id=self.mode,
+            title=self.title,
+            description=self.description,
+            tooltip=self.tooltip,
+        )
+
+        # Atomic slider commands (shelf buttons, hotkeys, search) already run
+        # inside trigger's dispatcher-owned operation. Reuse it and add the
+        # slider's undo chunk lazily; only interactive drag sessions entered
+        # directly by the widget need to create and own a context here.
+        active_operation = tool_common.current_tool_operation()
+        if active_operation is not None:
+            active_operation.ensure_undo(undo_name=undo_name)
+            self._operation = active_operation
+            self._is_open = True
+            return
+
         self._operation_context = tool_common.tool_operation(
             tool_id=self.mode,
             label=self.title,
             progress=False,
             undo=True,
-            undo_name=tool_common.make_undo_chunk_name(
-                tool_id=self.mode,
-                title=self.title,
-                description=self.description,
-                tooltip=self.tooltip,
-            ),
+            undo_name=undo_name,
             suspend_refresh=False,
             show_success_message=False,
             selection_snapshot=self.selection_snapshot,
@@ -244,7 +257,8 @@ class SliderSession:
         self.clear_tint()
         if self._is_open:
             try:
-                self._operation_context.__exit__(None, None, None)
+                if self._operation_context is not None:
+                    self._operation_context.__exit__(None, None, None)
             finally:
                 self._operation_context = None
                 self._operation = None

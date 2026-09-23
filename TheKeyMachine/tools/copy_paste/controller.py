@@ -412,6 +412,7 @@ def _apply_anim_layer_weight_data(
     progress=None,
     insert_time=None,
     time_shift=None,
+    paste_range=None,
 ):
     if not layer_name or not weight_data:
         return 0
@@ -437,6 +438,13 @@ def _apply_anim_layer_weight_data(
                 continue
             try:
                 pasted_time = float(key_time) + float(weight_time_shift)
+                if (
+                    paste_range
+                    and not paste_range[0] <= pasted_time <= paste_range[1]
+                ):
+                    if progress:
+                        progress.step()
+                    continue
                 cmds.setKeyframe(
                     f"{layer_name}.weight",
                     time=(pasted_time,),
@@ -488,6 +496,20 @@ def _transform_channel_values(channel_data, transform_value):
 def _maybe_apply_paste_range(paste_range, anchor_widget=None):
     if not paste_range:
         return
+
+    # The confirmation runs its own nested Qt event loop.  Do not show it
+    # while the paste command still owns its ToolOperation: doing so keeps the
+    # paste tint alive for the lifetime of the dialog and allows toolbar clicks
+    # from that nested event loop to attempt a second operation.  Queue this
+    # helper itself so the operation can finish (including tint cleanup) first.
+    if toolCommon.current_tool_operation() is not None:
+        toolCommon.defer_tool_callback(
+            _maybe_apply_paste_range,
+            tuple(paste_range),
+            anchor_widget=anchor_widget,
+        )
+        return
+
     try:
         start_frame, end_frame = int(paste_range[0]), int(paste_range[1])
         current_range = (
@@ -682,6 +704,7 @@ def _apply_animation_channels_to_targets(
     layer_metadata=None,
     channels_by_target=None,
     applied_targets=None,
+    paste_range=None,
 ):
     from TheKeyMachine.tools.animation_layers import controller as animation_layers_controller
 
@@ -887,6 +910,16 @@ def _apply_animation_channels_to_targets(
         for key_index, (frame, value) in enumerate(zip(keyframes, values)):
             try:
                 key_time = frame + channel_time_shift
+                if (
+                    paste_range
+                    and not paste_range[0] <= key_time <= paste_range[1]
+                ):
+                    pending_progress += 1
+                    if progress and pending_progress >= progress_batch_size:
+                        if progress.step(amount=pending_progress):
+                            return applied
+                        pending_progress = 0
+                    continue
                 key_kwargs = {
                     "time": (key_time,),
                     "attribute": channel,
@@ -1009,6 +1042,7 @@ def _apply_animation_channels_to_targets(
                     progress=progress,
                     insert_time=insert_time,
                     time_shift=time_shift,
+                    paste_range=paste_range,
                 )
                 applied_weights.add(weight_key)
         if keys_set > keys_before:
@@ -1060,7 +1094,14 @@ def _select_existing_targets(targets):
         pass
 
 
-def _apply_animation_data(animation_data, selected_objects, replace=False, insert_time=None, progress=None):
+def _apply_animation_data(
+    animation_data,
+    selected_objects,
+    replace=False,
+    insert_time=None,
+    progress=None,
+    paste_range=None,
+):
     mappings = _animation_target_mappings(animation_data, selected_objects)
     if not mappings:
         return 0, []
@@ -1077,12 +1118,15 @@ def _apply_animation_data(animation_data, selected_objects, replace=False, inser
         replace=replace,
         insert_time=insert_time,
         replace_range=(
-            _animation_data_timerange(animation_data) or (0, 10000)
+            paste_range
+            or _animation_data_timerange(animation_data)
+            or (0, 10000)
         ),
         progress=progress,
         layer_metadata=metadata.get(ANIMATION_LAYER_META_KEY) or {},
         channels_by_target=channels_by_target,
         applied_targets=pasted_targets,
+        paste_range=paste_range,
     )
 
     return keys_set, [
@@ -1126,6 +1170,7 @@ def _apply_pose_data(
     progress=None,
     mappings=None,
     allowed_target_attributes=None,
+    paste_times=None,
 ):
     controls = _pose_controls(pose_data)
     mappings = (
@@ -1134,6 +1179,8 @@ def _apply_pose_data(
         else _pose_target_mappings(pose_data, selected_objects)
     )
     if not mappings:
+        return 0, []
+    if paste_times is not None and not paste_times:
         return 0, []
 
     def _attributes_for_mapping(source_control, target_control):
@@ -1159,6 +1206,7 @@ def _apply_pose_data(
     pasted_targets = []
     blocked_destination = False
     current_time = cmds.currentTime(query=True)
+    paste_times = None if paste_times is None else tuple(paste_times)
     settable_channels = {
         target_control: set(_settable_keyable_channels(target_control))
         for _source_control, target_control in mappings
@@ -1190,28 +1238,37 @@ def _apply_pose_data(
                 continue
             layer_name = destinations[attr]
             try:
-                if layer_context.get("has_layers") and isinstance(
-                    value, (float, int)
+                if isinstance(value, (float, int)) and (
+                    layer_context.get("has_layers") or paste_times is not None
                 ):
                     paste_layer = layer_name or layer_context.get("root_name")
-                    result = cmds.setKeyframe(
-                        target_control,
-                        attribute=attr,
-                        time=(current_time,),
-                        value=value,
-                        animLayer=paste_layer,
-                        shape=False,
-                    )
-                    if not result:
+                    keyed = 0
+                    for paste_time in (
+                        paste_times if paste_times is not None else (current_time,)
+                    ):
+                        key_kwargs = {
+                            "attribute": attr,
+                            "time": (paste_time,),
+                            "value": value,
+                            "shape": False,
+                        }
+                        if paste_layer:
+                            key_kwargs["animLayer"] = paste_layer
+                        keyed += int(bool(cmds.setKeyframe(
+                            target_control, **key_kwargs
+                        )))
+                    if not keyed:
                         continue
+                    attrs_set += keyed
+                    control_attrs_set += keyed
                 else:
                     # Scenes without layers and non-animatable values
                     # retain pose paste's traditional setAttr behavior.
                     _set_attr_value(
                         "{}.{}".format(target_control, attr), value
                     )
-                attrs_set += 1
-                control_attrs_set += 1
+                    attrs_set += 1
+                    control_attrs_set += 1
             except (RuntimeError, ValueError, TypeError) as e:
                 import TheKeyMachine.tools.bug_report.controller as report
 
@@ -1422,9 +1479,10 @@ def copy_animation(*args, **kwargs):
 
 
 def paste_animation(*args, anchor_widget=None, **kwargs):
-    selected_objects = animation.resolve_context(
+    target_info = animation.resolve_context(
         default_mode="all_animation", include_channels=True
-    ).objects
+    )
+    selected_objects = target_info.objects
 
     animation_data = _load_clipboard_data("animation", "animation")
     if not animation_data:
@@ -1434,19 +1492,30 @@ def paste_animation(*args, anchor_widget=None, **kwargs):
         source for source, _target in
         _animation_target_mappings(animation_data, selected_objects)
     ]
-    paste_range = _animation_data_timerange(animation_data)
+    selected_range = (
+        target_info.time.timerange
+        if target_info.time.mode == "time_slider_range"
+        else None
+    )
+    paste_range = selected_range or _animation_data_timerange(animation_data)
     key_count = _animation_data_apply_count(animation_data, targets=targets)
     prompt_range = None
     processor = configure_copy_paste_operation(
         "paste_animation", "Animation Pasted", tint="range",
         timerange=paste_range, progress_max=key_count,
     ).set_status("Pasting Animation")
-    keys_set, pasted_targets = _apply_animation_data(animation_data, selected_objects, replace=True, progress=processor)
+    keys_set, pasted_targets = _apply_animation_data(
+        animation_data,
+        selected_objects,
+        replace=True,
+        progress=processor,
+        paste_range=selected_range,
+    )
     if keys_set:
         processor.succeed("Animation Pasted", timerange=paste_range)
         _select_existing_targets(pasted_targets)
         _refresh_animation_view(pasted_targets)
-        prompt_range = paste_range
+        prompt_range = None if selected_range else paste_range
     else:
         _result_message("animation", "paste")
     _maybe_apply_paste_range(prompt_range, anchor_widget=anchor_widget)
@@ -1797,16 +1866,55 @@ def import_pose_file(*args, **kwargs):
 # PASTE POSE _____________________________________________________________
 
 
+def _pose_key_times_in_selected_range(target_info):
+    """Return existing target key times inside the highlighted range."""
+    if target_info.time.mode != "time_slider_range":
+        return None
+
+    frames = set()
+    curves = list(target_info.curves or ())
+    if not curves:
+        curves = target_info.curves_for_plugs(target_info.plugs)
+    for curve in curves:
+        frames.update(float(frame) for frame in target_info.key_times(curve))
+
+    # Some Maya destinations do not resolve back to a curve through the layer
+    # graph. Query the target plugs as a fallback while retaining the same
+    # selected time bounds.
+    if not frames:
+        query = {
+            "query": True,
+            "time": target_info.time.timerange,
+            "timeChange": True,
+        }
+        for plug in target_info.plugs:
+            try:
+                frames.update(float(frame) for frame in (cmds.keyframe(
+                    plug, **query
+                ) or ()))
+            except (RuntimeError, ValueError, TypeError):
+                continue
+    return tuple(sorted(frames))
+
+
 def paste_pose(*args, **kwargs):
     target_info = animation.resolve_context(
         default_mode="current_frame",
         include_channels=True,
     )
     selected_objects = target_info.objects
+    paste_times = _pose_key_times_in_selected_range(target_info)
+    paste_range = (
+        target_info.time.timerange
+        if target_info.time.mode == "time_slider_range"
+        else None
+    )
 
     pose_data = _load_clipboard_data("pose", "pose")
     if not pose_data:
         return
+    if paste_times is not None and not paste_times:
+        return wutil.make_inViewMessage("No keys in the selected range")
 
     controls = _pose_controls(pose_data)
     mappings = _pose_target_mappings(pose_data, selected_objects)
@@ -1830,7 +1938,8 @@ def paste_pose(*args, **kwargs):
     processor = configure_copy_paste_operation(
         "paste_pose",
         "Pose Pasted",
-        tint="current",
+        tint="range" if paste_range else "current",
+        timerange=paste_range,
         progress_max=attribute_total,
     ).set_status("Pasting Pose")
     attrs_set, pasted_targets = _apply_pose_data(
@@ -1839,6 +1948,7 @@ def paste_pose(*args, **kwargs):
         progress=processor,
         mappings=mappings,
         allowed_target_attributes=allowed_target_attributes,
+        paste_times=paste_times,
     )
     if attrs_set:
         processor.succeed("Pose Pasted")

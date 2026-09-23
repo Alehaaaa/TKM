@@ -633,10 +633,11 @@ class MenuWidget(QtWidgets.QMenu):
 
     def _on_action_hovered(self, action):
         if action is None or not QtCompat.isValid(action) or isinstance(action, QtWidgets.QWidgetAction):
-            QFlatTooltipManager.cancel_timer()
+            QFlatTooltipManager.hide()
             return
         if action.property("tkm_tooltip_enabled") is False:
-            QFlatTooltipManager.cancel_timer()
+            QFlatTooltipManager.hide()
+            return
             return
 
         source_key = self._action_tooltip_key(action)
@@ -677,7 +678,7 @@ class MenuWidget(QtWidgets.QMenu):
             return
 
         if not (title or desc or tooltip):
-            QFlatTooltipManager.cancel_timer()
+            QFlatTooltipManager.hide()
             return
 
         if QFlatTooltipManager.enabled:

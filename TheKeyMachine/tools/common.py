@@ -25,7 +25,7 @@ from TheKeyMachine.core import i18n, settings
 # the Script Editor -- lets a reported "hang before the tool actually runs"
 # be pinned to an exact phase (progress/tint setup, undo chunk, refresh
 # suspension, or the callback itself) instead of guessed at. Uses the same
-# .env reader as TKM_TOOL_DEBUG (see core/debug.py) rather than a second,
+# .env reader as TKM_DEBUG (see core/debug.py) rather than a second,
 # duplicated parser. Read once at import -- tool_operation() runs on every
 # click, so this must not become another uncached per-click file read;
 # reload TheKeyMachine after changing the flag to pick up a new value.
@@ -995,9 +995,9 @@ def defer_tool_callback(callback, *args, **kwargs):
     """Queue a re-entrant UI command until the active operation is closed.
 
     Worker-backed operations keep Maya's Qt event loop responsive. That also
-    means a second toolbar click can arrive while the first command still owns
-    its undo/progress lifecycle. Preserve the click as a separate invocation;
-    never merge it into the active operation or open a nested lifecycle.
+    means a second command can arrive while the first still owns its
+    undo/progress lifecycle. Preserve it as a separate invocation; never merge
+    it into the active operation or open a nested lifecycle.
     """
     if not callable(callback):
         return None

@@ -16,6 +16,11 @@ def set_viewport_paused(paused=False, *_args):
     return maya_viewport.set_paused(paused)
 
 
+def viewport_paused_changed_signal():
+    """Notify checkable controls when manual pause changes elsewhere."""
+    return maya_viewport.paused_changed_signal()
+
+
 def is_auto_pause_enabled():
     """Whether automatic viewport pause is enabled."""
     return maya_viewport.is_auto_pause_enabled()
