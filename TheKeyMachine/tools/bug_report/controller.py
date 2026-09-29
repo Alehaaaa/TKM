@@ -20,6 +20,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 from TheKeyMachine.core.lifecycle import on_shutdown, ShutdownPhase
 
 import hashlib
+import html
 import json
 import os
 import platform
@@ -52,6 +53,7 @@ _BUG_EXCEPTION_DIALOG_PENDING = False
 _BUG_EXCEPTION_LAST_SIGNATURE = None
 _BUG_EXCEPTION_LAST_TIME = 0.0
 _BUG_REPORT_DIALOG = None
+_BUG_REPORT_STATUS_WORKER = None
 _REPORTED_EXCEPTION_IDS = {}
 _PREVIOUS_EXCEPTHOOK = None
 _PREVIOUS_THREADING_EXCEPTHOOK = None
@@ -76,6 +78,7 @@ _SENT_REPORTS_OPTION = "tkm_bug_report_sent_history"
 _SENT_REPORTS_MAX_ENTRIES = 30
 _SENT_REPORT_SUMMARY_CHARS = 70
 _SENT_REPORT_STATUS_TTL_SECONDS = 24 * 60 * 60
+_SENT_REPORT_LAST_VIEWED_STATUS_KEY = "last_viewed_ticket_status"
 
 # Local, cheap dedupe for auto-detected exceptions: mirrors the relay's own
 # fingerprint normalization so a recurring bug is recognized on-device,
@@ -451,12 +454,10 @@ def list_sent_bug_reports():
 
 def _fetch_bug_report_status(fingerprint, report_type="bug"):
     """Ask the relay whether `fingerprint` still has a live issue. Raises on failure."""
-    query = urllib.parse.urlencode(
-        {
-            "fingerprint": fingerprint,
-            "report_type": _normalize_report_type(report_type),
-        }
-    )
+    query = urllib.parse.urlencode({
+        "fingerprint": fingerprint,
+        "report_type": _normalize_report_type(report_type),
+    })
     request = urllib.request.Request(
         "{}?{}".format(_BUG_REPORT_STATUS_ENDPOINT, query),
         headers={
@@ -503,6 +504,8 @@ class _BugReportPruneWorker(BackgroundThread):
                         "fingerprint": fingerprint,
                         "issue_number": result.get("issue_number"),
                         "state": result.get("state") or "open",
+                        "issue_title": result.get("issue_title") or "",
+                        "ticket_status": result.get("ticket_status") or "",
                         "checked_at": time.time(),
                     }
                 )
@@ -532,6 +535,14 @@ def refresh_sent_bug_report_statuses(force=False):
     session without causing a burst of GitHub calls, while deleted/closed
     tickets still get cleaned up shortly after launch or the next menu open.
     """
+    global _BUG_REPORT_STATUS_WORKER
+
+    if (
+        _BUG_REPORT_STATUS_WORKER is not None
+        and _BUG_REPORT_STATUS_WORKER.isRunning()
+    ):
+        return _BUG_REPORT_STATUS_WORKER
+
     entries = _load_sent_reports()
     if not entries:
         return None
@@ -541,6 +552,48 @@ def refresh_sent_bug_report_statuses(force=False):
             return None
 
     worker = _BugReportPruneWorker(entries)
+
+    def _tkm_menu_anchor():
+        try:
+            from TheKeyMachine.ui.widgets import toolbar
+
+            instance = toolbar.get_toolbar()
+            return getattr(instance, "tkm_btn", None) if instance is not None else None
+        except Exception:
+            return None
+
+    def _show_update_notifications(notifications):
+        if not notifications:
+            return
+        try:
+            from TheKeyMachine.ui.widgets import customDialogs
+
+            for notification in notifications:
+                entry = notification["entry"]
+                issue_number = entry.get("issue_number") or "?"
+                title = html.escape(
+                    notification.get("issue_title")
+                    or entry.get("summary")
+                    or "Sent report"
+                )
+                status_text = {
+                    "open": "Open",
+                    "being_worked_on": "Being worked on",
+                    "completed": "Completed",
+                    "cancelled": "Cancelled",
+                }.get(notification.get("ticket_status"), "Updated")
+                tooltip = "<title>{}</title><text>#{} · {}</text>".format(
+                    title,
+                    issue_number,
+                    status_text,
+                )
+                customDialogs.QFlatAutoHideMessage.show_message(
+                    tooltip,
+                    duration=7000,
+                    anchor_widget=_tkm_menu_anchor(),
+                )
+        except Exception as exc:
+            print("[TheKeyMachine] Failed to show ticket update notification:", exc)
 
     def _on_pruned(removed_fingerprints):
         if worker._cancelled or not removed_fingerprints:
@@ -562,6 +615,7 @@ def refresh_sent_bug_report_statuses(force=False):
         if not updates_by_fingerprint:
             return
         changed = False
+        notifications = []
         current = _load_sent_reports()
         for entry in current:
             update = updates_by_fingerprint.get(entry.get("fingerprint"))
@@ -570,6 +624,24 @@ def refresh_sent_bug_report_statuses(force=False):
             state = update.get("state") or "open"
             checked_at = update.get("checked_at") or time.time()
             issue_number = update.get("issue_number") or entry.get("issue_number")
+            ticket_status = update.get("ticket_status")
+            if ticket_status:
+                if (
+                    _SENT_REPORT_LAST_VIEWED_STATUS_KEY in entry
+                    and entry.get(_SENT_REPORT_LAST_VIEWED_STATUS_KEY) != ticket_status
+                ):
+                    notification_entry = dict(entry)
+                    notification_entry["issue_number"] = issue_number
+                    notifications.append(
+                        {
+                            "entry": notification_entry,
+                            "issue_title": update.get("issue_title") or "",
+                            "ticket_status": ticket_status,
+                        }
+                    )
+                if entry.get(_SENT_REPORT_LAST_VIEWED_STATUS_KEY) != ticket_status:
+                    entry[_SENT_REPORT_LAST_VIEWED_STATUS_KEY] = ticket_status
+                    changed = True
             if (
                 entry.get("status") != state
                 or entry.get("issue_number") != issue_number
@@ -581,15 +653,42 @@ def refresh_sent_bug_report_statuses(force=False):
                 changed = True
         if changed:
             _save_sent_reports(current)
+        _show_update_notifications(notifications)
 
     worker.pruned_ready.connect(_on_pruned)
     worker.statuses_ready.connect(_on_statuses)
+
+    def _clear_worker():
+        global _BUG_REPORT_STATUS_WORKER
+        if _BUG_REPORT_STATUS_WORKER is worker:
+            _BUG_REPORT_STATUS_WORKER = None
+
+    worker.finished.connect(_clear_worker)
+    _BUG_REPORT_STATUS_WORKER = worker
     worker.start()
     return worker
 
 
 def refresh_sent_bug_report_statuses_on_launch():
     return refresh_sent_bug_report_statuses(force=True)
+
+
+def reset_last_viewed_ticket_statuses():
+    """Mark cached ticket statuses unseen so the next fetch reports them anew."""
+    entries = _load_sent_reports()
+    changed = False
+    for entry in entries:
+        if entry.get(_SENT_REPORT_LAST_VIEWED_STATUS_KEY) != "reset":
+            entry[_SENT_REPORT_LAST_VIEWED_STATUS_KEY] = "reset"
+            changed = True
+    if changed:
+        _save_sent_reports(entries)
+    print(
+        "TheKeyMachine debug: reset viewed ticket updates for {} sent report{}.".format(
+            len(entries), "" if len(entries) == 1 else "s"
+        )
+    )
+    return len(entries)
 
 
 _BUG_REPORT_INBOX_REPO_URL = "https://github.com/Alehaaaa/TKM-bug-inbox"

@@ -74,7 +74,10 @@ def event_global_pos(event):
             continue
         position = method()
         to_point = getattr(position, "toPoint", None)
-        return to_point() if callable(to_point) else position
+        if callable(to_point):
+            return to_point()
+        if position is not None:
+            return QtCore.QPoint(int(position.x()), int(position.y()))
     return QtGui.QCursor.pos()
 
 

@@ -86,6 +86,14 @@ def print_debug_summary(*_args):
     return summary
 
 
+def replay_ticket_status_updates(*_args):
+    """Mark cached ticket statuses unseen, refetch, and show their tooltips."""
+    from TheKeyMachine.tools.bug_report import controller as bug_reporting
+
+    bug_reporting.reset_last_viewed_ticket_statuses()
+    return bug_reporting.refresh_sent_bug_report_statuses(force=True)
+
+
 _FLATTENABLE_SVG_TAGS = {"path", "rect", "circle", "ellipse", "line", "polygon", "polyline"}
 
 
@@ -589,6 +597,7 @@ def export_slider_button_icons(*_args):
 # must be callable and live in this module so reloading debug refreshes it.
 DEBUG_ACTIONS = {
     "Print Debug Summary": print_debug_summary,
+    "Replay Ticket Status Updates": replay_ticket_status_updates,
     "Export Slider Text Icons": export_slider_text_icons,
     "Export Slider Button Icons": export_slider_button_icons,
     "Export Selection Set Icons": export_selection_set_icons,

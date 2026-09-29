@@ -1011,11 +1011,16 @@ class _TooltipMouseFilter(QtCore.QObject):
 
     @staticmethod
     def _event_global_pos(event):
-        if hasattr(event, "globalPos"):
-            return event.globalPos()
-        if hasattr(event, "globalPosition"):
-            pos = event.globalPosition()
-            return QtCore.QPoint(int(pos.x()), int(pos.y()))
+        for method_name in ("globalPosition", "globalPos", "screenPos"):
+            method = getattr(event, method_name, None)
+            if not callable(method):
+                continue
+            pos = method()
+            to_point = getattr(pos, "toPoint", None)
+            if callable(to_point):
+                return to_point()
+            if pos is not None:
+                return QtCore.QPoint(int(pos.x()), int(pos.y()))
         return None
 
     @staticmethod

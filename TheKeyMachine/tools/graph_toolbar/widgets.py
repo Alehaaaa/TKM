@@ -325,7 +325,9 @@ def createCustomGraph(*_args, force: bool = False, _attempt: int = 0, **_kwargs)
         applyCustomGraphAlignment()
         return existing
 
-    graph_vis = cmds.getPanel(vis=True)
+    # Maya can return None while its panel UI is still initializing (notably
+    # during startup in Maya 2026), so normalize it before the membership test.
+    graph_vis = cmds.getPanel(vis=True) or []
     if "graphEditor1" not in graph_vis:
         if not force:
             return

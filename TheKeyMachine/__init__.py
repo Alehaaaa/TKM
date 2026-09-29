@@ -16,7 +16,7 @@ Modified by: Alehaaaa / alehaaaa.github.io
 
 """
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __stage__ = "beta"
 __build__ = "357"
 __codename__ = "Cortado"
