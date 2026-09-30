@@ -9,7 +9,7 @@
   let standardToolbarToolMap = new Map();
 
   async function loadStandardToolbarData() {
-    const response = await fetch('tools.json?v=1.0.1');
+    const response = await fetch('tools.json?v=1.0.2');
     if (!response.ok) throw new Error(`Unable to load tools.json (${response.status})`);
     const payload = await response.json();
     standardToolbarTools = Array.isArray(payload.tools) ? payload.tools : [];

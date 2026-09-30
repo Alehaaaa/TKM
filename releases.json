@@ -1,10 +1,43 @@
 {
-  "latest": "1.0.1",
+  "latest": "1.0.2",
   "generatedFrom": {
     "versionFile": "TheKeyMachine/version",
     "changelog": "TheKeyMachine/changelog"
   },
   "releases": [
+    {
+      "version": "1.0.2",
+      "tag": "TKM-1.0.2",
+      "publishedAt": "2026-09-30T17:38:45Z",
+      "publishedLabel": "September 30, 2026",
+      "hasRelease": true,
+      "url": "https://github.com/Alehaaaa/TKM/releases/tag/TKM-1.0.2",
+      "hasDownload": true,
+      "downloadUrl": "https://github.com/Alehaaaa/TKM/releases/download/TKM-1.0.2/TKM-1.0.2.zip",
+      "entries": [
+        {
+          "kind": "polish",
+          "label": "Polish",
+          "description": "Sent bug reports and suggestions show useful ticket status changes from the TKM menu"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Reload remains available after TheKeyMachine modules have been refreshed"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Tooltips handle Maya 2027 pointer events without coordinate type errors"
+        },
+        {
+          "kind": "bugfix",
+          "label": "Bugfix",
+          "description": "Graph Editor toolbar starts safely while Maya 2026 panels are still initializing"
+        }
+      ],
+      "compareUrl": "https://github.com/Alehaaaa/TKM/compare/TKM-1.0.1...TKM-1.0.2"
+    },
     {
       "version": "1.0.1",
       "tag": "TKM-1.0.1",
