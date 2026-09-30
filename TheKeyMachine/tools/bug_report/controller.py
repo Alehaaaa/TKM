@@ -591,6 +591,8 @@ def refresh_sent_bug_report_statuses(force=False):
                     tooltip,
                     duration=7000,
                     anchor_widget=_tkm_menu_anchor(),
+                    action_text="Open ticket",
+                    action_callback=partial(open_sent_bug_report, entry),
                 )
         except Exception as exc:
             print("[TheKeyMachine] Failed to show ticket update notification:", exc)
@@ -665,11 +667,17 @@ def refresh_sent_bug_report_statuses(force=False):
 
     worker.finished.connect(_clear_worker)
     _BUG_REPORT_STATUS_WORKER = worker
+    from . import tickets
+    worker.finished.connect(tickets._update_dialog)
     worker.start()
     return worker
 
 
 def refresh_sent_bug_report_statuses_on_launch():
+    from . import tickets
+
+    if tickets.is_enabled():
+        tickets.refresh()
     return refresh_sent_bug_report_statuses(force=True)
 
 
@@ -712,14 +720,19 @@ def open_issue(issue_number):
 
 
 def open_sent_bug_report(entry, *_args):
-    """Open a previously sent report's GitHub issue in the browser.
+    """Open a sent report in the manager in ticket debug mode, otherwise GitHub.
 
     Accepts and ignores any extra positional args -- menu actions built via
     ``addAction(label, callback=...)`` may invoke this through a shared
     runner that appends its own arguments (e.g. the QAction ``checked``
     state) after the ones already bound by ``partial()``.
     """
-    open_issue(entry.get("issue_number"))
+    from . import tickets
+
+    if tickets.is_enabled():
+        tickets.open_manager(entry.get("issue_number"))
+    else:
+        open_issue(entry.get("issue_number"))
 
 
 def _format_sent_report_label(entry):
@@ -773,6 +786,12 @@ def populate_bug_report_menu(menu):
         callback=dialog_tool.get("callback"),
         command_id="bug_report_open_dialog",
     )
+
+    from . import tickets
+
+    if tickets.is_enabled():
+        menu.addAction("Ticket Manager", callback=lambda *_: tickets.open_manager())
+        menu.addAction("Refetch Issues", callback=tickets.refresh)
 
     entries = list_sent_bug_reports()
     if not entries:

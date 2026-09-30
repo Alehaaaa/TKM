@@ -888,7 +888,7 @@ class QFlatTooltipConfirm(QFlatDialog):
 
 
 class QFlatAutoHideMessage(QFlatDialog):
-    """A borderless, buttonless notification popup -- the same dark rounded
+    """A borderless notification popup with an optional action -- the same dark rounded
     XML-tooltip look ``QFlatTooltipConfirm`` uses (arrow included, same
     ``paintEvent``/margin-reservation approach), minus its buttons (nothing
     to confirm): it just states its piece and closes itself after
@@ -907,7 +907,7 @@ class QFlatAutoHideMessage(QFlatDialog):
 
     _live_instances = []
 
-    def __init__(self, tooltip="", duration=5000, parent=None):
+    def __init__(self, tooltip="", duration=5000, parent=None, action_text=None, action_callback=None):
         QFlatDialog.__init__(self, parent=parent)
 
         # A timed message is persistent for the duration of its countdown.
@@ -942,6 +942,13 @@ class QFlatAutoHideMessage(QFlatDialog):
         self.root_layout.addWidget(self.bg_frame)
 
         self.bg_layout.addWidget(QFlatTooltipContent(tooltip, parent=self.bg_frame))
+        if action_text and action_callback:
+            action = QtWidgets.QPushButton(action_text, self.bg_frame)
+            def activate_action():
+                self.close()
+                action_callback()
+            action.clicked.connect(activate_action)
+            self.bg_layout.addWidget(action)
         self.bg_layout.addSpacing(DPI(12))
 
         radius = DPI(self.BORDER_RADIUS)
@@ -1021,7 +1028,7 @@ class QFlatAutoHideMessage(QFlatDialog):
         painter.drawPolygon(poly)
 
     @classmethod
-    def show_message(cls, tooltip, duration=5000, anchor_widget=None, parent=None):
+    def show_message(cls, tooltip, duration=5000, anchor_widget=None, parent=None, action_text=None, action_callback=None):
         """Build, position, show, and start counting down one of these --
         the usual entry point instead of the constructor.
 
@@ -1032,7 +1039,7 @@ class QFlatAutoHideMessage(QFlatDialog):
         below. Without one (or if it's gone/hidden by the time this
         fires), it falls back to centered near the top of the cursor's own
         screen, with no arrow (nothing to point at there)."""
-        msg = cls(tooltip=tooltip, duration=duration, parent=parent)
+        msg = cls(tooltip=tooltip, duration=duration, parent=parent, action_text=action_text, action_callback=action_callback)
         cls._live_instances.append(msg)
 
         if anchor_widget is not None and is_valid_widget(anchor_widget) and anchor_widget.isVisible():
